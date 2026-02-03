@@ -12,6 +12,7 @@
       - fd
       - jq
       - tree
+      - just
     state: present
 
 - name: Install base packages (Debian/Ubuntu)
@@ -41,3 +42,21 @@
     dest: /usr/bin/fd
     state: link
   ignore_errors: true
+
+- name: Check if just is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: just --version
+  register: just_check
+  changed_when: false
+  failed_when: false
+
+- name: Install just via official installer (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - just_check.rc != 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+  args:
+    creates: /usr/local/bin/just

@@ -32,7 +32,7 @@ This automatically:
 - `~/.claude/` - Claude Code settings
 
 ### Tools (via ansible)
-- **Base**: git, curl, ripgrep, fd, build tools
+- **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli
 

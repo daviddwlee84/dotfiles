@@ -54,3 +54,7 @@ This will prompt user to setup when they call `chezmoi init`
 And will update the `~/.config/chezmoi/chezmoi.toml` file accordingly.
 
 (or we can just use `chezmoi edit-config` to change the config without using chezmoi interactive prompts)
+
+---
+
+(After setup CLAUDE.md I mostly ask it to update, so please checkout [`.specstory/history/`](../../.specstory/history/) instead)

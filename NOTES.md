@@ -39,6 +39,10 @@ chezmoi init git@github.com:daviddwlee84/dotfiles.git
 - "tags" for different profile
 - Compare different alternatives
 - separate different function in different shell script (and source them in the rc file)
+- Install `just`
+  - Use package manager for each platform [Packages - Just Programmer's Manual](https://just.systems/man/en/packages.html)
+  - Maybe use the `https://just.systems/install.sh` installation script and set the target location to `~/.local/bin/just`?
+  - If without "sudo" permission, can we install to user-space?!
 
 advanced
 
