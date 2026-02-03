@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Read JSON from stdin
+json="$(cat)"
+
+# Parse fields
+event="$(echo "$json" | jq -r '.hook_event_name // "unknown"')"
+title="$(echo "$json" | jq -r '.title // "Claude Code"')"
+msg="$(echo "$json" | jq -r '.message // empty')"
+ntype="$(echo "$json" | jq -r '.notification_type // empty')"
+
+# Handle Stop event (no message/title in payload)
+if [[ "$event" == "Stop" ]]; then
+  title="Claude Code"
+  msg="Task finished"
+fi
+
+# Build subtitle if notification_type exists
+subtitle=""
+[[ -n "$ntype" ]] && subtitle="[$ntype]"
+
+# Send notification based on OS
+{{- if eq .chezmoi.os "darwin" }}
+terminal-notifier -title "$title" -subtitle "$subtitle" -message "$msg" -sound default
+{{- else if eq .chezmoi.os "linux" }}
+notify-send "$title${subtitle:+ $subtitle}" "$msg"
+{{- end }}
+
+# Optional: Also send via apprise if configured
+if [[ -n "${APPRISE_URLS:-}" ]]; then
+  apprise -t "${title}${subtitle:+ $subtitle}" -b "$msg" "$APPRISE_URLS" 2>/dev/null || true
+fi
