@@ -12,3 +12,5 @@ README.md
 backups/   # ignore the backups folder, but not its contents
 backups/** # ignore the contents of backups folder but not the folder itself
 
+docs/** # ignore everything in docs/ and its subdirectories
+
