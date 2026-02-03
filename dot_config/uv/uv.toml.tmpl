@@ -3,5 +3,13 @@
 {{- if .useChineseMirror }}
 # Use Tsinghua PyPI mirror for faster downloads in China
 # https://mirrors.tuna.tsinghua.edu.cn/help/pypi/
+
+# Modern syntax for uv sync, uv lock, uv add, etc.
+[[index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+# Legacy pip-compatible syntax for uv pip commands
+[pip]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 {{- end }}
