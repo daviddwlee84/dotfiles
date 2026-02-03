@@ -72,6 +72,15 @@ chezmoi-status:
 chezmoi-reinit:
     chezmoi init
 
+# Clear run_once script state (allows re-running run_once scripts)
+chezmoi-clear-scripts:
+    chezmoi state delete-bucket --bucket=scriptState
+
+# Clear script state and re-apply (for testing run_once scripts)
+chezmoi-rerun-scripts:
+    chezmoi state delete-bucket --bucket=scriptState
+    chezmoi apply -v
+
 # ============================================================================
 # Ansible
 # ============================================================================
