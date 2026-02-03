@@ -1,0 +1,7 @@
+# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+
+[data]
+# 只在 init 才需要問一次：你之後都讀這個值
+# 這裡用 promptString：沒有值就會問使用者，輸入後寫進 config
+profile = {{ promptString "profile (ubuntu_server|ubuntu_desktop|macos)" "ubuntu_desktop" | quote }}
+

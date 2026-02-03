@@ -30,6 +30,8 @@ brew install chezmoi age
 - environment variables for API keys (encrypt)
 - improve ~/.zshrc that check command first (if/exists guard)
 - "tags" for different profile
+- Compare different alternatives
+- separate different function in different shell script (and source them in the rc file)
 
 advanced
 
@@ -43,3 +45,15 @@ advanced
 
 - [nl-scripts/dev-bootstrap at main · daviddwlee84/nl-scripts](https://github.com/daviddwlee84/nl-scripts/tree/main/dev-bootstrap) - add `chezmoi` script
 - [daviddwlee84/DevEnvPack: Bring my development environment everywhere. vim, tmux, bash, zsh, VSCode, docker, and so on.](https://github.com/daviddwlee84/DevEnvPack)
+
+Examples
+
+- [omerxx/dotfiles: My dotfiles synced from localhost and remote machines](https://github.com/omerxx/dotfiles)
+- [logandonley/dotfiles](https://github.com/logandonley/dotfiles)
+  - [The ultimate dotfiles setup](https://www.youtube.com/watch?v=-RkANM9FfTM): chezmoi + ansible
+- [bartekspitza/dotfiles](https://github.com/bartekspitza/dotfiles)
+  - [Solving the Dotfiles Problem (And Learning Bash)](https://www.youtube.com/watch?v=mSXOYhfDFYo)
+
+---
+
+- [Why I'm Ditching Nix Home Manager - And What I'm Using Instead](https://www.youtube.com/watch?v=U6reJVR3FfA) (from Nix to GNU Stow)

@@ -1,6 +1,8 @@
 # https://www.chezmoi.io/reference/special-files/chezmoiignore/
 # chezmoi managed | grep -n 'README' || true
 README.md
+CLAUDE.md
+AGENTS.md
 
 *.txt   # ignore *.txt in the target directory
 */*.txt # ignore *.txt in subdirectories of the target directory
