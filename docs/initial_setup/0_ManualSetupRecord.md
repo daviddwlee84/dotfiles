@@ -52,3 +52,5 @@ Add `.chezmoi.toml.tmpl` ([`.chezmoi.<format>.tmpl - chezmoi`](https://www.chezm
 
 This will prompt user to setup when they call `chezmoi init`
 And will update the `~/.config/chezmoi/chezmoi.toml` file accordingly.
+
+(or we can just use `chezmoi edit-config` to change the config without using chezmoi interactive prompts)

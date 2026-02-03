@@ -43,6 +43,7 @@ advanced
 - ssh keys
 - platform difference (cuda, mac)
 - CLI tools?! -> run_once_*.sh
+- Inside GFW then use different profile (sync proxy settings like for docker?!)
 
 ## Resources
 
@@ -59,9 +60,13 @@ Examples
 
 ```bash
 docker run --rm -it ubuntu:latest bash
-apt update -y && apt install curl -y
 export GITHUB_USERNAME=logandonley
+# NOTE: if you prefer to use the system package manager to install chezmoi, then don't use this script
+apt update -y && apt install curl -y
 sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
+# or wget
+apt update -y && apt install wget -y
+sh -c "$(wget -qO- https://get.chezmoi.io)" -- init --apply "$GITHUB_USERNAME"
 ```
 
 ---
