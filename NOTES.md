@@ -30,9 +30,10 @@ chezmoi init git@github.com:daviddwlee84/dotfiles.git
 ## Todo
 
 - oh-my-zsh
-- NeoVim + LazyVim
+- [x] NeoVim + LazyVim
 - LazyGit, ...?
 - Tmux / Zellij
+- alacritty.toml
 - environment variables for API keys (encrypt)
 - improve ~/.zshrc that check command first (if/exists guard)
 - "tags" for different profile
@@ -54,6 +55,11 @@ advanced
 - Coding Agents global config
   - Claude Code notification hook - [Hooks reference - Claude Code Docs](https://code.claude.com/docs/en/hooks#notification)
     - hooks for different matcher for notification?! (permission_prompt, idle_prompt, auth_success, elicitation_dialog)
+- Install docker
+  - with convenience script: `curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh ./get-docker.sh --dry-run`
+  - macOS maybe use OrbStack?!
+  - setup for non-root user [Post-installation steps | Docker Docs](https://docs.docker.com/engine/install/linux-postinstall/)
+  - use Ansible to maintain?!
 
 ## Resources
 

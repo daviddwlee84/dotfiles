@@ -1,0 +1,89 @@
+# Docker Compose for dotfiles testing and development
+#
+# Usage:
+#   docker compose up -d devbox && docker compose exec devbox bash
+#   docker compose --profile desktop up -d
+#   docker compose --profile china up -d
+#   docker compose run --rm test
+
+services:
+  # Default devbox with ubuntu_server profile
+  devbox:
+    build:
+      context: .
+      args:
+        CHEZMOI_PROFILE: ubuntu_server
+        CHEZMOI_EMAIL: docker@example.com
+        CHEZMOI_NAME: Docker User
+        CHEZMOI_USE_CHINESE_MIRROR: "false"
+    image: dotfiles:server
+    container_name: dotfiles-devbox
+    stdin_open: true
+    tty: true
+    volumes:
+      - workspace:/home/devuser/workspace
+
+  # Ubuntu desktop profile (GUI dependencies)
+  desktop:
+    build:
+      context: .
+      args:
+        CHEZMOI_PROFILE: ubuntu_desktop
+        CHEZMOI_EMAIL: docker@example.com
+        CHEZMOI_NAME: Docker User
+        CHEZMOI_USE_CHINESE_MIRROR: "false"
+    image: dotfiles:desktop
+    container_name: dotfiles-desktop
+    stdin_open: true
+    tty: true
+    profiles:
+      - desktop
+
+  # China mirror profile (behind GFW)
+  china:
+    build:
+      context: .
+      args:
+        CHEZMOI_PROFILE: ubuntu_server
+        CHEZMOI_EMAIL: docker@example.com
+        CHEZMOI_NAME: Docker User
+        CHEZMOI_USE_CHINESE_MIRROR: "true"
+    image: dotfiles:china
+    container_name: dotfiles-china
+    stdin_open: true
+    tty: true
+    profiles:
+      - china
+
+  # Quick validation service (runs and exits)
+  test:
+    build:
+      context: .
+      args:
+        CHEZMOI_PROFILE: ubuntu_server
+    image: dotfiles:test
+    container_name: dotfiles-test
+    command: |
+      bash -c '
+        echo "=== Dotfiles Test Suite ==="
+        echo ""
+        echo "Checking installed tools..."
+        echo -n "git: "; git --version || echo "MISSING"
+        echo -n "nvim: "; nvim --version | head -1 || echo "MISSING"
+        echo -n "rg: "; rg --version | head -1 || echo "MISSING"
+        echo -n "fd: "; fd --version || echo "MISSING"
+        echo -n "fzf: "; fzf --version || echo "MISSING"
+        echo -n "lazygit: "; lazygit --version || echo "MISSING"
+        echo ""
+        echo "Checking config files..."
+        [ -f ~/.gitconfig ] && echo "~/.gitconfig: OK" || echo "~/.gitconfig: MISSING"
+        [ -d ~/.config/nvim ] && echo "~/.config/nvim/: OK" || echo "~/.config/nvim/: MISSING"
+        [ -f ~/.config/uv/uv.toml ] && echo "~/.config/uv/uv.toml: OK" || echo "~/.config/uv/uv.toml: MISSING"
+        echo ""
+        echo "=== Test Complete ==="
+      '
+    profiles:
+      - test
+
+volumes:
+  workspace:

@@ -55,6 +55,34 @@ chezmoi cd            # Go to source directory
 cd ~/.ansible && ansible-playbook playbooks/macos.yml
 ```
 
+## Docker Testing
+
+Test the full dotfiles setup on a bare Ubuntu machine:
+
+```bash
+# Build and run test suite
+just docker-test
+
+# Interactive devbox shell
+just docker-run
+
+# Build specific profiles
+just docker-desktop    # Ubuntu desktop profile
+just docker-china      # China mirror profile
+```
+
+## Development with justfile
+
+This project uses [just](https://github.com/casey/just) as a command runner:
+
+```bash
+just                  # List all commands
+just lint             # Ansible syntax check
+just check            # Full lint + dry-run
+just docker-build     # Build Docker image
+just info             # Show system info
+```
+
 ## Customization
 
 See [CLAUDE.md](CLAUDE.md) for development guide and [docs/ansible.md](docs/ansible.md) for ansible customization.

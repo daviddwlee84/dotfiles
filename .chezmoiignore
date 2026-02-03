@@ -6,6 +6,12 @@ NOTES.md
 CLAUDE.md
 AGENTS.md
 
+# Docker and development files
+Dockerfile
+docker-compose.yml
+justfile
+.dockerignore
+
 *.txt   # ignore *.txt in the target directory
 */*.txt # ignore *.txt in subdirectories of the target directory
         # but not in subdirectories of subdirectories;

@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Claude/AI
+.claude/
+.specstory/
+
+# Chezmoi internals (not needed in container)
+.chezmoiroot
+.chezmoiversion
+
+# Local development
+*.local
+*.bak
