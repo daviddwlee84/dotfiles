@@ -2,7 +2,7 @@
 # Base role - essential tools across platforms
 
 - name: Install base packages (macOS)
-  when: ansible_os_family == "Darwin"
+  when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name:
       - git
@@ -15,7 +15,7 @@
     state: present
 
 - name: Install base packages (Debian/Ubuntu)
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -33,7 +33,7 @@
     cache_valid_time: 3600
 
 - name: Create fd symlink on Debian/Ubuntu
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.file:

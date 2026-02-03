@@ -3,7 +3,7 @@
 
 # macOS - all via Homebrew
 - name: Install LazyVim dependencies (macOS)
-  when: ansible_os_family == "Darwin"
+  when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name:
       - fzf
@@ -14,7 +14,7 @@
 
 # Linux - mixed sources
 - name: Install LazyVim dependencies from apt (Debian/Ubuntu)
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -25,7 +25,7 @@
     state: present
 
 - name: Install lazygit (Debian/Ubuntu)
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   block:
@@ -42,7 +42,7 @@
       ignore_errors: true
 
 - name: Install tree-sitter-cli via npm
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   community.general.npm:

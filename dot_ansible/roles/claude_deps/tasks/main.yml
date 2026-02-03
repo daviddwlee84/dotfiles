@@ -4,14 +4,14 @@
 
 # macOS - terminal-notifier
 - name: Install terminal-notifier (macOS)
-  when: ansible_os_family == "Darwin"
+  when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name: terminal-notifier
     state: present
 
 # Linux - libnotify-bin (provides notify-send)
 - name: Install libnotify-bin (Debian/Ubuntu)
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:

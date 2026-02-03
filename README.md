@@ -48,6 +48,12 @@ advanced
 - CLI tools?! -> run_once_*.sh
 - Inside GFW then use different profile (sync proxy settings like for docker?!)
 - Improve [`.ansible.cfg`](https://gist.github.com/wbcurry/f38bc6d8d1ee4a70ee2c)
+- Agent Skills
+  - Ansible
+    - [sigridjineth/hello-ansible-skills: Ansible automation skills for Claude Code: playbook development, debugging, shell conversion, and interactive workflows.](https://github.com/sigridjineth/hello-ansible-skills)
+- Coding Agents global config
+  - Claude Code notification hook - [Hooks reference - Claude Code Docs](https://code.claude.com/docs/en/hooks#notification)
+    - hooks for different matcher for notification?! (permission_prompt, idle_prompt, auth_success, elicitation_dialog)
 
 ## Resources
 
@@ -71,6 +77,15 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
 # or wget
 apt update -y && apt install wget -y
 sh -c "$(wget -qO- https://get.chezmoi.io)" -- init --apply "$GITHUB_USERNAME"
+```
+
+```bash
+# To test, you can run:
+chezmoi state delete-bucket --bucket=scriptState  # Clear script state to re-run
+chezmoi apply -v
+```
+
+```
 ```
 
 ---

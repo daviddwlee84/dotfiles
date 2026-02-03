@@ -17,14 +17,14 @@
 
 # macOS - use Homebrew
 - name: Install Neovim (macOS)
-  when: ansible_os_family == "Darwin"
+  when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name: neovim
     state: latest
 
 # Linux - try apt first, then snap
 - name: Install Neovim from apt (Debian/Ubuntu)
-  when: ansible_os_family == "Debian"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -33,7 +33,7 @@
   register: apt_neovim
 
 - name: Check Neovim version after apt install
-  when: ansible_os_family == "Debian" and apt_neovim is succeeded
+  when: ansible_facts["os_family"] == "Debian" and apt_neovim is succeeded
   ansible.builtin.shell: nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
   register: nvim_apt_version
   changed_when: false
@@ -41,7 +41,7 @@
 
 - name: Install Neovim from snap if apt version too old
   when:
-    - ansible_os_family == "Debian"
+    - ansible_facts["os_family"] == "Debian"
     - nvim_apt_version.stdout is defined
     - nvim_apt_version.stdout is version(neovim_min_version, '<')
   become: true
