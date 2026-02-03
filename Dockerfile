@@ -14,6 +14,31 @@ ARG CHEZMOI_REPO=daviddwlee84
 # Avoid interactive prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Configure TUNA mirror for faster downloads in China (if enabled)
+# Ubuntu 24.04 uses DEB822 format in /etc/apt/sources.list.d/ubuntu.sources
+# Handles both amd64 (ubuntu) and arm64 (ubuntu-ports)
+RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
+        ARCH=$(dpkg --print-architecture) && \
+        if [ "$ARCH" = "amd64" ]; then \
+            MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"; \
+        else \
+            MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"; \
+        fi && \
+        printf '%s\n' \
+            "Types: deb" \
+            "URIs: ${MIRROR_URL}" \
+            "Suites: noble noble-updates noble-backports" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+            "" \
+            "Types: deb" \
+            "URIs: ${MIRROR_URL}" \
+            "Suites: noble-security" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+            > /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
 # Install minimal dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \

@@ -61,6 +61,8 @@ services:
       context: .
       args:
         CHEZMOI_PROFILE: ubuntu_server
+        # currently we are testing in GFW
+        CHEZMOI_USE_CHINESE_MIRROR: "true"
     image: dotfiles:test
     container_name: dotfiles-test
     command: |
