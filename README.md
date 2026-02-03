@@ -85,7 +85,10 @@ chezmoi state delete-bucket --bucket=scriptState  # Clear script state to re-run
 chezmoi apply -v
 ```
 
-```
+```bash
+# Test Claude Code notification hook
+echo '{"hook_event_name":"Stop"}' | ~/.claude/hooks/notify.sh
+echo '{"hook_event_name":"Notification","title":"Test Title","message":"Test message","notification_type":"info"}' | ~/.claude/hooks/notify.sh
 ```
 
 ---
