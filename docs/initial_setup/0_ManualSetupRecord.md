@@ -47,3 +47,8 @@ Add [`.chezmoiignore`](https://www.chezmoi.io/reference/special-files/chezmoiign
 ```
 EDITOR=nvim chezmoi edit
 ```
+
+Add `.chezmoi.toml.tmpl` ([`.chezmoi.<format>.tmpl - chezmoi`](https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/))
+
+This will prompt user to setup when they call `chezmoi init`
+And will update the `~/.config/chezmoi/chezmoi.toml` file accordingly.

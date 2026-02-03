@@ -10,6 +10,9 @@ Currently, I use [`chezmoi`](https://www.chezmoi.io/) as the management tool.
 
 ```bash
 brew install chezmoi age
+
+chezmoi init git@github.com:daviddwlee84/dotfiles.git
+
 ```
 
 ### Ubuntu
@@ -53,6 +56,13 @@ Examples
   - [The ultimate dotfiles setup](https://www.youtube.com/watch?v=-RkANM9FfTM): chezmoi + ansible
 - [bartekspitza/dotfiles](https://github.com/bartekspitza/dotfiles)
   - [Solving the Dotfiles Problem (And Learning Bash)](https://www.youtube.com/watch?v=mSXOYhfDFYo)
+
+```bash
+docker run --rm -it ubuntu:latest bash
+apt update -y && apt install curl -y
+export GITHUB_USERNAME=logandonley
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
+```
 
 ---
 
