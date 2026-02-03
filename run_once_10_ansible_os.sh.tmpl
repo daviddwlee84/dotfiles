@@ -3,11 +3,34 @@
 
 set -e
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 ANSIBLE_DIR="$HOME/.ansible"
 INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
 
 if ! command -v ansible-playbook &> /dev/null; then
-    echo "ansible-playbook not found, skipping OS setup"
+    warn "ansible-playbook not found, skipping OS setup"
     exit 0
 fi
 
@@ -16,14 +39,15 @@ PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 {{ else if eq .chezmoi.os "linux" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 {{ else -}}
-echo "Unsupported OS: {{ .chezmoi.os }}"
+warn "Unsupported OS: {{ .chezmoi.os }}"
 exit 0
 {{ end -}}
 
 if [[ ! -f "$PLAYBOOK" ]]; then
-    echo "Playbook not found: $PLAYBOOK"
+    warn "Playbook not found: $PLAYBOOK"
     exit 0
 fi
 
-echo "Running OS-specific ansible playbook..."
+info "Running OS-specific ansible playbook..."
 ansible-playbook -i "$INVENTORY" "$PLAYBOOK"
+success "OS-specific ansible playbook completed!"

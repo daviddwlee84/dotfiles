@@ -1,0 +1,25 @@
+---
+# Claude Code hooks dependencies
+# Provides notification tools for Claude hooks
+
+# macOS - terminal-notifier
+- name: Install terminal-notifier (macOS)
+  when: ansible_os_family == "Darwin"
+  community.general.homebrew:
+    name: terminal-notifier
+    state: present
+
+# Linux - libnotify-bin (provides notify-send)
+- name: Install libnotify-bin (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: libnotify-bin
+    state: present
+
+# Cross-platform - apprise via uv
+- name: Install apprise via uv
+  ansible.builtin.command: uv tool install apprise
+  args:
+    creates: "{{ ansible_env.HOME }}/.local/bin/apprise"

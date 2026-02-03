@@ -16,3 +16,6 @@
 
     - role: lazyvim_deps
       tags: [lazyvim_deps]
+
+    - role: claude_deps
+      tags: [claude_deps]
