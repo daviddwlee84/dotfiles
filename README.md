@@ -9,7 +9,10 @@ Currently, I use [`chezmoi`](https://www.chezmoi.io/) as the management tool.
 ### MacOS
 
 ```bash
+# TODO: eventually we don't these "manual" steps
 brew install chezmoi age
+uv tool install ansible-core    # Installs all ansible executables
+ansible-galaxy collection install community.general  # For homebrew module
 
 chezmoi init git@github.com:daviddwlee84/dotfiles.git
 
@@ -44,6 +47,7 @@ advanced
 - platform difference (cuda, mac)
 - CLI tools?! -> run_once_*.sh
 - Inside GFW then use different profile (sync proxy settings like for docker?!)
+- Improve [`.ansible.cfg`](https://gist.github.com/wbcurry/f38bc6d8d1ee4a70ee2c)
 
 ## Resources
 

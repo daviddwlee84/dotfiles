@@ -5,11 +5,15 @@ Cross-platform dotfiles management using **chezmoi** for configuration files and
 ## Quick Start
 
 ```bash
+# Install ansible (if not already installed)
+uv tool install ansible-core
+ansible-galaxy collection install community.general
+
 # Apply dotfiles
 chezmoi apply
 
-# Run ansible manually (after chezmoi deploys ~/.ansible)
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml
+# Run ansible manually (from ~/.ansible directory)
+cd ~/.ansible && ansible-playbook playbooks/macos.yml
 ```
 
 ## Architecture
@@ -33,18 +37,25 @@ chezmoi cd                # Go to source directory
 
 ## Ansible Usage
 
+Run from `~/.ansible/` directory:
+
 ```bash
-# Full setup
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml
+cd ~/.ansible
+
+# Full setup (macOS)
+ansible-playbook playbooks/macos.yml
+
+# Full setup (Linux)
+ansible-playbook playbooks/linux.yml
 
 # Specific tags only
-ansible-playbook ... --tags "neovim,lazyvim_deps"
+ansible-playbook playbooks/macos.yml --tags "neovim,lazyvim_deps"
 
 # Skip tags requiring sudo
-ansible-playbook ... --skip-tags "sudo"
+ansible-playbook playbooks/linux.yml --skip-tags "sudo"
 
 # Dry run
-ansible-playbook ... --check
+ansible-playbook playbooks/macos.yml --check
 ```
 
 ### Available Tags
@@ -77,6 +88,16 @@ ansible-playbook ... --check
 After `chezmoi apply`:
 - Config files in `~/.*`
 - Ansible playbooks in `~/.ansible/`
+
+## Development
+
+After modifying ansible playbooks or roles, run syntax check:
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/base.yml
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
+```
 
 ## Customization
 

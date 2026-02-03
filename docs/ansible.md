@@ -8,6 +8,7 @@ After `chezmoi apply`, ansible files are deployed to `~/.ansible/`:
 
 ```
 ~/.ansible/
+├── ansible.cfg            # Ansible configuration (sets roles_path, inventory)
 ├── inventories/
 │   └── localhost.ini      # Local inventory
 ├── playbooks/
@@ -21,43 +22,61 @@ After `chezmoi apply`, ansible files are deployed to `~/.ansible/`:
     └── lazyvim_deps/      # fzf, lazygit, tree-sitter-cli
 ```
 
+## Prerequisites
+
+Install ansible and required collections:
+
+```bash
+# Install ansible with uv
+uv tool install ansible-core
+
+# Install community.general collection (for homebrew module)
+ansible-galaxy collection install community.general
+```
+
 ## Running Playbooks
+
+Run from `~/.ansible/` directory (ansible.cfg sets inventory and roles_path automatically):
 
 ### Full Setup
 
 ```bash
+cd ~/.ansible
+
 # macOS
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml
+ansible-playbook playbooks/macos.yml
 
 # Linux
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/linux.yml
+ansible-playbook playbooks/linux.yml
 ```
 
 ### Specific Tags
 
 ```bash
+cd ~/.ansible
+
 # Only install neovim
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml --tags neovim
+ansible-playbook playbooks/macos.yml --tags neovim
 
 # Install neovim and its dependencies
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml --tags "neovim,lazyvim_deps"
+ansible-playbook playbooks/macos.yml --tags "neovim,lazyvim_deps"
 ```
 
 ### Skip Tags
 
 ```bash
 # Skip tasks requiring sudo (for non-admin users)
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/linux.yml --skip-tags sudo
+ansible-playbook playbooks/linux.yml --skip-tags sudo
 ```
 
 ### Dry Run
 
 ```bash
 # Check what would change without applying
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml --check
+ansible-playbook playbooks/macos.yml --check
 
 # Verbose output
-ansible-playbook -i ~/.ansible/inventories/localhost.ini ~/.ansible/playbooks/macos.yml --check -v
+ansible-playbook playbooks/macos.yml --check -v
 ```
 
 ## Available Tags
