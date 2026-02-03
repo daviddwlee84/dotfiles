@@ -2,6 +2,17 @@
 
 Cross-platform dotfiles management using **chezmoi** for configuration files and **ansible** for system dependencies.
 
+## Maintaining README.md
+
+**IMPORTANT**: When adding or modifying configurations, update `README.md` to reflect changes:
+
+- **New config files**: Add to "What You Get > Config Files" section
+- **New ansible roles/tools**: Add to "What You Get > Tools" section
+- **New platforms**: Add to "Supported Platforms" table
+- **Changed setup steps**: Update "Quick Setup" section
+
+Keep README.md concise and user-focused. Technical details belong in CLAUDE.md or docs/.
+
 ## Quick Start
 
 ```bash
