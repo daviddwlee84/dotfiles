@@ -1,0 +1,4 @@
+---
+# LazyVim dependencies defaults
+
+lazyvim_nodejs_version: "lts"

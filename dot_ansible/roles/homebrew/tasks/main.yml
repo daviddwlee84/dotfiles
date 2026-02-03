@@ -1,0 +1,31 @@
+---
+# Homebrew role - macOS package manager
+
+- name: Check if Homebrew is installed
+  ansible.builtin.stat:
+    path: /opt/homebrew/bin/brew
+  register: homebrew_arm
+
+- name: Check if Homebrew is installed (Intel)
+  ansible.builtin.stat:
+    path: /usr/local/bin/brew
+  register: homebrew_intel
+
+- name: Set Homebrew installed fact
+  ansible.builtin.set_fact:
+    homebrew_installed: "{{ homebrew_arm.stat.exists or homebrew_intel.stat.exists }}"
+
+- name: Install Homebrew
+  when: not homebrew_installed
+  ansible.builtin.shell: |
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  args:
+    creates: /opt/homebrew/bin/brew
+  environment:
+    NONINTERACTIVE: "1"
+
+- name: Update Homebrew
+  when: homebrew_installed
+  community.general.homebrew:
+    update_homebrew: true
+  ignore_errors: true

@@ -1,0 +1,9 @@
+---
+# Base playbook - cross-platform essentials
+- name: Base setup
+  hosts: local
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags: [base]

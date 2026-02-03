@@ -1,0 +1,23 @@
+#!/bin/bash
+# Run base ansible playbook (cross-platform essentials)
+
+set -e
+
+ANSIBLE_DIR="$HOME/.ansible"
+INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+PLAYBOOK="$ANSIBLE_DIR/playbooks/base.yml"
+
+if ! command -v ansible-playbook &> /dev/null; then
+    echo "ansible-playbook not found, skipping base setup"
+    echo "Install ansible first: pip install ansible"
+    exit 0
+fi
+
+if [[ ! -f "$PLAYBOOK" ]]; then
+    echo "Playbook not found: $PLAYBOOK"
+    echo "Run 'chezmoi apply' first to deploy ansible files"
+    exit 0
+fi
+
+echo "Running base ansible playbook..."
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK"

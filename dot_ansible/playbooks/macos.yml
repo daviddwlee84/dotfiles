@@ -1,0 +1,18 @@
+---
+# macOS playbook - Homebrew-based setup
+- name: macOS setup
+  hosts: local
+  gather_facts: true
+
+  roles:
+    - role: homebrew
+      tags: [homebrew]
+
+    - role: base
+      tags: [base]
+
+    - role: neovim
+      tags: [neovim]
+
+    - role: lazyvim_deps
+      tags: [lazyvim_deps]

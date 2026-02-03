@@ -1,0 +1,52 @@
+---
+# LazyVim dependencies role
+
+# macOS - all via Homebrew
+- name: Install LazyVim dependencies (macOS)
+  when: ansible_os_family == "Darwin"
+  community.general.homebrew:
+    name:
+      - fzf
+      - lazygit
+      - tree-sitter
+      - node
+    state: present
+
+# Linux - mixed sources
+- name: Install LazyVim dependencies from apt (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - fzf
+      - nodejs
+      - npm
+    state: present
+
+- name: Install lazygit (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  block:
+    - name: Add lazygit PPA
+      ansible.builtin.apt_repository:
+        repo: ppa:lazygit-team/release
+        state: present
+      ignore_errors: true
+
+    - name: Install lazygit from apt
+      ansible.builtin.apt:
+        name: lazygit
+        state: present
+      ignore_errors: true
+
+- name: Install tree-sitter-cli via npm
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  community.general.npm:
+    name: tree-sitter-cli
+    global: true
+    state: present
+  ignore_errors: true

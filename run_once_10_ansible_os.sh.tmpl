@@ -1,0 +1,29 @@
+#!/bin/bash
+# Run OS-specific ansible playbook
+
+set -e
+
+ANSIBLE_DIR="$HOME/.ansible"
+INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+
+if ! command -v ansible-playbook &> /dev/null; then
+    echo "ansible-playbook not found, skipping OS setup"
+    exit 0
+fi
+
+{{ if eq .chezmoi.os "darwin" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+{{ else if eq .chezmoi.os "linux" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+{{ else -}}
+echo "Unsupported OS: {{ .chezmoi.os }}"
+exit 0
+{{ end -}}
+
+if [[ ! -f "$PLAYBOOK" ]]; then
+    echo "Playbook not found: $PLAYBOOK"
+    exit 0
+fi
+
+echo "Running OS-specific ansible playbook..."
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK"

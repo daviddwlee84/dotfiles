@@ -1,0 +1,43 @@
+---
+# Base role - essential tools across platforms
+
+- name: Install base packages (macOS)
+  when: ansible_os_family == "Darwin"
+  community.general.homebrew:
+    name:
+      - git
+      - curl
+      - wget
+      - ripgrep
+      - fd
+      - jq
+      - tree
+    state: present
+
+- name: Install base packages (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - wget
+      - ripgrep
+      - fd-find
+      - jq
+      - tree
+      - build-essential
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create fd symlink on Debian/Ubuntu
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.file:
+    src: /usr/bin/fdfind
+    dest: /usr/bin/fd
+    state: link
+  ignore_errors: true

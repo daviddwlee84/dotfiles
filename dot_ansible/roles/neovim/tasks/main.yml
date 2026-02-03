@@ -1,0 +1,59 @@
+---
+# Neovim role - install Neovim with version check
+
+- name: Check current Neovim version
+  ansible.builtin.shell: nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
+  register: nvim_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set Neovim version fact
+  ansible.builtin.set_fact:
+    nvim_current_version: "{{ nvim_version_check.stdout | default('0.0.0') }}"
+
+- name: Display current Neovim version
+  ansible.builtin.debug:
+    msg: "Current Neovim version: {{ nvim_current_version }} (required: >= {{ neovim_min_version }})"
+
+# macOS - use Homebrew
+- name: Install Neovim (macOS)
+  when: ansible_os_family == "Darwin"
+  community.general.homebrew:
+    name: neovim
+    state: latest
+
+# Linux - try apt first, then snap
+- name: Install Neovim from apt (Debian/Ubuntu)
+  when: ansible_os_family == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: neovim
+    state: present
+  register: apt_neovim
+
+- name: Check Neovim version after apt install
+  when: ansible_os_family == "Debian" and apt_neovim is succeeded
+  ansible.builtin.shell: nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
+  register: nvim_apt_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Neovim from snap if apt version too old
+  when:
+    - ansible_os_family == "Debian"
+    - nvim_apt_version.stdout is defined
+    - nvim_apt_version.stdout is version(neovim_min_version, '<')
+  become: true
+  tags: [sudo]
+  block:
+    - name: Remove apt Neovim
+      ansible.builtin.apt:
+        name: neovim
+        state: absent
+
+    - name: Install Neovim from snap
+      community.general.snap:
+        name: nvim
+        classic: true
+        state: present

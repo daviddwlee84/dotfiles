@@ -1,0 +1,4 @@
+---
+# Neovim role defaults
+
+neovim_min_version: "0.11.2"

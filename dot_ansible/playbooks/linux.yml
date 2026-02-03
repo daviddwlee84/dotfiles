@@ -1,0 +1,15 @@
+---
+# Linux playbook - Ubuntu/Debian setup
+- name: Linux setup
+  hosts: local
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags: [base]
+
+    - role: neovim
+      tags: [neovim]
+
+    - role: lazyvim_deps
+      tags: [lazyvim_deps]
