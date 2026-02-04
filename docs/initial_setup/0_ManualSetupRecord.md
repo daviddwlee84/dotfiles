@@ -71,3 +71,6 @@ We better make it clean <https://github.com/ohmyzsh/ohmyzsh/blob/master/template
 
 - [Use alt-f and alt-b to jump forward and backward in command line on macOS](https://gist.github.com/windsting/d21a07b236acf243c8ebbfe7302765ef)
 - [macOS: alt/option key as meta · Issue #7966 · alacritty/alacritty](https://github.com/alacritty/alacritty/issues/7966)
+
+- [交互模式 - Claude Code Docs](https://code.claude.com/docs/zh-CN/interactive-mode)
+- [优化您的终端设置 - Claude Code Docs](https://code.claude.com/docs/zh-CN/terminal-config)
