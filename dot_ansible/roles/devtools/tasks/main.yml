@@ -62,7 +62,7 @@
   ansible.builtin.shell: |
     curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
   args:
-    creates: "{{ ansible_env.HOME }}/.local/bin/zoxide"
+    creates: "{{ ansible_facts.env.HOME }}/.local/bin/zoxide"
 
 # --- eza ---
 - name: Check if eza is installed
@@ -306,12 +306,24 @@
 
 - name: Check if TPM is installed
   ansible.builtin.stat:
-    path: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
+    path: "{{ ansible_facts.env.HOME }}/.tmux/plugins/tpm"
   register: tpm_check
 
 - name: Install TPM (Tmux Plugin Manager)
   when: not tpm_check.stat.exists
   ansible.builtin.git:
     repo: https://github.com/tmux-plugins/tpm
-    dest: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
+    dest: "{{ ansible_facts.env.HOME }}/.tmux/plugins/tpm"
     depth: 1
+  register: tpm_installed
+
+- name: Install tmux plugins via TPM
+  when: tpm_installed.changed | default(false)
+  ansible.builtin.shell: |
+    # Source config to set TMUX_PLUGIN_MANAGER_PATH (works with running server)
+    tmux source-file {{ ansible_facts.env.HOME }}/.tmux.conf
+    # Now install plugins
+    {{ ansible_facts.env.HOME }}/.tmux/plugins/tpm/bin/install_plugins
+  args:
+    executable: /bin/bash
+  changed_when: true

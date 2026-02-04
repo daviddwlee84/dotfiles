@@ -12,14 +12,14 @@
 - name: Ensure fonts directory exists (Linux)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.file:
-    path: "{{ ansible_env.HOME }}/.local/share/fonts"
+    path: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
     state: directory
     mode: '0755'
 
 - name: Check if Hack Nerd Font is installed (Linux)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.find:
-    paths: "{{ ansible_env.HOME }}/.local/share/fonts"
+    paths: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
     patterns: "HackNerdFont*.ttf"
   register: hack_font_check
 
@@ -37,7 +37,7 @@
     - name: Extract Hack Nerd Font
       ansible.builtin.unarchive:
         src: /tmp/Hack.zip
-        dest: "{{ ansible_env.HOME }}/.local/share/fonts"
+        dest: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
         remote_src: true
 
     - name: Update font cache
