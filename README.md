@@ -31,12 +31,13 @@ This automatically:
 - `~/.config/uv/uv.toml` - uv package manager config
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
+- `~/.tmux.conf` - Tmux configuration with TPM plugins
 
 ### Tools (via ansible)
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli
-- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
+- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms

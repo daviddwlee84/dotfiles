@@ -2955,3 +2955,717 @@ Done. I've added `direnv` and `yazi` to the devtools:
 3. **Documentation updated** in README.md and CLAUDE.md
 
 Note: The `30_direnv.zsh` already existed with the correct `eval "$(direnv hook zsh)"` configuration, so no changes were needed there.
+
+---
+
+_**User**_
+
+Now add Tmux with tpm
++ the following config
+~/.tmux.conf (manage by chezmoi)
+
+```
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+
+setw -g mouse on
+setw -g mode-keys vi
+set-option -g status on
+set-option -g status-position bottom
+
+# Theme
+# set -g @plugin 'ndyakov/pimux'
+# set -g @plugin 'dracula/tmux'
+# set -g @plugin 'wfxr/tmux-power'
+# set -g @tmux_power_theme 'default'
+# Set 256 colors
+set -s default-terminal 'tmux-256color'
+
+set -g @plugin '2kabhishek/tmux2k'
+
+# use a theme
+set -g @tmux2k-theme 'onedark'
+
+# set start icon, accpets: `session`, 'window`, or any string
+set -g @tmux2k-start-icon ""
+
+set -g @tmux2k-left-plugins "git cpu ram"
+set -g @tmux2k-right-plugins "bandwidth network time"
+
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# set -g @plugin 'thewtex/tmux-mem-cpu-load'
+# set -g status-left '#[fg=green]#($TMUX_PLUGIN_MANAGER_PATH/tmux-mem-cpu-load/tmux-mem-cpu-load --colors --powerline-right --interval 2)#[default]'
+
+# Other examples:
+# set -g @plugin 'github_username/plugin_name'
+# set -g @plugin 'github_username/plugin_name#branch'
+# set -g @plugin 'git@github.com:user/plugin'
+# set -g @plugin 'git@bitbucket.com:user/plugin'
+
+# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+run '~/.tmux/plugins/tpm/tpm'
+```
+
+https://github.com/tmux-plugins/tpm
+https://github.com/wfxr/tmux-power
+
+And install Zellij
+
+and
+
+btop + htop
+
+to devtools
+
+---
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to:
+1. Add Tmux with TPM (Tmux Plugin Manager) - need to install tmux and clone tpm
+2. Create ~/.tmux.conf managed by chezmoi
+3. Install Zellij (terminal multiplexer)
+4. Add btop and htop to devtools
+
+Let me update the ansible role and create the tmux config file.
+</details></think>
+
+I'll add Tmux with TPM, Zellij, btop, and htop to the devtools setup.
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml`</summary>
+```
+     1|---
+     2|# Developer CLI tools role
+     3|# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
+     4|
+     5|# =============================================================================
+     6|# macOS - all via Homebrew
+     7|# =============================================================================
+     8|
+     9|- name: Install developer CLI tools (macOS)
+    10|  when: ansible_facts["os_family"] == "Darwin"
+    11|  community.general.homebrew:
+    12|    name:
+    13|      - bat
+    14|      - git-delta
+    15|      - eza
+    16|      - tlrc
+    17|      - thefuck
+    18|      - zoxide
+    19|      - direnv
+    20|      - yazi
+    21|    state: present
+    22|
+    23|# =============================================================================
+    24|# Linux (Debian/Ubuntu)
+    25|# =============================================================================
+    26|
+    27|# --- bat ---
+    28|- name: Install bat (Debian/Ubuntu)
+    29|  when: ansible_facts["os_family"] == "Debian"
+    30|  become: true
+    31|  tags: [sudo]
+    32|  ansible.builtin.apt:
+    33|    name: bat
+    34|    state: present
+    35|
+    36|- name: Create bat symlink on Debian/Ubuntu
+    37|  when: ansible_facts["os_family"] == "Debian"
+    38|  become: true
+    39|  tags: [sudo]
+    40|  ansible.builtin.file:
+    41|    src: /usr/bin/batcat
+    42|    dest: /usr/bin/bat
+    43|    state: link
+    44|  ignore_errors: true
+    45|
+    46|# --- zoxide ---
+    47|- name: Check if zoxide is installed
+    48|  when: ansible_facts["os_family"] == "Debian"
+    49|  ansible.builtin.command: zoxide --version
+    50|  register: zoxide_check
+    51|  changed_when: false
+    52|  failed_when: false
+    53|
+    54|- name: Install zoxide via official installer (Debian/Ubuntu)
+    55|  when:
+    56|    - ansible_facts["os_family"] == "Debian"
+    57|    - zoxide_check.rc != 0
+    58|  ansible.builtin.shell: |
+    59|    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    60|  args:
+    61|    creates: "{{ ansible_env.HOME }}/.local/bin/zoxide"
+    62|
+    63|# --- eza ---
+    64|- name: Check if eza is installed
+    65|  when: ansible_facts["os_family"] == "Debian"
+    66|  ansible.builtin.command: eza --version
+    67|  register: eza_check
+    68|  changed_when: false
+    69|  failed_when: false
+    70|
+    71|- name: Install eza via official installer (Debian/Ubuntu)
+    72|  when:
+    73|    - ansible_facts["os_family"] == "Debian"
+    74|    - eza_check.rc != 0
+    75|  become: true
+    76|  tags: [sudo]
+    77|  block:
+    78|    - name: Add eza GPG key
+    79|      ansible.builtin.shell: |
+    80|        mkdir -p /etc/apt/keyrings
+    81|        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    82|      args:
+    83|        creates: /etc/apt/keyrings/gierens.gpg
+    84|
+    85|    - name: Add eza repository
+    86|      ansible.builtin.apt_repository:
+    87|        repo: "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main"
+    88|        state: present
+    89|        filename: gierens
+    90|
+    91|    - name: Install eza from repository
+    92|      ansible.builtin.apt:
+    93|        name: eza
+    94|        state: present
+    95|        update_cache: true
+    96|
+    97|# --- git-delta ---
+    98|- name: Check if delta is installed
+    99|  when: ansible_facts["os_family"] == "Debian"
+   100|  ansible.builtin.command: delta --version
+   101|  register: delta_check
+   102|  changed_when: false
+   103|  failed_when: false
+   104|
+   105|- name: Install git-delta from GitHub releases (Debian/Ubuntu)
+   106|  when:
+   107|    - ansible_facts["os_family"] == "Debian"
+   108|    - delta_check.rc != 0
+   109|  become: true
+   110|  tags: [sudo]
+   111|  block:
+   112|    - name: Get latest delta release
+   113|      ansible.builtin.uri:
+   114|        url: https://api.github.com/repos/dandavison/delta/releases/latest
+   115|        return_content: true
+   116|      register: delta_release
+   117|
+   118|    - name: Download delta .deb package
+   119|      ansible.builtin.get_url:
+   120|        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
+   121|        dest: /tmp/git-delta.deb
+   122|        mode: '0644'
+   123|
+   124|    - name: Install delta .deb package
+   125|      ansible.builtin.apt:
+   126|        deb: /tmp/git-delta.deb
+   127|
+   128|    - name: Clean up delta .deb
+   129|      ansible.builtin.file:
+   130|        path: /tmp/git-delta.deb
+   131|        state: absent
+   132|
+   133|# --- tldr ---
+   134|- name: Check if tldr is installed
+   135|  when: ansible_facts["os_family"] == "Debian"
+   136|  ansible.builtin.command: tldr --version
+   137|  register: tldr_check
+   138|  changed_when: false
+   139|  failed_when: false
+   140|
+   141|- name: Install tldr via npm (Debian/Ubuntu)
+   142|  when:
+   143|    - ansible_facts["os_family"] == "Debian"
+   144|    - tldr_check.rc != 0
+   145|  become: true
+   146|  tags: [sudo]
+   147|  community.general.npm:
+   148|    name: tldr
+   149|    global: true
+   150|    state: present
+   151|  ignore_errors: true
+   152|
+   153|# --- thefuck ---
+   154|- name: Check if thefuck is installed
+   155|  when: ansible_facts["os_family"] == "Debian"
+   156|  ansible.builtin.command: thefuck --version
+   157|  register: thefuck_check
+   158|  changed_when: false
+   159|  failed_when: false
+   160|
+   161|- name: Install thefuck via pip (Debian/Ubuntu)
+   162|  when:
+   163|    - ansible_facts["os_family"] == "Debian"
+   164|    - thefuck_check.rc != 0
+   165|  ansible.builtin.pip:
+   166|    name: thefuck
+   167|    state: present
+   168|    extra_args: --user
+   169|  ignore_errors: true
+   170|
+   171|# --- direnv ---
+   172|- name: Install direnv (Debian/Ubuntu)
+   173|  when: ansible_facts["os_family"] == "Debian"
+   174|  become: true
+   175|  tags: [sudo]
+   176|  ansible.builtin.apt:
+   177|    name: direnv
+   178|    state: present
+   179|
+   180|# --- yazi ---
+   181|- name: Check if yazi is installed
+   182|  when: ansible_facts["os_family"] == "Debian"
+   183|  ansible.builtin.command: yazi --version
+   184|  register: yazi_check
+   185|  changed_when: false
+   186|  failed_when: false
+   187|
+   188|- name: Install yazi from GitHub releases (Debian/Ubuntu)
+   189|  when:
+   190|    - ansible_facts["os_family"] == "Debian"
+   191|    - yazi_check.rc != 0
+   192|  become: true
+   193|  tags: [sudo]
+   194|  block:
+   195|    - name: Get latest yazi release
+   196|      ansible.builtin.uri:
+   197|        url: https://api.github.com/repos/sxyazi/yazi/releases/latest
+   198|        return_content: true
+   199|      register: yazi_release
+   200|
+   201|    - name: Download yazi binary
+   202|      ansible.builtin.get_url:
+   203|        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu.zip"
+   204|        dest: /tmp/yazi.zip
+   205|        mode: '0644'
+   206|
+   207|    - name: Install unzip if not present
+   208|      ansible.builtin.apt:
+   209|        name: unzip
+   210|        state: present
+   211|
+   212|    - name: Extract yazi
+   213|      ansible.builtin.unarchive:
+   214|        src: /tmp/yazi.zip
+   215|        dest: /tmp
+   216|        remote_src: true
+   217|
+   218|    - name: Install yazi binary
+   219|      ansible.builtin.copy:
+   220|        src: "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu/yazi"
+   221|        dest: /usr/local/bin/yazi
+   222|        mode: '0755'
+   223|        remote_src: true
+   224|
+   225|    - name: Clean up yazi files
+   226|      ansible.builtin.file:
+   227|        path: "{{ item }}"
+   228|        state: absent
+   229|      loop:
+   230|        - /tmp/yazi.zip
+   231|        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
+   232|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Update the macOS homebrew list to add tmux, zellij, btop, htop
+2. Add Linux installations for these tools
+3. Add TPM (Tmux Plugin Manager) installation
+4. Create the tmux.conf file
+
+Let me do all of this.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+----
+-# Developer CLI tools role
+-# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
+-
+-# =============================================================================
+-# macOS - all via Homebrew
+-# =============================================================================
+-
+-- name: Install developer CLI tools (macOS)
+-  when: ansible_facts["os_family"] == "Darwin"
+-  community.general.homebrew:
+-    name:
+-      - bat
+-      - git-delta
+-      - eza
+-      - tlrc
+-      - thefuck
+-      - zoxide
+-      - direnv
+-      - yazi
+-    state: present
++---
++# Developer CLI tools role
++# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux, zellij, btop, htop
++
++# =============================================================================
++# macOS - all via Homebrew
++# =============================================================================
++
++- name: Install developer CLI tools (macOS)
++  when: ansible_facts["os_family"] == "Darwin"
++  community.general.homebrew:
++    name:
++      - bat
++      - git-delta
++      - eza
++      - tlrc
++      - thefuck
++      - zoxide
++      - direnv
++      - yazi
++      - tmux
++      - zellij
++      - btop
++      - htop
++    state: present
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me add the Linux installations for tmux, zellij, btop, htop, and TPM at the end of the file.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-    - name: Clean up yazi files
+-      ansible.builtin.file:
+-        path: "{{ item }}"
+-        state: absent
+-      loop:
+-        - /tmp/yazi.zip
+-        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
++    - name: Clean up yazi files
++      ansible.builtin.file:
++        path: "{{ item }}"
++        state: absent
++      loop:
++        - /tmp/yazi.zip
++        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
++
++# --- tmux ---
++- name: Install tmux (Debian/Ubuntu)
++  when: ansible_facts["os_family"] == "Debian"
++  become: true
++  tags: [sudo]
++  ansible.builtin.apt:
++    name: tmux
++    state: present
++
++# --- htop ---
++- name: Install htop (Debian/Ubuntu)
++  when: ansible_facts["os_family"] == "Debian"
++  become: true
++  tags: [sudo]
++  ansible.builtin.apt:
++    name: htop
++    state: present
++
++# --- btop ---
++- name: Install btop (Debian/Ubuntu)
++  when: ansible_facts["os_family"] == "Debian"
++  become: true
++  tags: [sudo]
++  ansible.builtin.apt:
++    name: btop
++    state: present
++  ignore_errors: true
++
++# --- zellij ---
++- name: Check if zellij is installed
++  when: ansible_facts["os_family"] == "Debian"
++  ansible.builtin.command: zellij --version
++  register: zellij_check
++  changed_when: false
++  failed_when: false
++
++- name: Install zellij from GitHub releases (Debian/Ubuntu)
++  when:
++    - ansible_facts["os_family"] == "Debian"
++    - zellij_check.rc != 0
++  become: true
++  tags: [sudo]
++  block:
++    - name: Get latest zellij release
++      ansible.builtin.uri:
++        url: https://api.github.com/repos/zellij-org/zellij/releases/latest
++        return_content: true
++      register: zellij_release
++
++    - name: Download zellij binary
++      ansible.builtin.get_url:
++        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
++        dest: /tmp/zellij.tar.gz
++        mode: '0644'
++
++    - name: Extract zellij
++      ansible.builtin.unarchive:
++        src: /tmp/zellij.tar.gz
++        dest: /usr/local/bin
++        remote_src: true
++
++    - name: Clean up zellij tarball
++      ansible.builtin.file:
++        path: /tmp/zellij.tar.gz
++        state: absent
++
++# =============================================================================
++# TPM (Tmux Plugin Manager) - All platforms
++# =============================================================================
++
++- name: Check if TPM is installed
++  ansible.builtin.stat:
++    path: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
++  register: tpm_check
++
++- name: Install TPM (Tmux Plugin Manager)
++  when: not tpm_check.stat.exists
++  ansible.builtin.git:
++    repo: https://github.com/tmux-plugins/tpm
++    dest: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
++    depth: 1
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me create the tmux.conf file managed by chezmoi.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write** `/Users/daviddwlee84/.local/share/chezmoi/dot_tmux.conf`</summary>
+```conf
+# ~/.tmux.conf - Tmux configuration
+# Managed by chezmoi - do not edit directly
+
+# =============================================================================
+# Plugins (managed by TPM)
+# =============================================================================
+
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+
+# Session management
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# =============================================================================
+# Theme: tmux2k
+# =============================================================================
+
+set -g @plugin '2kabhishek/tmux2k'
+
+# Theme settings
+set -g @tmux2k-theme 'onedark'
+
+# Start icon: `session`, 'window`, or any string
+set -g @tmux2k-start-icon ""
+
+# Status bar plugins
+set -g @tmux2k-left-plugins "git cpu ram"
+set -g @tmux2k-right-plugins "bandwidth network time"
+
+# =============================================================================
+# General Settings
+# =============================================================================
+
+# Enable mouse support
+setw -g mouse on
+
+# Use vi mode keys
+setw -g mode-keys vi
+
+# Status bar
+set-option -g status on
+set-option -g status-position bottom
+
+# Set 256 colors
+set -s default-terminal 'tmux-256color'
+
+# =============================================================================
+# Alternative Themes (uncomment to use)
+# =============================================================================
+
+# set -g @plugin 'ndyakov/pimux'
+# set -g @plugin 'dracula/tmux'
+# set -g @plugin 'wfxr/tmux-power'
+# set -g @tmux_power_theme 'default'
+
+# set -g @plugin 'thewtex/tmux-mem-cpu-load'
+# set -g status-left '#[fg=green]#($TMUX_PLUGIN_MANAGER_PATH/tmux-mem-cpu-load/tmux-mem-cpu-load --colors --powerline-right --interval 2)#[default]'
+
+# =============================================================================
+# Initialize TPM (keep this line at the very bottom)
+# =============================================================================
+
+run '~/.tmux/plugins/tpm/tpm'
+
+```
+
+```
+Wrote contents to /Users/daviddwlee84/.local/share/chezmoi/dot_tmux.conf
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me run syntax check and update documentation.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="shell" data-tool-name="Shell"><details>
+<summary>Tool use: **Shell** `cd /Users/daviddwlee84/.local/share/chezmoi && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml`</summary>
+```
+Exit code: 0
+
+Command output:
+
+\```
+
+playbook: dot_ansible/playbooks/macos.yml
+
+playbook: dot_ansible/playbooks/linux.yml
+
+\```
+
+Command completed in 2379 ms.
+
+Shell state (cwd, env vars) persists for subsequent calls.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Good, syntax check passed. Now let me update the documentation.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi |
++| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
++- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/README.md has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+I should also add the tmux.conf to the Config Files section in README.md.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-### Config Files
+-- `~/.gitconfig` - Git configuration
+-- `~/.config/nvim/` - Neovim (LazyVim) configuration
+-- `~/.config/uv/uv.toml` - uv package manager config
+-- `~/.config/alacritty/` - Alacritty terminal config
+-- `~/.claude/` - Claude Code settings
++### Config Files
++- `~/.gitconfig` - Git configuration
++- `~/.config/nvim/` - Neovim (LazyVim) configuration
++- `~/.config/uv/uv.toml` - uv package manager config
++- `~/.config/alacritty/` - Alacritty terminal config
++- `~/.claude/` - Claude Code settings
++- `~/.tmux.conf` - Tmux configuration with TPM plugins
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/README.md has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Done. Let me provide a summary of what was added.
+</details></think>
+
+Done. I've added Tmux with TPM, Zellij, btop, and htop to the devtools:
+
+**Changes made:**
+
+1. **`dot_ansible/roles/devtools/tasks/main.yml`**:
+   - Added `tmux`, `zellij`, `btop`, `htop` to macOS Homebrew packages
+   - Added tmux, htop, btop installation via apt for Linux
+   - Added zellij installation from GitHub releases for Linux
+   - Added TPM (Tmux Plugin Manager) installation via git clone for all platforms
+
+2. **`dot_tmux.conf`** (new file):
+   - TPM plugin manager setup
+   - tmux-sensible for sensible defaults
+   - tmux-resurrect and tmux-continuum for session persistence
+   - tmux2k theme with onedark style
+   - Mouse support and vi mode keys enabled
+   - Status bar with git, cpu, ram, bandwidth, network, time
+
+3. **Documentation updated** in README.md and CLAUDE.md
+
+**After installation, run this to install tmux plugins:**
+```bash
+# Start tmux and press: prefix + I (capital i)
+# Or run:
+~/.tmux/plugins/tpm/bin/install_plugins
+```

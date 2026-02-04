@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
+# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux, zellij, btop, htop
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -18,6 +18,10 @@
       - zoxide
       - direnv
       - yazi
+      - tmux
+      - zellij
+      - btop
+      - htop
     state: present
 
 # =============================================================================
@@ -229,3 +233,85 @@
       loop:
         - /tmp/yazi.zip
         - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
+
+# --- tmux ---
+- name: Install tmux (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: tmux
+    state: present
+
+# --- htop ---
+- name: Install htop (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: htop
+    state: present
+
+# --- btop ---
+- name: Install btop (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: btop
+    state: present
+  ignore_errors: true
+
+# --- zellij ---
+- name: Check if zellij is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: zellij --version
+  register: zellij_check
+  changed_when: false
+  failed_when: false
+
+- name: Install zellij from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - zellij_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest zellij release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/zellij-org/zellij/releases/latest
+        return_content: true
+      register: zellij_release
+
+    - name: Download zellij binary
+      ansible.builtin.get_url:
+        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/zellij.tar.gz
+        mode: '0644'
+
+    - name: Extract zellij
+      ansible.builtin.unarchive:
+        src: /tmp/zellij.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+
+    - name: Clean up zellij tarball
+      ansible.builtin.file:
+        path: /tmp/zellij.tar.gz
+        state: absent
+
+# =============================================================================
+# TPM (Tmux Plugin Manager) - All platforms
+# =============================================================================
+
+- name: Check if TPM is installed
+  ansible.builtin.stat:
+    path: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
+  register: tpm_check
+
+- name: Install TPM (Tmux Plugin Manager)
+  when: not tpm_check.stat.exists
+  ansible.builtin.git:
+    repo: https://github.com/tmux-plugins/tpm
+    dest: "{{ ansible_env.HOME }}/.tmux/plugins/tpm"
+    depth: 1

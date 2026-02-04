@@ -78,7 +78,7 @@ ansible-playbook playbooks/macos.yml --check
 | `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli |
-| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi |
+| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `security_tools` | pre-commit, gitleaks |
 
