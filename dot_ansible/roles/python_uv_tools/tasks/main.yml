@@ -5,7 +5,7 @@
 - name: Install Python CLI tools via uv
   ansible.builtin.command: >-
     uv tool install {{ item.name }}
-    {{ '--with ' + item.with if item.with is defined else '' }}
+    {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
   loop: "{{ python_uv_tools }}"

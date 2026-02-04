@@ -8,8 +8,13 @@
 python_uv_tools:
   - name: apprise
     binary: apprise
-  - name: sqlit-tui
+  - name: sqlit-tui[ssh]
     binary: sqlit
+    with:
+      - psycopg2-binary
+      - pymysql
+      - mssql-python
+      - pyodbc
   - name: python-dotenv[cli]
     binary: dotenv
   - name: git-filter-repo
@@ -18,4 +23,5 @@ python_uv_tools:
     binary: mlflow
   - name: litellm[proxy]
     binary: litellm
-    with: httpx[socks]
+    with:
+      - httpx[socks]

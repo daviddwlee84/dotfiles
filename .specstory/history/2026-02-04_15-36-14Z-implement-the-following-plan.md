@@ -837,3 +837,183 @@ All changes are complete. Here's a summary of what was done:
 ```bash
 cd ~/.ansible && ansible-playbook playbooks/macos.yml --tags python_uv_tools
 ```
+
+---
+
+_**User (2026-02-04 15:54:17Z)**_
+
+Oh actually we might require more dependency for the sqlit-tui
+
+uv tool install 'sqlit-tui[ssh]' \
+  --with psycopg2-binary \
+  --with pymysql \
+  --with mssql-python \
+  --with pyodbc
+
+---
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 15:54:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to update the sqlit-tui entry in the python_uv_tools defaults to include more dependencies. Looking at the current structure, I need to modify the defaults/main.yml file to:
+1. Change `sqlit-tui` to `sqlit-tui[ssh]`
+2. Add multiple `--with` dependencies
+
+The current structure only supports a single `with` field. I need to either:
+1. Change `with` to support a list
+2. Or modify the task to handle multiple `--with` flags
+
+Let me update both the defaults and the tasks to support a list of `with` dependencies.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 15:54:24Z)**_
+
+I'll update the role to support multiple `--with` dependencies.
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 15:54:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/python_uv_tools/defaults/main.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 15:54:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/python_uv_tools/defaults/main.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (<synthetic> 2026-02-04 15:54:29Z)**_
+
+You've hit your limit · resets 12am (Asia/Shanghai)
+
+---
+
+_**User (2026-02-04 16:02:39Z)**_
+
+continue
+
+---
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update the tasks file to handle the `with` field as a list now, generating multiple `--with` flags.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/python_uv_tools/tasks/main.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me run the syntax check to make sure everything is valid.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:51Z)**_
+
+Now let me verify the syntax.
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax check macos.yml playbook
+
+`ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml`
+
+```text
+playbook: dot_ansible/playbooks/macos.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+The syntax check passed. Let me show the updated files to confirm everything looks correct.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:56Z)**_
+
+Syntax check passed. Here's the updated configuration:
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:02:56Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/python_uv_tools/defaults/main.yml`
+
+```text
+     1→---
+     2→# Python CLI tools installed via uv tool install
+     3→# Each tool has:
+     4→#   - name: package name (can include extras like [cli])
+     5→#   - binary: executable name to check for idempotency
+     6→#   - with: (optional) additional dependency to install with --with
+     7→
+     8→python_uv_tools:
+     9→  - name: apprise
+    10→    binary: apprise
+    11→  - name: sqlit-tui[ssh]
+    12→    binary: sqlit
+    13→    with:
+    14→      - psycopg2-binary
+    15→      - pymysql
+    16→      - mssql-python
+    17→      - pyodbc
+    18→  - name: python-dotenv[cli]
+    19→    binary: dotenv
+    20→  - name: git-filter-repo
+    21→    binary: git-filter-repo
+    22→  - name: mlflow
+    23→    binary: mlflow
+    24→  - name: litellm[proxy]
+    25→    binary: litellm
+    26→    with:
+    27→      - httpx[socks]
+    28→
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:03:00Z)**_
+
+<think><details><summary>Thought Process</summary>
+The update is complete. sqlit-tui now includes:
+- The `[ssh]` extra
+- Multiple `--with` dependencies: psycopg2-binary, pymysql, mssql-python, pyodbc
+
+I also updated the task template to handle `with` as a list, generating multiple `--with` flags.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-04 16:03:02Z)**_
+
+Updated `sqlit-tui` to include all database drivers:
+
+```yaml
+- name: sqlit-tui[ssh]
+  binary: sqlit
+  with:
+    - psycopg2-binary   # PostgreSQL
+    - pymysql           # MySQL
+    - mssql-python      # MS SQL Server
+    - pyodbc            # ODBC connections
+```
+
+The task template now generates multiple `--with` flags from the list. This will produce:
+```bash
+uv tool install 'sqlit-tui[ssh]' --with psycopg2-binary --with pymysql --with mssql-python --with pyodbc
+```
