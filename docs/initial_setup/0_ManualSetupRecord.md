@@ -68,3 +68,6 @@ That install zsh & chsh stuff should be manage by Ansible; ~/.oh-my-zsh/custom/ 
 
 oh-my-zsh actually just initialize ~/.zshrc by the templates <https://github.com/ohmyzsh/ohmyzsh/blob/master/templates/zshrc.zsh-template>
 We better make it clean <https://github.com/ohmyzsh/ohmyzsh/blob/master/templates/minimal.zshrc>
+
+- [Use alt-f and alt-b to jump forward and backward in command line on macOS](https://gist.github.com/windsting/d21a07b236acf243c8ebbfe7302765ef)
+- [macOS: alt/option key as meta · Issue #7966 · alacritty/alacritty](https://github.com/alacritty/alacritty/issues/7966)

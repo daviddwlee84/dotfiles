@@ -10,12 +10,29 @@ key = "Return"
 mods = "Shift"
 chars = "\u001b[13;2u"
 
+[env]
+TERM = "xterm-256color"
+
+[window]
+padding.x = 10
+padding.y = 10
+
+decorations = "Buttonless"
+
+opacity = 0.7
+blur = true
+
+# https://gist.github.com/windsting/d21a07b236acf243c8ebbfe7302765ef
+# https://github.com/alacritty/alacritty/issues/7966
+option_as_alt = "Both" # 或 "OnlyLeft" / "OnlyRight" / "None"
+
+# Actually this solves the following keyboard bindings in MacOS
 [[keyboard.bindings]]
 key = "T"
 mods = "Alt"
-chars = "\u001bt"   # ESC + 't'  (Meta-t)
+chars = "\u001bt" # ESC + 't'  (Meta-t)
 
 [[keyboard.bindings]]
 key = "P"
 mods = "Alt"
-chars = "\u001bp"   # ESC + 'p'  (Meta-p)
+chars = "\u001bp" # ESC + 'p'  (Meta-p)
