@@ -1,0 +1,21 @@
+[font]
+normal = { family = "Hack Nerd Font Mono", style = "Regular" }
+bold = { family = "Hack Nerd Font Mono", style = "Bold" }
+italic = { family = "Hack Nerd Font Mono", style = "Italic" }
+bold_italic = { family = "Hack Nerd Font Mono", style = "Bold Italic" }
+size = 14.0
+
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001b[13;2u"
+
+[[keyboard.bindings]]
+key = "T"
+mods = "Alt"
+chars = "\u001bt"   # ESC + 't'  (Meta-t)
+
+[[keyboard.bindings]]
+key = "P"
+mods = "Alt"
+chars = "\u001bp"   # ESC + 'p'  (Meta-p)

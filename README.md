@@ -29,12 +29,14 @@ This automatically:
 - `~/.gitconfig` - Git configuration
 - `~/.config/nvim/` - Neovim (LazyVim) configuration
 - `~/.config/uv/uv.toml` - uv package manager config
+- `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 
 ### Tools (via ansible)
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli
+- **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms
 

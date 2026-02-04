@@ -17,6 +17,9 @@
     - role: lazyvim_deps
       tags: [lazyvim_deps]
 
+    - role: nerdfonts
+      tags: [nerdfonts]
+
     - role: claude_deps
       tags: [claude_deps]
 

@@ -1,0 +1,50 @@
+---
+# NerdFonts role - install Hack Nerd Font
+
+# macOS - via Homebrew cask
+- name: Install Hack Nerd Font (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_cask:
+    name: font-hack-nerd-font
+    state: present
+
+# Linux - download from GitHub releases
+- name: Ensure fonts directory exists (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.local/share/fonts"
+    state: directory
+    mode: '0755'
+
+- name: Check if Hack Nerd Font is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.find:
+    paths: "{{ ansible_env.HOME }}/.local/share/fonts"
+    patterns: "HackNerdFont*.ttf"
+  register: hack_font_check
+
+- name: Download and install Hack Nerd Font (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - hack_font_check.matched == 0
+  block:
+    - name: Download Hack Nerd Font
+      ansible.builtin.get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip"
+        dest: /tmp/Hack.zip
+        mode: '0644'
+
+    - name: Extract Hack Nerd Font
+      ansible.builtin.unarchive:
+        src: /tmp/Hack.zip
+        dest: "{{ ansible_env.HOME }}/.local/share/fonts"
+        remote_src: true
+
+    - name: Update font cache
+      ansible.builtin.command: fc-cache -fv
+      changed_when: true
+
+    - name: Clean up
+      ansible.builtin.file:
+        path: /tmp/Hack.zip
+        state: absent
