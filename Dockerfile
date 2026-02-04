@@ -14,16 +14,19 @@ ARG CHEZMOI_REPO=daviddwlee84
 # Avoid interactive prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Configure TUNA mirror for faster downloads in China (if enabled)
+# First install ca-certificates from default repos (required for HTTPS mirrors)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure Huawei Cloud mirror for faster downloads in China (if enabled)
 # Ubuntu 24.04 uses DEB822 format in /etc/apt/sources.list.d/ubuntu.sources
 # Handles both amd64 (ubuntu) and arm64 (ubuntu-ports)
-# NOTE: Uses HTTP (not HTTPS) because ca-certificates isn't installed yet
 RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
         ARCH=$(dpkg --print-architecture) && \
         if [ "$ARCH" = "amd64" ]; then \
-            MIRROR_URL="http://mirrors.tuna.tsinghua.edu.cn/ubuntu"; \
+            MIRROR_URL="https://repo.huaweicloud.com/ubuntu"; \
         else \
-            MIRROR_URL="http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"; \
+            MIRROR_URL="https://repo.huaweicloud.com/ubuntu-ports"; \
         fi && \
         printf '%s\n' \
             "Types: deb" \
@@ -44,7 +47,6 @@ RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
 # python3 is required for ansible to run modules on localhost
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    ca-certificates \
     sudo \
     git \
     python3 \
