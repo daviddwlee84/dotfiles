@@ -23,8 +23,8 @@
     - role: nerdfonts
       tags: [nerdfonts]
 
-    - role: claude_deps
-      tags: [claude_deps]
+    - role: coding_agents
+      tags: [coding_agents]
 
     - role: security_tools
       tags: [security_tools]

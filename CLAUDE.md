@@ -92,6 +92,7 @@ ansible-playbook playbooks/macos.yml --check
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
 | `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
+| `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy |
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 

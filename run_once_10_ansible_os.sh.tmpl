@@ -53,6 +53,15 @@ fi
 
 info "Running OS-specific ansible playbook..."
 
+# Build skip-tags based on chezmoi config
+SKIP_TAGS=""
+{{ if not .installCodingAgents -}}
+SKIP_TAGS="${SKIP_TAGS},coding_agents"
+{{ end -}}
+{{ if not .installPythonUvTools -}}
+SKIP_TAGS="${SKIP_TAGS},python_uv_tools"
+{{ end -}}
+
 # Check if we need to prompt for sudo password (Linux only)
 BECOME_FLAGS=""
 {{ if eq .chezmoi.os "linux" -}}
@@ -74,5 +83,11 @@ else
 fi
 {{ end -}}
 
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" $BECOME_FLAGS
+# Build skip-tags flag if needed
+SKIP_TAGS_FLAG=""
+if [[ -n "$SKIP_TAGS" ]]; then
+    SKIP_TAGS_FLAG="--skip-tags ${SKIP_TAGS#,}"
+fi
+
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" $BECOME_FLAGS $SKIP_TAGS_FLAG
 success "OS-specific ansible playbook completed!"

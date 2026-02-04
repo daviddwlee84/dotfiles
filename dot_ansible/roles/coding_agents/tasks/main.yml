@@ -1,0 +1,172 @@
+---
+# Coding Agents Installation
+# Installs various AI coding assistants and companion tools
+
+# === Notification Tools (from claude_deps) ===
+
+# macOS - terminal-notifier
+- name: Install terminal-notifier (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: terminal-notifier
+    state: present
+
+# Linux - libnotify-bin (provides notify-send)
+- name: Install libnotify-bin (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: libnotify-bin
+    state: present
+
+# === Claude Code ===
+
+- name: Install Claude Code (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_cask:
+    name: claude-code
+    state: present
+
+- name: Check if Claude Code is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which claude
+  register: claude_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Claude Code (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - claude_check.rc != 0
+  ansible.builtin.shell: |
+    curl -fsSL https://claude.ai/install.sh | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.claude/local/bin/claude"
+
+# === OpenCode ===
+
+- name: Tap anomalyco/tap for OpenCode (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_tap:
+    name: anomalyco/tap
+    state: present
+
+- name: Install OpenCode (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: opencode
+    state: present
+
+- name: Check if OpenCode is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which opencode
+  register: opencode_check
+  changed_when: false
+  failed_when: false
+
+- name: Install OpenCode (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - opencode_check.rc != 0
+  ansible.builtin.shell: |
+    curl -fsSL https://opencode.ai/install | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.local/bin/opencode"
+
+# === Cursor CLI ===
+
+- name: Install Cursor CLI (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_cask:
+    name: cursor-cli
+    state: present
+
+- name: Check if Cursor CLI is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which cursor
+  register: cursor_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Cursor CLI (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - cursor_check.rc != 0
+  ansible.builtin.shell: |
+    curl -fsSL https://cursor.com/install | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.local/bin/cursor"
+
+# === GitHub Copilot CLI ===
+
+- name: Check if npm is available
+  ansible.builtin.command: which npm
+  register: npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install GitHub Copilot CLI (npm)
+  when: npm_check.rc == 0
+  community.general.npm:
+    name: "@githubnext/github-copilot-cli"
+    global: true
+    state: present
+
+# === Gemini CLI ===
+
+- name: Install Gemini CLI (npm)
+  when: npm_check.rc == 0
+  community.general.npm:
+    name: "@google/gemini-cli"
+    global: true
+    state: present
+
+# === SpecStory ===
+
+- name: Tap specstoryai/tap for SpecStory (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_tap:
+    name: specstoryai/tap
+    state: present
+
+- name: Install SpecStory (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: specstory
+    state: present
+
+- name: Check if SpecStory is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which specstory
+  register: specstory_check
+  changed_when: false
+  failed_when: false
+
+- name: Get latest SpecStory release version (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/specstoryai/specstory/releases/latest
+    return_content: true
+  register: specstory_release
+
+- name: Install SpecStory from GitHub release (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+    - specstory_release is defined
+  ansible.builtin.get_url:
+    url: "https://github.com/specstoryai/specstory/releases/download/{{ specstory_release.json.tag_name }}/specstory-linux-x86_64"
+    dest: "{{ ansible_env.HOME }}/.local/bin/specstory"
+    mode: "0755"
+
+# === Happy ===
+
+- name: Install Happy (npm)
+  when: npm_check.rc == 0
+  community.general.npm:
+    name: happy-coder
+    global: true
+    state: present

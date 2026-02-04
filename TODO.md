@@ -33,3 +33,5 @@ Fix Claude Code hook on Ubuntu `Stop hook error: Failed with non-blocking status
 Use mise to manage most of the runtime version?!
 
 Optimize zsh & tmux startup time
+
+Do we want to use Brewfile to manage macOS packages installation instead of writing one by one through Ansible?

@@ -52,6 +52,17 @@ This automatically:
 3. Runs OS-specific playbook (macOS/Linux)
 4. Deploys all config files
 
+### Optional Components
+
+During `chezmoi init`, you'll be prompted for optional installs:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `installCodingAgents` | true | Claude Code, OpenCode, Cursor, Copilot, Gemini CLI, etc. |
+| `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
+
+To change options later: `chezmoi init --force`
+
 ## What You Get
 
 ### Config Files
@@ -68,6 +79,7 @@ This automatically:
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
+- **Coding Agents** (optional): Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
 
 ### Bootstrap (installed before ansible)
 - **uv**: Python package manager for ansible

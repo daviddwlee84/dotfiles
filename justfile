@@ -101,7 +101,7 @@ ansible-macos:
 
 # Run Linux playbook
 ansible-linux:
-    cd ~/.ansible && ansible-playbook playbooks/linux.yml
+    cd ~/.ansible && ansible-playbook playbooks/linux.yml --ask-become-pass
 
 # Run playbook with specific tags (usage: just ansible-tags "neovim,lazyvim_deps")
 ansible-tags tags:
