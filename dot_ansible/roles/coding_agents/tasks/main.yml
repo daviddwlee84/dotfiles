@@ -42,7 +42,7 @@
   ansible.builtin.shell: |
     curl -fsSL https://claude.ai/install.sh | bash
   args:
-    creates: "{{ ansible_env.HOME }}/.claude/local/bin/claude"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.claude/local/bin/claude"
 
 # === OpenCode ===
 
@@ -72,7 +72,7 @@
   ansible.builtin.shell: |
     curl -fsSL https://opencode.ai/install | bash
   args:
-    creates: "{{ ansible_env.HOME }}/.local/bin/opencode"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
 
 # === Cursor CLI ===
 
@@ -96,7 +96,7 @@
   ansible.builtin.shell: |
     curl -fsSL https://cursor.com/install | bash
   args:
-    creates: "{{ ansible_env.HOME }}/.local/bin/cursor"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/cursor"
 
 # === GitHub Copilot CLI ===
 
@@ -167,7 +167,7 @@
     - specstory_release is defined
   ansible.builtin.get_url:
     url: "https://github.com/specstoryai/specstory/releases/download/{{ specstory_release.json.tag_name }}/specstory-linux-x86_64"
-    dest: "{{ ansible_env.HOME }}/.local/bin/specstory"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/specstory"
     mode: "0755"
 
 # === Happy ===
