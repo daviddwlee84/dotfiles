@@ -1,0 +1,5 @@
+{
+  "MD013": false, // 關掉行長限制
+  "MD012": false, // (可選) 允許檔案尾部空白行
+  "MD033": false // (可選) 允許 inline HTML
+}

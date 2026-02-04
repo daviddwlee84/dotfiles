@@ -46,6 +46,11 @@ chezmoi init git@github.com:daviddwlee84/dotfiles.git
 - Pueue
   - Homebrew
   - linux (build from cargo / download binary + setup systemd service?)
+- Mirror
+  - Python
+  - Ubuntu (docker)
+    - [aosp-monthly | 镜像站使用帮助 | 清华大学开源软件镜像站 | Tsinghua Open Source Mirror](https://mirrors.tuna.tsinghua.edu.cn/help/aosp-monthly/) -> timeout, seems got banned?!
+    - [Ubuntu - USTC Mirror Help](https://mirrors.ustc.edu.cn/help/ubuntu.html#__tabbed_1_1)
 
 advanced
 
@@ -107,3 +112,4 @@ echo '{"hook_event_name":"Notification","title":"Test Title","message":"Test mes
 ---
 
 - [Why I'm Ditching Nix Home Manager - And What I'm Using Instead](https://www.youtube.com/watch?v=U6reJVR3FfA) (from Nix to GNU Stow)
+

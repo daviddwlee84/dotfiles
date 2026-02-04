@@ -26,3 +26,5 @@ docs/** # ignore everything in docs/ and its subdirectories
 
 scripts/adhoc/
 
+# markdownlint (nvim mfussenegger/nvim-lint)
+.markdownlint.jsonc
