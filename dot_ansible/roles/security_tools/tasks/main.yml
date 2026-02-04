@@ -63,7 +63,7 @@
     - name: Set gitleaks version and arch
       ansible.builtin.set_fact:
         gitleaks_version: "{{ gitleaks_release.json.tag_name | regex_replace('^v', '') }}"
-        gitleaks_arch: "{{ 'x64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        gitleaks_arch: "{{ 'x64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
 
     - name: Download gitleaks
       ansible.builtin.get_url:

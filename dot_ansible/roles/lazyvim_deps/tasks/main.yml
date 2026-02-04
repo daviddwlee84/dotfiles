@@ -86,12 +86,50 @@
         path: /tmp/lazygit.tar.gz
         state: absent
 
-- name: Install tree-sitter-cli via npm
+- name: Check if tree-sitter is installed
   when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: tree-sitter --version
+  register: treesitter_check
+  changed_when: false
+  failed_when: false
+
+- name: Check Node.js version for tree-sitter-cli
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - treesitter_check.rc != 0
+  ansible.builtin.command: node --version
+  register: node_version
+  changed_when: false
+  failed_when: false
+
+- name: Install tree-sitter-cli via npm (Node >= 14)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - treesitter_check.rc != 0
+    - node_version.stdout is defined
+    - node_version.stdout | regex_replace('^v', '') is version('14.0.0', '>=')
   become: true
   tags: [sudo]
   community.general.npm:
     name: tree-sitter-cli
     global: true
     state: present
+  ignore_errors: true
+
+- name: Install tree-sitter-cli via cargo (fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - treesitter_check.rc != 0
+    - node_version.stdout is not defined or node_version.stdout | regex_replace('^v', '') is version('14.0.0', '<')
+  ansible.builtin.shell: |
+    if command -v cargo >/dev/null 2>&1; then
+      cargo install tree-sitter-cli
+    else
+      echo "Neither modern Node.js nor cargo available for tree-sitter-cli"
+      echo "Install manually: cargo install tree-sitter-cli"
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
   ignore_errors: true

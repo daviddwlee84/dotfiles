@@ -56,9 +56,21 @@ info "Running OS-specific ansible playbook..."
 # Check if we need to prompt for sudo password (Linux only)
 BECOME_FLAGS=""
 {{ if eq .chezmoi.os "linux" -}}
-if ! sudo -n true 2>/dev/null; then
+if sudo -n true 2>/dev/null; then
+    # Passwordless sudo available
+    :
+elif [[ -t 0 ]]; then
+    # Interactive TTY - can prompt for password
     info "Sudo password required for package installation"
     BECOME_FLAGS="--ask-become-pass"
+else
+    # Non-interactive without passwordless sudo - skip sudo tasks
+    warn "Non-interactive mode without passwordless sudo"
+    warn "Skipping package installation (config files will still be deployed)"
+    warn ""
+    warn "To complete setup, run manually:"
+    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --ask-become-pass"
+    BECOME_FLAGS="--skip-tags sudo"
 fi
 {{ end -}}
 
