@@ -72,6 +72,19 @@ advanced
   - macOS maybe use OrbStack?!
   - setup for non-root user [Post-installation steps | Docker Docs](https://docs.docker.com/engine/install/linux-postinstall/)
   - use Ansible to maintain?!
+- benchmark the oh-my-zsh, nvim startup time
+  - oh-my-zsh vs. antidote
+  - [sharkdp/hyperfine: A command-line benchmarking tool](https://github.com/sharkdp/hyperfine)
+coding env
+
+- Python
+  - UV (must have)
+  - with or without miniforge
+  - default python version?!
+- Mise: to manage different runtime (e.g. Python & NodeJS nvm)
+  - vs. ASDF
+  - [Mise + Python Cookbook | mise-en-place](https://mise.jdx.dev/mise-cookbook/python.html#mise-uv) vs. Pure UV
+  - nvm startup time super long
 
 ## Resources
 
@@ -112,4 +125,3 @@ echo '{"hook_event_name":"Notification","title":"Test Title","message":"Test mes
 ---
 
 - [Why I'm Ditching Nix Home Manager - And What I'm Using Instead](https://www.youtube.com/watch?v=U6reJVR3FfA) (from Nix to GNU Stow)
-

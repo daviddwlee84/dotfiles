@@ -112,11 +112,75 @@ ansible-check:
     cd ~/.ansible && ansible-playbook playbooks/$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/').yml --check
 
 # ============================================================================
+# Security & Pre-commit
+# ============================================================================
+
+# Install pre-commit tool (auto-detects brew on macOS, uv, or pip)
+pre-commit-install-tool:
+    #!/usr/bin/env bash
+    if command -v pre-commit &> /dev/null; then
+        echo "pre-commit is already installed: $(pre-commit --version)"
+        exit 0
+    fi
+    if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &> /dev/null; then
+        echo "Installing pre-commit via Homebrew..."
+        brew install pre-commit
+    elif command -v uv &> /dev/null; then
+        echo "Installing pre-commit via uv..."
+        uv tool install pre-commit
+    elif command -v pip &> /dev/null; then
+        echo "Installing pre-commit via pip..."
+        pip install pre-commit
+    else
+        echo "Error: No package manager found. Install brew, uv, or pip first."
+        exit 1
+    fi
+    echo "pre-commit installed: $(pre-commit --version)"
+
+# Set up pre-commit hooks in the repository
+pre-commit-setup: pre-commit-install-tool
+    pre-commit install
+    @echo "Pre-commit hooks installed successfully!"
+    @echo "Hooks will now run automatically on git commit."
+
+# Run pre-commit on all files
+pre-commit-run-all:
+    pre-commit run --all-files
+
+# Run pre-commit on staged files only
+pre-commit-run:
+    pre-commit run
+
+# Update pre-commit hooks to latest versions
+pre-commit-update:
+    pre-commit autoupdate
+
+# Uninstall pre-commit hooks
+pre-commit-uninstall:
+    pre-commit uninstall
+
+# Check for secrets in .specstory (reports only)
+check-specstory:
+    ./scripts/redact_specstory.py || true
+
+# Auto-redact secrets in .specstory and stage files
+redact-specstory:
+    ./scripts/redact_specstory.py --fix
+
+# Scan entire repository for secrets with gitleaks
+gitleaks-scan:
+    gitleaks detect --source . --verbose
+
+# Scan git history for secrets (thorough but slower)
+gitleaks-scan-history:
+    gitleaks detect --source . --verbose --log-opts="--all"
+
+# ============================================================================
 # Development
 # ============================================================================
 
 # Run all linting checks
-lint: ansible-syntax-check
+lint: ansible-syntax-check pre-commit-run-all
 
 # Run tests (docker test suite)
 test: docker-test
@@ -141,6 +205,11 @@ setup-macos: chezmoi-apply ansible-macos
 
 # Full Linux setup
 setup-linux: chezmoi-apply ansible-linux
+
+# Set up development environment (includes security hooks)
+setup-dev: pre-commit-setup
+    @echo "Development environment ready!"
+    @echo "Run 'just pre-commit-run-all' to scan existing files."
 
 # Show system info
 info:

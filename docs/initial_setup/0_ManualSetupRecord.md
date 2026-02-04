@@ -58,3 +58,13 @@ And will update the `~/.config/chezmoi/chezmoi.toml` file accordingly.
 ---
 
 (After setup CLAUDE.md I mostly ask it to update, so please checkout [`.specstory/history/`](../../.specstory/history/) instead)
+
+---
+
+- [ohmyzsh/ohmyzsh: 🙃 A delightful community-driven (with 2,400+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python, etc), 140+ themes to spice up your morning, and an auto-update tool that makes it easy to keep up with the latest updates from the community.](https://github.com/ohmyzsh/ohmyzsh?tab=readme-ov-file#manual-installation)
+
+The oh-my-zsh setup script `sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"` actually do more than what we need
+That install zsh & chsh stuff should be manage by Ansible; ~/.oh-my-zsh/custom/ $ZSH_CUSTOM stuff should be managed by chezmoi (and put in different place so we can clone oh-my-zsh repo normally)
+
+oh-my-zsh actually just initialize ~/.zshrc by the templates <https://github.com/ohmyzsh/ohmyzsh/blob/master/templates/zshrc.zsh-template>
+We better make it clean <https://github.com/ohmyzsh/ohmyzsh/blob/master/templates/minimal.zshrc>

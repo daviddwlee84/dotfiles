@@ -28,3 +28,9 @@ scripts/adhoc/
 
 # markdownlint (nvim mfussenegger/nvim-lint)
 .markdownlint.jsonc
+
+# Pre-commit and security configuration (development only)
+.pre-commit-config.yaml
+.gitleaks.toml
+.gitignore
+scripts/redact_specstory.py

@@ -1,0 +1,18 @@
+# Gitleaks configuration for dotfiles repository
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "Dotfiles Gitleaks Config"
+
+# Extend the default gitleaks ruleset
+[extend]
+useDefault = true
+
+# Allow chezmoi template patterns (not secrets)
+[allowlist]
+  description = "Chezmoi templates"
+  regexes = [
+    # Chezmoi template variables: {{ .email }}, {{ .name }}
+    '''(?i)\{\{\s*\.?\w+\s*\}\}''',
+    # Chezmoi prompt functions: {{ promptString ... }}
+    '''(?i)\{\{\s*prompt(String|Bool)(Once)?\s+.*\}\}''',
+  ]

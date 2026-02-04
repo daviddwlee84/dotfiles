@@ -260,7 +260,7 @@ Now I have a good understanding. Let me update both files:
    - Core dependencies (chezmoi + ansible)
    - Quick setup steps
    - What you get (configs + tools)
-   
+
 2. CLAUDE.md - Add a section about maintaining README.md
 </details></think>
 
