@@ -20,6 +20,9 @@
     - role: lazyvim_deps
       tags: [lazyvim_deps]
 
+    - role: devtools
+      tags: [devtools]
+
     - role: nerdfonts
       tags: [nerdfonts]
 

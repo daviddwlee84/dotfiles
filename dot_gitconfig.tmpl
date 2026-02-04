@@ -12,3 +12,11 @@
     defaultBranch = main
 [core]
     hooksPath = ~/.config/git/hooks
+{{- if lookPath "delta" }}
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true
+    side-by-side = true
+{{- end }}

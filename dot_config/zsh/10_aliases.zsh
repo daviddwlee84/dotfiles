@@ -1,7 +1,6 @@
 # 10_aliases.zsh - Common aliases
 
 # --- Your existing aliases ---
-alias cd="z"
 alias v="nvim"
 
 # --- Suggested aliases (uncomment to enable) ---

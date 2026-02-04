@@ -36,6 +36,7 @@ This automatically:
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli
+- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms
