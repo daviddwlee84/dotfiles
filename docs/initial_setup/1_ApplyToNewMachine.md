@@ -20,3 +20,9 @@ Use Homebrew for every UNIX-based machine?!
 
 Sync mac
 <https://www.chezmoi.io/user-guide/machines/macos/>
+
+```bash
+# Ubuntu
+# https://www.chezmoi.io/install/#__tabbed_5_5
+sudo snap install chezmoi --classic
+```

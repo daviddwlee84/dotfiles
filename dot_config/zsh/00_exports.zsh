@@ -1,11 +1,14 @@
 # 00_exports.zsh - Environment variables
 
 # Editor
-if [[ -n $SSH_CONNECTION ]]; then
-    export EDITOR='vim'
-else
-    export EDITOR='nvim'
-fi
+# if [[ -n $SSH_CONNECTION ]]; then
+#     export EDITOR='vim'
+# else
+#     export EDITOR='nvim'
+# fi
+# Let's always use nvim (but sometimes, when the latency is high,
+# some animation might be slow)
+export EDITOR='nvim'
 export VISUAL="$EDITOR"
 
 # Language

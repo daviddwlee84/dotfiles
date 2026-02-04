@@ -25,3 +25,9 @@ Future enhancements for the dotfiles repository.
 - [ ] pnpm (package manager)
 - [ ] rust/cargo
 - [ ] go
+
+---
+
+Fix Claude Code hook on Ubuntu `Stop hook error: Failed with non-blocking status code: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Notifications was not provided by any .service files`
+
+Use mise to manage most of the runtime version?!

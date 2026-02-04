@@ -14,10 +14,12 @@ Cross-platform development environment setup using **chezmoi** + **ansible**.
 
 ```bash
 # One-liner to initialize and apply
-chezmoi init --apply <your-github-username>
+export GITHUB_USERNAME=daviddwlee84
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
 ```
 
 This automatically:
+
 1. Bootstraps ansible via `uv`
 2. Runs base ansible playbook (git, ripgrep, fd, etc.)
 3. Runs OS-specific playbook (macOS/Linux)
@@ -26,6 +28,7 @@ This automatically:
 ## What You Get
 
 ### Config Files
+
 - `~/.gitconfig` - Git configuration
 - `~/.config/nvim/` - Neovim (LazyVim) configuration
 - `~/.config/uv/uv.toml` - uv package manager config
@@ -34,6 +37,7 @@ This automatically:
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
 
 ### Tools (via ansible)
+
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
