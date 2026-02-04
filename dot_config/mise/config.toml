@@ -1,0 +1,6 @@
+# mise global configuration
+# https://mise.jdx.dev/configuration.html
+
+[tools]
+# Node.js LTS for LazyVim LSP servers and tree-sitter-cli
+node = "lts"

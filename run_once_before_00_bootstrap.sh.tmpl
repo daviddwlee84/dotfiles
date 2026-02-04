@@ -1,5 +1,5 @@
 #!/bin/bash
-# Bootstrap script - installs uv, ansible, and galaxy collections
+# Bootstrap script - installs uv, ansible, mise, and galaxy collections
 # Runs BEFORE any ansible playbooks
 
 set -e
@@ -27,20 +27,45 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Ensure PATH includes local bin
+export PATH="$HOME/.local/bin:$PATH"
+
 # 1. Install uv if missing
 if ! command -v uv &> /dev/null; then
     info "Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
     success "uv installed successfully"
 else
     info "uv is already installed"
 fi
 
-# Ensure PATH includes uv location
-export PATH="$HOME/.local/bin:$PATH"
+# 2. Install mise if missing (runtime manager for Node.js, etc.)
+if ! command -v mise &> /dev/null; then
+    info "Installing mise..."
+    # Try curl installer first (fast, no sudo)
+    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
+        success "mise installed via curl"
+    else
+        # Fallback to apt for GFW environments
+        warn "curl installer failed/timed out, trying apt..."
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update -y
+            sudo apt-get install -y curl gpg
+            sudo install -dm 755 /etc/apt/keyrings
+            curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
+            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+            sudo apt-get update -y
+            sudo apt-get install -y mise
+            success "mise installed via apt"
+        else
+            error "Could not install mise - please install manually"
+        fi
+    fi
+else
+    info "mise is already installed"
+fi
 
-# 2. Install ansible if missing
+# 3. Install ansible if missing
 if ! command -v ansible-playbook &> /dev/null; then
     info "Installing ansible via uv..."
     uv tool install ansible-core
@@ -49,9 +74,18 @@ else
     info "ansible is already installed"
 fi
 
-# 3. Install ansible-galaxy collections
+# 4. Install ansible-galaxy collections
 info "Installing ansible-galaxy collections..."
 ansible-galaxy collection install community.general --force-with-deps
 success "ansible-galaxy collections installed"
+
+# 5. Install mise global tools (Node.js) if mise config exists
+MISE_BIN="${HOME}/.local/bin/mise"
+[[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
+if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
+    info "Installing mise global tools..."
+    "$MISE_BIN" install --yes
+    success "mise tools installed"
+fi
 
 success "Bootstrap complete!"

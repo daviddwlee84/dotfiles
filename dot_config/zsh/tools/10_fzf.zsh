@@ -1,10 +1,23 @@
 # 10_fzf.zsh - fzf configuration
 
+# Add git-installed fzf to PATH if present
+[[ -d "$HOME/.fzf/bin" ]] && export PATH="$HOME/.fzf/bin:$PATH"
+
 # Check if fzf is installed
 command -v fzf &>/dev/null || return 0
 
 # Load fzf shell integration
-source <(fzf --zsh)
+# fzf 0.48.0+ supports --zsh flag, older versions need separate script files
+if fzf --zsh &>/dev/null; then
+    source <(fzf --zsh)
+elif [[ -f ~/.fzf.zsh ]]; then
+    # Git-installed fzf (if install script was run with shell integration)
+    source ~/.fzf.zsh
+elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+    # Debian/Ubuntu apt-installed fzf (fallback for old versions)
+    source /usr/share/doc/fzf/examples/key-bindings.zsh
+    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+fi
 
 # Default options
 export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"

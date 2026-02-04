@@ -12,18 +12,60 @@
       - node
     state: present
 
-# Linux - mixed sources
-- name: Install LazyVim dependencies from apt (Debian/Ubuntu)
+# Linux - find mise binary (installed by bootstrap)
+- name: Check for user-installed mise
   when: ansible_facts["os_family"] == "Debian"
-  become: true
-  tags: [sudo]
-  ansible.builtin.apt:
-    name:
-      - fzf
-      - nodejs
-      - npm
-    state: present
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: mise_user_bin
 
+- name: Set mise binary path (user install)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - mise_user_bin.stat.exists | default(false)
+  ansible.builtin.set_fact:
+    mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+
+- name: Set mise binary path (system install)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - mise_bin is not defined
+  ansible.builtin.set_fact:
+    mise_bin: /usr/bin/mise
+
+# Install mise tools from ~/.config/mise/config.toml (node@lts)
+- name: Install mise global tools (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command:
+    cmd: "{{ mise_bin }} install --yes"
+  register: mise_install
+  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+
+# fzf - install via git for latest version (apt version is outdated and lacks --zsh flag)
+- name: Check if fzf is installed via git
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.fzf"
+  register: fzf_git_dir
+
+- name: Clone fzf from GitHub
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - not fzf_git_dir.stat.exists
+  ansible.builtin.git:
+    repo: https://github.com/junegunn/fzf.git
+    dest: "{{ ansible_facts['env']['HOME'] }}/.fzf"
+    depth: 1
+
+- name: Install fzf (binary only, shell integration handled by zsh config)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - not fzf_git_dir.stat.exists
+  ansible.builtin.command:
+    cmd: "{{ ansible_facts['env']['HOME'] }}/.fzf/install --bin"
+  changed_when: true
+
+# lazygit
 - name: Check if lazygit is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: lazygit --version
@@ -86,6 +128,7 @@
         path: /tmp/lazygit.tar.gz
         state: absent
 
+# tree-sitter-cli
 - name: Check if tree-sitter is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: tree-sitter --version
@@ -93,39 +136,28 @@
   changed_when: false
   failed_when: false
 
-- name: Check Node.js version for tree-sitter-cli
+- name: Install tree-sitter-cli via mise npm (Debian/Ubuntu)
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
-  ansible.builtin.command: node --version
-  register: node_version
-  changed_when: false
-  failed_when: false
-
-- name: Install tree-sitter-cli via npm (Node >= 14)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - treesitter_check.rc != 0
-    - node_version.stdout is defined
-    - node_version.stdout | regex_replace('^v', '') is version('14.0.0', '>=')
-  become: true
-  tags: [sudo]
-  community.general.npm:
-    name: tree-sitter-cli
-    global: true
-    state: present
+  ansible.builtin.shell: |
+    {{ mise_bin }} exec -- npm install -g tree-sitter-cli
+  args:
+    executable: /bin/bash
+  register: treesitter_npm
+  changed_when: "'added' in treesitter_npm.stdout or 'added' in treesitter_npm.stderr"
   ignore_errors: true
 
 - name: Install tree-sitter-cli via cargo (fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
-    - node_version.stdout is not defined or node_version.stdout | regex_replace('^v', '') is version('14.0.0', '<')
+    - treesitter_npm is failed
   ansible.builtin.shell: |
     if command -v cargo >/dev/null 2>&1; then
       cargo install tree-sitter-cli
     else
-      echo "Neither modern Node.js nor cargo available for tree-sitter-cli"
+      echo "Neither Node.js nor cargo available for tree-sitter-cli"
       echo "Install manually: cargo install tree-sitter-cli"
       exit 0
     fi

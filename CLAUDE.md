@@ -77,7 +77,7 @@ ansible-playbook playbooks/macos.yml --check
 | `homebrew` | macOS Homebrew installation |
 | `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting) |
 | `neovim` | Neovim (>= 0.11.2) |
-| `lazyvim_deps` | fzf, lazygit, tree-sitter-cli |
+| `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
 | `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `security_tools` | pre-commit, gitleaks |
@@ -87,16 +87,16 @@ ansible-playbook playbooks/macos.yml --check
 | Profile | OS | Package Manager |
 |---------|-----|-----------------|
 | `macos` | macOS | Homebrew |
-| `ubuntu_desktop` | Ubuntu Desktop | apt + snap |
-| `ubuntu_server` | Ubuntu Server | apt + snap |
+| `ubuntu_desktop` | Ubuntu Desktop | apt + snap + mise |
+| `ubuntu_server` | Ubuntu Server | apt + snap + mise |
 
 ## LazyVim Requirements
 
 - Neovim >= 0.11.2
 - ripgrep, fd
-- Node.js (for LSP servers)
+- Node.js (via mise on Linux, Homebrew on macOS)
 - tree-sitter-cli
-- lazygit, fzf
+- lazygit, fzf (via git on Linux, Homebrew on macOS)
 
 ## Directory Structure
 

@@ -36,7 +36,11 @@ This automatically:
 ### Tools (via ansible)
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
-- **LazyVim deps**: fzf, lazygit, tree-sitter-cli
+- **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
+
+### Bootstrap (installed before ansible)
+- **uv**: Python package manager for ansible
+- **mise**: Runtime manager for Node.js (ensures latest versions)
 - **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
