@@ -11,6 +11,9 @@
     - role: base
       tags: [base]
 
+    - role: zsh
+      tags: [zsh]
+
     - role: neovim
       tags: [neovim]
 

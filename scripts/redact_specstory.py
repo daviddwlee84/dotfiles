@@ -8,38 +8,80 @@ Check for secrets in .specstory/history/ files using gitleaks.
 Reports findings and suggests redaction format (sk-abc...xyz).
 
 Usage:
-    ./scripts/redact_specstory.py          # Check only (default)
-    ./scripts/redact_specstory.py --fix    # Auto-redact and stage files
+    ./scripts/redact_specstory.py              # Check staged files (default)
+    ./scripts/redact_specstory.py --fix        # Auto-redact and re-stage files
+    ./scripts/redact_specstory.py --working-dir  # Scan working directory instead of staged
 """
 import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
-def run_gitleaks_detect(target_path: str) -> list[dict]:
-    """Run gitleaks and return findings as JSON."""
-    result = subprocess.run(
-        [
-            "gitleaks",
-            "detect",
-            "--source",
-            target_path,
-            "--report-format",
-            "json",
-            "--report-path",
-            "/dev/stdout",
-            "--no-git",
-            "--exit-code",
-            "0",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if not result.stdout.strip():
+def run_gitleaks_staged() -> list[dict]:
+    """Run gitleaks on staged files and return findings as JSON."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        report_path = f.name
+
+    try:
+        subprocess.run(
+            [
+                "gitleaks",
+                "protect",
+                "--staged",
+                "--report-format",
+                "json",
+                "--report-path",
+                report_path,
+                "--exit-code",
+                "0",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        content = Path(report_path).read_text()
+        if not content.strip():
+            return []
+        return json.loads(content)
+    except (json.JSONDecodeError, FileNotFoundError):
         return []
-    return json.loads(result.stdout)
+    finally:
+        Path(report_path).unlink(missing_ok=True)
+
+
+def run_gitleaks_workdir(target_path: str) -> list[dict]:
+    """Run gitleaks on working directory and return findings as JSON."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        report_path = f.name
+
+    try:
+        subprocess.run(
+            [
+                "gitleaks",
+                "detect",
+                "--source",
+                target_path,
+                "--report-format",
+                "json",
+                "--report-path",
+                report_path,
+                "--no-git",
+                "--exit-code",
+                "0",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        content = Path(report_path).read_text()
+        if not content.strip():
+            return []
+        return json.loads(content)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+    finally:
+        Path(report_path).unlink(missing_ok=True)
 
 
 def redact_secret(secret: str, keep_chars: int = 3) -> str:
@@ -69,12 +111,22 @@ def redact_file(file_path: Path, findings: list[dict]) -> bool:
     return False
 
 
+def filter_specstory(findings: list[dict]) -> list[dict]:
+    """Filter findings to only include .specstory/history/ files."""
+    return [f for f in findings if ".specstory/history/" in f.get("File", "")]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check/redact secrets in .specstory/history/ files"
     )
     parser.add_argument(
-        "--fix", action="store_true", help="Auto-redact secrets and stage files"
+        "--fix", action="store_true", help="Auto-redact secrets and re-stage files"
+    )
+    parser.add_argument(
+        "--working-dir",
+        action="store_true",
+        help="Scan working directory instead of staged files (default: scan staged)",
     )
     args = parser.parse_args()
 
@@ -84,12 +136,19 @@ def main():
         return 0
 
     # Detect secrets
-    findings = run_gitleaks_detect(str(specstory_path))
+    if args.working_dir:
+        print("Scanning working directory...")
+        findings = run_gitleaks_workdir(str(specstory_path))
+    else:
+        print("Scanning staged files...")
+        all_findings = run_gitleaks_staged()
+        findings = filter_specstory(all_findings)
+
     if not findings:
         print("No secrets found in .specstory/history/")
         return 0
 
-    print(f"Found {len(findings)} potential secret(s) in .specstory/history/:\n")
+    print(f"\nFound {len(findings)} potential secret(s) in .specstory/history/:\n")
 
     # Group by file
     by_file: dict[str, list[dict]] = {}
@@ -119,13 +178,14 @@ def main():
             subprocess.run(["git", "add", str(f)], check=True)
             print(f"  Redacted and staged: {f}")
 
-        # Verify
-        remaining = run_gitleaks_detect(str(specstory_path))
+        # Verify - check staged files again
+        print("\nVerifying...")
+        remaining = filter_specstory(run_gitleaks_staged())
         if remaining:
-            print(f"\nERROR: {len(remaining)} secrets still detected after redaction!")
+            print(f"ERROR: {len(remaining)} secrets still detected after redaction!")
             return 1
 
-        print(f"\nSuccessfully redacted {len(modified_files)} file(s)")
+        print(f"Successfully redacted {len(modified_files)} file(s)")
         return 0
     else:
         print("Run with --fix to auto-redact these secrets")

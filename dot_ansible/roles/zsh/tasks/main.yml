@@ -1,0 +1,39 @@
+---
+# Zsh role - install zsh, oh-my-zsh, and plugins
+
+# Install zsh package
+- name: Install zsh (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: zsh
+    state: present
+
+- name: Install zsh (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: zsh
+    state: present
+
+# Install oh-my-zsh (manual installation)
+- name: Check if oh-my-zsh is installed
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh"
+  register: ohmyzsh_check
+
+- name: Clone oh-my-zsh
+  when: not ohmyzsh_check.stat.exists
+  ansible.builtin.git:
+    repo: "{{ oh_my_zsh_repo }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh"
+    depth: 1
+
+# Clone zsh plugins to ZSH_CUSTOM/plugins
+- name: Clone zsh plugins
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh/custom/plugins/{{ item.name }}"
+    depth: 1
+    update: false
+  loop: "{{ zsh_plugins }}"

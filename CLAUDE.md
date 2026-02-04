@@ -75,6 +75,7 @@ ansible-playbook playbooks/macos.yml --check
 |-----|-------------|
 | `base` | git, curl, ripgrep, fd, build tools |
 | `homebrew` | macOS Homebrew installation |
+| `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli |
 | `security_tools` | pre-commit, gitleaks |

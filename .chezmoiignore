@@ -34,3 +34,6 @@ scripts/adhoc/
 .gitleaks.toml
 .gitignore
 scripts/redact_specstory.py
+
+# Zsh secrets file (API keys, tokens, proxy - never track)
+.config/zsh/secrets.zsh

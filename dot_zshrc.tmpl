@@ -1,0 +1,41 @@
+# ~/.zshrc - Interactive shell configuration
+# Managed by chezmoi - do not edit directly
+
+# =============================================================================
+# Oh-My-Zsh Configuration
+# =============================================================================
+
+# Theme
+ZSH_THEME="robbyrussell"
+
+# Plugins (from $ZSH/plugins/ and $ZSH_CUSTOM/plugins/)
+plugins=(
+    git
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+)
+
+# Load Oh-My-Zsh
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
+# =============================================================================
+# Modular Configuration Loader
+# =============================================================================
+
+# Load all .zsh files from a directory (sorted by filename)
+load_zsh_dir() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return 0
+    setopt local_options null_glob
+    local f
+    for f in "$dir"/*.zsh; do
+        [[ -r "$f" ]] && source "$f"
+    done
+}
+
+# Load modular configs
+load_zsh_dir "$ZSH_CONFIG_DIR"
+load_zsh_dir "$ZSH_CONFIG_DIR/tools"
+
+# Load secrets (not tracked by chezmoi)
+[[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh"

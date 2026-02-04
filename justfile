@@ -163,13 +163,17 @@ pre-commit-update:
 pre-commit-uninstall:
     pre-commit uninstall
 
-# Check for secrets in .specstory (reports only)
+# Check for secrets in staged .specstory files (reports only)
 check-specstory:
     ./scripts/redact_specstory.py || true
 
-# Auto-redact secrets in .specstory and stage files
+# Auto-redact secrets in staged .specstory files and re-stage
 redact-specstory:
     ./scripts/redact_specstory.py --fix
+
+# Check for secrets in working directory .specstory files
+check-specstory-workdir:
+    ./scripts/redact_specstory.py --working-dir || true
 
 # Scan entire repository for secrets with gitleaks
 gitleaks-scan:
