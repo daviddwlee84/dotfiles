@@ -9,18 +9,44 @@ ARG CHEZMOI_PROFILE=ubuntu_server
 ARG CHEZMOI_EMAIL=docker@example.com
 ARG CHEZMOI_NAME="Docker User"
 ARG CHEZMOI_USE_CHINESE_MIRROR=false
+ARG CHEZMOI_GITLEAKS_ALL_REPOS=false
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# First install ca-certificates from default repos (required for HTTPS mirrors)
+# Configure HTTP mirror BEFORE installing ca-certificates (if in China)
+# This solves the chicken-and-egg problem: HTTPS mirrors need ca-certificates,
+# but installing ca-certificates from default repos fails under GFW
+# Uses HTTP (not HTTPS) since ca-certificates isn't installed yet
+RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
+        ARCH=$(dpkg --print-architecture) && \
+        if [ "$ARCH" = "amd64" ]; then \
+            MIRROR_URL="http://repo.huaweicloud.com/ubuntu"; \
+        else \
+            MIRROR_URL="http://repo.huaweicloud.com/ubuntu-ports"; \
+        fi && \
+        printf '%s\n' \
+            "Types: deb" \
+            "URIs: ${MIRROR_URL}" \
+            "Suites: noble noble-updates noble-backports" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+            "" \
+            "Types: deb" \
+            "URIs: ${MIRROR_URL}" \
+            "Suites: noble-security" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+            > /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
+# Install ca-certificates (now using HTTP mirror if in China, default repos otherwise)
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure Huawei Cloud mirror for faster downloads in China (if enabled)
-# Ubuntu 24.04 uses DEB822 format in /etc/apt/sources.list.d/ubuntu.sources
-# Handles both amd64 (ubuntu) and arm64 (ubuntu-ports)
+# Upgrade to HTTPS mirror after ca-certificates is installed (if in China)
+# HTTPS is more secure for subsequent package installations
 RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
         ARCH=$(dpkg --print-architecture) && \
         if [ "$ARCH" = "amd64" ]; then \
@@ -83,7 +109,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptString "profile (ubuntu_server|ubuntu_desktop|macos)=${CHEZMOI_PROFILE}" \
     --promptString "What is your email address=${CHEZMOI_EMAIL}" \
     --promptString "What is your full name=${CHEZMOI_NAME}" \
-    --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}"
+    --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}" \
+    --promptBool "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)=${CHEZMOI_GITLEAKS_ALL_REPOS}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

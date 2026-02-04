@@ -33,7 +33,7 @@ docker-down:
 
 # Run test suite in container
 docker-test:
-    docker compose run --rm test
+    docker compose run --build --rm test
 
 # Build and run desktop profile
 docker-desktop:
