@@ -66,11 +66,57 @@
         classic: true
         state: present
 
-- name: Warn if Neovim version is too old and snap unavailable
+- name: Install Neovim from GitHub releases if snap unavailable
   when:
     - ansible_facts["os_family"] == "Debian"
     - nvim_apt_version.stdout is defined
     - nvim_apt_version.stdout is version(neovim_min_version, '<')
     - snap_check.rc != 0
-  ansible.builtin.debug:
-    msg: "WARNING: Neovim {{ nvim_apt_version.stdout }} is older than required {{ neovim_min_version }}, but snap is not available. Some LazyVim features may not work."
+  become: true
+  tags: [sudo]
+  block:
+    - name: Remove apt Neovim (before GitHub install)
+      ansible.builtin.apt:
+        name: neovim
+        state: absent
+
+    - name: Get latest Neovim release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/neovim/neovim/releases/latest
+        return_content: true
+      register: nvim_release
+
+    - name: Download Neovim tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/neovim/neovim/releases/download/{{ nvim_release.json.tag_name }}/nvim-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        dest: /tmp/nvim.tar.gz
+        mode: '0644'
+
+    - name: Create /opt/nvim directory
+      ansible.builtin.file:
+        path: /opt/nvim
+        state: directory
+        mode: '0755'
+
+    - name: Extract Neovim
+      ansible.builtin.unarchive:
+        src: /tmp/nvim.tar.gz
+        dest: /opt/nvim
+        remote_src: true
+        extra_opts:
+          - --strip-components=1
+
+    - name: Create nvim symlink
+      ansible.builtin.file:
+        src: /opt/nvim/bin/nvim
+        dest: /usr/local/bin/nvim
+        state: link
+
+    - name: Clean up Neovim tarball
+      ansible.builtin.file:
+        path: /tmp/nvim.tar.gz
+        state: absent
+
+    - name: Display installed Neovim version
+      ansible.builtin.debug:
+        msg: "Installed Neovim {{ nvim_release.json.tag_name }} from GitHub releases"

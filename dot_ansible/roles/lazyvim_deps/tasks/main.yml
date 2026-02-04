@@ -69,7 +69,7 @@
 
     - name: Download lazygit binary
       ansible.builtin.get_url:
-        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_architecture | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
 

@@ -1,15 +1,21 @@
 # https://docs.astral.sh/uv/concepts/configuration-files/
 
 {{- if .useChineseMirror }}
-# Use Tsinghua PyPI mirror for faster downloads in China
-# https://mirrors.tuna.tsinghua.edu.cn/help/pypi/
+# Chinese PyPI mirrors for faster downloads behind GFW
+# Primary: Tsinghua TUNA - https://mirrors.tuna.tsinghua.edu.cn/help/pypi/
+# Backup: Aliyun - https://developer.aliyun.com/mirror/pypi
 
 # Modern syntax for uv sync, uv lock, uv add, etc.
 [[index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
 
+[[index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+name = "aliyun"
+
 # Legacy pip-compatible syntax for uv pip commands
 [pip]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+extra-index-url = ["https://mirrors.aliyun.com/pypi/simple/"]
 {{- end }}
