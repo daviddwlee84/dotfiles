@@ -36,6 +36,18 @@ chezmoi repo/
 └── run_once_*.tmpl  → triggers ansible on first apply
 ```
 
+Installation Order:
+```
+1. Bootstrap (curl installers)
+   ├── uv → ansible
+   └── mise → Node.js
+2. chezmoi apply
+   ├── Config files → ~/.*
+   └── Ansible → ~/.ansible/
+3. Ansible playbooks
+   └── base → zsh → neovim → devtools → python_uv_tools
+```
+
 ## Chezmoi Commands
 
 ```bash
@@ -81,6 +93,7 @@ ansible-playbook playbooks/macos.yml --check
 | `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `security_tools` | pre-commit, gitleaks |
+| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 
 ## Profiles
 

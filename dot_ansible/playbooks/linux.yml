@@ -28,3 +28,6 @@
 
     - role: security_tools
       tags: [security_tools]
+
+    - role: python_uv_tools
+      tags: [python_uv_tools]

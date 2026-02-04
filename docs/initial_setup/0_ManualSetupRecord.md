@@ -74,3 +74,5 @@ We better make it clean <https://github.com/ohmyzsh/ohmyzsh/blob/master/template
 
 - [交互模式 - Claude Code Docs](https://code.claude.com/docs/zh-CN/interactive-mode)
 - [优化您的终端设置 - Claude Code Docs](https://code.claude.com/docs/zh-CN/terminal-config)
+
+chezmoi 當入口 + ansible 管系統依賴 + mise 管 node/bun + uv 管 python

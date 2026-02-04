@@ -1,0 +1,21 @@
+---
+# Python CLI tools installed via uv tool install
+# Each tool has:
+#   - name: package name (can include extras like [cli])
+#   - binary: executable name to check for idempotency
+#   - with: (optional) additional dependency to install with --with
+
+python_uv_tools:
+  - name: apprise
+    binary: apprise
+  - name: sqlit-tui
+    binary: sqlit
+  - name: python-dotenv[cli]
+    binary: dotenv
+  - name: git-filter-repo
+    binary: git-filter-repo
+  - name: mlflow
+    binary: mlflow
+  - name: litellm[proxy]
+    binary: litellm
+    with: httpx[socks]

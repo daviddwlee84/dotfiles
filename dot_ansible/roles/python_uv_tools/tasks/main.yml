@@ -1,0 +1,13 @@
+---
+# Python CLI tools via uv
+# uv is bootstrapped before ansible runs
+
+- name: Install Python CLI tools via uv
+  ansible.builtin.command: >-
+    uv tool install {{ item.name }}
+    {{ '--with ' + item.with if item.with is defined else '' }}
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
+  loop: "{{ python_uv_tools }}"
+  loop_control:
+    label: "{{ item.name }}"

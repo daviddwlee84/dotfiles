@@ -10,6 +10,33 @@ Cross-platform development environment setup using **chezmoi** + **ansible**.
 - [chezmoi](https://www.chezmoi.io/install/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (for ansible)
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Bootstrap["1. Bootstrap"]
+        UV[uv] --> ANS[ansible]
+        MISE[mise]
+    end
+
+    subgraph Chezmoi["2. chezmoi apply"]
+        DOT[Config files<br/>~/.gitconfig, ~/.config/]
+        ANSDIR[~/.ansible/]
+    end
+
+    subgraph Ansible["3. Ansible Playbooks"]
+        BASE[base]
+        ZSH[zsh]
+        NVIM[neovim]
+        DEVTOOLS[devtools]
+        UVTOOLS[python_uv_tools]
+    end
+
+    Bootstrap --> Chezmoi --> Ansible
+    MISE -.->|Node.js| NVIM
+    UV -.->|Python tools| UVTOOLS
+```
+
 ## Quick Setup
 
 ```bash

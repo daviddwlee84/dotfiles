@@ -17,9 +17,3 @@
   ansible.builtin.apt:
     name: libnotify-bin
     state: present
-
-# Cross-platform - apprise via uv
-- name: Install apprise via uv
-  ansible.builtin.command: uv tool install apprise
-  args:
-    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/apprise"
