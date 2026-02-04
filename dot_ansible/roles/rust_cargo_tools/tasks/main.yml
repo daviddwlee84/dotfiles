@@ -1,0 +1,94 @@
+---
+# Cargo CLI tools installation
+# Rust is installed via mise
+
+# =============================================================================
+# Ensure Rust is installed via mise
+# =============================================================================
+
+- name: Check for user-installed mise
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: mise_user_install
+
+- name: Set mise binary path
+  ansible.builtin.set_fact:
+    mise_bin: "{{ mise_user_install.stat.exists | ternary(ansible_facts['env']['HOME'] + '/.local/bin/mise', '/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' else '/usr/local/bin/mise') }}"
+
+- name: Install Rust via mise
+  ansible.builtin.command: "{{ mise_bin }} install rust@latest"
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/rust"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# =============================================================================
+# Install cargo tools (all platforms)
+# =============================================================================
+
+- name: Install Cargo CLI tools via cargo install
+  ansible.builtin.command: cargo install {{ item.name }}
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/{{ item.binary }}"
+  loop: "{{ cargo_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# =============================================================================
+# Pueue - macOS (via Homebrew)
+# =============================================================================
+
+- name: Install pueue via Homebrew (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: pueue
+    state: present
+
+# =============================================================================
+# Pueue - Linux (via cargo + systemd)
+# =============================================================================
+
+- name: Install pueue via cargo (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: cargo install pueue --locked
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/pueue"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Create systemd user directory
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user"
+    state: directory
+    mode: '0755'
+
+- name: Install pueued systemd user service
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.copy:
+    dest: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user/pueued.service"
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Pueue Daemon - CLI Process Queue
+      Documentation=https://github.com/Nukesor/pueue
+
+      [Service]
+      ExecStart=%h/.cargo/bin/pueued --verbose
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=default.target
+
+- name: Enable and start pueued service
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.systemd:
+    name: pueued
+    scope: user
+    enabled: true
+    state: started
+    daemon_reload: true
+  ignore_errors: true  # May fail in containers without systemd

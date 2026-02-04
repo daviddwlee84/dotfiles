@@ -115,8 +115,16 @@
 
 # === Gemini CLI ===
 
-- name: Install Gemini CLI (npm)
-  when: npm_check.rc == 0
+- name: Install Gemini CLI (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: gemini-cli
+    state: present
+
+- name: Install Gemini CLI (npm - Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - npm_check.rc == 0
   community.general.npm:
     name: "@google/gemini-cli"
     global: true

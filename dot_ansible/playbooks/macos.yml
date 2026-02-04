@@ -34,3 +34,6 @@
 
     - role: python_uv_tools
       tags: [python_uv_tools]
+
+    - role: rust_cargo_tools
+      tags: [rust_cargo_tools]

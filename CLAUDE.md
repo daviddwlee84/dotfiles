@@ -45,7 +45,7 @@ Installation Order:
    ├── Config files → ~/.*
    └── Ansible → ~/.ansible/
 3. Ansible playbooks
-   └── base → zsh → neovim → devtools → python_uv_tools
+   └── base → zsh → neovim → devtools → python_uv_tools → rust_cargo_tools
 ```
 
 ## Chezmoi Commands
@@ -95,6 +95,7 @@ ansible-playbook playbooks/macos.yml --check
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy |
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
+| `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 
 ## Profiles
 

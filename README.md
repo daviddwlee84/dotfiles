@@ -30,10 +30,12 @@ flowchart TB
         NVIM[neovim]
         DEVTOOLS[devtools]
         UVTOOLS[python_uv_tools]
+        CARGO[rust_cargo_tools]
     end
 
     Bootstrap --> Chezmoi --> Ansible
-    MISE -.->|Node.js| NVIM
+    MISE -.->|Node.js, Rust| NVIM
+    MISE -.->|Rust| CARGO
     UV -.->|Python tools| UVTOOLS
 ```
 
@@ -80,10 +82,11 @@ To change options later: `chezmoi init --force`
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Coding Agents** (optional): Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
+- **Cargo tools**: pueue (process queue manager)
 
 ### Bootstrap (installed before ansible)
 - **uv**: Python package manager for ansible
-- **mise**: Runtime manager for Node.js (ensures latest versions)
+- **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 

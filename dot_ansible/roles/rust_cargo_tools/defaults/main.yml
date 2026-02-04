@@ -1,0 +1,8 @@
+---
+# Cargo CLI tools installed via cargo install
+# pueue handled separately per platform
+# Add tools here as needed, e.g.:
+#   - name: ripgrep
+#     binary: rg
+
+cargo_tools: []
