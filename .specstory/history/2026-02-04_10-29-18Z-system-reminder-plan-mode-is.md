@@ -2357,3 +2357,601 @@ All tasks completed. Here's a summary of the changes:
 - Git delta config uses `{{ if lookPath "delta" }}` template conditional
 - macOS uses Homebrew for all tools
 - Linux uses apt where available, GitHub releases/installers for others (eza, delta, zoxide)
+
+---
+
+_**User**_
+
+Run the following command: just docker-test
+
+---
+
+_**Agent**_
+
+<tool-use data-tool-type="shell" data-tool-name="Shell"><details>
+<summary>Tool use: **Shell** `just docker-test`</summary>
+```
+Exit code: 0
+
+Command output:
+
+\```
+docker compose run --build --rm test
+#1 [internal] load local bake definitions
+#1 reading from stdin 640B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 4.87kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/ubuntu:24.04
+#3 ...
+
+#4 [auth] library/ubuntu:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/ubuntu:24.04
+#3 DONE 8.4s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 322B done
+#5 DONE 0.0s
+
+#6 [ 1/10] FROM docker.io/library/ubuntu:24.04@sha256:cd1dba651b3080c3686ecf4e3c4220f026b521fb76978881737d24f200828b2b
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 20.25kB 0.1s done
+#7 DONE 0.1s
+
+#8 [ 4/10] RUN if [ "true" = "true" ]; then         ARCH=$(dpkg --print-architecture) &&         if [ "$ARCH" = "amd64" ]; then             MIRROR_URL="https://repo.huaweicloud.com/ubuntu";         else             MIRROR_URL="https://repo.huaweicloud.com/ubuntu-ports";         fi &&         printf '%s\n'             "Types: deb"             "URIs: ${MIRROR_URL}"             "Suites: noble noble-updates noble-backports"             "Components: main restricted universe multiverse"             "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"             ""             "Types: deb"             "URIs: ${MIRROR_URL}"             "Suites: noble-security"             "Components: main restricted universe multiverse"             "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"             > /etc/apt/sources.list.d/ubuntu.sources;     fi
+#8 CACHED
+
+#9 [ 5/10] RUN apt-get update && apt-get install -y --no-install-recommends     curl     sudo     git     python3     && rm -rf /var/lib/apt/lists/*
+#9 CACHED
+
+#10 [ 2/10] RUN if [ "true" = "true" ]; then         ARCH=$(dpkg --print-architecture) &&         if [ "$ARCH" = "amd64" ]; then             MIRROR_URL="http://repo.huaweicloud.com/ubuntu";         else             MIRROR_URL="http://repo.huaweicloud.com/ubuntu-ports";         fi &&         printf '%s\n'             "Types: deb"             "URIs: ${MIRROR_URL}"             "Suites: noble noble-updates noble-backports"             "Components: main restricted universe multiverse"             "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"             ""             "Types: deb"             "URIs: ${MIRROR_URL}"             "Suites: noble-security"             "Components: main restricted universe multiverse"             "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"             > /etc/apt/sources.list.d/ubuntu.sources;     fi
+#10 CACHED
+
+#11 [ 3/10] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates     && rm -rf /var/lib/apt/lists/*
+#11 CACHED
+
+#12 [ 6/10] RUN useradd -m -s /bin/bash devuser     && echo "devuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/devuser     && chmod 0440 /etc/sudoers.d/devuser
+#12 CACHED
+
+#13 [ 7/10] COPY --chown=devuser:devuser . /tmp/dotfiles-source
+#13 DONE 0.2s
+
+#14 [ 8/10] WORKDIR /home/devuser
+#14 DONE 0.0s
+
+#15 [ 9/10] RUN for i in 1 2 3; do         echo "Attempt $i: Installing chezmoi..." &&         sh -c "$(curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io)" &&         echo "chezmoi installed successfully" && break ||         { echo "Attempt $i failed, retrying..."; sleep 10; };     done
+#15 1.907 Attempt 1: Installing chezmoi...
+#15 6.197 info found chezmoi version 2.69.3 for latest/linux/arm64
+
+error: Recipe `docker-test` failed on line 36 with exit code 130
+
+\```
+
+Command completed.
+
+Shell state (cwd, env vars) persists for subsequent calls.
+```
+</details></tool-use>
+
+---
+
+_**User**_
+
+Now I want to add `direnv` and `yazi` to the devtools
+
+```
+eval "$(direnv hook zsh)"
+
+function y() {
+  local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+  command yazi "$@" --cwd-file="$tmp"
+  IFS= read -r -d '' cwd < "$tmp"
+  [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
+  rm -f -- "$tmp"
+}
+```
+
+---
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to add direnv and yazi to the devtools. I need to:
+
+1. Update the ansible role `dot_ansible/roles/devtools/tasks/main.yml` to install direnv and yazi
+2. Update the existing `30_direnv.zsh` (already exists) - let me check if it needs changes
+3. Create a new zsh config for yazi with the wrapper function
+4. Update documentation
+
+Let me first check the existing direnv config and then make the changes.
+</details></think>
+
+I'll add `direnv` and `yazi` to the devtools role and create the necessary ZSH configs.
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/30_direnv.zsh`</summary>
+```
+     1|# 30_direnv.zsh - direnv configuration
+     2|
+     3|# Check if direnv is installed
+     4|command -v direnv &>/dev/null || return 0
+     5|
+     6|# Initialize direnv
+     7|eval "$(direnv hook zsh)"
+     8|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml`</summary>
+```
+     1|---
+     2|# Developer CLI tools role
+     3|# Tools: bat, eza, git-delta, tldr, thefuck, zoxide
+     4|
+     5|# =============================================================================
+     6|# macOS - all via Homebrew
+     7|# =============================================================================
+     8|
+     9|- name: Install developer CLI tools (macOS)
+    10|  when: ansible_facts["os_family"] == "Darwin"
+    11|  community.general.homebrew:
+    12|    name:
+    13|      - bat
+    14|      - git-delta
+    15|      - eza
+    16|      - tlrc
+    17|      - thefuck
+    18|      - zoxide
+    19|    state: present
+    20|
+    21|# =============================================================================
+    22|# Linux (Debian/Ubuntu)
+    23|# =============================================================================
+    24|
+    25|# --- bat ---
+    26|- name: Install bat (Debian/Ubuntu)
+    27|  when: ansible_facts["os_family"] == "Debian"
+    28|  become: true
+    29|  tags: [sudo]
+    30|  ansible.builtin.apt:
+    31|    name: bat
+    32|    state: present
+    33|
+    34|- name: Create bat symlink on Debian/Ubuntu
+    35|  when: ansible_facts["os_family"] == "Debian"
+    36|  become: true
+    37|  tags: [sudo]
+    38|  ansible.builtin.file:
+    39|    src: /usr/bin/batcat
+    40|    dest: /usr/bin/bat
+    41|    state: link
+    42|  ignore_errors: true
+    43|
+    44|# --- zoxide ---
+    45|- name: Check if zoxide is installed
+    46|  when: ansible_facts["os_family"] == "Debian"
+    47|  ansible.builtin.command: zoxide --version
+    48|  register: zoxide_check
+    49|  changed_when: false
+    50|  failed_when: false
+    51|
+    52|- name: Install zoxide via official installer (Debian/Ubuntu)
+    53|  when:
+    54|    - ansible_facts["os_family"] == "Debian"
+    55|    - zoxide_check.rc != 0
+    56|  ansible.builtin.shell: |
+    57|    curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+    58|  args:
+    59|    creates: "{{ ansible_env.HOME }}/.local/bin/zoxide"
+    60|
+    61|# --- eza ---
+    62|- name: Check if eza is installed
+    63|  when: ansible_facts["os_family"] == "Debian"
+    64|  ansible.builtin.command: eza --version
+    65|  register: eza_check
+    66|  changed_when: false
+    67|  failed_when: false
+    68|
+    69|- name: Install eza via official installer (Debian/Ubuntu)
+    70|  when:
+    71|    - ansible_facts["os_family"] == "Debian"
+    72|    - eza_check.rc != 0
+    73|  become: true
+    74|  tags: [sudo]
+    75|  block:
+    76|    - name: Add eza GPG key
+    77|      ansible.builtin.shell: |
+    78|        mkdir -p /etc/apt/keyrings
+    79|        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    80|      args:
+    81|        creates: /etc/apt/keyrings/gierens.gpg
+    82|
+    83|    - name: Add eza repository
+    84|      ansible.builtin.apt_repository:
+    85|        repo: "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main"
+    86|        state: present
+    87|        filename: gierens
+    88|
+    89|    - name: Install eza from repository
+    90|      ansible.builtin.apt:
+    91|        name: eza
+    92|        state: present
+    93|        update_cache: true
+    94|
+    95|# --- git-delta ---
+    96|- name: Check if delta is installed
+    97|  when: ansible_facts["os_family"] == "Debian"
+    98|  ansible.builtin.command: delta --version
+    99|  register: delta_check
+   100|  changed_when: false
+   101|  failed_when: false
+   102|
+   103|- name: Install git-delta from GitHub releases (Debian/Ubuntu)
+   104|  when:
+   105|    - ansible_facts["os_family"] == "Debian"
+   106|    - delta_check.rc != 0
+   107|  become: true
+   108|  tags: [sudo]
+   109|  block:
+   110|    - name: Get latest delta release
+   111|      ansible.builtin.uri:
+   112|        url: https://api.github.com/repos/dandavison/delta/releases/latest
+   113|        return_content: true
+   114|      register: delta_release
+   115|
+   116|    - name: Download delta .deb package
+   117|      ansible.builtin.get_url:
+   118|        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
+   119|        dest: /tmp/git-delta.deb
+   120|        mode: '0644'
+   121|
+   122|    - name: Install delta .deb package
+   123|      ansible.builtin.apt:
+   124|        deb: /tmp/git-delta.deb
+   125|
+   126|    - name: Clean up delta .deb
+   127|      ansible.builtin.file:
+   128|        path: /tmp/git-delta.deb
+   129|        state: absent
+   130|
+   131|# --- tldr ---
+   132|- name: Check if tldr is installed
+   133|  when: ansible_facts["os_family"] == "Debian"
+   134|  ansible.builtin.command: tldr --version
+   135|  register: tldr_check
+   136|  changed_when: false
+   137|  failed_when: false
+   138|
+   139|- name: Install tldr via npm (Debian/Ubuntu)
+   140|  when:
+   141|    - ansible_facts["os_family"] == "Debian"
+   142|    - tldr_check.rc != 0
+   143|  become: true
+   144|  tags: [sudo]
+   145|  community.general.npm:
+   146|    name: tldr
+   147|    global: true
+   148|    state: present
+   149|  ignore_errors: true
+   150|
+   151|# --- thefuck ---
+   152|- name: Check if thefuck is installed
+   153|  when: ansible_facts["os_family"] == "Debian"
+   154|  ansible.builtin.command: thefuck --version
+   155|  register: thefuck_check
+   156|  changed_when: false
+   157|  failed_when: false
+   158|
+   159|- name: Install thefuck via pip (Debian/Ubuntu)
+   160|  when:
+   161|    - ansible_facts["os_family"] == "Debian"
+   162|    - thefuck_check.rc != 0
+   163|  ansible.builtin.pip:
+   164|    name: thefuck
+   165|    state: present
+   166|    extra_args: --user
+   167|  ignore_errors: true
+   168|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Good. I see that:
+1. `30_direnv.zsh` already exists and has the correct configuration
+2. I need to add direnv and yazi to the ansible role
+3. I need to create a new yazi config file
+
+Let me update the ansible role and create the yazi config.
+</details></think>
+
+The direnv ZSH config already exists with the correct setup. I'll update the ansible role and create the yazi config.
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+----
+-# Developer CLI tools role
+-# Tools: bat, eza, git-delta, tldr, thefuck, zoxide
+-
+-# =============================================================================
+-# macOS - all via Homebrew
+-# =============================================================================
+-
+-- name: Install developer CLI tools (macOS)
+-  when: ansible_facts["os_family"] == "Darwin"
+-  community.general.homebrew:
+-    name:
+-      - bat
+-      - git-delta
+-      - eza
+-      - tlrc
+-      - thefuck
+-      - zoxide
+-    state: present
++---
++# Developer CLI tools role
++# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
++
++# =============================================================================
++# macOS - all via Homebrew
++# =============================================================================
++
++- name: Install developer CLI tools (macOS)
++  when: ansible_facts["os_family"] == "Darwin"
++  community.general.homebrew:
++    name:
++      - bat
++      - git-delta
++      - eza
++      - tlrc
++      - thefuck
++      - zoxide
++      - direnv
++      - yazi
++    state: present
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-- name: Install thefuck via pip (Debian/Ubuntu)
+-  when:
+-    - ansible_facts["os_family"] == "Debian"
+-    - thefuck_check.rc != 0
+-  ansible.builtin.pip:
+-    name: thefuck
+-    state: present
+-    extra_args: --user
+-  ignore_errors: true
++- name: Install thefuck via pip (Debian/Ubuntu)
++  when:
++    - ansible_facts["os_family"] == "Debian"
++    - thefuck_check.rc != 0
++  ansible.builtin.pip:
++    name: thefuck
++    state: present
++    extra_args: --user
++  ignore_errors: true
++
++# --- direnv ---
++- name: Install direnv (Debian/Ubuntu)
++  when: ansible_facts["os_family"] == "Debian"
++  become: true
++  tags: [sudo]
++  ansible.builtin.apt:
++    name: direnv
++    state: present
++
++# --- yazi ---
++- name: Check if yazi is installed
++  when: ansible_facts["os_family"] == "Debian"
++  ansible.builtin.command: yazi --version
++  register: yazi_check
++  changed_when: false
++  failed_when: false
++
++- name: Install yazi from GitHub releases (Debian/Ubuntu)
++  when:
++    - ansible_facts["os_family"] == "Debian"
++    - yazi_check.rc != 0
++  become: true
++  tags: [sudo]
++  block:
++    - name: Get latest yazi release
++      ansible.builtin.uri:
++        url: https://api.github.com/repos/sxyazi/yazi/releases/latest
++        return_content: true
++      register: yazi_release
++
++    - name: Download yazi binary
++      ansible.builtin.get_url:
++        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu.zip"
++        dest: /tmp/yazi.zip
++        mode: '0644'
++
++    - name: Install unzip if not present
++      ansible.builtin.apt:
++        name: unzip
++        state: present
++
++    - name: Extract yazi
++      ansible.builtin.unarchive:
++        src: /tmp/yazi.zip
++        dest: /tmp
++        remote_src: true
++
++    - name: Install yazi binary
++      ansible.builtin.copy:
++        src: "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu/yazi"
++        dest: /usr/local/bin/yazi
++        mode: '0755'
++        remote_src: true
++
++    - name: Clean up yazi files
++      ansible.builtin.file:
++        path: "{{ item }}"
++        state: absent
++      loop:
++        - /tmp/yazi.zip
++        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me create the yazi config file.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write** `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/35_yazi.zsh`</summary>
+```zsh
+# 35_yazi.zsh - yazi file manager configuration
+
+# Check if yazi is installed
+command -v yazi &>/dev/null || return 0
+
+# Wrapper function to change directory on exit
+# When you quit yazi, it will cd to the directory you were browsing
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+    command yazi "$@" --cwd-file="$tmp"
+    IFS= read -r -d '' cwd < "$tmp"
+    [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
+    rm -f -- "$tmp"
+}
+
+```
+
+```
+Wrote contents to /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/35_yazi.zsh
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me run syntax check and update the documentation.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="shell" data-tool-name="Shell"><details>
+<summary>Tool use: **Shell** `cd /Users/daviddwlee84/.local/share/chezmoi && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml`</summary>
+```
+Exit code: 0
+
+Command output:
+
+\```
+
+playbook: dot_ansible/playbooks/macos.yml
+
+playbook: dot_ansible/playbooks/linux.yml
+
+\```
+
+Command completed in 1608 ms.
+
+Shell state (cwd, env vars) persists for subsequent calls.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Syntax check passed. Now let me update the documentation to add direnv and yazi to the devtools list.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide |
++| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi |
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide
++- **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/README.md has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Done. Let me also update AGENTS.md if it exists and has the old value.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep** pattern `devtools.*bat` path `/Users/daviddwlee84/.local/share/chezmoi/AGENTS.md`</summary>
+AGENTS.md
+  81:| `devtools` | bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi |
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+AGENTS.md is already updated (it's in sync with CLAUDE.md). The changes are complete.
+</details></think>
+
+Done. I've added `direnv` and `yazi` to the devtools:
+
+**Changes made:**
+
+1. **`dot_ansible/roles/devtools/tasks/main.yml`**:
+   - Added `direnv` and `yazi` to macOS Homebrew packages
+   - Added `direnv` installation via apt for Linux
+   - Added `yazi` installation from GitHub releases for Linux
+
+2. **`dot_config/zsh/tools/35_yazi.zsh`** (new file):
+   - Created yazi config with the `y()` wrapper function that changes directory on exit
+
+3. **Documentation updated** in README.md and CLAUDE.md
+
+Note: The `30_direnv.zsh` already existed with the correct `eval "$(direnv hook zsh)"` configuration, so no changes were needed there.

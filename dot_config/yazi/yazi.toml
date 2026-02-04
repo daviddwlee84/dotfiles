@@ -1,0 +1,167 @@
+# ~/.config/yazi/yazi.toml
+[mgr]
+show_hidden = true
+
+# -----------------------
+# Open rules: 決定 Enter / o 的預設 opener，還有 O 的候選清單
+# -----------------------
+[open]
+rules = [
+  # 目錄：提供多種 opener 給 O 選
+  { name = "*/", use = ["edit", "git", "marimo_dir", "agent", "open"] },
+
+  # Python 檔：提供 marimo sandbox
+  { name = "*.py", use = ["edit", "marimo_py_sandbox", "open", "code"] },
+
+  # 文字/程式碼檔：edit/open/code
+  { mime = "text/*", use = ["edit", "open", "code"] },
+
+  # 其他：至少能 open
+  { mime = "*", use = ["open"] },
+]
+
+# -----------------------
+# Openers: 真正的「Open with」選項
+# -----------------------
+[opener]
+
+# --- edit：nvim，會把 cwd 切到目標（dir）或檔案所在資料夾（file）
+edit = [
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t" && exec nvim .
+else
+  cd "$(dirname "$t")" && exec nvim "$t"
+fi
+' -- "$1"
+""", block = true, desc = "Neovim (auto cd into dir)" },
+]
+
+# --- open：macOS 預設開啟
+open = [
+  { run = """sh -lc 'exec open "$1"' -- "$1" """, block = false, desc = "Open (macOS default)" },
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+[ -f .venv/bin/activate ] && source .venv/bin/activate
+# Use ipython from venv if available, otherwise fallback to python
+if [ -f .venv/bin/ipython ]; then
+  REPL=ipython
+elif command -v ipython >/dev/null 2>&1 && [ ! -f .venv/bin/activate ]; then
+  # Only use system ipython if no venv is active (to avoid the warning)
+  REPL=ipython
+else
+  REPL=python
+fi
+if [ -d "$t" ]; then
+  exec $REPL
+else
+  exec $REPL "$t"
+fi
+' -- "$1"
+""", block = true, desc = "ipython/python (auto cd, source .venv, fallback to python if no venv ipython)" },
+  # BUG: (if ipython not install in the .venv, fallback to python) /Users/daviddwlee84/miniforge3/lib/python3.12/site-packages/IPython/core/interactiveshell.py:937: UserWarning: Attempting to work in a virtualenv. If you encounter problems, please install IPython inside the virtualenv.
+#   { run = """sh -lc '
+# t="$1"
+# if [ -d "$t" ]; then
+#   cd "$t"
+# else
+#   cd "$(dirname "$t")"
+# fi
+# [ -f .venv/bin/activate ] && source .venv/bin/activate
+# if [ -d "$t" ]; then
+#   exec ipython
+# else
+#   exec ipython "$t"
+# fi
+# ' -- "$1"
+# """, block = true, desc = "ipython (auto cd into dir and source .venv if exists)" },
+]
+
+# --- code：VS Code / Cursor（留一個就好，或兩個都留）
+code = [
+  { run = """sh -lc 'exec code "$1"' -- "$1" """, block = false, desc = "VS Code" },
+  { run = """sh -lc 'exec cursor "$1"' -- "$1" """, block = false, desc = "Cursor" },
+]
+
+agent = [
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec specstory run
+' -- "$1"
+""", block = true, desc = "Claude (specstory)" },
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec specstory run opencode
+' -- "$1"
+""", block = true, desc = "OpenCode (specstory)" },
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec specstory run codex
+' -- "$1"
+""", block = true, desc = "Codex (specstory)" },
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec specstory run cursor
+' -- "$1"
+""", block = true, desc = "Cursor Agent CLI (specstory)" },
+
+]
+
+# --- git：在該目錄（或檔案所在目錄）開 lazygit
+git = [
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec lazygit
+' -- "$1"
+""", block = true, desc = "Lazygit (here)" },
+]
+
+# --- marimo：對目錄用 marimo edit --watch .
+marimo_dir = [
+  { run = """sh -lc '
+t="$1"
+if [ -d "$t" ]; then
+  cd "$t"
+else
+  cd "$(dirname "$t")"
+fi
+exec marimo edit --watch .
+' -- "$1"
+""", block = true, desc = "Marimo (watch dir)" },
+]
+
+# --- marimo sandbox：只給 .py 用，避免對 dir 亂套
+marimo_py_sandbox = [
+  { run = """sh -lc 'exec marimo edit --watch --sandbox "$1"' -- "$1" """, block = true, desc = "Marimo (watch + sandbox py)" },
+]

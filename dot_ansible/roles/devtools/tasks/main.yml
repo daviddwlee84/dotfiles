@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, tldr, thefuck, zoxide
+# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -16,6 +16,8 @@
       - tlrc
       - thefuck
       - zoxide
+      - direnv
+      - yazi
     state: present
 
 # =============================================================================
@@ -165,3 +167,65 @@
     state: present
     extra_args: --user
   ignore_errors: true
+
+# --- direnv ---
+- name: Install direnv (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: direnv
+    state: present
+
+# --- yazi ---
+- name: Check if yazi is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: yazi --version
+  register: yazi_check
+  changed_when: false
+  failed_when: false
+
+- name: Install yazi from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - yazi_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest yazi release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/sxyazi/yazi/releases/latest
+        return_content: true
+      register: yazi_release
+
+    - name: Download yazi binary
+      ansible.builtin.get_url:
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu.zip"
+        dest: /tmp/yazi.zip
+        mode: '0644'
+
+    - name: Install unzip if not present
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+
+    - name: Extract yazi
+      ansible.builtin.unarchive:
+        src: /tmp/yazi.zip
+        dest: /tmp
+        remote_src: true
+
+    - name: Install yazi binary
+      ansible.builtin.copy:
+        src: "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu/yazi"
+        dest: /usr/local/bin/yazi
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up yazi files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/yazi.zip
+        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
