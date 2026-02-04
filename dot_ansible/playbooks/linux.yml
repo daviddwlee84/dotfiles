@@ -16,3 +16,6 @@
 
     - role: claude_deps
       tags: [claude_deps]
+
+    - role: security_tools
+      tags: [security_tools]

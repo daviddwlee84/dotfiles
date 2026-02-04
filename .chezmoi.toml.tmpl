@@ -9,3 +9,5 @@ email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee
 name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
 # 是否在中國大陸 GFW 內，需要使用鏡像源
 useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (behind GFW) and need to use mirrors" false }}
+# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)" false }}

@@ -77,6 +77,7 @@ ansible-playbook playbooks/macos.yml --check
 | `homebrew` | macOS Homebrew installation |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli |
+| `security_tools` | pre-commit, gitleaks |
 
 ## Profiles
 

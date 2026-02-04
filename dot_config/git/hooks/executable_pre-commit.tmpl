@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Global pre-commit hook - runs on ALL git repos
+# Managed by chezmoi - do not edit directly
+set -eu
+
+# Run pre-commit if repo has config and tool is available
+if [ -f .pre-commit-config.yaml ]; then
+    if command -v pre-commit >/dev/null 2>&1; then
+        exec pre-commit run --config .pre-commit-config.yaml
+    else
+        echo "[global pre-commit] pre-commit not installed; skipping" >&2
+    fi
+fi
+
+{{- if .gitleaksAllRepos }}
+
+# Run gitleaks on ALL repos (user opted in via chezmoi init)
+if command -v gitleaks >/dev/null 2>&1; then
+    # Only scan staged files for speed
+    if ! gitleaks protect --staged --verbose; then
+        echo "[global pre-commit] gitleaks detected secrets in staged files!" >&2
+        exit 1
+    fi
+fi
+{{- else }}
+
+# Run gitleaks only if repo has .gitleaks.toml (default behavior)
+if [ -f .gitleaks.toml ] && command -v gitleaks >/dev/null 2>&1; then
+    if ! gitleaks protect --staged --verbose; then
+        echo "[global pre-commit] gitleaks detected secrets in staged files!" >&2
+        exit 1
+    fi
+fi
+{{- end }}
+
+exit 0

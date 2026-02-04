@@ -1,0 +1,95 @@
+---
+# Security tools role - pre-commit and gitleaks for secret scanning
+
+# macOS: Install via Homebrew
+- name: Install security tools (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name:
+      - pre-commit
+      - gitleaks
+    state: present
+
+# Linux: Install pre-commit via pipx/uv, gitleaks via binary
+- name: Check if pre-commit is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: pre-commit --version
+  register: precommit_check
+  changed_when: false
+  failed_when: false
+
+- name: Install pre-commit via uv (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - precommit_check.rc != 0
+  ansible.builtin.shell: |
+    if command -v uv >/dev/null 2>&1; then
+      uv tool install pre-commit
+    elif command -v pipx >/dev/null 2>&1; then
+      pipx install pre-commit
+    elif command -v pip >/dev/null 2>&1; then
+      pip install --user pre-commit
+    else
+      echo "No Python package manager found (uv/pipx/pip)" >&2
+      exit 1
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Check if gitleaks is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: gitleaks version
+  register: gitleaks_check
+  changed_when: false
+  failed_when: false
+
+- name: Get latest gitleaks version
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gitleaks_check.rc != 0
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/gitleaks/gitleaks/releases/latest
+    return_content: true
+  register: gitleaks_release
+
+- name: Install gitleaks binary (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gitleaks_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Set gitleaks version and arch
+      ansible.builtin.set_fact:
+        gitleaks_version: "{{ gitleaks_release.json.tag_name | regex_replace('^v', '') }}"
+        gitleaks_arch: "{{ 'x64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+
+    - name: Download gitleaks
+      ansible.builtin.get_url:
+        url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_linux_{{ gitleaks_arch }}.tar.gz"
+        dest: /tmp/gitleaks.tar.gz
+        mode: "0644"
+
+    - name: Extract gitleaks
+      ansible.builtin.unarchive:
+        src: /tmp/gitleaks.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install gitleaks to /usr/local/bin
+      ansible.builtin.copy:
+        src: /tmp/gitleaks
+        dest: /usr/local/bin/gitleaks
+        mode: "0755"
+        remote_src: true
+
+    - name: Clean up gitleaks temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gitleaks.tar.gz
+        - /tmp/gitleaks
+        - /tmp/LICENSE
+        - /tmp/README.md

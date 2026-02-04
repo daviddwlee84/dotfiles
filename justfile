@@ -111,6 +111,10 @@ ansible-tags tags:
 ansible-check:
     cd ~/.ansible && ansible-playbook playbooks/$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/').yml --check
 
+# Install security tools (pre-commit, gitleaks)
+ansible-security:
+    cd ~/.ansible && ansible-playbook playbooks/$(uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/').yml --tags "security_tools"
+
 # ============================================================================
 # Security & Pre-commit
 # ============================================================================
