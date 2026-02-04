@@ -52,5 +52,15 @@ if [[ ! -f "$PLAYBOOK" ]]; then
 fi
 
 info "Running OS-specific ansible playbook..."
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK"
+
+# Check if we need to prompt for sudo password (Linux only)
+BECOME_FLAGS=""
+{{ if eq .chezmoi.os "linux" -}}
+if ! sudo -n true 2>/dev/null; then
+    info "Sudo password required for package installation"
+    BECOME_FLAGS="--ask-become-pass"
+fi
+{{ end -}}
+
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" $BECOME_FLAGS
 success "OS-specific ansible playbook completed!"
