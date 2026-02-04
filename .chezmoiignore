@@ -24,3 +24,5 @@ backups/** # ignore the contents of backups folder but not the folder itself
 
 docs/** # ignore everything in docs/ and its subdirectories
 
+scripts/adhoc/
+

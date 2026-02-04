@@ -156,3 +156,11 @@ info:
     @echo -n "  ansible: "; ansible --version 2>/dev/null | head -1 || echo "not installed"
     @echo -n "  nvim: "; nvim --version 2>/dev/null | head -1 || echo "not installed"
     @echo -n "  git: "; git --version 2>/dev/null || echo "not installed"
+
+# ============================================================================
+# Ad-hoc Scripts
+# ============================================================================
+
+# Test Ubuntu mirror
+test-ubuntu-mirror:
+    ./scripts/adhoc/test_ubuntu_mirror.sh
