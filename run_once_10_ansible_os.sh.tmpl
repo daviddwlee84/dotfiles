@@ -3,6 +3,9 @@
 
 set -e
 
+# Ensure PATH includes uv tools location (where ansible is installed)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

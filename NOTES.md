@@ -43,6 +43,9 @@ chezmoi init git@github.com:daviddwlee84/dotfiles.git
   - Use package manager for each platform [Packages - Just Programmer's Manual](https://just.systems/man/en/packages.html)
   - Maybe use the `https://just.systems/install.sh` installation script and set the target location to `~/.local/bin/just`?
   - If without "sudo" permission, can we install to user-space?!
+- Pueue
+  - Homebrew
+  - linux (build from cargo / download binary + setup systemd service?)
 
 advanced
 

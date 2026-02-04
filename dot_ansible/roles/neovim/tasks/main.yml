@@ -39,11 +39,19 @@
   changed_when: false
   failed_when: false
 
+- name: Check if snap is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which snap
+  register: snap_check
+  changed_when: false
+  failed_when: false
+
 - name: Install Neovim from snap if apt version too old
   when:
     - ansible_facts["os_family"] == "Debian"
     - nvim_apt_version.stdout is defined
     - nvim_apt_version.stdout is version(neovim_min_version, '<')
+    - snap_check.rc == 0
   become: true
   tags: [sudo]
   block:
@@ -57,3 +65,12 @@
         name: nvim
         classic: true
         state: present
+
+- name: Warn if Neovim version is too old and snap unavailable
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - nvim_apt_version.stdout is defined
+    - nvim_apt_version.stdout is version(neovim_min_version, '<')
+    - snap_check.rc != 0
+  ansible.builtin.debug:
+    msg: "WARNING: Neovim {{ nvim_apt_version.stdout }} is older than required {{ neovim_min_version }}, but snap is not available. Some LazyVim features may not work."

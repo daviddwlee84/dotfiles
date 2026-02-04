@@ -24,8 +24,17 @@
       - npm
     state: present
 
-- name: Install lazygit (Debian/Ubuntu)
+- name: Check if lazygit is installed
   when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: lazygit --version
+  register: lazygit_check
+  changed_when: false
+  failed_when: false
+
+- name: Install lazygit via PPA (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - lazygit_check.rc != 0
   become: true
   tags: [sudo]
   block:
@@ -34,12 +43,48 @@
         repo: ppa:lazygit-team/release
         state: present
       ignore_errors: true
+      register: lazygit_ppa
 
     - name: Install lazygit from apt
       ansible.builtin.apt:
         name: lazygit
         state: present
       ignore_errors: true
+      register: lazygit_apt
+      when: lazygit_ppa is succeeded
+
+- name: Install lazygit from GitHub releases (fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - lazygit_check.rc != 0
+    - lazygit_apt is not defined or lazygit_apt is failed or lazygit_apt is skipped
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest lazygit release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+        return_content: true
+      register: lazygit_release
+
+    - name: Download lazygit binary
+      ansible.builtin.get_url:
+        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_architecture | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        dest: /tmp/lazygit.tar.gz
+        mode: '0644'
+
+    - name: Extract lazygit
+      ansible.builtin.unarchive:
+        src: /tmp/lazygit.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        extra_opts:
+          - lazygit
+
+    - name: Clean up lazygit tarball
+      ansible.builtin.file:
+        path: /tmp/lazygit.tar.gz
+        state: absent
 
 - name: Install tree-sitter-cli via npm
   when: ansible_facts["os_family"] == "Debian"
