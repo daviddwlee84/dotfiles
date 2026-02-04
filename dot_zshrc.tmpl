@@ -38,4 +38,4 @@ load_zsh_dir "$ZSH_CONFIG_DIR"
 load_zsh_dir "$ZSH_CONFIG_DIR/tools"
 
 # Load secrets (not tracked by chezmoi)
-[[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh"
+[[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh" || true
