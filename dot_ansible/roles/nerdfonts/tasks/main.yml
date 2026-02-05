@@ -28,6 +28,13 @@
     - ansible_facts["os_family"] == "Debian"
     - hack_font_check.matched == 0
   block:
+    - name: Install fontconfig for fc-cache
+      become: true
+      ansible.builtin.apt:
+        name: fontconfig
+        state: present
+      tags: [sudo]
+
     - name: Download Hack Nerd Font
       ansible.builtin.get_url:
         url: "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip"

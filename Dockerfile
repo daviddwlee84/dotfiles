@@ -10,6 +10,8 @@ ARG CHEZMOI_EMAIL=docker@example.com
 ARG CHEZMOI_NAME="Docker User"
 ARG CHEZMOI_USE_CHINESE_MIRROR=false
 ARG CHEZMOI_GITLEAKS_ALL_REPOS=false
+ARG CHEZMOI_INSTALL_CODING_AGENTS=false
+ARG CHEZMOI_INSTALL_PYTHON_UV_TOOLS=false
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -110,7 +112,9 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptString "What is your email address=${CHEZMOI_EMAIL}" \
     --promptString "What is your full name=${CHEZMOI_NAME}" \
     --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}" \
-    --promptBool "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)=${CHEZMOI_GITLEAKS_ALL_REPOS}"
+    --promptBool "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)=${CHEZMOI_GITLEAKS_ALL_REPOS}" \
+    --promptBool "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)=${CHEZMOI_INSTALL_CODING_AGENTS}" \
+    --promptBool "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

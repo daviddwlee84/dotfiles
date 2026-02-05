@@ -16,6 +16,8 @@ services:
         CHEZMOI_EMAIL: docker@example.com
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "false"
+        CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
     image: dotfiles:server
     container_name: dotfiles-devbox
     stdin_open: true
@@ -32,6 +34,8 @@ services:
         CHEZMOI_EMAIL: docker@example.com
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "false"
+        CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
     image: dotfiles:desktop
     container_name: dotfiles-desktop
     stdin_open: true
@@ -48,6 +52,8 @@ services:
         CHEZMOI_EMAIL: docker@example.com
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "true"
+        CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
     image: dotfiles:china
     container_name: dotfiles-china
     stdin_open: true
@@ -63,6 +69,8 @@ services:
         CHEZMOI_PROFILE: ubuntu_server
         # currently we are testing in GFW
         CHEZMOI_USE_CHINESE_MIRROR: "true"
+        CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
     image: dotfiles:test
     container_name: dotfiles-test
     command: |
