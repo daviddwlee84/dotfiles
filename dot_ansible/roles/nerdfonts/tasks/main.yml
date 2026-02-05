@@ -2,8 +2,19 @@
 # NerdFonts role - install Hack Nerd Font
 
 # macOS - via Homebrew cask
-- name: Install Hack Nerd Font (macOS)
+- name: Check if Hack Nerd Font is installed (macOS)
   when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.find:
+    paths:
+      - "{{ ansible_facts.env.HOME }}/Library/Fonts"
+      - "/Library/Fonts"
+    patterns: "HackNerdFont*.ttf"
+  register: hack_font_macos_check
+
+- name: Install Hack Nerd Font (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - hack_font_macos_check.matched == 0
   community.general.homebrew_cask:
     name: font-hack-nerd-font
     state: present

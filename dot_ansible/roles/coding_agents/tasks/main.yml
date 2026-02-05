@@ -1,6 +1,7 @@
 ---
 # Coding Agents Installation
 # Installs various AI coding assistants and companion tools
+# All installations include idempotency checks to avoid slow reinstalls
 
 # === Notification Tools (from claude_deps) ===
 
@@ -22,8 +23,17 @@
 
 # === Claude Code ===
 
-- name: Install Claude Code (macOS)
+- name: Check if Claude Code is installed (macOS)
   when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which claude
+  register: claude_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Claude Code (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - claude_macos_check.rc != 0
   community.general.homebrew_cask:
     name: claude-code
     state: present
@@ -46,14 +56,25 @@
 
 # === OpenCode ===
 
-- name: Tap anomalyco/tap for OpenCode (macOS)
+- name: Check if OpenCode is installed (macOS)
   when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which opencode
+  register: opencode_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Tap anomalyco/tap for OpenCode (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - opencode_macos_check.rc != 0
   community.general.homebrew_tap:
     name: anomalyco/tap
     state: present
 
 - name: Install OpenCode (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - opencode_macos_check.rc != 0
   community.general.homebrew:
     name: opencode
     state: present
@@ -75,16 +96,27 @@
     creates: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
 
 # === Cursor CLI ===
+# Note: cursor-cli cask provides `cursor-agent` and `agent` binaries, not `cursor`
+
+- name: Check if Cursor CLI is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which cursor-agent
+  register: cursor_macos_check
+  changed_when: false
+  failed_when: false
 
 - name: Install Cursor CLI (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - cursor_macos_check.rc != 0
   community.general.homebrew_cask:
     name: cursor-cli
     state: present
+  ignore_errors: true  # Network errors shouldn't fail the playbook
 
 - name: Check if Cursor CLI is installed (Linux)
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: which cursor
+  ansible.builtin.command: which cursor-agent
   register: cursor_check
   changed_when: false
   failed_when: false
@@ -96,7 +128,8 @@
   ansible.builtin.shell: |
     curl -fsSL https://cursor.com/install | bash
   args:
-    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/cursor"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/cursor-agent"
+  ignore_errors: true
 
 # === GitHub Copilot CLI ===
 
@@ -106,40 +139,81 @@
   changed_when: false
   failed_when: false
 
-- name: Install GitHub Copilot CLI (npm)
+- name: Check if GitHub Copilot CLI is installed
   when: npm_check.rc == 0
+  ansible.builtin.command: which github-copilot-cli
+  register: copilot_check
+  changed_when: false
+  failed_when: false
+
+- name: Install GitHub Copilot CLI (npm)
+  when:
+    - npm_check.rc == 0
+    - copilot_check.rc != 0
   community.general.npm:
     name: "@githubnext/github-copilot-cli"
     global: true
     state: present
+  ignore_errors: true
 
 # === Gemini CLI ===
 
-- name: Install Gemini CLI (macOS)
+- name: Check if Gemini CLI is installed (macOS)
   when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which gemini
+  register: gemini_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Gemini CLI (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - gemini_macos_check.rc != 0
   community.general.homebrew:
     name: gemini-cli
     state: present
+
+- name: Check if Gemini CLI is installed (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - npm_check.rc == 0
+  ansible.builtin.command: which gemini
+  register: gemini_check
+  changed_when: false
+  failed_when: false
 
 - name: Install Gemini CLI (npm - Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
     - npm_check.rc == 0
+    - gemini_check.rc != 0
   community.general.npm:
     name: "@google/gemini-cli"
     global: true
     state: present
+  ignore_errors: true
 
 # === SpecStory ===
 
-- name: Tap specstoryai/tap for SpecStory (macOS)
+- name: Check if SpecStory is installed (macOS)
   when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which specstory
+  register: specstory_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Tap specstoryai/tap for SpecStory (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
   community.general.homebrew_tap:
     name: specstoryai/tap
     state: present
 
 - name: Install SpecStory (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
   community.general.homebrew:
     name: specstory
     state: present
@@ -172,9 +246,19 @@
 
 # === Happy ===
 
-- name: Install Happy (npm)
+- name: Check if Happy is installed
   when: npm_check.rc == 0
+  ansible.builtin.command: which happy
+  register: happy_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Happy (npm)
+  when:
+    - npm_check.rc == 0
+    - happy_check.rc != 0
   community.general.npm:
     name: happy-coder
     global: true
     state: present
+  ignore_errors: true
