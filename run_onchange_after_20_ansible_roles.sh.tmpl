@@ -1,0 +1,79 @@
+#!/bin/bash
+# Re-run ansible when any role changes
+# Triggers on changes to any role's tasks or defaults files
+
+# === Role Hashes (changes trigger re-run) ===
+# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+
+set -e
+export PATH="$HOME/.local/bin:$PATH"
+
+# Colors
+info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+
+ANSIBLE_DIR="$HOME/.ansible"
+INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+
+command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+
+{{ if eq .chezmoi.os "darwin" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else if eq .chezmoi.os "linux" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else -}}
+warn "Unsupported OS: {{ .chezmoi.os }}"
+exit 0
+{{ end -}}
+
+# Add optional tags based on chezmoi config
+{{ if .installCodingAgents -}}
+TAGS="${TAGS},coding_agents"
+{{ end -}}
+{{ if .installPythonUvTools -}}
+TAGS="${TAGS},python_uv_tools"
+{{ end -}}
+
+[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+
+# Handle sudo for Linux
+BECOME_FLAGS=""
+{{ if eq .chezmoi.os "linux" -}}
+if sudo -n true 2>/dev/null; then
+    :
+elif [[ -t 0 ]]; then
+    info "Sudo password required for package installation"
+    BECOME_FLAGS="--ask-become-pass"
+else
+    warn "Non-interactive mode without passwordless sudo"
+    warn "To complete setup, run manually:"
+    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
+    BECOME_FLAGS="--skip-tags sudo"
+fi
+{{ end -}}
+
+info "Re-running ansible with tags: $TAGS"
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+success "Ansible roles updated!"

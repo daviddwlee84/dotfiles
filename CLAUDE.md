@@ -31,21 +31,34 @@ cd ~/.ansible && ansible-playbook playbooks/macos.yml
 
 ```
 chezmoi repo/
-├── dot_* files      → ~/.* (config files)
-├── dot_ansible/     → ~/.ansible/ (ansible playbooks)
-└── run_once_*.tmpl  → triggers ansible on first apply
+├── dot_* files               → ~/.* (config files)
+├── dot_ansible/              → ~/.ansible/ (ansible playbooks)
+├── run_once_before_*.tmpl    → bootstrap (runs once)
+└── run_onchange_after_*.tmpl → ansible (runs on changes)
 ```
 
 Installation Order:
 ```
-1. Bootstrap (curl installers)
-   ├── uv → ansible
-   └── mise → Node.js
-2. chezmoi apply
-   ├── Config files → ~/.*
-   └── Ansible → ~/.ansible/
-3. Ansible playbooks
-   └── base → zsh → neovim → devtools → python_uv_tools → rust_cargo_tools
+1. Bootstrap (run_once_before) - installs uv, ansible, mise
+2. chezmoi apply - deploys config files + ansible playbooks
+3. Ansible (run_onchange_after) - runs on fresh install + when roles change
+```
+
+### Auto-run on Ansible Changes
+
+| Script | Behavior |
+|--------|----------|
+| `run_once_before_00_bootstrap.sh.tmpl` | Installs uv, mise, ansible (once) |
+| `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
+
+The onchange script includes SHA256 hashes of all role files. It runs:
+- **Fresh install**: no previous hash state → triggers run
+- **Updates**: any role's `tasks/main.yml` or `defaults/main.yml` changes → triggers run
+
+To force re-run all scripts:
+```bash
+chezmoi state delete-bucket --bucket=scriptState
+chezmoi apply
 ```
 
 ## Chezmoi Commands
@@ -60,7 +73,7 @@ chezmoi cd                # Go to source directory
 
 ## Ansible Usage
 
-Run from `~/.ansible/` directory:
+Ansible playbooks run automatically via `chezmoi apply` when playbook files change. For manual runs, use `~/.ansible/` directory:
 
 ```bash
 cd ~/.ansible
