@@ -1,0 +1,68 @@
+---
+# Docker role - Container runtime installation
+# macOS: OrbStack (skip if Docker Desktop exists)
+# Linux: Docker Engine via convenience script
+
+# ============================================
+# macOS: OrbStack installation
+# ============================================
+
+- name: Check if Docker Desktop is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: /Applications/Docker.app
+  register: docker_desktop
+
+- name: Install OrbStack via Homebrew Cask (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not docker_desktop.stat.exists
+  community.general.homebrew_cask:
+    name: orbstack
+    state: present
+
+# ============================================
+# Linux: Docker Engine installation
+# ============================================
+
+- name: Check if Docker is installed (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Docker via convenience script (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - docker_check.rc != 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+    rm /tmp/get-docker.sh
+  args:
+    creates: /usr/bin/docker
+
+- name: Ensure docker group exists (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: Add user to docker group (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.user:
+    name: "{{ ansible_facts['env']['USER'] }}"
+    groups: docker
+    append: true
+
+- name: Notify about docker group change (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.debug:
+    msg: "NOTE: You may need to log out and back in for docker group membership to take effect."

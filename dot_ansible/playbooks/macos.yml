@@ -23,6 +23,9 @@
     - role: devtools
       tags: [devtools]
 
+    - role: docker
+      tags: [docker]
+
     - role: nerdfonts
       tags: [nerdfonts]
 

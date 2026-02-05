@@ -82,6 +82,7 @@ To change options later: `chezmoi init --force`
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Coding Agents** (optional): Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
+- **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
 
 ### Bootstrap (installed before ansible)
