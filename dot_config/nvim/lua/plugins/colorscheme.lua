@@ -1,0 +1,51 @@
+return {
+  -- -- 1) 安裝 vscode.nvim
+  -- {
+  --   "Mofiqul/vscode.nvim",
+  --   -- 顏色主題通常希望最早載入，避免啟動時閃一下
+  --   lazy = false,
+  --   priority = 1000,
+  --   config = function()
+  --     -- Dark / Light 先決定背景（可選）
+  --     vim.o.background = "dark" -- 或 "light"
+  --
+  --     local c = require("vscode.colors").get_colors()
+  --     require("vscode").setup({
+  --       note = "this config is optional",
+  --       -- 透明背景
+  --       transparent = false, -- 你要透明就改 true（README 有此選項）
+  --       -- 註解斜體
+  --       italic_comments = true,
+  --       -- inlay hints 斜體
+  --       italic_inlayhints = true,
+  --       -- link underline
+  --       underline_links = true,
+  --       -- nvim-tree 背景
+  --       disable_nvimtree_bg = true,
+  --       -- 套用到 terminal colors
+  --       terminal_colors = true,
+  --
+  --       -- 覆寫顏色（可選）
+  --       color_overrides = {
+  --         -- vscLineNumber = "#FFFFFF",
+  --       },
+  --
+  --       -- 覆寫 highlight groups（可選）
+  --       group_overrides = {
+  --         -- Cursor = { fg = c.vscDarkBlue, bg = c.vscLightGreen, bold = true },
+  --       },
+  --     })
+  --
+  --     -- 載入 colorscheme（README 建議用這句）
+  --     vim.cmd.colorscheme("vscode")
+  --   end,
+  -- },
+
+  -- -- 2) 告訴 LazyVim：預設 colorscheme 用 vscode
+  -- {
+  --   "LazyVim/LazyVim",
+  --   opts = {
+  --     colorscheme = "vscode",
+  --   },
+  -- },
+}
