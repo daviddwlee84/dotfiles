@@ -1,0 +1,48 @@
+# Example Apprise Configuration
+# Copy this file to custom.yaml and customize with your notification services
+# custom.yaml is NOT tracked by chezmoi (safe for sensitive data)
+#
+# Documentation: https://appriseit.com/getting-started/configuration/
+# Supported services: https://github.com/caronc/apprise/wiki#notification-services
+
+version: 1
+
+# Optional: Global settings
+# asset:
+#   app_id: MyApp
+#   async_mode: true
+#   body_format: markdown
+
+# Optional: Tag groups for easier targeting
+# groups:
+#   critical: ops, after-hours
+#   personal: family, friends
+
+# Notification services
+urls:
+  # Discord
+  # - discord://webhook_id/webhook_token:
+  #     tag: chat
+
+  # Slack
+  # - slack://token_a/token_b/token_c:
+  #     tag: work
+
+  # Email (Gmail example)
+  # - mailto://user:app_password@gmail.com:
+  #     tag: email
+
+  # Telegram
+  # - tgram://bot_token/chat_id:
+  #     tag: mobile
+
+  # Pushover
+  # - pover://user_key@app_token:
+  #     tag: mobile
+
+  # Generic webhook (JSON)
+  # - json://hostname/path:
+  #     tag: webhook
+
+  # Add your services here...
+  []

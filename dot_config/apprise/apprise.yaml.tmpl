@@ -1,0 +1,22 @@
+version: 1
+
+# Include user's custom configuration (not tracked by chezmoi)
+# Create your own custom.yaml based on example.yaml
+# include:
+#   - ~/.config/apprise/custom.yaml
+
+# Default system-wide desktop notifications (auto-detected by OS)
+urls:
+{{- if eq .chezmoi.os "darwin" }}
+  # macOS native notifications
+  - macosx://:
+      tag: desktop
+{{- else if eq .chezmoi.os "linux" }}
+  # Linux DBus notifications (works with most DEs)
+  - dbus://:
+      tag: desktop
+{{- else if eq .chezmoi.os "windows" }}
+  # Windows native notifications
+  - windows://:
+      tag: desktop
+{{- end }}

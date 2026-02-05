@@ -37,3 +37,6 @@ scripts/redact_specstory.py
 
 # Zsh secrets file (API keys, tokens, proxy - never track)
 .config/zsh/secrets.zsh
+
+# Apprise custom config (user's notification services - contains sensitive tokens)
+.config/apprise/custom.yaml
