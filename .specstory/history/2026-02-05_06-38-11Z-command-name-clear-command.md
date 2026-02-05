@@ -2002,128 +2002,13 @@ _**Agent (claude-opus-4-5-20251101 2026-02-05 06:55:19Z)**_
 <tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
 <summary>Tool use: **ExitPlanMode**</summary>
 
-**Input:**
-
-- plan: `# Plan: Setup Apprise Configuration
-
-## Overview
-
-Create apprise config files in `~/.config/apprise/` managed by chezmoi, with an `include:` pattern for user-customizable sensitive configs.
-
-## Files to Create
-
-### 1. `dot_config/apprise/apprise.yaml.tmpl` (Main Entry Point - Templated)
-
-Uses chezmoi templating to include platform-appropriate desktop notifications:
-
-```yaml
-version: 1
-
-# Include user's custom configuration (not tracked by chezmoi)
-# Create your own custom.yaml based on example.yaml
-include:
-  - ~/.config/apprise/custom.yaml
-
-# Default system-wide desktop notifications (auto-detected by OS)
-urls:
-{{- if eq .chezmoi.os "darwin" }}
-  # macOS native notifications
-  - macosx://:
-      tag: desktop
-{{- else if eq .chezmoi.os "linux" }}
-  # Linux DBus notifications (works with most DEs)
-  - dbus://:
-      tag: desktop
-{{- else if eq .chezmoi.os "windows" }}
-  # Windows native notifications
-  - windows://:
-      tag: desktop
-{{- end }}
+```text
+The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.
 ```
-
-### 2. `dot_config/apprise/example.yaml` (Template Reference)
-
-```yaml
-# Example Apprise Configuration
-# Copy this file to custom.yaml and customize with your notification services
-# custom.yaml is NOT tracked by chezmoi (safe for sensitive data)
-#
-# Documentation: https://appriseit.com/getting-started/configuration/
-# Supported services: https://github.com/caronc/apprise/wiki#notification-services
-
-version: 1
-
-# Optional: Global settings
-# asset:
-#   app_id: MyApp
-#   async_mode: true
-#   body_format: markdown
-
-# Optional: Tag groups for easier targeting
-# groups:
-#   critical: ops, after-hours
-#   personal: family, friends
-
-# Notification services
-urls:
-  # Discord
-  # - discord://webhook_id/webhook_token:
-  #     tag: chat
-
-  # Slack
-  # - slack://token_a/token_b/token_c:
-  #     tag: work
-
-  # Email (Gmail example)
-  # - mailto://user:app_password@gmail.com:
-  #     tag: email
-
-  # Telegram
-  # - tgram://bot_token/chat_id:
-  #     tag: mobile
-
-  # Pushover
-  # - pover://user_key@app_token:
-  #     tag: mobile
-
-  # Generic webhook (JSON)
-  # - json://hostname/path:
-  #     tag: webhook
-
-  # Add your services here...
-  []
-```
-
-### 3. Update `.chezmoiignore`
-
-Add line to exclude user's custom config:
-```
-.config/apprise/custom.yaml
-```
-
-## File Structure
-
-**Source (chezmoi repo):**
-```
-dot_config/apprise/
-├── apprise.yaml.tmpl  # Templated - generates OS-specific defaults
-└── example.yaml       # Reference template for users
-```
-
-**After `chezmoi apply`:**
-```
-~/.config/apprise/
-├── apprise.yaml     # Main entry with OS-appropriate desktop notifications
-├── example.yaml     # Reference template (managed by chezmoi)
-└── custom.yaml      # User's config (NOT tracked - create manually)
-```
-
-## Verification
-
-1. Run `chezmoi diff` to preview changes
-2. Run `chezmoi apply` to deploy
-3. Create custom config: `cp ~/.config/apprise/example.yaml ~/.config/apprise/custom.yaml`
-4. Test with: `apprise --dry-run --config ~/.config/apprise/apprise.yaml "Test message"`
-`
-
 </details></tool-use>
+
+---
+
+_**User (2026-02-05 06:56:18Z)**_
+
+[Request interrupted by user for tool use]
