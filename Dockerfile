@@ -12,6 +12,7 @@ ARG CHEZMOI_USE_CHINESE_MIRROR=false
 ARG CHEZMOI_GITLEAKS_ALL_REPOS=false
 ARG CHEZMOI_INSTALL_CODING_AGENTS=false
 ARG CHEZMOI_INSTALL_PYTHON_UV_TOOLS=false
+ARG CHEZMOI_INSTALL_BREW_APPS=false
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -106,6 +107,7 @@ RUN for i in 1 2 3; do \
 # This avoids interactive prompts during Docker build
 # Set PATH to include ~/.local/bin so run_once scripts can find uv tools (ansible)
 # Use local source instead of cloning from GitHub to test local changes
+# Note: installBrewApps=false by default (Linuxbrew is optional on Linux)
 RUN export PATH="$HOME/.local/bin:$PATH" && \
     ~/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
     --promptString "profile (ubuntu_server|ubuntu_desktop|macos)=${CHEZMOI_PROFILE}" \
@@ -114,7 +116,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}" \
     --promptBool "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)=${CHEZMOI_GITLEAKS_ALL_REPOS}" \
     --promptBool "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)=${CHEZMOI_INSTALL_CODING_AGENTS}" \
-    --promptBool "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}"
+    --promptBool "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}" \
+    --promptBool "Install GUI apps via Homebrew Brewfile (casks, mas)=${CHEZMOI_INSTALL_BREW_APPS}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

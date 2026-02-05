@@ -18,6 +18,7 @@ services:
         CHEZMOI_USE_CHINESE_MIRROR: "false"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
+        CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:server
     container_name: dotfiles-devbox
     stdin_open: true
@@ -36,6 +37,7 @@ services:
         CHEZMOI_USE_CHINESE_MIRROR: "false"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
+        CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:desktop
     container_name: dotfiles-desktop
     stdin_open: true
@@ -54,6 +56,7 @@ services:
         CHEZMOI_USE_CHINESE_MIRROR: "true"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
+        CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:china
     container_name: dotfiles-china
     stdin_open: true
@@ -71,6 +74,7 @@ services:
         CHEZMOI_USE_CHINESE_MIRROR: "true"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
+        CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:test
     container_name: dotfiles-test
     command: |

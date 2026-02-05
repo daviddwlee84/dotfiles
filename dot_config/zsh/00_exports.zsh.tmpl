@@ -1,0 +1,49 @@
+# 00_exports.zsh - Environment variables
+# Profile: {{ .profile }}
+
+# Editor
+# if [[ -n $SSH_CONNECTION ]]; then
+#     export EDITOR='vim'
+# else
+#     export EDITOR='nvim'
+# fi
+# Let's always use nvim (but sometimes, when the latency is high,
+# some animation might be slow)
+export EDITOR='nvim'
+export VISUAL="$EDITOR"
+
+# Language
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+
+# PATH additions
+export PATH="$HOME/.local/bin:$PATH"
+
+# =============================================================================
+# Homebrew Setup
+# =============================================================================
+{{ if eq .profile "macos" -}}
+# macOS: Initialize Homebrew (Apple Silicon or Intel)
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linux: Initialize Linuxbrew if installed
+# Linuxbrew is optional on Linux (most packages managed by apt via Ansible)
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+{{ end -}}
+
+# Set default Brewfile location (XDG-compliant)
+export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+
+# --- Suggested exports (uncomment to enable) ---
+# History configuration (oh-my-zsh handles this, but can customize)
+# export HISTSIZE=10000
+# export SAVEHIST=10000
+# export HISTFILE="$XDG_DATA_HOME/zsh/history"

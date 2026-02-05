@@ -49,7 +49,7 @@ Installation Order:
 
 | Script | Behavior |
 |--------|----------|
-| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS), uv, mise, ansible (once) |
+| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS always, Linux if installBrewApps), uv, mise, ansible |
 | `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
 | `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` enabled) |
 
@@ -101,7 +101,7 @@ ansible-playbook playbooks/macos.yml --check
 | Tag | Description |
 |-----|-------------|
 | `base` | git, curl, ripgrep, fd, build tools |
-| `homebrew` | macOS Homebrew installation |
+| `homebrew` | macOS Homebrew update (installation done by bootstrap) |
 | `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
@@ -154,11 +154,29 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
 ```
 
-## Brewfile (macOS GUI Apps)
+## Ansible vs Homebrew
+
+**Primary tool: Ansible** - manages CLI tools and system dependencies cross-platform.
+
+| Tool | Role | When to Use |
+|------|------|-------------|
+| **Ansible** | CLI tools, system packages | Always (apt/brew formulas) |
+| **Brewfile** | macOS GUI apps (casks), App Store | Optional (opt-in) |
+| **Linuxbrew** | Linux backup option | Optional (if installBrewApps enabled) |
+
+**How they work together:**
+- Bootstrap installs Homebrew (macOS always, Linux optional)
+- Ansible roles use `community.general.homebrew` for macOS formulas
+- Brewfile manages casks (GUI apps) and mas (App Store) separately
+- On Linux, Ansible uses apt; Linuxbrew is a backup for newer packages
+
+## Brewfile (GUI Apps - Opt-in)
 
 GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
 
 **Note**: Brewfile installation is **opt-in** (disabled by default). Enable via `chezmoi init --force` and set `installBrewApps = true`.
+
+On Linux, enabling `installBrewApps` will also install Linuxbrew during bootstrap.
 
 ### File Structure
 

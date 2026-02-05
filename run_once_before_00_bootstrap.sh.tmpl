@@ -1,6 +1,7 @@
 #!/bin/bash
-# Bootstrap script - installs Homebrew (macOS), uv, ansible, mise, and galaxy collections
+# Bootstrap script - installs Homebrew, uv, ansible, mise, and galaxy collections
 # Runs BEFORE any ansible playbooks
+# Profile: {{ .profile }}
 
 set -e
 
@@ -29,19 +30,35 @@ error() {
 
 # Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
+
+# Add Homebrew to PATH if installed
 {{ if eq .profile "macos" -}}
-# Add Homebrew to PATH (Apple Silicon and Intel)
+# macOS: Apple Silicon and Intel paths
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -f /usr/local/bin/brew ]]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
+{{ else -}}
+# Linux: Linuxbrew paths
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
 {{ end -}}
 
+# =============================================================================
+# 0. Homebrew Installation
+# =============================================================================
+# macOS: Always install Homebrew (required for ansible roles)
+# Linux: Optional - only install if installBrewApps is enabled
+# =============================================================================
+
 {{ if eq .profile "macos" -}}
-# 0. Install Homebrew if missing (macOS only)
+# macOS: Install Homebrew (required for package management)
 if ! command -v brew &> /dev/null; then
-    info "Installing Homebrew..."
+    info "Installing Homebrew (macOS)..."
     NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     # Add to PATH for this session
     if [[ -f /opt/homebrew/bin/brew ]]; then
@@ -53,7 +70,33 @@ if ! command -v brew &> /dev/null; then
 else
     info "Homebrew is already installed"
 fi
-
+{{ else -}}
+# Linux: Linuxbrew is optional (only if installBrewApps is enabled)
+# Most packages are managed by apt via Ansible
+{{ if .installBrewApps -}}
+if ! command -v brew &> /dev/null; then
+    info "Installing Linuxbrew (optional, for brew bundle)..."
+    # Install Linuxbrew dependencies first
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y build-essential procps curl file git
+    fi
+    # Install Linuxbrew
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Add to PATH for this session
+    if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    elif [[ -d "$HOME/.linuxbrew" ]]; then
+        eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+    fi
+    success "Linuxbrew installed successfully"
+else
+    info "Linuxbrew is already installed"
+fi
+{{ else -}}
+info "Linuxbrew installation skipped (installBrewApps=false)"
+info "To install Linuxbrew later, run: chezmoi init --force and enable installBrewApps"
+{{ end -}}
 {{ end -}}
 # 1. Install uv if missing
 if ! command -v uv &> /dev/null; then

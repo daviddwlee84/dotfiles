@@ -1,7 +1,9 @@
 ---
 # Homebrew role - macOS package manager
+# NOTE: Homebrew installation is handled by bootstrap script (run_once_before_00)
+# This role only updates Homebrew if already installed
 
-- name: Check if Homebrew is installed
+- name: Check if Homebrew is installed (Apple Silicon)
   ansible.builtin.stat:
     path: /opt/homebrew/bin/brew
   register: homebrew_arm
@@ -15,14 +17,10 @@
   ansible.builtin.set_fact:
     homebrew_installed: "{{ homebrew_arm.stat.exists or homebrew_intel.stat.exists }}"
 
-- name: Install Homebrew
+- name: Skip if Homebrew not installed
   when: not homebrew_installed
-  ansible.builtin.shell: |
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  args:
-    creates: /opt/homebrew/bin/brew
-  environment:
-    NONINTERACTIVE: "1"
+  ansible.builtin.debug:
+    msg: "Homebrew not installed. It should be installed by bootstrap script."
 
 - name: Update Homebrew
   when: homebrew_installed
