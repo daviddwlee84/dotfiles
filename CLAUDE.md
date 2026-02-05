@@ -39,7 +39,7 @@ chezmoi repo/
 
 Installation Order:
 ```
-1. Bootstrap (run_once_before) - installs Homebrew (macOS), uv, ansible, mise
+1. Bootstrap (run_once_before) - installs Homebrew (macOS/Linux), uv, ansible, mise
 2. chezmoi apply - deploys config files + ansible playbooks
 3. Ansible (run_onchange_after) - runs on fresh install + when roles change
 4. Brew bundle (run_onchange_after) - installs GUI apps if enabled
@@ -49,7 +49,7 @@ Installation Order:
 
 | Script | Behavior |
 |--------|----------|
-| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS always, Linux if installBrewApps), uv, mise, ansible |
+| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS and Linux), uv, mise, ansible |
 | `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
 | `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` enabled) |
 
@@ -162,21 +162,19 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 |------|------|-------------|
 | **Ansible** | CLI tools, system packages | Always (apt/brew formulas) |
 | **Brewfile** | macOS GUI apps (casks), App Store | Optional (opt-in) |
-| **Linuxbrew** | Linux backup option | Optional (if installBrewApps enabled) |
+| **Linuxbrew** | Linux packages not in apt | Always installed on Linux |
 
 **How they work together:**
-- Bootstrap installs Homebrew (macOS always, Linux optional)
+- Bootstrap installs Homebrew on both macOS and Linux
 - Ansible roles use `community.general.homebrew` for macOS formulas
 - Brewfile manages casks (GUI apps) and mas (App Store) separately
-- On Linux, Ansible uses apt; Linuxbrew is a backup for newer packages
+- On Linux, Ansible uses apt; Linuxbrew is available for newer packages
 
 ## Brewfile (GUI Apps - Opt-in)
 
 GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
 
 **Note**: Brewfile installation is **opt-in** (disabled by default). Enable via `chezmoi init --force` and set `installBrewApps = true`.
-
-On Linux, enabling `installBrewApps` will also install Linuxbrew during bootstrap.
 
 ### File Structure
 

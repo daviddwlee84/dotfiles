@@ -58,7 +58,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
 
 This automatically:
 
-1. Bootstraps Homebrew (macOS), uv, mise, ansible
+1. Bootstraps Homebrew (macOS/Linux), uv, mise, ansible
 2. Deploys all config files
 3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
 4. Runs brew bundle (if `installBrewApps` enabled)

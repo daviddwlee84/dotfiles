@@ -71,11 +71,9 @@ else
     info "Homebrew is already installed"
 fi
 {{ else -}}
-# Linux: Linuxbrew is optional (only if installBrewApps is enabled)
-# Most packages are managed by apt via Ansible
-{{ if .installBrewApps -}}
+# Linux: Install Linuxbrew (useful for packages not available or outdated in apt)
 if ! command -v brew &> /dev/null; then
-    info "Installing Linuxbrew (optional, for brew bundle)..."
+    info "Installing Linuxbrew..."
     # Install Linuxbrew dependencies first
     if command -v apt-get &> /dev/null; then
         sudo apt-get update
@@ -93,10 +91,6 @@ if ! command -v brew &> /dev/null; then
 else
     info "Linuxbrew is already installed"
 fi
-{{ else -}}
-info "Linuxbrew installation skipped (installBrewApps=false)"
-info "To install Linuxbrew later, run: chezmoi init --force and enable installBrewApps"
-{{ end -}}
 {{ end -}}
 # 1. Install uv if missing
 if ! command -v uv &> /dev/null; then

@@ -75,7 +75,7 @@ info "Running brew bundle..."
 
 # Run shared Brewfile first (installs mas, taps)
 info "Installing shared packages from Brewfile..."
-brew bundle --file="$BREWFILE_DIR/Brewfile" --no-lock --no-upgrade || {
+brew bundle --file="$BREWFILE_DIR/Brewfile" --no-upgrade || {
     warn "Some packages in Brewfile failed to install (continuing...)"
 }
 
@@ -83,7 +83,7 @@ brew bundle --file="$BREWFILE_DIR/Brewfile" --no-lock --no-upgrade || {
 {{ if eq .profile "macos" -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.darwin" ]]; then
     info "Installing macOS packages from Brewfile.darwin..."
-    brew bundle --file="$BREWFILE_DIR/Brewfile.darwin" --no-lock --no-upgrade || {
+    brew bundle --file="$BREWFILE_DIR/Brewfile.darwin" --no-upgrade || {
         warn "Some packages in Brewfile.darwin failed to install (continuing...)"
     }
 fi
@@ -98,7 +98,7 @@ fi
 {{ else -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.linux" ]]; then
     info "Installing Linux packages from Brewfile.linux..."
-    brew bundle --file="$BREWFILE_DIR/Brewfile.linux" --no-lock --no-upgrade || {
+    brew bundle --file="$BREWFILE_DIR/Brewfile.linux" --no-upgrade || {
         warn "Some packages in Brewfile.linux failed to install (continuing...)"
     }
 fi
