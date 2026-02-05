@@ -1,0 +1,53 @@
+---
+# Ruby gem CLI tools installation
+# Ruby is installed via mise
+
+# =============================================================================
+# Ensure Ruby is installed via mise
+# =============================================================================
+
+- name: Check for user-installed mise
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: mise_user_install
+
+- name: Set mise binary path
+  ansible.builtin.set_fact:
+    mise_bin: "{{ mise_user_install.stat.exists | ternary(ansible_facts['env']['HOME'] + '/.local/bin/mise', '/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' else '/usr/local/bin/mise') }}"
+
+- name: Install Ruby via mise
+  ansible.builtin.command: "{{ mise_bin }} install ruby@3"
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/ruby"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# =============================================================================
+# Install gem tools
+# =============================================================================
+
+- name: Install Ruby gem CLI tools via gem install
+  ansible.builtin.command: gem install {{ item.name }}
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims/{{ item.binary }}"
+  loop: "{{ ruby_gem_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['PATH'] }}"
+
+# =============================================================================
+# Install toolkami (single-file Ruby tool from GitHub)
+# =============================================================================
+
+- name: Create ~/.local directory for toolkami
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local"
+    state: directory
+    mode: '0755'
+
+- name: Download toolkami.rb from GitHub
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/toolkami.rb"
+    mode: '0755'

@@ -6,3 +6,5 @@
 node = "lts"
 # Rust toolchain for cargo tools
 rust = "latest"
+# Ruby for gem tools
+ruby = "3"

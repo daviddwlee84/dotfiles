@@ -1,0 +1,23 @@
+layout {
+    // This adds the status bar at the bottom and tab bar at the top
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+        pane size=2 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
+
+    tab name="Editor" focus=true {
+        pane command="nvim" // Automatically opens your editor
+    }
+
+    tab name="Server & Logs" {
+        pane split_direction="vertical" {
+            pane name="Server" command="npm" { args "run" "dev"; }
+            pane name="Logs"
+        }
+    }
+}

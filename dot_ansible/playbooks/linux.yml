@@ -34,3 +34,6 @@
 
     - role: rust_cargo_tools
       tags: [rust_cargo_tools]
+
+    - role: ruby_gem_tools
+      tags: [ruby_gem_tools]

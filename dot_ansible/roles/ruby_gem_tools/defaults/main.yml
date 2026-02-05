@@ -1,0 +1,5 @@
+---
+# Ruby gem CLI tools installed via gem install
+ruby_gem_tools:
+  - name: try-cli
+    binary: try

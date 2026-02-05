@@ -96,6 +96,7 @@ ansible-playbook playbooks/macos.yml --check
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
+| `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
 
 ## Profiles
 
