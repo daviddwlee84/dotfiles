@@ -33,7 +33,7 @@
   register: apt_neovim
 
 - name: Check Neovim version after apt install
-  when: ansible_facts["os_family"] == "Debian" and apt_neovim is succeeded
+  when: ansible_facts["os_family"] == "Debian" and apt_neovim is defined and apt_neovim is succeeded
   ansible.builtin.shell: nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
   register: nvim_apt_version
   changed_when: false
@@ -120,3 +120,55 @@
     - name: Display installed Neovim version
       ansible.builtin.debug:
         msg: "Installed Neovim {{ nvim_release.json.tag_name }} from GitHub releases"
+
+# =============================================================================
+# User-level install (noRoot mode) - AppImage to ~/.local/bin
+# =============================================================================
+
+- name: Install Neovim tarball (user-level, no sudo required)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - nvim_current_version is version(neovim_min_version, '<')
+    - apt_neovim is not defined  # sudo tasks were skipped
+  block:
+    - name: Ensure ~/.local exists
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local"
+        state: directory
+        mode: '0755'
+
+    - name: Set Neovim tarball architecture
+      ansible.builtin.set_fact:
+        nvim_tarball_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+
+    - name: Download Neovim tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-{{ nvim_tarball_arch }}.tar.gz"
+        dest: "/tmp/nvim.tar.gz"
+        mode: '0644'
+        timeout: 600
+      environment:
+        http_proxy: "{{ lookup('env', 'http_proxy') | default('', true) }}"
+        https_proxy: "{{ lookup('env', 'https_proxy') | default('', true) }}"
+
+    - name: Extract Neovim tarball to ~/.local
+      ansible.builtin.unarchive:
+        src: /tmp/nvim.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local"
+        remote_src: true
+        extra_opts:
+          - --strip-components=1
+
+    - name: Clean up Neovim tarball
+      ansible.builtin.file:
+        path: /tmp/nvim.tar.gz
+        state: absent
+
+    - name: Check Neovim version
+      ansible.builtin.shell: "{{ ansible_facts['env']['HOME'] }}/.local/bin/nvim --version | head -1"
+      register: nvim_user_version
+      changed_when: false
+
+    - name: Display installed Neovim version
+      ansible.builtin.debug:
+        msg: "Installed Neovim (user-level): {{ nvim_user_version.stdout }}"

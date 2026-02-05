@@ -3,6 +3,22 @@
 # Ruby is installed via mise
 
 # =============================================================================
+# Install Ruby compile-time dependencies (requires sudo)
+# =============================================================================
+
+- name: Install Ruby compile dependencies (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - libffi-dev
+      - libyaml-dev
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# =============================================================================
 # Ensure Ruby is installed via mise
 # =============================================================================
 

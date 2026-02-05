@@ -148,9 +148,8 @@ chezmoi init --force  # Answer "y" to "No sudo/root access" prompt
 ```
 
 This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). You'll get:
-- **mise**: Node.js, Ruby, Rust runtime management
+- **mise**: Node.js, Rust runtime management
 - **cargo tools**: pueue
-- **gem tools**: toolkami, try-cli
 - **uv tools**: mlflow, litellm, sqlit-tui, etc.
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, etc.
 
@@ -159,6 +158,7 @@ What you **won't get** without root:
 - neovim, lazygit, fzf (unless pre-installed)
 - Docker
 - System fonts
+- Ruby and gem tools (ruby-build requires `libffi-dev` which needs sudo)
 
 **Tip**: If base tools (git, curl, etc.) are already installed by your sysadmin, the user-level tools will work fine.
 

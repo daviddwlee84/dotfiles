@@ -82,8 +82,10 @@ BECOME_FLAGS=""
 {{ if $noRoot -}}
 # noRoot mode: skip all sudo-requiring tasks
 info "noRoot mode enabled - skipping all system package installations"
-info "Only user-level tools will be installed (mise, cargo, gem, uv, npm)"
+info "Only user-level tools will be installed (mise, cargo, uv, npm)"
 BECOME_FLAGS="--skip-tags sudo"
+# Ruby can't compile without libffi-dev (requires sudo on Ubuntu)
+TAGS="${TAGS//,ruby_gem_tools/}"
 {{ else -}}
 if sudo -n true 2>/dev/null; then
     :

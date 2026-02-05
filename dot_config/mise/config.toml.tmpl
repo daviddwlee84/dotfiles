@@ -1,3 +1,4 @@
+{{- $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
 # mise global configuration
 # https://mise.jdx.dev/configuration.html
 
@@ -6,5 +7,9 @@
 node = "lts"
 # Rust toolchain for cargo tools
 rust = "latest"
+{{ if not $noRoot -}}
 # Ruby for gem tools
 ruby = "3"
+{{ else -}}
+# Ruby skipped in noRoot mode: ruby-build requires libffi-dev (needs sudo)
+{{ end -}}
