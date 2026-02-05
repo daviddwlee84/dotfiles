@@ -111,12 +111,13 @@ ansible-playbook playbooks/macos.yml --check
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
+| `brew_bundle` | macOS GUI apps via Brewfile (~/.Brewfile) |
 
 ## Profiles
 
 | Profile | OS | Tags Included |
 |---------|-----|---------------|
-| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, brew_bundle |
 | `ubuntu_desktop` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
 | `ubuntu_server` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
 
@@ -151,6 +152,43 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml
 ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
 ```
+
+## Brewfile (macOS GUI Apps)
+
+The `~/.Brewfile` manages macOS GUI applications (casks) and Mac App Store apps (via mas).
+
+```bash
+# Edit Brewfile
+chezmoi edit ~/.Brewfile
+
+# Apply changes (runs brew bundle)
+brew bundle --file=~/.Brewfile
+
+# Or via ansible
+ansible-playbook playbooks/macos.yml --tags brew_bundle
+
+# Check what would be installed
+brew bundle check --file=~/.Brewfile
+```
+
+### Brewfile Categories
+
+- **Terminals & Editors**: alacritty, iterm2, warp, cursor, visual-studio-code
+- **AI & Coding**: claude, chatgpt, ollama
+- **System Utilities**: aerospace, alt-tab, raycast, jordanbaird-ice
+- **Communication**: discord, telegram, wechat, tencent-meeting
+- **Browsers**: arc, google-chrome, tor-browser
+- **Productivity**: obsidian, google-drive, grammarly-desktop
+- **Gaming**: steam, minecraft, battle-net (skipped if WORK_MACHINE env var set)
+- **Finance**: binance, tradingview
+- **Network**: tailscale, openvpn-connect, clash-verge-rev
+- **Mac App Store**: LINE, Keynote, Numbers, Pages
+
+### Customizing Brewfile
+
+The Brewfile is a chezmoi template. Conditional sections:
+- Gaming apps: skipped if `WORK_MACHINE` environment variable is set
+- Chinese apps (baidunetdisk): only included if `useChineseMirror` is true
 
 ## Customization
 

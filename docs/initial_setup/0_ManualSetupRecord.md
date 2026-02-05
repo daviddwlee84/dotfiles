@@ -76,3 +76,6 @@ We better make it clean <https://github.com/ohmyzsh/ohmyzsh/blob/master/template
 - [优化您的终端设置 - Claude Code Docs](https://code.claude.com/docs/zh-CN/terminal-config)
 
 chezmoi 當入口 + ansible 管系統依賴 + mise 管 node/bun + uv 管 python
+
+- [Homebrew Bundle, brew bundle and Brewfile — Homebrew Documentation](https://docs.brew.sh/Brew-Bundle-and-Brewfile)
+- [Brew Bundle Brewfile Tips](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)

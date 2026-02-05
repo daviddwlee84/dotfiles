@@ -75,6 +75,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
+- `~/.Brewfile` - macOS GUI apps managed by Homebrew (casks + mas)
 
 ### Tools (via ansible)
 
@@ -84,6 +85,7 @@ To change options later: `chezmoi init --force`
 - **Coding Agents** (optional): Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
+- **GUI Apps** (macOS): terminals, editors, browsers, utilities via Brewfile
 
 ### Bootstrap (installed before ansible)
 - **uv**: Python package manager for ansible

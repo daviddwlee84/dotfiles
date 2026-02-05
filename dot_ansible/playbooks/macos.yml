@@ -43,3 +43,6 @@
 
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
+
+    - role: brew_bundle
+      tags: [brew_bundle]
