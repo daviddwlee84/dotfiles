@@ -63,3 +63,31 @@ load_zsh_dir "$ZSH_CONFIG_DIR/tools"
 
 # Load secrets (not tracked by chezmoi)
 [[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh" || true
+
+# =============================================================================
+# Adhoc Configuration (not tracked by chezmoi)
+# =============================================================================
+
+# Create adhoc file if it doesn't exist
+if [[ ! -f "$HOME/.zshrc.adhoc" ]]; then
+    cat > "$HOME/.zshrc.adhoc" << 'ADHOC_EOF'
+# ~/.zshrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+#
+# Use this file for:
+#   - Quick experiments with new aliases/functions
+#   - Machine-specific configurations
+#   - Temporary PATH modifications
+#   - Testing before adding to chezmoi-managed configs
+#
+# This file is sourced at the end of ~/.zshrc
+# Changes here take effect on new shell sessions (or run: source ~/.zshrc.adhoc)
+
+# Example:
+# alias myalias='echo "Hello from adhoc!"'
+# export MY_VAR="my_value"
+
+ADHOC_EOF
+fi
+
+# Source adhoc config
+[[ -r "$HOME/.zshrc.adhoc" ]] && source "$HOME/.zshrc.adhoc"

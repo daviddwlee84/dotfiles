@@ -38,3 +38,6 @@ scripts/redact_specstory.py
 
 # Zsh secrets file (API keys, tokens, proxy - never track)
 .config/zsh/secrets.zsh
+
+# Zsh adhoc file (personal experiments - never track)
+.zshrc.adhoc
