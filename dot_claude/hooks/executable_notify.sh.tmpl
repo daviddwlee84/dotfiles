@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Claude Code notification hook using apprise
+# Notifications are configured in ~/.config/apprise/apprise.yaml
+
 # Read JSON from stdin
 json="$(cat)"
 
@@ -16,18 +19,10 @@ if [[ "$event" == "Stop" ]]; then
   msg="Task finished"
 fi
 
-# Build subtitle if notification_type exists
-subtitle=""
-[[ -n "$ntype" ]] && subtitle="[$ntype]"
+# Build full title with notification type
+full_title="$title"
+[[ -n "$ntype" ]] && full_title="$title [$ntype]"
 
-# Send notification based on OS
-{{- if eq .chezmoi.os "darwin" }}
-terminal-notifier -title "$title" -subtitle "$subtitle" -message "$msg" -sound default
-{{- else if eq .chezmoi.os "linux" }}
-notify-send "$title${subtitle:+ $subtitle}" "$msg"
-{{- end }}
-
-# Optional: Also send via apprise if configured
-if [[ -n "${APPRISE_URLS:-}" ]]; then
-  apprise -t "${title}${subtitle:+ $subtitle}" -b "$msg" "$APPRISE_URLS" 2>/dev/null || true
-fi
+# Send notification via apprise using desktop tag
+# Desktop notifications are auto-detected by OS in apprise.yaml
+apprise --tag desktop --title "$full_title" --body "$msg" 2>/dev/null || true

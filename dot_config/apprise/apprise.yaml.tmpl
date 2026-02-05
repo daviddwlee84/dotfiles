@@ -1,9 +1,10 @@
 version: 1
 
-# Include user's custom configuration (not tracked by chezmoi)
-# Create your own custom.yaml based on example.yaml
-# include:
-#   - ~/.config/apprise/custom.yaml
+# Include user's custom notification services
+# custom.yaml is created once by chezmoi and never overwritten
+# Edit it to add your own services (Discord, Slack, Telegram, etc.)
+include:
+  - custom.yaml
 
 # Default system-wide desktop notifications (auto-detected by OS)
 urls:

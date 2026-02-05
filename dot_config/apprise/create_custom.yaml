@@ -1,0 +1,14 @@
+# Your custom Apprise notification services
+# This file is created once and never overwritten by chezmoi
+# See example.yaml for configuration examples
+#
+# Documentation: https://github.com/caronc/apprise/wiki#notification-services
+
+version: 1
+
+urls:
+  # Add your notification services here
+  # Example:
+  # - discord://webhook_id/webhook_token:
+  #     tag: chat
+  []
