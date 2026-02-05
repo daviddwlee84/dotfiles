@@ -1,6 +1,0 @@
----
-# Defaults for brew_bundle role
-
-# Whether to ignore errors from brew bundle
-# Set to false to fail on any package installation error
-brew_bundle_ignore_errors: true

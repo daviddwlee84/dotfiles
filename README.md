@@ -15,6 +15,7 @@ Cross-platform development environment setup using **chezmoi** + **ansible**.
 ```mermaid
 flowchart TB
     subgraph Bootstrap["1. Bootstrap"]
+        BREW[Homebrew macOS]
         UV[uv] --> ANS[ansible]
         MISE[mise]
     end
@@ -22,6 +23,7 @@ flowchart TB
     subgraph Chezmoi["2. chezmoi apply"]
         DOT[Config files<br/>~/.gitconfig, ~/.config/]
         ANSDIR[~/.ansible/]
+        BREWFILE[Brewfiles<br/>~/.config/homebrew/]
     end
 
     subgraph Ansible["3. Ansible Playbooks"]
@@ -33,10 +35,17 @@ flowchart TB
         CARGO[rust_cargo_tools]
     end
 
+    subgraph BrewBundle["4. Brew Bundle opt-in"]
+        CASKS[GUI Apps]
+        MAS[App Store]
+    end
+
     Bootstrap --> Chezmoi --> Ansible
+    Chezmoi -.-> BrewBundle
     MISE -.->|Node.js, Rust| NVIM
     MISE -.->|Rust| CARGO
     UV -.->|Python tools| UVTOOLS
+    BREW -.->|casks| CASKS
 ```
 
 ## Quick Setup
@@ -49,10 +58,10 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
 
 This automatically:
 
-1. Bootstraps ansible via `uv`
-2. Runs base ansible playbook (git, ripgrep, fd, etc.)
-3. Runs OS-specific playbook (macOS/Linux)
-4. Deploys all config files
+1. Bootstraps Homebrew (macOS), uv, mise, ansible
+2. Deploys all config files
+3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
+4. Runs brew bundle (if `installBrewApps` enabled)
 
 ### Optional Components
 
@@ -62,6 +71,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 |--------|---------|-------------|
 | `installCodingAgents` | true | Claude Code, OpenCode, Cursor, Copilot, Gemini CLI, etc. |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
+| `installBrewApps` | false | GUI apps via Homebrew Brewfile (casks, mas) |
 
 To change options later: `chezmoi init --force`
 
@@ -75,7 +85,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
-- `~/.Brewfile` - macOS GUI apps managed by Homebrew (casks + mas)
+- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
 
 ### Tools (via ansible)
 
@@ -88,6 +98,7 @@ To change options later: `chezmoi init --force`
 - **GUI Apps** (macOS): terminals, editors, browsers, utilities via Brewfile
 
 ### Bootstrap (installed before ansible)
+- **Homebrew** (macOS): Package manager for macOS
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop

@@ -1,0 +1,107 @@
+#!/bin/bash
+# Run brew bundle when Brewfiles change
+# Only runs if installBrewApps is enabled
+# Profile: {{ .profile }}
+# installBrewApps: {{ .installBrewApps }}
+
+{{ if not .installBrewApps -}}
+# Brew apps installation is disabled (installBrewApps = false)
+# To enable, run: chezmoi init --force
+exit 0
+{{ end -}}
+
+{{ if eq .profile "macos" -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
+{{ else -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.linux: {{ include "dot_config/homebrew/Brewfile.linux.tmpl" | sha256sum }}
+{{ end -}}
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Setup Homebrew PATH
+{{ if eq .profile "macos" -}}
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linuxbrew
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+{{ end -}}
+
+# Check if brew is available
+if ! command -v brew &> /dev/null; then
+    {{ if eq .profile "macos" -}}
+    error "Homebrew not found. It should have been installed by bootstrap."
+    exit 1
+    {{ else -}}
+    warn "Homebrew (Linuxbrew) not installed. Skipping brew bundle."
+    warn "To install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    exit 0
+    {{ end -}}
+fi
+
+BREWFILE_DIR="$HOME/.config/homebrew"
+
+# Check if Brewfiles exist
+if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
+    warn "Brewfile not found at $BREWFILE_DIR/Brewfile"
+    warn "Run 'chezmoi apply' to deploy Brewfiles first."
+    exit 0
+fi
+
+info "Running brew bundle..."
+
+# Run shared Brewfile first (installs mas, taps)
+info "Installing shared packages from Brewfile..."
+brew bundle --file="$BREWFILE_DIR/Brewfile" --no-lock --no-upgrade || {
+    warn "Some packages in Brewfile failed to install (continuing...)"
+}
+
+# Run platform-specific Brewfile
+{{ if eq .profile "macos" -}}
+if [[ -f "$BREWFILE_DIR/Brewfile.darwin" ]]; then
+    info "Installing macOS packages from Brewfile.darwin..."
+    brew bundle --file="$BREWFILE_DIR/Brewfile.darwin" --no-lock --no-upgrade || {
+        warn "Some packages in Brewfile.darwin failed to install (continuing...)"
+    }
+fi
+
+# Remind about mas sign-in
+if command -v mas &> /dev/null; then
+    if ! mas account &> /dev/null; then
+        warn "Not signed in to Mac App Store."
+        warn "Sign in via App Store.app to install mas apps."
+    fi
+fi
+{{ else -}}
+if [[ -f "$BREWFILE_DIR/Brewfile.linux" ]]; then
+    info "Installing Linux packages from Brewfile.linux..."
+    brew bundle --file="$BREWFILE_DIR/Brewfile.linux" --no-lock --no-upgrade || {
+        warn "Some packages in Brewfile.linux failed to install (continuing...)"
+    }
+fi
+{{ end -}}
+
+success "Brew bundle complete!"

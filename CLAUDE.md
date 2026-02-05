@@ -39,17 +39,19 @@ chezmoi repo/
 
 Installation Order:
 ```
-1. Bootstrap (run_once_before) - installs uv, ansible, mise
+1. Bootstrap (run_once_before) - installs Homebrew (macOS), uv, ansible, mise
 2. chezmoi apply - deploys config files + ansible playbooks
 3. Ansible (run_onchange_after) - runs on fresh install + when roles change
+4. Brew bundle (run_onchange_after) - installs GUI apps if enabled
 ```
 
-### Auto-run on Ansible Changes
+### Auto-run Scripts
 
 | Script | Behavior |
 |--------|----------|
-| `run_once_before_00_bootstrap.sh.tmpl` | Installs uv, mise, ansible (once) |
+| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS), uv, mise, ansible (once) |
 | `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
+| `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` enabled) |
 
 The onchange script includes SHA256 hashes of all role files. It runs:
 - **Fresh install**: no previous hash state → triggers run
@@ -111,13 +113,12 @@ ansible-playbook playbooks/macos.yml --check
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
-| `brew_bundle` | macOS GUI apps via Brewfile (~/.Brewfile) |
 
 ## Profiles
 
 | Profile | OS | Tags Included |
 |---------|-----|---------------|
-| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, brew_bundle |
+| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
 | `ubuntu_desktop` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
 | `ubuntu_server` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
 
@@ -155,23 +156,37 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 
 ## Brewfile (macOS GUI Apps)
 
-The `~/.Brewfile` manages macOS GUI applications (casks) and Mac App Store apps (via mas).
+GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
 
-```bash
-# Edit Brewfile
-chezmoi edit ~/.Brewfile
+**Note**: Brewfile installation is **opt-in** (disabled by default). Enable via `chezmoi init --force` and set `installBrewApps = true`.
 
-# Apply changes (runs brew bundle)
-brew bundle --file=~/.Brewfile
+### File Structure
 
-# Or via ansible
-ansible-playbook playbooks/macos.yml --tags brew_bundle
-
-# Check what would be installed
-brew bundle check --file=~/.Brewfile
+```
+~/.config/homebrew/
+├── Brewfile          # Shared: taps, CLI formulas, mas
+├── Brewfile.darwin   # macOS: casks (GUI apps), mas entries
+└── Brewfile.linux    # Linux: linuxbrew-specific (minimal)
 ```
 
-### Brewfile Categories
+### Usage
+
+```bash
+# Edit Brewfiles
+chezmoi edit ~/.config/homebrew/Brewfile.darwin
+
+# Apply changes manually
+brew bundle --file=~/.config/homebrew/Brewfile
+brew bundle --file=~/.config/homebrew/Brewfile.darwin
+
+# Or just run chezmoi apply (triggers run_onchange script)
+chezmoi apply
+
+# Check what would be installed
+brew bundle check --file=~/.config/homebrew/Brewfile.darwin
+```
+
+### Brewfile Categories (darwin)
 
 - **Terminals & Editors**: alacritty, iterm2, warp, cursor, visual-studio-code
 - **AI & Coding**: claude, chatgpt, ollama
@@ -186,9 +201,10 @@ brew bundle check --file=~/.Brewfile
 
 ### Customizing Brewfile
 
-The Brewfile is a chezmoi template. Conditional sections:
+The Brewfiles are chezmoi templates. Conditional sections:
 - Gaming apps: skipped if `WORK_MACHINE` environment variable is set
 - Chinese apps (baidunetdisk): only included if `useChineseMirror` is true
+- mas apps: requires signing in to App Store.app first
 
 ## Customization
 

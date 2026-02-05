@@ -15,3 +15,5 @@ gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for A
 installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
 # 是否安裝 Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)" true }}
+# 是否安裝 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.)
+installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Homebrew Brewfile (casks, mas)" false }}

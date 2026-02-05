@@ -1,0 +1,22 @@
+# Brewfile - Shared configuration (macOS & Linux)
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile
+
+# =============================================================================
+# Taps (Third-party repositories)
+# =============================================================================
+tap "homebrew/bundle"
+tap "nikitabobko/tap"  # aerospace (macOS window manager)
+
+# =============================================================================
+# Formulas - CLI Tools (cross-platform)
+# =============================================================================
+# Note: Most CLI tools are managed by ansible for better cross-platform support
+# Only add formulas here that you want to manage via Brewfile
+
+# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+{{ if eq .profile "macos" -}}
+brew "mas"
+{{ end -}}

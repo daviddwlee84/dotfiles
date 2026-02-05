@@ -18,6 +18,10 @@ export LC_ALL="en_US.UTF-8"
 # PATH additions
 export PATH="$HOME/.local/bin:$PATH"
 
+# Homebrew
+# Set default Brewfile location (XDG-compliant)
+export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+
 # --- Suggested exports (uncomment to enable) ---
 # History configuration (oh-my-zsh handles this, but can customize)
 # export HISTSIZE=10000

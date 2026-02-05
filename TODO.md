@@ -34,4 +34,4 @@ Use mise to manage most of the runtime version?!
 
 Optimize zsh & tmux startup time
 
-~Do we want to use Brewfile to manage macOS packages installation instead of writing one by one through Ansible?~ **Done**: Added `dot_Brewfile.tmpl` and `brew_bundle` ansible role.
+~Do we want to use Brewfile to manage macOS packages installation instead of writing one by one through Ansible?~ **Done**: XDG-compliant Brewfiles at `~/.config/homebrew/` with chezmoi run_onchange script (opt-in via `installBrewApps`).

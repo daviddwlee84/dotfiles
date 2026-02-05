@@ -79,3 +79,4 @@ chezmoi 當入口 + ansible 管系統依賴 + mise 管 node/bun + uv 管 python
 
 - [Homebrew Bundle, brew bundle and Brewfile — Homebrew Documentation](https://docs.brew.sh/Brew-Bundle-and-Brewfile)
 - [Brew Bundle Brewfile Tips](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)
+- [How to keep your mac software updated easily (2026)](https://gist.github.com/arturmartins/f779720379e6bd97cac4bbe1dc202c8b#file-mac-upgrade-sh)

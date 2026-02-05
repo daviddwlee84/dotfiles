@@ -1,0 +1,30 @@
+# Brewfile.linux - Linux-specific Homebrew (Linuxbrew) packages
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.linux
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.linux
+#
+# Note: Most packages on Linux are managed by apt/ansible.
+# This file is for Linuxbrew-specific additions that aren't easily
+# available via apt or provide better/newer versions.
+
+# =============================================================================
+# Formulas - CLI tools better installed via Linuxbrew
+# =============================================================================
+# Uncomment as needed - most are already handled by ansible
+
+# brew "gh"           # GitHub CLI (newer version than apt)
+# brew "bat"          # Better cat with syntax highlighting
+# brew "eza"          # Modern ls replacement
+# brew "fd"           # Better find
+# brew "ripgrep"      # Better grep
+# brew "fzf"          # Fuzzy finder
+# brew "lazygit"      # Terminal UI for git
+
+# =============================================================================
+# Linux-compatible casks (limited availability)
+# =============================================================================
+# Note: Most casks are macOS-only. Only fonts and a few tools work on Linux.
+
+# Fonts (if you prefer Homebrew over manual install)
+# cask "font-hack-nerd-font"  # Already managed by ansible nerdfonts role

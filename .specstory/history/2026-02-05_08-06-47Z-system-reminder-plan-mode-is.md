@@ -3270,3 +3270,1718 @@ ansible-playbook playbooks/macos.yml --tags brew_bundle
 # Check what's missing
 brew bundle check --file=~/.Brewfile
 ```
+
+---
+
+_**User**_
+
+<system_reminder>
+You are now in Plan mode. Continue with the task in the new mode.
+</system_reminder>
+
+
+<system_reminder>
+Plan mode is active. The user indicated that they do not want you to execute yet -- you MUST NOT make any edits, run any non-readonly tools (including changing configs or making commits), or otherwise make any changes to the system. This supersedes any other instructions you have received (for example, to make edits). Instead, you should:
+
+1. Answer the user's query comprehensively by searching to gather information
+
+2. If you do not have enough information to create an accurate plan, you MUST ask the user for more information. If any of the user instructions are ambiguous, you MUST ask the user to clarify.
+
+3. If the user's request is too broad, you MUST ask the user questions that narrow down the scope of the plan. ONLY ask 1-2 critical questions at a time.
+
+4. If there are multiple valid implementations, each changing the plan significantly, you MUST ask the user to clarify which implementation they want you to use.
+
+5. If you have determined that you will need to ask questions, you should ask them IMMEDIATELY at the start of the conversation. Prefer a small pre-read beforehand only if ≤5 files (~20s) will likely answer them. The questions should ≤200 chars each, lettered multiple choice. Format questions as markdown numbered lists without bold (e.g., "1. Question text here?"), and if providing options, use a standard sublist pattern (e.g., " - a) Option one", " - b) Option two"). The first option should always be the default assumption if the user doesn't answer, so do not specify a separate default.
+
+6. When you're done researching, present your plan by calling the create_plan tool, which will prompt the user to confirm the plan. Do NOT make any file changes or run any tools that modify the system state in any way until the user has confirmed the plan.
+
+7. The plan should be concise, specific and actionable. Cite specific file paths and essential snippets of code.
+
+8. Keep plans proportional to the request complexity - don't over-engineer simple tasks.
+
+9. Do NOT use emojis in the plan.
+
+10. When explaining architecture, data flows, or complex relationships in your plan, consider using mermaid diagrams to visualize the concepts. Diagrams can make plans clearer and easier to understand.
+
+<mermaid_syntax>
+When writing mermaid diagrams:
+- Do NOT use spaces in node names/IDs. Use camelCase, PascalCase, or underscores instead.
+  - Good: `UserService`, `user_service`, `userAuth`
+  - Bad: `User Service`, `user auth`
+- Do NOT use HTML tags like `<br/>` or `<br>` - they render as literal text or cause syntax errors.
+  - Good: `participant FileSyncer as FS_TypeScript` or put details in notes
+  - Bad: `participant FileSyncer as FileSyncer<br/>TypeScript`
+- When edge labels contain parentheses, brackets, or other special characters, wrap the label in quotes:
+  - Good: `A -->|"O(1) lookup"| B`
+  - Bad: `A -->|O(1) lookup| B` (parentheses parsed as node syntax)
+- Use double quotes for node labels containing special characters (parentheses, commas, colons):
+  - Good: `A["Process (main)"]`, `B["Step 1: Init"]`
+  - Bad: `A[Process (main)]` (parentheses parsed as shape syntax)
+- Avoid reserved keywords as node IDs: `end`, `subgraph`, `graph`, `flowchart`
+  - Good: `endNode[End]`, `processEnd[End]`
+  - Bad: `end[End]` (conflicts with subgraph syntax)
+- For subgraphs, use explicit IDs with labels in brackets: `subgraph id [Label]`
+  - Good: `subgraph auth [Authentication Flow]`
+  - Bad: `subgraph Authentication Flow` (spaces cause parsing issues)
+- Avoid angle brackets and HTML entities in labels - they render as literal text:
+  - Good: `Files[Files Vec]` or `Files[FilesTuple]`
+  - Bad: `Files["Vec&lt;T&gt;"]`
+- Do NOT use explicit colors or styling - the renderer applies theme colors automatically:
+  - Bad: `style A fill:#fff`, `classDef myClass fill:white`, `A:::someStyle`
+  - These break in dark mode. Let the default theme handle colors.
+- Click events are disabled for security - don't use `click` syntax
+</mermaid_syntax>
+</system_reminder>
+
+Are we following the best practice?
+
+- [Homebrew on Linux — Homebrew Documentation](https://docs.brew.sh/Homebrew-on-Linux)
+- [Brew Bundle Brewfile Tips](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)
+- [How to keep your mac software updated easily (2026)](https://gist.github.com/arturmartins/f779720379e6bd97cac4bbe1dc202c8b#file-mac-upgrade-sh)
+
+以下是ChatGPT的建議
+
+```
+Brewfile 放哪裡最好？
+
+用 Homebrew 官方的 brew bundle 來說，Brewfile 其實「放哪裡都可以」，因為你可以用 --file 指定路徑，或用環境變數指定預設檔案。Homebrew manpage 也明講 brew bundle dump 會把 Brewfile 寫到「目前目錄」或 --file 指定的位置。  ￼
+
+我建議你在 dotfiles 走 XDG 路線，放在：
+  •  ~/.config/homebrew/Brewfile（我個人最推薦）
+  •  好處：符合 XDG、跟其他工具的 config 放一起、很好用 chezmoi 管
+  •  或者更「bundle 專用」一點：~/.config/brewfile/Brewfile（很多人習慣這樣放）
+
+然後在 shell（zshrc/zshenv）設定預設 bundle 檔案：
+
+export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+
+這樣你在哪個目錄跑 brew bundle 都會吃同一份 Brewfile（相當於「global Brewfile」）。社群常見做法也是用 HOMEBREW_BUNDLE_FILE 指到你想放的路徑。  ￼
+
+補充：brew bundle dump --global / brew bundle --global 這種「全域模式」也有人用來管理跨機器搬家（會寫到 Homebrew 的 global 位置），但如果你想把 Brewfile 明確放在 dotfiles repo，XDG + HOMEBREW_BUNDLE_FILE 通常更直覺。  ￼
+
+⸻
+
+要不要分 Linux？
+
+很適合分，而且我建議你分。
+
+原因很現實：
+  •  macOS 會用到 cask（GUI app）和 mas（Mac App Store）
+  •  Linux 上 mas 沒意義；cask 在 Linux 也只有一部分能用（主要是 fonts 或有 Linux binaries 的 casks），而大量 macOS 專用 cask 不可能在 Linux 出現。  ￼
+
+所以最穩的結構是：
+  •  ~/.config/homebrew/Brewfile（共用：CLI tools、taps、服務）
+  •  ~/.config/homebrew/Brewfile.darwin（mac 專用：cask + mas）
+  •  ~/.config/homebrew/Brewfile.linux（linux 專用：Linuxbrew 的差異、必要套件）
+
+然後用 wrapper script 決定跑哪個：
+
+brew bundle --file "$HOME/.config/homebrew/Brewfile"
+case "$(uname -s)" in
+  Darwin) brew bundle --file "$HOME/.config/homebrew/Brewfile.darwin" ;;
+  Linux)  brew bundle --file "$HOME/.config/homebrew/Brewfile.linux" ;;
+esac
+
+這比「在同一份 Brewfile 裡寫平台條件」可靠很多；因為 brew bundle 目前也沒有官方的 platform block DSL（你看到的那種 platform :macos do ... end 比較像討論/需求，不是標準語法）。  ￼
+
+⸻
+
+Ansible：用 Brewfile（brew bundle）還是直接寫 tasks？
+
+結論：用 Brewfile 當 single source of truth + Ansible 只負責執行它（你這種 dotfiles/chezmoi 取向，這會最乾淨）。
+
+為什麼
+  •  Brewfile 是 declarative（你要什麼狀態），brew bundle 會幫你對齊安裝/升級。  ￼
+  •  Brewfile 天生就適合版本控制，換機器只要 brew bundle。
+  •  Ansible 寫死一堆 community.general.homebrew / homebrew_cask 會變長、而且跨平台/差異處理更麻煩。
+
+我會怎麼寫（思路）
+  •  Ansible：
+  1.  確保 Homebrew 存在（mac / linux 各一段）
+  2.  command: brew bundle --file ... 跑對應 Brewfile
+  •  Brewfile：
+  •  共用 + darwin + linux 分開管理（如上）
+
+另外，Homebrew 的 Tips & Tricks 也把 brew bundle dump / brew bundle install 當成遷移安裝的標準方式。  ￼
+
+⸻
+
+如果你要我幫你把它「落到你的 repo 結構」：你用 chezmoi 的話，我可以直接給你一套：
+  •  dot_config/homebrew/Brewfile*
+  •  run_once_*.sh 或 Ansible task 判斷 ansible_facts['system']
+  •  以及一個 bin/brew-sync wrapper（同時支援 mac/linux）
+
+你偏好：純 Brew（不靠 Ansible），還是 Ansible 當 bootstrap？
+```
+
+我認為我們最好把配置都放到 ~/.config/homebrew/ 下 然後區分 darwin & linux 再往下細分具體app
+
+不過mas可能需要以某種方式保證能先安裝才行
+（或是就乾脆跟Ansible獨立開來？ 單純用 chezmoi 的 script + hash trick 來控制運行與否）
+然後多加個選項 預設不裝這些玩意
+此外 把Homebrew setup提升至 @run_once_before_00_bootstrap.sh.tmpl 之中？
+
+---
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking about best practices for Brewfile management and wants to restructure the current implementation based on ChatGPT's suggestions. Let me analyze the key points:
+
+1. **Brewfile location**: Move from `~/.Brewfile` to `~/.config/homebrew/Brewfile` (XDG-compliant)
+2. **Split by platform**: Separate Brewfile for darwin vs linux
+3. **mas handling**: Need to ensure mas is installed before running mas entries
+4. **Decouple from Ansible**: Use chezmoi scripts with hash trick instead
+5. **Add option**: Default to not installing GUI apps (make it opt-in)
+6. **Move Homebrew setup**: To bootstrap script instead of ansible role
+
+Let me check the current structure and the bootstrap script to understand how to best implement this.
+</details></think>
+
+Let me examine the current structure and best practices to provide a comprehensive plan.
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/dot_Brewfile.tmpl`</summary>
+```
+     1|# Brewfile - macOS GUI applications managed by Homebrew
+     2|# Applied via: brew bundle --file=~/.Brewfile
+     3|# Or via ansible brew_bundle role
+     4|#
+     5|# This file is managed by chezmoi. Edit the source:
+     6|#   chezmoi edit ~/.Brewfile
+     7|
+     8|# =============================================================================
+     9|# Taps (Third-party repositories)
+    10|# =============================================================================
+    11|tap "homebrew/bundle"
+    12|tap "homebrew/cask"
+    13|tap "nikitabobko/tap"  # aerospace
+    14|
+    15|# =============================================================================
+    16|# Formulas (CLI tools managed here instead of ansible for convenience)
+    17|# =============================================================================
+    18|brew "mas"  # Mac App Store CLI for mas entries below
+    19|
+    20|# =============================================================================
+    21|# Casks - Terminals & Editors
+    22|# =============================================================================
+    23|cask "alacritty"
+    24|cask "iterm2"
+    25|cask "warp"
+    26|cask "cursor"
+    27|cask "visual-studio-code"
+    28|
+    29|# =============================================================================
+    30|# Casks - AI & Coding Assistants
+    31|# =============================================================================
+    32|cask "claude"
+    33|cask "chatgpt"
+    34|# cask "chatgpt-atlas"  # Uncomment if needed
+    35|cask "ollama"
+    36|
+    37|# =============================================================================
+    38|# Casks - System Utilities
+    39|# =============================================================================
+    40|cask "nikitabobko/tap/aerospace"  # Tiling window manager
+    41|cask "alt-tab"                     # Windows-style alt-tab
+    42|cask "raycast"                     # Spotlight replacement
+    43|cask "itsycal"                     # Menu bar calendar
+    44|cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+    45|cask "scroll-reverser"             # Reverse scroll direction per device
+    46|cask "sloth"                       # Process/file viewer
+    47|cask "the-unarchiver"              # Archive extraction
+    48|cask "applite"                     # GUI for Homebrew casks
+    49|
+    50|# =============================================================================
+    51|# Casks - Communication
+    52|# =============================================================================
+    53|cask "discord"
+    54|cask "messenger"
+    55|cask "telegram"
+    56|cask "wechat"
+    57|cask "whatsapp"
+    58|cask "dingtalk"
+    59|cask "tencent-meeting"  # TencentMeeting.app
+    60|cask "termius"          # SSH client
+    61|
+    62|# =============================================================================
+    63|# Casks - Browsers
+    64|# =============================================================================
+    65|cask "arc"
+    66|cask "google-chrome"
+    67|cask "tor-browser"
+    68|
+    69|# =============================================================================
+    70|# Casks - Productivity
+    71|# =============================================================================
+    72|cask "obsidian"
+    73|cask "google-drive"
+    74|cask "grammarly-desktop"
+    75|cask "readest"              # E-book reader
+    76|cask "super-productivity"   # Task/time management
+    77|cask "wispr-flow"           # Voice typing
+    78|cask "mathpix-snipping-tool"
+    79|
+    80|# =============================================================================
+    81|# Casks - Media & Entertainment
+    82|# =============================================================================
+    83|cask "spotify"
+    84|cask "anki"
+    85|
+    86|# =============================================================================
+    87|# Casks - Gaming
+    88|# =============================================================================
+    89|{{ if not (env "WORK_MACHINE") -}}
+    90|cask "steam"
+    91|cask "minecraft"
+    92|cask "battle-net"
+    93|cask "hstracker"  # Hearthstone deck tracker
+    94|{{- end }}
+    95|
+    96|# =============================================================================
+    97|# Casks - Finance & Trading
+    98|# =============================================================================
+    99|cask "binance"
+   100|cask "tradingview"
+   101|
+   102|# =============================================================================
+   103|# Casks - Network & VPN
+   104|# =============================================================================
+   105|cask "tailscale"
+   106|cask "openvpn-connect"
+   107|cask "vibetunnel"
+   108|cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
+   109|
+   110|# =============================================================================
+   111|# Casks - Virtualization & Remote
+   112|# =============================================================================
+   113|cask "virtualbox"
+   114|cask "windows-app"      # Microsoft Remote Desktop
+   115|cask "teamviewer-host"
+   116|cask "sharemouse"       # KVM software
+   117|
+   118|# =============================================================================
+   119|# Casks - Developer Tools
+   120|# =============================================================================
+   121|# Note: docker/orbstack is managed by ansible docker role
+   122|cask "dbeaver-community"
+   123|cask "superset"
+   124|
+   125|# =============================================================================
+   126|# Casks - Cloud Storage
+   127|# =============================================================================
+   128|{{ if .useChineseMirror -}}
+   129|cask "baidunetdisk"  # Baidu Netdisk (百度网盘)
+   130|{{- end }}
+   131|
+   132|# =============================================================================
+   133|# Mac App Store Apps (via mas)
+   134|# Requires: brew install mas && mas signin
+   135|# =============================================================================
+   136|mas "LINE", id: 539883307
+   137|mas "Keynote", id: 409183694
+   138|mas "Numbers", id: 409203825
+   139|mas "Pages", id: 409201541
+   140|# mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
+   141|
+   142|# =============================================================================
+   143|# Apps NOT available via Homebrew (manual install required):
+   144|# - 东方财富, 同花顺 (Chinese finance apps)
+   145|# - FileZilla (removed from Homebrew)
+   146|# - Google Docs/Sheets/Slides (PWAs, not standalone apps)
+   147|# - Safari (system built-in)
+   148|# - osu! (use official installer)
+   149|# - Wine Staging (deprecated, use wine-stable or crossover)
+   150|# - Perplexity (App Store only)
+   151|# - Immersive Translate (browser extension)
+   152|# =============================================================================
+   153|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob** pattern `run_once_before*.tmpl`</summary>
+Result of search in '' (total 1 file):
+- ./run_once_before_00_bootstrap.sh.tmpl
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="unknown" data-tool-name="WebFetch"><details>
+<summary>Tool use: **WebFetch**</summary>
+```
+# Content from https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f
+
+Content written to file: /Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/agent-tools/bdf03585-f965-41e2-8877-9b0e68f87a30.txt
+Size: 19.9 KB, 310 lines
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Let me read the bootstrap script and the fetched gist content to understand better.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl`</summary>
+```
+     1|#!/bin/bash
+     2|# Bootstrap script - installs uv, ansible, mise, and galaxy collections
+     3|# Runs BEFORE any ansible playbooks
+     4|
+     5|set -e
+     6|
+     7|# Colors for output
+     8|RED='\033[0;31m'
+     9|GREEN='\033[0;32m'
+    10|YELLOW='\033[1;33m'
+    11|BLUE='\033[0;34m'
+    12|NC='\033[0m' # No Color
+    13|
+    14|info() {
+    15|    echo -e "${BLUE}[INFO]${NC} $1"
+    16|}
+    17|
+    18|success() {
+    19|    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    20|}
+    21|
+    22|warn() {
+    23|    echo -e "${YELLOW}[WARN]${NC} $1"
+    24|}
+    25|
+    26|error() {
+    27|    echo -e "${RED}[ERROR]${NC} $1"
+    28|}
+    29|
+    30|# Ensure PATH includes local bin
+    31|export PATH="$HOME/.local/bin:$PATH"
+    32|
+    33|# 1. Install uv if missing
+    34|if ! command -v uv &> /dev/null; then
+    35|    info "Installing uv..."
+    36|    curl -LsSf https://astral.sh/uv/install.sh | sh
+    37|    success "uv installed successfully"
+    38|else
+    39|    info "uv is already installed"
+    40|fi
+    41|
+    42|# 2. Install mise if missing (runtime manager for Node.js, etc.)
+    43|if ! command -v mise &> /dev/null; then
+    44|    info "Installing mise..."
+    45|    # Try curl installer first (fast, no sudo)
+    46|    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
+    47|        success "mise installed via curl"
+    48|    else
+    49|        # Fallback to apt for GFW environments
+    50|        warn "curl installer failed/timed out, trying apt..."
+    51|        if command -v apt-get &> /dev/null; then
+    52|            sudo apt-get update -y
+    53|            sudo apt-get install -y curl gpg
+    54|            sudo install -dm 755 /etc/apt/keyrings
+    55|            curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
+    56|            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+    57|            sudo apt-get update -y
+    58|            sudo apt-get install -y mise
+    59|            success "mise installed via apt"
+    60|        else
+    61|            error "Could not install mise - please install manually"
+    62|        fi
+    63|    fi
+    64|else
+    65|    info "mise is already installed"
+    66|fi
+    67|
+    68|# 3. Install ansible if missing
+    69|if ! command -v ansible-playbook &> /dev/null; then
+    70|    info "Installing ansible via uv..."
+    71|    uv tool install ansible-core
+    72|    success "ansible installed successfully"
+    73|else
+    74|    info "ansible is already installed"
+    75|fi
+    76|
+    77|# 4. Install ansible-galaxy collections
+    78|info "Installing ansible-galaxy collections..."
+    79|ansible-galaxy collection install community.general --force-with-deps
+    80|success "ansible-galaxy collections installed"
+    81|
+    82|# 5. Install mise global tools (Node.js) if mise config exists
+    83|MISE_BIN="${HOME}/.local/bin/mise"
+    84|[[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
+    85|if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
+    86|    info "Installing mise global tools..."
+    87|    "$MISE_BIN" install --yes
+    88|    success "mise tools installed"
+    89|fi
+    90|
+    91|success "Bootstrap complete!"
+    92|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/agent-tools/bdf03585-f965-41e2-8877-9b0e68f87a30.txt`</summary>
+```
+     1|Brew Bundle Brewfile Tips ·GitHub
+     2|[Skip to content](#start-of-content)
+     3|[](https://gist.github.com/)
+     4| 
+     5|Search Gists
+     6|Search Gists
+     7|[](https://gist.github.com/)
+     8|[Signin](https://gist.github.com/auth/github?return_to=https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)[Signup](https://gist.github.com/join?return_to=https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f&amp;source=header-gist)
+     9|You signed in with another tab or window.[Reload]()to refresh your session.You signed out in another tab or window.[Reload]()to refresh your session.You switched accounts on another tab or window.[Reload]()to refresh your session.Dismiss alert
+    10|{{ message }}
+    11|Instantly share code, notes, and snippets.
+    12|[![@ChristopherA](https://avatars.githubusercontent.com/u/69103?s=64&amp;v=4)](https://gist.github.com/ChristopherA)
+    13|# [ChristopherA](https://gist.github.com/ChristopherA)/**[brew-bundle-brewfile-tips.md](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)**
+    14|Last activeJanuary 14, 2026 14:46
+    15|Show Gist options
+    16|* [Download ZIP](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f/archive/576932d0a246b2300a0e44d4a1ee56e3150903f2.zip)
+    17|* [Star618(618)](https://gist.github.com/login?return_to=https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)You must be signed in to star a gist
+    18|* [Fork76(76)](https://gist.github.com/login?return_to=https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)You must be signed in to fork a gist
+    19|* Embed
+    20|# Select an option
+    21|* EmbedEmbed this gist in your website.
+    22|* ShareCopy sharable link for this gist.
+    23|* Clone via HTTPSClone using the web URL.
+    24|## No results found
+    25|[Learn more about clone URLs](https://docs.github.com/articles/which-remote-url-should-i-use)
+    26|Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;
+    27|* Save ChristopherA/a579274536aab36ea9966f301ff14f3f to your computer and use it in GitHub Desktop.
+    28|Embed
+    29|# Select an option
+    30|* EmbedEmbed this gist in your website.
+    31|* ShareCopy sharable link for this gist.
+    32|* Clone via HTTPSClone using the web URL.
+    33|## No results found
+    34|[Learn more about clone URLs](https://docs.github.com/articles/which-remote-url-should-i-use)
+    35|Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;
+    36|Save ChristopherA/a579274536aab36ea9966f301ff14f3f to your computer and use it in GitHub Desktop.
+    37|[Download ZIP](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f/archive/576932d0a246b2300a0e44d4a1ee56e3150903f2.zip)
+    38|Brew Bundle Brewfile Tips
+    39|[Raw](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f/raw/576932d0a246b2300a0e44d4a1ee56e3150903f2/brew-bundle-brewfile-tips.md)
+    40|[**brew-bundle-brewfile-tips.md**](#file-brew-bundle-brewfile-tips-md)
+    41|# Brew Bundle Brewfile Tips
+    42|[](#brew-bundle-brewfile-tips)
+    43|## Copyright &amp; License
+    44|[](#copyright--license)
+    45|> > Unless otherwise noted (either in this file or in a file's copyright section) the contents of this gist are Copyright ©️2020 by Christopher Allen, and are shared under [> spdx:Creative Commons Attribution Share Alike 4.0 International (CC-BY-SA-4.)
+    46|](https://spdx.org/licenses/CC-BY-SA-4.0.html)> open-source license.
+    47|> ## Sponsor
+    48|[](#sponsor)
+    49|> > If you more tips and advice like these, you can become a monthly patron on my [> GitHub Sponsor Page
+    50|](https://github.com/sponsors/ChristopherA)> for as little as $5 a month; and your contributions will be multipled, as GitHub is matching the first $5,000!This gist is all about Homebrew, so if you like it you can support it by [> donating
+    51|](https://github.com/homebrew/brew#donations)> to them or becoming one of their [> Github Sponsors
+    52|](https://github.com/sponsors/Homebrew)> .
+    53|> ## Intro to Brew, Bundle, and Brewfile
+    54|[](#intro-to-brew-bundle-and-brewfile)
+    55|If you are using a Mac as your development environment, you really should be using[Brew](https://brew.sh). You probably should be using it if you are a power user as well, as it isn't really that difficult.
+    56|A key feature of Brew is its ability to set up your Mac to a known configuration. It does this a feature called Bundle that uses Brewfiles. As doing development, or experimenting with new apps can break your system, I can easily restore back to a known configuration, both on my primary Macs, but also in VMware Fusion instances where I do more testing, including testing on old versions of MacOS and new beta versions of MacOS.
+    57|A version of Brew also is available on Linux, but I mostly use apt-get on Debian. I am considering some cross-platform development scripts to use Brew instead.
+    58|## Installing Brew
+    59|[](#installing-brew)
+    60|Compete details are at[Brew](https://brew.sh)but fairly simple to install. Open terminal.app (command-space + "terminal") and paste this command on the command line.
+    61|\```
+    62|`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"`
+    63|\```
+    64|If you don't have a recent version of macOS, you may need to install the latest Xcode command tools first. I don't like downloading all of Xcode, so I use this trick to only install the latest command-line tools.
+    65|\```
+    66|`touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress;
+    67|softwareupdate -i -a
+    68|rm /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress`
+    69|\```
+    70|Another easy way to install all of this, along with some good basic security hardening practices, is to use[Mike McQuaid's Strap](https://github.com/MikeMcQuaid/strap)tool by going to[https://macos-strap.herokuapp.com/](https://macos-strap.herokuapp.com/). If you have a github account, it will also install basic github permissions.
+    71|## Basic Brew Bundle
+    72|[](#basic-brew-bundle)
+    73|The most basic command
+    74|\```
+    75|`brew bundle install`
+    76|\```
+    77|Looks for`\~/Brewfile`and installs its contents
+    78|## Install a specific brewfile
+    79|[](#install-a-specific-brewfile)
+    80|If you want to use a brewfile from a non-standard place.
+    81|\```
+    82|`brew bundle --file=\~/.private/Brewfile`
+    83|\```
+    84|Or more specifically:
+    85|\```
+    86|`brew bundle install --file=rs-brew-dump`
+    87|\```
+    88|## Creating a Brewfile
+    89|[](#creating-a-brewfile)
+    90|You can dump a Brewfile of your current brew/cask/mas entries into your current directory with
+    91|\```
+    92|`brew bundle dump`
+    93|\```
+    94|or to a specific directory and file name.
+    95|\```
+    96|`brew bundle dump --file=\~/.private/Brewfile`
+    97|\```
+    98|If a Brewfile already exists, you'll need to do
+    99|\```
+   100|`brew bundle dump --force`
+   101|\```
+   102|## Cleaning up to match brewfile
+   103|[](#cleaning-up-to-match-brewfile)
+   104|If you want your current system configuration to match your brewfile
+   105|\```
+   106|`brew bundle --force cleanup`
+   107|\```
+   108|## Best Practices:`brew cask`,`mas`and`cu`
+   109|[](#best-practices-brew-cask-mas-and-cu)
+   110|A key practice is to install EVERYTHING possible using brew, brew cask, or mas. Even things like fonts!
+   111|Three tools that really make this work for more than just development tools is the ability to install a large number of macOS UI apps using`brew cask install &lt;appname&gt;`, Mac Apple Store apps using`mas install &lt;appnumber&gt;`, search for them using`brew search &lt;searchterm&gt;`&amp;`mas search &lt;searchterm&gt;`. Not everything is avaiable this way, but the most important ones are.
+   112|To use this make sure that these entries are near the top of your`Brewfile`:
+   113|\```
+   114|`tap "homebrew/cask"
+   115|tap "buo/cask-upgrade"
+   116|brew "mas"`
+   117|\```
+   118|You even install many open source fonts this way. Do`brew tap homebrew/cask-fonts" and Add this top the top of your`Brewfile`:
+   119|\```
+   120|`tap "homebrew/cask-fonts"`
+   121|\```
+   122|On can search for fonts once tapped by
+   123|\```
+   124|`brew search font`
+   125|\```
+   126|Finally, there is a[Cask-Update](https://github.com/buo/homebrew-cask-upgrade)tool that works with`brew cask`to update all of your Mac apps.
+   127|Add this to your`Brewfile`:
+   128|\```
+   129|`tap "buo/cask-upgrade"`
+   130|\```
+   131|Then to upgrade all of you Mac apps, just do:
+   132|\```
+   133|`brew cu`
+   134|\```
+   135|[Cask-Update](https://github.com/buo/homebrew-cask-upgrade)details some other features. In particular, I like`brew cu pin &lt;caskname&gt;`which locks an app to a specific version.
+   136|## Minimal Essential Bundle
+   137|[](#minimal-essential-bundle)
+   138|My current minimal Brew on macOS is:
+   139|\```
+   140|`tap "homebrew/core"
+   141|tap "homebrew/bundle"
+   142|tap "homebrew/cask"
+   143|tap "buo/cask-upgrade"
+   144|tap "homebrew/cask-fonts"
+   145|brew "github-keygen"
+   146|brew "gnupg"
+   147|brew "pinentry-mac"
+   148|brew "stow"
+   149|brew "mas"
+   150|brew "gh"
+   151|cask "atom"
+   152|cask "carbon-copy-cloner"cask "atom"
+   153|cask "typora"`
+   154|\```
+   155|## Best Pracices: Using with`.dotfiles`
+   156|[](#best-pracices-using-with-dotfiles)
+   157|I have two brewfiles currently:
+   158|* One in`\~.private`which I install right after installing brew and before setting up my basic`.ssh`and`.gnupg`files so that I can use GitHub. It is the minimal essential list above. I can install this manually with a script inside`.private`.
+   159|* My standard in`\~/Brewfile`is actually a symlink to`\~/.dotfiles/mac/Brewfile`. I different`\~/.dotfiles/`for different environments.
+   160|* My primary Mac is a monster MacBook Pro is really more of a "desktop" for me. It has 64 GB RAM with an 8TB HD. It probably has my largest Brewfile.
+   161|* That being said, it actually doesn't have many development tools in it. Instead, I mostly use VMware instances (mostly macOS but some Debian) for my development images. They use a different`\~.dotfiles`based Brewfile.
+   162|* My smaller, older MacBook is mostly for travel. It has different set of`\~/.dotfiles/`focused on just enough to work remotely. I'm always prepared to restore this Mac from scratch.
+   163|* For a month or so each year, late summer early fall, my old MacBook also will run the latest beta of macOS, allowing me to test not just macOS, but also be prepared for changes to my development environments.
+   164|## Advanced Topics &amp; To Investigate
+   165|[](#advanced-topics--to-investigate)
+   166|* Instead of`brew cask uninstall &lt;caskname&gt;`you can do`brew cask zap &lt;caskname&gt;`which may also do additional removal of preferences, caches, updaters, etc. stored in`\~/Library`. See[Zap](https://github.com/Homebrew/homebrew-cask/blob/master/doc/cask_language_reference/stanzas/zap.md)
+   167|* A pariculary powerful feature for Brew is that it attempts to install developer tools in ways that allow them to co-exist. However if you are using multiple versions of a tool, it can be difficult to understand dependencies. These links may help:
+   168|* brew deps
+   169|* `brew deps --tree &lt;brewformula&gt;`
+   170|* `brew deps --tree -1 &lt;brewformula&gt;`
+   171|* `brew deps --include-build --tree $(brew leaves)`
+   172|* [brew leaves](https://thoughtbot.com/blog/brew-leaves)
+   173|* `brew leaves | xargs brew deps --include-build --tree`
+   174|* `brew leaves | xargs brew deps --installed --for-each | sed "s/^.\*:/$(tput setaf 4)&amp;&amp;$(tput sgr0)/"`
+   175|* `brew leaves | sed 's/^/install /' &gt; Brewfile`
+   176|* [brew graph](https://github.com/martido/homebrew-graph)
+   177|* A[critique](https://blog.jpalardy.com/posts/untangling-your-homebrew-dependencies/)of`brew leaves`and`brew graph`
+   178|* If you are a heavy Github user, or are creating brew formulae, there is an advanced wrapper for Homebrew that automates the creation of the Brewfile and can store it on Github, along with a many more features:[https://homebrew-file.readthedocs.io/](https://homebrew-file.readthedocs.io/)
+   179|[![@ChristopherA](https://avatars.githubusercontent.com/u/69103?s=80&amp;v=4)](https://gist.github.com/ChristopherA)
+   180|Copy link
+   181|Author
+   182|### **[ChristopherA](https://gist.github.com/ChristopherA)**commented[Sep 18, 2022](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=4306947#gistcomment-4306947)
+   183|TODO:`brew bundle dump --file=\~/brew\_bundle\_titania\_2022-09-18.txt`
+   184| 
+   185|Sorry, something went wrong.
+   186|### Uh oh!
+   187|There was an error while loading.[Please reload this page]().
+   188|[![@ariel-frischer](https://avatars.githubusercontent.com/u/19893395?s=80&amp;v=4)](https://gist.github.com/ariel-frischer)
+   189|Copy link
+   190|### **[ariel-frischer](https://gist.github.com/ariel-frischer)**commented[Oct 24, 2022](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=4346589#gistcomment-4346589)
+   191|This is super informative and useful. Thank you! 🚀 
+   192|Sorry, something went wrong.
+   193|### Uh oh!
+   194|There was an error while loading.[Please reload this page]().
+   195|[![@NH3R717](https://avatars.githubusercontent.com/u/17020768?s=80&amp;v=4)](https://gist.github.com/NH3R717)
+   196|Copy link
+   197|### **[NH3R717](https://gist.github.com/NH3R717)**commented[Jun 22, 2023](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=4607192#gistcomment-4607192)
+   198|When restoring a Mac from scratch do you have a way to implement save preferences? There doesn't seem to be a set way to install macOS with these kinds of settings from a config file.
+   199| 
+   200|Sorry, something went wrong.
+   201|### Uh oh!
+   202|There was an error while loading.[Please reload this page]().
+   203|[![@phette23](https://avatars.githubusercontent.com/u/1024833?s=80&amp;v=4)](https://gist.github.com/phette23)
+   204|Copy link
+   205|### **[phette23](https://gist.github.com/phette23)**commented[Oct 25, 2023](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=4738489#gistcomment-4738489)
+   206|[@NH3R717](https://github.com/NH3R717)[defaults](https://macos-defaults.com/)might help. You could try to dump settings with`defaults read`and then apply them when restoring with`defaults write`. This is essentially what Mathias Bynens'[.macos](https://github.com/mathiasbynens/dotfiles/blob/main/.macos)does. The concern that's stopped me from doing this is new settings / state stored in settings messing up a new machine but it should at least be possible.
+   207| 
+   208|Sorry, something went wrong.
+   209|### Uh oh!
+   210|There was an error while loading.[Please reload this page]().
+   211|[![@thoroc](https://avatars.githubusercontent.com/u/2297889?s=80&amp;v=4)](https://gist.github.com/thoroc)
+   212|Copy link
+   213|### **[thoroc](https://gist.github.com/thoroc)**commented[Jul 1, 2024](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5107208#gistcomment-5107208)
+   214|I cannot see the`homebrew/cask`. This is the related`homebrew`from`brew bundle dump`:
+   215|\```
+   216|tap"homebrew/autoupdate"tap"homebrew/bundle"tap"homebrew/cask-fonts"tap"homebrew/services"
+   217|\```
+   218| 
+   219|Sorry, something went wrong.
+   220|### Uh oh!
+   221|There was an error while loading.[Please reload this page]().
+   222|[![@mdrxy](https://avatars.githubusercontent.com/u/61371264?s=80&amp;v=4)](https://gist.github.com/mdrxy)
+   223|Copy link
+   224|### **[mdrxy](https://gist.github.com/mdrxy)**commented[Jul 22, 2024](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5129736#gistcomment-5129736)
+   225|[@thoroc](https://github.com/thoroc)
+   226|Doesn't appear it is necessary anymore:
+   227|\```
+   228|&gt;brew tap"homebrew/cask""Error: Tapping homebrew/cask is no longer typically necessary.""Add --force if you are sure you need it for contributing to Homebrew."
+   229|\```
+   230| 
+   231|Sorry, something went wrong.
+   232|### Uh oh!
+   233|There was an error while loading.[Please reload this page]().
+   234|[![@odebroqueville](https://avatars.githubusercontent.com/u/4818315?s=80&amp;v=4)](https://gist.github.com/odebroqueville)
+   235|Copy link
+   236|### **[odebroqueville](https://gist.github.com/odebroqueville)**commented[Aug 26, 2024](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5168079#gistcomment-5168079)
+   237|Thank you for these explanations. They've helped me a lot. Just FYI:
+   238|\```
+   239|`Tapping homebrew/cask-fonts
+   240|Error: homebrew/cask-fonts was deprecated. This tap is now empty and all its contents were either deleted or migrated.`
+   241|\```
+   242| 
+   243|Sorry, something went wrong.
+   244|### Uh oh!
+   245|There was an error while loading.[Please reload this page]().
+   246|[![@vraravam](https://avatars.githubusercontent.com/u/69629?s=80&amp;v=4)](https://gist.github.com/vraravam)
+   247|Copy link
+   248|### **[vraravam](https://gist.github.com/vraravam)**commented[Dec 1, 2024](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5311971#gistcomment-5311971)
+   249|> [> @NH3R717
+   250|](https://github.com/NH3R717)> [> defaults
+   251|](https://macos-defaults.com/)> might help. You could try to dump settings with `> defaults read
+   252|`> and then apply them when restoring with `> defaults write
+   253|`> . This is essentially what Mathias Bynens' [> .macos
+   254|](https://github.com/mathiasbynens/dotfiles/blob/main/.macos)> does. The concern that's stopped me from doing this is new settings / state stored in settings messing up a new machine but it should at least be possible.
+   255|> What you said about the "new settings" (potentially from new versions of the apps/OS) is perfectly true.
+   256|I use a similar script to setup the "reference/base". And then apply the exported preferences from my old machine on top. This essentially (hopefully) ensures that the latest settings of each app are captured into the exported file from the old machine, and then can be reimported into the new machine. My script for both import and export is[here](https://github.com/vraravam/dotfiles/blob/master/scripts/capture-defaults.sh)- HTH
+   257| 
+   258|Sorry, something went wrong.
+   259|### Uh oh!
+   260|There was an error while loading.[Please reload this page]().
+   261|[![@anunayasri](https://avatars.githubusercontent.com/u/3938758?s=80&amp;v=4)](https://gist.github.com/anunayasri)
+   262|Copy link
+   263|### **[anunayasri](https://gist.github.com/anunayasri)**commented[Dec 4, 2024](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5318068#gistcomment-5318068)
+   264|Awesome! Thanks for the writing this 👍 
+   265|Sorry, something went wrong.
+   266|### Uh oh!
+   267|There was an error while loading.[Please reload this page]().
+   268|[![@BCtopics](https://avatars.githubusercontent.com/u/21264722?s=80&amp;v=4)](https://gist.github.com/BCtopics)
+   269|Copy link
+   270|### **[BCtopics](https://gist.github.com/BCtopics)**commented[Jan 17, 2025](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5395065#gistcomment-5395065)
+   271|This helped a lot. Thank you for providing this openly to the public!
+   272| 
+   273|Sorry, something went wrong.
+   274|### Uh oh!
+   275|There was an error while loading.[Please reload this page]().
+   276|[![@ChristopherA](https://avatars.githubusercontent.com/u/69103?s=80&amp;v=4)](https://gist.github.com/ChristopherA)
+   277|Copy link
+   278|Author
+   279|### **[ChristopherA](https://gist.github.com/ChristopherA)**commented[Jun 22, 2025](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5627129#gistcomment-5627129)
+   280|TODO: remove reference to`tap "homebrew/cask`, etc. as they are now automatically installed. Investigate other recommended taps to see if out-of-date.
+   281| 
+   282|Sorry, something went wrong.
+   283|### Uh oh!
+   284|There was an error while loading.[Please reload this page]().
+   285|[![@ChristopherA](https://avatars.githubusercontent.com/u/69103?s=80&amp;v=4)](https://gist.github.com/ChristopherA)
+   286|Copy link
+   287|Author
+   288|### **[ChristopherA](https://gist.github.com/ChristopherA)**commented[Jun 22, 2025](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5627132#gistcomment-5627132)
+   289|TODO: investigate`https://github.com/mas-cli/homebrew-tap`reportedly bottles`mas`for older macOS now that new brew installs have`mas`pre-installed.
+   290| 
+   291|Sorry, something went wrong.
+   292|### Uh oh!
+   293|There was an error while loading.[Please reload this page]().
+   294|[![@arturmartins](https://avatars.githubusercontent.com/u/101411?s=80&amp;v=4)](https://gist.github.com/arturmartins)
+   295|Copy link
+   296|### **[arturmartins](https://gist.github.com/arturmartins)**commented[Aug 19, 2025](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f?permalink_comment_id=5725954#gistcomment-5725954)&#8226;
+   297|edited
+   298|Loading
+   299|### Uh oh!
+   300|There was an error while loading.[Please reload this page]().
+   301|Created this script 6 years ago and it's still quite useful today:[https://gist.github.com/arturmartins/f779720379e6bd97cac4bbe1dc202c8b#file-mac-upgrade-sh](https://gist.github.com/arturmartins/f779720379e6bd97cac4bbe1dc202c8b#file-mac-upgrade-sh)
+   302|For .dotfiles, I recommend using chezmoi :)
+   303| 
+   304|Sorry, something went wrong.
+   305|### Uh oh!
+   306|There was an error while loading.[Please reload this page]().
+   307|[Sign up for free](https://gist.github.com/join?source=comment-gist)**to join this conversation on GitHub**.
+   308|Already have an account?[Sign in to comment](https://gist.github.com/login?return_to=https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)
+   309|You can’t perform that action at this time.
+   310|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now I have a good understanding of the best practices. Let me also check how `run_onchange_after` scripts work in this repo to understand the hash trick better.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl`</summary>
+```
+     1|#!/bin/bash
+     2|# Re-run ansible when any role changes
+     3|# Triggers on changes to any role's tasks or defaults files
+     4|# Profile: {{ .profile }}
+     5|
+     6|# === Role Hashes (changes trigger re-run) ===
+     7|# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+     8|# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+     9|# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+    10|# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+    11|# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+    12|# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+    13|# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+    14|# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+    15|# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+    16|# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+    17|# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+    18|# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+    19|# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+    20|# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+    21|# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+    22|# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+    23|# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+    24|# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+    25|# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+    26|# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+    27|
+    28|set -e
+    29|export PATH="$HOME/.local/bin:$PATH"
+    30|
+    31|# Colors
+    32|info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+    33|success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+    34|warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+    35|
+    36|ANSIBLE_DIR="$HOME/.ansible"
+    37|INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+    38|
+    39|command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+    40|
+    41|# === Profile-based tag selection ===
+    42|# Profile: {{ .profile }}
+    43|#
+    44|# Tag categories:
+    45|#   Core:    base, zsh, neovim, lazyvim_deps, security_tools
+    46|#   Desktop: devtools, docker, nerdfonts
+    47|#   Server:  devtools, docker (no nerdfonts - no GUI)
+    48|#   macOS:   homebrew
+    49|#   Optional: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+    50|
+    51|{{ if eq .profile "macos" -}}
+    52|PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+    53|# macOS: full desktop experience
+    54|TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    55|{{ else if eq .profile "ubuntu_desktop" -}}
+    56|PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+    57|# Ubuntu Desktop: full desktop experience (no homebrew)
+    58|TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    59|{{ else if eq .profile "ubuntu_server" -}}
+    60|PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+    61|# Ubuntu Server: no GUI stuff (no nerdfonts)
+    62|TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+    63|{{ else -}}
+    64|warn "Unknown profile: {{ .profile }}"
+    65|exit 0
+    66|{{ end -}}
+    67|
+    68|# Add optional tags based on chezmoi config
+    69|{{ if .installCodingAgents -}}
+    70|TAGS="${TAGS},coding_agents"
+    71|{{ end -}}
+    72|{{ if .installPythonUvTools -}}
+    73|TAGS="${TAGS},python_uv_tools"
+    74|{{ end -}}
+    75|
+    76|[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+    77|
+    78|# Handle sudo for Linux
+    79|BECOME_FLAGS=""
+    80|{{ if ne .profile "macos" -}}
+    81|if sudo -n true 2>/dev/null; then
+    82|    :
+    83|elif [[ -t 0 ]]; then
+    84|    info "Sudo password required for package installation"
+    85|    BECOME_FLAGS="--ask-become-pass"
+    86|else
+    87|    warn "Non-interactive mode without passwordless sudo"
+    88|    warn "To complete setup, run manually:"
+    89|    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
+    90|    BECOME_FLAGS="--skip-tags sudo"
+    91|fi
+    92|{{ end -}}
+    93|
+    94|info "Profile: {{ .profile }}"
+    95|info "Re-running ansible with tags: $TAGS"
+    96|ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+    97|success "Ansible roles updated!"
+    98|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="shell" data-tool-name="LS"><details>
+<summary>Tool use: **LS** `/Users/daviddwlee84/.local/share/chezmoi/dot_config`</summary>
+```
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/
+  - alacritty/
+    - alacritty.toml
+  - apprise/
+    - apprise.yaml.tmpl
+    - create_custom.yaml
+    - example.yaml
+  - git/
+    - hooks/
+      - executable_pre-commit.tmpl
+  - mise/
+    - config.toml
+  - nvim/
+    - dot_gitignore
+    - dot_neoconf.json
+    - init.lua
+    - LICENSE
+    - lua/
+      - config/
+        - autocmds.lua
+        - keymaps.lua
+        - lazy.lua
+        - options.lua
+      - plugins/
+        - example.lua
+    - README.md
+    - stylua.toml
+  - uv/
+    - uv.toml.tmpl
+  - yazi/
+    - yazi.toml
+  - zellij/
+    - layouts/
+      - dev-example.kdl
+  - zsh/
+    - 00_exports.zsh
+    - 10_aliases.zsh
+    - tools/
+      - 05_mise.zsh
+      - 06_cargo.zsh
+      - 10_fzf.zsh
+      - 20_zoxide.zsh
+      - 25_bat.zsh
+      - 26_eza.zsh
+      - 27_thefuck.zsh
+      - 30_direnv.zsh
+      - 32_try.zsh
+      - 33_toolkami.zsh.disabled
+      - 35_yazi.zsh
+      - 90_completions.zsh
+
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now I understand the structure better. Let me also check the chezmoi config template to see what configuration options are available.
+
+The user wants to:
+1. Move Brewfile to `~/.config/homebrew/` (XDG compliant)
+2. Split into darwin & linux files
+3. Decouple from Ansible - use chezmoi scripts with hash trick
+4. Add option to make it opt-in (default off)
+5. Move Homebrew installation to bootstrap script
+6. Handle mas separately (ensure it's installed first)
+
+Let me create a comprehensive plan for this restructuring.
+</details></think>
+
+Now I have a clear picture. Let me create a comprehensive plan for the restructuring.
+
+_**Agent**_
+
+<tool-use data-tool-type="unknown" data-tool-name="CreatePlan"><details>
+<summary>Tool use: **CreatePlan**</summary>
+```
+Plan created successfully
+```
+</details></tool-use>
+
+---
+
+_**User**_
+
+<attached_files>
+
+<code_selection path="cursor-plan://plan.md" lines="1-116">
+     1|# Brewfile XDG Restructure
+     2|
+     3|## Architecture Changes
+     4|
+     5|```mermaid
+     6|flowchart TB
+     7|    subgraph Before [Current]
+     8|        B1[dot_Brewfile.tmpl] --> B2[~/.Brewfile]
+     9|        B3[ansible brew_bundle role] --> B4["brew bundle"]
+    10|    end
+    11|    
+    12|    subgraph After [New Structure]
+    13|        A1[dot_config/homebrew/Brewfile.tmpl] --> A2[~/.config/homebrew/Brewfile]
+    14|        A3[dot_config/homebrew/Brewfile.darwin.tmpl] --> A4[~/.config/homebrew/Brewfile.darwin]
+    15|        A5[dot_config/homebrew/Brewfile.linux.tmpl] --> A6[~/.config/homebrew/Brewfile.linux]
+    16|        A7[run_onchange_after_30_brew_bundle.sh.tmpl] --> A8["brew bundle"]
+    17|        A9[bootstrap] --> A10[Homebrew install]
+    18|    end
+    19|```
+    20|
+    21|## Key Changes
+    22|
+    23|1. **XDG Location**: `~/.config/homebrew/` instead of `~/.Brewfile`
+    24|2. **Split by Platform**:
+    25|   - `Brewfile` - shared CLI tools and taps
+    26|   - `Brewfile.darwin` - macOS casks + mas apps
+    27|   - `Brewfile.linux` - Linux-specific (fonts, etc.)
+    28|3. **Decouple from Ansible**: Use `run_onchange_after_30_brew_bundle.sh.tmpl` with hash trick
+    29|4. **Opt-in**: Add `installBrewApps` config option (default: false)
+    30|5. **Homebrew in Bootstrap**: Move from ansible role to `run_once_before_00_bootstrap.sh.tmpl`
+    31|
+    32|## File Structure
+    33|
+    34|```
+    35|dot_config/homebrew/
+    36|├── Brewfile.tmpl              # Shared: taps, CLI formulas
+    37|├── Brewfile.darwin.tmpl       # macOS: casks, mas
+    38|└── Brewfile.linux.tmpl        # Linux: linuxbrew-specific
+    39|```
+    40|
+    41|## Brewfile Split Strategy
+    42|
+    43|### Brewfile (shared)
+    44|- Taps (nikitabobko/tap, etc.)
+    45|- CLI formulas that work on both platforms
+    46|- `mas` formula (needed before mas entries)
+    47|
+    48|### Brewfile.darwin
+    49|- All casks (GUI apps)
+    50|- mas entries (App Store apps)
+    51|- macOS-specific taps
+    52|
+    53|### Brewfile.linux
+    54|- Linux-compatible casks (fonts, some tools)
+    55|- Linuxbrew-specific formulas
+    56|
+    57|## mas Handling
+    58|
+    59|The `mas` formula must be installed before `mas` entries can be processed. Solution:
+    60|1. Put `brew "mas"` in shared Brewfile
+    61|2. Run shared Brewfile first, then platform-specific
+    62|3. The `run_onchange` script will run them in order
+    63|
+    64|## New chezmoi Config Option
+    65|
+    66|Add to `.chezmoi.toml.tmpl`:
+    67|
+    68|```
+    69|installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Homebrew Brewfile" false }}
+    70|```
+    71|
+    72|## Implementation Files
+    73|
+    74|### 1. Move Homebrew to Bootstrap
+    75|Update `run_once_before_00_bootstrap.sh.tmpl` to install Homebrew on macOS before anything else.
+    76|
+    77|### 2. Create Brewfiles
+    78|- `dot_config/homebrew/Brewfile.tmpl` - shared
+    79|- `dot_config/homebrew/Brewfile.darwin.tmpl` - macOS casks/mas
+    80|- `dot_config/homebrew/Brewfile.linux.tmpl` - Linux
+    81|
+    82|### 3. Create brew bundle script
+    83|`run_onchange_after_30_brew_bundle.sh.tmpl`:
+    84|- Only runs if `installBrewApps` is true
+    85|- Only runs on macOS or Linux with Homebrew
+    86|- Uses hash trick to re-run on Brewfile changes
+    87|- Sets `HOMEBREW_BUNDLE_FILE` environment variable
+    88|
+    89|### 4. Update zsh config
+    90|Add to `dot_config/zsh/00_exports.zsh`:
+    91|```bash
+    92|export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+    93|```
+    94|
+    95|### 5. Cleanup
+    96|- Delete `dot_Brewfile.tmpl`
+    97|- Delete `dot_ansible/roles/brew_bundle/`
+    98|- Remove `brew_bundle` from `macos.yml` playbook
+    99|- Remove homebrew role from ansible (moved to bootstrap)
+   100|
+   101|## Execution Order
+   102|
+   103|```
+   104|1. Bootstrap (run_once_before_00)
+   105|   └── Install Homebrew (macOS)
+   106|   └── Install uv, mise, ansible
+   107|
+   108|2. chezmoi apply
+   109|   └── Deploy ~/.config/homebrew/Brewfile*
+   110|   └── Deploy other configs
+   111|
+   112|3. run_onchange_after_30_brew_bundle
+   113|   └── brew bundle --file=~/.config/homebrew/Brewfile
+   114|   └── brew bundle --file=~/.config/homebrew/Brewfile.darwin (or .linux)
+   115|```
+   116|
+</code_selection>
+
+</attached_files>
+
+
+
+<system_reminder>
+You are now in Agent mode. Continue with the task in the new mode.
+</system_reminder>
+
+Brewfile XDG Restructure
+
+Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.
+
+To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.
+
+---
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+I need to implement the Brewfile XDG restructure plan. Let me start by marking the first todo as in_progress and working through each task.
+
+The tasks are:
+1. Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+2. Move Homebrew installation from ansible to bootstrap script
+3. Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+4. Create run_onchange_after_30_brew_bundle.sh.tmpl with hash trick
+5. Update zsh exports with HOMEBREW_BUNDLE_FILE
+6. Remove old dot_Brewfile.tmpl, brew_bundle role, update playbooks
+7. Update CLAUDE.md and README.md with new structure
+
+Let me start with the first task.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="task" data-tool-name="TodoWrite"><details>
+<summary>Tool use: **TodoWrite**</summary>
+**Agent task list:**
+- [⚡] Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+- [ ] Move Homebrew installation from ansible to bootstrap script
+- [ ] Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+- [ ] Create run_onchange_after_30_brew_bundle.sh.tmpl with hash trick
+- [ ] Add HOMEBREW_BUNDLE_FILE to zsh exports
+- [ ] Remove old dot_Brewfile.tmpl, brew_bundle role, update playbooks
+- [ ] Update CLAUDE.md and README.md with new structure
+
+
+Successfully updated TODOs. Make sure to follow and update your TODO list as you make progress. Cancel and add new TODO tasks as needed when the user makes a correction or follow-up request.
+
+Here are the latest contents of your todo list:
+- **IN_PROGRESS**: Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+- **PENDING**: Move Homebrew installation from ansible to bootstrap script
+- **PENDING**: Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+- **PENDING**: Create run_onchange_after_30_brew_bundle.sh.tmpl with hash trick
+- **PENDING**: Add HOMEBREW_BUNDLE_FILE to zsh exports
+- **PENDING**: Remove old dot_Brewfile.tmpl, brew_bundle role, update playbooks
+- **PENDING**: Update CLAUDE.md and README.md with new structure
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl`</summary>
+```
+     1|# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+     2|
+     3|[data]
+     4|# 只在 init 才需要問一次：你之後都讀這個值
+     5|# 這裡用 promptString：沒有值就會問使用者，輸入後寫進 config
+     6|# TODO: not all the things we want to change all the time we chezmoi init
+     7|profile = {{ promptString "profile (ubuntu_server|ubuntu_desktop|macos)" "macos" | quote }}
+     8|email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee84@gmail.com" | quote }}
+     9|name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
+    10|# 是否在中國大陸 GFW 內，需要使用鏡像源
+    11|useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (behind GFW) and need to use mirrors" false }}
+    12|# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+    13|gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)" false }}
+    14|# 是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)
+    15|installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
+    16|# 是否安裝 Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)
+    17|installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)" true }}
+    18|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now I'll add the installBrewApps config option.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-# 是否安裝 Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)
+-installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)" true }}
++# 是否安裝 Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)
++installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)" true }}
++# 是否安裝 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.)
++installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Homebrew Brewfile (casks, mas)" false }}
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let's move on to the second task - moving Homebrew installation to bootstrap script.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="task" data-tool-name="TodoWrite"><details>
+<summary>Tool use: **TodoWrite**</summary>
+**Agent task list:**
+- [X] Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+- [⚡] Move Homebrew installation from ansible to bootstrap script
+
+
+Successfully updated TODOs. Make sure to follow and update your TODO list as you make progress. Cancel and add new TODO tasks as needed when the user makes a correction or follow-up request.
+
+Here are the latest contents of your todo list:
+- **COMPLETED**: Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+- **IN_PROGRESS**: Move Homebrew installation from ansible to bootstrap script
+- **PENDING**: Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+- **PENDING**: Create run_onchange_after_30_brew_bundle.sh.tmpl with hash trick
+- **PENDING**: Add HOMEBREW_BUNDLE_FILE to zsh exports
+- **PENDING**: Remove old dot_Brewfile.tmpl, brew_bundle role, update playbooks
+- **PENDING**: Update CLAUDE.md and README.md with new structure
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read** `/Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl`</summary>
+```
+     1|#!/bin/bash
+     2|# Bootstrap script - installs uv, ansible, mise, and galaxy collections
+     3|# Runs BEFORE any ansible playbooks
+     4|
+     5|set -e
+     6|
+     7|# Colors for output
+     8|RED='\033[0;31m'
+     9|GREEN='\033[0;32m'
+    10|YELLOW='\033[1;33m'
+    11|BLUE='\033[0;34m'
+    12|NC='\033[0m' # No Color
+    13|
+    14|info() {
+    15|    echo -e "${BLUE}[INFO]${NC} $1"
+    16|}
+    17|
+    18|success() {
+    19|    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    20|}
+    21|
+    22|warn() {
+    23|    echo -e "${YELLOW}[WARN]${NC} $1"
+    24|}
+    25|
+    26|error() {
+    27|    echo -e "${RED}[ERROR]${NC} $1"
+    28|}
+    29|
+    30|# Ensure PATH includes local bin
+    31|export PATH="$HOME/.local/bin:$PATH"
+    32|
+    33|# 1. Install uv if missing
+    34|if ! command -v uv &> /dev/null; then
+    35|    info "Installing uv..."
+    36|    curl -LsSf https://astral.sh/uv/install.sh | sh
+    37|    success "uv installed successfully"
+    38|else
+    39|    info "uv is already installed"
+    40|fi
+    41|
+    42|# 2. Install mise if missing (runtime manager for Node.js, etc.)
+    43|if ! command -v mise &> /dev/null; then
+    44|    info "Installing mise..."
+    45|    # Try curl installer first (fast, no sudo)
+    46|    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
+    47|        success "mise installed via curl"
+    48|    else
+    49|        # Fallback to apt for GFW environments
+    50|        warn "curl installer failed/timed out, trying apt..."
+    51|        if command -v apt-get &> /dev/null; then
+    52|            sudo apt-get update -y
+    53|            sudo apt-get install -y curl gpg
+    54|            sudo install -dm 755 /etc/apt/keyrings
+    55|            curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
+    56|            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+    57|            sudo apt-get update -y
+    58|            sudo apt-get install -y mise
+    59|            success "mise installed via apt"
+    60|        else
+    61|            error "Could not install mise - please install manually"
+    62|        fi
+    63|    fi
+    64|else
+    65|    info "mise is already installed"
+    66|fi
+    67|
+    68|# 3. Install ansible if missing
+    69|if ! command -v ansible-playbook &> /dev/null; then
+    70|    info "Installing ansible via uv..."
+    71|    uv tool install ansible-core
+    72|    success "ansible installed successfully"
+    73|else
+    74|    info "ansible is already installed"
+    75|fi
+    76|
+    77|# 4. Install ansible-galaxy collections
+    78|info "Installing ansible-galaxy collections..."
+    79|ansible-galaxy collection install community.general --force-with-deps
+    80|success "ansible-galaxy collections installed"
+    81|
+    82|# 5. Install mise global tools (Node.js) if mise config exists
+    83|MISE_BIN="${HOME}/.local/bin/mise"
+    84|[[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
+    85|if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
+    86|    info "Installing mise global tools..."
+    87|    "$MISE_BIN" install --yes
+    88|    success "mise tools installed"
+    89|fi
+    90|
+    91|success "Bootstrap complete!"
+    92|
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+I need to add Homebrew installation to the bootstrap script for macOS. I'll add it near the beginning since it's fundamental for macOS. I'll use chezmoi templating to only run on macOS.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="StrReplace"><details>
+<summary>Tool use: **StrReplace**</summary>
+```diff
+-#!/bin/bash
+-# Bootstrap script - installs uv, ansible, mise, and galaxy collections
+-# Runs BEFORE any ansible playbooks
+-
+-set -e
+-
+-# Colors for output
+-RED='\033[0;31m'
+-GREEN='\033[0;32m'
+-YELLOW='\033[1;33m'
+-BLUE='\033[0;34m'
+-NC='\033[0m' # No Color
+-
+-info() {
+-    echo -e "${BLUE}[INFO]${NC} $1"
+-}
+-
+-success() {
+-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+-}
+-
+-warn() {
+-    echo -e "${YELLOW}[WARN]${NC} $1"
+-}
+-
+-error() {
+-    echo -e "${RED}[ERROR]${NC} $1"
+-}
+-
+-# Ensure PATH includes local bin
+-export PATH="$HOME/.local/bin:$PATH"
+-
+-# 1. Install uv if missing
++#!/bin/bash
++# Bootstrap script - installs Homebrew (macOS), uv, ansible, mise, and galaxy collections
++# Runs BEFORE any ansible playbooks
++
++set -e
++
++# Colors for output
++RED='\033[0;31m'
++GREEN='\033[0;32m'
++YELLOW='\033[1;33m'
++BLUE='\033[0;34m'
++NC='\033[0m' # No Color
++
++info() {
++    echo -e "${BLUE}[INFO]${NC} $1"
++}
++
++success() {
++    echo -e "${GREEN}[SUCCESS]${NC} $1"
++}
++
++warn() {
++    echo -e "${YELLOW}[WARN]${NC} $1"
++}
++
++error() {
++    echo -e "${RED}[ERROR]${NC} $1"
++}
++
++# Ensure PATH includes local bin and Homebrew
++export PATH="$HOME/.local/bin:$PATH"
++{{ if eq .profile "macos" -}}
++# Add Homebrew to PATH (Apple Silicon and Intel)
++if [[ -f /opt/homebrew/bin/brew ]]; then
++    eval "$(/opt/homebrew/bin/brew shellenv)"
++elif [[ -f /usr/local/bin/brew ]]; then
++    eval "$(/usr/local/bin/brew shellenv)"
++fi
++{{ end -}}
++
++{{ if eq .profile "macos" -}}
++# 0. Install Homebrew if missing (macOS only)
++if ! command -v brew &> /dev/null; then
++    info "Installing Homebrew..."
++    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
++    # Add to PATH for this session
++    if [[ -f /opt/homebrew/bin/brew ]]; then
++        eval "$(/opt/homebrew/bin/brew shellenv)"
++    elif [[ -f /usr/local/bin/brew ]]; then
++        eval "$(/usr/local/bin/brew shellenv)"
++    fi
++    success "Homebrew installed successfully"
++else
++    info "Homebrew is already installed"
++fi
++
++{{ end -}}
++# 1. Install uv if missing
+```
+
+```
+The file /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl has been updated.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me create the Brewfiles. First, I need to create the homebrew directory structure and the three Brewfile templates.
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="task" data-tool-name="TodoWrite"><details>
+<summary>Tool use: **TodoWrite**</summary>
+**Agent task list:**
+- [X] Move Homebrew installation from ansible to bootstrap script
+- [⚡] Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+
+
+Successfully updated TODOs. Make sure to follow and update your TODO list as you make progress. Cancel and add new TODO tasks as needed when the user makes a correction or follow-up request.
+
+Here are the latest contents of your todo list:
+- **COMPLETED**: Add installBrewApps config option to .chezmoi.toml.tmpl (default false)
+- **COMPLETED**: Move Homebrew installation from ansible to bootstrap script
+- **IN_PROGRESS**: Create dot_config/homebrew/Brewfile*.tmpl (shared, darwin, linux)
+- **PENDING**: Create run_onchange_after_30_brew_bundle.sh.tmpl with hash trick
+- **PENDING**: Add HOMEBREW_BUNDLE_FILE to zsh exports
+- **PENDING**: Remove old dot_Brewfile.tmpl, brew_bundle role, update playbooks
+- **PENDING**: Update CLAUDE.md and README.md with new structure
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="shell" data-tool-name="Shell"><details>
+<summary>Tool use: **Shell** `mkdir -p /Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew`</summary>
+```
+Exit code: 0
+
+Command output:
+
+\```
+
+\```
+
+Command completed in 1009 ms.
+
+Shell state (cwd, env vars) persists for subsequent calls.
+```
+</details></tool-use>
+
+_**Agent**_
+
+<think><details><summary>Thought Process</summary>
+Now let me create the three Brewfiles:
+1. Brewfile.tmpl - shared taps and CLI tools
+2. Brewfile.darwin.tmpl - macOS casks and mas
+3. Brewfile.linux.tmpl - Linux-specific
+</details></think>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write** `/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.tmpl`</summary>
+```tmpl
+# Brewfile - Shared configuration (macOS & Linux)
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile
+
+# =============================================================================
+# Taps (Third-party repositories)
+# =============================================================================
+tap "homebrew/bundle"
+tap "nikitabobko/tap"  # aerospace (macOS window manager)
+
+# =============================================================================
+# Formulas - CLI Tools (cross-platform)
+# =============================================================================
+# Note: Most CLI tools are managed by ansible for better cross-platform support
+# Only add formulas here that you want to manage via Brewfile
+
+# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+{{ if eq .profile "macos" -}}
+brew "mas"
+{{ end -}}
+
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write** `/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl`</summary>
+```tmpl
+# Brewfile.darwin - macOS GUI applications (casks) and Mac App Store apps
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.darwin
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.darwin
+
+# =============================================================================
+# Casks - Terminals & Editors
+# =============================================================================
+cask "alacritty"
+cask "iterm2"
+cask "warp"
+cask "cursor"
+cask "visual-studio-code"
+
+# =============================================================================
+# Casks - AI & Coding Assistants
+# =============================================================================
+cask "claude"
+cask "chatgpt"
+# cask "chatgpt-atlas"  # Uncomment if needed
+cask "ollama"
+
+# =============================================================================
+# Casks - System Utilities
+# =============================================================================
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "itsycal"                     # Menu bar calendar
+cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+cask "scroll-reverser"             # Reverse scroll direction per device
+cask "sloth"                       # Process/file viewer
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+
+# =============================================================================
+# Casks - Communication
+# =============================================================================
+cask "discord"
+cask "messenger"
+cask "telegram"
+cask "wechat"
+cask "whatsapp"
+cask "dingtalk"
+cask "tencent-meeting"  # TencentMeeting.app
+cask "termius"          # SSH client
+
+# =============================================================================
+# Casks - Browsers
+# =============================================================================
+cask "arc"
+cask "google-chrome"
+cask "tor-browser"
+
+# =============================================================================
+# Casks - Productivity
+# =============================================================================
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+cask "readest"              # E-book reader
+cask "super-productivity"   # Task/time management
+cask "wispr-flow"           # Voice typing
+cask "mathpix-snipping-tool"
+
+# =============================================================================
+# Casks - Media & Entertainment
+# =============================================================================
+cask "spotify"
+cask "anki"
+
+# =============================================================================
+# Casks - Gaming (skip on work machines)
+# =============================================================================
+{{ if not (env "WORK_MACHINE") -}}
+cask "steam"
+cask "minecraft"
+cask "battle-net"
+cask "hstracker"  # Hearthstone deck tracker
+{{- end }}
+
+# =============================================================================
+# Casks - Finance & Trading
+# =============================================================================
+cask "binance"
+cask "tradingview"
+
+# =============================================================================
+# Casks - Network & VPN
+# =============================================================================
+cask "tailscale"
+cask "openvpn-connect"
+cask "vibetunnel"
+cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
+
+# =============================================================================
+# Casks - Virtualization & Remote
+# =============================================================================
+cask "virtualbox"
+cask "windows-app"      # Microsoft Remote Desktop
+cask "teamviewer-host"
+cask "sharemouse"       # KVM software
+
+# =============================================================================
+# Casks - Developer Tools
+# =============================================================================
+# Note: docker/orbstack is managed by ansible docker role
+cask "dbeaver-community"
+cask "superset"
+
+# =============================================================================
+# Casks - Cloud Storage (Chinese apps)
+# =============================================================================
+{{ if .useChineseMirror -}}
+cask "baidunetdisk"  # Baidu Netdisk (百度网盘)
+{{- end }}
+
+# =============================================================================
+# Mac App Store Apps (via mas)
+# Requires: mas signin (or sign in via App Store.app)
+# =============================================================================
+mas "LINE", id: 539883307
+mas "Keynote", id: 409183694
+mas "Numbers", id: 409203825
+mas "Pages", id: 409201541
+# mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
+
+# =============================================================================
+# Apps NOT available via Homebrew (manual install required):
+# - 东方财富, 同花顺 (Chinese finance apps)
+# - FileZilla (removed from Homebrew)
+# - Google Docs/Sheets/Slides (PWAs, not standalone apps)
+# - Safari (system built-in)
+# - osu! (use official installer)
+# - Wine Staging (deprecated, use wine-stable or crossover)
+# - Perplexity (App Store only)
+# - Immersive Translate (browser extension)
+# =============================================================================
+
+```
+</details></tool-use>
+
+_**Agent**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write** `/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.linux.tmpl`</summary>
+```tmpl
+# Brewfile.linux - Linux-specific Homebrew (Linuxbrew) packages
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.linux
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.linux
+#
+# Note: Most packages on Linux are managed by apt/ansible.
+# This file is for Linuxbrew-specific additions that aren't easily
+# available via apt or provide better/newer versions.
+
+# =============================================================================
+# Formulas - CLI tools better installed via Linuxbrew
+# =============================================================================
+# Uncomment as needed - most are already handled by ansible
+
+# brew "gh"           # GitHub CLI (newer version than apt)
+# brew "bat"          # Better cat with syntax highlighting
+# brew "eza"          # Modern ls replacement
+# brew "fd"           # Better find
+# brew "ripgrep"      # Better grep
+# brew "fzf"          # Fuzzy finder
+# brew "lazygit"      # Terminal UI for git
+
+# =============================================================================
+# Linux-compatible casks (limited availability)
+# =============================================================================
+# Note: Most casks are macOS-only. Only fonts and a few tools work on Linux.
+
+# Fonts (if you prefer Homebrew over manual install)
+# cask "font-hack-nerd-font"  # Already managed by ansible nerdfonts role
+
+```
+</details></tool-use>

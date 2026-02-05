@@ -1,5 +1,5 @@
 #!/bin/bash
-# Bootstrap script - installs uv, ansible, mise, and galaxy collections
+# Bootstrap script - installs Homebrew (macOS), uv, ansible, mise, and galaxy collections
 # Runs BEFORE any ansible playbooks
 
 set -e
@@ -27,9 +27,34 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Ensure PATH includes local bin
+# Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
+{{ if eq .profile "macos" -}}
+# Add Homebrew to PATH (Apple Silicon and Intel)
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ end -}}
 
+{{ if eq .profile "macos" -}}
+# 0. Install Homebrew if missing (macOS only)
+if ! command -v brew &> /dev/null; then
+    info "Installing Homebrew..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Add to PATH for this session
+    if [[ -f /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -f /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+    success "Homebrew installed successfully"
+else
+    info "Homebrew is already installed"
+fi
+
+{{ end -}}
 # 1. Install uv if missing
 if ! command -v uv &> /dev/null; then
     info "Installing uv..."

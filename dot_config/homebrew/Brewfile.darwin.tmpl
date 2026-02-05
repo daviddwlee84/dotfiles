@@ -1,27 +1,14 @@
-# Brewfile - macOS GUI applications managed by Homebrew
-# Applied via: brew bundle --file=~/.Brewfile
-# Or via ansible brew_bundle role
+# Brewfile.darwin - macOS GUI applications (casks) and Mac App Store apps
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.darwin
 #
 # This file is managed by chezmoi. Edit the source:
-#   chezmoi edit ~/.Brewfile
-
-# =============================================================================
-# Taps (Third-party repositories)
-# =============================================================================
-tap "homebrew/bundle"
-tap "homebrew/cask"
-tap "nikitabobko/tap"  # aerospace
-
-# =============================================================================
-# Formulas (CLI tools managed here instead of ansible for convenience)
-# =============================================================================
-brew "mas"  # Mac App Store CLI for mas entries below
+#   chezmoi edit ~/.config/homebrew/Brewfile.darwin
 
 # =============================================================================
 # Casks - Terminals & Editors
 # =============================================================================
 cask "alacritty"
-cask "iterm2"
+# cask "iterm2"
 cask "warp"
 cask "cursor"
 cask "visual-studio-code"
@@ -33,6 +20,7 @@ cask "claude"
 cask "chatgpt"
 # cask "chatgpt-atlas"  # Uncomment if needed
 cask "ollama"
+# cask "termius"          # SSH client
 
 # =============================================================================
 # Casks - System Utilities
@@ -40,10 +28,10 @@ cask "ollama"
 cask "nikitabobko/tap/aerospace"  # Tiling window manager
 cask "alt-tab"                     # Windows-style alt-tab
 cask "raycast"                     # Spotlight replacement
-cask "itsycal"                     # Menu bar calendar
-cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+# cask "itsycal"                     # Menu bar calendar
+# cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
 cask "scroll-reverser"             # Reverse scroll direction per device
-cask "sloth"                       # Process/file viewer
+# cask "sloth"                       # Process/file viewer
 cask "the-unarchiver"              # Archive extraction
 cask "applite"                     # GUI for Homebrew casks
 
@@ -51,20 +39,19 @@ cask "applite"                     # GUI for Homebrew casks
 # Casks - Communication
 # =============================================================================
 cask "discord"
-cask "messenger"
-cask "telegram"
+# cask "messenger"
+# cask "telegram"
 cask "wechat"
-cask "whatsapp"
-cask "dingtalk"
-cask "tencent-meeting"  # TencentMeeting.app
-cask "termius"          # SSH client
+# cask "whatsapp"
+# cask "dingtalk"
+# cask "tencent-meeting"  # TencentMeeting.app
 
 # =============================================================================
 # Casks - Browsers
 # =============================================================================
 cask "arc"
-cask "google-chrome"
-cask "tor-browser"
+# cask "google-chrome"
+# cask "tor-browser"
 
 # =============================================================================
 # Casks - Productivity
@@ -72,10 +59,10 @@ cask "tor-browser"
 cask "obsidian"
 cask "google-drive"
 cask "grammarly-desktop"
-cask "readest"              # E-book reader
+# cask "readest"              # E-book reader
 cask "super-productivity"   # Task/time management
-cask "wispr-flow"           # Voice typing
-cask "mathpix-snipping-tool"
+# cask "wispr-flow"           # Voice typing
+# cask "mathpix-snipping-tool"
 
 # =============================================================================
 # Casks - Media & Entertainment
@@ -84,36 +71,36 @@ cask "spotify"
 cask "anki"
 
 # =============================================================================
-# Casks - Gaming
+# Casks - Gaming (skip on work machines)
 # =============================================================================
-{{ if not (env "WORK_MACHINE") -}}
-cask "steam"
-cask "minecraft"
-cask "battle-net"
-cask "hstracker"  # Hearthstone deck tracker
-{{- end }}
+# {{ if not (env "WORK_MACHINE") -}}
+# cask "steam"
+# cask "minecraft"
+# cask "battle-net"
+# cask "hstracker"  # Hearthstone deck tracker
+# {{- end }}
 
 # =============================================================================
 # Casks - Finance & Trading
 # =============================================================================
-cask "binance"
-cask "tradingview"
+# cask "binance"
+# cask "tradingview"
 
 # =============================================================================
 # Casks - Network & VPN
 # =============================================================================
-cask "tailscale"
-cask "openvpn-connect"
-cask "vibetunnel"
-cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
+# cask "tailscale"
+# cask "openvpn-connect"
+# cask "vibetunnel"
+# cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
 
 # =============================================================================
 # Casks - Virtualization & Remote
 # =============================================================================
-cask "virtualbox"
-cask "windows-app"      # Microsoft Remote Desktop
-cask "teamviewer-host"
-cask "sharemouse"       # KVM software
+# cask "virtualbox"
+# cask "windows-app"      # Microsoft Remote Desktop
+# cask "teamviewer-host"
+# cask "sharemouse"       # KVM software
 
 # =============================================================================
 # Casks - Developer Tools
@@ -123,20 +110,20 @@ cask "dbeaver-community"
 cask "superset"
 
 # =============================================================================
-# Casks - Cloud Storage
+# Casks - Cloud Storage (Chinese apps)
 # =============================================================================
-{{ if .useChineseMirror -}}
-cask "baidunetdisk"  # Baidu Netdisk (百度网盘)
-{{- end }}
+# {{ if .useChineseMirror -}}
+# cask "baidunetdisk"  # Baidu Netdisk (百度网盘)
+# {{- end }}
 
 # =============================================================================
 # Mac App Store Apps (via mas)
-# Requires: brew install mas && mas signin
+# Requires: mas signin (or sign in via App Store.app)
 # =============================================================================
-mas "LINE", id: 539883307
-mas "Keynote", id: 409183694
-mas "Numbers", id: 409203825
-mas "Pages", id: 409201541
+# mas "LINE", id: 539883307
+# mas "Keynote", id: 409183694
+# mas "Numbers", id: 409203825
+# mas "Pages", id: 409201541
 # mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
 
 # =============================================================================
