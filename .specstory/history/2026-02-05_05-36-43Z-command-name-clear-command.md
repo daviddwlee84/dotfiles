@@ -2987,3 +2987,457 @@ chezmoi apply
 ```
 
 Gemini was right - the `run_onchange` mechanism handles both initial setup and updates elegantly.
+
+---
+
+_**User (2026-02-05 06:26:28Z)**_
+
+But in the @.chezmoi.toml.tmpl, we will have different profiles
+e.g. (ubuntu_server|ubuntu_desktop|macos)
+
+And each should have different preset (tags combo)
+
+For example, ubuntu_server don't need GUI related stuff (maybe don't need to install font?)
+
+(in the future we might have ubuntu server (with or without cude / require sudo))
+
+Different stuff might have different recepie 
+
+---
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:26:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to support different profiles with different tag combinations. Looking at the chezmoi config:
+
+- `profile` can be: `ubuntu_server`, `ubuntu_desktop`, `macos`
+
+Each profile should have different default tags:
+- `macos`: full setup including homebrew, nerdfonts, etc.
+- `ubuntu_desktop`: similar to macOS but no homebrew
+- `ubuntu_server`: minimal, no GUI stuff (no nerdfonts, maybe less devtools)
+
+The user also hints at future profiles like:
+- ubuntu server with/without CUDA
+- ubuntu server with/without sudo
+
+This suggests we need a more flexible tag selection based on profile in the onchange script.
+
+Let me think about the tag categories:
+1. **Core** (all profiles): base, zsh, neovim, lazyvim_deps
+2. **Desktop/GUI** (macos, ubuntu_desktop): nerdfonts, maybe some devtools
+3. **macOS only**: homebrew
+4. **Optional** (based on config): coding_agents, python_uv_tools
+5. **Server minimal**: might skip nerdfonts, some devtools
+
+Let me update the onchange script to handle profile-based tag selection.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:26:38Z)**_
+
+Good point. Let me update the onchange script to support profile-based tag combinations.
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:26:38Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_onchange_after_20_ansible_roles.sh.tmpl`
+
+```text
+     1→#!/bin/bash
+     2→# Re-run ansible when any role changes
+     3→# Triggers on changes to any role's tasks or defaults files
+     4→
+     5→# === Role Hashes (changes trigger re-run) ===
+     6→# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+     7→# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+     8→# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+     9→# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+    10→# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+    11→# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+    12→# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+    13→# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+    14→# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+    15→# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+    16→# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+    17→# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+    18→# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+    19→# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+    20→# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+    21→# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+    22→# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+    23→# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+    24→# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+    25→# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+    26→
+    27→set -e
+    28→export PATH="$HOME/.local/bin:$PATH"
+    29→
+    30→# Colors
+    31→info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+    32→success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+    33→warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+    34→
+    35→ANSIBLE_DIR="$HOME/.ansible"
+    36→INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+    37→
+    38→command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+    39→
+    40→{{ if eq .chezmoi.os "darwin" -}}
+    41→PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+    42→TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    43→{{ else if eq .chezmoi.os "linux" -}}
+    44→PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+    45→TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    46→{{ else -}}
+    47→warn "Unsupported OS: {{ .chezmoi.os }}"
+    48→exit 0
+    49→{{ end -}}
+    50→
+    51→# Add optional tags based on chezmoi config
+    52→{{ if .installCodingAgents -}}
+    53→TAGS="${TAGS},coding_agents"
+    54→{{ end -}}
+    55→{{ if .installPythonUvTools -}}
+    56→TAGS="${TAGS},python_uv_tools"
+    57→{{ end -}}
+    58→
+    59→[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+    60→
+    61→# Handle sudo for Linux
+    62→BECOME_FLAGS=""
+    63→{{ if eq .chezmoi.os "linux" -}}
+    64→if sudo -n true 2>/dev/null; then
+    65→    :
+    66→elif [[ -t 0 ]]; then
+    67→    info "Sudo password required for package installation"
+    68→    BECOME_FLAGS="--ask-become-pass"
+    69→else
+    70→    warn "Non-interactive mode without passwordless sudo"
+    71→    warn "To complete setup, run manually:"
+    72→    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
+    73→    BECOME_FLAGS="--skip-tags sudo"
+    74→fi
+    75→{{ end -}}
+    76→
+    77→info "Re-running ansible with tags: $TAGS"
+    78→ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+    79→success "Ansible roles updated!"
+    80→
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:26:45Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me update this to support profile-based tag selection. I'll define tag categories:
+
+1. **Core** (all profiles): base, zsh, neovim, lazyvim_deps, security_tools
+2. **Desktop** (macos, ubuntu_desktop): devtools (full), nerdfonts, docker
+3. **Server** (ubuntu_server): devtools (maybe subset?), docker
+4. **macOS only**: homebrew
+5. **Optional**: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+
+Actually, looking at this more carefully, I think the approach should be:
+- Define what each profile includes
+- Use chezmoi template conditionals based on `.profile`
+
+Let me restructure:
+- `macos`: everything
+- `ubuntu_desktop`: everything except homebrew
+- `ubuntu_server`: core tools, no GUI stuff (nerdfonts)
+
+I'll update the script to use profile-based tag selection.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```tmpl
+#!/bin/bash
+# Re-run ansible when any role changes
+# Triggers on changes to any role's tasks or defaults files
+# Profile: {{ .profile }}
+
+# === Role Hashes (changes trigger re-run) ===
+# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+
+set -e
+export PATH="$HOME/.local/bin:$PATH"
+
+# Colors
+info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+
+ANSIBLE_DIR="$HOME/.ansible"
+INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+
+command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+
+# === Profile-based tag selection ===
+# Profile: {{ .profile }}
+#
+# Tag categories:
+#   Core:    base, zsh, neovim, lazyvim_deps, security_tools
+#   Desktop: devtools, docker, nerdfonts
+#   Server:  devtools, docker (no nerdfonts - no GUI)
+#   macOS:   homebrew
+#   Optional: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+
+{{ if eq .profile "macos" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+# macOS: full desktop experience
+TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else if eq .profile "ubuntu_desktop" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+# Ubuntu Desktop: full desktop experience (no homebrew)
+TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else if eq .profile "ubuntu_server" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+# Ubuntu Server: no GUI stuff (no nerdfonts)
+TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else -}}
+warn "Unknown profile: {{ .profile }}"
+exit 0
+{{ end -}}
+
+# Add optional tags based on chezmoi config
+{{ if .installCodingAgents -}}
+TAGS="${TAGS},coding_agents"
+{{ end -}}
+{{ if .installPythonUvTools -}}
+TAGS="${TAGS},python_uv_tools"
+{{ end -}}
+
+[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+
+# Handle sudo for Linux
+BECOME_FLAGS=""
+{{ if ne .profile "macos" -}}
+if sudo -n true 2>/dev/null; then
+    :
+elif [[ -t 0 ]]; then
+    info "Sudo password required for package installation"
+    BECOME_FLAGS="--ask-become-pass"
+else
+    warn "Non-interactive mode without passwordless sudo"
+    warn "To complete setup, run manually:"
+    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
+    BECOME_FLAGS="--skip-tags sudo"
+fi
+{{ end -}}
+
+info "Profile: {{ .profile }}"
+info "Re-running ansible with tags: $TAGS"
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+success "Ansible roles updated!"
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+     1→#!/bin/bash
+     2→# Re-run ansible when any role changes
+     3→# Triggers on changes to any role's tasks or defaults files
+     4→# Profile: {{ .profile }}
+     5→
+     6→# === Role Hashes (changes trigger re-run) ===
+     7→# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+     8→# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+     9→# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+    10→# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+    11→# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+    12→# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+    13→# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+    14→# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+    15→# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+    16→# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+    17→# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+    18→# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+    19→# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+    20→# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+    21→# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+    22→# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+    23→# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+    24→# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+    25→# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+    26→# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+    27→
+    28→set -e
+    29→export PATH="$HOME/.local/bin:$PATH"
+    30→
+    31→# Colors
+    32→info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+    33→success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+    34→warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+    35→
+    36→ANSIBLE_DIR="$HOME/.ansible"
+    37→INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+    38→
+    39→command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+    40→
+    41→# === Profile-based tag selection ===
+    42→# Profile: {{ .profile }}
+    43→#
+    44→# Tag categories:
+    45→#   Core:    base, zsh, neovim, lazyvim_deps, security_tools
+    46→#   Desktop: devtools, docker, nerdfonts
+    47→#   Server:  devtools, docker (no nerdfonts - no GUI)
+    48→#   macOS:   homebrew
+    49→#   Optional: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+    50→
+    51→{{ if eq .profile "macos" -}}
+    52→PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+    53→# macOS: full desktop experience
+    54→TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    55→{{ else if eq .profile "ubuntu_desktop" -}}
+    56→PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+    57→# Ubuntu Desktop: full desktop experience (no homebrew)
+    58→TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+    59→{{ else if eq .profile "ubuntu_server" -}}
+    60→PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+    61→# Ubuntu Server: no GUI stuff (no nerdfonts)
+    62→TAGS="base,zsh,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+    63→{{ else -}}
+    64→warn "Unknown profile: {{ .profile }}"
+    65→exit 0
+    66→{{ end -}}
+    67→
+    68→# Add optional tags based on chezmoi config
+    69→{{ if .installCodingAgents -}}
+    70→TAGS="${TAGS},coding_agents"
+    71→{{ end -}}
+    72→{{ if .installPythonUvTools -}}
+    73→TAGS="${TAGS},python_uv_tools"
+    74→{{ end -}}
+    75→
+    76→[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+    77→
+    78→# Handle sudo for Linux
+    79→BECOME_FLAGS=""
+    80→{{ if ne .profile "macos" -}}
+    81→if sudo -n true 2>/dev/null; then
+    82→    :
+    83→elif [[ -t 0 ]]; then
+    84→    info "Sudo password required for package installation"
+    85→    BECOME_FLAGS="--ask-become-pass"
+    86→else
+    87→    warn "Non-interactive mode without passwordless sudo"
+    88→    warn "To complete setup, run manually:"
+    89→    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
+    90→    BECOME_FLAGS="--skip-tags sudo"
+    91→fi
+    92→{{ end -}}
+    93→
+    94→info "Profile: {{ .profile }}"
+    95→info "Re-running ansible with tags: $TAGS"
+    96→ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+    97→success "Ansible roles updated!"
+    98→
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+Good, now let me verify this works and update CLAUDE.md to document the profiles.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify template renders with profile
+
+`chezmoi execute-template < run_onchange_after_20_ansible_roles.sh.tmpl | grep -E "(Profile|TAGS=|PLAYBOOK=)"`
+
+```text
+# Profile: macos
+# === Profile-based tag selection ===
+# Profile: macos
+PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="${TAGS},coding_agents"
+TAGS="${TAGS},python_uv_tools"
+info "Profile: macos"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me update CLAUDE.md to document the profiles with their tag combinations.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:10Z)**_
+
+Now let me update CLAUDE.md to document the profile-based tag selection.
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I should also note that the profile is embedded in the script's hash comment, so changing the profile will also trigger a re-run. This is actually important because the script content changes when the profile changes.
+
+Let me verify the final structure looks good.
+</details></think>
+
+_**Agent (claude-opus-4-5-20251101 2026-02-05 06:27:25Z)**_
+
+Done. Now the script supports profile-based tag selection:
+
+| Profile | Tags |
+|---------|------|
+| `macos` | Full desktop + homebrew |
+| `ubuntu_desktop` | Full desktop (no homebrew) |
+| `ubuntu_server` | No nerdfonts (no GUI) |
+
+**Key features:**
+- Profile is embedded in script header (`# Profile: {{ .profile }}`)
+- Changing profile in chezmoi config triggers re-run (hash changes)
+- Optional tags (`coding_agents`, `python_uv_tools`) added based on chezmoi config
+
+**Future extensibility:**
+You can easily add more profiles like:
+```go
+{{ else if eq .profile "ubuntu_server_cuda" -}}
+TAGS="base,zsh,neovim,..."
+{{ else if eq .profile "ubuntu_server_minimal" -}}
+TAGS="base,zsh"
+```
+
+Or add more optional flags in `.chezmoi.toml.tmpl`:
+```
+installDocker = {{ promptBoolOnce . "installDocker" "Install Docker" true }}
+```

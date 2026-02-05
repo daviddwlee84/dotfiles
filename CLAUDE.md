@@ -114,11 +114,19 @@ ansible-playbook playbooks/macos.yml --check
 
 ## Profiles
 
-| Profile | OS | Package Manager |
-|---------|-----|-----------------|
-| `macos` | macOS | Homebrew |
-| `ubuntu_desktop` | Ubuntu Desktop | apt + snap + mise |
-| `ubuntu_server` | Ubuntu Server | apt + snap + mise |
+| Profile | OS | Tags Included |
+|---------|-----|---------------|
+| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `ubuntu_desktop` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `ubuntu_server` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
+
+**Tag categories:**
+- **Core** (all): base, zsh, neovim, lazyvim_deps, security_tools
+- **Desktop** (macos, ubuntu_desktop): nerdfonts
+- **macOS only**: homebrew
+- **Optional** (via chezmoi config): coding_agents, python_uv_tools
+
+Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 
 ## LazyVim Requirements
 
