@@ -13,6 +13,15 @@ Cross-platform dotfiles management using **chezmoi** for configuration files and
 
 Keep README.md concise and user-focused. Technical details belong in CLAUDE.md or docs/.
 
+## Maintaining Dockerfile
+
+**IMPORTANT**: When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, also update `Dockerfile`:
+
+1. Add corresponding `ARG CHEZMOI_*` build argument
+2. Add `--promptBool` or `--promptString` flag to the `chezmoi init` command
+
+This ensures Docker testing works with all configuration options.
+
 ## Quick Start
 
 ```bash
@@ -129,6 +138,29 @@ ansible-playbook playbooks/macos.yml --check
 - **Optional** (via chezmoi config): coding_agents, python_uv_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
+
+## No Root Mode (Linux)
+
+For Linux servers where you don't have sudo/root access, enable `noRoot = true` during `chezmoi init`:
+
+```bash
+chezmoi init --force  # Answer "y" to "No sudo/root access" prompt
+```
+
+This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). You'll get:
+- **mise**: Node.js, Ruby, Rust runtime management
+- **cargo tools**: pueue
+- **gem tools**: toolkami, try-cli
+- **uv tools**: mlflow, litellm, sqlit-tui, etc.
+- **npm tools**: Claude Code, OpenCode, Gemini CLI, etc.
+
+What you **won't get** without root:
+- apt packages (git, curl, ripgrep, fd, zsh, etc.)
+- neovim, lazygit, fzf (unless pre-installed)
+- Docker
+- System fonts
+
+**Tip**: If base tools (git, curl, etc.) are already installed by your sysadmin, the user-level tools will work fine.
 
 ## LazyVim Requirements
 

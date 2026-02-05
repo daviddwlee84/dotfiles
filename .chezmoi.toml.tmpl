@@ -17,3 +17,5 @@ installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding 
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)" true }}
 # 是否安裝 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.)
 installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Homebrew Brewfile (casks, mas)" false }}
+# 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
+noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}

@@ -78,6 +78,13 @@ TAGS="${TAGS},python_uv_tools"
 # Handle sudo for Linux
 BECOME_FLAGS=""
 {{ if ne .profile "macos" -}}
+{{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+{{ if $noRoot -}}
+# noRoot mode: skip all sudo-requiring tasks
+info "noRoot mode enabled - skipping all system package installations"
+info "Only user-level tools will be installed (mise, cargo, gem, uv, npm)"
+BECOME_FLAGS="--skip-tags sudo"
+{{ else -}}
 if sudo -n true 2>/dev/null; then
     :
 elif [[ -t 0 ]]; then
@@ -89,6 +96,7 @@ else
     warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
     BECOME_FLAGS="--skip-tags sudo"
 fi
+{{ end -}}
 {{ end -}}
 
 info "Profile: {{ .profile }}"

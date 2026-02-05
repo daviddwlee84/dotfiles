@@ -72,6 +72,11 @@ else
 fi
 {{ else -}}
 # Linux: Install Linuxbrew (useful for packages not available or outdated in apt)
+{{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+{{ if $noRoot -}}
+# noRoot mode: Skip Linuxbrew (requires sudo for dependencies)
+info "noRoot mode: Skipping Linuxbrew installation (requires sudo)"
+{{ else -}}
 if ! command -v brew &> /dev/null; then
     info "Installing Linuxbrew..."
     # Install Linuxbrew dependencies first
@@ -92,6 +97,7 @@ else
     info "Linuxbrew is already installed"
 fi
 {{ end -}}
+{{ end -}}
 # 1. Install uv if missing
 if ! command -v uv &> /dev/null; then
     info "Installing uv..."
@@ -107,6 +113,8 @@ if ! command -v mise &> /dev/null; then
     # Try curl installer first (fast, no sudo)
     if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
         success "mise installed via curl"
+{{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
+{{ if not $noRootMise -}}
     else
         # Fallback to apt for GFW environments
         warn "curl installer failed/timed out, trying apt..."
@@ -122,6 +130,7 @@ if ! command -v mise &> /dev/null; then
         else
             error "Could not install mise - please install manually"
         fi
+{{ end -}}
     fi
 else
     info "mise is already installed"

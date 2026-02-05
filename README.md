@@ -72,6 +72,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | `installCodingAgents` | true | Claude Code, OpenCode, Cursor, Copilot, Gemini CLI, etc. |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
 | `installBrewApps` | false | GUI apps via Homebrew Brewfile (casks, mas) |
+| `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
 
 To change options later: `chezmoi init --force`
 
@@ -106,11 +107,12 @@ To change options later: `chezmoi init --force`
 
 ## Supported Platforms
 
-| Platform | Package Manager |
-|----------|-----------------|
-| macOS | Homebrew |
-| Ubuntu Desktop | apt + snap |
-| Ubuntu Server | apt + snap |
+| Platform | Package Manager | Notes |
+|----------|-----------------|-------|
+| macOS | Homebrew | Full support |
+| Ubuntu Desktop | apt + snap | Full support |
+| Ubuntu Server | apt + snap | Full support |
+| Ubuntu Server (no root) | mise + cargo + uv | `noRoot=true`, user-level tools only |
 
 ## Manual Commands
 
