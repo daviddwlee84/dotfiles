@@ -80,3 +80,24 @@ chezmoi 當入口 + ansible 管系統依賴 + mise 管 node/bun + uv 管 python
 - [Homebrew Bundle, brew bundle and Brewfile — Homebrew Documentation](https://docs.brew.sh/Brew-Bundle-and-Brewfile)
 - [Brew Bundle Brewfile Tips](https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f)
 - [How to keep your mac software updated easily (2026)](https://gist.github.com/arturmartins/f779720379e6bd97cac4bbe1dc202c8b#file-mac-upgrade-sh)
+
+```bash
+$ mas list
+1435447041  DingTalk             (8.2.5)
+6447957425  Immersive Translate  (1.25.3)
+ 409183694  Keynote              (14.5)
+ 539883307  LINE                 (9.14.0)
+ 441258766  Magnet               (3.0.7)
+1480068668  Messenger            (520.0.0)
+ 409203825  Numbers              (14.5)
+ 409201541  Pages                (14.5)
+6714467650  Perplexity           (2.251216.0)
+1475387142  Tailscale            (1.92.3)
+ 747648890  Telegram             (12.4.1)
+1176074088  Termius              (9.36.2)
+ 425424353  The Unarchiver       (4.3.9)
+ 836500024  WeChat               (4.1.5)
+ 310633997  WhatsApp             (26.2.74)
+1295203466  Windows App          (11.1.4)
+1247341465  同花顺                  (5.2.2)
+```
