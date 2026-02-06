@@ -2,12 +2,13 @@ return {
   "nvim-mini/mini.surround",
   opts = {
     mappings = {
-      add = "gza", -- Normal mode: add surround
-      delete = "gzd", -- Normal mode: delete surround
-      replace = "gzr", -- Normal mode: replace surround
-      -- The key change:
-      suffix_last = "gS", -- Visual mode: add surround (end of selection)
-      suffix_next = "gS", -- Visual mode: add surround (start of selection)
+      add = "gza", -- Add surrounding (Normal and Visual modes)
+      delete = "gzd", -- Delete surrounding
+      find = "gzf", -- Find surrounding (to the right)
+      find_left = "gzF", -- Find surrounding (to the left)
+      highlight = "gzh", -- Highlight surrounding
+      replace = "gzr", -- Replace surrounding
+      update_n_lines = "gzn", -- Update `n_lines`
     },
   },
 }
