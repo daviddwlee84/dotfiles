@@ -98,8 +98,8 @@ WORKDIR /home/devuser
 # Install chezmoi binary
 # Retry up to 3 times to handle network issues (especially behind GFW)
 RUN for i in 1 2 3; do \
-        echo "Attempt $i: Installing chezmoi..." && \
-        sh -c "$(curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io)" && \
+        echo "Attempt $i: Installing chezmoi to ~/.local/bin..." && \
+        sh -c "$(curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io/lb)" && \
         echo "chezmoi installed successfully" && break || \
         { echo "Attempt $i failed, retrying..."; sleep 10; }; \
     done
@@ -110,7 +110,7 @@ RUN for i in 1 2 3; do \
 # Use local source instead of cloning from GitHub to test local changes
 # Note: installBrewApps=false by default (Linuxbrew is optional on Linux)
 RUN export PATH="$HOME/.local/bin:$PATH" && \
-    ~/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
+    ~/.local/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
     --promptString "profile (ubuntu_server|ubuntu_desktop|macos)=${CHEZMOI_PROFILE}" \
     --promptString "What is your email address=${CHEZMOI_EMAIL}" \
     --promptString "What is your full name=${CHEZMOI_NAME}" \

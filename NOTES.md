@@ -104,10 +104,10 @@ docker run --rm -it ubuntu:latest bash
 export GITHUB_USERNAME=logandonley
 # NOTE: if you prefer to use the system package manager to install chezmoi, then don't use this script
 apt update -y && apt install curl -y
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply $GITHUB_USERNAME
+sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply git@github.com:$GITHUB_USERNAME/dotfiles.git
 # or wget
 apt update -y && apt install wget -y
-sh -c "$(wget -qO- https://get.chezmoi.io)" -- init --apply "$GITHUB_USERNAME"
+sh -c "$(wget -qO- https://get.chezmoi.io/lb)" -- init --apply "git@github.com:$GITHUB_USERNAME/dotfiles.git"
 ```
 
 ```bash
