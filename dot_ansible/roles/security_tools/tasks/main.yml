@@ -53,25 +53,25 @@
     return_content: true
   register: gitleaks_release
 
-- name: Install gitleaks binary (Debian/Ubuntu)
+- name: Install gitleaks binary (Debian/Ubuntu, system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - gitleaks_check.rc != 0
   become: true
   tags: [sudo]
   block:
-    - name: Set gitleaks version and arch
+    - name: Set gitleaks version and arch (system)
       ansible.builtin.set_fact:
         gitleaks_version: "{{ gitleaks_release.json.tag_name | regex_replace('^v', '') }}"
         gitleaks_arch: "{{ 'x64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
 
-    - name: Download gitleaks
+    - name: Download gitleaks (system)
       ansible.builtin.get_url:
         url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_linux_{{ gitleaks_arch }}.tar.gz"
         dest: /tmp/gitleaks.tar.gz
         mode: "0644"
 
-    - name: Extract gitleaks
+    - name: Extract gitleaks (system)
       ansible.builtin.unarchive:
         src: /tmp/gitleaks.tar.gz
         dest: /tmp
@@ -84,7 +84,66 @@
         mode: "0755"
         remote_src: true
 
-    - name: Clean up gitleaks temp files
+    - name: Clean up gitleaks temp files (system)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gitleaks.tar.gz
+        - /tmp/gitleaks
+        - /tmp/LICENSE
+        - /tmp/README.md
+
+# --- gitleaks (user-level fallback) ---
+- name: Re-check if gitleaks is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v gitleaks
+  register: gitleaks_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install gitleaks from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gitleaks_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (gitleaks)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest gitleaks release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/gitleaks/gitleaks/releases/latest
+        return_content: true
+      register: gitleaks_release_user
+
+    - name: Set gitleaks version and arch (user)
+      ansible.builtin.set_fact:
+        gitleaks_version_user: "{{ gitleaks_release_user.json.tag_name | regex_replace('^v', '') }}"
+        gitleaks_arch_user: "{{ 'x64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+
+    - name: Download gitleaks (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version_user }}/gitleaks_{{ gitleaks_version_user }}_linux_{{ gitleaks_arch_user }}.tar.gz"
+        dest: /tmp/gitleaks.tar.gz
+        mode: "0644"
+
+    - name: Extract gitleaks (user)
+      ansible.builtin.unarchive:
+        src: /tmp/gitleaks.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install gitleaks to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/gitleaks
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/gitleaks"
+        mode: "0755"
+        remote_src: true
+
+    - name: Clean up gitleaks temp files (user)
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent

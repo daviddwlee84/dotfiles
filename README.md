@@ -112,7 +112,7 @@ To change options later: `chezmoi init --force`
 | macOS | Homebrew | Full support |
 | Ubuntu Desktop | apt + snap | Full support |
 | Ubuntu Server | apt + snap | Full support |
-| Ubuntu Server (no root) | mise + cargo + uv | `noRoot=true`, user-level tools only |
+| Ubuntu Server (no root) | GitHub binaries + mise + cargo + uv | `noRoot=true`, tools installed to `~/.local/bin` |
 
 ## Manual Commands
 

@@ -147,20 +147,26 @@ For Linux servers where you don't have sudo/root access, enable `noRoot = true` 
 chezmoi init --force  # Answer "y" to "No sudo/root access" prompt
 ```
 
-This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). You'll get:
+This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). Tools with user-level fallbacks are automatically installed to `~/.local/bin` instead.
+
+**User-level tools** (installed automatically without sudo):
+- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, zellij, btop, gitleaks, lazygit, fzf
 - **mise**: Node.js, Rust runtime management
+- **Installers**: zoxide, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
 - **uv tools**: mlflow, litellm, sqlit-tui, etc.
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, etc.
 
 What you **won't get** without root:
-- apt packages (git, curl, ripgrep, fd, zsh, etc.)
-- neovim, lazygit, fzf (unless pre-installed)
-- Docker
-- System fonts
+- zsh (needs `/etc/shells` for login shell)
+- tmux, htop (require system libraries)
+- direnv (apt only)
+- Docker (kernel features, daemon)
+- System fonts (nerdfonts)
 - Ruby and gem tools (ruby-build requires `libffi-dev` which needs sudo)
+- build-essential, git, curl, wget, tree (assumed pre-installed)
 
-**Tip**: If base tools (git, curl, etc.) are already installed by your sysadmin, the user-level tools will work fine.
+**Tip**: Ask your sysadmin to run: `sudo apt install git curl wget zsh tmux htop direnv build-essential tree`
 
 ## LazyVim Requirements
 

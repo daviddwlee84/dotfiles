@@ -47,6 +47,58 @@
     state: link
   ignore_errors: true
 
+# --- bat (user-level fallback) ---
+- name: Re-check if bat is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v bat
+  register: bat_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install bat from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - bat_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (bat)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest bat release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/sharkdp/bat/releases/latest
+        return_content: true
+      register: bat_release
+
+    - name: Download bat binary
+      ansible.builtin.get_url:
+        url: "https://github.com/sharkdp/bat/releases/download/{{ bat_release.json.tag_name }}/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/bat.tar.gz
+        mode: '0644'
+
+    - name: Extract bat
+      ansible.builtin.unarchive:
+        src: /tmp/bat.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install bat to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/bat"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/bat"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up bat temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/bat.tar.gz
+        - "/tmp/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+
 # --- zoxide ---
 - name: Check if zoxide is installed
   when: ansible_facts["os_family"] == "Debian"
@@ -98,6 +150,48 @@
         state: present
         update_cache: true
 
+# --- eza (user-level fallback) ---
+- name: Re-check if eza is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v eza
+  register: eza_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install eza from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - eza_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (eza)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest eza release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/eza-community/eza/releases/latest
+        return_content: true
+      register: eza_release
+
+    - name: Download eza binary
+      ansible.builtin.get_url:
+        url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        dest: /tmp/eza.tar.gz
+        mode: '0644'
+
+    - name: Extract eza to ~/.local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/eza.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+
+    - name: Clean up eza tarball
+      ansible.builtin.file:
+        path: /tmp/eza.tar.gz
+        state: absent
+
 # --- git-delta ---
 - name: Check if delta is installed
   when: ansible_facts["os_family"] == "Debian"
@@ -134,6 +228,58 @@
         path: /tmp/git-delta.deb
         state: absent
 
+# --- git-delta (user-level fallback) ---
+- name: Re-check if delta is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v delta
+  register: delta_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install git-delta from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (delta)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest delta release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/dandavison/delta/releases/latest
+        return_content: true
+      register: delta_release_user
+
+    - name: Download delta tarball (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        dest: /tmp/delta.tar.gz
+        mode: '0644'
+
+    - name: Extract delta (user)
+      ansible.builtin.unarchive:
+        src: /tmp/delta.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install delta to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/delta"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/delta"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up delta temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/delta.tar.gz
+        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+
 # --- tldr ---
 - name: Check if tldr is installed
   when: ansible_facts["os_family"] == "Debian"
@@ -142,7 +288,7 @@
   changed_when: false
   failed_when: false
 
-- name: Install tldr via npm (Debian/Ubuntu)
+- name: Install tldr via npm (Debian/Ubuntu, system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - tldr_check.rc != 0
@@ -152,6 +298,32 @@
     name: tldr
     global: true
     state: present
+  ignore_errors: true
+
+# --- tldr (user-level fallback) ---
+- name: Re-check if tldr is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v tldr
+  register: tldr_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install tldr via mise npm (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tldr_recheck.rc != 0
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g tldr
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm install -g tldr
+    else
+      echo "mise not found, skipping tldr install" >&2
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
   ignore_errors: true
 
 # --- thefuck ---
@@ -220,6 +392,59 @@
         - /tmp/yazi.zip
         - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
 
+# --- yazi (user-level fallback) ---
+- name: Re-check if yazi is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v yazi
+  register: yazi_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install yazi from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - yazi_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (yazi)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest yazi release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/sxyazi/yazi/releases/latest
+        return_content: true
+      register: yazi_release_user
+
+    - name: Download yazi binary (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.zip"
+        dest: /tmp/yazi.zip
+        mode: '0644'
+
+    - name: Extract yazi (user)
+      ansible.builtin.shell: |
+        cd /tmp && python3 -m zipfile -e yazi.zip .
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Install yazi to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/yazi"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/yazi"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up yazi files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/yazi.zip
+        - "/tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+
 # --- tmux ---
 - name: Install tmux (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
@@ -247,6 +472,65 @@
     name: btop
     state: present
   ignore_errors: true
+
+# --- btop (user-level fallback) ---
+- name: Re-check if btop is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v btop
+  register: btop_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install btop from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - btop_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (btop)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest btop release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/aristocratos/btop/releases/latest
+        return_content: true
+      register: btop_release
+
+    - name: Download btop binary
+      ansible.builtin.get_url:
+        url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ ansible_facts['architecture'] }}-linux-musl.tbz"
+        dest: /tmp/btop.tbz
+        mode: '0644'
+
+    - name: Create btop temp directory
+      ansible.builtin.file:
+        path: /tmp/btop-extract
+        state: directory
+        mode: '0755'
+
+    - name: Extract btop
+      ansible.builtin.shell: |
+        cd /tmp/btop-extract && tar xjf /tmp/btop.tbz
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Install btop to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/btop-extract/btop/bin/btop
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/btop"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up btop temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/btop.tbz
+        - /tmp/btop-extract
 
 # --- zellij ---
 - name: Check if zellij is installed
@@ -282,6 +566,48 @@
         remote_src: true
 
     - name: Clean up zellij tarball
+      ansible.builtin.file:
+        path: /tmp/zellij.tar.gz
+        state: absent
+
+# --- zellij (user-level fallback) ---
+- name: Re-check if zellij is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v zellij
+  register: zellij_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install zellij from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - zellij_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (zellij)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest zellij release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/zellij-org/zellij/releases/latest
+        return_content: true
+      register: zellij_release_user
+
+    - name: Download zellij binary (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release_user.json.tag_name }}/zellij-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/zellij.tar.gz
+        mode: '0644'
+
+    - name: Extract zellij to ~/.local/bin (user)
+      ansible.builtin.unarchive:
+        src: /tmp/zellij.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+
+    - name: Clean up zellij tarball (user)
       ansible.builtin.file:
         path: /tmp/zellij.tar.gz
         state: absent

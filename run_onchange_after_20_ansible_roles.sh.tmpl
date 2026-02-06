@@ -80,9 +80,19 @@ BECOME_FLAGS=""
 {{ if ne .profile "macos" -}}
 {{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
 {{ if $noRoot -}}
-# noRoot mode: skip all sudo-requiring tasks
-info "noRoot mode enabled - skipping all system package installations"
-info "Only user-level tools will be installed (mise, cargo, uv, npm)"
+# noRoot mode: skip all sudo-requiring tasks, user-level fallbacks will install tools
+info "noRoot mode enabled - installing user-level tools to ~/.local/bin"
+info ""
+info "The following tools will be installed without sudo:"
+info "  neovim, fzf, lazygit, ripgrep, fd, jq, just, bat, eza, delta,"
+info "  yazi, zellij, btop, gitleaks, zoxide, tldr, pre-commit, thefuck"
+info ""
+info "The following tools require sudo (ask your administrator):"
+info "  git, curl, wget, zsh, tmux, htop, direnv, build-essential, docker"
+info ""
+info "Suggested command for your administrator:"
+info "  sudo apt install git curl wget zsh tmux htop direnv build-essential tree"
+info ""
 BECOME_FLAGS="--skip-tags sudo"
 # Ruby can't compile without libffi-dev (requires sudo on Ubuntu)
 TAGS="${TAGS//,ruby_gem_tools/}"

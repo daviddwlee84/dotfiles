@@ -43,6 +43,136 @@
     state: link
   ignore_errors: true
 
+# --- ripgrep (user-level fallback) ---
+- name: Re-check if ripgrep is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v rg
+  register: rg_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install ripgrep from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rg_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (ripgrep)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest ripgrep release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/BurntSushi/ripgrep/releases/latest
+        return_content: true
+      register: rg_release
+
+    - name: Download ripgrep binary
+      ansible.builtin.get_url:
+        url: "https://github.com/BurntSushi/ripgrep/releases/download/{{ rg_release.json.tag_name }}/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/ripgrep.tar.gz
+        mode: '0644'
+
+    - name: Extract ripgrep
+      ansible.builtin.unarchive:
+        src: /tmp/ripgrep.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install ripgrep to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/rg"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/rg"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up ripgrep temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ripgrep.tar.gz
+        - "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+
+# --- fd (user-level fallback) ---
+- name: Re-check if fd is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v fd
+  register: fd_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install fd from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - fd_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (fd)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest fd release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/sharkdp/fd/releases/latest
+        return_content: true
+      register: fd_release
+
+    - name: Download fd binary
+      ansible.builtin.get_url:
+        url: "https://github.com/sharkdp/fd/releases/download/{{ fd_release.json.tag_name }}/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        dest: /tmp/fd.tar.gz
+        mode: '0644'
+
+    - name: Extract fd
+      ansible.builtin.unarchive:
+        src: /tmp/fd.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install fd to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/fd"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/fd"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up fd temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/fd.tar.gz
+        - "/tmp/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+
+# --- jq (user-level fallback) ---
+- name: Re-check if jq is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v jq
+  register: jq_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install jq from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - jq_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (jq)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download jq binary
+      ansible.builtin.get_url:
+        url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
+        mode: '0755'
+
+# --- just ---
 - name: Check if just is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: just --version
@@ -50,7 +180,7 @@
   changed_when: false
   failed_when: false
 
-- name: Install just via official installer (Debian/Ubuntu)
+- name: Install just via official installer (Debian/Ubuntu, system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - just_check.rc != 0
@@ -60,3 +190,28 @@
     curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
   args:
     creates: /usr/local/bin/just
+
+# --- just (user-level fallback) ---
+- name: Re-check if just is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: just --version
+  register: just_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install just via official installer (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - just_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (just)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download and install just to ~/.local/bin
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to {{ ansible_facts['env']['HOME'] }}/.local/bin
+      args:
+        creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/just"
