@@ -29,6 +29,8 @@
       - jq
       - tree
       - build-essential
+      - libffi-dev
+      - libyaml-dev
     state: present
     update_cache: true
     cache_valid_time: 3600

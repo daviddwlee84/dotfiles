@@ -3,11 +3,14 @@
 # Run `just pre-commit-setup` to install hooks
 
 repos:
-  # Gitleaks - detect secrets (blocks commit if secrets found)
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.22.1
+  # Gitleaks - detect secrets (use system binary to avoid Go bootstrap downloads)
+  - repo: local
     hooks:
       - id: gitleaks
+        name: gitleaks
+        entry: gitleaks git --pre-commit --staged --redact
+        language: system
+        pass_filenames: false
 
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
