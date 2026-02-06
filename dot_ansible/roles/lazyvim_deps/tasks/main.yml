@@ -95,7 +95,7 @@
       register: lazygit_apt
       when: lazygit_ppa is succeeded
 
-- name: Install lazygit from GitHub releases (fallback)
+- name: Install lazygit from GitHub releases (system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - lazygit_check.rc != 0
@@ -103,19 +103,19 @@
   become: true
   tags: [sudo]
   block:
-    - name: Get latest lazygit release
+    - name: Get latest lazygit release (system)
       ansible.builtin.uri:
         url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
         return_content: true
       register: lazygit_release
 
-    - name: Download lazygit binary
+    - name: Download lazygit binary (system)
       ansible.builtin.get_url:
         url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
 
-    - name: Extract lazygit
+    - name: Extract lazygit (system)
       ansible.builtin.unarchive:
         src: /tmp/lazygit.tar.gz
         dest: /usr/local/bin
@@ -123,7 +123,51 @@
         extra_opts:
           - lazygit
 
-    - name: Clean up lazygit tarball
+    - name: Clean up lazygit tarball (system)
+      ansible.builtin.file:
+        path: /tmp/lazygit.tar.gz
+        state: absent
+
+# User-level install (no sudo required) - runs if system install was skipped
+- name: Re-check if lazygit is installed after system install attempt
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: lazygit --version
+  register: lazygit_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install lazygit from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - lazygit_recheck.rc != 0
+  block:
+    - name: Get latest lazygit release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+        return_content: true
+      register: lazygit_release_user
+
+    - name: Ensure ~/.local/bin exists
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download lazygit binary (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        dest: /tmp/lazygit.tar.gz
+        mode: '0644'
+
+    - name: Extract lazygit to user bin (user)
+      ansible.builtin.unarchive:
+        src: /tmp/lazygit.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+        extra_opts:
+          - lazygit
+
+    - name: Clean up lazygit tarball (user)
       ansible.builtin.file:
         path: /tmp/lazygit.tar.gz
         state: absent

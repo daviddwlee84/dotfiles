@@ -155,22 +155,8 @@
   ignore_errors: true
 
 # --- thefuck ---
-- name: Check if thefuck is installed
-  when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: thefuck --version
-  register: thefuck_check
-  changed_when: false
-  failed_when: false
-
-- name: Install thefuck via pip (Debian/Ubuntu)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - thefuck_check.rc != 0
-  ansible.builtin.pip:
-    name: thefuck
-    state: present
-    extra_args: --user
-  ignore_errors: true
+# NOTE: thefuck is now installed via uv tool (python_uv_tools role)
+# This avoids conda/virtualenv Python path conflicts
 
 # --- direnv ---
 - name: Install direnv (Debian/Ubuntu)

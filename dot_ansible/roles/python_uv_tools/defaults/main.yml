@@ -6,6 +6,9 @@
 #   - with: (optional) additional dependency to install with --with
 
 python_uv_tools:
+  - name: thefuck
+    binary: thefuck
+    python: "3.11"  # Python 3.13 removed distutils which thefuck still uses
   - name: apprise
     binary: apprise
   - name: sqlit-tui[ssh]
