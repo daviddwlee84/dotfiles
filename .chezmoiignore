@@ -41,3 +41,6 @@ scripts/redact_specstory.py
 
 # Zsh adhoc file (personal experiments - never track)
 .zshrc.adhoc
+
+# LazyVim lock file differs across OS/machines; do not track
+.config/nvim/lazy-lock.json
