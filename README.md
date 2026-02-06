@@ -53,7 +53,7 @@ flowchart TB
 ```bash
 # One-liner to initialize and apply (installs chezmoi to ~/.local/bin)
 export GITHUB_USERNAME=daviddwlee84
-sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply git@github.com:$GITHUB_USERNAME/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" init --apply git@github.com:$GITHUB_USERNAME/dotfiles.git
 ```
 
 This automatically:
