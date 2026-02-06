@@ -362,35 +362,34 @@
 
     - name: Download yazi binary
       ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu.zip"
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.zip"
         dest: /tmp/yazi.zip
         mode: '0644'
+        force: true
 
     - name: Install unzip if not present
       ansible.builtin.apt:
         name: unzip
         state: present
 
-    - name: Extract yazi
-      ansible.builtin.unarchive:
-        src: /tmp/yazi.zip
-        dest: /tmp
-        remote_src: true
-
-    - name: Install yazi binary
-      ansible.builtin.copy:
-        src: "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu/yazi"
-        dest: /usr/local/bin/yazi
-        mode: '0755'
-        remote_src: true
+    - name: Extract and install yazi
+      ansible.builtin.shell: |
+        cd /tmp
+        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        unzip -o yazi.zip
+        cp /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*/yazi /usr/local/bin/yazi
+        chmod 755 /usr/local/bin/yazi
+      args:
+        executable: /bin/bash
+      changed_when: true
 
     - name: Clean up yazi files
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /tmp/yazi.zip
-        - "/tmp/yazi-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-gnu"
+      ansible.builtin.shell: |
+        rm -f /tmp/yazi.zip
+        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+      args:
+        executable: /bin/bash
+      changed_when: false
 
 # --- yazi (user-level fallback) ---
 - name: Re-check if yazi is installed
@@ -422,28 +421,26 @@
         url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.zip"
         dest: /tmp/yazi.zip
         mode: '0644'
+        force: true
 
-    - name: Extract yazi (user)
+    - name: Extract and install yazi (user)
       ansible.builtin.shell: |
-        cd /tmp && python3 -m zipfile -e yazi.zip .
+        cd /tmp
+        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        python3 -m zipfile -e yazi.zip .
+        cp /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
+        chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
       args:
         executable: /bin/bash
       changed_when: true
 
-    - name: Install yazi to ~/.local/bin
-      ansible.builtin.copy:
-        src: "/tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/yazi"
-        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/yazi"
-        mode: '0755'
-        remote_src: true
-
     - name: Clean up yazi files (user)
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /tmp/yazi.zip
-        - "/tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+      ansible.builtin.shell: |
+        rm -f /tmp/yazi.zip
+        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+      args:
+        executable: /bin/bash
+      changed_when: false
 
 # --- tmux ---
 - name: Install tmux (Debian/Ubuntu)
