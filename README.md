@@ -83,6 +83,7 @@ To change options later: `chezmoi init --force`
 - `~/.gitconfig` - Git configuration
 - `~/.config/nvim/` - Neovim (LazyVim) configuration
 - `~/.config/uv/uv.toml` - uv package manager config
+- `~/.cargo/config.toml` - Cargo registry mirror config (GFW)
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins

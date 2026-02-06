@@ -1,0 +1,21 @@
+{{- if .useChineseMirror }}
+# Cargo mirror config for faster downloads behind GFW.
+[source.crates-io]
+replace-with = "tuna"
+
+[source.tuna]
+# Sparse index (recommended; requires cargo >= 1.68)
+# NOTE: trailing slash is required for sparse indexes.
+registry = "sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/"
+# Git index (compatibility; slower). Uncomment to use instead of sparse:
+# registry = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
+
+[registries.tuna]
+# Used by `cargo search --registry tuna` and `cargo info --registry tuna`
+index = "sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/"
+# Git index (compatibility; slower). Uncomment to use instead of sparse:
+# index = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
+
+# Manual fallback:
+# Comment out `replace-with = "tuna"` to return to crates.io.
+{{- end }}
