@@ -156,6 +156,55 @@
     state: present
   ignore_errors: true
 
+# === OpenAI Codex CLI ===
+
+- name: Check if OpenAI Codex CLI is installed via Homebrew cask (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: brew list --cask codex
+  register: codex_macos_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install OpenAI Codex CLI (Homebrew cask - macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - codex_macos_brew_check.rc != 0
+  community.general.homebrew_cask:
+    name: codex
+    state: present
+
+- name: Get Homebrew prefix (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: brew --prefix
+  register: codex_macos_brew_prefix
+  changed_when: false
+
+- name: Verify OpenAI Codex CLI binary is available from Homebrew path (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: "{{ codex_macos_brew_prefix.stdout }}/bin/codex"
+  register: codex_macos_bin_stat
+  failed_when: not codex_macos_bin_stat.stat.exists
+
+- name: Check if OpenAI Codex CLI is installed via npm (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - npm_check.rc == 0
+  ansible.builtin.command: npm list -g --depth=0 @openai/codex
+  register: codex_linux_npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install OpenAI Codex CLI (npm - Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - npm_check.rc == 0
+    - codex_linux_npm_check.rc != 0
+  community.general.npm:
+    name: "@openai/codex"
+    global: true
+    state: present
+
 # === Gemini CLI ===
 
 - name: Check if Gemini CLI is installed (macOS)
@@ -171,6 +220,26 @@
     - gemini_macos_check.rc != 0
   community.general.homebrew:
     name: gemini-cli
+    state: present
+
+- name: Re-check Gemini CLI after Homebrew install (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - gemini_macos_check.rc != 0
+  ansible.builtin.command: which gemini
+  register: gemini_macos_postbrew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Gemini CLI via npm fallback (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - gemini_macos_check.rc != 0
+    - gemini_macos_postbrew_check.rc != 0
+    - npm_check.rc == 0
+  community.general.npm:
+    name: "@google/gemini-cli"
+    global: true
     state: present
 
 - name: Check if Gemini CLI is installed (Linux)

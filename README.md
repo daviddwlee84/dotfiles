@@ -94,7 +94,7 @@ To change options later: `chezmoi init --force`
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
-- **Coding Agents** (optional): Claude Code, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
+- **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
 - **GUI Apps** (macOS): terminals, editors, browsers, utilities via Brewfile
