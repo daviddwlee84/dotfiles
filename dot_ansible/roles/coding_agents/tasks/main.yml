@@ -244,6 +244,156 @@
     dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/specstory"
     mode: "0755"
 
+# === CodexBar ===
+
+- name: Check if CodexBar is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which codexbar
+  register: codexbar_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Tap steipete/tap for CodexBar (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - codexbar_macos_check.rc != 0
+  community.general.homebrew_tap:
+    name: steipete/tap
+    state: present
+
+- name: Install CodexBar (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - codexbar_macos_check.rc != 0
+  community.general.homebrew_cask:
+    name: codexbar
+    state: present
+
+- name: Check if CodexBar is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which codexbar
+  register: codexbar_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if Homebrew (Linuxbrew) is available
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+  ansible.builtin.command: command -v brew
+  register: codexbar_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install CodexBar via Linuxbrew (preferred)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc == 0
+  block:
+    - name: Tap steipete/tap for CodexBar (Linuxbrew)
+      community.general.homebrew_tap:
+        name: steipete/tap
+        state: present
+
+    - name: Install CodexBar (Linuxbrew)
+      community.general.homebrew:
+        name: codexbar
+        state: present
+  rescue:
+    - name: Mark Linuxbrew install as failed
+      ansible.builtin.set_fact:
+        codexbar_brew_failed: true
+
+- name: Ensure ~/.local/bin exists (CodexBar fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: '0755'
+
+- name: Get latest CodexBar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/steipete/CodexBar/releases/latest
+    return_content: true
+  register: codexbar_release
+
+- name: Compute CodexBar release asset name (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_release is defined
+  ansible.builtin.set_fact:
+    codexbar_arch: "{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}"
+    codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"
+    codexbar_asset: "CodexBarCLI-{{ codexbar_tag }}-linux-{{ codexbar_arch }}.tar.gz"
+
+- name: Download CodexBar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_asset is defined
+  ansible.builtin.get_url:
+    url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
+    dest: /tmp/codexbar.tar.gz
+    mode: '0644'
+
+- name: Extract CodexBar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_asset is defined
+  ansible.builtin.unarchive:
+    src: /tmp/codexbar.tar.gz
+    dest: /tmp/codexbar
+    remote_src: true
+
+- name: Find codexbar binary (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_asset is defined
+  ansible.builtin.find:
+    paths: /tmp/codexbar
+    patterns: codexbar
+    file_type: file
+  register: codexbar_find
+
+- name: Install CodexBar to ~/.local/bin (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_find.matched | default(0) | int > 0
+  ansible.builtin.copy:
+    src: "{{ codexbar_find.files[0].path }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/codexbar"
+    mode: '0755'
+    remote_src: true
+
+- name: Clean up CodexBar temp files (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/codexbar.tar.gz
+    - /tmp/codexbar
+
 # === Happy ===
 
 - name: Check if Happy is installed
