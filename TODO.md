@@ -2,6 +2,31 @@
 
 Future enhancements for the dotfiles repository.
 
+## LazyVim v8 Incremental Restore (2026-02-07)
+
+Gradual restore from backup at `backups/nvim-20260206-223408` to reduce behavior churn.
+
+### Restored
+
+- [x] `dot_config/nvim/lua/plugins/dashboard.lua`
+- [x] `dot_config/nvim/lua/plugins/gitsigns.lua`
+- [x] `dot_config/nvim/lua/plugins/mini-surround.lua`
+- [x] `dot_config/nvim/lua/plugins/vim-visual-multi.lua`
+- [x] `dot_config/nvim/lua/plugins/wakatime.lua`
+
+### Deferred (review before restore)
+
+- [ ] `dot_config/nvim/lua/plugins/avante.lua` (avoid conflict with `lazyvim.plugins.extras.ai.avante`)
+- [ ] `dot_config/nvim/lua/plugins/diffview.lua` (`command` key typo and undefined `is_git_root`)
+- [ ] `dot_config/nvim/lua/plugins/nvim-cmp.lua` (changes `<Tab>` completion behavior globally)
+- [ ] `dot_config/nvim/lua/plugins/noice-fix.lua` (UI behavior override)
+- [ ] `dot_config/nvim/lua/plugins/sqlit-float.lua` + `lua/sqlit_float/*` (local plugin path, higher maintenance)
+- [ ] `dot_config/nvim/lua/plugins/colorscheme.lua` (currently disabled/commented block)
+
+### Notes
+
+- Current explorer is Snacks, not Neo-tree. `x` cut is not a default mapping in Snacks explorer.
+
 ## Zsh Configuration
 
 | Item | Notes |
