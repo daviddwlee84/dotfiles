@@ -37,12 +37,20 @@
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/ruby"
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  ignore_errors: true
+  register: ruby_install_result
+
+- name: Check if Ruby is available via mise shims
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims/ruby"
+  register: ruby_shim
 
 # =============================================================================
 # Install gem tools
 # =============================================================================
 
 - name: Install Ruby gem CLI tools via gem install
+  when: ruby_shim.stat.exists
   ansible.builtin.command: gem install {{ item.name }}
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims/{{ item.binary }}"

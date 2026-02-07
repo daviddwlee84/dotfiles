@@ -279,13 +279,84 @@
     name: specstoryai/tap
     state: present
 
-- name: Install SpecStory (macOS)
+- name: Install SpecStory via Homebrew (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - specstory_macos_check.rc != 0
   community.general.homebrew:
     name: specstory
     state: present
+  ignore_errors: true
+
+- name: Re-check if SpecStory is installed after Homebrew attempt (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+  ansible.builtin.command: which specstory
+  register: specstory_macos_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Set SpecStory architecture for GitHub release (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+  ansible.builtin.set_fact:
+    specstory_macos_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'arm64' else 'x86_64' }}"
+
+- name: Get latest SpecStory release (macOS fallback)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/specstoryai/getspecstory/releases/latest
+    return_content: true
+  register: specstory_macos_release
+
+- name: Ensure ~/.local/bin exists (SpecStory macOS fallback)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+    - specstory_macos_release is defined
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: "0755"
+
+- name: Download SpecStory from GitHub release (macOS fallback)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+    - specstory_macos_release is defined
+  ansible.builtin.get_url:
+    url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_macos_release.json.tag_name }}/SpecStoryCLI_Darwin_{{ specstory_macos_arch }}.zip"
+    dest: /tmp/specstory-macos.zip
+    mode: "0644"
+
+- name: Extract SpecStory to ~/.local/bin (macOS fallback)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+    - specstory_macos_release is defined
+  ansible.builtin.unarchive:
+    src: /tmp/specstory-macos.zip
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    remote_src: true
+    mode: "0755"
+
+- name: Clean up SpecStory zip (macOS fallback)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - specstory_macos_check.rc != 0
+    - specstory_macos_recheck.rc != 0
+  ansible.builtin.file:
+    path: /tmp/specstory-macos.zip
+    state: absent
 
 - name: Check if SpecStory is installed (Linux)
   when: ansible_facts["os_family"] == "Debian"
@@ -299,40 +370,80 @@
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
   ansible.builtin.uri:
-    url: https://api.github.com/repos/specstoryai/specstory/releases/latest
+    url: https://api.github.com/repos/specstoryai/getspecstory/releases/latest
     return_content: true
   register: specstory_release
 
-- name: Install SpecStory from GitHub release (Linux)
+- name: Set SpecStory architecture (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+  ansible.builtin.set_fact:
+    specstory_linux_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+
+- name: Download SpecStory from GitHub release (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
     - specstory_release is defined
   ansible.builtin.get_url:
-    url: "https://github.com/specstoryai/specstory/releases/download/{{ specstory_release.json.tag_name }}/specstory-linux-x86_64"
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/specstory"
+    url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
+    dest: /tmp/specstory-linux.tar.gz
+    mode: "0644"
+
+- name: Ensure ~/.local/bin exists (SpecStory)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+    - specstory_release is defined
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
     mode: "0755"
+
+- name: Extract SpecStory to ~/.local/bin (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+    - specstory_release is defined
+  ansible.builtin.unarchive:
+    src: /tmp/specstory-linux.tar.gz
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    remote_src: true
+    mode: "0755"
+
+- name: Clean up SpecStory tarball (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+  ansible.builtin.file:
+    path: /tmp/specstory-linux.tar.gz
+    state: absent
 
 # === CodexBar ===
 
-- name: Check if CodexBar is installed (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
+- name: Check if CodexBar is installed (macOS, ARM only)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - ansible_facts["architecture"] == "arm64"
   ansible.builtin.command: which codexbar
   register: codexbar_macos_check
   changed_when: false
   failed_when: false
 
-- name: Tap steipete/tap for CodexBar (macOS)
+- name: Tap steipete/tap for CodexBar (macOS, ARM only)
   when:
     - ansible_facts["os_family"] == "Darwin"
+    - ansible_facts["architecture"] == "arm64"
     - codexbar_macos_check.rc != 0
   community.general.homebrew_tap:
     name: steipete/tap
     state: present
 
-- name: Install CodexBar (macOS)
+- name: Install CodexBar (macOS, ARM only)
   when:
     - ansible_facts["os_family"] == "Darwin"
+    - ansible_facts["architecture"] == "arm64"
     - codexbar_macos_check.rc != 0
   community.general.homebrew_cask:
     name: codexbar

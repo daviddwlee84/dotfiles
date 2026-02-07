@@ -27,3 +27,9 @@
   community.general.homebrew:
     update_homebrew: true
   ignore_errors: true
+
+- name: Clean up stale Homebrew versions and links
+  when: homebrew_installed
+  ansible.builtin.command: brew cleanup
+  changed_when: false
+  ignore_errors: true

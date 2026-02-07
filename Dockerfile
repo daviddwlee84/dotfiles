@@ -14,6 +14,7 @@ ARG CHEZMOI_INSTALL_CODING_AGENTS=false
 ARG CHEZMOI_INSTALL_PYTHON_UV_TOOLS=false
 ARG CHEZMOI_INSTALL_BREW_APPS=false
 ARG CHEZMOI_NO_ROOT=false
+ARG CHEZMOI_BACKUP_DOTFILES=false
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -119,7 +120,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)=${CHEZMOI_INSTALL_CODING_AGENTS}" \
     --promptBool "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}" \
     --promptBool "Install GUI apps via Homebrew Brewfile (casks, mas)=${CHEZMOI_INSTALL_BREW_APPS}" \
-    --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}"
+    --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
+    --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

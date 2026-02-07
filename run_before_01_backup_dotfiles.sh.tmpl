@@ -1,0 +1,64 @@
+#!/bin/bash
+# Backup existing dotfiles before chezmoi overwrites them
+# Runs before every chezmoi apply, but only creates one backup per day
+
+{{ if not .backupDotfiles -}}
+# Backup disabled by config
+exit 0
+{{ else -}}
+
+BACKUP_BASE="$HOME/.dotfiles_backup"
+TODAY=$(date +%Y%m%d)
+
+# Skip if a backup from today already exists
+if ls -d "${BACKUP_BASE}/${TODAY}_"* &>/dev/null; then
+    exit 0
+fi
+
+BACKUP_DIR="${BACKUP_BASE}/$(date +%Y%m%d_%H%M%S)"
+BACKED_UP=0
+
+# Files to back up
+FILES=(
+    "$HOME/.zshrc"
+    "$HOME/.zshenv"
+    "$HOME/.gitconfig"
+    "$HOME/.tmux.conf"
+)
+
+# Directories to back up
+DIRS=(
+    "$HOME/.config/nvim"
+    "$HOME/.config/zsh"
+    "$HOME/.config/mise"
+    "$HOME/.config/alacritty"
+    "$HOME/.config/yazi"
+    "$HOME/.config/zellij"
+)
+
+for f in "${FILES[@]}"; do
+    if [[ -f "$f" ]]; then
+        REL="${f#$HOME/}"
+        mkdir -p "${BACKUP_DIR}/$(dirname "$REL")"
+        cp -a "$f" "${BACKUP_DIR}/${REL}"
+        BACKED_UP=$((BACKED_UP + 1))
+    fi
+done
+
+for d in "${DIRS[@]}"; do
+    if [[ -d "$d" ]]; then
+        REL="${d#$HOME/}"
+        mkdir -p "${BACKUP_DIR}/$(dirname "$REL")"
+        cp -a "$d" "${BACKUP_DIR}/${REL}"
+        BACKED_UP=$((BACKED_UP + 1))
+    fi
+done
+
+# Remove empty backup dir if nothing was backed up (fresh machine)
+if [[ $BACKED_UP -eq 0 ]]; then
+    rmdir "$BACKUP_DIR" 2>/dev/null
+else
+    echo "[BACKUP] Backed up $BACKED_UP items to $BACKUP_DIR"
+fi
+
+{{ end -}}
