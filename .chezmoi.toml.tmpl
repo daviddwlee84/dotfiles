@@ -21,3 +21,8 @@ installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Ho
 noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
 # 在 chezmoi apply 之前備份現有的 dotfiles
 backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
+
+[diff]
+    exclude = ["scripts"]
+[status]
+    exclude = ["scripts"]
