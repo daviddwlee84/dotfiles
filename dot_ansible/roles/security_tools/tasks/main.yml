@@ -8,6 +8,7 @@
     name:
       - pre-commit
       - gitleaks
+      - go
     state: present
 
 # Linux: Install pre-commit via pipx/uv, gitleaks via binary

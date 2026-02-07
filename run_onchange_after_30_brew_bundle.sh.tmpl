@@ -10,7 +10,7 @@
 exit 0
 {{ end -}}
 
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 # === Brewfile Hashes (changes trigger re-run) ===
 # Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
 # Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
@@ -35,7 +35,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Setup Homebrew PATH
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -f /usr/local/bin/brew ]]; then
@@ -52,7 +52,7 @@ fi
 
 # Check if brew is available
 if ! command -v brew &> /dev/null; then
-    {{ if eq .profile "macos" -}}
+    {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
     error "Homebrew not found. It should have been installed by bootstrap."
     exit 1
     {{ else -}}
@@ -80,7 +80,7 @@ brew bundle --file="$BREWFILE_DIR/Brewfile" --no-upgrade || {
 }
 
 # Run platform-specific Brewfile
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.darwin" ]]; then
     info "Installing macOS packages from Brewfile.darwin..."
     brew bundle --file="$BREWFILE_DIR/Brewfile.darwin" --no-upgrade || {

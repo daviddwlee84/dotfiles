@@ -22,7 +22,7 @@ export PATH="$HOME/.local/bin:$PATH"
 # =============================================================================
 # Homebrew Setup
 # =============================================================================
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 # macOS: Initialize Homebrew (Apple Silicon or Intel)
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"

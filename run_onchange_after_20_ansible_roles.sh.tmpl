@@ -48,7 +48,7 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 #   macOS:   homebrew
 #   Optional: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
 
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
 TAGS="homebrew,base,zsh,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
@@ -77,7 +77,7 @@ TAGS="${TAGS},python_uv_tools"
 
 # Handle sudo for Linux
 BECOME_FLAGS=""
-{{ if ne .profile "macos" -}}
+{{ if and (ne .profile "macos") (ne .profile "macos_intel") -}}
 {{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
 {{ if $noRoot -}}
 # noRoot mode: skip all sudo-requiring tasks, user-level fallbacks will install tools

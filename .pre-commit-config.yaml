@@ -7,7 +7,9 @@ repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.22.1
     hooks:
-      - id: gitleaks
+      # Use system-installed gitleaks to avoid Go toolchain build/runtime issues
+      - id: gitleaks-system
+        pass_filenames: false
 
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks

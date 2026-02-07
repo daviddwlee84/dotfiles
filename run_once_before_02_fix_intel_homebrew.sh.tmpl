@@ -3,8 +3,8 @@
 # Only runs on macOS — separate from bootstrap so existing machines get the fix
 # Profile: {{ .profile }}
 
-{{ if ne .profile "macos" -}}
-# Not macOS — nothing to do
+{{ if ne .profile "macos_intel" -}}
+# Not Intel macOS profile — nothing to do
 exit 0
 {{ else -}}
 
@@ -28,22 +28,30 @@ elif [[ -f /usr/local/bin/brew ]]; then
 fi
 
 # =============================================================================
-# 1. Fix Intel Homebrew directory permissions
+# 1. Fix Intel Homebrew directory permissions (acautlly this doesn't make sence)
 # =============================================================================
 # Only needed when Homebrew is installed at /usr/local (Intel Macs)
 # After macOS upgrades, /usr/local permissions can revert to root ownership
-
-if [[ -f /usr/local/bin/brew ]]; then
-    info "Intel Homebrew detected — fixing /usr/local directory permissions..."
-    for dir in Cellar Caskroom var/homebrew opt Homebrew lib include share Frameworks; do
-        if [[ -d "/usr/local/$dir" ]]; then
-            sudo chown -R "$(whoami)" "/usr/local/$dir" 2>/dev/null || warn "Could not fix permissions for /usr/local/$dir"
-        fi
-    done
-    success "Intel Homebrew directory permissions fixed"
-else
-    info "Apple Silicon or no Homebrew — skipping Intel permission fix"
-fi
+#
+# if [[ -f /usr/local/bin/brew ]]; then
+#     info "Intel Homebrew detected — fixing /usr/local directory permissions..."
+#     for dir in Cellar Caskroom var/homebrew opt Homebrew lib include share Frameworks; do
+#         if [[ -d "/usr/local/$dir" ]]; then
+#             sudo chown -R "$(whoami)" "/usr/local/$dir" 2>/dev/null || warn "Could not fix permissions for /usr/local/$dir"
+#         fi
+#     done
+#
+#     # Fix group-writable zsh directories that compinit flags as insecure
+#     for dir in /usr/local/share/zsh /usr/local/share/zsh/site-functions; do
+#         if [[ -d "$dir" ]]; then
+#             sudo chmod g-w "$dir" 2>/dev/null || true
+#         fi
+#     done
+#
+#     success "Intel Homebrew directory permissions fixed"
+# else
+#     info "Apple Silicon or no Homebrew — skipping Intel permission fix"
+# fi
 
 # =============================================================================
 # 2. Check and update Xcode Command Line Tools
@@ -80,12 +88,19 @@ else
 fi
 
 # =============================================================================
-# 3. Clean stale Homebrew links
+# 3. Clean stale Homebrew links and re-link key formulas
 # =============================================================================
 
 if command -v brew &>/dev/null; then
     info "Cleaning stale Homebrew versions and links..."
     brew cleanup 2>/dev/null || warn "brew cleanup encountered issues (non-fatal)"
+
+    # Re-link git so Homebrew version takes precedence over /usr/bin/git
+    if brew list git &>/dev/null; then
+        info "Re-linking Homebrew git..."
+        brew link --overwrite git 2>/dev/null || warn "Could not link git (non-fatal)"
+    fi
+
     success "Homebrew cleanup complete"
 fi
 

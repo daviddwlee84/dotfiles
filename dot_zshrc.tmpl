@@ -18,6 +18,11 @@ plugins=(
 # Oh-My-Zsh path
 export ZSH="$HOME/.oh-my-zsh"
 
+{{ if eq .profile "macos_intel" -}}
+# Skip compinit insecure directory warnings (e.g. /usr/local/share on Intel Macs)
+# ZSH_DISABLE_COMPFIX=true
+{{ end }}
+
 # Load Oh-My-Zsh
 [[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
 

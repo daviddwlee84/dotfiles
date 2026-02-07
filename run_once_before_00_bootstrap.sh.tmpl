@@ -32,7 +32,7 @@ error() {
 export PATH="$HOME/.local/bin:$PATH"
 
 # Add Homebrew to PATH if installed
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 # macOS: Apple Silicon and Intel paths
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -55,7 +55,7 @@ fi
 # Linux: Optional - only install if installBrewApps is enabled
 # =============================================================================
 
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 # macOS: Install Homebrew (required for package management)
 if ! command -v brew &> /dev/null; then
     info "Installing Homebrew (macOS)..."

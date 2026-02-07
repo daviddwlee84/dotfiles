@@ -17,6 +17,6 @@ tap "superset-sh/superset"
 # Only add formulas here that you want to manage via Brewfile
 
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)
-{{ if eq .profile "macos" -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 brew "mas"
 {{ end -}}
