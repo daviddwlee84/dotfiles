@@ -505,7 +505,7 @@
     return_content: true
   register: codexbar_release
 
-- name: Compute CodexBar release asset name (Linux fallback)
+- name: Compute CodexBar arch and tag (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - codexbar_check.rc != 0
@@ -514,6 +514,14 @@
   ansible.builtin.set_fact:
     codexbar_arch: "{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}"
     codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"
+
+- name: Compute CodexBar release asset name (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_tag is defined
+  ansible.builtin.set_fact:
     codexbar_asset: "CodexBarCLI-{{ codexbar_tag }}-linux-{{ codexbar_arch }}.tar.gz"
 
 - name: Download CodexBar release (Linux fallback)
@@ -526,6 +534,17 @@
     url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
     dest: /tmp/codexbar.tar.gz
     mode: '0644'
+
+- name: Create temp directory for CodexBar extraction (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - codexbar_check.rc != 0
+    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+    - codexbar_asset is defined
+  ansible.builtin.file:
+    path: /tmp/codexbar
+    state: directory
+    mode: '0755'
 
 - name: Extract CodexBar release (Linux fallback)
   when:
