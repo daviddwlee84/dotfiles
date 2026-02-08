@@ -44,22 +44,27 @@ fi
 # NVM (Node Version Manager) - Legacy
 # https://github.com/nvm-sh/nvm
 # NOTE: mise (05_mise.zsh) is preferred for Node.js management.
-#       nvm is lazy-loaded for backwards compatibility.
+#       nvm is kept for backwards compatibility with existing installations.
 # =============================================================================
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
+# Standard nvm initialization
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
 # Lazy load nvm - only load when nvm/node/npm/npx command is called
-if [[ -s "$NVM_DIR/nvm.sh" ]] && ! command -v nvm &>/dev/null; then
-    _nvm_lazy_load() {
-        unset -f nvm node npm npx _nvm_lazy_load
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-    }
-    nvm() { _nvm_lazy_load; nvm "$@"; }
-    node() { _nvm_lazy_load; node "$@"; }
-    npm() { _nvm_lazy_load; npm "$@"; }
-    npx() { _nvm_lazy_load; npx "$@"; }
-fi
+# Disabled in favor of standard initialization to support globally installed npm packages (e.g., clawdbot)
+# if [[ -s "$NVM_DIR/nvm.sh" ]] && ! command -v nvm &>/dev/null; then
+#     _nvm_lazy_load() {
+#         unset -f nvm node npm npx _nvm_lazy_load
+#         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+#         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+#     }
+#     nvm() { _nvm_lazy_load; nvm "$@"; }
+#     node() { _nvm_lazy_load; node "$@"; }
+#     npm() { _nvm_lazy_load; npm "$@"; }
+#     npx() { _nvm_lazy_load; npx "$@"; }
+# fi
 
 # =============================================================================
 # .NET

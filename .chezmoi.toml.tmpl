@@ -22,6 +22,7 @@ noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system pac
 # 在 chezmoi apply 之前備份現有的 dotfiles
 backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
 
+# https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]
     exclude = ["scripts"]
 [status]
