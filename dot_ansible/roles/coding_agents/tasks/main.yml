@@ -512,7 +512,7 @@
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_release is defined
   ansible.builtin.set_fact:
-    codexbar_arch: "{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}"
+    codexbar_arch: "{{ ansible_facts['architecture'] }}"
     codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"
 
 - name: Compute CodexBar release asset name (Linux fallback)
@@ -565,7 +565,7 @@
     - codexbar_asset is defined
   ansible.builtin.find:
     paths: /tmp/codexbar
-    patterns: codexbar
+    patterns: CodexBarCLI
     file_type: file
   register: codexbar_find
 
