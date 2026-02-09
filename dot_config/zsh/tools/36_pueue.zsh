@@ -158,10 +158,28 @@ pqsum() {
             | ($task_list | map(select((.group // "default") == $group_name))) as $group_tasks
             | ($group_tasks | length) as $group_total
             | ($group_tasks | map(select(task_status == "Done")) | length) as $group_done
+            | ($group_total - $group_done) as $group_remaining
             | ($group_tasks | map(done_seconds) | map(select(. != null))) as $group_durations
             | ($group_durations | if length > 0 then (add / length) else null end) as $group_avg_sec
+            | ($groups[$group_name].parallel_tasks // 1) as $group_parallel_raw
+            | (
+                if ($group_parallel_raw | type) == "number" and $group_parallel_raw > 0 then
+                  $group_parallel_raw
+                else
+                  1
+                end
+              ) as $group_parallel_for_eta
             | ($group_tasks | sort_by(task_status) | group_by(task_status) | map({key: (.[0] | task_status), value: length}) | from_entries) as $group_status_map
             | (pct($group_done; $group_total)) as $group_pct
+            | (
+                if $group_remaining == 0 then
+                  (if $group_total > 0 then 0 else null end)
+                elif $group_avg_sec == null then
+                  null
+                else
+                  (($group_remaining * $group_avg_sec) / $group_parallel_for_eta)
+                end
+              ) as $group_eta_sec
             | {
                 group: $group_name,
                 daemon: ($groups[$group_name].status // "N/A"),
@@ -172,9 +190,13 @@ pqsum() {
                 pct_int: ($group_pct | round),
                 pct: fmt_pct($group_pct),
                 avg_done: ($group_avg_sec | fmt_duration),
+                eta_sec: $group_eta_sec,
+                eta: ($group_eta_sec | fmt_duration),
                 statuses: ($group_status_map | status_map_to_string)
               }
           )) as $group_rows
+        | ($group_rows | map(.eta_sec) | map(select(. != null))) as $overall_eta_candidates
+        | (if ($overall_eta_candidates | length) > 0 then ($overall_eta_candidates | max) else null end) as $overall_eta_sec
         | {
             overall: {
               total: $total,
@@ -182,7 +204,9 @@ pqsum() {
               progress_pct_num: $overall_pct,
               progress_pct_int: ($overall_pct | round),
               progress_pct: fmt_pct($overall_pct),
-              avg_done: ($avg_done_sec | fmt_duration)
+              avg_done: ($avg_done_sec | fmt_duration),
+              eta_sec: $overall_eta_sec,
+              eta: ($overall_eta_sec | fmt_duration)
             },
             status_rows: $status_rows,
             group_rows: $group_rows
@@ -198,12 +222,13 @@ pqsum() {
         printf '%s%s%s\n' "$c_warn" "pqsum: 'column' not found, using plain spacing fallback." "$c_reset" >&2
     fi
 
-    local overall_total overall_done overall_pct overall_pct_int overall_avg overall_bar
+    local overall_total overall_done overall_pct overall_pct_int overall_avg overall_eta overall_bar
     overall_total="$(jq -r '.overall.total' <<< "$stats_json")"
     overall_done="$(jq -r '.overall.done' <<< "$stats_json")"
     overall_pct="$(jq -r '.overall.progress_pct' <<< "$stats_json")"
     overall_pct_int="$(jq -r '.overall.progress_pct_int' <<< "$stats_json")"
     overall_avg="$(jq -r '.overall.avg_done' <<< "$stats_json")"
+    overall_eta="$(jq -r '.overall.eta' <<< "$stats_json")"
     overall_bar="$(pqsum_progress_bar "$overall_pct_int")"
 
     printf '%sPueue Summary%s\n' "$c_title" "$c_reset"
@@ -211,6 +236,7 @@ pqsum() {
     printf '  Total tasks: %s\n' "$overall_total"
     printf '  Done progress: %s/%s  %s  %s\n' "$overall_done" "$overall_total" "$overall_bar" "$overall_pct"
     printf '  Avg done duration: %s\n' "$overall_avg"
+    printf '  Est. remaining (ETA): %s\n' "$overall_eta"
 
     printf '\n%sStatus Breakdown%s\n' "$c_title" "$c_reset"
     local status_count
@@ -231,9 +257,9 @@ pqsum() {
         printf '  -\n'
     else
         {
-            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\tavg_done\tstatuses\n'
-            while IFS=$'\t' read -r group daemon parallel total done pct pct_int avg_done statuses; do
-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\tavg_done\teta\tstatuses\n'
+            while IFS=$'\t' read -r group daemon parallel total done pct pct_int avg_done eta statuses; do
+                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
                     "$group" \
                     "$daemon" \
                     "$parallel" \
@@ -242,9 +268,10 @@ pqsum() {
                     "$pct" \
                     "$(pqsum_progress_bar "$pct_int")" \
                     "$avg_done" \
+                    "$eta" \
                     "$statuses"
             done < <(
-                jq -r '.group_rows[] | "\(.group)\t\(.daemon)\t\(.parallel)\t\(.total)\t\(.done)\t\(.pct)\t\(.pct_int)\t\(.avg_done)\t\(.statuses)"' <<< "$stats_json"
+                jq -r '.group_rows[] | "\(.group)\t\(.daemon)\t\(.parallel)\t\(.total)\t\(.done)\t\(.pct)\t\(.pct_int)\t\(.avg_done)\t\(.eta)\t\(.statuses)"' <<< "$stats_json"
             )
         } | pqsum_align_table | sed 's/^/  /'
     fi
