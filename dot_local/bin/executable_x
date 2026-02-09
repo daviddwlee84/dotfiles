@@ -1,0 +1,345 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    printf '%s\n' \
+        "Usage:" \
+        "  x copy [--force] [FILE]" \
+        "  x paste" \
+        "  x open TARGET" \
+        "  x help" \
+        "" \
+        "Examples:" \
+        "  printf \"hello\" | x copy" \
+        "  x copy ~/.ssh/id_ed25519.pub" \
+        "  x paste" \
+        "  x open https://example.com"
+}
+
+err() {
+    printf 'x: %s\n' "$*" >&2
+}
+
+is_wsl() {
+    local version
+    [[ -r /proc/version ]] || return 1
+    version="$(< /proc/version)"
+    [[ "$version" == *[Mm]icrosoft* || "$version" == *[Ww][Ss][Ll]* ]]
+}
+
+clipboard_backend_help() {
+    printf '%s\n' \
+        "x: no clipboard backend found." \
+        "x: install one of:" \
+        "x:   - macOS: pbcopy/pbpaste (built-in)" \
+        "x:   - Linux Wayland: wl-clipboard (wl-copy/wl-paste)" \
+        "x:   - Linux X11: xclip or xsel" \
+        "x:   - WSL: clip.exe / powershell.exe" >&2
+}
+
+open_backend_help() {
+    printf '%s\n' \
+        "x: no opener backend found." \
+        "x: install one of:" \
+        "x:   - macOS: open (built-in)" \
+        "x:   - Linux: xdg-open (xdg-utils) or gio (glib)" \
+        "x:   - WSL: wslview (wslu) or explorer.exe" >&2
+}
+
+is_sensitive_filename() {
+    local file="$1"
+    local base
+    base="$(basename -- "$file")"
+
+    # Public keys are safe to copy.
+    if [[ "$base" == *.pub ]]; then
+        return 1
+    fi
+
+    case "$base" in
+        id_rsa|id_ed25519|id_ecdsa|id_dsa|id_xmss)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+is_sensitive_content() {
+    local file="$1"
+    if head -c 8192 -- "$file" 2>/dev/null | grep -aq "PRIVATE KEY"; then
+        return 0
+    fi
+    return 1
+}
+
+is_sensitive_file() {
+    local file="$1"
+    if is_sensitive_filename "$file"; then
+        return 0
+    fi
+    if is_sensitive_content "$file"; then
+        return 0
+    fi
+    return 1
+}
+
+copy_backend() {
+    if is_wsl && command -v clip.exe >/dev/null 2>&1; then
+        if clip.exe; then
+            return 0
+        fi
+        err "copy backend failed: clip.exe"
+        exit 1
+    fi
+
+    if command -v pbcopy >/dev/null 2>&1; then
+        if pbcopy; then
+            return 0
+        fi
+        err "copy backend failed: pbcopy"
+        exit 1
+    fi
+
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+        if wl-copy; then
+            return 0
+        fi
+        err "copy backend failed: wl-copy"
+        exit 1
+    fi
+
+    if command -v xclip >/dev/null 2>&1; then
+        if xclip -selection clipboard; then
+            return 0
+        fi
+        err "copy backend failed: xclip"
+        exit 1
+    fi
+
+    if command -v xsel >/dev/null 2>&1; then
+        if xsel --clipboard --input; then
+            return 0
+        fi
+        err "copy backend failed: xsel"
+        exit 1
+    fi
+
+    clipboard_backend_help
+    exit 1
+}
+
+paste_backend() {
+    if is_wsl && command -v powershell.exe >/dev/null 2>&1; then
+        if powershell.exe -NoProfile -Command "Get-Clipboard" | tr -d '\r'; then
+            return 0
+        fi
+        err "paste backend failed: powershell.exe"
+        exit 1
+    fi
+
+    if command -v pbpaste >/dev/null 2>&1; then
+        if pbpaste; then
+            return 0
+        fi
+        err "paste backend failed: pbpaste"
+        exit 1
+    fi
+
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-paste >/dev/null 2>&1; then
+        if wl-paste --no-newline; then
+            return 0
+        fi
+        err "paste backend failed: wl-paste"
+        exit 1
+    fi
+
+    if command -v xclip >/dev/null 2>&1; then
+        if xclip -selection clipboard -o; then
+            return 0
+        fi
+        err "paste backend failed: xclip"
+        exit 1
+    fi
+
+    if command -v xsel >/dev/null 2>&1; then
+        if xsel --clipboard --output; then
+            return 0
+        fi
+        err "paste backend failed: xsel"
+        exit 1
+    fi
+
+    clipboard_backend_help
+    exit 1
+}
+
+open_backend() {
+    local target="$1"
+
+    if is_wsl && command -v wslview >/dev/null 2>&1; then
+        if wslview "$target"; then
+            return 0
+        fi
+        err "open backend failed: wslview"
+        exit 1
+    fi
+
+    if is_wsl && command -v explorer.exe >/dev/null 2>&1; then
+        if explorer.exe "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        err "open backend failed: explorer.exe"
+        exit 1
+    fi
+
+    if command -v open >/dev/null 2>&1; then
+        if open "$target"; then
+            return 0
+        fi
+        err "open backend failed: open"
+        exit 1
+    fi
+
+    if command -v xdg-open >/dev/null 2>&1; then
+        if xdg-open "$target" >/dev/null 2>&1 & then
+            return 0
+        fi
+        err "open backend failed: xdg-open"
+        exit 1
+    fi
+
+    if command -v gio >/dev/null 2>&1; then
+        if gio open "$target" >/dev/null 2>&1 & then
+            return 0
+        fi
+        err "open backend failed: gio"
+        exit 1
+    fi
+
+    if command -v cmd.exe >/dev/null 2>&1; then
+        if cmd.exe /c start "" "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        err "open backend failed: cmd.exe"
+        exit 1
+    fi
+
+    open_backend_help
+    exit 1
+}
+
+do_copy() {
+    local force=0
+    local file=""
+
+    while (($#)); do
+        case "$1" in
+            --force)
+                force=1
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                err "copy: unknown option: $1"
+                usage >&2
+                exit 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# > 1)); then
+        err "copy: too many arguments"
+        usage >&2
+        exit 2
+    fi
+
+    if (($# == 1)); then
+        file="$1"
+    fi
+
+    if [[ -n "$file" ]]; then
+        if [[ ! -r "$file" ]]; then
+            err "copy: file not readable: $file"
+            exit 1
+        fi
+
+        if ((force == 0)) && is_sensitive_file "$file"; then
+            err "copy: refusing to copy sensitive key material: $file"
+            err "copy: use 'x copy --force \"$file\"' to override."
+            exit 3
+        fi
+
+        copy_backend < "$file"
+        return 0
+    fi
+
+    if [[ -t 0 ]]; then
+        printf '%s\n' "x copy: reading from terminal input; press Ctrl-D to finish." >&2
+    fi
+
+    copy_backend
+}
+
+do_paste() {
+    if (($# != 0)); then
+        err "paste: unexpected arguments"
+        usage >&2
+        exit 2
+    fi
+
+    paste_backend
+}
+
+do_open() {
+    if (($# != 1)); then
+        err "open: expected exactly one TARGET"
+        usage >&2
+        exit 2
+    fi
+
+    open_backend "$1"
+}
+
+main() {
+    local sub="${1:-}"
+    if (($# > 0)); then
+        shift
+    fi
+
+    case "$sub" in
+        copy)
+            do_copy "$@"
+            ;;
+        paste)
+            do_paste "$@"
+            ;;
+        open)
+            do_open "$@"
+            ;;
+        help|-h|--help)
+            usage
+            ;;
+        "")
+            usage >&2
+            exit 2
+            ;;
+        *)
+            err "unknown subcommand: $sub"
+            usage >&2
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"
