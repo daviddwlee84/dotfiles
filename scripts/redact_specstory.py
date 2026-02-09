@@ -265,15 +265,7 @@ def main():
                 modified_files.add(path)
 
         for f in modified_files:
-            subprocess.run(["git", "add", str(f)], check=True)
-            print(f"  Redacted and staged: {f}")
-
-        # Verify gitleaks
-        print("\nVerifying...")
-        remaining = filter_specstory(run_gitleaks_staged())
-        if remaining:
-            print(f"ERROR: {len(remaining)} secrets still detected after redaction!")
-            return 1
+            print(f"  Redacted: {f}")
 
         # Verify private keys
         remaining_pk = find_private_key_files(
@@ -283,7 +275,9 @@ def main():
             print("ERROR: Private key patterns still detected after redaction!")
             return 1
 
-        print(f"Successfully redacted {len(modified_files)} file(s)")
+        print(f"\nSuccessfully redacted {len(modified_files)} file(s)")
+        print("Review changes with: git diff")
+        print("Then stage with: git add .specstory/")
         return 0
     else:
         print("Run with --fix to auto-redact these secrets")

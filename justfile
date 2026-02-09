@@ -167,7 +167,7 @@ pre-commit-uninstall:
 check-specstory:
     ./scripts/redact_specstory.py || true
 
-# Auto-redact secrets in staged .specstory files and re-stage
+# Auto-redact secrets in staged .specstory files (review with git diff, then stage manually)
 redact-specstory:
     ./scripts/redact_specstory.py --fix
 
