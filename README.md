@@ -87,6 +87,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
+- `~/.config/zsh/tools/36_pueue.zsh` - Pueue queue summary helper (`pqsum`)
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
 
 ### Tools (via ansible)

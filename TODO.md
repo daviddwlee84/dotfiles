@@ -26,6 +26,10 @@ Future enhancements for the dotfiles repository.
 - [ ] rust/cargo
 - [ ] go
 
+## Pueue
+
+- [ ] Manage pueue config via chezmoi (`~/.config/pueue/pueue.yml`) and define macOS compatibility strategy for `~/Library/Application Support/pueue/pueue.yml` (`PUEUE_CONFIG_PATH` or path sync).
+
 ---
 
 Fix Claude Code hook on Ubuntu `Stop hook error: Failed with non-blocking status code: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Notifications was not provided by any .service files`

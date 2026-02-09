@@ -58,6 +58,58 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
 
+# =============================================================================
+# Pueue version checks (warn by default, optional strict enforcement)
+# =============================================================================
+
+- name: Check installed pueue version
+  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+  ansible.builtin.shell: pueue --version 2>/dev/null | awk '{print $2}'
+  args:
+    executable: /bin/bash
+  register: pueue_version_raw
+  changed_when: false
+  failed_when: false
+
+- name: Check installed pueued version
+  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+  ansible.builtin.shell: pueued --version 2>/dev/null | awk '{print $2}'
+  args:
+    executable: /bin/bash
+  register: pueued_version_raw
+  changed_when: false
+  failed_when: false
+
+- name: Parse installed pueue versions
+  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+  ansible.builtin.set_fact:
+    pueue_version_installed: "{{ (pueue_version_raw.stdout | trim | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+')) | default('0.0.0', true) }}"
+    pueued_version_installed: "{{ (pueued_version_raw.stdout | trim | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+')) | default('0.0.0', true) }}"
+
+- name: Display installed pueue versions
+  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+  ansible.builtin.debug:
+    msg: "Installed pueue versions: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }} (required: >= {{ pueue_min_version }}, enforce={{ pueue_version_enforce | bool }})"
+
+- name: Warn if pueue versions are below minimum (non-enforcing mode)
+  when:
+    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+    - not (pueue_version_enforce | bool)
+    - pueue_version_installed is version(pueue_min_version, '<') or pueued_version_installed is version(pueue_min_version, '<')
+  ansible.builtin.debug:
+    msg: "WARNING: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }} are below required {{ pueue_min_version }}. Set pueue_version_enforce=true to fail on this condition."
+
+- name: Enforce minimum pueue versions
+  when:
+    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+    - pueue_version_enforce | bool
+  ansible.builtin.assert:
+    that:
+      - pueue_version_installed is version(pueue_min_version, '>=')
+      - pueued_version_installed is version(pueue_min_version, '>=')
+    fail_msg: "pueue version requirement failed: required >= {{ pueue_min_version }}, found pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }}"
+    success_msg: "pueue version requirement satisfied: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }}"
+
 - name: Create systemd user directory
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.file:

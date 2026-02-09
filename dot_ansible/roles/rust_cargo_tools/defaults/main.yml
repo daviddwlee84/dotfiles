@@ -7,6 +7,12 @@
 
 cargo_tools: []
 
+# Minimum supported pueue version for pqsum-compatible JSON structure.
+pueue_min_version: "4.0.0"
+
+# If true, fail ansible run when pueue/pueued are below pueue_min_version.
+pueue_version_enforce: false
+
 # =============================================================================
 # Optional tools (not in cargo_tools list, install manually if needed)
 # =============================================================================
