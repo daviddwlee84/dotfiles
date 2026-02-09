@@ -88,6 +88,7 @@ To change options later: `chezmoi init --force`
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
 - `~/.config/zsh/tools/36_pueue.zsh` - Pueue queue summary helper (`pqsum`)
+- `~/.config/zsh/tools/28_tldr.zsh` - `tldrf` helper with `TLDR_LANGUAGES` fallback order
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
 
 ### Tools (via ansible)
