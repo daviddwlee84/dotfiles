@@ -2,6 +2,7 @@
 # chezmoi managed | grep -n 'README' || true
 README.md
 NOTES.md
+TODO.md
 
 CLAUDE.md
 AGENTS.md

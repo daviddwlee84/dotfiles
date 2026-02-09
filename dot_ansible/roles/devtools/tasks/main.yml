@@ -339,6 +339,57 @@
     name: direnv
     state: present
 
+- name: Check installed direnv version
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv" ]; then
+      "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv" --version | sed 's/^v//'
+    elif command -v direnv >/dev/null 2>&1; then
+      direnv --version | sed 's/^v//'
+    else
+      echo "0.0.0"
+    fi
+  args:
+    executable: /bin/bash
+  register: direnv_version
+  changed_when: false
+
+- name: Set direnv release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - direnv_version.stdout | trim is version('2.32.1', '<')
+  ansible.builtin.set_fact:
+    direnv_release_arch: >-
+      {{
+        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else 'arm' if ansible_facts['architecture'] in ['armv7l', 'armv6l', 'arm']
+        else ansible_facts['architecture']
+      }}
+
+- name: Install direnv from GitHub releases (user-level fallback, min v2.32.1)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - direnv_version.stdout | trim is version('2.32.1', '<')
+  block:
+    - name: Ensure ~/.local/bin exists (direnv)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest direnv release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/direnv/direnv/releases/latest
+        return_content: true
+      register: direnv_release
+
+    - name: Download direnv binary (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/direnv/direnv/releases/download/{{ direnv_release.json.tag_name }}/direnv.linux-{{ direnv_release_arch }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv"
+        mode: '0755'
+
 # --- yazi ---
 - name: Check if yazi is installed
   when: ansible_facts["os_family"] == "Debian"
