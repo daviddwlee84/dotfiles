@@ -70,6 +70,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `installCodingAgents` | true | Claude Code, OpenCode, Cursor, Copilot, Gemini CLI, etc. |
+| `installBitwarden` | false | Bitwarden CLI (`bw`) with SSH agent auto-detection and zsh completion |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
 | `installBrewApps` | false | GUI apps via Homebrew Brewfile (casks, mas) |
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
@@ -89,6 +90,7 @@ To change options later: `chezmoi init --force`
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
 - `~/.config/zsh/tools/36_pueue.zsh` - Pueue queue summary helper (`pqsum`)
 - `~/.config/zsh/tools/28_tldr.zsh` - `tldrf` helper with `TLDR_LANGUAGES` fallback order
+- `~/.config/zsh/tools/95_bitwarden.zsh` - Bitwarden CLI completion + SSH agent socket auto-detection
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
 
 ### Tools (via ansible)
@@ -97,6 +99,7 @@ To change options later: `chezmoi init --force`
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
+- **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, with zsh completion and SSH agent auto-detection
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
 - **GUI Apps** (macOS): terminals, editors, browsers, utilities via Brewfile

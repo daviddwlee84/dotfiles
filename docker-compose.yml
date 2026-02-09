@@ -17,6 +17,7 @@ services:
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "false"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_BITWARDEN: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
         CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:server
@@ -36,6 +37,7 @@ services:
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "false"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_BITWARDEN: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
         CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:desktop
@@ -55,6 +57,7 @@ services:
         CHEZMOI_NAME: Docker User
         CHEZMOI_USE_CHINESE_MIRROR: "true"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_BITWARDEN: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
         CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:china
@@ -73,6 +76,7 @@ services:
         # currently we are testing in GFW
         CHEZMOI_USE_CHINESE_MIRROR: "true"
         CHEZMOI_INSTALL_CODING_AGENTS: "false"
+        CHEZMOI_INSTALL_BITWARDEN: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
         CHEZMOI_INSTALL_BREW_APPS: "false"
     image: dotfiles:test

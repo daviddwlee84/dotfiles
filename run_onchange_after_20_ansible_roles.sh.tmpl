@@ -17,6 +17,8 @@
 # nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
 # coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
 # coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+# bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}
+# bitwarden defaults: {{ include "dot_ansible/roles/bitwarden/defaults/main.yml" | sha256sum }}
 # security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
@@ -46,7 +48,7 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 #   Desktop: devtools, docker, nerdfonts
 #   Server:  devtools, docker (no nerdfonts - no GUI)
 #   macOS:   homebrew
-#   Optional: coding_agents, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+#   Optional: coding_agents, bitwarden, python_uv_tools, rust_cargo_tools, ruby_gem_tools
 
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
@@ -68,6 +70,10 @@ exit 0
 # Add optional tags based on chezmoi config
 {{ if .installCodingAgents -}}
 TAGS="${TAGS},coding_agents"
+{{ end -}}
+{{ $installBitwarden := false }}{{ if hasKey . "installBitwarden" }}{{ $installBitwarden = .installBitwarden }}{{ end -}}
+{{ if $installBitwarden -}}
+TAGS="${TAGS},bitwarden"
 {{ end -}}
 {{ if .installPythonUvTools -}}
 TAGS="${TAGS},python_uv_tools"

@@ -118,6 +118,7 @@ ansible-playbook playbooks/macos.yml --check
 | `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy |
+| `bitwarden` | Bitwarden CLI (`bw`) via npm, with zsh completion + SSH agent integration |
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
@@ -135,7 +136,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, python_uv_tools
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 
@@ -155,7 +156,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 - **Installers**: zoxide, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
 - **uv tools**: mlflow, litellm, sqlit-tui, etc.
-- **npm tools**: Claude Code, OpenCode, Gemini CLI, etc.
+- **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
 
 What you **won't get** without root:
 - zsh (needs `/etc/shells` for login shell)

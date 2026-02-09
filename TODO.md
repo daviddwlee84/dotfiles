@@ -47,3 +47,10 @@ Optimize zsh & tmux startup time
 - [PS1 · direnv/direnv Wiki](https://github.com/direnv/direnv/wiki/PS1)
 
 ([hyperupcall/autoenv: Directory-based environments.](https://github.com/hyperupcall/autoenv))
+
+---
+
+ML
+
+- cuda
+- SLURM?

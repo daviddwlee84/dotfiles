@@ -1,0 +1,3 @@
+---
+# Default variables for bitwarden role
+bitwarden_cli_npm_package: "@bitwarden/cli"
