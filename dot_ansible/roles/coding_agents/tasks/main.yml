@@ -593,6 +593,25 @@
     - /tmp/codexbar.tar.gz
     - /tmp/codexbar
 
+# === OpenChamber ===
+
+- name: Check if OpenChamber is installed
+  when: npm_check.rc == 0
+  ansible.builtin.command: which openchamber
+  register: openchamber_check
+  changed_when: false
+  failed_when: false
+
+- name: Install OpenChamber (npm)
+  when:
+    - npm_check.rc == 0
+    - openchamber_check.rc != 0
+  community.general.npm:
+    name: "@openchamber/web"
+    global: true
+    state: present
+  ignore_errors: true
+
 # === Happy ===
 
 - name: Check if Happy is installed

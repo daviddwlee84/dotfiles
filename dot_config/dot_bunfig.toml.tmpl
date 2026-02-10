@@ -1,0 +1,11 @@
+# Bun global configuration
+# Managed by chezmoi
+
+[install]
+{{- if .useChineseMirror }}
+# Use npmmirror for faster package downloads behind GFW
+registry = "https://registry.npmmirror.com"
+{{- else }}
+# Use the official npm registry by default
+registry = "https://registry.npmjs.org"
+{{- end }}

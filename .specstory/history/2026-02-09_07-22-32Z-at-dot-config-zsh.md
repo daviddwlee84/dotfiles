@@ -9532,3 +9532,397 @@ _**Agent (gpt-5.3-codex 2026-02-09 08:56:54Z)**_
 - `column` 不存在時 fallback 仍可輸出（有 warning，不會失敗）
 
 如果你要，我下一步可以再加「扣掉 running 已執行時間」的 ETA 修正版本，會比現在更準一些。
+
+---
+
+_**User (2026-02-10 05:27:07Z)**_
+
+我現在想要新增total time spent 可以獲取group中任務最早與最晚的時間相差
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:27:35Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Planning group time span metric**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:27:36Z)**_
+
+我會直接在 `pqsum` 的 group 聚合裡新增 `total_spent`（以該 group 任務最早與最晚時間差計算），並把欄位加到 `Group Summary` 表格與文件範例中。改完我會跑一次輸出驗證。
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:27:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/36_pueue.zsh`**
+
+```diff
+@@
+         | ($group_names | map(
+             . as $group_name
+             | ($task_list | map(select((.group // "default") == $group_name))) as $group_tasks
+             | ($group_tasks | length) as $group_total
+             | ($group_tasks | map(select(task_status == "Done")) | length) as $group_done
+             | ($group_total - $group_done) as $group_remaining
+             | ($group_tasks | map(done_seconds) | map(select(. != null))) as $group_durations
++            | (
++                $group_tasks
++                | map(
++                    [
++                      .created_at,
++                      (.status[]?.enqueued_at?),
++                      (.status[]?.start?),
++                      (.status[]?.end?)
++                    ]
++                    | map(select(. != null))
++                    | map(to_epoch)
++                  )
++                | if length > 0 then add else [] end
++              ) as $group_timestamps
++            | ($group_timestamps | if length > 0 then min else null end) as $group_first_ts
++            | ($group_timestamps | if length > 0 then max else null end) as $group_last_ts
++            | (
++                if $group_first_ts != null and $group_last_ts != null then
++                  ($group_last_ts - $group_first_ts)
++                else
++                  null
++                end
++              ) as $group_spent_sec
+             | ($group_durations | if length > 0 then (add / length) else null end) as $group_avg_sec
+             | ($groups[$group_name].parallel_tasks // 1) as $group_parallel_raw
+             | (
+                 if ($group_parallel_raw | type) == "number" and $group_parallel_raw > 0 then
+                   $group_parallel_raw
+@@
+                 pct_num: $group_pct,
+                 pct_int: ($group_pct | round),
+                 pct: fmt_pct($group_pct),
++                total_spent: ($group_spent_sec | fmt_duration),
+                 avg_done: ($group_avg_sec | fmt_duration),
+                 eta_sec: $group_eta_sec,
+                 eta: ($group_eta_sec | fmt_duration),
+                 statuses: ($group_status_map | status_map_to_string)
+               }
+@@
+-            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\tavg_done\teta\tstatuses\n'
+-            while IFS=$'\t' read -r group daemon parallel total done pct pct_int avg_done eta statuses; do
+-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
++            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\ttotal_spent\tavg_done\teta\tstatuses\n'
++            while IFS=$'\t' read -r group daemon parallel total done pct pct_int total_spent avg_done eta statuses; do
++                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                     "$group" \
+                     "$daemon" \
+                     "$parallel" \
+                     "$total" \
+                     "$done" \
+                     "$pct" \
+                     "$(pqsum_progress_bar "$pct_int")" \
++                    "$total_spent" \
+                     "$avg_done" \
+                     "$eta" \
+                     "$statuses"
+             done < <(
+-                jq -r '.group_rows[] | "\(.group)\t\(.daemon)\t\(.parallel)\t\(.total)\t\(.done)\t\(.pct)\t\(.pct_int)\t\(.avg_done)\t\(.eta)\t\(.statuses)"' <<< "$stats_json"
++                jq -r '.group_rows[] | "\(.group)\t\(.daemon)\t\(.parallel)\t\(.total)\t\(.done)\t\(.pct)\t\(.pct_int)\t\(.total_spent)\t\(.avg_done)\t\(.eta)\t\(.statuses)"' <<< "$stats_json"
+             )
+         } | pqsum_align_table | sed 's/^/  /'
+     fi
+ }
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:27:50Z)**_
+
+`total_spent` 欄位已加進 group 聚合與表格。現在我同步更新 `docs/tools/pqsum.md` 的欄位說明和範例，接著跑檢查。
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/pqsum.md`**
+
+```diff
+@@
+ 2. `Status Breakdown`
+    - Aligned table: status, count, progress
+ 3. `Group Summary`
+-   - Aligned table with: group, daemon, parallel, total, done, progress, bar, avg_done, eta, statuses
++   - Aligned table with: group, daemon, parallel, total, done, progress, bar, total_spent, avg_done, eta, statuses
+@@
+ Group Summary
+-  group      daemon   parallel  total  done  progress  bar           avg_done  eta  statuses
+-  default    Running  1         9      9     100.0%    [============] 1m 18s   0s   Done=9
++  group      daemon   parallel  total  done  progress  bar           total_spent  avg_done  eta  statuses
++  default    Running  1         9      9     100.0%    [============] 4h 12m 8s    1m 18s   0s   Done=9
+ ```
+@@
+ - Average duration only includes tasks whose `Done.start` and `Done.end` are both present.
++- `total_spent` is the time span between the earliest and latest timestamps observed in that group (from task `created_at` and status timestamps such as `enqueued_at/start/end`).
+ - ETA is a coarse estimate based on `remaining * avg_done / max(parallel, 1)`.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:18Z)**_
+
+我現在跑語法與輸出驗證，確認 `total_spent` 顯示正確、對齊不破版，並檢查 `-g` / filter 場景。
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:18Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: d53679
+Wall time: 0.0521 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:18Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: c98d8c
+Wall time: 2.2583 seconds
+Process exited with code 0
+Original token count: 160
+Output:
+Pueue Summary
+Overall
+  Total tasks: 9
+  Done progress: 9/9  [============]  100.0%
+  Avg done duration: 1m 18s
+  Est. remaining (ETA): 0s
+
+Status Breakdown
+  status  count  progress
+  Done    9      100.0%
+
+Group Summary
+  group      daemon   parallel  total  done  progress  bar             total_spent  avg_done  eta  statuses
+  default    Running  1         9      9     100.0%    [============]  476h 8m 18s  1m 18s    0s   Done=9
+  synthesis  Running  4         0      0     0.0%      [------------]  -            -         -    -
+  test       Running  4         0      0     0.0%      [------------]  -            -         -    -
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:20Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: c557a6
+Wall time: 0.9395 seconds
+Process exited with code 0
+Original token count: 108
+Output:
+Pueue Summary
+Overall
+  Total tasks: 9
+  Done progress: 9/9  [============]  100.0%
+  Avg done duration: 1m 18s
+  Est. remaining (ETA): 0s
+
+Status Breakdown
+  status  count  progress
+  Done    9      100.0%
+
+Group Summary
+  group    daemon   parallel  total  done  progress  bar             total_spent  avg_done  eta  statuses
+  default  Running  1         9      9     100.0%    [============]  476h 8m 18s  1m 18s    0s   Done=9
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:20Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: e5689a
+Wall time: 0.9908 seconds
+Process exited with code 0
+Original token count: 145
+Output:
+Pueue Summary
+Overall
+  Total tasks: 0
+  Done progress: 0/0  [------------]  0.0%
+  Avg done duration: -
+  Est. remaining (ETA): -
+
+Status Breakdown
+  -
+
+Group Summary
+  group      daemon   parallel  total  done  progress  bar             total_spent  avg_done  eta  statuses
+  default    Running  1         0      0     0.0%      [------------]  -            -         -    -
+  synthesis  Running  4         0      0     0.0%      [------------]  -            -         -    -
+  test       Running  4         0      0     0.0%      [------------]  -            -         -    -
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:31Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Confirming total spent rationale**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:36Z)**_
+
+`total_spent` 已可用；我再抓一次 diff 與狀態確認變更只落在腳本與文件，接著回你可直接使用的結果。
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: 0880f7
+Wall time: 0.0525 seconds
+Process exited with code 0
+Original token count: 15
+Output:
+ M docs/tools/pqsum.md
+ M dot_config/zsh/tools/36_pueue.zsh
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```
+Chunk ID: 5df5df
+Wall time: 0.0526 seconds
+Process exited with code 0
+Original token count: 1283
+Output:
+diff --git a/docs/tools/pqsum.md b/docs/tools/pqsum.md
+index db9346e..e4d9800 100644
+--- a/docs/tools/pqsum.md
++++ b/docs/tools/pqsum.md
+@@ -19,7 +19,7 @@
+ 2. `Status Breakdown`
+    - Aligned table: status, count, progress
+ 3. `Group Summary`
+-   - Aligned table with: group, daemon, parallel, total, done, progress, bar, avg_done, eta, statuses
++   - Aligned table with: group, daemon, parallel, total, done, progress, bar, total_spent, avg_done, eta, statuses
+ 
+ ## Usage
+ 
+@@ -51,8 +51,8 @@ Status Breakdown
+   Done    9      100.0%
+ 
+ Group Summary
+-  group      daemon   parallel  total  done  progress  bar           avg_done  eta  statuses
+-  default    Running  1         9      9     100.0%    [============] 1m 18s   0s   Done=9
++  group      daemon   parallel  total  done  progress  bar           total_spent  avg_done  eta  statuses
++  default    Running  1         9      9     100.0%    [============] 4h 12m 8s    1m 18s   0s   Done=9
+ ```
+ 
+ ## Notes
+@@ -60,6 +60,7 @@ Group Summary
+ - `pqsum` forwards all arguments to `pueue status --json`.
+ - If `pueue` or `jq` is missing, `pqsum` exits with non-zero and prints an error.
+ - Average duration only includes tasks whose `Done.start` and `Done.end` are both present.
++- `total_spent` is the time span between the earliest and latest timestamps observed in that group (from task `created_at` and status timestamps such as `enqueued_at/start/end`).
+ - ETA is a coarse estimate based on `remaining * avg_done / max(parallel, 1)`.
+ - `-g/--group` controls which group rows are shown in the summary output.
+ - Color is enabled only on TTY output and disabled when `NO_COLOR` is set.
+diff --git a/dot_config/zsh/tools/36_pueue.zsh b/dot_config/zsh/tools/36_pueue.zsh
+index 42d1bdd..cb2d5fd 100644
+--- a/dot_config/zsh/tools/36_pueue.zsh
++++ b/dot_config/zsh/tools/36_pueue.zsh
+@@ -160,6 +160,29 @@ pqsum() {
+             | ($group_tasks | map(select(task_status == "Done")) | length) as $group_done
+             | ($group_total - $group_done) as $group_remaining
+             | ($group_tasks | map(done_seconds) | map(select(. != null))) as $group_durations
++            | (
++                $group_tasks
++                | map(
++                    [
++                      .created_at,
++                      (.status[]?.enqueued_at?),
++                      (.status[]?.start?),
++                      (.status[]?.end?)
++                    ]
++                    | map(select(. != null))
++                    | map(to_epoch)
++                  )
++                | if length > 0 then add else [] end
++              ) as $group_timestamps
++            | ($group_timestamps | if length > 0 then min else null end) as $group_first_ts
++            | ($group_timestamps | if length > 0 then max else null end) as $group_last_ts
++            | (
++                if $group_first_ts != null and $group_last_ts != null then
++                  ($group_last_ts - $group_first_ts)
++                else
++                  null
++                end
++              ) as $group_spent_sec
+             | ($group_durations | if length > 0 then (add / length) else null end) as $group_avg_sec
+             | ($groups[$group_name].parallel_tasks // 1) as $group_parallel_raw
+             | (
+@@ -189,6 +212,7 @@ pqsum() {
+                 pct_num: $group_pct,
+                 pct_int: ($group_pct | round),
+                 pct: fmt_pct($group_pct),
++                total_spent: ($group_spent_sec | fmt_duration),
+                 avg_done: ($group_avg_sec | fmt_duration),
+                 eta_sec: $group_eta_sec,
+                 eta: ($group_eta_sec | fmt_duration),
+@@ -257,9 +281,9 @@ pqsum() {
+         printf '  -\n'
+     else
+         {
+-            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\tavg_done\teta\tstatuses\n'
+-            while IFS=$'\t' read -r group daemon parallel total done pct pct_int avg_done eta statuses; do
+-                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
++            printf 'group\tdaemon\tparallel\ttotal\tdone\tprogress\tbar\ttotal_spent\tavg_done\teta\tstatuses\n'
++            while IFS=$'\t' read -r group daemon parallel total done pct pct_int total_spent avg_done eta statuses; do
++                printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+                     "$group" \
+                     "$daemon" \
+                     "$parallel" \
+@@ -267,11 +291,12 @@ pqsum() {
+                     "$done" \
+                     "$pct" \
+                     "$(pqsum_progress_bar "$pct_int")" \
++                    "$total_spent" \
+                     "$avg_done" \
+                     "$eta" \
+                     "$statuses"
+             done < <(
+-                jq -r '.group_rows[] | "\(.group)\t\(.daemon)\t\(.parallel)\t\(.total)\t\(.done)\t\(.pct)\t\(.pct_int)\t\(.avg_done)\t\(.eta)\t\(.statuses)"' <<< "$stats_json"
++                jq -r '.gr
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.3-codex 2026-02-10 05:28:48Z)**_
+
+已加好 `total_spent`，邏輯是你說的「group 內任務最早與最晚時間差」。
+
+**實作內容**
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/36_pueue.zsh`
+  - 在 group 聚合新增 `total_spent`：
+    - 取每個任務可用時間戳（`created_at`, `enqueued_at`, `start`, `end`）
+    - 轉 epoch 後算 `max - min`
+    - 格式化為可讀時間（如 `476h 8m 18s`）
+  - `Group Summary` 新增欄位：`total_spent`
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/pqsum.md`
+  - 補上 `total_spent` 欄位與定義
+
+**驗證**
+- `zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/36_pueue.zsh` 通過
+- `pqsum`, `pqsum -g default`, `pqsum status=running` 皆正常輸出
+- 表格對齊正常，且 `total_spent` 已顯示在 group 表中
+
+你現在可以直接看：
+- `pqsum`
+- `pqsum -g default`
+
+補充：你目前看到 `default` 的 `total_spent` 很大（例如 `476h...`）是正常的，因為它是基於目前查詢到的那批任務的最早到最晚時間跨度（包含歷史任務）。

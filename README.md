@@ -85,6 +85,8 @@ To change options later: `chezmoi init --force`
 - `~/.config/nvim/` - Neovim (LazyVim) configuration
 - `~/.config/uv/uv.toml` - uv package manager config
 - `~/.cargo/config.toml` - Cargo registry mirror config (GFW)
+- `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
+- `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
@@ -99,7 +101,7 @@ To change options later: `chezmoi init --force`
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
-- **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy
+- **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy, OpenChamber
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, with zsh completion and SSH agent auto-detection
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
