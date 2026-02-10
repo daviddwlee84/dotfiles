@@ -5,6 +5,8 @@
 #   docker compose --profile desktop up -d
 #   docker compose --profile china up -d
 #   docker compose run --rm test
+#   docker compose run --rm test-user-e2e
+#   docker compose run --rm test-root-e2e
 
 services:
   # Default devbox with ubuntu_server profile
@@ -112,6 +114,38 @@ services:
         echo ""
         echo "=== Test Complete ==="
       '
+    profiles:
+      - test
+
+  # E2E: non-root user flow using get.chezmoi.io one-liner
+  test-user-e2e:
+    image: ubuntu:24.04
+    container_name: dotfiles-test-user-e2e
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:ro
+    environment:
+      GITHUB_USERNAME: daviddwlee84
+      CHEZMOI_REPO: dotfiles
+      PROFILE: ubuntu_server
+      USE_CHINESE_MIRROR: "true"
+    command: bash -lc "/workspace/scripts/docker/e2e_quick_setup.sh user"
+    profiles:
+      - test
+
+  # E2E: root user flow using get.chezmoi.io one-liner
+  test-root-e2e:
+    image: ubuntu:24.04
+    container_name: dotfiles-test-root-e2e
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:ro
+    environment:
+      GITHUB_USERNAME: daviddwlee84
+      CHEZMOI_REPO: dotfiles
+      PROFILE: ubuntu_server
+      USE_CHINESE_MIRROR: "true"
+    command: bash -lc "/workspace/scripts/docker/e2e_quick_setup.sh root"
     profiles:
       - test
 

@@ -35,6 +35,14 @@ docker-down:
 docker-test:
     docker compose run --build --rm test
 
+# Run quick setup e2e test as non-root user (get.chezmoi.io one-liner)
+docker-test-user-e2e:
+    docker compose run --rm test-user-e2e
+
+# Run quick setup e2e test as root user (get.chezmoi.io one-liner)
+docker-test-root-e2e:
+    docker compose run --rm test-root-e2e
+
 # Build and run desktop profile
 docker-desktop:
     docker compose --profile desktop up -d desktop && docker compose exec desktop bash

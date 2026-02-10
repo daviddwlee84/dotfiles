@@ -142,6 +142,10 @@ Test the full dotfiles setup on a bare Ubuntu machine:
 # Build and run test suite
 just docker-test
 
+# End-to-end quick setup tests (one-liner via get.chezmoi.io)
+just docker-test-user-e2e   # Non-root user flow
+just docker-test-root-e2e   # Root user flow
+
 # Interactive devbox shell
 just docker-run
 
