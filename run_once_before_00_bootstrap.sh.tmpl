@@ -31,6 +31,14 @@ error() {
 # Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
 
+# Homebrew mirror settings for GFW environments
+{{ if .useChineseMirror -}}
+export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+{{ end -}}
+
 # Add Homebrew to PATH if installed
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 # macOS: Apple Silicon and Intel paths
@@ -98,65 +106,87 @@ else
 fi
 {{ end -}}
 {{ end -}}
-# 1. Install uv if missing
-if ! command -v uv &> /dev/null; then
-    info "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    success "uv installed successfully"
+# In Docker tests we may skip network-heavy bootstrap tools to avoid flaky mirrors.
+if [[ "${CHEZMOI_SKIP_BOOTSTRAP_TOOLS:-false}" = "true" ]]; then
+    warn "Skipping uv/mise/ansible bootstrap tools (CHEZMOI_SKIP_BOOTSTRAP_TOOLS=true)"
 else
-    info "uv is already installed"
-fi
+    # 1. Install uv if missing
+    if ! command -v uv &> /dev/null; then
+        info "Installing uv..."
+        if curl -LsSf --connect-timeout 10 --max-time 120 https://astral.sh/uv/install.sh | sh; then
+            success "uv installed successfully"
+        else
+            warn "Failed to install uv (network timeout/error), continuing bootstrap without uv"
+        fi
+    else
+        info "uv is already installed"
+    fi
 
-# 2. Install mise if missing (runtime manager for Node.js, etc.)
-if ! command -v mise &> /dev/null; then
-    info "Installing mise..."
-    # Try curl installer first (fast, no sudo)
-    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
-        success "mise installed via curl"
+    # 2. Install mise if missing (runtime manager for Node.js, etc.)
+    if ! command -v mise &> /dev/null; then
+        info "Installing mise..."
+        # Try curl installer first (fast, no sudo)
+        if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
+            success "mise installed via curl"
 {{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
 {{ if not $noRootMise -}}
-    else
-        # Fallback to apt for GFW environments
-        warn "curl installer failed/timed out, trying apt..."
-        if command -v apt-get &> /dev/null; then
-            sudo apt-get update -y
-            sudo apt-get install -y curl gpg
-            sudo install -dm 755 /etc/apt/keyrings
-            curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
-            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
-            sudo apt-get update -y
-            sudo apt-get install -y mise
-            success "mise installed via apt"
         else
-            error "Could not install mise - please install manually"
-        fi
+            # Fallback to apt for GFW environments
+            warn "curl installer failed/timed out, trying apt..."
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get update -y
+                sudo apt-get install -y curl gpg
+                sudo install -dm 755 /etc/apt/keyrings
+                curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
+                echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+                sudo apt-get update -y
+                sudo apt-get install -y mise
+                success "mise installed via apt"
+            else
+                error "Could not install mise - please install manually"
+            fi
 {{ end -}}
+        fi
+    else
+        info "mise is already installed"
     fi
-else
-    info "mise is already installed"
-fi
 
-# 3. Install ansible if missing
-if ! command -v ansible-playbook &> /dev/null; then
-    info "Installing ansible via uv..."
-    uv tool install ansible-core
-    success "ansible installed successfully"
-else
-    info "ansible is already installed"
-fi
+    # 3. Install ansible if missing
+    if ! command -v ansible-playbook &> /dev/null; then
+        if command -v uv &> /dev/null; then
+            info "Installing ansible via uv..."
+            if uv tool install ansible-core; then
+                success "ansible installed successfully"
+            else
+                warn "Failed to install ansible via uv, continuing bootstrap"
+            fi
+        else
+            warn "uv not found, skipping ansible installation"
+        fi
+    else
+        info "ansible is already installed"
+    fi
 
-# 4. Install ansible-galaxy collections
-info "Installing ansible-galaxy collections..."
-ansible-galaxy collection install community.general --force-with-deps
-success "ansible-galaxy collections installed"
+    # 4. Install ansible-galaxy collections
+    if command -v ansible-galaxy &> /dev/null; then
+        info "Installing ansible-galaxy collections..."
+        if ansible-galaxy collection install community.general --force-with-deps; then
+            success "ansible-galaxy collections installed"
+        else
+            warn "Failed to install ansible-galaxy collections, continuing bootstrap"
+        fi
+    else
+        warn "ansible-galaxy not found, skipping collection installation"
+    fi
 
-# 5. Install mise global tools (Node.js) if mise config exists
-MISE_BIN="${HOME}/.local/bin/mise"
-[[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
-if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
-    info "Installing mise global tools..."
-    "$MISE_BIN" install --yes
-    success "mise tools installed"
+    # 5. Install mise global tools (Node.js) if mise config exists
+    MISE_BIN="${HOME}/.local/bin/mise"
+    [[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
+    if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
+        info "Installing mise global tools..."
+        "$MISE_BIN" install --yes
+        success "mise tools installed"
+    fi
 fi
 
 success "Bootstrap complete!"

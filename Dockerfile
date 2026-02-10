@@ -9,6 +9,7 @@ ARG CHEZMOI_PROFILE=ubuntu_server
 ARG CHEZMOI_EMAIL=docker@example.com
 ARG CHEZMOI_NAME="Docker User"
 ARG CHEZMOI_USE_CHINESE_MIRROR=false
+ARG CHEZMOI_VERSION=2.69.3
 ARG CHEZMOI_GITLEAKS_ALL_REPOS=false
 ARG CHEZMOI_INSTALL_CODING_AGENTS=false
 ARG CHEZMOI_INSTALL_BITWARDEN=false
@@ -17,6 +18,7 @@ ARG CHEZMOI_INSTALL_BREW_APPS=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_DOTFILES=false
 ARG CHEZMOI_REPO=daviddwlee84
+ARG CHEZMOI_SKIP_BOOTSTRAP_TOOLS=false
 
 # Avoid interactive prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
@@ -101,9 +103,25 @@ WORKDIR /home/devuser
 # Retry up to 3 times to handle network issues (especially behind GFW)
 RUN for i in 1 2 3; do \
         echo "Attempt $i: Installing chezmoi to ~/.local/bin..." && \
-        sh -c "$(curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io/lb)" && \
+        ARCH="$(uname -m)" && \
+        case "${ARCH}" in \
+            x86_64) GOARCH="amd64" ;; \
+            aarch64|arm64) GOARCH="arm64" ;; \
+            *) echo "Unsupported architecture for chezmoi install: ${ARCH}" && exit 1 ;; \
+        esac && \
+        TARBALL="chezmoi_${CHEZMOI_VERSION}_linux_${GOARCH}.tar.gz" && \
+        if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
+            BASE_URL="https://ghproxy.cc/https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"; \
+        else \
+            BASE_URL="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"; \
+        fi && \
+        curl -fL --connect-timeout 10 --max-time 180 --retry 3 --retry-delay 5 \
+            -o "/tmp/${TARBALL}" "${BASE_URL}/${TARBALL}" && \
+        tar -xzf "/tmp/${TARBALL}" -C /tmp && \
+        install -d "$HOME/.local/bin" && \
+        install -m 0755 "/tmp/chezmoi" "$HOME/.local/bin/chezmoi" && \
         echo "chezmoi installed successfully" && break || \
-        { echo "Attempt $i failed, retrying..."; sleep 10; }; \
+        { echo "Attempt $i failed."; if [ "$i" -eq 3 ]; then exit 1; fi; echo "Retrying..."; sleep 10; }; \
     done
 
 # Initialize and apply dotfiles with prompt values passed via flags
@@ -112,8 +130,9 @@ RUN for i in 1 2 3; do \
 # Use local source instead of cloning from GitHub to test local changes
 # Note: installBrewApps=false by default (Linuxbrew is optional on Linux)
 RUN export PATH="$HOME/.local/bin:$PATH" && \
+    export CHEZMOI_SKIP_BOOTSTRAP_TOOLS="${CHEZMOI_SKIP_BOOTSTRAP_TOOLS}" && \
     ~/.local/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
-    --promptString "profile (ubuntu_server|ubuntu_desktop|macos)=${CHEZMOI_PROFILE}" \
+    --promptString "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)=${CHEZMOI_PROFILE}" \
     --promptString "What is your email address=${CHEZMOI_EMAIL}" \
     --promptString "What is your full name=${CHEZMOI_NAME}" \
     --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}" \
@@ -125,5 +144,5 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
     --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}"
 
-# Default to bash shell
-CMD ["/bin/bash"]
+# Default to zsh shell
+CMD ["/bin/zsh"]

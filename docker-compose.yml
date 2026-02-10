@@ -79,6 +79,8 @@ services:
         CHEZMOI_INSTALL_BITWARDEN: "false"
         CHEZMOI_INSTALL_PYTHON_UV_TOOLS: "false"
         CHEZMOI_INSTALL_BREW_APPS: "false"
+        CHEZMOI_NO_ROOT: "true"
+        CHEZMOI_SKIP_BOOTSTRAP_TOOLS: "true"
     image: dotfiles:test
     container_name: dotfiles-test
     command: |
