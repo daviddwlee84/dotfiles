@@ -15,9 +15,9 @@ Use the Bitwarden desktop app as your SSH agent so private keys never leave the 
                                               │
                                               ▼
                                         Vault (encrypted)
-                                        ├─ SSH: jingle
-                                        ├─ SSH: azure_vm1
-                                        └─ SSH: YetAnotherStupidVM
+                                        ├─ SSH: ssh_key_1
+                                        ├─ SSH: ssh_key_2
+                                        └─ SSH: ssh_key_3
 ```
 
 When an SSH client needs a key, it talks to whichever agent `SSH_AUTH_SOCK` points to.
@@ -70,9 +70,9 @@ No manual shell configuration is needed if you use the managed zsh config.
 ssh-add -l
 
 # Expected output (example):
-# 3072 SHA256:S93TIv0W2E1B...  SSH: azure_vm1 (RSA)
-# 3072 SHA256:B7ZcVqELH0RQ...  SSH: jingle (RSA)
-# 3072 SHA256:i+mZs1/NiKo+...  SSH: YetAnotherStupidVM (RSA)
+# 3072 SHA256:S93TIv0W2E1B...  SSH: ssh_key_1 (RSA)
+# 3072 SHA256:B7ZcVqELH0RQ...  SSH: ssh_key_2 (RSA)
+# 3072 SHA256:i+mZs1/NiKo+...  SSH: ssh_key_3 (RSA)
 
 # Test GitHub authentication
 ssh -T git@github.com
