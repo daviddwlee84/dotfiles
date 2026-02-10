@@ -78,6 +78,10 @@
     name: "{{ bitwarden_cli_npm_package }}"
     global: true
     state: present
+  register: bitwarden_npm_install
+  until: bitwarden_npm_install is succeeded
+  retries: 3
+  delay: 5
 
 - name: Install Bitwarden CLI via mise npm fallback
   when:
@@ -89,4 +93,8 @@
     {{ bitwarden_mise_bin }} exec -- npm install -g {{ bitwarden_cli_npm_package }}
   args:
     executable: /bin/bash
+  register: bitwarden_mise_npm_install
+  until: bitwarden_mise_npm_install is succeeded
+  retries: 3
+  delay: 5
   changed_when: true
