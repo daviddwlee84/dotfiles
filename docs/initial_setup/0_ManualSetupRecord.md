@@ -106,3 +106,14 @@ Austin (python tools)
 
 - [P403n1x87/austin: Python frame stack sampler for CPython](https://github.com/P403n1x87/austin)
 - [P403n1x87/austin-tui: The top-like text-based user interface for Austin](https://github.com/P403n1x87/austin-tui?tab=readme-ov-file)
+
+---
+
+Code Agents UI
+
+- [slopus/happy: Mobile and Web client for Codex and Claude Code, with realtime voice, encryption and fully featured](https://github.com/slopus/happy)
+- [btriapitsyn/openchamber: Desktop and web interface for OpenCode AI agent](https://github.com/btriapitsyn/openchamber)
+  - [Happy Coder for OpenCode : r/opencodeCLI](https://www.reddit.com/r/opencodeCLI/comments/1qho03o/happy_coder_for_opencode/)
+  - [OpenCode Support · Issue #265 · slopus/happy](https://github.com/slopus/happy/issues/265)
+- [happier-dev/happier: Mobile, Web & Desktop client for Codex, Claude Code, OpenCode, Kimi, Augment Code, Qwen, fully end-to-end encrypted](https://github.com/happier-dev/happier)
+- [NeuralNomadsAI/CodeNomad: CodeNomad: The command center that puts AI coding on steroids.](https://github.com/NeuralNomadsAI/CodeNomad)
