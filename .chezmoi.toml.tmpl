@@ -2,9 +2,8 @@
 
 [data]
 # 只在 init 才需要問一次：你之後都讀這個值
-# 這裡用 promptString：沒有值就會問使用者，輸入後寫進 config
 # TODO: not all the things we want to change all the time we chezmoi init
-profile = {{ promptString "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)" "macos" | quote }}
+profile = {{ promptStringOnce . "profile" "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)" "macos" | quote }}
 email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee84@gmail.com" | quote }}
 name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
 # 是否在中國大陸 GFW 內，需要使用鏡像源
