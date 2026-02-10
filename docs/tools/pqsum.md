@@ -19,7 +19,7 @@
 2. `Status Breakdown`
    - Aligned table: status, count, progress
 3. `Group Summary`
-   - Aligned table with: group, daemon, parallel, total, done, progress, bar, avg_done, eta, statuses
+   - Aligned table with: group, daemon, parallel, total, done, progress, bar, total_spent, avg_done, eta, statuses
 
 ## Usage
 
@@ -51,8 +51,8 @@ Status Breakdown
   Done    9      100.0%
 
 Group Summary
-  group      daemon   parallel  total  done  progress  bar           avg_done  eta  statuses
-  default    Running  1         9      9     100.0%    [============] 1m 18s   0s   Done=9
+  group      daemon   parallel  total  done  progress  bar           total_spent  avg_done  eta  statuses
+  default    Running  1         9      9     100.0%    [============] 4h 12m 8s    1m 18s   0s   Done=9
 ```
 
 ## Notes
@@ -60,6 +60,7 @@ Group Summary
 - `pqsum` forwards all arguments to `pueue status --json`.
 - If `pueue` or `jq` is missing, `pqsum` exits with non-zero and prints an error.
 - Average duration only includes tasks whose `Done.start` and `Done.end` are both present.
+- `total_spent` is the time span between the earliest and latest timestamps observed in that group (from task `created_at` and status timestamps such as `enqueued_at/start/end`).
 - ETA is a coarse estimate based on `remaining * avg_done / max(parallel, 1)`.
 - `-g/--group` controls which group rows are shown in the summary output.
 - Color is enabled only on TTY output and disabled when `NO_COLOR` is set.
