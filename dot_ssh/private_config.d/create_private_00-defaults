@@ -1,0 +1,10 @@
+# ~/.ssh/config.d/00-defaults
+#
+# Stub file for optional global defaults.
+# Intentionally all-commented to avoid duplicating Host * defaults from
+# ~/.ssh/config.
+
+# Host *
+#     AddKeysToAgent yes
+#     IdentitiesOnly yes
+#     PreferredAuthentications publickey

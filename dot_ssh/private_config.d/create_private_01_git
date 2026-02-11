@@ -1,0 +1,25 @@
+# ~/.ssh/config.d/git
+#
+# Public host defaults for Git providers.
+
+Host github.com
+    HostName github.com
+    User git
+
+Host gitlab.com
+    HostName gitlab.com
+    User git
+
+# Example: multiple account alias (disabled by default)
+# Host github-work
+#     HostName github.com
+#     User git
+#     IdentityFile ~/.ssh/github_work.pub
+#     IdentitiesOnly yes
+
+# Example: Bitwarden agent pinning (disabled by default)
+# Host gitlab-work
+#     HostName gitlab.com
+#     User git
+#     IdentityFile ~/.ssh/gitlab_work.pub
+#     IdentitiesOnly yes

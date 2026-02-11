@@ -1,5 +1,7 @@
 # 95_bitwarden.zsh - Bitwarden CLI completion and SSH agent integration
 
+# TODO:: Consider if we want to automatically set SSH_AUTH_SOCK for Bitwarden SSH agent, or set in ~/.ssh/config manually?
+
 # Check if Bitwarden CLI is installed
 command -v bw &>/dev/null || return 0
 

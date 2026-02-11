@@ -1,0 +1,27 @@
+# ~/.ssh/config
+#
+# Managed by chezmoi as create-only:
+# - Created only when this file does not exist.
+# - Existing ~/.ssh/config will NOT be overwritten.
+#
+# Put host-specific entries in ~/.ssh/config.d/*. Files in that directory are
+# loaded in lexical order.
+Include ~/.ssh/config.d/*
+
+Host *
+    # Conservative cross-platform keepalive defaults.
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+
+    # Optional Bitwarden SSH agent (examples, disabled by default).
+    # Uncomment one IdentityAgent path that matches your installation:
+    # macOS (.dmg):
+    # IdentityAgent ~/.bitwarden-ssh-agent.sock
+    # macOS (App Store):
+    # IdentityAgent ~/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock
+    # Linux native/.deb:
+    # IdentityAgent ~/.bitwarden-ssh-agent.sock
+    # Linux Snap:
+    # IdentityAgent ~/snap/bitwarden/current/.bitwarden-ssh-agent.sock
+    # Linux Flatpak:
+    # IdentityAgent ~/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock
