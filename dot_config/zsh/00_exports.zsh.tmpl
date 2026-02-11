@@ -17,7 +17,8 @@ export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 
 # PATH additions
-export PATH="$HOME/.local/bin:$PATH"
+# ~/bin for custom scripts, ~/.local/bin for auto-installed tools (uv, npm, cargo)
+export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 
 # =============================================================================
 # Homebrew Setup

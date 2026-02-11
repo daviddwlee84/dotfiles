@@ -42,3 +42,6 @@ scripts/redact_specstory.py
 
 # Zsh adhoc file (personal experiments - never track)
 .zshrc.adhoc
+
+# .local directory (dynamically managed by package managers)
+.local/
