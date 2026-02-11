@@ -1,6 +1,12 @@
 ---
-# Bitwarden CLI installation
-# Installs @bitwarden/cli via npm, with mise fallback when npm is not in PATH.
+# Bitwarden role - CLI installation + Desktop app (for SSH agent)
+# CLI: Installs @bitwarden/cli via npm, with mise fallback when npm is not in PATH.
+# Desktop: Installs Bitwarden desktop app (snap/deb on Linux, Homebrew cask on macOS)
+#          when bitwarden_install_desktop=true (passed via --extra-vars)
+
+# =============================================================================
+# CLI Installation
+# =============================================================================
 
 - name: Check if Bitwarden CLI is already installed
   when: ansible_facts["os_family"] in ["Darwin", "Debian"]
@@ -98,3 +104,98 @@
   retries: 3
   delay: 5
   changed_when: true
+
+# =============================================================================
+# Desktop App Installation (for SSH agent support)
+# Only runs when bitwarden_install_desktop=true (set via --extra-vars)
+# =============================================================================
+
+# --- macOS: Homebrew Cask ---
+
+- name: Check if Bitwarden Desktop is installed (macOS)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: /Applications/Bitwarden.app
+  register: bitwarden_desktop_macos
+
+- name: Install Bitwarden Desktop via Homebrew Cask (macOS)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Darwin"
+    - not (bitwarden_desktop_macos.stat.exists | default(false))
+  community.general.homebrew_cask:
+    name: bitwarden
+    state: present
+
+# --- Linux: Snap (primary) with .deb fallback ---
+
+- name: Check if Bitwarden Desktop is already installed (Linux)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v bitwarden || snap list bitwarden 2>/dev/null
+  register: bitwarden_desktop_linux_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if snap is available (Bitwarden Desktop)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Debian"
+    - bitwarden_desktop_linux_check.rc != 0
+  ansible.builtin.command: which snap
+  register: bitwarden_snap_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Bitwarden Desktop via snap (Linux)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Debian"
+    - bitwarden_desktop_linux_check.rc != 0
+    - bitwarden_snap_check.rc == 0
+  become: true
+  tags: [sudo]
+  community.general.snap:
+    name: bitwarden
+    state: present
+
+- name: Install Bitwarden Desktop via .deb fallback (Linux)
+  when:
+    - bitwarden_install_desktop | bool
+    - ansible_facts["os_family"] == "Debian"
+    - bitwarden_desktop_linux_check.rc != 0
+    - bitwarden_snap_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Download Bitwarden Desktop .deb package
+      ansible.builtin.get_url:
+        url: "https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=deb"
+        dest: /tmp/bitwarden-desktop.deb
+        mode: '0644'
+        timeout: 120
+
+    - name: Install Bitwarden Desktop .deb package
+      ansible.builtin.apt:
+        deb: /tmp/bitwarden-desktop.deb
+
+    - name: Clean up Bitwarden Desktop .deb
+      ansible.builtin.file:
+        path: /tmp/bitwarden-desktop.deb
+        state: absent
+
+- name: Remind user to enable SSH agent (Bitwarden Desktop)
+  when:
+    - bitwarden_install_desktop | bool
+    - (bitwarden_desktop_linux_check is defined and bitwarden_desktop_linux_check.rc != 0) or
+      (bitwarden_desktop_macos is defined and not (bitwarden_desktop_macos.stat.exists | default(true)))
+  ansible.builtin.debug:
+    msg: >-
+      Bitwarden Desktop installed. To use the SSH agent:
+      1. Open Bitwarden Desktop and log in
+      2. Go to Settings > Enable SSH agent
+      3. Import your SSH keys into the vault
+      4. Open a new terminal -- SSH_AUTH_SOCK will be auto-detected

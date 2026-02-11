@@ -1,3 +1,8 @@
 ---
 # Default variables for bitwarden role
 bitwarden_cli_npm_package: "@bitwarden/cli"
+
+# Whether to install the Bitwarden desktop app (for SSH agent support)
+# Override via --extra-vars "bitwarden_install_desktop=true"
+# Only meaningful on ubuntu_desktop (snap/deb) and macOS (homebrew cask)
+bitwarden_install_desktop: false

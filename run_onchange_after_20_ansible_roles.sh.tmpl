@@ -79,6 +79,13 @@ TAGS="${TAGS},bitwarden"
 TAGS="${TAGS},python_uv_tools"
 {{ end -}}
 
+# Extra vars for role-level configuration
+EXTRA_VARS=""
+{{ if and $installBitwarden (or (eq .profile "ubuntu_desktop") (eq .profile "macos") (eq .profile "macos_intel")) -}}
+# Install Bitwarden Desktop app (for SSH agent) on desktop profiles
+EXTRA_VARS="bitwarden_install_desktop=true"
+{{ end -}}
+
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
 
 # Handle sudo for Linux
@@ -119,5 +126,7 @@ fi
 
 info "Profile: {{ .profile }}"
 info "Re-running ansible with tags: $TAGS"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS
+EXTRA_VARS_FLAG=""
+[[ -n "$EXTRA_VARS" ]] && EXTRA_VARS_FLAG="--extra-vars $EXTRA_VARS"
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS $EXTRA_VARS_FLAG
 success "Ansible roles updated!"
