@@ -190,7 +190,7 @@
 - name: Remind user to enable SSH agent (Bitwarden Desktop)
   when:
     - bitwarden_install_desktop | bool
-    - (bitwarden_desktop_linux_check is defined and bitwarden_desktop_linux_check.rc != 0) or
+    - (((bitwarden_desktop_linux_check | default({})).rc | default(0)) != 0) or
       (bitwarden_desktop_macos is defined and not (bitwarden_desktop_macos.stat.exists | default(true)))
   ansible.builtin.debug:
     msg: >-
