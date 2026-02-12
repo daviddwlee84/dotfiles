@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop
+# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -24,6 +24,7 @@
       - zellij
       - btop
       - htop
+      - duckdb
     state: present
 
 # =============================================================================
@@ -380,6 +381,40 @@
     executable: /bin/bash
   changed_when: true
   ignore_errors: true
+
+# --- duckdb ---
+- name: Check if DuckDB CLI is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: duckdb --version
+  register: duckdb_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install DuckDB CLI via official installer (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - duckdb_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (duckdb)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Install DuckDB CLI
+      ansible.builtin.shell: |
+        curl -fsSL https://install.duckdb.org | sh
+      args:
+        executable: /bin/bash
+
+- name: Verify DuckDB CLI is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: duckdb --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # --- thefuck ---
 # NOTE: thefuck is now installed via uv tool (python_uv_tools role)

@@ -204,6 +204,12 @@ status:
 diff:
     @git diff
 
+# Stage all changes and redact .specstory files and stage again
+add-and-redact:
+    @git add -A
+    @just redact-specstory
+    @git add -A
+
 # ============================================================================
 # Setup Utilities
 # ============================================================================
