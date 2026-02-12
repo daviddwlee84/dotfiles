@@ -18,6 +18,7 @@ python_uv_tools:
       - pymysql
       - mssql-python
       - pyodbc
+      - duckdb
   - name: python-dotenv[cli]
     binary: dotenv
   - name: git-filter-repo
@@ -30,3 +31,8 @@ python_uv_tools:
       - httpx[socks]
   - name: tmuxp
     binary: tmuxp
+  - name: visidata
+    binary: vd
+    with:
+      - pandas
+      - pyarrow  # To be able open feather file
