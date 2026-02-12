@@ -8,10 +8,10 @@ show_hidden = true
 [open]
 rules = [
   # 目錄：提供多種 opener 給 O 選
-  { name = "*/", use = ["edit", "git", "marimo_dir", "agent", "open"] },
+  { mime = "inode/directory", use = ["edit", "git", "marimo_dir", "agent", "open"] },
 
   # Python 檔：提供 marimo sandbox
-  { name = "*.py", use = ["edit", "marimo_py_sandbox", "open", "code"] },
+  { url = "*.py", use = ["edit", "marimo_py_sandbox", "open", "code"] },
 
   # 文字/程式碼檔：edit/open/code
   { mime = "text/*", use = ["edit", "open", "code"] },
@@ -34,13 +34,13 @@ if [ -d "$t" ]; then
 else
   cd "$(dirname "$t")" && exec nvim "$t"
 fi
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Neovim (auto cd into dir)" },
 ]
 
 # --- open：macOS 預設開啟
 open = [
-  { run = """sh -lc 'exec open "$1"' -- "$1" """, block = false, desc = "Open (macOS default)" },
+  { run = """sh -lc 'exec open "$1"' -- %s1 """, block = false, desc = "Open (macOS default)" },
   { run = """sh -lc '
 t="$1"
 if [ -d "$t" ]; then
@@ -63,7 +63,7 @@ if [ -d "$t" ]; then
 else
   exec $REPL "$t"
 fi
-' -- "$1"
+' -- %s1
 """, block = true, desc = "ipython/python (auto cd, source .venv, fallback to python if no venv ipython)" },
   # BUG: (if ipython not install in the .venv, fallback to python) /Users/daviddwlee84/miniforge3/lib/python3.12/site-packages/IPython/core/interactiveshell.py:937: UserWarning: Attempting to work in a virtualenv. If you encounter problems, please install IPython inside the virtualenv.
 #   { run = """sh -lc '
@@ -85,8 +85,8 @@ fi
 
 # --- code：VS Code / Cursor（留一個就好，或兩個都留）
 code = [
-  { run = """sh -lc 'exec code "$1"' -- "$1" """, block = false, desc = "VS Code" },
-  { run = """sh -lc 'exec cursor "$1"' -- "$1" """, block = false, desc = "Cursor" },
+  { run = """sh -lc 'exec code "$1"' -- %s1 """, block = false, desc = "VS Code" },
+  { run = """sh -lc 'exec cursor "$1"' -- %s1 """, block = false, desc = "Cursor" },
 ]
 
 agent = [
@@ -98,7 +98,7 @@ else
   cd "$(dirname "$t")"
 fi
 exec specstory run
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Claude (specstory)" },
   { run = """sh -lc '
 t="$1"
@@ -108,7 +108,7 @@ else
   cd "$(dirname "$t")"
 fi
 exec specstory run opencode
-' -- "$1"
+' -- %s1
 """, block = true, desc = "OpenCode (specstory)" },
   { run = """sh -lc '
 t="$1"
@@ -118,7 +118,7 @@ else
   cd "$(dirname "$t")"
 fi
 exec specstory run codex
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Codex (specstory)" },
   { run = """sh -lc '
 t="$1"
@@ -128,7 +128,7 @@ else
   cd "$(dirname "$t")"
 fi
 exec specstory run cursor
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Cursor Agent CLI (specstory)" },
 
 ]
@@ -143,7 +143,7 @@ else
   cd "$(dirname "$t")"
 fi
 exec lazygit
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Lazygit (here)" },
 ]
 
@@ -157,11 +157,11 @@ else
   cd "$(dirname "$t")"
 fi
 exec marimo edit --watch .
-' -- "$1"
+' -- %s1
 """, block = true, desc = "Marimo (watch dir)" },
 ]
 
 # --- marimo sandbox：只給 .py 用，避免對 dir 亂套
 marimo_py_sandbox = [
-  { run = """sh -lc 'exec marimo edit --watch --sandbox "$1"' -- "$1" """, block = true, desc = "Marimo (watch + sandbox py)" },
+  { run = """sh -lc 'exec marimo edit --watch --sandbox "$1"' -- %s1 """, block = true, desc = "Marimo (watch + sandbox py)" },
 ]
