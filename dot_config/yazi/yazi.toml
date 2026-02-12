@@ -1,6 +1,16 @@
 # ~/.config/yazi/yazi.toml
-[mgr]
-show_hidden = true
+# Yazi configuration (tested with v0.3.3+, syntax updated for v25.12.29+)
+# Last updated: 2026-02-12
+# Documentation: https://yazi-rs.github.io/docs/configuration/yazi/
+# Default preset: https://github.com/sxyazi/yazi/blob/shipped/yazi-config/preset/yazi.toml
+
+[manager]
+ratio = [1, 4, 3]           # Layout: 1/8 parent, 4/8 current, 3/8 preview
+sort_by = "natural"          # Natural number sorting
+sort_dir_first = true        # Show directories first
+linemode = "size"            # Show file sizes by default
+show_hidden = true           # Show hidden files
+show_symlink = true          # Show symlink targets
 
 # -----------------------
 # Open rules: 決定 Enter / o 的預設 opener，還有 O 的候選清單
@@ -8,7 +18,8 @@ show_hidden = true
 [open]
 rules = [
   # 目錄：提供多種 opener 給 O 選
-  { mime = "inode/directory", use = ["edit", "git", "marimo_dir", "agent", "open"] },
+  # Note: Use url = "*/" for directories (recommended), not mime = "inode/directory"
+  { url = "*/", use = ["edit", "git", "marimo_dir", "agent", "open"] },
 
   # Python 檔：提供 marimo sandbox
   { url = "*.py", use = ["edit", "marimo_py_sandbox", "open", "code"] },

@@ -88,7 +88,9 @@ To change options later: `chezmoi init --force`
 - `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/alacritty/` - Alacritty terminal config
-- `~/.config/yazi/yazi.toml` - Yazi file manager open rules and openers (`o`/`O`)
+- `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))
+  - `yazi.toml` - Main config with open rules and openers (`o`/`O`)
+  - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
 - `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`
