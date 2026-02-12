@@ -8,6 +8,10 @@
 # Theme
 ZSH_THEME="robbyrussell"
 
+# Prevent zsh from overwriting tmux/tmuxp window names (only inside tmux)
+# [[ -n "$TMUX" ]] && export DISABLE_AUTO_TITLE='true'
+export DISABLE_AUTO_TITLE='true'
+
 # Plugins (from $ZSH/plugins/ and $ZSH_CUSTOM/plugins/)
 plugins=(
     git
