@@ -2,6 +2,17 @@
 
 Cross-platform dotfiles management using **chezmoi** for configuration files and **ansible** for system dependencies.
 
+## MANDATORY: Use td for Task Management
+
+Run td usage --new-session at conversation start (or after /clear). This tells you what to work on next.
+
+Sessions are automatic (based on terminal/agent context). Optional:
+
+- td session "name" to label the current session
+- td session --new to force a new session in the same context
+
+Use td usage -q after first read.
+
 ## Maintaining README.md
 
 **IMPORTANT**: When adding or modifying configurations, update `README.md` to reflect changes:
@@ -47,6 +58,7 @@ chezmoi repo/
 ```
 
 Installation Order:
+
 ```
 1. Bootstrap (run_once_before) - installs Homebrew (macOS/Linux), uv, ansible, mise
 2. chezmoi apply - deploys config files + ansible playbooks
@@ -63,10 +75,12 @@ Installation Order:
 | `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` enabled) |
 
 The onchange script includes SHA256 hashes of all role files. It runs:
+
 - **Fresh install**: no previous hash state → triggers run
 - **Updates**: any role's `tasks/main.yml` or `defaults/main.yml` changes → triggers run
 
 To force re-run all scripts:
+
 ```bash
 chezmoi state delete-bucket --bucket=scriptState
 chezmoi apply
@@ -133,6 +147,7 @@ ansible-playbook playbooks/macos.yml --check
 | `ubuntu_server` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
 
 **Tag categories:**
+
 - **Core** (all): base, zsh, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
@@ -151,6 +166,7 @@ chezmoi init --force  # Answer "y" to "No sudo/root access" prompt
 This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). Tools with user-level fallbacks are automatically installed to `~/.local/bin` instead.
 
 **User-level tools** (installed automatically without sudo):
+
 - **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, zellij, btop, gitleaks, lazygit, fzf
 - **mise**: Node.js, Rust runtime management
 - **Installers**: zoxide, pre-commit, thefuck, tldr
@@ -159,6 +175,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
 
 What you **won't get** without root:
+
 - zsh (needs `/etc/shells` for login shell)
 - tmux, htop (require system libraries)
 - direnv (apt only)
@@ -180,6 +197,7 @@ What you **won't get** without root:
 ## Directory Structure
 
 After `chezmoi apply`:
+
 - Config files in `~/.*`
 - Ansible playbooks in `~/.ansible/`
 
@@ -204,6 +222,7 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 | **Linuxbrew** | Linux packages not in apt | Always installed on Linux |
 
 **How they work together:**
+
 - Bootstrap installs Homebrew on both macOS and Linux
 - Ansible roles use `community.general.homebrew` for macOS formulas
 - Brewfile manages casks (GUI apps) and mas (App Store) separately
@@ -257,6 +276,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin
 ### Customizing Brewfile
 
 The Brewfiles are chezmoi templates. Conditional sections:
+
 - Gaming apps: skipped if `WORK_MACHINE` environment variable is set
 - Chinese apps (baidunetdisk): only included if `useChineseMirror` is true
 - mas apps: requires signing in to App Store.app first
