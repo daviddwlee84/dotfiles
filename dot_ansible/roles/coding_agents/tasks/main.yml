@@ -593,6 +593,395 @@
     - /tmp/codexbar.tar.gz
     - /tmp/codexbar
 
+# === td ===
+
+- name: Check if td is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which td
+  register: td_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Tap marcus/tap for td (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - td_macos_check.rc != 0
+  community.general.homebrew_tap:
+    name: marcus/tap
+    state: present
+
+- name: Install td (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - td_macos_check.rc != 0
+  community.general.homebrew:
+    name: td
+    state: present
+
+- name: Check if td is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which td
+  register: td_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if Homebrew (Linuxbrew) is available for td
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+  ansible.builtin.command: command -v brew
+  register: td_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install td via Linuxbrew (preferred)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_brew_check.rc == 0
+  block:
+    - name: Tap marcus/tap for td (Linuxbrew)
+      community.general.homebrew_tap:
+        name: marcus/tap
+        state: present
+
+    - name: Install td (Linuxbrew)
+      community.general.homebrew:
+        name: td
+        state: present
+  rescue:
+    - name: Continue with GitHub release fallback when td Linuxbrew install fails
+      ansible.builtin.debug:
+        msg: "td Linuxbrew installation failed, continuing with GitHub release fallback."
+
+- name: Re-check if td is installed after Linuxbrew attempt
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+  ansible.builtin.command: which td
+  register: td_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Ensure ~/.local/bin exists (td fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: "0755"
+
+- name: Get latest td release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/marcus/td/releases/latest
+    return_content: true
+  register: td_release
+
+- name: Compute td release arch and version (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_release is defined
+  ansible.builtin.set_fact:
+    td_linux_arch: "{{ 'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64'] else 'unsupported' }}"
+    td_linux_version: "{{ td_release.json.tag_name | regex_replace('^v', '') }}"
+    td_linux_tag: "{{ td_release.json.tag_name }}"
+
+- name: Warn when td release fallback does not support current architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch == "unsupported"
+  ansible.builtin.debug:
+    msg: "td fallback skipped: unsupported architecture {{ ansible_facts['architecture'] }}."
+
+- name: Download td release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch != "unsupported"
+  ansible.builtin.get_url:
+    url: "https://github.com/marcus/td/releases/download/{{ td_linux_tag }}/td_{{ td_linux_version }}_linux_{{ td_linux_arch }}.tar.gz"
+    dest: /tmp/td.tar.gz
+    mode: "0644"
+
+- name: Create temp directory for td extraction (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch != "unsupported"
+  ansible.builtin.file:
+    path: /tmp/td
+    state: directory
+    mode: "0755"
+
+- name: Extract td release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch != "unsupported"
+  ansible.builtin.unarchive:
+    src: /tmp/td.tar.gz
+    dest: /tmp/td
+    remote_src: true
+
+- name: Find td binary (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch != "unsupported"
+  ansible.builtin.find:
+    paths: /tmp/td
+    patterns: td
+    file_type: file
+  register: td_find
+
+- name: Install td to ~/.local/bin (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+    - td_linux_arch != "unsupported"
+    - td_find.matched | default(0) | int > 0
+  ansible.builtin.copy:
+    src: "{{ td_find.files[0].path }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/td"
+    mode: "0755"
+    remote_src: true
+
+- name: Clean up td temp files (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc != 0
+    - td_recheck.rc != 0
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/td.tar.gz
+    - /tmp/td
+
+# === Sidecar ===
+
+- name: Check if sidecar is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which sidecar
+  register: sidecar_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Tap marcus/tap for sidecar (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - sidecar_macos_check.rc != 0
+  community.general.homebrew_tap:
+    name: marcus/tap
+    state: present
+
+- name: Install sidecar (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - sidecar_macos_check.rc != 0
+  community.general.homebrew:
+    name: sidecar
+    state: present
+
+- name: Check if sidecar is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which sidecar
+  register: sidecar_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if Homebrew (Linuxbrew) is available for sidecar
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+  ansible.builtin.command: command -v brew
+  register: sidecar_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install sidecar via Linuxbrew (preferred)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_brew_check.rc == 0
+  block:
+    - name: Tap marcus/tap for sidecar (Linuxbrew)
+      community.general.homebrew_tap:
+        name: marcus/tap
+        state: present
+
+    - name: Install sidecar (Linuxbrew)
+      community.general.homebrew:
+        name: sidecar
+        state: present
+  rescue:
+    - name: Continue with GitHub release fallback when sidecar Linuxbrew install fails
+      ansible.builtin.debug:
+        msg: "sidecar Linuxbrew installation failed, continuing with GitHub release fallback."
+
+- name: Re-check if sidecar is installed after Linuxbrew attempt
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+  ansible.builtin.command: which sidecar
+  register: sidecar_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Ensure ~/.local/bin exists (sidecar fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: "0755"
+
+- name: Get latest sidecar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/marcus/sidecar/releases/latest
+    return_content: true
+  register: sidecar_release
+
+- name: Compute sidecar release arch and version (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_release is defined
+  ansible.builtin.set_fact:
+    sidecar_linux_arch: "{{ 'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64'] else 'unsupported' }}"
+    sidecar_linux_version: "{{ sidecar_release.json.tag_name | regex_replace('^v', '') }}"
+    sidecar_linux_tag: "{{ sidecar_release.json.tag_name }}"
+
+- name: Warn when sidecar release fallback does not support current architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch == "unsupported"
+  ansible.builtin.debug:
+    msg: "sidecar fallback skipped: unsupported architecture {{ ansible_facts['architecture'] }}."
+
+- name: Download sidecar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch != "unsupported"
+  ansible.builtin.get_url:
+    url: "https://github.com/marcus/sidecar/releases/download/{{ sidecar_linux_tag }}/sidecar_{{ sidecar_linux_version }}_linux_{{ sidecar_linux_arch }}.tar.gz"
+    dest: /tmp/sidecar.tar.gz
+    mode: "0644"
+
+- name: Create temp directory for sidecar extraction (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch != "unsupported"
+  ansible.builtin.file:
+    path: /tmp/sidecar
+    state: directory
+    mode: "0755"
+
+- name: Extract sidecar release (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch != "unsupported"
+  ansible.builtin.unarchive:
+    src: /tmp/sidecar.tar.gz
+    dest: /tmp/sidecar
+    remote_src: true
+
+- name: Find sidecar binary (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch != "unsupported"
+  ansible.builtin.find:
+    paths: /tmp/sidecar
+    patterns: sidecar
+    file_type: file
+  register: sidecar_find
+
+- name: Install sidecar to ~/.local/bin (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+    - sidecar_linux_arch != "unsupported"
+    - sidecar_find.matched | default(0) | int > 0
+  ansible.builtin.copy:
+    src: "{{ sidecar_find.files[0].path }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sidecar"
+    mode: "0755"
+    remote_src: true
+
+- name: Clean up sidecar temp files (Linux fallback)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sidecar_check.rc != 0
+    - sidecar_recheck.rc != 0
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/sidecar.tar.gz
+    - /tmp/sidecar
+
+# === Specify CLI ===
+
+- name: Check if uv is available
+  ansible.builtin.command: which uv
+  register: uv_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if Specify CLI is installed
+  ansible.builtin.command: which specify
+  register: specify_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Specify CLI via uv
+  when:
+    - uv_check.rc == 0
+    - specify_check.rc != 0
+  ansible.builtin.command: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/specify"
+
+- name: Warn when uv is missing and Specify CLI is not installed
+  when:
+    - uv_check.rc != 0
+    - specify_check.rc != 0
+  ansible.builtin.debug:
+    msg: "uv not found; skipping Specify CLI installation. Install uv first or install specify manually."
+
 # === OpenChamber ===
 
 - name: Check if OpenChamber is installed

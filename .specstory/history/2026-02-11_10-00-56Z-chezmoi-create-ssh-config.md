@@ -1775,7 +1775,7 @@ docs/tutorials/bitwarden_ssh_agent.md:178:    IdentityFile ~/.ssh/jingle.pub
 docs/tutorials/bitwarden_ssh_agent.md:219:Or in `~/.ssh/config`:
 CLAUDE.md:129:| Profile | OS | Tags Included |
 run_once_before_02_fix_intel_homebrew.sh.tmpl:47:#             sudo chmod g-w "$dir" 2>/dev/null || true
-docs/scripts/import_ssh_to_bw.sh.md:13:1. **Discovery** -- Scans `~/.ssh` (or a custom directory) for files starting with `-----BEGIN...PRIVATE KEY-----`. Skips `.pub`, `known_hosts`, `config`, `authorized_keys`, swap files, etc.
+docs/scripts/import_ssh_to_bw.sh.md:13:1. **Discovery** -- Scans `~/.ssh` (or a custom directory) for files starting with `-----BEGIN...PRIV***KEY-----`. Skips `.pub`, `known_hosts`, `config`, `authorized_keys`, swap files, etc.
 docs/scripts/import_ssh_to_bw.sh.md:29:| `-d, --dir DIR` | Directory to scan (default: `~/.ssh`) |
 docs/scripts/import_ssh_to_bw.sh.md:38:# Interactive mode -- scan ~/.ssh, pick which keys to import
 docs/initial_setup/0_ManualSetupRecord.md:64:- [ohmyzsh/ohmyzsh: 🙃 A delightful community-driven (with 2,400+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python, etc), 140+ themes to spice up your morning, and an auto-update tool that makes it easy to keep up with the latest updates from the community.](https://github.com/ohmyzsh/ohmyzsh?tab=readme-ov-file#manual-installation)
@@ -2679,3 +2679,520 @@ Implemented as requested.
   - Fresh apply creates `~/.ssh/config`, `~/.ssh/config.d/00-defaults`, `~/.ssh/config.d/git`
   - Existing `~/.ssh/config` is not overwritten
   - User edits to create-only files are not reported as drift by `chezmoi status/diff`
+
+---
+
+_**User (2026-02-11 10:27:48Z)**_
+
+你知道為什麼會遇到
+```bash
+$ git push
+No user exists for uid 501
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+```
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:28:25Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Analyzing UID 501 SSH error**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:28:32Z)**_
+
+這個錯誤通常代表：
+
+`git push` 用的是 SSH，但**目前執行 git 的這個 process 的 UID（501）在系統裡找不到對應使用者**（`/etc/passwd` / directory service 沒有記錄）。  
+SSH 會因此無法正確取得使用者資訊（home、ssh config/key），連線就失敗。
+
+最常見情境：
+- 在 Docker/容器裡用 `-u 501` 跑，但容器沒建立 uid 501 的帳號
+- 用 `sudo`/切換使用者後環境不一致
+- 系統帳號記錄異常（較少見）
+
+先檢查：
+```bash
+id -u
+whoami
+getent passwd "$(id -u)"   # macOS 可用: dscl . -search /Users UniqueID "$(id -u)"
+ssh -Tv git@github.com
+```
+
+如果是容器，解法通常是：
+- 建立對應 UID 的使用者（例如 uid 501）
+- 或改成用容器內已存在的使用者執行 git/ssh
+- 確保 `HOME` 指到該使用者可讀的目錄且有 `~/.ssh`。
+
+如果你貼 `id -u && whoami && ssh -Tv git@github.com` 的輸出，我可以直接幫你判斷是哪一種。
+
+---
+
+_**User (2026-02-11 10:33:49Z)**_
+
+我在terminal 1
+```
+id -u && whoami && ssh -Tv git@github.com
+501
+daviddwlee84
+debug1: OpenSSH_10.0p2, LibreSSL 3.3.6
+debug1: Reading configuration data /Users/daviddwlee84/.ssh/config
+debug1: /Users/daviddwlee84/.ssh/config line 2: Applying options for *
+debug1: /Users/daviddwlee84/.ssh/config line 87: Applying options for github.com
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: Reading configuration data /etc/ssh/ssh_config.d/100-macos.conf
+debug1: /etc/ssh/ssh_config.d/100-macos.conf line 1: Applying options for *
+debug1: Reading configuration data /etc/ssh/crypto.conf
+debug1: Authenticator provider $SSH_SK_PROVIDER did not resolve; disabling
+debug1: Connecting to github.com port 22.
+debug1: Connection established.
+debug1: identity file /Users/daviddwlee84/.ssh/jingle type 0
+debug1: identity file /Users/daviddwlee84/.ssh/jingle-cert type -1
+debug1: Local version string SSH-2.0-OpenSSH_10.0
+debug1: Remote protocol version 2.0, remote software version b1ddf78
+debug1: compat_banner: no match: b1ddf78
+debug1: Authenticating to github.com:22 as 'git'
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: ecdh-sha2-nistp256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: SSH2_MSG_KEX_ECDH_REPLY received
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.
+debug1: Found key in /Users/daviddwlee84/.ssh/known_hosts:35
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 3
+debug1: rekey out after 4294967296 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey in after 4294967296 blocks
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: Will attempt key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Server accepts key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Authenticated to github.com ([198.18.0.67]:22) using "publickey".
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: Entering interactive session.
+debug1: pledge: filesystem
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts for github.com / (none)
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts2 for github.com / (none)
+debug1: client_input_hostkeys: hostkeys file /Users/daviddwlee84/.ssh/known_hosts2 does not exist
+debug1: client_input_hostkeys: no new or deprecated keys from server
+debug1: Sending environment.
+debug1: channel 0: setting env LC_CTYPE = "UTF-8"
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_ALL = "en_US.UTF-8"
+debug1: pledge: fork
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+Hi daviddwlee84! You've successfully authenticated, but GitHub does not provide shell access.
+debug1: channel 0: free: client-session, nchannels 1
+Transferred: sent 3516, received 3152 bytes, in 0.5 seconds
+Bytes per second: sent 6567.2, received 5887.3
+debug1: Exit status 1
+```
+
+terminal 2
+```
+debug1: compat_banner: no match: b1ddf78nSSH_10.0
+debug1: Authenticating to github.com:22 as 'git'ware version b1ddf78
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: SSH2_MSG_KEXINIT sent/etc/ssh/ssh_known_hosts: No such file or directory
+debug1: SSH2_MSG_KEXINIT received/ssh/ssh_known_hosts2: No such file or directory
+debug1: kex: algorithm: ecdh-sha2-nistp256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY8-gcm@openssh.com MAC: <implicit> compression: none
+debug1: SSH2_MSG_KEX_ECDH_REPLY received28-gcm@openssh.com MAC: <implicit> compression: none
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory4UvCOqU
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.or directory
+debug1: Found key in /Users/daviddwlee84/.ssh/known_hosts:35uch file or directory
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 319 host key.
+debug1: rekey out after 4294967296 blocks.ssh/known_hosts:35
+debug1: SSH2_MSG_NEWKEYS sentped: resetting send seqnr 3
+debug1: expecting SSH2_MSG_NEWKEYS blocks
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS receivedS
+debug1: rekey in after 4294967296 blocks read seqnr 3
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: Will attempt key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Server accepts key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Authenticated to github.com ([198.18.0.67]:22) using "publickey".
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: Entering interactive session.
+debug1: pledge: filesystem
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts for github.com / (none)
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts2 for github.com / (none)
+debug1: client_input_hostkeys: hostkeys file /Users/daviddwlee84/.ssh/known_hosts2 does not exist
+debug1: client_input_hostkeys: no new or deprecated keys from server
+debug1: Sending environment.
+debug1: channel 0: setting env LC_CTYPE = "UTF-8"
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_ALL = "en_US.UTF-8"
+debug1: pledge: fork
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+Hi daviddwlee84! You've successfully authenticated, but GitHub does not provide shell access.
+debug1: channel 0: free: client-session, nchannels 1
+Transferred: sent 3516, received 3152 bytes, in 0.5 seconds
+Bytes per second: sent 6567.2, received 5887.3
+debug1: Exit status 1        >....
+debug1: compat_banner: no match: b1ddf78nSSH_10.0
+debug1: Authenticating to github.com:22 as 'git'ware version b1ddf78
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: SSH2_MSG_KEXINIT sent/etc/ssh/ssh_known_hosts: No such file or directory
+debug1: SSH2_MSG_KEXINIT received/ssh/ssh_known_hosts2: No such file or directory
+debug1: kex: algorithm: ecdh-sha2-nistp256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY8-gcm@openssh.com MAC: <implicit> compression: none
+debug1: SSH2_MSG_KEX_ECDH_REPLY received28-gcm@openssh.com MAC: <implicit> compression: none
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory4UvCOqU
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.or directory
+debug1: Found key in /Users/daviddwlee84/.ssh/known_hosts:35uch file or directory
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 319 host key.
+debug1: rekey out after 4294967296 blocks.ssh/known_hosts:35
+debug1: SSH2_MSG_NEWKEYS sentped: resetting send seqnr 3
+debug1: expecting SSH2_MSG_NEWKEYS blocks
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS receivedS
+debug1: rekey in after 4294967296 blocks read seqnr 3
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: Will attempt key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Server accepts key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Authenticated to github.com ([198.18.0.67]:22) using "publickey".
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: Entering interactive session.
+debug1: pledge: filesystem
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts for github.com / (none)
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts2 for github.com / (none)
+debug1: client_input_hostkeys: hostkeys file /Users/daviddwlee84/.ssh/known_hosts2 does not exist
+debug1: client_input_hostkeys: no new or deprecated keys from server
+debug1: Sending environment.
+debug1: channel 0: setting env LC_CTYPE = "UTF-8"
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_ALL = "en_US.UTF-8"
+debug1: pledge: fork
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+Hi daviddwlee84! You've successfully authenticated, but GitHub does not provide shell access.
+debug1: channel 0: free: client-session, nchannels 1
+Transferred: sent 3516, received 3152 bytes, in 0.5 seconds
+Bytes per second: sent 6567.2>....
+debug1: compat_banner: no match: b1ddf78nSSH_10.0
+debug1: Authenticating to github.com:22 as 'git'ware version b1ddf78
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: SSH2_MSG_KEXINIT sent/etc/ssh/ssh_known_hosts: No such file or directory
+debug1: SSH2_MSG_KEXINIT received/ssh/ssh_known_hosts2: No such file or directory
+debug1: kex: algorithm: ecdh-sha2-nistp256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY8-gcm@openssh.com MAC: <implicit> compression: none
+debug1: SSH2_MSG_KEX_ECDH_REPLY received28-gcm@openssh.com MAC: <implicit> compression: none
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory4UvCOqU
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directoryor directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.or directory
+debug1: Found key in /Users/daviddwlee84/.ssh/known_hosts:35uch file or directory
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 319 host key.
+debug1: rekey out after 4294967296 blocks.ssh/known_hosts:35
+debug1: SSH2_MSG_NEWKEYS sentped: resetting send seqnr 3
+debug1: expecting SSH2_MSG_NEWKEYS blocks
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS receivedS
+debug1: rekey in after 4294967296 blocks read seqnr 3
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: Will attempt key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Server accepts key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Authenticated to github.com ([198.18.0.67]:22) using "publickey".
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: Entering interactive session.
+debug1: pledge: filesystem
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts for github.com / (none)
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts2 for github.com / (none)
+debug1: client_input_hostkeys: hostkeys file /Users/daviddwlee84/.ssh/known_hosts2 does not exist
+debug1: client_input_hostkeys: no new or deprecated keys from server
+debug1: Sending environment.
+debug1: channel 0: setting env LC_CTYPE = "UTF-8"
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_ALL = "en_US.UTF-8"
+debug1: pledge: fork
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+Hi daviddwlee84! You've successfully authenticated, but GitHub does not provide shell access.
+debug1: channel 0: free: client-session, nchannels 1
+Transferred: sent 3516, received 3152 bytes, in 0.5 seconds
+Bytes per second: sent 6567.2, received 5887.3
+debug1: Exit status 1
+```
+
+是因為 ~/.ssh 的權限700怪怪的？
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:34:06Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Explaining UID 501 SSH Error**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:34:11Z)**_
+
+不是 `~/.ssh` 700 的問題。`~/.ssh` 目錄 700、key/config 600 是正確設定。
+
+你在 terminal 1 的結果已經證明：
+- UID 501 有對應使用者（`whoami = daviddwlee84`）
+- SSH 到 GitHub 驗證成功
+
+所以 `No user exists for uid 501` 幾乎可以確定是**另一個執行 `git push` 的環境**在跑（不是你這個正常 shell），常見是：
+- IDE 內建 Git/SSH
+- `sudo` / 非互動 shell
+- 容器或隔離環境（UID 501 但沒有 passwd entry）
+- 自訂 `core.sshCommand` / `GIT_SSH_COMMAND` 指到不同 runtime
+
+先在「出錯的那個 terminal/session」跑這組：
+
+```bash
+id -u; whoami
+echo "HOME=$HOME SHELL=$SHELL"
+which git
+git remote -v
+git config --show-origin --get core.sshCommand || true
+echo "GIT_SSH_COMMAND=$GIT_SSH_COMMAND"
+GIT_TRACE=1 GIT_SSH_COMMAND='ssh -Tv' git push
+```
+
+如果同一台機器 terminal 1 可用、terminal 2 不可用，結論就是 terminal 2 的執行上下文有問題，不是 SSH 金鑰或權限本身。  
+你貼上面這組輸出，我可以直接幫你定位是哪個變數/設定造成的。
+
+---
+
+_**User (2026-02-11 10:35:13Z)**_
+
+```
+id -u; whoami
+echo "HOME=$HOME SHELL=$SHELL"
+which git
+git remote -v
+git config --show-origin --get core.sshCommand || true
+echo "GIT_SSH_COMMAND=$GIT_SSH_COMMAND"
+GIT_TRACE=1 GIT_SSH_COMMAND='ssh -Tv' git push
+
+501
+501
+HOME=/Users/daviddwlee84 SHELL=/bin/zsh
+/opt/homebrew/bin/git
+origin  git@github.com:daviddwlee84/dotfiles.git (fetch)
+origin  git@github.com:daviddwlee84/dotfiles.git (push)
+GIT_SSH_COMMAND=
+18:34:28.409461 git.c:502               trace: built-in: git push
+18:34:28.411444 run-command.c:673       trace: run_command: unset GIT_PREFIX; 'ssh -Tv' git@github.com 'git-receive-pack '\''daviddwlee84/dotfiles.git'\'''
+18:34:28.411519 run-command.c:765       trace: start_command: /bin/sh -c 'ssh -Tv "$@"' 'ssh -Tv' git@github.com 'git-receive-pack '\''daviddwlee84/dotfiles.git'\'''
+No user exists for uid 501
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+```
+
+
+```
+id -u; whoami
+echo "HOME=$HOME SHELL=$SHELL"
+which git
+git remote -v
+git config --show-origin --get core.sshCommand || true
+echo "GIT_SSH_COMMAND=$GIT_SSH_COMMAND"
+GIT_TRACE=1 GIT_SSH_COMMAND='ssh -Tv' git push
+
+501
+daviddwlee84
+HOME=/Users/daviddwlee84 SHELL=/bin/zsh
+/opt/homebrew/bin/git
+origin	git@github.com:daviddwlee84/dotfiles.git (fetch)
+origin	git@github.com:daviddwlee84/dotfiles.git (push)
+GIT_SSH_COMMAND=
+18:34:48.672263 git.c:502               trace: built-in: git push
+18:34:48.675065 run-command.c:673       trace: run_command: unset GIT_PREFIX; 'ssh -Tv' git@github.com 'git-receive-pack '\''daviddwlee84/dotfiles.git'\'''
+18:34:48.675072 run-command.c:765       trace: start_command: /bin/sh -c 'ssh -Tv "$@"' 'ssh -Tv' git@github.com 'git-receive-pack '\''daviddwlee84/dotfiles.git'\'''
+debug1: OpenSSH_10.0p2, LibreSSL 3.3.6
+debug1: Reading configuration data /Users/daviddwlee84/.ssh/config
+debug1: /Users/daviddwlee84/.ssh/config line 2: Applying options for *
+debug1: /Users/daviddwlee84/.ssh/config line 87: Applying options for github.com
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: Reading configuration data /etc/ssh/ssh_config.d/100-macos.conf
+debug1: /etc/ssh/ssh_config.d/100-macos.conf line 1: Applying options for *
+debug1: Reading configuration data /etc/ssh/crypto.conf
+debug1: Authenticator provider $SSH_SK_PROVIDER did not resolve; disabling
+debug1: Connecting to github.com port 22.
+debug1: Connection established.
+debug1: identity file /Users/daviddwlee84/.ssh/jingle type 0
+debug1: identity file /Users/daviddwlee84/.ssh/jingle-cert type -1
+debug1: Local version string SSH-2.0-OpenSSH_10.0
+debug1: Remote protocol version 2.0, remote software version b1ddf78
+debug1: compat_banner: no match: b1ddf78
+debug1: Authenticating to github.com:22 as 'git'
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: ecdh-sha2-nistp256
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: aes128-gcm@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: SSH2_MSG_KEX_ECDH_REPLY received
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /Users/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.
+debug1: Found key in /Users/daviddwlee84/.ssh/known_hosts:35
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 3
+debug1: rekey out after 4294967296 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey in after 4294967296 blocks
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: Will attempt key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Server accepts key: /Users/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Authenticated to github.com ([198.18.0.67]:22) using "publickey".
+debug1: channel 0: new session [client-session] (inactive timeout: 0)
+debug1: Entering interactive session.
+debug1: pledge: filesystem
+debug1: client_input_global_request: rtype hostkeys-00@openssh.com want_reply 0
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts for github.com / (none)
+debug1: client_input_hostkeys: searching /Users/daviddwlee84/.ssh/known_hosts2 for github.com / (none)
+debug1: client_input_hostkeys: hostkeys file /Users/daviddwlee84/.ssh/known_hosts2 does not exist
+debug1: client_input_hostkeys: no new or deprecated keys from server
+debug1: Sending environment.
+debug1: channel 0: setting env LC_ALL = "en_US.UTF-8"
+debug1: channel 0: setting env LANG = "en_US.UTF-8"
+debug1: channel 0: setting env LC_CTYPE = "UTF-8"
+debug1: Sending command: git-receive-pack 'daviddwlee84/dotfiles.git'
+debug1: pledge: fork
+18:34:51.255174 run-command.c:673       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset --progress
+18:34:51.255233 run-command.c:765       trace: start_command: /opt/homebrew/opt/git/libexec/git-core/git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset --progress
+18:34:51.267911 git.c:502               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset --progress
+Enumerating objects: 25, done.
+Counting objects: 100% (25/25), done.
+Delta compression using up to 10 threads
+Compressing objects: 100% (16/16), done.
+Writing objects: 100% (16/16), 28.05 KiB | 9.35 MiB/s, done.
+Total 16 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (8/8), completed with 7 local objects.
+debug1: client_input_channel_req: channel 0 rtype exit-status reply 0
+debug1: channel 0: free: client-session, nchannels 1
+Transferred: sent 32592, received 4368 bytes, in 1.3 seconds
+Bytes per second: sent 25637.7, received 3436.0
+debug1: Exit status 0
+To github.com:daviddwlee84/dotfiles.git
+   4e28c54..14189c5  main -> main
+```
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:36:00Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Diagnosing UID-to-username lookup failure**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-11 10:36:06Z)**_
+
+不是 `~/.ssh` 權限問題。`700/600` 反而是正確的。
+
+從你兩段輸出可確定：
+
+1. 同一台機器、同一 repo、同一 key，可以成功 `git push`（第二段成功）。  
+2. 失敗那段在 SSH 啟動前就報 `No user exists for uid 501`，這是「該 shell/session 無法把 UID 501 解析成使用者」的問題。  
+3. 所以是**執行環境差異**（某個 terminal session 壞掉/隔離了），不是 GitHub 權限、不是 key、不是 ssh config 權限。
+
+先做這幾個修復步驟（由快到慢）：
+
+```bash
+# 在出錯那個 terminal
+type -a whoami
+id -un
+exec -l zsh
+```
+
+如果還會發生（macOS 目錄服務快取異常）：
+
+```bash
+sudo dscacheutil -flushcache
+sudo killall -HUP opendirectoryd
+```
+
+再測：
+
+```bash
+id -u; id -un
+GIT_SSH_COMMAND='ssh -Tv' git push
+```
+
+你現在最關鍵訊號是：**同機另一個 terminal 可正常 push**，代表 repo/ssh 設定本身沒壞，先處理該 session 的 user lookup 狀態即可。

@@ -69,7 +69,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `installCodingAgents` | true | Claude Code, OpenCode, Cursor, Copilot, Gemini CLI, etc. |
+| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, td, sidecar, specify-cli, etc. |
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
 | `installBrewApps` | false | GUI apps via Homebrew Brewfile (casks, mas) |
@@ -106,7 +106,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Base**: git, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
-- **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy, OpenChamber
+- **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy, OpenChamber, td, sidecar, specify-cli
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
@@ -169,4 +169,4 @@ just info             # Show system info
 
 ## Customization
 
-See [CLAUDE.md](CLAUDE.md) for development guide and [docs/ansible.md](docs/ansible.md) for ansible customization.
+See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, and [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI.
