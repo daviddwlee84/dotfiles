@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, tldr, thefuck, zoxide, direnv, yazi, tmux, zellij, btop, htop
+# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, zellij, btop, htop
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -12,6 +12,7 @@
     name:
       - bat
       - git-delta
+      - git-graph
       - eza
       - tlrc
       - thefuck
@@ -279,6 +280,59 @@
       loop:
         - /tmp/delta.tar.gz
         - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+
+# --- git-graph ---
+- name: Check if git-graph is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: git-graph --version
+  register: git_graph_check
+  changed_when: false
+  failed_when: false
+
+- name: Install git-graph from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - git_graph_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64']  # Only amd64 available
+  block:
+    - name: Ensure ~/.local/bin exists (git-graph)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest git-graph release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/git-bahn/git-graph/releases/latest
+        return_content: true
+      register: git_graph_release
+
+    - name: Download git-graph tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/git-bahn/git-graph/releases/download/{{ git_graph_release.json.tag_name }}/git-graph-{{ git_graph_release.json.tag_name }}-linux-amd64.tar.gz"
+        dest: /tmp/git-graph.tar.gz
+        mode: '0644'
+
+    - name: Extract git-graph
+      ansible.builtin.unarchive:
+        src: /tmp/git-graph.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install git-graph to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/git-graph
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/git-graph"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up git-graph temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/git-graph.tar.gz
+        - /tmp/git-graph
 
 # --- tldr ---
 - name: Check if tldr is installed
