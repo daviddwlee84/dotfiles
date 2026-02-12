@@ -106,6 +106,7 @@ services:
         [ -d ~/.oh-my-zsh ] && echo "~/.oh-my-zsh/: OK" || echo "~/.oh-my-zsh/: MISSING"
         [ -d ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions ] && echo "zsh-autosuggestions: OK" || echo "zsh-autosuggestions: MISSING"
         [ -d ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting ] && echo "zsh-syntax-highlighting: OK" || echo "zsh-syntax-highlighting: MISSING"
+        [ -d ~/.oh-my-zsh/custom/plugins/zsh-completions ] && echo "zsh-completions: OK" || echo "zsh-completions: MISSING"
         [ -d ~/.config/zsh ] && echo "~/.config/zsh/: OK" || echo "~/.config/zsh/: MISSING"
         echo ""
         echo "=== Test Complete ==="
