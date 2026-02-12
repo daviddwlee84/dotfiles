@@ -125,16 +125,16 @@ ansible-playbook playbooks/macos.yml --check
 |-----|-------------|
 | `base` | git, curl, ripgrep, fd, build tools |
 | `homebrew` | macOS Homebrew update (installation done by bootstrap) |
-| `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting) |
+| `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting, completions) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
-| `devtools` | bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop |
+| `devtools` | bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop |
 | `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy |
 | `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
 | `security_tools` | pre-commit, gitleaks |
-| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, etc.) |
+| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, tmuxp, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
 
@@ -167,11 +167,11 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 
 **User-level tools** (installed automatically without sudo):
 
-- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, zellij, btop, gitleaks, lazygit, fzf
+- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, zellij, btop, gitleaks, lazygit, fzf, sesh
 - **mise**: Node.js, Rust runtime management
 - **Installers**: zoxide, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
-- **uv tools**: mlflow, litellm, sqlit-tui, etc.
+- **uv tools**: mlflow, litellm, sqlit-tui, tmuxp, etc.
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
 
 What you **won't get** without root:

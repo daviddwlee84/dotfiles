@@ -94,12 +94,15 @@ To change options later: `chezmoi init --force`
 - `~/.claude/` - Claude Code settings
 - `~/.tmux.conf` - Tmux configuration with TPM plugins
 - `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`
+- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (Ctrl+A for tmux session switcher)
 - `~/.config/zsh/tools/36_pueue.zsh` - Pueue queue summary helper (`pqsum`)
 - `~/.config/zsh/tools/28_tldr.zsh` - `tldrf` helper with `TLDR_LANGUAGES` fallback order
 - `~/.config/zsh/tools/95_bitwarden.zsh` - Bitwarden CLI completion + SSH agent socket auto-detection
 - `~/.ssh/config` - SSH main config skeleton (create-only: `Include ~/.ssh/config.d/*` + conservative `Host *` defaults)
 - `~/.ssh/config.d/00-defaults` - SSH global defaults stub (commented examples only)
 - `~/.ssh/config.d/git` - SSH host entries for `github.com` and `gitlab.com` with commented multi-account/Bitwarden examples
+- `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
+- `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
@@ -119,7 +122,8 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Homebrew** (macOS): Package manager for macOS
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
-- **Dev tools**: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, zellij, btop, htop
+- **Dev tools**: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop
+- **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, litellm, tmuxp
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms

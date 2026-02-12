@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, zellij, btop, htop
+# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -20,6 +20,7 @@
       - direnv
       - yazi
       - tmux
+      - sesh
       - zellij
       - btop
       - htop
@@ -713,6 +714,69 @@
       ansible.builtin.file:
         path: /tmp/zellij.tar.gz
         state: absent
+
+# --- sesh (tmux session manager) ---
+- name: Check if sesh is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: sesh --version
+  register: sesh_check
+  changed_when: false
+  failed_when: false
+
+- name: Install sesh from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - sesh_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (sesh)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest sesh release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/joshmedeski/sesh/releases/latest
+        return_content: true
+      register: sesh_release
+
+    - name: Set sesh architecture mapping
+      ansible.builtin.set_fact:
+        sesh_arch: >-
+          {{
+            'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ansible_facts['architecture']
+          }}
+
+    - name: Download sesh tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/joshmedeski/sesh/releases/download/{{ sesh_release.json.tag_name }}/sesh_Linux_{{ sesh_arch }}.tar.gz"
+        dest: /tmp/sesh.tar.gz
+        mode: '0644'
+
+    - name: Extract sesh
+      ansible.builtin.unarchive:
+        src: /tmp/sesh.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install sesh to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/sesh
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sesh"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up sesh temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/sesh.tar.gz
+        - /tmp/sesh
+        - /tmp/README.md
+        - /tmp/LICENSE
 
 # =============================================================================
 # TPM (Tmux Plugin Manager) - All platforms

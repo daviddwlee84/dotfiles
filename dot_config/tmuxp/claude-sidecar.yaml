@@ -1,0 +1,7 @@
+session_name: claude-sidecar
+windows:
+  - window_name: claude-workspace
+    layout: main-vertical
+    panes:
+      - shell_command: specstory run claude -c 'claude --dangerously-skip-permissions'
+      - shell_command: sidecar
