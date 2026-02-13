@@ -24,5 +24,6 @@
   },
   "enabledPlugins": {
     "pyright-lsp@claude-plugins-official": true
-  }
+  },
+  "skipDangerousModePermissionPrompt": true
 }

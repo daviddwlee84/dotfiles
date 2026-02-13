@@ -29,3 +29,6 @@ alias v="nvim"
 
 # Zsh startup profiling
 alias zsh-profile='ZSH_PROF=1 zsh -i -c exit'
+
+# Load NVM for current session (when needed for version switching)
+alias load-nvm='export LOAD_NVM=1 && source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && source "${NVM_DIR:-$HOME/.nvm}/bash_completion" && echo "nvm loaded: $(nvm current)"'
