@@ -21,6 +21,16 @@ import tempfile
 from pathlib import Path
 
 
+def read_text(path: Path) -> str:
+    """Read as UTF-8 while preserving invalid bytes via surrogate escape."""
+    return path.read_text(encoding="utf-8", errors="surrogateescape")
+
+
+def write_text(path: Path, content: str) -> None:
+    """Write UTF-8 while preserving surrogate-escaped bytes."""
+    path.write_text(content, encoding="utf-8", errors="surrogateescape")
+
+
 def run_gitleaks_staged() -> list[dict]:
     """Run gitleaks on staged files and return findings as JSON."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -42,7 +52,7 @@ def run_gitleaks_staged() -> list[dict]:
             capture_output=True,
             text=True,
         )
-        content = Path(report_path).read_text()
+        content = read_text(Path(report_path))
         if not content.strip():
             return []
         return json.loads(content)
@@ -75,7 +85,7 @@ def run_gitleaks_workdir(target_path: str) -> list[dict]:
             capture_output=True,
             text=True,
         )
-        content = Path(report_path).read_text()
+        content = read_text(Path(report_path))
         if not content.strip():
             return []
         return json.loads(content)
@@ -94,7 +104,7 @@ def redact_secret(secret: str, keep_chars: int = 3) -> str:
 
 def redact_file(file_path: Path, findings: list[dict]) -> bool:
     """Redact secrets in a file. Returns True if modified."""
-    content = file_path.read_text()
+    content = read_text(file_path)
     original = content
 
     file_findings = [
@@ -107,7 +117,7 @@ def redact_file(file_path: Path, findings: list[dict]) -> bool:
             content = content.replace(secret, redact_secret(secret))
 
     if content != original:
-        file_path.write_text(content)
+        write_text(file_path, content)
         return True
     return False
 
@@ -134,7 +144,7 @@ def find_private_key_files(files: list[Path]) -> dict[Path, list[str]]:
         if not path.is_file() or path.suffix != ".md":
             continue
         try:
-            content = path.read_text()
+            content = read_text(path)
         except OSError:
             continue
         if _PRIVATE_KEY_STR not in content:
@@ -155,14 +165,14 @@ def find_private_key_files(files: list[Path]) -> dict[Path, list[str]]:
 
 def redact_private_keys(file_path: Path) -> bool:
     """Redact private key patterns in a file. Returns True if modified."""
-    content = file_path.read_text()
+    content = read_text(file_path)
     original = content
     # Replace full PEM blocks
     content = _PEM_BLOCK_RE.sub("[REDACTED PRIVATE KEY BLOCK]", content)
     # Replace remaining literal "PRIVATE KEY" mentions
     content = content.replace(_PRIVATE_KEY_STR, "PRIV***KEY")
     if content != original:
-        file_path.write_text(content)
+        write_text(file_path, content)
         return True
     return False
 

@@ -3358,3 +3358,32 @@ _**Agent (gpt-5.3-codex 2026-02-13 13:59:46Z)**_
 - `dot_ansible/playbooks/base.yml`
 - `dot_ansible/playbooks/macos.yml`
 - `dot_ansible/playbooks/linux.yml`
+
+---
+
+_**User (2026-02-13 14:02:58Z)**_
+
+所以原本這個裝錯了的 td 是幹嘛的？常用嗎？ 想了解一下
+
+
+---
+
+_**Agent (gpt-5.3-codex 2026-02-13 14:03:16Z)**_
+
+<think><details><summary>Thought Process</summary>
+**提供錯裝說明與使用狀況**
+</details></think>
+
+_**Agent (gpt-5.3-codex 2026-02-13 14:03:18Z)**_
+
+你原本那個是 `homebrew/core/td`（[Swatto/td](https://github.com/Swatto/td)），本質是「終端機待辦清單」工具，不是 sidecar 生態的 `td`。
+
+它主要做這些事：
+- `init` 建 todo 清單
+- `add/modify/toggle/clean/reorder/search` 管理待辦
+
+「常用嗎」要看場景：
+- 做個人 CLI todo：可用，但整體屬於相對小眾工具
+- 做 AI agent workflow（session/handoff/review）：幾乎不會用它，因為缺 sidecar 需要的指令模型
+
+所以你這次會撞到是正常的命名衝突：兩個完全不同的工具都叫 `td`。
