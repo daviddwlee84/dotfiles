@@ -32,3 +32,6 @@ alias zsh-profile='ZSH_PROF=1 zsh -i -c exit'
 
 # Load NVM for current session (when needed for version switching)
 alias load-nvm='export LOAD_NVM=1 && source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && source "${NVM_DIR:-$HOME/.nvm}/bash_completion" && echo "nvm loaded: $(nvm current)"'
+
+# Regenerate cached bw completion (run after updating bw CLI)
+alias bw-update-completion='mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh" && bw completion --shell zsh > "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/bw_completion.zsh" 2>/dev/null && echo "bw completion cache updated"'
