@@ -11,4 +11,10 @@ fpath+=~/.zfunc
 [[ -d ~/.docker/completions ]] && fpath=(~/.docker/completions $fpath)
 
 # Initialize completion system
-autoload -Uz compinit && compinit
+# Regenerate .zcompdump only if older than 24 hours; otherwise skip security check (-C)
+autoload -Uz compinit
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
+    compinit
+else
+    compinit -C
+fi

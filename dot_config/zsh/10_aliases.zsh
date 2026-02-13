@@ -26,3 +26,6 @@ alias v="nvim"
 # Modern replacements (if installed)
 # command -v eza &>/dev/null && alias ls="eza"
 # command -v bat &>/dev/null && alias cat="bat"
+
+# Zsh startup profiling
+alias zsh-profile='ZSH_PROF=1 zsh -i -c exit'

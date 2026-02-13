@@ -1,3 +1,8 @@
+# Profiling: start a profiled shell with `ZSH_PROF=1 zsh`
+if [[ -n "$ZSH_PROF" ]]; then
+    zmodload zsh/zprof
+fi
+
 # ~/.zshrc - Interactive shell configuration
 # Managed by chezmoi - do not edit directly
 
@@ -100,3 +105,8 @@ fi
 
 # Source adhoc config
 [[ -r "$HOME/.zshrc.adhoc" ]] && source "$HOME/.zshrc.adhoc"
+
+# Profiling: output results
+if [[ -n "$ZSH_PROF" ]]; then
+    zprof
+fi
