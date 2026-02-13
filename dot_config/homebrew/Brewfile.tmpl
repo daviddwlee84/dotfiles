@@ -16,7 +16,9 @@ tap "superset-sh/superset"
 # Note: Most CLI tools are managed by ansible for better cross-platform support
 # Only add formulas here that you want to manage via Brewfile
 
-# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+# The following Formulas are MacOS only
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
 brew "mas"
+brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
 {{ end -}}

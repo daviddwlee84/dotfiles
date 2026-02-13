@@ -104,7 +104,7 @@ To change options later: `chezmoi init --force`
 - `~/.ssh/config.d/git` - SSH host entries for `github.com` and `gitlab.com` with commented multi-account/Bitwarden examples
 - `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
 - `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
-- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas)
+- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
 
@@ -119,7 +119,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
-- **GUI Apps** (macOS): terminals, editors, browsers, utilities via Brewfile
+- **GUI Apps** (macOS): terminals, editors, browsers, network tools, utilities via Brewfile (Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile)
 
 ### Bootstrap (installed before ansible)
 - **Homebrew** (macOS): Package manager for macOS
