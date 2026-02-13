@@ -1,0 +1,66 @@
+---
+# Starship prompt role - cross-platform shell prompt
+# https://starship.rs/
+
+# =============================================================================
+# macOS - via Homebrew
+# =============================================================================
+
+- name: Install starship (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: starship
+    state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu)
+# =============================================================================
+
+# --- starship (system-level via official installer) ---
+- name: Check if starship is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: starship --version
+  register: starship_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install starship via official installer (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - starship_check.rc != 0
+  ansible.builtin.shell: |
+    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+  args:
+    executable: /bin/bash
+  become: true
+  tags: [sudo]
+  ignore_errors: true
+
+# --- starship (user-level fallback) ---
+- name: Re-check if starship is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v starship
+  register: starship_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install starship from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - starship_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (starship)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Install starship via official installer (user-level)
+      ansible.builtin.shell: |
+        curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir {{ ansible_facts['env']['HOME'] }}/.local/bin
+      args:
+        executable: /bin/bash

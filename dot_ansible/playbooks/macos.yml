@@ -14,6 +14,9 @@
     - role: zsh
       tags: [zsh]
 
+    - role: starship
+      tags: [starship]
+
     - role: neovim
       tags: [neovim]
 

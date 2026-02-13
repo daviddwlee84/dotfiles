@@ -126,6 +126,7 @@ ansible-playbook playbooks/macos.yml --check
 | `base` | git, curl, ripgrep, fd, build tools |
 | `homebrew` | macOS Homebrew update (installation done by bootstrap) |
 | `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting, completions) |
+| `starship` | Starship cross-shell prompt (replaces oh-my-zsh theme) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
 | `devtools` | bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop |
@@ -142,13 +143,13 @@ ansible-playbook playbooks/macos.yml --check
 
 | Profile | OS | Tags Included |
 |---------|-----|---------------|
-| `macos` | macOS | homebrew, base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
-| `ubuntu_desktop` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
-| `ubuntu_server` | Ubuntu | base, zsh, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `macos` | macOS | homebrew, base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `ubuntu_desktop` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `ubuntu_server` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
 
 **Tag categories:**
 
-- **Core** (all): base, zsh, neovim, lazyvim_deps, security_tools
+- **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
 - **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools
@@ -169,7 +170,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 
 - **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, zellij, btop, gitleaks, lazygit, fzf, sesh
 - **mise**: Node.js, Rust runtime management
-- **Installers**: zoxide, pre-commit, thefuck, tldr
+- **Installers**: zoxide, starship, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
 - **uv tools**: mlflow, litellm, sqlit-tui, tmuxp, etc.
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.

@@ -88,6 +88,7 @@ To change options later: `chezmoi init --force`
 - `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/alacritty/` - Alacritty terminal config
+- `~/.config/starship.toml` - Starship cross-shell prompt config
 - `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))
   - `yazi.toml` - Main config with open rules and openers (`o`/`O`)
   - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
@@ -125,6 +126,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop
+- **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
 - **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, litellm, tmuxp
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
