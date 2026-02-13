@@ -145,3 +145,76 @@ td ws handoff                 ← 批次 handoff 所有 tagged issues
 2. **`td approve` 必須不同 session** — 不能自己審自己（除非 `--minor`）
 3. **`td handoff` 是 review 前的必要步驟** — 捕捉 git state + 工作摘要
 4. **Session = 身份識別**，Work Session = 工作容器（可選）
+
+---
+
+## `td` 與 Git Worktree 的關係
+
+### 數據存儲架構
+
+`td` 的數據是一個 **SQLite 文件** (`.todos/issues.db`)，放在 project root（靠 `.td-root` 或 git root 定位）。Global flag `-w, --work-dir` 的說明寫的是：
+
+> `resolves .td-root and git worktrees from this path`
+
+這表示 `td` **有 worktree 感知** — 從任何 worktree 路徑啟動，它會回溯找到主 repo 的 `.todos/issues.db`。所以多個 worktree 會 **共享同一個 database**。
+
+### Session 是 branch-scoped
+
+從 DB schema 和實際數據可以看到：
+
+```
+sessions table: branch TEXT DEFAULT ''
+session list:   列出時也是 "branch + agent scoped"
+```
+
+所有 session 都記了 `branch`，而 `td session list` 也標注每個 session 在哪個 branch。所以理論上不同 worktree (= 不同 branch) 的 session 不會互相干擾。
+
+### 但 Issues 沒有 branch scope
+
+```sql
+CREATE TABLE issues (
+    ...
+    created_branch TEXT DEFAULT '',  -- 記錄建立時的 branch，但不是 filter 條件
+    ...
+);
+```
+
+Issues 有 `created_branch` 欄位，但這只是 metadata — `td list` 預設會顯示 **所有 issues**，不會按 branch 過濾。這表示：
+
+- Worktree A (branch: feature-x) 建的 issue，在 Worktree B (branch: main) 也看得到
+- 這可以是優點（全域 backlog），也可以造成混亂
+
+### 結論：可以用 worktree，但有 caveats
+
+**支持的部分：**
+
+- 共享 DB — 多個 worktree 看到同一份 backlog (符合 "one project, one backlog" 設計)
+- Session isolation by branch — 不同 branch 的 session 自動區分
+- Review workflow 仍然成立 — 不同 worktree/session 之間可以互相 review
+
+**可能不太適合的場景：**
+
+- 如果你想要 **branch 獨立的 issue list** — `td` 沒有提供這個。所有 issues 共享同一個池子。你需要靠 labels 或 boards 自己做分類。
+- 同時在多個 worktree 並行工作時，SQLite 的 WAL mode 可能有極少數的併發問題（但 CLI 工具一般不會長時間 hold lock，所以實務上應該沒問題）。
+
+### Best Practice
+
+```
+場景 1: 單人 + 多 agent sessions（推薦方式）
+  main branch, 一個 repo 目錄
+  不同 agent (Claude, Codex, Cursor) 各自開 session
+  用 review workflow 互相審核
+  → 這是 td 的設計甜蜜點
+
+場景 2: 單人 + worktrees
+  可行，但用 labels/boards 區分不同 branch 的工作
+  td create "fix auth" --label "feature-x"
+  td board create "feature-x" --query "label:feature-x"
+  → 能用，需要自己維護分類
+
+場景 3: 多人多機
+  不適合 — td 是 local SQLite，沒有 remote sync
+  （雖然 schema 有 sync_state table，但目前看起來不 active）
+```
+
+簡單說：**`td` 設計定位是「單 project、多 AI session、local-first」**。Worktree 技術上能用（共享 DB），但它最順暢的用法就是在同一個目錄、同一個 branch 上，讓不同 agent sessions 依次接力工作。
