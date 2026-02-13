@@ -602,10 +602,28 @@
   changed_when: false
   failed_when: false
 
+- name: Check whether installed td is Sidecar-compatible (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - td_macos_check.rc == 0
+  ansible.builtin.shell: td --help 2>&1 | grep -Eq '\bsession\b'
+  register: td_macos_compatible_check
+  changed_when: false
+  failed_when: false
+
+- name: Remove conflicting td formula (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - td_macos_check.rc == 0
+    - td_macos_compatible_check.rc != 0
+  community.general.homebrew:
+    name: td
+    state: absent
+
 - name: Tap marcus/tap for td (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - td_macos_check.rc != 0
+    - td_macos_check.rc != 0 or (td_macos_compatible_check.rc is defined and td_macos_compatible_check.rc != 0)
   community.general.homebrew_tap:
     name: marcus/tap
     state: present
@@ -613,9 +631,9 @@
 - name: Install td (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - td_macos_check.rc != 0
+    - td_macos_check.rc != 0 or (td_macos_compatible_check.rc is defined and td_macos_compatible_check.rc != 0)
   community.general.homebrew:
-    name: td
+    name: marcus/tap/td
     state: present
 
 - name: Check if td is installed (Linux)
@@ -625,19 +643,38 @@
   changed_when: false
   failed_when: false
 
+- name: Check whether installed td is Sidecar-compatible (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc == 0
+  ansible.builtin.shell: td --help 2>&1 | grep -Eq '\bsession\b'
+  register: td_compatible_check
+  changed_when: false
+  failed_when: false
+
 - name: Check if Homebrew (Linuxbrew) is available for td
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
   ansible.builtin.command: command -v brew
   register: td_brew_check
   changed_when: false
   failed_when: false
 
+- name: Remove conflicting td formula (Linuxbrew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - td_check.rc == 0
+    - td_compatible_check.rc != 0
+    - td_brew_check.rc == 0
+  community.general.homebrew:
+    name: td
+    state: absent
+
 - name: Install td via Linuxbrew (preferred)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_brew_check.rc == 0
   block:
     - name: Tap marcus/tap for td (Linuxbrew)
@@ -647,7 +684,7 @@
 
     - name: Install td (Linuxbrew)
       community.general.homebrew:
-        name: td
+        name: marcus/tap/td
         state: present
   rescue:
     - name: Continue with GitHub release fallback when td Linuxbrew install fails
@@ -657,7 +694,7 @@
 - name: Re-check if td is installed after Linuxbrew attempt
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
   ansible.builtin.command: which td
   register: td_recheck
   changed_when: false
@@ -666,7 +703,7 @@
 - name: Ensure ~/.local/bin exists (td fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
   ansible.builtin.file:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
@@ -676,7 +713,7 @@
 - name: Get latest td release (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
   ansible.builtin.uri:
     url: https://api.github.com/repos/marcus/td/releases/latest
@@ -686,7 +723,7 @@
 - name: Compute td release arch and version (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_release is defined
   ansible.builtin.set_fact:
@@ -697,7 +734,7 @@
 - name: Warn when td release fallback does not support current architecture
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch == "unsupported"
   ansible.builtin.debug:
@@ -706,7 +743,7 @@
 - name: Download td release (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
   ansible.builtin.get_url:
@@ -717,7 +754,7 @@
 - name: Create temp directory for td extraction (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
   ansible.builtin.file:
@@ -728,7 +765,7 @@
 - name: Extract td release (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
   ansible.builtin.unarchive:
@@ -739,7 +776,7 @@
 - name: Find td binary (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
   ansible.builtin.find:
@@ -751,7 +788,7 @@
 - name: Install td to ~/.local/bin (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
     - td_find.matched | default(0) | int > 0
@@ -764,7 +801,7 @@
 - name: Clean up td temp files (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0
+    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
   ansible.builtin.file:
     path: "{{ item }}"
@@ -795,7 +832,7 @@
     - ansible_facts["os_family"] == "Darwin"
     - sidecar_macos_check.rc != 0
   community.general.homebrew:
-    name: sidecar
+    name: marcus/tap/sidecar
     state: present
 
 - name: Check if sidecar is installed (Linux)
@@ -827,7 +864,7 @@
 
     - name: Install sidecar (Linuxbrew)
       community.general.homebrew:
-        name: sidecar
+        name: marcus/tap/sidecar
         state: present
   rescue:
     - name: Continue with GitHub release fallback when sidecar Linuxbrew install fails
