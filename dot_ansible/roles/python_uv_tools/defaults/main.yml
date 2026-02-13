@@ -36,3 +36,5 @@ python_uv_tools:
     with:
       - pandas
       - pyarrow  # To be able open feather file
+  - name: copyparty
+    binary: copyparty

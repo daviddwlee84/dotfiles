@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb
+# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -25,6 +25,7 @@
       - btop
       - htop
       - duckdb
+      - rclone
     state: present
 
 # =============================================================================
@@ -412,6 +413,84 @@
 - name: Verify DuckDB CLI is available
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: duckdb --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# --- rclone ---
+- name: Check if rclone is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: rclone version
+  register: rclone_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set rclone release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rclone_check.rc != 0
+  ansible.builtin.set_fact:
+    rclone_release_arch: >-
+      {{
+        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else 'arm-v7' if ansible_facts['architecture'] == 'armv7l'
+        else 'arm-v6' if ansible_facts['architecture'] == 'armv6l'
+        else ''
+      }}
+
+- name: Fail on unsupported architecture for rclone
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rclone_check.rc != 0
+    - rclone_release_arch == ''
+  ansible.builtin.fail:
+    msg: "Unsupported architecture for rclone official downloads: {{ ansible_facts['architecture'] }}"
+
+- name: Install rclone from official downloads (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rclone_check.rc != 0
+    - rclone_release_arch != ''
+  block:
+    - name: Ensure ~/.local/bin exists (rclone)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download rclone archive
+      ansible.builtin.get_url:
+        url: "https://downloads.rclone.org/rclone-current-linux-{{ rclone_release_arch }}.zip"
+        dest: /tmp/rclone.zip
+        mode: '0644'
+        force: true
+
+    - name: Install rclone to ~/.local/bin
+      ansible.builtin.shell: |
+        set -e
+        rm -rf /tmp/rclone-extract
+        mkdir -p /tmp/rclone-extract
+        python3 -m zipfile -e /tmp/rclone.zip /tmp/rclone-extract
+        cp /tmp/rclone-extract/rclone-*-linux-{{ rclone_release_arch }}/rclone "{{ ansible_facts['env']['HOME'] }}/.local/bin/rclone"
+        chmod 0755 "{{ ansible_facts['env']['HOME'] }}/.local/bin/rclone"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up rclone temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/rclone.zip
+        - /tmp/rclone-extract
+
+- name: Verify rclone is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: rclone version
   changed_when: false
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"

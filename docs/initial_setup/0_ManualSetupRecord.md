@@ -117,3 +117,9 @@ Code Agents UI
   - [OpenCode Support · Issue #265 · slopus/happy](https://github.com/slopus/happy/issues/265)
 - [happier-dev/happier: Mobile, Web & Desktop client for Codex, Claude Code, OpenCode, Kimi, Augment Code, Qwen, fully end-to-end encrypted](https://github.com/happier-dev/happier)
 - [NeuralNomadsAI/CodeNomad: CodeNomad: The command center that puts AI coding on steroids.](https://github.com/NeuralNomadsAI/CodeNomad)
+
+---
+
+- [9001/copyparty: Portable file server with accelerated resumable uploads, dedup, WebDAV, SFTP, FTP, TFTP, zeroconf, media indexer, thumbnails++ all in one file](https://github.com/9001/copyparty)
+  - [introducing copyparty, the FOSS file server](https://www.youtube.com/watch?v=15_-hgsX2V0)
+- [cloudflare/cloudflared: Cloudflare Tunnel client](https://github.com/cloudflare/cloudflared)
