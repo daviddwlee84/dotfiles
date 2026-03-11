@@ -1,14 +1,10 @@
 # SpecStory CLI Configuration
 #
-# This is the user-level config file for SpecStory CLI.
-# Settings here act as global defaults for all projects when you run `specstory`.
+# This is the project-level config file for SpecStory CLI.
+# All settings here apply to this project unless overridden by CLI flags.
 #
-# Project-local `./.specstory/cli/config.toml` settings override these defaults.
-# CLI flags override both user-level and project-level configuration.
-#
-# Uncomment (remove the #) any setting below to change the default behavior.
-# For more information, see:
-# https://docs.specstory.com/integrations/terminal-coding-agents/usage#configuration
+# Uncomment (remove the #) the line and edit any setting below to change the default behavior.
+# For more information, see: https://docs.specstory.com/integrations/terminal-coding-agents/usage
 
 [local_sync]
 # Write markdown files locally. (default: true)
@@ -27,10 +23,10 @@
 
 [logging]
 # Write logs to .specstory/debug/debug.log (default: false)
-# log = true # equivalent to --log
+# log = true # equivalent to --log        
 
 # Debug-level output, requires console or log (default: false)
-# debug = true # equivalent to --debug
+# debug = true # equivalent to --debug 
 
 # Custom output directory for debug data.
 # Default: ./.specstory/debug (relative to the project directory)
@@ -40,7 +36,7 @@
 # console = true # equivalent to --console
 
 # Suppress all non-error output (default: false)
-# silent = true # equivalent to --silent
+# silent = true	# equivalent to --silent
 
 [version_check]
 # Check for new versions of the CLI on startup.
@@ -63,21 +59,21 @@
 # prompts = false
 
 [providers]
-# Agent execution commands by provider (used by `specstory run`)
-# Pass custom flags (e.g. `claude_cmd = "claude --allow-dangerously-skip-permissions"`).
-# Use of these is equivalent to `-c "custom command"`.
+# Agent execution commands by provider (used by specstory run)
+# Pass custom flags (e.g. claude_cmd = "claude --allow-dangerously-skip-permissions")
+# Use of these is equivalent to -c "custom command"
 
 # Claude Code command
-claude_cmd = "claude --dangerously-skip-permissions"
+# claude_cmd = "claude"
 
 # Codex CLI command
-codex_cmd = 'codex -c model_reasoning_effort="high" --ask-for-approval never --sandbox danger-full-access -c model_reasoning_summary="detailed" -c model_supports_reasoning_summaries=true'
+# codex_cmd = "codex"
 
 # Cursor CLI command
-cursor_cmd = "cursor-agent --force"
+# cursor_cmd = "cursor-agent"
 
 # Droid CLI command
-droid_cmd = "droid --yolo"
+# droid_cmd = "droid"
 
 # Gemini CLI command
-gemini_cmd = "gemini --sandbox=none"
+# gemini_cmd = "gemini"
