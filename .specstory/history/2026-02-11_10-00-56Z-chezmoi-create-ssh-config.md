@@ -44,8 +44,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:10Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:10Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `pwd && ls -la`</summary>
 ```
 Chunk ID: eab9c2
 Wall time: 0.0509 seconds
@@ -101,8 +101,8 @@ drwxr-xr-x@  6 daviddwlee84  staff   192 Feb 11 16:42 scripts
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:10Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg --files | rg -n "ssh|chezmoi|bitwarden|README|Dockerfile|config.d|\.chezmoi"`</summary>
 ```
 Chunk ID: 3378cd
 Wall time: 0.0515 seconds
@@ -124,8 +124,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:10Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "bitwarden|ssh|config\.d|Include|Host \*|promptBool|promptString|installBrewApps|noRoot" .chezmoi.toml.tmpl README.md Dockerfile 2>/dev/null`</summary>
 ```
 Chunk ID: d185d4
 Wall time: 0.0515 seconds
@@ -176,8 +176,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:17Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg --files | rg -n "ssh|config\.d|dot_ssh|private_ssh|create_.*ssh|run_.*ssh"`</summary>
 ```
 Chunk ID: d30f67
 Wall time: 0.0509 seconds
@@ -192,8 +192,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `find . -maxdepth 4 -type f | rg "ssh|config.d|bitwarden"`</summary>
 ```
 Chunk ID: dcb497
 Wall time: 0.0518 seconds
@@ -212,8 +212,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "IdentityAgent|SSH_AUTH_SOCK|Include ~/.ssh/config\.d|Host \*|github\.com|gitlab\.com|bitwarden" dot_config dot_zshrc.tmpl docs scripts README.md`</summary>
 ```
 Chunk ID: ff1593
 Wall time: 0.0509 seconds
@@ -278,8 +278,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' .chezmoiignore`</summary>
 ```
 Chunk ID: 5cb6b6
 Wall time: 0.0519 seconds
@@ -338,8 +338,8 @@ scripts/redact_specstory.py
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' README.md`</summary>
 ```
 Chunk ID: 8ba5f7
 Wall time: 0.0518 seconds
@@ -485,8 +485,8 @@ chezmoi cd            # Go to source directory
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,320p' docs/tutorials/bitwarden_ssh_agent.md`</summary>
 ```
 Chunk ID: 24e64b
 Wall time: 0.0507 seconds
@@ -600,8 +600,8 @@ ssh-add -l
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' dot_config/zsh/tools/95_bitwarden.zsh`</summary>
 ```
 Chunk ID: 3f657c
 Wall time: 0.0522 seconds
@@ -646,8 +646,8 @@ unset _bw_sock _bw_ssh_candidates
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' .chezmoi.toml.tmpl`</summary>
 ```
 Chunk ID: bfe373
 Wall time: 0.0507 seconds
@@ -689,8 +689,8 @@ backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles 
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:25Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' Dockerfile`</summary>
 ```
 Chunk ID: 49d3ff
 Wall time: 0.0517 seconds
@@ -833,8 +833,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:34Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:34Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `find . -maxdepth 4 -type f | sed 's#^./##' | sort | rg -n "^(create_|private_|dot_|run_|literal_|encrypted_|exact_)"`</summary>
 ```
 Chunk ID: 3926f7
 Wall time: 0.0524 seconds
@@ -907,8 +907,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:34Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "create_" CLAUDE.md README.md docs .chezmoi.toml.tmpl .chezmoiignore 2>/dev/null`</summary>
 ```
 Chunk ID: c16c68
 Wall time: 0.0516 seconds
@@ -920,8 +920,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:34Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -la dot_config && find dot_config -maxdepth 3 -type f | sed 's#^./##' | sort | head -n 80`</summary>
 ```
 Chunk ID: f580d6
 Wall time: 0.0525 seconds
@@ -996,8 +996,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:40Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:40Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "private_|encrypted_|literal_|exact_|run_once|run_onchange|create_" CLAUDE.md docs README.md .chezmoi.toml.tmpl`</summary>
 ```
 Chunk ID: a5cffb
 Wall time: 0.0515 seconds
@@ -1018,8 +1018,8 @@ CLAUDE.md:237:# Or just run chezmoi apply (triggers run_onchange script)
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:40Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi --version 2>/dev/null || true`</summary>
 ```
 Chunk ID: 654d34
 Wall time: 0.0517 seconds
@@ -1032,8 +1032,8 @@ chezmoi version v2.69.3, commit e2e3d1d416604bfe97ff2abfd14d197b79359e5b, built 
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:40Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi help | head -n 40 2>/dev/null || true`</summary>
 ```
 Chunk ID: 165f60
 Wall time: 0.0519 seconds
@@ -1090,8 +1090,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:01:49Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi help add | sed -n '1,240p'`</summary>
 ```
 Chunk ID: 7ebf57
 Wall time: 0.0513 seconds
@@ -1167,8 +1167,8 @@ Global Flags:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi help chattr | sed -n '1,260p'`</summary>
 ```
 Chunk ID: 8516c8
 Wall time: 0.0514 seconds
@@ -1265,8 +1265,8 @@ Global Flags:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi help source-state-attributes | sed -n '1,260p'`</summary>
 ```
 Chunk ID: 837f34
 Wall time: 0.0526 seconds
@@ -1279,8 +1279,8 @@ chezmoi: unknown command "source-state-attributes" for "chezmoi"
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:01:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi help special-files | sed -n '1,260p'`</summary>
 ```
 Chunk ID: 06b6e4
 Wall time: 0.0526 seconds
@@ -1304,8 +1304,36 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:00Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:05Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src" "$dst/.ssh"
+# create source with create_ file
+cat > "$src/create_dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+# case 1: destination has existing file with custom content
+cat > "$dst/.ssh/config" <<'EOF'
+# user existing
+Host example
+  User test
+EOF
+# run chezmoi apply using temp source/destination
+chezmoi -S "$src" -D "$dst" apply -v >/tmp/chezmoi_create_test.log 2>&1 || { cat /tmp/chezmoi_create_test.log; exit 1; }
+# print result
+printf '=== destination ~/.ssh/config after apply ===\n'
+cat "$dst/.ssh/config"
+printf '\n=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+
+```
 ```
 Chunk ID: 410d95
 Wall time: 0.0510 seconds
@@ -1324,8 +1352,32 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:08Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:11Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/create_dot_ssh" "$dst/.ssh"
+cat > "$src/create_dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+cat > "$dst/.ssh/config" <<'EOF'
+# user existing
+Host example
+  User test
+EOF
+chezmoi -S "$src" -D "$dst" apply -v >/tmp/chezmoi_create_test.log 2>&1 || { cat /tmp/chezmoi_create_test.log; exit 1; }
+printf '=== destination ~/.ssh/config after apply ===\n'
+cat "$dst/.ssh/config"
+printf '\n=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+
+```
 ```
 Chunk ID: b3bd52
 Wall time: 0.0515 seconds
@@ -1351,8 +1403,27 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:20Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:21Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/create_dot_ssh" "$dst"
+cat > "$src/create_dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_create_test2.log 2>&1 || { cat /tmp/chezmoi_create_test2.log; exit 1; }
+printf '=== destination ~/.ssh/config exists? ===\n'
+ls -la "$dst/.ssh/config"
+printf '\n=== destination content ===\n'
+cat "$dst/.ssh/config"
+
+```
 ```
 Chunk ID: 4f30cb
 Wall time: 0.0521 seconds
@@ -1372,8 +1443,23 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:32Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:33Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/create_dot_ssh"
+cat > "$src/create_dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+EOF
+chezmoi -S "$src" -D "$dst" managed --path-style absolute
+printf '\n=== destination tree ===\n'
+find "$dst" -maxdepth 4 -print | sort
+
+```
 ```
 Chunk ID: 40d247
 Wall time: 0.0519 seconds
@@ -1396,8 +1482,27 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:38Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:40Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh"
+cat > "$src/dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_create_test3.log 2>&1 || { cat /tmp/chezmoi_create_test3.log; exit 1; }
+printf '=== destination tree ===\n'
+find "$dst" -maxdepth 4 -print | sort
+printf '\n=== config content ===\n'
+cat "$dst/.ssh/config"
+
+```
 ```
 Chunk ID: 79c2fa
 Wall time: 0.0521 seconds
@@ -1417,8 +1522,27 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:45Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:47Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh" "$dst"
+cat > "$src/dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_create_test3.log 2>&1 || { cat /tmp/chezmoi_create_test3.log; exit 1; }
+printf '=== destination tree ===\n'
+find "$dst" -maxdepth 4 -print | sort
+printf '\n=== config content ===\n'
+cat "$dst/.ssh/config"
+
+```
 ```
 Chunk ID: 695d07
 Wall time: 0.0521 seconds
@@ -1446,8 +1570,30 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:51Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:53Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh" "$dst/.ssh"
+cat > "$src/dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+cat > "$dst/.ssh/config" <<'EOF'
+# existing user config
+Host custom
+  User alice
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_create_test4.log 2>&1 || { cat /tmp/chezmoi_create_test4.log; exit 1; }
+printf '=== config after apply ===\n'
+cat "$dst/.ssh/config"
+
+```
 ```
 Chunk ID: 1198c3
 Wall time: 0.0522 seconds
@@ -1469,8 +1615,31 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:02:57Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:02:59Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh" "$dst"
+cat > "$src/dot_ssh/create_config" <<'EOF'
+# managed default
+Include ~/.ssh/config.d/*
+EOF
+chezmoi -S "$src" -D "$dst" apply >/dev/null
+# user edits file
+cat > "$dst/.ssh/config" <<'EOF'
+# user modified
+Host x
+  User y
+EOF
+printf '=== chezmoi status ===\n'
+chezmoi -S "$src" -D "$dst" status || true
+printf '\n=== chezmoi diff ===\n'
+chezmoi -S "$src" -D "$dst" diff || true
+
+```
 ```
 Chunk ID: bff8de
 Wall time: 0.0520 seconds
@@ -1499,8 +1668,30 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:03:08Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:03:11Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh/config.d" "$dst"
+cat > "$src/dot_ssh/private_create_config" <<'EOF'
+Include ~/.ssh/config.d/*
+Host *
+  AddKeysToAgent yes
+EOF
+cat > "$src/dot_ssh/config.d/private_create_00-defaults" <<'EOF'
+Host *
+  ServerAliveInterval 60
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_private_create_test.log 2>&1 || { cat /tmp/chezmoi_private_create_test.log; exit 1; }
+printf '=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+printf '\n=== perms ===\n'
+stat -f '%N %Sp' "$dst/.ssh/config" "$dst/.ssh/config.d/00-defaults"
+
+```
 ```
 Chunk ID: 1fe0ea
 Wall time: 0.0522 seconds
@@ -1527,8 +1718,30 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:03:15Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:03:18Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/dot_ssh/config.d" "$dst"
+cat > "$src/dot_ssh/create_private_config" <<'EOF'
+Include ~/.ssh/config.d/*
+EOF
+cat > "$src/dot_ssh/config.d/create_private_00-defaults" <<'EOF'
+Host *
+  ServerAliveInterval 60
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_private_create_test2.log 2>&1 || { cat /tmp/chezmoi_private_create_test2.log; exit 1; }
+printf '=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+printf '\n=== destination tree ===\n'
+find "$dst" -maxdepth 4 -print | sort
+printf '\n=== perms ===\n'
+stat -f '%N %Sp' "$dst/.ssh/config" "$dst/.ssh/config.d/00-defaults"
+
+```
 ```
 Chunk ID: be5b52
 Wall time: 0.0512 seconds
@@ -1591,8 +1804,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:08:03Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:08:03Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,280p' justfile`</summary>
 ```
 Chunk ID: bc0431
 Wall time: 0.0514 seconds
@@ -1755,8 +1968,8 @@ pre-commit-setup: pre-commit-install-tool
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:08:03Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "chmod|private_|\.ssh|config.d|Include" run_* .chezmoi.toml.tmpl README.md CLAUDE.md docs 2>/dev/null`</summary>
 ```
 Chunk ID: 76c561
 Wall time: 0.0521 seconds
@@ -1784,8 +1997,8 @@ docs/initial_setup/0_ManualSetupRecord.md:64:- [ohmyzsh/ohmyzsh: 🙃 A delightf
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:08:03Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
 ```
 Chunk ID: 059f7b
 Wall time: 0.0521 seconds
@@ -1797,8 +2010,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:08:03Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git branch --show-current`</summary>
 ```
 Chunk ID: 9a0f63
 Wall time: 0.0521 seconds
@@ -1870,8 +2083,32 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:10:39Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:10:43Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/private_dot_ssh/dot_config.d" "$dst"
+cat > "$src/private_dot_ssh/create_private_config" <<'EOF'
+Include ~/.ssh/config.d/*
+Host *
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+EOF
+cat > "$src/private_dot_ssh/dot_config.d/create_private_git" <<'EOF'
+Host github.com
+  HostName github.com
+  User git
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_private_dir_test.log 2>&1 || { cat /tmp/chezmoi_private_dir_test.log; exit 1; }
+printf '=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+printf '\n=== perms ===\n'
+stat -f '%N %Sp' "$dst/.ssh" "$dst/.ssh/config" "$dst/.ssh/config.d" "$dst/.ssh/config.d/git"
+
+```
 ```
 Chunk ID: bed4b5
 Wall time: 0.1092 seconds
@@ -1900,8 +2137,31 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:10:50Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:10:54Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/private_dot_ssh/config.d" "$dst"
+cat > "$src/private_dot_ssh/create_private_config" <<'EOF'
+Include ~/.ssh/config.d/*
+Host *
+  ServerAliveInterval 60
+EOF
+cat > "$src/private_dot_ssh/config.d/create_private_git" <<'EOF'
+Host github.com
+  HostName github.com
+  User git
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_private_dir_test2.log 2>&1 || { cat /tmp/chezmoi_private_dir_test2.log; exit 1; }
+printf '=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+printf '\n=== perms ===\n'
+stat -f '%N %Sp' "$dst/.ssh" "$dst/.ssh/config" "$dst/.ssh/config.d" "$dst/.ssh/config.d/git"
+
+```
 ```
 Chunk ID: bb72a3
 Wall time: 0.0516 seconds
@@ -1930,8 +2190,29 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:10:58Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:11:01Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+workdir=$(mktemp -d)
+src="$workdir/src"
+dst="$workdir/dst"
+mkdir -p "$src/private_dot_ssh/private_config.d" "$dst"
+cat > "$src/private_dot_ssh/create_private_config" <<'EOF'
+Include ~/.ssh/config.d/*
+EOF
+cat > "$src/private_dot_ssh/private_config.d/create_private_git" <<'EOF'
+Host github.com
+  HostName github.com
+  User git
+EOF
+chezmoi -S "$src" -D "$dst" apply >/tmp/chezmoi_private_dir_test3.log 2>&1 || { cat /tmp/chezmoi_private_dir_test3.log; exit 1; }
+printf '=== managed entries ===\n'
+chezmoi -S "$src" -D "$dst" managed
+printf '\n=== perms ===\n'
+stat -f '%N %Sp' "$dst/.ssh/config.d" "$dst/.ssh/config.d/git"
+
+```
 ```
 Chunk ID: 9f1d10
 Wall time: 0.0513 seconds
@@ -2036,8 +2317,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:13:51Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:13:51Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short && ls -la dot_ssh 2>/dev/null || true && rg -n "~/.ssh|config.d|create-only|create_private|Config Files" README.md`</summary>
 ```
 Chunk ID: f5be76
 Wall time: 0.0521 seconds
@@ -2060,8 +2341,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:14:06Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:14:06Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '70,150p' README.md`</summary>
 ```
 Chunk ID: d63e83
 Wall time: 0.0520 seconds
@@ -2154,8 +2435,8 @@ just docker-china      # China mirror profile
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:14:06Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `mkdir -p dot_ssh/private_config.d && echo 'prepared'`</summary>
 ```
 Chunk ID: 31dd73
 Wall time: 0.0520 seconds
@@ -2312,8 +2593,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:14:43Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:14:43Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just chezmoi-dry-run`</summary>
 ```
 Chunk ID: 71c0f8
 Wall time: 0.1245 seconds
@@ -2326,8 +2607,8 @@ chezmoi apply --dry-run
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:14:43Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
 ```
 Chunk ID: 5f254c
 Wall time: 0.0509 seconds
@@ -2351,8 +2632,54 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:14:51Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:14:58Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -euo pipefail
+repo_src="$PWD"
+workdir=$(mktemp -d)
+src="$workdir/src"
+mkdir -p "$src"
+cp -R "$repo_src/dot_ssh" "$src/dot_ssh"
+
+printf '== Test 1: fresh install ==\n'
+dst1="$workdir/dst1"
+mkdir -p "$dst1"
+chezmoi -S "$src" -D "$dst1" apply
+for f in "$dst1/.ssh/config" "$dst1/.ssh/config.d/00-defaults" "$dst1/.ssh/config.d/git"; do
+  [[ -f "$f" ]] || { echo "missing: $f"; exit 1; }
+  echo "present: $f"
+done
+stat -f 'perm %N %Sp' "$dst1/.ssh" "$dst1/.ssh/config" "$dst1/.ssh/config.d" "$dst1/.ssh/config.d/00-defaults" "$dst1/.ssh/config.d/git"
+
+printf '\n== Test 2: existing ~/.ssh/config is not overwritten ==\n'
+dst2="$workdir/dst2"
+mkdir -p "$dst2/.ssh"
+cat > "$dst2/.ssh/config" <<'EOF'
+# existing user config
+Host custom
+  User alice
+EOF
+chezmoi -S "$src" -D "$dst2" apply
+printf 'content after apply:\n'
+cat "$dst2/.ssh/config"
+
+printf '\n== Test 3: user-modified create-only file not reported as drift ==\n'
+dst3="$workdir/dst3"
+mkdir -p "$dst3"
+chezmoi -S "$src" -D "$dst3" apply
+cat > "$dst3/.ssh/config" <<'EOF'
+# user changed after initial create
+Include ~/.ssh/config.d/*
+Host *
+  ServerAliveInterval 10
+EOF
+printf 'status output (should be empty):\n'
+chezmoi -S "$src" -D "$dst3" status || true
+printf 'diff output (should be empty):\n'
+chezmoi -S "$src" -D "$dst3" diff || true
+
+```
 ```
 Chunk ID: 71c889
 Wall time: 0.2161 seconds
@@ -2394,8 +2721,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:15:12Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:13Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
 ```
 Chunk ID: 5e98b9
 Wall time: 0.0520 seconds
@@ -2409,8 +2736,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:13Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_ssh/create_private_config`</summary>
 ```
 Chunk ID: 7245aa
 Wall time: 0.0518 seconds
@@ -2449,8 +2776,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:13Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_ssh/private_config.d/create_private_00-defaults`</summary>
 ```
 Chunk ID: e81476
 Wall time: 0.0518 seconds
@@ -2472,8 +2799,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:13Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_ssh/private_config.d/create_private_git`</summary>
 ```
 Chunk ID: 82b2c1
 Wall time: 0.0519 seconds
@@ -2510,8 +2837,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:13Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba README.md | sed -n '88,122p'`</summary>
 ```
 Chunk ID: 05eb53
 Wall time: 0.0506 seconds
@@ -2558,8 +2885,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:18Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- README.md dot_ssh/create_private_config dot_ssh/private_config.d/create_private_00-defaults dot_ssh/private_config.d/create_private_git`</summary>
 ```
 Chunk ID: 6544b7
 Wall time: 0.0514 seconds
@@ -2599,8 +2926,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:15:29Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:31Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `if command -v pre-commit >/dev/null 2>&1; then pre-commit run --files README.md dot_ssh/create_private_config dot_ssh/private_config.d/create_private_00-defaults dot_ssh/private_config.d/create_private_git; else echo 'pre-commit not installed'; fi`</summary>
 ```
 Chunk ID: 949425
 Wall time: 0.5666 seconds
@@ -2626,8 +2953,8 @@ _**Agent (gpt-5.3-codex 2026-02-11 10:15:35Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-11 10:15:35Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short && find dot_ssh -type f | sort`</summary>
 ```
 Chunk ID: af3a32
 Wall time: 0.0520 seconds

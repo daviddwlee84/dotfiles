@@ -89,6 +89,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/alacritty/` - Alacritty terminal config
 - `~/.config/starship.toml` - Starship cross-shell prompt config
+- `~/.config/direnv/direnvrc` - direnv helper functions, including `.venv`-aware Python activation
 - `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))
   - `yazi.toml` - Main config with open rules and openers (`o`/`O`)
   - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
@@ -181,4 +182,4 @@ just info             # Show system info
 
 ## Customization
 
-See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, and [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI.
+See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, and [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI.

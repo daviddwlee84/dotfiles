@@ -40,14 +40,6 @@ Optimize zsh & tmux startup time
 
 ~Do we want to use Brewfile to manage macOS packages installation instead of writing one by one through Ansible?~ **Done**: XDG-compliant Brewfiles at `~/.config/homebrew/` with chezmoi run_onchange script (opt-in via `installBrewApps`).
 
-`direnv` & Python integration
-
-- [Python · direnv/direnv Wiki](https://github.com/direnv/direnv/wiki/Python)
-- [Activate python venv by default? · Issue #1264 · direnv/direnv](https://github.com/direnv/direnv/issues/1264)
-- [PS1 · direnv/direnv Wiki](https://github.com/direnv/direnv/wiki/PS1)
-
-([hyperupcall/autoenv: Directory-based environments.](https://github.com/hyperupcall/autoenv))
-
 ---
 
 ML

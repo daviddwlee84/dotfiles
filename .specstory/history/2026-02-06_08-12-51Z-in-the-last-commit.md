@@ -27,8 +27,8 @@ _**Agent (gpt-5.2-codex 2026-02-06 08:16:33Z)**_
 
 _**Agent (gpt-5.2-codex 2026-02-06 08:16:34Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls`</summary>
 ```
 Chunk ID: 9cd851
 Wall time: 0.0517 seconds
@@ -69,8 +69,8 @@ I'm targeting two specific files related to the dashboard view for further inspe
 
 _**Agent (gpt-5.2-codex 2026-02-06 08:16:39Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "project" dot_config/nvim/lazyvim.json dot_config/nvim/lua/plugins/dashboard.lua`</summary>
 ```
 Chunk ID: 8cff84
 Wall time: 0.0512 seconds
@@ -85,8 +85,8 @@ dot_config/nvim/lua/plugins/dashboard.lua:6:      -- desc="Projects (util.projec
 
 _**Agent (gpt-5.2-codex 2026-02-06 08:16:42Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat dot_config/nvim/lazyvim.json`</summary>
 ```
 Chunk ID: 1f0999
 Wall time: 0.0520 seconds
@@ -119,8 +119,8 @@ Output:
 
 _**Agent (gpt-5.2-codex 2026-02-06 08:16:45Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `cat dot_config/nvim/lua/plugins/dashboard.lua`</summary>
 ```
 Chunk ID: 6fb50c
 Wall time: 0.0523 seconds

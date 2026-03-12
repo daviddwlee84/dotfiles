@@ -1,0 +1,27 @@
+# ~/.config/direnv/direnvrc - direnv helper functions
+
+# Activate an existing Python virtual environment directory without creating it.
+#
+# Usage:
+#   layout_python_venv            # use .venv
+#   layout_python_venv venv       # use ./venv
+#   layout_python_venv ~/.venvs/x # use custom absolute path
+layout_python_venv() {
+  local venv_dir=${1:-.venv}
+  local venv_path=${venv_dir/#\~/$HOME}
+
+  # Re-evaluate when the virtualenv appears or is recreated.
+  watch_file "$venv_path/pyvenv.cfg"
+  watch_file "$venv_path/bin/activate"
+
+  if [[ ! -d "$venv_path" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$venv_path/pyvenv.cfg" && ! -f "$venv_path/bin/activate" ]]; then
+    return 0
+  fi
+
+  export VIRTUAL_ENV="$venv_path"
+  layout python3
+}

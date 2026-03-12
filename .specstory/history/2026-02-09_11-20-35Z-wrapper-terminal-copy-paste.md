@@ -204,8 +204,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:20:44Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:44Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `pwd && ls -la`</summary>
 ```
 Chunk ID: 21e55a
 Wall time: 0.0525 seconds
@@ -256,8 +256,8 @@ drwxr-xr-x@  4 daviddwlee84  staff   128 Feb  4 16:07 scripts
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:44Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg --files`</summary>
 ```
 Chunk ID: 283d67
 Wall time: 0.0508 seconds
@@ -391,8 +391,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:20:49Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "\b(pbcopy|pbpaste|xclip|xsel|wl-copy|wl-paste|xdg-open|wslview|clip\.exe|explorer\.exe|copy|paste|open)\b" dot_config dot_zshrc.tmpl dot_ansible README.md CLAUDE.md`</summary>
 ```
 Chunk ID: 392f46
 Wall time: 0.0518 seconds
@@ -430,8 +430,8 @@ dot_ansible/roles/coding_agents/tasks/main.yml:578:  ansible.builtin.copy:
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:49Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -la dot_config/zsh && ls -la dot_config/zsh/tools`</summary>
 ```
 Chunk ID: a6b22f
 Wall time: 0.0514 seconds
@@ -481,8 +481,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:20:58Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:58Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg --files -g 'executable_*' -g 'dot_local/**' -g '*.tmpl' | sed -n '1,200p'`</summary>
 ```
 Chunk ID: 909118
 Wall time: 0.0521 seconds
@@ -514,8 +514,8 @@ dot_config/zsh/00_exports.zsh.tmpl
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:20:58Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' dot_zshrc.tmpl && echo '---' && sed -n '1,220p' dot_config/zsh/00_exports.zsh.tmpl && echo '---' && sed -n '1,220p' dot_config/zsh/10_aliases.zsh`</summary>
 ```
 Chunk ID: b4a34a
 Wall time: 0.0521 seconds
@@ -701,8 +701,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:05Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:05Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' README.md`</summary>
 ```
 Chunk ID: 64c55c
 Wall time: 0.0521 seconds
@@ -877,8 +877,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:09Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:10Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "private_dot_local|dot_local|\.local/bin|executable_" .chezmoi.toml.tmpl README.md CLAUDE.md run_once_before_00_bootstrap.sh.tmpl dot_ansible/roles -g '*.yml' -g '*.tmpl'`</summary>
 ```
 Chunk ID: 1b3d31
 Wall time: 0.0521 seconds
@@ -941,8 +941,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:14Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:14Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' dot_config/git/hooks/executable_pre-commit.tmpl`</summary>
 ```
 Chunk ID: 930f96
 Wall time: 0.0506 seconds
@@ -1000,8 +1000,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:18Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:19Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' .chezmoi.toml.tmpl`</summary>
 ```
 Chunk ID: c44a06
 Wall time: 0.0512 seconds
@@ -1048,8 +1048,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:22Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:23Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,320p' Dockerfile`</summary>
 ```
 Chunk ID: 99e8b4
 Wall time: 0.0506 seconds
@@ -1190,8 +1190,8 @@ Dockerfile 目前只跟 `.chezmoi.toml.tmpl` 的 prompt 綁定，若我們不新
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:30Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,280p' dot_config/zsh/02_legacy_tools.zsh && echo '---' && sed -n '1,220p' dot_config/zsh/tools/34_openclaw.zsh && echo '---' && sed -n '1,220p' dot_config/zsh/tools/40_codexbar.zsh`</summary>
 ```
 Chunk ID: 78c920
 Wall time: 0.0517 seconds
@@ -1299,8 +1299,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:36Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:36Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,240p' docs/tools/pqsum.md`</summary>
 ```
 Chunk ID: e12368
 Wall time: 0.0517 seconds
@@ -1383,8 +1383,8 @@ Group Summary
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:36Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' docs/tools/codexbar.md`</summary>
 ```
 Chunk ID: 5c1596
 Wall time: 0.0517 seconds
@@ -1479,8 +1479,8 @@ Defined in `~/.config/zsh/tools/40_codexbar.zsh`:
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:36Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' justfile`</summary>
 ```
 Chunk ID: 25cb84
 Wall time: 0.0517 seconds
@@ -1649,8 +1649,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:40Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:41Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "xclip|xsel|wl-clipboard|wl-copy|xdg-open|gio|wslu|wslview|pbcopy|pbpaste|clip.exe" dot_ansible README.md docs CLAUDE.md`</summary>
 ```
 Chunk ID: 5a5c68
 Wall time: 0.0518 seconds
@@ -1668,8 +1668,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:21:46Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:21:47Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
 ```
 Chunk ID: d7508b
 Wall time: 0.0524 seconds
@@ -1717,8 +1717,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:23:17Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:23:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' .pre-commit-config.yaml`</summary>
 ```
 Chunk ID: 665479
 Wall time: 0.0513 seconds
@@ -1760,8 +1760,8 @@ repos:
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:23:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' CLAUDE.md`</summary>
 ```
 Chunk ID: 10aec5
 Wall time: 0.0513 seconds
@@ -1939,8 +1939,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:25:21Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:25:21Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "is_wsl|WAYLAND_DISPLAY|XDG_SESSION_TYPE|uname -s|OSTYPE|xdg-open|pbcopy|clipboard" dot_config run_* scripts README.md CLAUDE.md`</summary>
 ```
 Chunk ID: f24571
 Wall time: 0.0521 seconds
@@ -1953,8 +1953,8 @@ dot_config/zsh/02_legacy_tools.zsh:30:if [[ "$OSTYPE" == darwin* ]]; then
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:25:21Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "shellcheck|bats|shunit|test.*script|bash -n|zsh -n" justfile README.md CLAUDE.md .pre-commit-config.yaml`</summary>
 ```
 Chunk ID: 2f2cc1
 Wall time: 0.0521 seconds
@@ -2102,8 +2102,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:43:01Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:43:01Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -la dot_local || true && ls -la dot_local/bin || true`</summary>
 ```
 Chunk ID: 93f5ac
 Wall time: 0.0519 seconds
@@ -2117,8 +2117,8 @@ ls: dot_local/bin: No such file or directory
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:43:01Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "What You Get|Config Files|Manual Commands|x copy|clipboard|~/.local/bin" README.md`</summary>
 ```
 Chunk ID: aed8ad
 Wall time: 0.0509 seconds
@@ -2141,8 +2141,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:43:24Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:43:24Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '70,170p' README.md`</summary>
 ```
 Chunk ID: a65a6f
 Wall time: 0.0520 seconds
@@ -2256,8 +2256,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:43:29Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:43:30Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `mkdir -p dot_local/bin`</summary>
 ```
 Chunk ID: 48d0a1
 Wall time: 0.0522 seconds
@@ -2630,8 +2630,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:44:39Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:44:39Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `bash -n dot_local/bin/executable_x`</summary>
 ```
 Chunk ID: 295cf8
 Wall time: 0.0515 seconds
@@ -2643,8 +2643,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:44:39Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chmod +x dot_local/bin/executable_x && ./dot_local/bin/executable_x help >/tmp/x_help.out && echo "help_exit=$?" && ./dot_local/bin/executable_x >/tmp/x_empty.out 2>/tmp/x_empty.err; echo "empty_exit=$?" && ./dot_local/bin/executable_x unknown >/tmp/x_unknown.out 2>/tmp/x_unknown.err; echo "unknown_exit=$?"`</summary>
 ```
 Chunk ID: c27cab
 Wall time: 0.4916 seconds
@@ -2669,8 +2669,55 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:45:08Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:45:17Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+printf 'not-a-real-key\n' > "$TMPDIR/id_ed25519"
+printf 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQABAAACAQ test@example\n' > "$TMPDIR/id_ed25519.pub"
+printf '[REDACTED PRIV***KEY BLOCK]\n' > "$TMPDIR/some.txt"
+printf 'hello world\n' > "$TMPDIR/file with spaces.txt"
+
+# Sensitive filename blocked
+./dot_local/bin/executable_x copy "$TMPDIR/id_ed25519" >/tmp/x_t1.out 2>/tmp/x_t1.err || true
+echo "sensitive_filename_exit=$(tail -n 1 /tmp/x_t1.err >/dev/null 2>&1; true; ./dot_local/bin/executable_x copy \"$TMPDIR/id_ed25519\" >/dev/null 2>&1; echo $?)" >/tmp/x_t1.code || true
+
+# Capture exit robustly
+set +e
+./dot_local/bin/executable_x copy "$TMPDIR/id_ed25519" >/tmp/x_t1.out 2>/tmp/x_t1.err
+T1=$?
+./dot_local/bin/executable_x copy "$TMPDIR/some.txt" >/tmp/x_t2.out 2>/tmp/x_t2.err
+T2=$?
+./dot_local/bin/executable_x copy --force "$TMPDIR/id_ed25519" >/tmp/x_t3.out 2>/tmp/x_t3.err
+T3=$?
+./dot_local/bin/executable_x copy "$TMPDIR/id_ed25519.pub" >/tmp/x_t4.out 2>/tmp/x_t4.err
+T4=$?
+./dot_local/bin/executable_x copy "$TMPDIR/file with spaces.txt" >/tmp/x_t5.out 2>/tmp/x_t5.err
+T5=$?
+set -e
+
+printf "t1=%s\nt2=%s\nt3=%s\nt4=%s\nt5=%s\n" "$T1" "$T2" "$T3" "$T4" "$T5"
+
+# Missing backend message (sanitize PATH, run via bash)
+mkdir -p "$TMPDIR/emptybin"
+set +e
+PATH="$TMPDIR/emptybin" bash ./dot_local/bin/executable_x paste >/tmp/x_t6.out 2>/tmp/x_t6.err
+T6=$?
+set -e
+printf "t6=%s\n" "$T6"
+
+echo '---t1.err---'
+sed -n '1,5p' /tmp/x_t1.err
+
+echo '---t2.err---'
+sed -n '1,5p' /tmp/x_t2.err
+
+echo '---t6.err---'
+sed -n '1,8p' /tmp/x_t6.err
+
+```
 ```
 Chunk ID: 8a3fcc
 Wall time: 0.2251 seconds
@@ -2706,8 +2753,43 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:45:39Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:45:45Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+TMPBIN=$(mktemp -d)
+trap 'rm -rf "$TMPBIN"' EXIT
+ln -s /usr/bin/grep "$TMPBIN/grep"
+
+set +e
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x copy < <(printf 'abc') >/tmp/x_nb_copy.out 2>/tmp/x_nb_copy.err
+NB_COPY=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x paste >/tmp/x_nb_paste.out 2>/tmp/x_nb_paste.err
+NB_PASTE=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x open https://example.com >/tmp/x_nb_open.out 2>/tmp/x_nb_open.err
+NB_OPEN=$?
+set -e
+
+printf "nb_copy=%s\nnb_paste=%s\nnb_open=%s\n" "$NB_COPY" "$NB_PASTE" "$NB_OPEN"
+
+echo '---nb_copy.err---'
+sed -n '1,8p' /tmp/x_nb_copy.err
+
+echo '---nb_paste.err---'
+sed -n '1,8p' /tmp/x_nb_paste.err
+
+echo '---nb_open.err---'
+sed -n '1,8p' /tmp/x_nb_open.err
+
+set +e
+printf 'abc' | ./dot_local/bin/executable_x copy
+CP_EXIT=$?
+PASTE_OUT=$(./dot_local/bin/executable_x paste)
+PASTE_EXIT=$?
+set -e
+printf "pipe_copy_exit=%s\npaste_exit=%s\npaste_out=%s\n" "$CP_EXIT" "$PASTE_EXIT" "$PASTE_OUT"
+
+```
 ```
 Chunk ID: 5cb0df
 Wall time: 0.0525 seconds
@@ -2737,8 +2819,36 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:45:52Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:45:56Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+TMPBIN=$(mktemp -d)
+trap 'rm -rf "$TMPBIN"' EXIT
+ln -s /usr/bin/grep "$TMPBIN/grep"
+ln -s /bin/cat "$TMPBIN/cat"
+
+set +e
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x copy < <(printf 'abc') >/tmp/x_nb_copy.out 2>/tmp/x_nb_copy.err
+NB_COPY=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x paste >/tmp/x_nb_paste.out 2>/tmp/x_nb_paste.err
+NB_PASTE=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x open https://example.com >/tmp/x_nb_open.out 2>/tmp/x_nb_open.err
+NB_OPEN=$?
+set -e
+
+printf "nb_copy=%s\nnb_paste=%s\nnb_open=%s\n" "$NB_COPY" "$NB_PASTE" "$NB_OPEN"
+
+echo '---nb_copy.err---'
+sed -n '1,8p' /tmp/x_nb_copy.err
+
+echo '---nb_paste.err---'
+sed -n '1,8p' /tmp/x_nb_paste.err
+
+echo '---nb_open.err---'
+sed -n '1,8p' /tmp/x_nb_open.err
+
+```
 ```
 Chunk ID: 70b095
 Wall time: 0.0519 seconds
@@ -2779,8 +2889,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:46:04Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:04Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
 ```
 Chunk ID: 9fccf3
 Wall time: 0.0517 seconds
@@ -2817,8 +2927,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:46:16Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:16Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- README.md dot_local/bin/executable_x`</summary>
 ```
 Chunk ID: 1c9cb0
 Wall time: 0.0521 seconds
@@ -2875,8 +2985,8 @@ index 31739fb..5957d96 100644
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:16Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -l dot_local/bin/executable_x && file dot_local/bin/executable_x`</summary>
 ```
 Chunk ID: c5b01a
 Wall time: 0.0509 seconds
@@ -2900,8 +3010,20 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:46:35Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:35Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set +e
+./dot_local/bin/executable_x open >/tmp/x_arg_open.out 2>/tmp/x_arg_open.err
+E1=$?
+./dot_local/bin/executable_x paste extra >/tmp/x_arg_paste.out 2>/tmp/x_arg_paste.err
+E2=$?
+./dot_local/bin/executable_x copy --bad >/tmp/x_arg_copy.out 2>/tmp/x_arg_copy.err
+E3=$?
+set -e
+printf "open_missing_target=%s\npaste_extra_arg=%s\ncopy_bad_option=%s\n" "$E1" "$E2" "$E3"
+
+```
 ```
 Chunk ID: 3e5b7b
 Wall time: 0.0519 seconds
@@ -2916,8 +3038,21 @@ copy_bad_option=2
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:35Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+TMPBIN=$(mktemp -d)
+trap 'rm -rf "$TMPBIN"' EXIT
+cat > "$TMPBIN/open" <<'EOF'
+#!/usr/bin/env bash
+printf 'open-called:%s\n' "$1" > /tmp/x_open_stub.log
+EOF
+chmod +x "$TMPBIN/open"
+PATH="$TMPBIN:/usr/bin:/bin" ./dot_local/bin/executable_x open "https://example.com"
+cat /tmp/x_open_stub.log
+
+```
 ```
 Chunk ID: 6a1bd8
 Wall time: 0.4431 seconds
@@ -2936,8 +3071,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:46:39Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:40Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short README.md dot_local/bin/executable_x && nl -ba dot_local/bin/executable_x | sed -n '1,260p' && nl -ba README.md | sed -n '80,155p'`</summary>
 ```
 Chunk ID: 686cae
 Wall time: 0.0524 seconds
@@ -3142,8 +3277,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:46:45Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:46:46Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_local/bin/executable_x | sed -n '256,360p'`</summary>
 ```
 Chunk ID: 9bb1ad
 Wall time: 0.0513 seconds
@@ -3441,8 +3576,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:47:44Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:47:44Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_local/bin/executable_x | sed -n '1,260p'`</summary>
 ```
 Chunk ID: 7f6358
 Wall time: 0.0522 seconds
@@ -3631,8 +3766,359 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:47:55Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:48:28Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+cat > dot_local/bin/executable_x <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    printf '%s\n' \
+        "Usage:" \
+        "  x copy [--force] [FILE]" \
+        "  x paste" \
+        "  x open TARGET" \
+        "  x help" \
+        "" \
+        "Examples:" \
+        "  printf \"hello\" | x copy" \
+        "  x copy ~/.ssh/id_ed25519.pub" \
+        "  x paste" \
+        "  x open https://example.com"
+}
+
+err() {
+    printf 'x: %s\n' "$*" >&2
+}
+
+is_wsl() {
+    local version
+    [[ -r /proc/version ]] || return 1
+    version="$(< /proc/version)"
+    version="${version,,}"
+    [[ "$version" == *microsoft* || "$version" == *wsl* ]]
+}
+
+clipboard_backend_help() {
+    printf '%s\n' \
+        "x: no clipboard backend found." \
+        "x: install one of:" \
+        "x:   - macOS: pbcopy/pbpaste (built-in)" \
+        "x:   - Linux Wayland: wl-clipboard (wl-copy/wl-paste)" \
+        "x:   - Linux X11: xclip or xsel" \
+        "x:   - WSL: clip.exe / powershell.exe" >&2
+}
+
+open_backend_help() {
+    printf '%s\n' \
+        "x: no opener backend found." \
+        "x: install one of:" \
+        "x:   - macOS: open (built-in)" \
+        "x:   - Linux: xdg-open (xdg-utils) or gio (glib)" \
+        "x:   - WSL: wslview (wslu) or explorer.exe" >&2
+}
+
+is_sensitive_filename() {
+    local file="$1"
+    local base
+    base="$(basename -- "$file")"
+
+    # Public keys are safe to copy.
+    if [[ "$base" == *.pub ]]; then
+        return 1
+    fi
+
+    case "$base" in
+        id_rsa|id_ed25519|id_ecdsa|id_dsa|id_xmss)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+is_sensitive_content() {
+    local file="$1"
+    if head -c 8192 -- "$file" 2>/dev/null | grep -aq "PRIV***KEY"; then
+        return 0
+    fi
+    return 1
+}
+
+is_sensitive_file() {
+    local file="$1"
+    if is_sensitive_filename "$file"; then
+        return 0
+    fi
+    if is_sensitive_content "$file"; then
+        return 0
+    fi
+    return 1
+}
+
+copy_backend() {
+    if is_wsl && command -v clip.exe >/dev/null 2>&1; then
+        if clip.exe; then
+            return 0
+        fi
+        err "copy backend failed: clip.exe"
+        exit 1
+    fi
+
+    if command -v pbcopy >/dev/null 2>&1; then
+        if pbcopy; then
+            return 0
+        fi
+        err "copy backend failed: pbcopy"
+        exit 1
+    fi
+
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+        if wl-copy; then
+            return 0
+        fi
+        err "copy backend failed: wl-copy"
+        exit 1
+    fi
+
+    if command -v xclip >/dev/null 2>&1; then
+        if xclip -selection clipboard; then
+            return 0
+        fi
+        err "copy backend failed: xclip"
+        exit 1
+    fi
+
+    if command -v xsel >/dev/null 2>&1; then
+        if xsel --clipboard --input; then
+            return 0
+        fi
+        err "copy backend failed: xsel"
+        exit 1
+    fi
+
+    clipboard_backend_help
+    exit 1
+}
+
+paste_backend() {
+    if is_wsl && command -v powershell.exe >/dev/null 2>&1; then
+        if powershell.exe -NoProfile -Command "Get-Clipboard" | tr -d '\r'; then
+            return 0
+        fi
+        err "paste backend failed: powershell.exe"
+        exit 1
+    fi
+
+    if command -v pbpaste >/dev/null 2>&1; then
+        if pbpaste; then
+            return 0
+        fi
+        err "paste backend failed: pbpaste"
+        exit 1
+    fi
+
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-paste >/dev/null 2>&1; then
+        if wl-paste --no-newline; then
+            return 0
+        fi
+        err "paste backend failed: wl-paste"
+        exit 1
+    fi
+
+    if command -v xclip >/dev/null 2>&1; then
+        if xclip -selection clipboard -o; then
+            return 0
+        fi
+        err "paste backend failed: xclip"
+        exit 1
+    fi
+
+    if command -v xsel >/dev/null 2>&1; then
+        if xsel --clipboard --output; then
+            return 0
+        fi
+        err "paste backend failed: xsel"
+        exit 1
+    fi
+
+    clipboard_backend_help
+    exit 1
+}
+
+open_backend() {
+    local target="$1"
+
+    if is_wsl && command -v wslview >/dev/null 2>&1; then
+        if wslview "$target"; then
+            return 0
+        fi
+        err "open backend failed: wslview"
+        exit 1
+    fi
+
+    if is_wsl && command -v explorer.exe >/dev/null 2>&1; then
+        if explorer.exe "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        err "open backend failed: explorer.exe"
+        exit 1
+    fi
+
+    if command -v open >/dev/null 2>&1; then
+        if open "$target"; then
+            return 0
+        fi
+        err "open backend failed: open"
+        exit 1
+    fi
+
+    if command -v xdg-open >/dev/null 2>&1; then
+        if xdg-open "$target" >/dev/null 2>&1 & then
+            return 0
+        fi
+        err "open backend failed: xdg-open"
+        exit 1
+    fi
+
+    if command -v gio >/dev/null 2>&1; then
+        if gio open "$target" >/dev/null 2>&1 & then
+            return 0
+        fi
+        err "open backend failed: gio"
+        exit 1
+    fi
+
+    if command -v cmd.exe >/dev/null 2>&1; then
+        if cmd.exe /c start "" "$target" >/dev/null 2>&1; then
+            return 0
+        fi
+        err "open backend failed: cmd.exe"
+        exit 1
+    fi
+
+    open_backend_help
+    exit 1
+}
+
+do_copy() {
+    local force=0
+    local file=""
+
+    while (($#)); do
+        case "$1" in
+            --force)
+                force=1
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                err "copy: unknown option: $1"
+                usage >&2
+                exit 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# > 1)); then
+        err "copy: too many arguments"
+        usage >&2
+        exit 2
+    fi
+
+    if (($# == 1)); then
+        file="$1"
+    fi
+
+    if [[ -n "$file" ]]; then
+        if [[ ! -r "$file" ]]; then
+            err "copy: file not readable: $file"
+            exit 1
+        fi
+
+        if ((force == 0)) && is_sensitive_file "$file"; then
+            err "copy: refusing to copy sensitive key material: $file"
+            err "copy: use 'x copy --force \"$file\"' to override."
+            exit 3
+        fi
+
+        copy_backend < "$file"
+        return 0
+    fi
+
+    if [[ -t 0 ]]; then
+        printf '%s\n' "x copy: reading from terminal input; press Ctrl-D to finish." >&2
+    fi
+
+    copy_backend
+}
+
+do_paste() {
+    if (($# != 0)); then
+        err "paste: unexpected arguments"
+        usage >&2
+        exit 2
+    fi
+
+    paste_backend
+}
+
+do_open() {
+    if (($# != 1)); then
+        err "open: expected exactly one TARGET"
+        usage >&2
+        exit 2
+    fi
+
+    open_backend "$1"
+}
+
+main() {
+    local sub="${1:-}"
+    if (($# > 0)); then
+        shift
+    fi
+
+    case "$sub" in
+        copy)
+            do_copy "$@"
+            ;;
+        paste)
+            do_paste "$@"
+            ;;
+        open)
+            do_open "$@"
+            ;;
+        help|-h|--help)
+            usage
+            ;;
+        "")
+            usage >&2
+            exit 2
+            ;;
+        *)
+            err "unknown subcommand: $sub"
+            usage >&2
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"
+EOF
+chmod +x dot_local/bin/executable_x
+```
 ```
 Chunk ID: 54b378
 Wall time: 0.0522 seconds
@@ -3650,8 +4136,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:48:33Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:48:33Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `bash -n dot_local/bin/executable_x`</summary>
 ```
 Chunk ID: 12f552
 Wall time: 0.0519 seconds
@@ -3669,8 +4155,88 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:48:39Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:48:53Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+
+# Basic exit codes
+set +e
+./dot_local/bin/executable_x help >/tmp/x_help.out 2>/tmp/x_help.err
+H=$?
+./dot_local/bin/executable_x >/tmp/x_empty.out 2>/tmp/x_empty.err
+E=$?
+./dot_local/bin/executable_x unknown >/tmp/x_unknown.out 2>/tmp/x_unknown.err
+U=$?
+./dot_local/bin/executable_x open >/tmp/x_open_missing.out 2>/tmp/x_open_missing.err
+OM=$?
+./dot_local/bin/executable_x paste extra >/tmp/x_paste_extra.out 2>/tmp/x_paste_extra.err
+PE=$?
+./dot_local/bin/executable_x copy --bad >/tmp/x_copy_bad.out 2>/tmp/x_copy_bad.err
+CB=$?
+set -e
+printf "help=%s empty=%s unknown=%s open_missing=%s paste_extra=%s copy_bad=%s\n" "$H" "$E" "$U" "$OM" "$PE" "$CB"
+
+# Sensitive guard tests
+TMPDIR=$(mktemp -d)
+TMPBIN=$(mktemp -d)
+trap 'rm -rf "$TMPDIR" "$TMPBIN"' EXIT
+printf 'not-a-real-key\n' > "$TMPDIR/id_ed25519"
+printf 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQABAAACAQ test@example\n' > "$TMPDIR/id_ed25519.pub"
+printf '[REDACTED PRIV***KEY BLOCK]\n' > "$TMPDIR/some.txt"
+printf 'hello world\n' > "$TMPDIR/file with spaces.txt"
+
+set +e
+./dot_local/bin/executable_x copy "$TMPDIR/id_ed25519" >/tmp/x_t1.out 2>/tmp/x_t1.err
+T1=$?
+./dot_local/bin/executable_x copy "$TMPDIR/some.txt" >/tmp/x_t2.out 2>/tmp/x_t2.err
+T2=$?
+./dot_local/bin/executable_x copy --force "$TMPDIR/id_ed25519" >/tmp/x_t3.out 2>/tmp/x_t3.err
+T3=$?
+./dot_local/bin/executable_x copy "$TMPDIR/id_ed25519.pub" >/tmp/x_t4.out 2>/tmp/x_t4.err
+T4=$?
+./dot_local/bin/executable_x copy "$TMPDIR/file with spaces.txt" >/tmp/x_t5.out 2>/tmp/x_t5.err
+T5=$?
+set -e
+printf "sens_name=%s sens_content=%s force=%s pub=%s spaces=%s\n" "$T1" "$T2" "$T3" "$T4" "$T5"
+
+# Pipe copy/paste roundtrip
+set +e
+printf 'abc' | ./dot_local/bin/executable_x copy
+CP=$?
+PASTE_OUT=$(./dot_local/bin/executable_x paste)
+PP=$?
+set -e
+printf "pipe_copy=%s paste=%s paste_out=%s\n" "$CP" "$PP" "$PASTE_OUT"
+
+# Missing backend tests (PATH isolated)
+set +e
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x copy < <(printf 'abc') >/tmp/x_nb_copy.out 2>/tmp/x_nb_copy.err
+NBC=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x paste >/tmp/x_nb_paste.out 2>/tmp/x_nb_paste.err
+NBP=$?
+PATH="$TMPBIN" /bin/bash ./dot_local/bin/executable_x open https://example.com >/tmp/x_nb_open.out 2>/tmp/x_nb_open.err
+NBO=$?
+set -e
+printf "no_backend_copy=%s no_backend_paste=%s no_backend_open=%s\n" "$NBC" "$NBP" "$NBO"
+
+# Open stub test
+cat > "$TMPBIN/open" <<'EOF'
+#!/usr/bin/env bash
+printf 'open-called:%s\n' "$1" > /tmp/x_open_stub.log
+EOF
+chmod +x "$TMPBIN/open"
+PATH="$TMPBIN:/usr/bin:/bin" ./dot_local/bin/executable_x open "https://example.com"
+cat /tmp/x_open_stub.log
+
+# Show representative errors
+echo '---sensitive err---'
+sed -n '1,3p' /tmp/x_t1.err
+
+echo '---no backend err---'
+sed -n '1,6p' /tmp/x_nb_copy.err
+
+```
 ```
 Chunk ID: 0883fd
 Wall time: 0.4811 seconds
@@ -3707,8 +4273,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:49:02Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:02Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short README.md dot_local/bin/executable_x`</summary>
 ```
 Chunk ID: 09c491
 Wall time: 0.0514 seconds
@@ -3722,8 +4288,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:02Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- README.md`</summary>
 ```
 Chunk ID: 960b08
 Wall time: 0.0514 seconds
@@ -3780,8 +4346,8 @@ index 31739fb..5957d96 100644
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:02Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_local/bin/executable_x | sed -n '1,340p'`</summary>
 ```
 Chunk ID: f0795b
 Wall time: 0.0525 seconds
@@ -3966,8 +4532,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:49:15Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:16Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_local/bin/executable_x | sed -n '340,380p'`</summary>
 ```
 Chunk ID: 302964
 Wall time: 0.0521 seconds
@@ -3992,8 +4558,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:49:26Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:26Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "dot_local|\.local" .chezmoiignore`</summary>
 ```
 Chunk ID: a74cd5
 Wall time: 0.0512 seconds
@@ -4040,8 +4606,23 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:49:46Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:48Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
 <summary>Tool use: **exec_command**</summary>
+```bash
+set -e
+bash -n dot_local/bin/executable_x
+set +e
+./dot_local/bin/executable_x help >/tmp/x_help2.out 2>/tmp/x_help2.err
+H=$?
+./dot_local/bin/executable_x unknown >/tmp/x_unknown2.out 2>/tmp/x_unknown2.err
+U=$?
+printf 'abc' | ./dot_local/bin/executable_x copy
+C=$?
+P=$(./dot_local/bin/executable_x paste)
+PP=$?
+set -e
+printf "help=%s unknown=%s copy=%s paste=%s paste_out=%s\n" "$H" "$U" "$C" "$PP" "$P"
+```
 ```
 Chunk ID: 523991
 Wall time: 0.1311 seconds
@@ -4060,8 +4641,8 @@ _**Agent (gpt-5.3-codex 2026-02-09 11:49:54Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-09 11:49:54Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- dot_local/bin/executable_x README.md | sed -n '1,260p'`</summary>
 ```
 Chunk ID: b645e8
 Wall time: 0.0520 seconds
