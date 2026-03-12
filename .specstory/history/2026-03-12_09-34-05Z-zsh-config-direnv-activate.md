@@ -2893,3 +2893,54 @@ dotenv_if_exists
 - 先沒有、後建立 `.venv` 時，後續重新載入會正確切換進去。
 
 另外跑過 `zsh -n dot_config/direnv/direnvrc` 和 `git diff --check`，都過了。下一步就是 `chezmoi apply`，然後在你的 Python 專案 `.envrc` 用上面那兩行再 `direnv allow`。
+
+---
+
+_**User (2026-03-12 10:18:13Z)**_
+
+那麼 我會需要給 ZSH 的 config 中添加這個嗎？ 以顯示PS1？
+
+```
+# 讓 prompt 顯示 VIRTUAL_ENV 名稱
+# 或者如果你用 powerlevel10k / starship 這類 prompt 工具，它們本身就會偵測 `$VIRTUAL_ENV` 環境變數自動顯示，不需要額外設定。
+show_virtual_env() {
+    if [[ -n "$VIRTUAL_ENV" && -n "$DIRENV_DIR" ]]; then
+        echo "($(basename $VIRTUAL_ENV)) "
+    fi
+}
+PS1='$(show_virtual_env)'$PS1
+```
+
+
+
+
+---
+
+_**Agent (gpt-5.4 2026-03-12 10:18:34Z)**_
+
+不用。對這個 repo 來說，不應該加這段 `PS1` hack。
+
+原因很簡單：
+- prompt 已經由 [01_starship.zsh](/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/01_starship.zsh) 和 [starship.toml](/Users/daviddwlee84/.local/share/chezmoi/dot_config/starship.toml) 接管。
+- 我們剛加的 [direnvrc](/Users/daviddwlee84/.local/share/chezmoi/dot_config/direnv/direnvrc) 會正確設 `VIRTUAL_ENV`。
+- Starship 的 `python` module 會自動讀 `VIRTUAL_ENV`，所以會直接顯示 `(.venv)`。
+
+如果你再手改 `PS1`，常見結果是：
+- 跟 Starship 重複顯示
+- 被 `starship init zsh` 接管後行為不一致
+- 把 prompt 邏輯分散到兩個地方，後面不好維護
+
+所以結論是：
+- 這個 dotfiles repo：`不用加`
+- 如果哪天你不用 Starship，只用原生 `oh-my-zsh` prompt，才考慮加類似邏輯
+
+如果套用後沒顯示，先檢查這三件事：
+- `chezmoi apply && exec zsh`
+- 專案 `.envrc` 是：
+  ```sh
+  layout_python_venv
+  dotenv_if_exists
+  ```
+- 進專案後 `echo $VIRTUAL_ENV` 有值，且 `which python` 指到 `.venv/bin/python`
+
+如果你要，我可以下一步幫你把 `starship` 的 Python 顯示再微調成你喜歡的格式，例如只顯示 env 名、不顯示 Python 版本。
