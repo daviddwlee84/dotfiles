@@ -1,0 +1,53 @@
+---
+# Input method role - Traditional Chinese input methods
+# macOS: McBopomofo + Squirrel (RIME) via Homebrew cask
+# Linux: ibus-rime via apt
+
+# =============================================================================
+# macOS: McBopomofo
+# =============================================================================
+
+- name: Check if McBopomofo is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: /Library/Input Methods/McBopomofo.app
+  register: mcbopomofo_check
+
+- name: Install McBopomofo via Homebrew cask (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not mcbopomofo_check.stat.exists
+  community.general.homebrew_cask:
+    name: mcbopomofo
+    state: present
+
+# =============================================================================
+# macOS: Squirrel (RIME)
+# =============================================================================
+
+- name: Check if Squirrel (RIME) is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.stat:
+    path: /Library/Input Methods/Squirrel.app
+  register: squirrel_check
+
+- name: Install Squirrel (RIME) via Homebrew cask (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not squirrel_check.stat.exists
+  community.general.homebrew_cask:
+    name: squirrel
+    state: present
+
+# =============================================================================
+# Linux: ibus-rime
+# =============================================================================
+
+- name: Install ibus-rime (Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: ibus-rime
+    state: present
+    update_cache: true

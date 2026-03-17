@@ -46,3 +46,6 @@
 
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
+
+    - role: input_method
+      tags: [input_method]

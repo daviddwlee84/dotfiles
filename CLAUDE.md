@@ -138,6 +138,7 @@ ansible-playbook playbooks/macos.yml --check
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, tmuxp, etc.) |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
+| `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
 
 ## Profiles
 
@@ -152,7 +153,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, input_method (desktop only)
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 
