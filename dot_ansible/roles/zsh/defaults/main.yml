@@ -9,3 +9,5 @@ zsh_plugins:
     repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
   - name: zsh-completions
     repo: https://github.com/zsh-users/zsh-completions.git
+  - name: zsh-vi-mode
+    repo: https://github.com/jeffreytse/zsh-vi-mode.git

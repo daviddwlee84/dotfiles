@@ -22,7 +22,14 @@ plugins=(
     git
     zsh-autosuggestions
     zsh-syntax-highlighting
+    zsh-vi-mode
 )
+
+# zsh-vi-mode overrides all keybindings on init; re-source fzf bindings afterward
+# so that Ctrl+R (history search), Ctrl+T (file search), Alt+C still work
+zvm_after_init() {
+    [ -f "$ZSH_CONFIG_DIR/tools/10_fzf.zsh" ] && source "$ZSH_CONFIG_DIR/tools/10_fzf.zsh"
+}
 
 # Oh-My-Zsh path
 export ZSH="$HOME/.oh-my-zsh"
