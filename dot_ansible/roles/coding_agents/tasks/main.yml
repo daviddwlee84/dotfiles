@@ -1037,22 +1037,3 @@
     global: true
     state: present
   ignore_errors: true
-
-# === Happy ===
-
-- name: Check if Happy is installed
-  when: npm_check.rc == 0
-  ansible.builtin.command: which happy
-  register: happy_check
-  changed_when: false
-  failed_when: false
-
-- name: Install Happy (npm)
-  when:
-    - npm_check.rc == 0
-    - happy_check.rc != 0
-  community.general.npm:
-    name: happy-coder
-    global: true
-    state: present
-  ignore_errors: true

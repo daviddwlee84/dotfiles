@@ -132,7 +132,7 @@ ansible-playbook playbooks/macos.yml --check
 | `devtools` | bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop |
 | `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
-| `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, Happy |
+| `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory |
 | `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, tmuxp, etc.) |
@@ -264,7 +264,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin
 
 ### Brewfile Categories (darwin)
 
-- **Terminals & Editors**: alacritty, iterm2, warp, cursor, visual-studio-code
+- **Terminals & Editors**: alacritty, iterm2, warp, cmux, cursor, visual-studio-code
 - **AI & Coding**: claude, chatgpt, ollama
 - **System Utilities**: aerospace, alt-tab, raycast, jordanbaird-ice
 - **Communication**: discord, telegram, wechat, tencent-meeting
