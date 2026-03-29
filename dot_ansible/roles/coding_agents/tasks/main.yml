@@ -1037,3 +1037,84 @@
     global: true
     state: present
   ignore_errors: true
+
+# === Claude HUD Plugin ===
+
+- name: Check if claude-hud plugin is already installed
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud"
+  register: claude_hud_cache
+
+- name: Get latest claude-hud release
+  when: not claude_hud_cache.stat.exists
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/jarrodwatts/claude-hud/releases/latest
+    return_content: true
+  register: claude_hud_release
+
+- name: Set claude-hud version facts
+  when:
+    - not claude_hud_cache.stat.exists
+    - claude_hud_release is not skipped
+  ansible.builtin.set_fact:
+    claude_hud_version: "{{ claude_hud_release.json.tag_name | regex_replace('^v', '') }}"
+    claude_hud_tag: "{{ claude_hud_release.json.tag_name }}"
+
+- name: Clone claude-hud plugin to cache
+  when: claude_hud_version is defined
+  ansible.builtin.git:
+    repo: https://github.com/jarrodwatts/claude-hud.git
+    dest: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud/claude-hud/{{ claude_hud_version }}"
+    version: "{{ claude_hud_tag }}"
+    depth: 1
+  ignore_errors: true
+
+- name: Get claude-hud commit SHA
+  when: claude_hud_version is defined
+  ansible.builtin.command:
+    cmd: git rev-parse HEAD
+    chdir: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud/claude-hud/{{ claude_hud_version }}"
+  register: claude_hud_commit
+  changed_when: false
+  failed_when: false
+
+- name: Register claude-hud in installed_plugins.json
+  when:
+    - claude_hud_version is defined
+    - claude_hud_commit.rc | default(1) == 0
+  ansible.builtin.shell: |
+    python3 << 'EOF'
+    import json, os
+    from datetime import datetime, timezone
+
+    home = os.path.expanduser('~')
+    path = os.path.join(home, '.claude', 'plugins', 'installed_plugins.json')
+
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {'version': 2, 'plugins': {}}
+
+    plugin_key = 'claude-hud@claude-hud'
+    version = '{{ claude_hud_version }}'
+
+    if any(e.get('version') == version for e in data.get('plugins', {}).get(plugin_key, [])):
+        exit(0)
+
+    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+    data.setdefault('plugins', {})[plugin_key] = [{
+        'scope': 'user',
+        'installPath': os.path.join(home, '.claude', 'plugins', 'cache', 'claude-hud', 'claude-hud', version),
+        'version': version,
+        'installedAt': now,
+        'lastUpdated': now,
+        'gitCommitSha': '{{ claude_hud_commit.stdout }}'
+    }]
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    EOF
+  changed_when: true
