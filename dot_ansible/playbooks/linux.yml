@@ -49,3 +49,6 @@
 
     - role: input_method
       tags: [input_method]
+
+    - role: networking_tools
+      tags: [networking_tools]

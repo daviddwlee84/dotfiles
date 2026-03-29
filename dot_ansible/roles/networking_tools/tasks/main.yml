@@ -1,0 +1,448 @@
+---
+# Networking CLI tools role
+# Tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
+
+# =============================================================================
+# macOS - all via Homebrew
+# =============================================================================
+
+- name: Install networking tools (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name:
+      - nmap
+      - arp-scan
+      - mtr
+      - iperf3
+      - doggo
+      - httpie
+      - gping
+      - trippy
+      - bandwhich
+      - rustscan
+    state: present
+
+- name: Install Ookla Speedtest CLI (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  block:
+    - name: Tap teamookla/speedtest
+      community.general.homebrew_tap:
+        name: teamookla/speedtest
+        state: present
+
+    - name: Install speedtest
+      community.general.homebrew:
+        name: speedtest
+        state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu)
+# =============================================================================
+
+# --- apt packages (system-level) ---
+- name: Install networking tools from apt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - nmap
+      - arp-scan
+      - mtr
+      - iperf3
+      - httpie
+      - tcpdump
+    state: present
+
+# --- Architecture mapping for GitHub release downloads ---
+- name: Set networking tools release architecture
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.set_fact:
+    net_arch_deb: >-
+      {{
+        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ansible_facts['architecture']
+      }}
+
+# --- doggo (modern DNS lookup) ---
+- name: Check if doggo is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: doggo --version
+  register: doggo_check
+  changed_when: false
+  failed_when: false
+
+- name: Install doggo from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - doggo_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (doggo)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest doggo release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/mr-karan/doggo/releases/latest
+        return_content: true
+      register: doggo_release
+
+    - name: Set doggo version (strip v prefix)
+      ansible.builtin.set_fact:
+        doggo_version: "{{ doggo_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Set doggo arch mapping
+      ansible.builtin.set_fact:
+        doggo_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ansible_facts['architecture']
+          }}
+
+    - name: Download doggo tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/mr-karan/doggo/releases/download/{{ doggo_release.json.tag_name }}/doggo_{{ doggo_version }}_Linux_{{ doggo_arch }}.tar.gz"
+        dest: /tmp/doggo.tar.gz
+        mode: '0644'
+
+    - name: Extract doggo
+      ansible.builtin.unarchive:
+        src: /tmp/doggo.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install doggo to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/doggo
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/doggo"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up doggo temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/doggo.tar.gz
+        - /tmp/doggo
+        - /tmp/LICENSE
+        - /tmp/README.md
+
+# --- gping (graphical ping) ---
+- name: Check if gping is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: gping --version
+  register: gping_check
+  changed_when: false
+  failed_when: false
+
+- name: Install gping from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gping_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (gping)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Set gping arch mapping
+      ansible.builtin.set_fact:
+        gping_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ansible_facts['architecture']
+          }}
+
+    - name: Get latest gping release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/orf/gping/releases/latest
+        return_content: true
+      register: gping_release
+
+    - name: Download gping tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/orf/gping/releases/download/{{ gping_release.json.tag_name }}/gping-Linux-musl-{{ gping_arch }}.tar.gz"
+        dest: /tmp/gping.tar.gz
+        mode: '0644'
+
+    - name: Extract gping to ~/.local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/gping.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+
+    - name: Clean up gping tarball
+      ansible.builtin.file:
+        path: /tmp/gping.tar.gz
+        state: absent
+
+# --- trippy (TUI traceroute) ---
+- name: Check if trippy is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: trip --version
+  register: trippy_check
+  changed_when: false
+  failed_when: false
+
+- name: Install trippy from GitHub releases (Debian/Ubuntu, system-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - trippy_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest trippy release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/fujiapple852/trippy/releases/latest
+        return_content: true
+      register: trippy_release
+
+    - name: Download trippy .deb package
+      ansible.builtin.get_url:
+        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.deb"
+        dest: /tmp/trippy.deb
+        mode: '0644'
+
+    - name: Install trippy .deb package
+      ansible.builtin.apt:
+        deb: /tmp/trippy.deb
+
+    - name: Clean up trippy .deb
+      ansible.builtin.file:
+        path: /tmp/trippy.deb
+        state: absent
+
+# --- trippy (user-level fallback) ---
+- name: Re-check if trippy is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v trip
+  register: trippy_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Install trippy from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - trippy_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (trippy)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest trippy release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/fujiapple852/trippy/releases/latest
+        return_content: true
+      register: trippy_release_user
+
+    - name: Download trippy tarball (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release_user.json.tag_name }}/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/trippy.tar.gz
+        mode: '0644'
+
+    - name: Extract trippy (user)
+      ansible.builtin.unarchive:
+        src: /tmp/trippy.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install trip to ~/.local/bin
+      ansible.builtin.copy:
+        src: "/tmp/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/trip"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/trip"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up trippy temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/trippy.tar.gz
+        - "/tmp/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+
+# --- bandwhich (bandwidth monitor) ---
+- name: Check if bandwhich is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: bandwhich --version
+  register: bandwhich_check
+  changed_when: false
+  failed_when: false
+
+- name: Install bandwhich from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - bandwhich_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (bandwhich)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest bandwhich release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/imsnif/bandwhich/releases/latest
+        return_content: true
+      register: bandwhich_release
+
+    - name: Download bandwhich tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/imsnif/bandwhich/releases/download/{{ bandwhich_release.json.tag_name }}/bandwhich-{{ bandwhich_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/bandwhich.tar.gz
+        mode: '0644'
+
+    - name: Extract bandwhich to ~/.local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/bandwhich.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+        extra_opts:
+          - --wildcards
+          - bandwhich
+
+    - name: Clean up bandwhich tarball
+      ansible.builtin.file:
+        path: /tmp/bandwhich.tar.gz
+        state: absent
+
+# --- Ookla Speedtest CLI ---
+- name: Check if speedtest is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: speedtest --version
+  register: speedtest_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Ookla Speedtest CLI (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - speedtest_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (speedtest)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Set speedtest arch mapping
+      ansible.builtin.set_fact:
+        speedtest_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ansible_facts['architecture']
+          }}
+
+    - name: Download Ookla Speedtest CLI
+      ansible.builtin.get_url:
+        url: "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{{ speedtest_arch }}.tgz"
+        dest: /tmp/speedtest.tgz
+        mode: '0644'
+
+    - name: Extract speedtest
+      ansible.builtin.unarchive:
+        src: /tmp/speedtest.tgz
+        dest: /tmp
+        remote_src: true
+
+    - name: Install speedtest to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/speedtest
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/speedtest"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up speedtest temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/speedtest.tgz
+        - /tmp/speedtest
+        - /tmp/speedtest.md
+        - /tmp/speedtest.5
+
+# --- rustscan (fast port scanner) ---
+- name: Check if rustscan is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: rustscan --version
+  register: rustscan_check
+  changed_when: false
+  failed_when: false
+
+- name: Install rustscan from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rustscan_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (rustscan)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Set rustscan arch mapping
+      ansible.builtin.set_fact:
+        rustscan_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ansible_facts['architecture']
+          }}
+
+    - name: Download rustscan archive (x86_64)
+      when: rustscan_arch == 'x86_64'
+      ansible.builtin.get_url:
+        url: "https://github.com/RustScan/RustScan/releases/latest/download/x86_64-linux-rustscan.tar.gz.zip"
+        dest: /tmp/rustscan.zip
+        mode: '0644'
+
+    - name: Download rustscan archive (aarch64)
+      when: rustscan_arch == 'aarch64'
+      ansible.builtin.get_url:
+        url: "https://github.com/RustScan/RustScan/releases/latest/download/aarch64-linux-rustscan.zip"
+        dest: /tmp/rustscan.zip
+        mode: '0644'
+
+    - name: Extract and install rustscan (x86_64 - double wrapped)
+      when: rustscan_arch == 'x86_64'
+      ansible.builtin.shell: |
+        set -e
+        cd /tmp
+        python3 -m zipfile -e rustscan.zip .
+        tar xzf x86_64-linux-rustscan.tar.gz
+        cp rustscan "{{ ansible_facts['env']['HOME'] }}/.local/bin/rustscan"
+        chmod 0755 "{{ ansible_facts['env']['HOME'] }}/.local/bin/rustscan"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Extract and install rustscan (aarch64)
+      when: rustscan_arch == 'aarch64'
+      ansible.builtin.shell: |
+        set -e
+        cd /tmp
+        python3 -m zipfile -e rustscan.zip .
+        cp rustscan "{{ ansible_facts['env']['HOME'] }}/.local/bin/rustscan"
+        chmod 0755 "{{ ansible_facts['env']['HOME'] }}/.local/bin/rustscan"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up rustscan temp files
+      ansible.builtin.shell: |
+        rm -f /tmp/rustscan.zip /tmp/rustscan /tmp/x86_64-linux-rustscan.tar.gz /tmp/aarch64-linux-rustscan
+      args:
+        executable: /bin/bash
+      changed_when: false

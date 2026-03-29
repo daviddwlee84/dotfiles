@@ -15,6 +15,7 @@ ARG CHEZMOI_INSTALL_BITWARDEN=false
 ARG CHEZMOI_INSTALL_PYTHON_UV_TOOLS=false
 ARG CHEZMOI_INSTALL_BREW_APPS=false
 ARG CHEZMOI_INSTALL_INPUT_METHOD=false
+ARG CHEZMOI_INSTALL_NETWORKING_TOOLS=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_DOTFILES=false
 ARG CHEZMOI_REPO=daviddwlee84
@@ -124,6 +125,7 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}" \
     --promptBool "Install GUI apps via Homebrew Brewfile (casks, mas)=${CHEZMOI_INSTALL_BREW_APPS}" \
     --promptBool "Install Traditional Chinese input methods (McBopomofo, RIME)=${CHEZMOI_INSTALL_INPUT_METHOD}" \
+    --promptBool "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)=${CHEZMOI_INSTALL_NETWORKING_TOOLS}" \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
     --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}"
 

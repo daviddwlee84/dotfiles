@@ -28,6 +28,7 @@
 # ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
 # starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
 # input_method: {{ include "dot_ansible/roles/input_method/tasks/main.yml" | sha256sum }}
+# networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -83,6 +84,10 @@ TAGS="${TAGS},python_uv_tools"
 {{ $installInputMethod := false }}{{ if hasKey . "installInputMethod" }}{{ $installInputMethod = .installInputMethod }}{{ end -}}
 {{ if $installInputMethod -}}
 TAGS="${TAGS},input_method"
+{{ end -}}
+{{ $installNetworkingTools := false }}{{ if hasKey . "installNetworkingTools" }}{{ $installNetworkingTools = .installNetworkingTools }}{{ end -}}
+{{ if $installNetworkingTools -}}
+TAGS="${TAGS},networking_tools"
 {{ end -}}
 
 # Extra vars for role-level configuration

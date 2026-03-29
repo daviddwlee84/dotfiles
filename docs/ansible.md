@@ -87,6 +87,7 @@ ansible-playbook playbooks/macos.yml --check -v
 | `homebrew` | macOS Homebrew installation | No |
 | `neovim` | Neovim installation with version check | Linux only |
 | `lazyvim_deps` | LazyVim dependencies | Linux only |
+| `networking_tools` | Networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.) | Linux only (partial) |
 | `sudo` | All tasks requiring elevated privileges | Yes |
 
 ## Adding New Roles

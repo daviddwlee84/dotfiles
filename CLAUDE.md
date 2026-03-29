@@ -139,6 +139,7 @@ ansible-playbook playbooks/macos.yml --check
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
 | `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
+| `networking_tools` | Networking CLI tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan |
 
 ## Profiles
 
@@ -153,7 +154,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, input_method (desktop only)
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, input_method (desktop only), networking_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 
