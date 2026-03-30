@@ -82,6 +82,34 @@ Some tools (like `sqlit`) may exit and show `[Process exited 0]`. Set `auto_clos
 
 Tools that use Esc internally (like sqlit's vim mode) work fine with Snacks' **double-Esc** timer — a single Esc goes to the TUI, pressing Esc again within 200ms exits terminal insert mode.
 
+### Tools That Use `q` to Quit
+
+By default, Snacks maps `q` in normal mode to **hide** the floating window (process keeps running). However, some TUI tools (like `sqlit`) use `q` as their own quit command, which terminates the process.
+
+**The conflict:** if you Double-Esc back to Neovim normal mode and press `q`, Snacks hides the window — but if you press `q` while still in terminal insert mode, the TUI receives it and may exit the process entirely.
+
+**Solution:** Remap the Snacks hide key to `<C-q>` for these tools, so `q` is never intercepted by Snacks:
+
+```lua
+Snacks.terminal.toggle("sqlit", {
+  win = {
+    title = " sqlit ",
+    keys = {
+      q = false,                              -- disable default q-to-hide
+      hide = { "<C-q>", "hide", mode = "n" }, -- use Ctrl-q to hide instead
+    },
+  },
+  auto_close = false,
+})
+```
+
+Workflow for these tools:
+- **Double-Esc** — exit terminal insert mode
+- **Ctrl-q** (normal mode) — hide the window, process keeps running
+- **Same keymap** (e.g. `<leader>zs`) — reopen the hidden window
+
+This pattern applies to any TUI tool where `q` has special meaning (e.g. database clients, interactive viewers).
+
 ## When to Use a Dedicated Plugin Instead
 
 For most TUI tools, `Snacks.terminal.toggle` is sufficient. Consider a dedicated plugin when you need:

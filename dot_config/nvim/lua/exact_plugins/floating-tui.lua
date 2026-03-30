@@ -21,6 +21,14 @@ return {
         function()
           Snacks.terminal.toggle("sqlit", {
             win = { title = " sqlit " },
+            -- Just use double ESC then q to quit the tool without killing the process
+            -- win = {
+            --   title = " sqlit ",
+            --   keys = {
+            --     q = false, -- sqlit uses q to goto query panel; disable Snacks' q-to-hide
+            --     hide = { "<C-q>", "hide", mode = "n" }, -- use Ctrl-q to hide instead
+            --   },
+            -- },
             auto_close = false,
           })
         end,
