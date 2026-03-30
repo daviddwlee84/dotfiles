@@ -25,10 +25,14 @@
 - name: Install Ookla Speedtest CLI (macOS)
   when: ansible_facts["os_family"] == "Darwin"
   block:
+    - name: Check if teamookla/speedtest tap is present
+      ansible.builtin.command: brew tap
+      register: speedtest_taps
+      changed_when: false
+
     - name: Tap teamookla/speedtest
-      community.general.homebrew_tap:
-        name: teamookla/speedtest
-        state: present
+      ansible.builtin.command: brew tap teamookla/speedtest
+      when: "'teamookla/speedtest' not in speedtest_taps.stdout_lines"
 
     - name: Install speedtest
       community.general.homebrew:

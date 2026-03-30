@@ -84,6 +84,7 @@ To change options later: `chezmoi init --force`
 ### Config Files
 
 - `~/.gitconfig` - Git configuration
+- `~/.config/git/hooks/` - Global Git hooks (pre-commit + Git LFS hooks)
 - `~/.config/nvim/` - Neovim (LazyVim) configuration
 - `~/.config/uv/uv.toml` - uv package manager config
 - `~/.cargo/config.toml` - Cargo registry mirror config (GFW)
@@ -115,7 +116,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 
 ### Tools (via ansible)
 
-- **Base**: git, curl, ripgrep, fd, just, build tools
+- **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **DuckDB CLI**: `duckdb` (Homebrew on macOS, official installer on Linux)

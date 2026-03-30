@@ -6,6 +6,7 @@
   community.general.homebrew:
     name:
       - git
+      - git-lfs
       - curl
       - wget
       - ripgrep

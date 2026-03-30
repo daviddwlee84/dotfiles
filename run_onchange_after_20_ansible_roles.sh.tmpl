@@ -33,6 +33,22 @@
 set -e
 export PATH="$HOME/.local/bin:$PATH"
 
+# Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linuxbrew
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+{{ end -}}
+
 # Colors
 info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
 success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
