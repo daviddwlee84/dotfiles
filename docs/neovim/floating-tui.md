@@ -31,6 +31,8 @@ Inside a floating TUI window:
 - **q** (normal mode) — hide the window, process keeps running
 - **Same keymap again** — reopen the hidden window
 
+For the managed `gh-dash` / `diffnav` / `lazygit` setup behind `<leader>zg`, see [Git Diff Workflow](../tools/git_diff_workflow.md).
+
 ## Adding a New TUI
 
 Add an entry to the `keys` table in `lua/plugins/floating-tui.lua`:

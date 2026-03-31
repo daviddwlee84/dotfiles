@@ -1,16 +1,24 @@
 ---
 # Developer CLI tools role
-# Tools: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone
+# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone
 
 # =============================================================================
 # macOS - all via Homebrew
 # =============================================================================
+
+- name: Tap diffnav formula (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_tap:
+    name: dlvhdr/formulae
+    state: present
 
 - name: Install developer CLI tools (macOS)
   when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name:
       - bat
+      - gh
+      - diffnav
       - git-delta
       - git-graph
       - eza
@@ -31,6 +39,119 @@
 # =============================================================================
 # Linux (Debian/Ubuntu)
 # =============================================================================
+
+# --- gh ---
+- name: Check if gh is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: gh --version
+  register: gh_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set gh release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gh_check.rc != 0
+  ansible.builtin.set_fact:
+    gh_release_arch: >-
+      {{
+        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Fail on unsupported architecture for gh official downloads
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gh_check.rc != 0
+    - gh_release_arch == ''
+  ansible.builtin.fail:
+    msg: "Unsupported architecture for gh official downloads: {{ ansible_facts['architecture'] }}"
+
+- name: Install gh from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gh_check.rc != 0
+    - gh_release_arch != ''
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest gh release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/cli/cli/releases/latest
+        return_content: true
+      register: gh_release
+
+    - name: Download gh .deb package
+      ansible.builtin.get_url:
+        url: "https://github.com/cli/cli/releases/download/{{ gh_release.json.tag_name }}/gh_{{ gh_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.deb"
+        dest: /tmp/gh.deb
+        mode: '0644'
+
+    - name: Install gh .deb package
+      ansible.builtin.apt:
+        deb: /tmp/gh.deb
+
+    - name: Clean up gh .deb
+      ansible.builtin.file:
+        path: /tmp/gh.deb
+        state: absent
+
+# --- gh (user-level fallback) ---
+- name: Re-check if gh is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v gh
+  register: gh_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install gh from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gh_recheck.rc != 0
+    - gh_release_arch | default('') != ''
+  block:
+    - name: Ensure ~/.local/bin exists (gh)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest gh release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/cli/cli/releases/latest
+        return_content: true
+      register: gh_release_user
+
+    - name: Download gh tarball (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/cli/cli/releases/download/{{ gh_release_user.json.tag_name }}/gh_{{ gh_release_user.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.tar.gz"
+        dest: /tmp/gh.tar.gz
+        mode: '0644'
+
+    - name: Extract and install gh (user)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/gh-extract
+        mkdir -p /tmp/gh-extract
+        tar -xzf /tmp/gh.tar.gz -C /tmp/gh-extract
+        gh_bin="$(find /tmp/gh-extract -type f -path '*/bin/gh' | head -n 1)"
+        install -m 0755 "$gh_bin" "{{ ansible_facts['env']['HOME'] }}/.local/bin/gh"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up gh temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gh.tar.gz
+        - /tmp/gh-extract
 
 # --- bat ---
 - name: Install bat (Debian/Ubuntu)
@@ -283,6 +404,155 @@
       loop:
         - /tmp/delta.tar.gz
         - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+
+# --- diffnav ---
+- name: Check if diffnav is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v diffnav
+  register: diffnav_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set diffnav release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - diffnav_check.rc != 0
+  ansible.builtin.set_fact:
+    diffnav_release_arch: >-
+      {{
+        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Fail on unsupported architecture for diffnav official downloads
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - diffnav_check.rc != 0
+    - diffnav_release_arch == ''
+  ansible.builtin.fail:
+    msg: "Unsupported architecture for diffnav official downloads: {{ ansible_facts['architecture'] }}"
+
+- name: Install diffnav from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - diffnav_check.rc != 0
+    - diffnav_release_arch != ''
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest diffnav release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/dlvhdr/diffnav/releases/latest
+        return_content: true
+      register: diffnav_release
+
+    - name: Download diffnav tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
+        dest: /tmp/diffnav.tar.gz
+        mode: '0644'
+
+    - name: Extract and install diffnav
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/diffnav-extract
+        mkdir -p /tmp/diffnav-extract
+        tar -xzf /tmp/diffnav.tar.gz -C /tmp/diffnav-extract
+        diffnav_bin="$(find /tmp/diffnav-extract -type f -name diffnav | head -n 1)"
+        install -m 0755 "$diffnav_bin" /usr/local/bin/diffnav
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up diffnav temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/diffnav.tar.gz
+        - /tmp/diffnav-extract
+
+# --- diffnav (user-level fallback) ---
+- name: Re-check if diffnav is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v diffnav
+  register: diffnav_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install diffnav from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - diffnav_recheck.rc != 0
+    - diffnav_release_arch | default('') != ''
+  block:
+    - name: Ensure ~/.local/bin exists (diffnav)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest diffnav release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/dlvhdr/diffnav/releases/latest
+        return_content: true
+      register: diffnav_release_user
+
+    - name: Download diffnav tarball (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release_user.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
+        dest: /tmp/diffnav.tar.gz
+        mode: '0644'
+
+    - name: Extract and install diffnav (user)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/diffnav-extract
+        mkdir -p /tmp/diffnav-extract
+        tar -xzf /tmp/diffnav.tar.gz -C /tmp/diffnav-extract
+        diffnav_bin="$(find /tmp/diffnav-extract -type f -name diffnav | head -n 1)"
+        install -m 0755 "$diffnav_bin" "{{ ansible_facts['env']['HOME'] }}/.local/bin/diffnav"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up diffnav temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/diffnav.tar.gz
+        - /tmp/diffnav-extract
+
+# --- gh-dash ---
+- name: Check if gh is available for gh-dash extension installation
+  ansible.builtin.shell: command -v gh
+  register: gh_cli_path
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: List installed gh extensions
+  when: gh_cli_path.rc == 0
+  ansible.builtin.command: gh extension list
+  register: gh_extension_list
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install gh-dash extension
+  when: gh_cli_path.rc == 0 and (gh_extension_list.rc != 0 or 'dlvhdr/gh-dash' not in gh_extension_list.stdout)
+  ansible.builtin.command: gh extension install dlvhdr/gh-dash
+  changed_when: true
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # --- git-graph ---
 - name: Check if git-graph is installed
