@@ -10,6 +10,10 @@
 
 本文內容以目前這台機器的實際狀態為基準整理，並補上 upstream 文件與 issue / PR 連結。
 
+## Related Notes
+
+- [macOS System-Level Input Source Switching](macos-system-switching.md): 不依賴 Rime / Squirrel 內建切換時，Apple 原生、Input Source Pro、Hammerspoon、Keyboard Maestro / BetterTouchTool、`macism`、`im-select`、Karabiner 等方案的比較
+
 ## 本機已驗證的路徑與狀態
 
 驗證日期：`2026-03-31`
