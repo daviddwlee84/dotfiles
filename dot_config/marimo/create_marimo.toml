@@ -1,0 +1,102 @@
+[runtime]
+default_sql_output = "auto"
+on_cell_change = "autorun"
+auto_instantiate = true
+std_stream_max_bytes = 1000000
+auto_reload = "autorun"
+output_max_bytes = 8000000
+dotenv = []
+default_auto_download = ["ipynb"]
+default_csv_encoding = "utf-8"
+reactive_tests = true
+watcher_on_save = "lazy"
+
+[save]
+autosave = "after_delay"
+autosave_delay = 1000
+format_on_save = false
+
+[language_servers.pylsp]
+enable_mypy = true
+enable_ruff = true
+enable_pydocstyle = false
+enabled = false
+enable_flake8 = false
+enable_pyflakes = false
+enable_pylint = false
+
+[language_servers.ty]
+
+[language_servers.basedpyright]
+
+[formatting]
+line_length = 79
+
+[ai]
+inline_tooltip = true
+rules = ""
+mode = "manual"
+
+[ai.open_ai]
+
+[ai.models]
+custom_models = ["ollama/qwen2.5-coder:3b "]
+edit_model = "google/gemini-2.5-pro"
+displayed_models = ["google/gemini-2.5-pro", "google/gemini-2.5-pro-exp", "google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "google/gemini-2.0-flash", "google/gemini-2.0-flash-exp", "google/gemini-2.0-flash-lite", "google/gemini-2.0-flash-thinking-exp-01-21", "google/gemini-1.5-flash", "google/gemini-1.5-flash-8b", "google/gemini-1.5-pro", "ollama/qwen2.5-coder:3b "]
+chat_model = "google/gemini-2.5-pro"
+
+[ai.bedrock]
+
+[ai.custom_providers]
+
+[ai.anthropic]
+
+[ai.azure]
+
+[ai.google]
+# Add your API key here after chezmoi apply:
+# api_key = "your-google-ai-api-key"
+
+[mcp]
+presets = ["context7", "marimo"]
+
+[mcp.mcpServers]
+
+[package_management]
+manager = "uv"
+
+[display]
+dataframes = "rich"
+code_editor_font_size = 14
+theme = "light"
+default_table_max_columns = 50
+cell_output = "below"
+default_width = "medium"
+default_table_page_size = 10
+reference_highlighting = false
+
+[keymap]
+destructive_delete = true
+preset = "vim"
+
+[keymap.overrides]
+
+[snippets]
+include_default_snippets = true
+custom_paths = []
+
+[diagnostics]
+sql_linter = true
+
+[experimental]
+chat_modes = true
+external_agents = true
+
+[server]
+browser = "default"
+follow_symlink = false
+
+[completion]
+activate_on_typing = true
+copilot = "github"
+signature_hint_on_typing = false
