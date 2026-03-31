@@ -20,7 +20,10 @@ cask "visual-studio-code"
 cask "claude"
 cask "chatgpt"
 # cask "chatgpt-atlas"  # Uncomment if needed
-cask "ollama-app"       # ollama is rename and deprecated
+# Local LLM GUI runtime (also provides the `ollama` CLI)
+{{ if and .installBrewApps .installLlmTools -}}
+cask "ollama-app"
+{{ end -}}
 # cask "termius"          # SSH client
 
 # =============================================================================

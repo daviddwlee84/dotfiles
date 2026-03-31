@@ -25,10 +25,6 @@ python_uv_tools:
     binary: git-filter-repo
   - name: mlflow
     binary: mlflow
-  - name: litellm[proxy]
-    binary: litellm
-    with:
-      - httpx[socks]
   - name: tmuxp
     binary: tmuxp
   - name: visidata

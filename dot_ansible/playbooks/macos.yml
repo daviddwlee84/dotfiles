@@ -47,6 +47,9 @@
     - role: rust_cargo_tools
       tags: [rust_cargo_tools]
 
+    - role: llm_tools
+      tags: [llm_tools]
+
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
 

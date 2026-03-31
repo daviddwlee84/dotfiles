@@ -33,6 +33,7 @@ flowchart TB
         DEVTOOLS[devtools]
         UVTOOLS[python_uv_tools]
         CARGO[rust_cargo_tools]
+        LLMTOOLS[llm_tools]
     end
 
     subgraph BrewBundle["4. Brew Bundle opt-in"]
@@ -45,7 +46,9 @@ flowchart TB
     MISE -.->|Node.js, Rust| NVIM
     MISE -.->|Rust| CARGO
     UV -.->|Python tools| UVTOOLS
+    UV -.->|LiteLLM| LLMTOOLS
     BREW -.->|casks| CASKS
+    BREW -.->|formulae / casks| LLMTOOLS
 ```
 
 ## Quick Setup
@@ -71,7 +74,8 @@ During `chezmoi init`, you'll be prompted for optional installs:
 |--------|---------|-------------|
 | `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, td, sidecar, specify-cli, etc. |
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
-| `installPythonUvTools` | true | Python CLI tools via uv (mlflow, litellm, sqlit-tui, etc.) |
+| `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
+| `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
 | `installBrewApps` | false | GUI apps via Homebrew Brewfile (casks, mas) |
 | `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux) |
 | `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
@@ -123,11 +127,12 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory, OpenChamber, td, sidecar, specify-cli
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
+- **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
 - **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
 - **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
-- **GUI Apps** (macOS): terminals, editors, browsers, network tools, utilities via Brewfile (Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile)
+- **GUI Apps** (macOS): terminals, editors, browsers, network tools, utilities via Brewfile (Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile; `ollama-app` when `installBrewApps=true` and `installLlmTools=true`)
 
 ### Bootstrap (installed before ansible)
 - **Homebrew** (macOS): Package manager for macOS
@@ -135,7 +140,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
-- **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, litellm, tmuxp
+- **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms
@@ -188,4 +193,4 @@ just info             # Show system info
 
 ## Customization
 
-See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, and [docs/tools/networking.md](docs/tools/networking.md) for networking tools.
+See [CLAUDE.md](CLAUDE.md) for development guide, [docs/ansible.md](docs/ansible.md) for ansible customization, [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, and [docs/tools/networking.md](docs/tools/networking.md) for networking tools.

@@ -22,6 +22,8 @@
 # security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+# llm_tools tasks: {{ include "dot_ansible/roles/llm_tools/tasks/main.yml" | sha256sum }}
+# llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
 # rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
 # rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
 # ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
@@ -67,7 +69,7 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 #   Desktop: devtools, docker, nerdfonts
 #   Server:  devtools, docker (no nerdfonts - no GUI)
 #   macOS:   homebrew
-#   Optional: coding_agents, bitwarden, python_uv_tools, rust_cargo_tools, ruby_gem_tools
+#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
 
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
@@ -97,6 +99,10 @@ TAGS="${TAGS},bitwarden"
 {{ if .installPythonUvTools -}}
 TAGS="${TAGS},python_uv_tools"
 {{ end -}}
+{{ $installLlmTools := false }}{{ if hasKey . "installLlmTools" }}{{ $installLlmTools = .installLlmTools }}{{ end -}}
+{{ if $installLlmTools -}}
+TAGS="${TAGS},llm_tools"
+{{ end -}}
 {{ $installInputMethod := false }}{{ if hasKey . "installInputMethod" }}{{ $installInputMethod = .installInputMethod }}{{ end -}}
 {{ if $installInputMethod -}}
 TAGS="${TAGS},input_method"
@@ -112,6 +118,13 @@ EXTRA_VARS=""
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles
 EXTRA_VARS="bitwarden_install_desktop=true"
 {{ end -}}
+{{ if $installLlmTools -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="llm_tools_install_brew_apps={{ .installBrewApps }}"
+else
+    EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
+fi
+{{ end -}}
 
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
 
@@ -126,10 +139,10 @@ info ""
 info "The following tools will be installed without sudo:"
 info "  neovim, fzf, lazygit, ripgrep, fd, jq, just, bat, eza, delta,"
 info "  yazi, zellij, btop, gitleaks, zoxide, tldr, pre-commit, thefuck,"
-info "  duckdb, rclone"
+info "  duckdb, rclone, litellm, llmfit, models"
 info ""
 info "The following tools require sudo (ask your administrator):"
-info "  git, curl, wget, zsh, tmux, htop, direnv, build-essential, docker"
+info "  git, curl, wget, zsh, tmux, htop, direnv, build-essential, docker, ollama"
 info ""
 info "Suggested command for your administrator:"
 info "  sudo apt install git curl wget zsh tmux htop direnv build-essential tree"
@@ -137,6 +150,13 @@ info ""
 BECOME_FLAGS="--skip-tags sudo"
 # Ruby can't compile without libffi-dev (requires sudo on Ubuntu)
 TAGS="${TAGS//,ruby_gem_tools/}"
+{{ if $installLlmTools -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="llm_tools_no_root=true"
+else
+    EXTRA_VARS="$EXTRA_VARS llm_tools_no_root=true"
+fi
+{{ end -}}
 {{ else -}}
 if sudo -n true 2>/dev/null; then
     :
@@ -154,7 +174,7 @@ fi
 
 info "Profile: {{ .profile }}"
 info "Re-running ansible with tags: $TAGS"
-EXTRA_VARS_FLAG=""
-[[ -n "$EXTRA_VARS" ]] && EXTRA_VARS_FLAG="--extra-vars $EXTRA_VARS"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS $EXTRA_VARS_FLAG
+EXTRA_VARS_ARGS=()
+[[ -n "$EXTRA_VARS" ]] && EXTRA_VARS_ARGS=(--extra-vars "$EXTRA_VARS")
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS "${EXTRA_VARS_ARGS[@]}"
 success "Ansible roles updated!"

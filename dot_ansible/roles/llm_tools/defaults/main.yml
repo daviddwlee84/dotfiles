@@ -1,0 +1,11 @@
+---
+# Local LLM runtimes and model tooling
+
+llm_tools_install_brew_apps: false
+llm_tools_no_root: false
+
+llm_tools_uv:
+  - name: litellm[proxy]
+    binary: litellm
+    with:
+      - httpx[socks]

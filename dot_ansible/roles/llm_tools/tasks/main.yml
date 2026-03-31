@@ -1,0 +1,102 @@
+---
+# Local LLM tools
+# - litellm: uv tool install
+# - llmfit: Homebrew on macOS, official local installer on Linux
+# - models: Homebrew when available, cargo fallback on Linux
+# - ollama: Homebrew formula on macOS unless Brewfile GUI install is enabled;
+#            official installer on Linux when sudo/root is available
+
+- name: Ensure ~/.local/bin exists for local LLM tools
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: '0755'
+
+- name: Install LiteLLM via uv
+  ansible.builtin.command: >-
+    uv tool install {{ item.name }}
+    {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
+  loop: "{{ llm_tools_uv }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Install llmfit via Homebrew (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: llmfit
+    state: present
+
+- name: Install llmfit via official local installer (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: |
+    curl -fsSL https://llmfit.axjns.dev/install.sh | sh -s -- --local
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/llmfit"
+
+- name: Check if Homebrew is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which brew
+  register: llm_tools_brew_check
+  changed_when: false
+  failed_when: false
+
+- name: Install models via Homebrew (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: models
+    state: present
+
+- name: Install models via Homebrew (Linuxbrew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - llm_tools_brew_check.rc == 0
+  community.general.homebrew:
+    name: models
+    state: present
+
+- name: Install models via cargo fallback (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - llm_tools_brew_check.rc != 0
+  ansible.builtin.command: cargo install modelsdev
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/models"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install Ollama via Homebrew formula (macOS CLI install)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not (llm_tools_install_brew_apps | bool)
+  community.general.homebrew:
+    name: ollama
+    state: present
+
+- name: Check if Ollama is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: ollama --version
+  register: llm_tools_ollama_linux_check
+  changed_when: false
+  failed_when: false
+
+- name: Warn that Ollama is skipped in noRoot mode
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - llm_tools_no_root | bool
+    - llm_tools_ollama_linux_check.rc != 0
+  ansible.builtin.debug:
+    msg: "Skipping Ollama in noRoot mode. Install it later with sudo/root if you want the local runtime service."
+
+- name: Install Ollama via official installer (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - not (llm_tools_no_root | bool)
+    - llm_tools_ollama_linux_check.rc != 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    curl -fsSL https://ollama.com/install.sh | sh
+  args:
+    creates: /usr/local/bin/ollama

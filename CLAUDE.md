@@ -135,7 +135,8 @@ ansible-playbook playbooks/macos.yml --check
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, SpecStory |
 | `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
 | `security_tools` | pre-commit, gitleaks |
-| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, litellm, sqlit-tui, tmuxp, etc.) |
+| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, sqlit-tui, tmuxp, etc.) |
+| `llm_tools` | Local LLM tools: Ollama, LiteLLM, llmfit, models |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
 | `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
@@ -154,7 +155,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, input_method (desktop only), networking_tools
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, llm_tools, input_method (desktop only), networking_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 
@@ -174,7 +175,8 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 - **mise**: Node.js, Rust runtime management
 - **Installers**: zoxide, starship, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
-- **uv tools**: mlflow, litellm, sqlit-tui, tmuxp, etc.
+- **uv tools**: mlflow, sqlit-tui, tmuxp, etc.
+- **llm tools**: ollama, litellm, llmfit, models
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
 
 What you **won't get** without root:
@@ -183,6 +185,7 @@ What you **won't get** without root:
 - tmux, htop (require system libraries)
 - direnv (apt only)
 - Docker (kernel features, daemon)
+- Ollama (system service install)
 - System fonts (nerdfonts)
 - Ruby and gem tools (ruby-build requires `libffi-dev` which needs sudo)
 - build-essential, git, curl, wget, tree (assumed pre-installed)
@@ -266,7 +269,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin
 ### Brewfile Categories (darwin)
 
 - **Terminals & Editors**: alacritty, iterm2, warp, cmux, cursor, visual-studio-code
-- **AI & Coding**: claude, chatgpt, ollama
+- **AI & Coding**: claude, chatgpt, ollama (when `installLlmTools` + `installBrewApps`)
 - **System Utilities**: aerospace, alt-tab, raycast, jordanbaird-ice
 - **Communication**: discord, telegram, wechat, tencent-meeting
 - **Browsers**: arc, google-chrome, tor-browser
