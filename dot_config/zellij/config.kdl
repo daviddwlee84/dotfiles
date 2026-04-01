@@ -1,0 +1,41 @@
+// Zellij configuration
+// Managed by chezmoi
+//
+// KEY CONFLICT NOTE: On first launch (without existing config), Zellij offers
+// a setup wizard to choose the "Unlock-First (non-colliding)" keybinding preset.
+// Select it to avoid key conflicts with coding agents (Claude Code, etc.).
+//
+// To switch presets later:
+//   Default preset:      Ctrl+o -> c
+//   Unlock-First preset: Ctrl+g -> o -> c
+
+// Start in locked mode so no keys are intercepted by default.
+// Press Ctrl+g to unlock and access Zellij commands.
+default_mode "locked"
+
+// Kitty keyboard protocol for proper Shift+Enter, Ctrl+Enter, etc.
+support_kitty_keyboard_protocol true
+
+// Session persistence (like tmux-resurrect)
+session_serialization true
+pane_viewport_serialization true
+
+// Clickable hyperlinks in terminal output
+osc8_hyperlinks true
+
+// Styled underlines (modern terminal feature)
+styled_underlines true
+
+// Mouse support
+mouse_mode true
+
+// Scrollback
+scroll_buffer_size 50000
+
+// Pane frames with rounded corners
+pane_frames true
+ui {
+    pane_frames {
+        rounded_corners true
+    }
+}

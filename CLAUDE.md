@@ -192,6 +192,42 @@ What you **won't get** without root:
 
 **Tip**: Ask your sysadmin to run: `sudo apt install git curl wget zsh tmux htop direnv build-essential tree`
 
+## Tmux Configuration
+
+The tmux config (`dot_tmux.conf`) includes modern best practices for coding agent compatibility.
+
+### Key Settings for Coding Agents
+
+- `extended-keys always` + `terminal-features 'xterm*:extkeys'` -- forwards Shift+Enter, Ctrl+Enter, etc. through tmux to inner applications (Claude Code, Neovim, etc.)
+- `escape-time 0` -- eliminates ESC delay for Neovim
+- `set-clipboard on` -- OSC 52 clipboard (works over SSH)
+- `allow-passthrough on` -- OSC passthrough for terminal images
+
+### Tmux Keybindings
+
+| Binding | Action |
+|---------|--------|
+| `prefix + Space` | tmux-which-key popup menu (discoverability) |
+| `prefix + h/j/k/l` | Navigate panes (vim-style) |
+| `prefix + H/J/K/L` | Resize panes |
+| `prefix + \|` | Split pane vertically |
+| `prefix + -` | Split pane horizontally |
+| `prefix + T` | Sesh session picker (fzf popup) |
+| `prefix + S` | Switch to last session (sesh) |
+| `prefix + 9` | Jump to git root session (sesh) |
+
+Note: `Ctrl+Space` is NOT bound (reserved for input method switching). The tmux-which-key plugin only uses `prefix + Space`.
+
+### tmux-which-key Configuration
+
+Config managed at `dot_config/tmux/plugins/tmux-which-key/config.yaml` (XDG mode). The plugin requires `coreutils` on macOS (installed via devtools ansible role). After changing the YAML, reload tmux config (`prefix + Space` -> `r`) or the plugin rebuilds automatically on TPM init.
+
+## Zellij Configuration
+
+Zellij config (`dot_config/zellij/config.kdl`) uses `default_mode "locked"` so all keys pass through to inner applications by default. Press `Ctrl+G` to unlock Zellij commands. This prevents key conflicts with coding agents and vim-style applications.
+
+On first Zellij launch (without existing config), select the "Unlock-First (non-colliding)" keybinding preset for the best experience.
+
 ## LazyVim Requirements
 
 - Neovim >= 0.11.2

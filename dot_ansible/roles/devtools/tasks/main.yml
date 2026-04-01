@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone
+# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -34,6 +34,7 @@
       - htop
       - duckdb
       - rclone
+      - coreutils
     state: present
 
 # =============================================================================
