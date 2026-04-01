@@ -77,6 +77,7 @@ These tools inject completions as part of broader shell integration. Already han
 | `zoxide` | `tools/20_zoxide.zsh` | `eval "$(zoxide init zsh)"` |
 | `thefuck` | `tools/25_thefuck.zsh` | `eval $(thefuck --alias)` |
 | `direnv` | `tools/30_direnv.zsh` | `eval "$(direnv hook zsh)"` |
+| `marimo` | `tools/29_marimo.zsh` | `eval "$(_MARIMO_COMPLETE=zsh_source marimo)"` |
 
 ### D. No completion support
 
