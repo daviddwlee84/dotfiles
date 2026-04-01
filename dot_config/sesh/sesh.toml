@@ -1,0 +1,45 @@
+#:schema https://github.com/joshmedeski/sesh/raw/main/sesh.schema.json
+
+# Session ordering: active tmux first, then configured, then zoxide history
+sort_order = ["tmux", "config", "zoxide"]
+
+# Use last 2 directory components for session names (e.g. "projects/sesh")
+dir_length = 2
+
+# Hide scratch and underscore-prefixed sessions from the picker
+blacklist = ["^scratch$", "^_"]
+
+[default_session]
+startup_command = "nvim"
+preview_command = "eza --all --git --icons --color=always {}"
+
+# ── Named sessions ──────────────────────────────────────────────────────────
+
+[[session]]
+name = "dotfiles"
+path = "~/.local/share/chezmoi"
+
+[[session]]
+name = "ansible"
+path = "~/.ansible"
+
+[[session]]
+name = "neovim config"
+path = "~/.config/nvim"
+
+[[session]]
+name = "home"
+path = "~"
+disable_startup_command = true
+
+# ── Wildcards ────────────────────────────────────────────────────────────────
+
+[[wildcard]]
+pattern = "~/repos/*"
+startup_command = "nvim"
+
+# ── Windows ──────────────────────────────────────────────────────────────────
+
+[[window]]
+name = "git"
+startup_script = "lazygit"
