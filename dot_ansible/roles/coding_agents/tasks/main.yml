@@ -262,6 +262,54 @@
     state: present
   ignore_errors: true
 
+# === RTK ===
+
+- name: Check if RTK is installed (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which rtk
+  register: rtk_macos_check
+  changed_when: false
+  failed_when: false
+
+- name: Install RTK (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - rtk_macos_check.rc != 0
+  community.general.homebrew:
+    name: rtk
+    state: present
+
+- name: Check if RTK is installed (Linux)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: which rtk
+  register: rtk_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Ensure ~/.local/bin exists (RTK)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rtk_check.rc != 0
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    state: directory
+    mode: "0755"
+
+- name: Install RTK (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - rtk_check.rc != 0
+  ansible.builtin.shell: |
+    curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/rtk"
+  environment:
+    RTK_INSTALL_DIR: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
 # === SpecStory ===
 
 - name: Check if SpecStory is installed (macOS)

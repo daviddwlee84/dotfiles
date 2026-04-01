@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils
+# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -23,6 +23,7 @@
       - git-graph
       - eza
       - tlrc
+      - glow
       - thefuck
       - zoxide
       - direnv
@@ -653,6 +654,107 @@
     executable: /bin/bash
   changed_when: true
   ignore_errors: true
+
+# --- glow ---
+- name: Check if glow is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: glow --version
+  register: glow_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set glow release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glow_check.rc != 0
+  ansible.builtin.set_fact:
+    glow_release_arch: >-
+      {{
+        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else 'arm' if ansible_facts['architecture'] in ['armv7l', 'armv6l', 'arm']
+        else ''
+      }}
+
+- name: Fail on unsupported architecture for glow official downloads
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glow_check.rc != 0
+    - glow_release_arch == ''
+  ansible.builtin.fail:
+    msg: "Unsupported architecture for glow official downloads: {{ ansible_facts['architecture'] }}"
+
+- name: Install glow from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glow_check.rc != 0
+    - glow_release_arch != ''
+  block:
+    - name: Ensure ~/.local/bin exists (glow)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest glow release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/charmbracelet/glow/releases/latest
+        return_content: true
+      register: glow_release
+
+    - name: Set glow version facts
+      ansible.builtin.set_fact:
+        glow_version: "{{ glow_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download glow tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/charmbracelet/glow/releases/download/{{ glow_release.json.tag_name }}/glow_{{ glow_version }}_Linux_{{ glow_release_arch }}.tar.gz"
+        dest: /tmp/glow.tar.gz
+        mode: '0644'
+
+    - name: Create glow temp directory
+      ansible.builtin.file:
+        path: /tmp/glow
+        state: directory
+        mode: '0755'
+
+    - name: Extract glow
+      ansible.builtin.unarchive:
+        src: /tmp/glow.tar.gz
+        dest: /tmp/glow
+        remote_src: true
+
+    - name: Find glow binary
+      ansible.builtin.find:
+        paths: /tmp/glow
+        patterns: glow
+        file_type: file
+      register: glow_find
+
+    - name: Install glow to ~/.local/bin
+      when: glow_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ glow_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/glow"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up glow temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/glow.tar.gz
+        - /tmp/glow
+
+- name: Verify glow is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: glow --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # --- duckdb ---
 - name: Check if DuckDB CLI is installed
