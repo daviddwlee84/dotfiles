@@ -1,11 +1,12 @@
 #!/bin/bash
 # Run brew bundle when Brewfiles change
-# Only runs if installBrewApps is enabled
+# Runs when general Brew apps are enabled, or on macOS when AI desktop apps are enabled
 # Profile: {{ .profile }}
 # installBrewApps: {{ .installBrewApps }}
+# installAiDesktopApps: {{ .installAiDesktopApps }}
 
-{{ if not .installBrewApps -}}
-# Brew apps installation is disabled (installBrewApps = false)
+{{ if and (not .installBrewApps) (or (and (ne .profile "macos") (ne .profile "macos_intel")) (not .installAiDesktopApps)) -}}
+# Brew app installation is disabled for this profile
 # To enable, run: chezmoi init --force
 exit 0
 {{ end -}}

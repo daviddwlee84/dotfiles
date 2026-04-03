@@ -18,8 +18,10 @@ installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
 # 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
 installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
-# 是否安裝 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.)
-installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install GUI apps via Homebrew Brewfile (casks, mas)" false }}
+# 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
+installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}
+# 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
+installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)" false }}
 # 是否安裝繁體中文輸入法 (McBopomofo + RIME)
 installInputMethod = {{ promptBoolOnce . "installInputMethod" "Install Traditional Chinese input methods (McBopomofo, RIME)" false }}
 # 是否安裝網路診斷工具 (nmap, mtr, httpie, gping, trippy, etc.)

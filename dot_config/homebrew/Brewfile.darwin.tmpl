@@ -17,14 +17,21 @@ cask "visual-studio-code"
 # =============================================================================
 # Casks - AI & Coding Assistants
 # =============================================================================
+{{ if .installAiDesktopApps -}}
 cask "claude"
 cask "chatgpt"
+cask "opencode-desktop"
+cask "antigravity"
+{{ if eq .profile "macos" -}}
+cask "codex-app"
+{{ end -}}
 # cask "chatgpt-atlas"  # Uncomment if needed
 # Local LLM GUI runtime (also provides the `ollama` CLI)
-{{ if and .installBrewApps .installLlmTools -}}
+{{ if .installLlmTools -}}
 cask "ollama-app"
 {{ end -}}
 # cask "termius"          # SSH client
+{{ end -}}
 
 # =============================================================================
 # Casks - System Utilities

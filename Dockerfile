@@ -14,6 +14,7 @@ ARG CHEZMOI_INSTALL_CODING_AGENTS=false
 ARG CHEZMOI_INSTALL_BITWARDEN=false
 ARG CHEZMOI_INSTALL_PYTHON_UV_TOOLS=false
 ARG CHEZMOI_INSTALL_LLM_TOOLS=false
+ARG CHEZMOI_INSTALL_AI_DESKTOP_APPS=false
 ARG CHEZMOI_INSTALL_BREW_APPS=false
 ARG CHEZMOI_INSTALL_INPUT_METHOD=false
 ARG CHEZMOI_INSTALL_NETWORKING_TOOLS=false
@@ -113,7 +114,7 @@ RUN for i in 1 2 3; do \
 # This avoids interactive prompts during Docker build
 # Set PATH to include ~/.local/bin so run_once scripts can find uv tools (ansible)
 # Use local source instead of cloning from GitHub to test local changes
-# Note: installBrewApps=false by default (Linuxbrew is optional on Linux)
+# Note: installBrewApps=false and installAiDesktopApps=false by default
 RUN export PATH="$HOME/.local/bin:$PATH" && \
     ~/.local/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
     --promptString "profile (ubuntu_server|ubuntu_desktop|macos)=${CHEZMOI_PROFILE}" \
@@ -125,7 +126,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion=${CHEZMOI_INSTALL_BITWARDEN}" \
     --promptBool "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)=${CHEZMOI_INSTALL_PYTHON_UV_TOOLS}" \
     --promptBool "Install local LLM tools (Ollama, LiteLLM, llmfit, models)=${CHEZMOI_INSTALL_LLM_TOOLS}" \
-    --promptBool "Install GUI apps via Homebrew Brewfile (casks, mas)=${CHEZMOI_INSTALL_BREW_APPS}" \
+    --promptBool "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)=${CHEZMOI_INSTALL_AI_DESKTOP_APPS}" \
+    --promptBool "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)=${CHEZMOI_INSTALL_BREW_APPS}" \
     --promptBool "Install Traditional Chinese input methods (McBopomofo, RIME)=${CHEZMOI_INSTALL_INPUT_METHOD}" \
     --promptBool "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)=${CHEZMOI_INSTALL_NETWORKING_TOOLS}" \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \

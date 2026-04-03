@@ -61,7 +61,7 @@ Installation Order:
 |--------|----------|
 | `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS and Linux), uv, mise, ansible |
 | `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
-| `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` enabled) |
+| `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled) |
 
 The onchange script includes SHA256 hashes of all role files. It runs:
 
@@ -263,7 +263,7 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 
 GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
 
-**Note**: Brewfile installation is **opt-in** (disabled by default). Enable via `chezmoi init --force` and set `installBrewApps = true`.
+**Note**: Brewfile installation is **opt-in** (disabled by default). Enable general GUI apps via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps are a separate opt-in via `installAiDesktopApps = true`.
 
 ### File Structure
 
@@ -294,7 +294,7 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin
 ### Brewfile Categories (darwin)
 
 - **Terminals & Editors**: alacritty, iterm2, warp, cmux, cursor, visual-studio-code
-- **AI & Coding**: claude, chatgpt, ollama (when `installLlmTools` + `installBrewApps`)
+- **AI & Coding**: claude, chatgpt, opencode-desktop, antigravity, codex-app (Apple Silicon only), and `ollama-app` when `installAiDesktopApps` + `installLlmTools`
 - **System Utilities**: aerospace, alt-tab, raycast, jordanbaird-ice
 - **Communication**: discord, telegram, wechat, tencent-meeting
 - **Browsers**: arc, google-chrome, tor-browser
