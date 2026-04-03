@@ -9,7 +9,7 @@ alias v="nvim"
 # alias ...="cd ../.."
 # alias ....="cd ../../.."
 
-# List files
+# List files (current managed by ./tools/26_esa.zsh)
 # alias l="ls -lah"
 # alias la="ls -lAh"
 # alias ll="ls -lh"
