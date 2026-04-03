@@ -48,40 +48,53 @@ glcreate() {
 #
 # Supported agents: opencode (default), claude, codex, cursor-agent
 # Set GLCREATE_AGENT to change the default agent.
+# Set GLCREATE_LANG to change the default prompt language (zh or en, default: zh).
 #
 # Usage:
-#   glcreate-ai <group> [description] [--agent <name>]
+#   glcreate-ai <group> [description] [--agent <name>] [--lang zh|en]
 #
 # Examples:
 #   glcreate-ai david_quick_tries
 #   glcreate-ai david_quick_tries "Override description"
 #   glcreate-ai david_quick_tries --agent claude
+#   glcreate-ai david_quick_tries --lang en
 #
 # If no description is given, the agent will summarize one from the project content.
 glcreate-ai() {
   emulate -L zsh
 
-  local group="" desc="" agent="${GLCREATE_AGENT:-opencode}"
+  local group="" desc="" agent="${GLCREATE_AGENT:-opencode}" lang="${GLCREATE_LANG:-zh}"
 
   # Parse arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --agent) agent="$2"; shift 2 ;;
+      --lang)  lang="$2"; shift 2 ;;
       *) [[ -z "$group" ]] && group="$1" || desc="$1"; shift ;;
     esac
   done
 
   if [[ -z "$group" ]]; then
-    echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent]"
+    echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent] [--lang zh|en]"
     echo "  Set GLCREATE_AGENT env var to change default agent (default: opencode)"
+    echo "  Set GLCREATE_LANG  env var to change default language (default: zh)"
     return 1
   fi
 
   local name=$(basename "$(pwd)")
   local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
-  local prompt="用 glab 把這個 repo 建到 gitlab.com/${group} 底下，repo name: ${name}，private，default branch: ${branch}，設定 origin remote 並 push。${desc:+Description: ${desc}。}如果沒給 description 就根據項目內容總結一句。"
+  local prompt
 
-  echo "Agent: ${agent} | Repo: ${group}/${name} | Branch: ${branch}"
+  case "$lang" in
+    en)
+      prompt="Use glab to create a private repo under gitlab.com/${group}, repo name: ${name}, default branch: ${branch}. Set the origin remote and push.${desc:+ Description: ${desc}.} If no description is provided, summarize one sentence from the project content."
+      ;;
+    zh|*)
+      prompt="用 glab 把這個 repo 建到 gitlab.com/${group} 底下，repo name: ${name}，private，default branch: ${branch}，設定 origin remote 並 push。${desc:+Description: ${desc}。}如果沒給 description 就根據項目內容總結一句。"
+      ;;
+  esac
+
+  echo "Agent: ${agent} | Lang: ${lang} | Repo: ${group}/${name} | Branch: ${branch}"
 
   case "$agent" in
     opencode)       opencode run "$prompt" ;;
