@@ -9,6 +9,8 @@ command -v eza &>/dev/null || return 0
 #   --color=always  - Enable colors
 #   --long          - Long format
 #   --git           - Show git status
+#   --git-repos     - Show nested repo branch/status columns when applicable
+#   --group-directories-first - Keep directories grouped together
 #   --no-filesize   - Hide file size
 #   --no-time       - Hide modification time
 #   --no-user       - Hide user/owner
@@ -16,6 +18,7 @@ command -v eza &>/dev/null || return 0
 alias ls="eza --icons=always --color=always --long --git --no-filesize --no-time --no-user --no-permissions"
 
 # Additional useful aliases
-alias la="eza --icons=always --color=always --long --git --all"
-alias ll="eza --icons=always --color=always --long --git"
+alias la="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso --all"
+alias ll="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso"
 alias lt="eza --icons=always --color=always --tree --level=2"
+alias llt="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso --tree --level=3"
