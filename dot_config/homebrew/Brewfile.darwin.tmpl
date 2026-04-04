@@ -19,10 +19,12 @@ cask "visual-studio-code"
 # =============================================================================
 {{ if .installAiDesktopApps -}}
 cask "claude"
+{{ if ne .profile "macos_intel" -}}
 cask "chatgpt"
+{{ end -}}
 cask "opencode-desktop"
 cask "antigravity"
-{{ if eq .profile "macos" -}}
+{{ if ne .profile "macos_intel" -}}
 cask "codex-app"
 {{ end -}}
 # cask "chatgpt-atlas"  # Uncomment if needed
@@ -118,7 +120,9 @@ cask "anki"
 # =============================================================================
 # Note: docker/orbstack is managed by ansible docker role
 cask "dbeaver-community"
+{{ if ne .profile "macos_intel" -}}
 cask "superset-sh/superset/superset"
+{{ end -}}
 
 # =============================================================================
 # Casks - Cloud Storage (Chinese apps)
