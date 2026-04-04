@@ -540,8 +540,17 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
-- name: List installed gh extensions
+- name: Check if gh is authenticated
   when: gh_cli_path.rc == 0
+  ansible.builtin.command: gh auth status
+  register: gh_auth_status
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: List installed gh extensions
+  when: gh_cli_path.rc == 0 and gh_auth_status.rc == 0
   ansible.builtin.command: gh extension list
   register: gh_extension_list
   changed_when: false
@@ -550,7 +559,7 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Install gh-dash extension
-  when: gh_cli_path.rc == 0 and (gh_extension_list.rc != 0 or 'dlvhdr/gh-dash' not in gh_extension_list.stdout)
+  when: gh_cli_path.rc == 0 and gh_auth_status.rc == 0 and (gh_extension_list.rc != 0 or 'dlvhdr/gh-dash' not in gh_extension_list.stdout)
   ansible.builtin.command: gh extension install dlvhdr/gh-dash
   changed_when: true
   environment:
