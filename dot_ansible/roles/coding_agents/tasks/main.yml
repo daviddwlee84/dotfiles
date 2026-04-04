@@ -96,35 +96,16 @@
     creates: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
 
 # === Cursor CLI ===
-# Note: cursor-cli cask provides `cursor-agent` and `agent` binaries, not `cursor`
+# Use official install script instead of Homebrew cask (cursor-cli cask has code signing issues on macOS)
 
-- name: Check if Cursor CLI is installed (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
-  ansible.builtin.command: which cursor-agent
-  register: cursor_macos_check
-  changed_when: false
-  failed_when: false
-
-- name: Install Cursor CLI (macOS)
-  when:
-    - ansible_facts["os_family"] == "Darwin"
-    - cursor_macos_check.rc != 0
-  community.general.homebrew_cask:
-    name: cursor-cli
-    state: present
-  ignore_errors: true  # Network errors shouldn't fail the playbook
-
-- name: Check if Cursor CLI is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+- name: Check if Cursor CLI is installed
   ansible.builtin.command: which cursor-agent
   register: cursor_check
   changed_when: false
   failed_when: false
 
-- name: Install Cursor CLI (Linux)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - cursor_check.rc != 0
+- name: Install Cursor CLI
+  when: cursor_check.rc != 0
   ansible.builtin.shell: |
     curl -fsSL https://cursor.com/install | bash
   args:
