@@ -25,11 +25,13 @@ All keybindings use the tmux prefix (default `Ctrl+B`).
 
 | Keybinding | Action |
 |------------|--------|
-| `prefix + T` | Open sesh picker popup (fzf with preview, icons, filtering) |
+| `prefix + g` | Open sesh picker popup (fzf with preview, icons, filtering) |
 | `prefix + S` | Switch to last session (via `sesh last`) |
 | `prefix + 9` | Jump to root of current git repo/worktree |
 
 Source: `~/.tmux.conf`
+
+`prefix + g` avoids relying on `Shift`, so it does not fall through to tmux's built-in `prefix + t` clock shortcut on terminals that do not report uppercase prefix bindings reliably.
 
 ### Picker Keybindings (inside fzf popup)
 

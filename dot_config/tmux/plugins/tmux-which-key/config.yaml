@@ -172,7 +172,7 @@ items:
         key: s
         command: choose-tree -Zs
       - name: Sesh picker
-        key: t
+        key: g
         command: "run-shell 'sesh connect \"$(sesh list --icons | fzf-tmux -p 80%,70% --no-sort --ansi)\"'"
       - name: Last (sesh)
         key: l

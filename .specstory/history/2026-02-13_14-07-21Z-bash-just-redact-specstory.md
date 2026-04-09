@@ -45,8 +45,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:07:33Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:33Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `td usage --new-session`</summary>
 ```
 Chunk ID: b3afc0
 Wall time: 0.0521 seconds
@@ -83,8 +83,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:07:37Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:38Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just redact-specstory`</summary>
 ```
 Chunk ID: 155953
 Wall time: 0.1551 seconds
@@ -109,8 +109,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:07:44Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:44Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "def find_private_key_files|read_text\(" scripts/redact_specstory.py`</summary>
 ```
 Chunk ID: e88729
 Wall time: 0.0524 seconds
@@ -128,8 +128,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:44Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,260p' scripts/redact_specstory.py`</summary>
 ```
 Chunk ID: dc0509
 Wall time: 0.0503 seconds
@@ -257,12 +257,12 @@ def filter_specstory(findings: list[dict]) -> list[dict]:
 
 # Matches actual PEM private key blocks
 _PEM_BLOCK_RE = re.compile(
-    r"-----BEGIN[^-]*PRIVATE KEY[^-]*-----.*?-----END[^-]*PRIVATE KEY[^-]*-----",
+    r"-----BEGIN[^-]*PRIV***KEY[^-]*-----.*?-----END[^-]*PRIV***KEY[^-]*-----",
     re.DOTALL,
 )
 
 # Matches the literal string the detect-private-key hook greps for
-_PRIVATE_KEY_STR = "PRIVATE KEY"
+_PRIVATE_KEY_STR = "PRIV***KEY"
 
 
 def find_private_key_files(files: list[Path]) -> dict[Path, list[str]]:
@@ -300,8 +300,8 @@ def redact_private_keys(file_path: Path) -> bool:
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:47Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '260,380p' scripts/redact_specstory.py`</summary>
 ```
 Chunk ID: bf9649
 Wall time: 0.0524 seconds
@@ -354,8 +354,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:07:55Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:55Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff --cached --name-only --diff-filter=ACM`</summary>
 ```
 Chunk ID: f9679f
 Wall time: 0.0524 seconds
@@ -375,8 +375,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:07:55Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `find .specstory/history -name '*.md' -type f -print0 | xargs -0 -I{} sh -c 'iconv -f utf-8 -t utf-8 "{}" >/dev/null 2>&1 || echo "{}"'`</summary>
 ```
 Chunk ID: 804919
 Wall time: 0.6725 seconds
@@ -400,8 +400,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:08:01Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:02Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `staged=$(git diff --cached --name-only --diff-filter=ACM | sort); bad=$(find .specstory/history -name '*.md' -type f -print0 | xargs -0 -I{} sh -c 'iconv -f utf-8 -t utf-8 "{}" >/dev/null 2>&1 || echo "{}"' | sort); comm -12 <(printf "%s\n" "$staged") <(printf "%s\n" "$bad")`</summary>
 ```
 Chunk ID: ab3fd2
 Wall time: 0.5778 seconds
@@ -423,8 +423,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:08:11Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:11Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `td usage -q`</summary>
 ```
 Chunk ID: 96e304
 Wall time: 0.0512 seconds
@@ -507,8 +507,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:08:45Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:45Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just redact-specstory`</summary>
 ```
 Chunk ID: c22b96
 Wall time: 0.3360 seconds
@@ -523,8 +523,8 @@ No secrets found in .specstory/history/
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:45Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `./scripts/redact_specstory.py --working-dir`</summary>
 ```
 Chunk ID: 4e2c77
 Wall time: 1.8344 seconds
@@ -535,7 +535,7 @@ Scanning working directory...
 Found private key pattern(s) in 1 file(s):
 
   .specstory/history/2026-02-07_12-35-23Z-i-added-macos-intel.md:
-    2 "PRIVATE KEY" mention(s)
+    2 "PRIV***KEY" mention(s)
 
 Run with --fix to auto-redact these secrets
 Or manually edit the files to remove sensitive information
@@ -550,8 +550,8 @@ _**Agent (gpt-5.3-codex 2026-02-13 14:08:50Z)**_
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:51Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba scripts/redact_specstory.py | sed -n '1,220p'`</summary>
 ```
 Chunk ID: 58c8de
 Wall time: 0.0519 seconds
@@ -696,8 +696,8 @@ Output:
 
 _**Agent (gpt-5.3-codex 2026-02-13 14:08:55Z)**_
 
-<tool-use data-tool-type="unknown" data-tool-name="exec_command"><details>
-<summary>Tool use: **exec_command**</summary>
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- scripts/redact_specstory.py`</summary>
 ```
 Chunk ID: 6f2985
 Wall time: 0.0521 seconds
@@ -778,8 +778,8 @@ index 5e88300..608fa70 100755
 +    content = read_text(file_path)
      original = content
      # Replace full PEM blocks
-     content = _PEM_BLOCK_RE.sub("[REDACTED PRIVATE KEY BLOCK]", content)
-     # Replace remaining literal "PRIVATE KEY" mentions
+     content = _PEM_BLOCK_RE.sub("[REDACTED PRIV***KEY BLOCK]", content)
+     # Replace remaining literal "PRIV***KEY" mentions
      content = content.replace(_PRIVATE_KEY_STR, "PRIV***KEY")
      if content != original:
 -        file_path.write_text(content)
