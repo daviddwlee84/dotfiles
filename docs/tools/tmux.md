@@ -4,7 +4,7 @@ Managed tmux config lives at `~/.tmux.conf` and is sourced from [`dot_tmux.conf`
 
 This setup is tuned for coding-agent and Neovim workflows:
 
-- `tmux-which-key` popup menu on `prefix + Space`
+- native popup menu on `prefix + Space`
 - `tmux2k` status line
 - vim-style pane navigation
 - sesh integration for session picking
@@ -57,7 +57,7 @@ Examples below assume `prefix = Ctrl + b`.
 | Keybinding | Action |
 |------------|--------|
 | `prefix + R` | Reload `~/.tmux.conf` |
-| `prefix + Space` | Open tmux-which-key popup |
+| `prefix + Space` | Open the tmux popup menu |
 | `prefix + g` | Open sesh picker |
 | `prefix + S` | Jump to the last sesh session |
 | `prefix + 9` | Jump to the git root session for the current repo |
@@ -89,7 +89,7 @@ Examples below assume `prefix = Ctrl + b`.
 | `prefix + ?` | List named keybindings |
 | `prefix + /` | Prompt for a key and show what it is bound to |
 
-## tmux-which-key Menu
+## Popup Menu
 
 Open the popup with:
 
@@ -97,25 +97,23 @@ Open the popup with:
 prefix + Space
 ```
 
-Top-level entries worth remembering:
+Useful entries in the popup:
 
-- `w`: windows
-- `p`: panes
-- `s`: sessions
-- `r`: reload config
+- `w`: choose window
+- `p`: choose pane
+- `s`: choose session
+- `R`: reload config
 - `D`: detach
 - `?`: list keys
-
-Inside `Sessions`:
-
-- `s`: choose session tree
 - `g`: open sesh picker
-- `l`: jump to last sesh session
+- `S`: jump to last sesh session
+- `9`: jump to the git root session
 
 ## Coding-Agent / Neovim Notes
 
 - `escape-time 0` removes the ESC delay, which helps Neovim feel responsive.
 - `extended-keys always` with `extended-keys-format csi-u` is what allows `Ctrl+/` and similar modified punctuation keys to pass through tmux more reliably.
+- The managed Alacritty config also sends `Ctrl+/` as `\u001f`, which matches LazyVim's built-in `<C-_>` fallback for terminal toggle.
 - `set-clipboard on` enables OSC 52 clipboard copy over SSH.
 - `allow-passthrough on` helps terminal image protocols and similar passthrough features.
 

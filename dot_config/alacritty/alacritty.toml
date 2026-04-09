@@ -10,6 +10,11 @@ key = "Return"
 mods = "Shift"
 chars = "\u001b[13;2u"
 
+[[keyboard.bindings]]
+key = "Slash"
+mods = "Control"
+chars = "\u001f"
+
 # https://www.youtube.com/watch?v=uOnL4fEnldA
 # https://www.josean.com/posts/how-to-setup-alacritty-terminal
 [env]

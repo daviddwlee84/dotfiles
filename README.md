@@ -106,7 +106,7 @@ To change options later: `chezmoi init --force`
   - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
 - `~/.claude/` - Claude Code settings
 - `~/.specstory/cli/config.toml` - Global SpecStory defaults for `specstory run` across all projects
-- `~/.tmux.conf` - Tmux configuration with TPM plugins, tmux-which-key (`prefix+Space`), vim-style pane nav, extended-keys for coding agents (including `Ctrl+/` in Neovim), sesh keybindings (`prefix+g` picker, `prefix+S` last), and config reload on `prefix+R` ([docs](docs/tools/tmux.md))
+- `~/.tmux.conf` - Tmux configuration with TPM plugins, a native popup menu (`prefix+Space`), vim-style pane nav, extended-keys for coding agents (including `Ctrl+/` in Neovim), sesh keybindings (`prefix+g` picker, `prefix+S` last), and config reload on `prefix+R` ([docs](docs/tools/tmux.md))
 - `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`
 - `~/.config/sesh/sesh.toml` - Sesh session manager config (named sessions, wildcards, defaults) ([docs](docs/tools/sesh.md))
 - `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker) + shell completion
@@ -123,7 +123,6 @@ To change options later: `chezmoi init --force`
 - `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
 - `~/.config/zellij/config.kdl` - Zellij config (locked default mode for coding agent compatibility, kitty keyboard protocol)
 - `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
-- `~/.config/tmux/plugins/tmux-which-key/config.yaml` - tmux-which-key menu config (prefix+Space, no root Ctrl+Space)
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
