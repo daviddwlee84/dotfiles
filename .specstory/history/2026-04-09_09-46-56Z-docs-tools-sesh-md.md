@@ -6959,3 +6959,590 @@ _**Agent (gpt-5.4 2026-04-09 10:38:23Z)**_
 `Ctrl + /` 這邊，LazyVim 本來就同時接受 `<C-/>` / `<C-_>`，所以我補的是終端層送鍵：在 [alacritty.toml:13](/Users/zhouhanru/.local/share/chezmoi/dot_config/alacritty/alacritty.toml#L13) 加了 `Ctrl+/ -> \u001f`，這會命中 LazyVim 的 `<C-_>` fallback。tmux 與 Alacritty 設定都已 `chezmoi apply` 到 live 環境，tmux 也已 reload；但 `Ctrl+/` 這個修正要 terminal app 自己重新吃到新鍵位，最好把 Alacritty 整個重開一次，再進 tmux / Neovim 測。
 
 文件也同步更新了，在 [docs/tools/tmux.md](/Users/zhouhanru/.local/share/chezmoi/docs/tools/tmux.md) 和 [README.md:109](/Users/zhouhanru/.local/share/chezmoi/README.md#L109)。如果你現在重開 Alacritty 後，`Ctrl+/` 還是不行，我下一步就直接針對你實際用的終端做 key capture。
+
+---
+
+_**User (2026-04-09 10:50:09Z)**_
+
+目前 sesh 有那種 在當前路徑下 直接開一個新的tmux session並切過去 的方法嗎？
+
+---
+
+_**Agent (gpt-5.4 2026-04-09 10:50:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Inspecting session connection**
+
+I think I can answer this without accessing the web by focusing on my existing knowledge and repository context. I might need to mention that the key prefix and the root session could be different. It seems I should check the session connection in the current directory and maybe look into the documentation to see if the session supports the --root option. I’ll quickly search local docs since I am a coding agent and need to inspect first. I should include some commentary before calling any tools.
+</details></think>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:18Z)**_
+
+我先直接查本機 `sesh` 與 repo 內現有綁定，確認它對「當前目錄直接開新 session」有沒有現成子命令，不先靠記憶猜。
+
+_**Agent (gpt-5.4 2026-04-09 10:50:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sesh --help | sed -n '1,220p'`</summary>
+```
+Command: /bin/zsh -lc "sesh --help | sed -n '1,220p'"
+Chunk ID: 46499d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 260
+Output:
+
+  Sesh is a smart terminal session manager that helps you create and manage tmux sessions quickly and easily using      
+  zoxide.                                                                                                               
+         
+  USAGE  
+         
+    sesh [command] [--flags]  
+            
+  COMMANDS  
+            
+    clone [--flags]       Clone a git repo and connect to it as a session
+    completion [command]  Generate the autocompletion script for the specified shell
+    connect [--flags]     Connect to the given session
+    help [command]        Help about any command
+    last                  Connect to the last tmux session
+    list [--flags]        List sessions
+    preview               Preview a session or directory
+    root                  Show the root from the active session
+         
+  FLAGS  
+         
+    -C --config           Path to config file
+    -h --help             Help for sesh
+    -v --version          Version for sesh
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sesh connect --help | sed -n '1,220p'`</summary>
+```
+Command: /bin/zsh -lc "sesh connect --help | sed -n '1,220p'"
+Chunk ID: 2e10bd
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 173
+Output:
+
+  Connect to the given session                                                                                          
+         
+  USAGE  
+         
+    sesh connect [--flags]  
+         
+  FLAGS  
+         
+    -c --command     Execute a command when connecting to a new session. Will be ignored if the session exists.
+    -C --config      Path to config file
+    -h --help        Help for connect
+    -r --root        Switches to the root of the current session
+    -s --switch      Switch the session (rather than attach). This is useful for actions triggered outside the terminal.
+    -T --tmuxinator  Use tmuxinator to start session if it doesnt exist
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "sesh connect|--root|new session|current git repo|current path" docs/tools/sesh.md dot_tmux.conf README.md -S`</summary>
+```
+Command: /bin/zsh -lc 'rg -n "sesh connect|--root|new session|current git repo|current path" docs/tools/sesh.md dot_tmux.conf README.md -S'
+Chunk ID: 574578
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 352
+Output:
+dot_tmux.conf:86:  "Sesh picker" g "run-shell 'sesh connect \"$(sesh list --icons | fzf-tmux -p 80%,70% --no-sort --ansi --border-label \" sesh \" --prompt \"⚡  \" --header \"  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find\" --bind \"tab:down,btab:up\" --bind \"ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)\" --bind \"ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)\" --bind \"ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)\" --bind \"ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)\" --bind \"ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)\" --bind \"ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)\" --preview-window \"right:55%\" --preview \"sesh preview {}\")\"'" \
+dot_tmux.conf:88:  "Repo root sesh" 9 "run-shell 'sesh connect --root $(pwd)'" \
+dot_tmux.conf:134:# New window/pane inherits current path
+dot_tmux.conf:145:bind-key "g" run-shell "sesh connect \"$(\
+dot_tmux.conf:163:# prefix + 9: jump to root of current git repo/worktree
+dot_tmux.conf:164:bind -N "switch to root session (via sesh)" 9 run-shell "sesh connect --root $(pwd)"
+docs/tools/sesh.md:30:| `prefix + 9` | Jump to root of current git repo/worktree |
+docs/tools/sesh.md:90:- `startup_command`: runs when a new session is created
+docs/tools/sesh.md:188:command = "sesh connect '{strip_ansi|split: :1..|join: }'"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:34Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Exploring session management**
+
+I might mention that in my configuration, using `prefix + 9` with `sesh connect --root $(pwd)` connects to the git root session, while `sesh connect "$PWD"` should connect to the current directory instead. I might need to offer a tmux command for creating a new session name based on the current path. It seems like if a session exists, `sesh` will just reuse it, but I could suggest using `tmux new-session -s "name" -c "$PWD"` for a guaranteed new session. The user probably wants to know if `sesh` has a specific command for this; I’d say it’s closest with `sesh connect "$PWD"` or `sesh connect .`.
+</details></think>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:34Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Clarifying session creation**
+
+It looks like there isn't a specific command in `sesh --help` for always creating a brand-new session, even if a session already exists in the same directory. I can mention using the `-c` option for startup commands when creating a new session. For example, I might suggest using `sesh connect "$PWD" -c nvim` if the user is looking to start a new session with Neovim. I could add that I confirmed this locally, so it's reliable!
+</details></think>
+
+_**Agent (gpt-5.4 2026-04-09 10:50:36Z)**_
+
+有，最接近你要的是：
+
+```bash
+sesh connect "$PWD"
+```
+
+或更短：
+
+```bash
+sesh connect .
+```
+
+我剛查了本機 `sesh connect --help`，它沒有單獨的 `new` 子命令，但 `connect` 會在 session 不存在時直接建立；如果已存在，就切過去/attach 到那個 session。
+
+幾個實用變體：
+
+```bash
+sesh connect "$PWD" -c nvim
+```
+
+只在新建 session 時執行 `nvim`
+
+```bash
+sesh connect --root "$PWD"
+```
+
+你現在 `prefix + 9` 用的就是這種，會跳到目前 git repo root 的 session，而不是當前子目錄
+
+如果你的需求是「無論如何都要開一個全新的 tmux session，就算同一路徑已經有舊的也不要重用」，那 `sesh` 目前看起來沒有明確的 force-new 選項；那種情況就比較適合直接用 `tmux new-session ...`。若你要，我可以順手幫你加一個 tmux keybinding，例如 `prefix + G` 直接對當前目錄做 `sesh connect "$PWD"`。
+
+---
+
+_**User (2026-04-09 10:52:41Z)**_
+
+那我感覺可以 dot_config/zsh/tools/22_sesh.zsh 在這裏新建一些alias/function即可
+
+---
+
+_**Agent (gpt-5.4 2026-04-09 10:52:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Planning implementation process**
+
+I'm in default mode, responding to the user's request to implement something likely. I need to inspect the file and consider adding some functions, maybe looking at the README to see if it needs updates. AGENTS suggests maintaining the README when modifying configurations. Since I'm adding new functions, I might need to update both the README and possibly the docs/tools/sesh.md to reflect the changes. Let's make sure to use apply_patch as we proceed.
+</details></think>
+
+_**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_
+
+我先看現有 `22_sesh.zsh` 怎麼組織，再把「當前目錄直接開/切 sesh session」做成幾個簡短 helper，並同步補到 sesh 文件。
+
+_**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,240p' dot_config/zsh/tools/22_sesh.zsh`</summary>
+```
+Command: /bin/zsh -lc "sed -n '1,240p' dot_config/zsh/tools/22_sesh.zsh"
+Chunk ID: 6fcf17
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 485
+Output:
+# 22_sesh.zsh - sesh tmux session manager
+# https://github.com/joshmedeski/sesh
+
+# Check if sesh is installed
+command -v sesh &>/dev/null || return 0
+
+# Auto-generate shell completion into ~/.zfunc/ (regenerates on version change)
+if [[ -d ~/.zfunc ]]; then
+    local _sesh_ver="$(sesh --version 2>/dev/null)"
+    if [[ ! -f ~/.zfunc/_sesh ]] || ! grep -q "${_sesh_ver}" ~/.zfunc/_sesh 2>/dev/null; then
+        sesh completion zsh > ~/.zfunc/_sesh 2>/dev/null
+    fi
+fi
+
+# Sesh session switcher with fzf (full-featured picker)
+# Supports icons, preview, filtering by source, and session killing
+function sesh-sessions() {
+    {
+        exec </dev/tty
+        exec <&1
+        local session
+        session=$(sesh list --icons | fzf-tmux -p 80%,70% \
+            --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+            --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+            --bind 'tab:down,btab:up' \
+            --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+            --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+            --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+            --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+            --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+            --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+            --preview-window 'right:55%' \
+            --preview 'sesh preview {}' \
+        )
+        zle reset-prompt > /dev/null 2>&1 || true
+        [[ -z "$session" ]] && return
+        sesh connect "$session"
+    }
+}
+
+# Register as zsh widget
+zle -N sesh-sessions
+
+# Key bindings (Alt+S for session switcher, avoids conflict with Ctrl+A tmux prefix)
+bindkey -M emacs '\es' sesh-sessions
+bindkey -M viins '\es' sesh-sessions
+bindkey -M vicmd '\es' sesh-sessions
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,120p' docs/tools/sesh.md`</summary>
+```
+Command: /bin/zsh -lc "sed -n '1,120p' docs/tools/sesh.md"
+Chunk ID: 90f609
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 858
+Output:
+# Sesh - Smart Tmux Session Manager
+
+[Sesh](https://github.com/joshmedeski/sesh) is a CLI that manages tmux sessions using zoxide, giving you instant access to your most-used projects with smart session naming, startup commands, and preview.
+
+## Installation
+
+Sesh is installed automatically by the `devtools` ansible role:
+
+- **macOS**: `brew install sesh`
+- **Linux**: GitHub release binary → `~/.local/bin/sesh`
+
+No manual installation needed after `chezmoi apply`.
+
+## Keybindings
+
+### ZSH (`Alt+S`)
+
+Press `Alt+S` anywhere in the shell to open the sesh picker. This uses `fzf-tmux` as a popup with full filtering support.
+
+Source: `~/.config/zsh/tools/22_sesh.zsh`
+
+### tmux
+
+All keybindings use the tmux prefix (default `Ctrl+B`).
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + g` | Open sesh picker popup (fzf with preview, icons, filtering) |
+| `prefix + S` | Switch to last session (via `sesh last`) |
+| `prefix + 9` | Jump to root of current git repo/worktree |
+
+Source: `~/.tmux.conf`
+
+`prefix + g` avoids relying on `Shift`, so it does not fall through to tmux's built-in `prefix + t` clock shortcut on terminals that do not report uppercase prefix bindings reliably.
+
+### Picker Keybindings (inside fzf popup)
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+A` | Show all sessions |
+| `Ctrl+T` | Filter: tmux sessions only |
+| `Ctrl+G` | Filter: configured sessions only |
+| `Ctrl+X` | Filter: zoxide directories only |
+| `Ctrl+F` | Filter: find directories (`fd`) |
+| `Ctrl+D` | Kill selected tmux session |
+| `Tab` / `Shift+Tab` | Navigate down/up |
+
+## Shell Completion
+
+ZSH tab completion for `sesh` subcommands and flags is auto-generated into `~/.zfunc/_sesh` on first load (and regenerated when sesh version changes). This follows the project's [completion pattern](zsh/zsh-completions.md).
+
+Manual regeneration:
+
+```bash
+sesh completion zsh > ~/.zfunc/_sesh
+rm -f ~/.zcompdump && compinit
+```
+
+## Configuration
+
+Config file: `~/.config/sesh/sesh.toml` (managed by chezmoi)
+
+### Schema Autocomplete
+
+The config includes a JSON Schema directive for editor autocomplete via [taplo](https://taplo.tamasfe.dev/):
+
+```toml
+#:schema https://github.com/joshmedeski/sesh/raw/main/sesh.schema.json
+```
+
+### Key Options
+
+| Option | Description |
+|--------|-------------|
+| `sort_order` | Session type display order: `tmux`, `config`, `tmuxinator`, `zoxide` |
+| `dir_length` | Directory components in session names (default: 1) |
+| `blacklist` | Regex patterns to hide from the picker |
+| `cache` | Enable stale-while-revalidate caching (experimental) |
+
+### Default Session
+
+Applied to all sessions unless overridden:
+
+```toml
+[default_session]
+startup_command = "nvim"
+preview_command = "eza --all --git --icons --color=always {}"
+```
+
+- `startup_command`: runs when a new session is created
+- `preview_command`: shown in the fzf preview pane (`{}` = session path)
+
+### Named Sessions
+
+Pin frequently used directories with custom names and commands:
+
+```toml
+[[session]]
+name = "dotfiles"
+path = "~/.local/share/chezmoi"
+
+[[session]]
+name = "home"
+path = "~"
+disable_startup_command = true
+```
+
+Available fields: `name`, `path`, `startup_command`, `preview_command`, `disable_startup_command`, `windows`.
+
+### Wildcard Sessions
+
+Apply settings to directories matching a glob pattern:
+
+```toml
+[[wildcard]]
+pattern = "~/repos/*"
+startup_command = "nvim"
+```
+
+- `*` matches one level, `**` matches recursively
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:52:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "22_sesh.zsh|sesh keybinding|Alt\+S|session picker|sesh" README.md -S`</summary>
+```
+Command: /bin/zsh -lc "rg -n \"22_sesh.zsh|sesh keybinding|Alt\\+S|session picker|sesh\" README.md -S"
+Chunk ID: 508a03
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 170
+Output:
+109:- `~/.tmux.conf` - Tmux configuration with TPM plugins, a native popup menu (`prefix+Space`), vim-style pane nav, extended-keys for coding agents (including `Ctrl+/` in Neovim), sesh keybindings (`prefix+g` picker, `prefix+S` last), and config reload on `prefix+R` ([docs](docs/tools/tmux.md))
+111:- `~/.config/sesh/sesh.toml` - Sesh session manager config (named sessions, wildcards, defaults) ([docs](docs/tools/sesh.md))
+112:- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker) + shell completion
+152:- **Dev tools**: bat, gh, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, tmux+tpm, sesh, zellij, btop, htop
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:53:00Z)**_
+
+我會在 `22_sesh.zsh` 加兩個 shell helper：一個是目前目錄直接 `sesh connect`，另一個是 git repo root 優先；再補上簡短 alias，並同步更新 sesh 文件與 README 描述。
+
+_**Agent (gpt-5.4 2026-04-09 10:53:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/Users/zhouhanru/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh`**
+
+```diff
+@@
+ # Sesh session switcher with fzf (full-featured picker)
+ # Supports icons, preview, filtering by source, and session killing
+ function sesh-sessions() {
+@@
+     }
+ }
+ 
++# Connect to a sesh session for the current directory (creates it if missing).
++function sesh-here() {
++    sesh connect "${1:-$PWD}"
++}
++
++# Connect to the current git root when available, otherwise use $PWD.
++function sesh-root() {
++    local root
++    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
++    sesh connect "$root"
++}
++
++alias shere='sesh-here'
++alias sroot='sesh-root'
++
+ # Register as zsh widget
+ zle -N sesh-sessions
+```
+
+**Update: `/Users/zhouhanru/.local/share/chezmoi/docs/tools/sesh.md`**
+
+```diff
+@@
+ ### ZSH (`Alt+S`)
+ 
+ Press `Alt+S` anywhere in the shell to open the sesh picker. This uses `fzf-tmux` as a popup with full filtering support.
+ 
+ Source: `~/.config/zsh/tools/22_sesh.zsh`
++
++### ZSH Helpers
++
++The managed zsh config also provides two shell helpers:
++
++| Command | Action |
++|---------|--------|
++| `shere` | Connect to a sesh session for the current directory (`sesh connect "$PWD"`) |
++| `sroot` | Connect to the current git root if present, otherwise `"$PWD"` |
++
++The underlying functions are `sesh-here` and `sesh-root`, so you can call them directly if you prefer function names over aliases.
+```
+
+**Update: `/Users/zhouhanru/.local/share/chezmoi/README.md`**
+
+```diff
+@@
+-- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker) + shell completion
++- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker), `shere`/`sroot` session helpers, and shell completion
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:53:16Z)**_
+
+我先做一次靜態檢查，確認 zsh 檔案語法沒問題，文件也已經把新 helper 寫進去。
+
+_**Agent (gpt-5.4 2026-04-09 10:53:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `zsh -n dot_config/zsh/tools/22_sesh.zsh`</summary>
+```
+Command: /bin/zsh -lc 'zsh -n dot_config/zsh/tools/22_sesh.zsh'
+Chunk ID: ff6b37
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:53:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `nl -ba dot_config/zsh/tools/22_sesh.zsh | sed -n '1,80p'`</summary>
+```
+Command: /bin/zsh -lc "nl -ba dot_config/zsh/tools/22_sesh.zsh | sed -n '1,80p'"
+Chunk ID: 0551f4
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 690
+Output:
+     1	# 22_sesh.zsh - sesh tmux session manager
+     2	# https://github.com/joshmedeski/sesh
+     3	
+     4	# Check if sesh is installed
+     5	command -v sesh &>/dev/null || return 0
+     6	
+     7	# Auto-generate shell completion into ~/.zfunc/ (regenerates on version change)
+     8	if [[ -d ~/.zfunc ]]; then
+     9	    local _sesh_ver="$(sesh --version 2>/dev/null)"
+    10	    if [[ ! -f ~/.zfunc/_sesh ]] || ! grep -q "${_sesh_ver}" ~/.zfunc/_sesh 2>/dev/null; then
+    11	        sesh completion zsh > ~/.zfunc/_sesh 2>/dev/null
+    12	    fi
+    13	fi
+    14	
+    15	# Sesh session switcher with fzf (full-featured picker)
+    16	# Supports icons, preview, filtering by source, and session killing
+    17	function sesh-sessions() {
+    18	    {
+    19	        exec </dev/tty
+    20	        exec <&1
+    21	        local session
+    22	        session=$(sesh list --icons | fzf-tmux -p 80%,70% \
+    23	            --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+    24	            --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+    25	            --bind 'tab:down,btab:up' \
+    26	            --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+    27	            --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+    28	            --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+    29	            --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+    30	            --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+    31	            --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+    32	            --preview-window 'right:55%' \
+    33	            --preview 'sesh preview {}' \
+    34	        )
+    35	        zle reset-prompt > /dev/null 2>&1 || true
+    36	        [[ -z "$session" ]] && return
+    37	        sesh connect "$session"
+    38	    }
+    39	}
+    40	
+    41	# Connect to a sesh session for the current directory (creates it if missing).
+    42	function sesh-here() {
+    43	    sesh connect "${1:-$PWD}"
+    44	}
+    45	
+    46	# Connect to the current git root when available, otherwise use $PWD.
+    47	function sesh-root() {
+    48	    local root
+    49	    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
+    50	    sesh connect "$root"
+    51	}
+    52	
+    53	alias shere='sesh-here'
+    54	alias sroot='sesh-root'
+    55	
+    56	# Register as zsh widget
+    57	zle -N sesh-sessions
+    58	
+    59	# Key bindings (Alt+S for session switcher, avoids conflict with Ctrl+A tmux prefix)
+    60	bindkey -M emacs '\es' sesh-sessions
+    61	bindkey -M viins '\es' sesh-sessions
+    62	bindkey -M vicmd '\es' sesh-sessions
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:53:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "shere|sroot|sesh-here|sesh-root" docs/tools/sesh.md README.md dot_config/zsh/tools/22_sesh.zsh -S`</summary>
+```
+Command: /bin/zsh -lc 'rg -n "shere|sroot|sesh-here|sesh-root" docs/tools/sesh.md README.md dot_config/zsh/tools/22_sesh.zsh -S'
+Chunk ID: 060092
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 189
+Output:
+dot_config/zsh/tools/22_sesh.zsh:42:function sesh-here() {
+dot_config/zsh/tools/22_sesh.zsh:47:function sesh-root() {
+dot_config/zsh/tools/22_sesh.zsh:53:alias shere='sesh-here'
+dot_config/zsh/tools/22_sesh.zsh:54:alias sroot='sesh-root'
+docs/tools/sesh.md:28:| `shere` | Connect to a sesh session for the current directory (`sesh connect "$PWD"`) |
+docs/tools/sesh.md:29:| `sroot` | Connect to the current git root if present, otherwise `"$PWD"` |
+docs/tools/sesh.md:31:The underlying functions are `sesh-here` and `sesh-root`, so you can call them directly if you prefer function names over aliases.
+README.md:112:- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker), `shere`/`sroot` session helpers, and shell completion
+```
+</details></tool-use>
+
+_**Agent (gpt-5.4 2026-04-09 10:53:28Z)**_
+
+加好了，在 [22_sesh.zsh](/Users/zhouhanru/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh#L41) 現在有：
+
+- `shere`: 對當前目錄做 `sesh connect "$PWD"`
+- `sroot`: 如果在 git repo 內，對 repo root 做 `sesh connect`，否則退回 `"$PWD"`
+
+對應函式名是 `sesh-here` 和 `sesh-root`。文件也同步補到 [docs/tools/sesh.md](/Users/zhouhanru/.local/share/chezmoi/docs/tools/sesh.md#L22) 和 [README.md:112](/Users/zhouhanru/.local/share/chezmoi/README.md#L112)。
+
+驗證方面，我跑過 `zsh -n dot_config/zsh/tools/22_sesh.zsh`，語法沒問題。要在目前 shell 用到它們，執行 `chezmoi apply ~/.config/zsh/tools/22_sesh.zsh` 後再 `source ~/.zshrc`，或直接開新 shell。

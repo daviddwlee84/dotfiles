@@ -19,6 +19,17 @@ Press `Alt+S` anywhere in the shell to open the sesh picker. This uses `fzf-tmux
 
 Source: `~/.config/zsh/tools/22_sesh.zsh`
 
+### ZSH Helpers
+
+The managed zsh config also provides two shell helpers:
+
+| Command | Action |
+|---------|--------|
+| `shere` | Connect to a sesh session for the current directory (`sesh connect "$PWD"`) |
+| `sroot` | Connect to the current git root if present, otherwise `"$PWD"` |
+
+The underlying functions are `sesh-here` and `sesh-root`, so you can call them directly if you prefer function names over aliases.
+
 ### tmux
 
 All keybindings use the tmux prefix (default `Ctrl+B`).

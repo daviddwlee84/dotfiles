@@ -38,6 +38,21 @@ function sesh-sessions() {
     }
 }
 
+# Connect to a sesh session for the current directory (creates it if missing).
+function sesh-here() {
+    sesh connect "${1:-$PWD}"
+}
+
+# Connect to the current git root when available, otherwise use $PWD.
+function sesh-root() {
+    local root
+    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
+    sesh connect "$root"
+}
+
+alias shere='sesh-here'
+alias sroot='sesh-root'
+
 # Register as zsh widget
 zle -N sesh-sessions
 
