@@ -201,8 +201,8 @@ The tmux config (`dot_tmux.conf`) includes modern best practices for coding agen
 | `prefix + H/J/K/L` | Resize panes (5 cells) |
 | `prefix + M-h/j/k/l` | Fine resize panes (1 cell) |
 | `prefix + +` | Set current pane to 75% width |
-| `prefix + \|` | Split pane vertically |
-| `prefix + -` | Split pane horizontally |
+| `prefix + \|` | Split pane left/right |
+| `prefix + -` | Split pane top/bottom |
 | `prefix + F` | Toggle floating pane (tmux-floax) |
 | `prefix + P` | Floax popup menu |
 | `prefix + u` | Open fzf URL picker (tmux-fzf-url) |
@@ -213,8 +213,11 @@ The tmux config (`dot_tmux.conf`) includes modern best practices for coding agen
 | `prefix + g` | Sesh session picker (fzf popup) |
 | `prefix + S` | Switch to last session (sesh) |
 | `prefix + 9` | Jump to git root session (sesh) |
+| `prefix + N` | New session (prompts for name) |
+| `prefix + X` | Kill session (with confirmation) |
+| `prefix + R` | Reload tmux config |
 
-Note: `Ctrl+Space` is NOT bound (reserved for input method switching).
+Note: `Ctrl+Space` is NOT bound (reserved for input method switching). Popup menu accelerator keys match standalone `prefix + key` bindings (see `docs/tools/tmux.md` for full mapping).
 
 ## Zellij Configuration
 

@@ -63,6 +63,8 @@ Examples below assume `prefix = Ctrl + b`.
 | `prefix + g` | Open sesh picker |
 | `prefix + S` | Jump to the last sesh session |
 | `prefix + 9` | Jump to the git root session for the current repo |
+| `prefix + N` | New session (prompts for name) |
+| `prefix + X` | Kill session (with confirmation) |
 | `prefix + d` | Detach |
 | `prefix + t` | Show tmux clock mode |
 
@@ -74,12 +76,16 @@ Examples below assume `prefix = Ctrl + b`.
 | `prefix + H/J/K/L` | Resize panes (5 cells, repeatable) |
 | `prefix + M-h/j/k/l` | Fine resize panes (1 cell, repeatable) |
 | `prefix + +` | Set current pane to 75% width |
-| `prefix + \|` | Split vertically |
-| `prefix + -` | Split horizontally |
+| `prefix + \|` | Split left/right (vertical divider) |
+| `prefix + -` | Split top/bottom (horizontal divider) |
 | `prefix + c` | New window in current path |
 | `prefix + x` | Kill pane |
 | `prefix + z` | Toggle pane zoom |
+| `prefix + {` | Swap pane with previous (left/up) |
+| `prefix + }` | Swap pane with next (right/down) |
 | `prefix + [` | Enter copy mode |
+
+Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75%/25% split and swap, the left pane's content moves to the right (25%) and vice versa -- the proportions stay fixed.
 
 ### Layouts
 
@@ -134,7 +140,7 @@ In copy-mode (after selecting text with `v`):
 |-----|--------|
 | `o` | Open selected URL/file in default browser/app (tmux-open) |
 | `C-o` | Open selection in `$EDITOR` |
-| `S` | Search selection in default search engine |
+| `S` | Search selection in Google (tmux-open, configurable via `@open-S`) |
 
 Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select + `o` for precise URL opening.
 
@@ -168,29 +174,39 @@ Open the popup with:
 prefix + Space
 ```
 
-Useful entries in the popup:
+Menu accelerator keys match the standalone `prefix + key` bindings wherever possible. Pressing `R` inside the menu does the same thing as `prefix + R` outside it.
 
-- `w`: choose window
-- `p`: choose pane
-- `s`: choose session
-- `$`: rename session
-- `,`: rename window
-- `N`: new session
-- `X`: kill session (with confirmation)
-- `Q`: kill all sessions / kill server (with confirmation)
-- `z`: zoom toggle (current pane)
-- `E`: even horizontal layout
-- `e`: even vertical layout
-- `v`: main vertical layout
-- `b`: main horizontal layout
-- `T`: tiled layout
-- `=`: resize current pane to 75% width
-- `R`: reload config
-- `D`: detach
-- `?`: list keys
-- `g`: open sesh picker
-- `S`: jump to last sesh session
-- `9`: jump to the git root session
+Items marked "menu-only" have no standalone binding -- use the popup or `M-1`..`M-5` for layouts.
+
+| Key | Action | Also works as `prefix + key`? |
+|-----|--------|-------------------------------|
+| `;` | Last pane | yes (built-in) |
+| `w` | Choose window | yes (built-in) |
+| `s` | Choose session | yes (built-in) |
+| `q` | Show pane numbers | yes (built-in) |
+| `c` | New window | yes |
+| `\|` | Split left/right | yes |
+| `-` | Split top/bottom | yes |
+| `h/j/k/l` | Navigate panes | yes |
+| `z` | Zoom toggle | yes (built-in) |
+| `{` / `}` | Swap pane left-up / right-down | yes (built-in) |
+| `E/e/v/b/T` | Layout presets | menu-only (use `M-1`..`M-5`) |
+| `+` | Resize pane to 75% width | yes |
+| `$` | Rename session | yes (built-in) |
+| `,` | Rename window | yes (built-in) |
+| `N` | New session | yes |
+| `x` | Kill pane (confirm) | yes |
+| `X` | Kill session (confirm) | yes |
+| `Q` | Kill all sessions / server | menu-only |
+| `g` | Sesh picker | yes |
+| `S` | Last sesh session | yes |
+| `9` | Sesh git root | yes |
+| `R` | Reload config | yes |
+| `I` | Install plugins (TPM) | yes (TPM built-in) |
+| `U` | Update plugins (TPM) | yes (TPM built-in) |
+| `d` | Detach | yes (built-in) |
+| `t` | Clock | yes (built-in) |
+| `?` | List keys | yes (built-in) |
 
 ## Coding-Agent / Neovim Notes
 
