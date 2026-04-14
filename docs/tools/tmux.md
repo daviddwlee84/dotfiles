@@ -102,6 +102,11 @@ Useful entries in the popup:
 - `w`: choose window
 - `p`: choose pane
 - `s`: choose session
+- `$`: rename session
+- `,`: rename window
+- `N`: new session
+- `X`: kill session (with confirmation)
+- `Q`: kill all sessions / kill server (with confirmation)
 - `R`: reload config
 - `D`: detach
 - `?`: list keys
