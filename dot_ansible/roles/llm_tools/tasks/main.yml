@@ -48,10 +48,20 @@
     name: models
     state: present
 
+- name: Check if models formula is available in Homebrew (Linuxbrew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - llm_tools_brew_check.rc == 0
+  ansible.builtin.command: brew info models
+  register: llm_tools_models_brew_info
+  changed_when: false
+  failed_when: false
+
 - name: Install models via Homebrew (Linuxbrew)
   when:
     - ansible_facts["os_family"] == "Debian"
     - llm_tools_brew_check.rc == 0
+    - llm_tools_models_brew_info.rc == 0
   community.general.homebrew:
     name: models
     state: present
@@ -59,7 +69,7 @@
 - name: Install models via cargo fallback (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - llm_tools_brew_check.rc != 0
+    - llm_tools_brew_check.rc != 0 or (llm_tools_models_brew_info is defined and llm_tools_models_brew_info.rc != 0)
   ansible.builtin.command: cargo install modelsdev
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/models"

@@ -137,7 +137,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Git review stack**: gh, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
 - **Markdown reader**: `glow` for terminal Markdown rendering
-- **DuckDB CLI**: `duckdb` (Homebrew on macOS, official installer on Linux)
+- **DuckDB CLI**: `duckdb` (Homebrew on macOS, official downloads on Linux)
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
 - **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli

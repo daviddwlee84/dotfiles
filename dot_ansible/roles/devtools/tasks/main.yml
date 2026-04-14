@@ -740,10 +740,15 @@
         paths: /tmp/glow
         patterns: glow
         file_type: file
+        recurse: true
       register: glow_find
 
+    - name: Fail if glow binary was not found in extracted archive
+      when: glow_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "glow binary was not found under /tmp/glow after extraction"
+
     - name: Install glow to ~/.local/bin
-      when: glow_find.matched | default(0) | int > 0
       ansible.builtin.copy:
         src: "{{ glow_find.files[0].path }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/glow"
@@ -786,11 +791,89 @@
         state: directory
         mode: '0755'
 
+    - name: Set DuckDB release architecture
+      ansible.builtin.set_fact:
+        duckdb_release_arch: >-
+          {{
+            'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Fail on unsupported architecture for DuckDB official downloads
+      when: duckdb_release_arch == ''
+      ansible.builtin.fail:
+        msg: "Unsupported architecture for DuckDB official downloads: {{ ansible_facts['architecture'] }}"
+
+    - name: Get latest DuckDB release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/duckdb/duckdb/releases/latest
+        return_content: true
+      register: duckdb_release
+
+    - name: Set DuckDB download URL facts
+      ansible.builtin.set_fact:
+        duckdb_download_url: >-
+          {{
+            (
+              duckdb_release.json.assets
+              | selectattr('name', 'equalto', 'duckdb_cli-linux-' ~ duckdb_release_arch ~ '.zip')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Fail if DuckDB download URL could not be determined
+      when: duckdb_download_url == ''
+      ansible.builtin.fail:
+        msg: "Could not determine DuckDB download URL for architecture {{ duckdb_release_arch }} from the latest GitHub release"
+
+    - name: Download DuckDB CLI zip
+      ansible.builtin.get_url:
+        url: "{{ duckdb_download_url }}"
+        dest: /tmp/duckdb_cli.zip
+        mode: '0644'
+
+    - name: Create DuckDB temp directory
+      ansible.builtin.file:
+        path: /tmp/duckdb
+        state: directory
+        mode: '0755'
+
+    - name: Extract DuckDB CLI zip
+      ansible.builtin.unarchive:
+        src: /tmp/duckdb_cli.zip
+        dest: /tmp/duckdb
+        remote_src: true
+
+    - name: Find DuckDB binary
+      ansible.builtin.find:
+        paths: /tmp/duckdb
+        patterns: duckdb
+        file_type: file
+        recurse: true
+      register: duckdb_find
+
+    - name: Fail if DuckDB binary was not found in extracted archive
+      when: duckdb_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "DuckDB binary was not found under /tmp/duckdb after extraction"
+
     - name: Install DuckDB CLI
-      ansible.builtin.shell: |
-        curl -fsSL https://install.duckdb.org | sh
-      args:
-        executable: /bin/bash
+      ansible.builtin.copy:
+        src: "{{ duckdb_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/duckdb"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up DuckDB temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/duckdb_cli.zip
+        - /tmp/duckdb
 
 - name: Verify DuckDB CLI is available
   when: ansible_facts["os_family"] == "Debian"
@@ -1240,26 +1323,68 @@
       ansible.builtin.set_fact:
         sesh_arch: >-
           {{
-            'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
             else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-            else ansible_facts['architecture']
+            else ''
           }}
+
+    - name: Fail on unsupported architecture for sesh official downloads
+      when: sesh_arch == ''
+      ansible.builtin.fail:
+        msg: "Unsupported architecture for sesh official downloads: {{ ansible_facts['architecture'] }}"
+
+    - name: Set sesh download URL facts
+      ansible.builtin.set_fact:
+        sesh_download_url: >-
+          {{
+            (
+              sesh_release.json.assets
+              | selectattr('name', 'equalto', 'sesh_Linux_' ~ sesh_arch ~ '.tar.gz')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Fail if sesh download URL could not be determined
+      when: sesh_download_url == ''
+      ansible.builtin.fail:
+        msg: "Could not determine sesh download URL for architecture {{ sesh_arch }} from the latest GitHub release"
 
     - name: Download sesh tarball
       ansible.builtin.get_url:
-        url: "https://github.com/joshmedeski/sesh/releases/download/{{ sesh_release.json.tag_name }}/sesh_Linux_{{ sesh_arch }}.tar.gz"
+        url: "{{ sesh_download_url }}"
         dest: /tmp/sesh.tar.gz
         mode: '0644'
+
+    - name: Create sesh temp directory
+      ansible.builtin.file:
+        path: /tmp/sesh
+        state: directory
+        mode: '0755'
 
     - name: Extract sesh
       ansible.builtin.unarchive:
         src: /tmp/sesh.tar.gz
-        dest: /tmp
+        dest: /tmp/sesh
         remote_src: true
+
+    - name: Find sesh binary
+      ansible.builtin.find:
+        paths: /tmp/sesh
+        patterns: sesh
+        file_type: file
+        recurse: true
+      register: sesh_find
+
+    - name: Fail if sesh binary was not found in extracted archive
+      when: sesh_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "sesh binary was not found under /tmp/sesh after extraction"
 
     - name: Install sesh to ~/.local/bin
       ansible.builtin.copy:
-        src: /tmp/sesh
+        src: "{{ sesh_find.files[0].path }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sesh"
         mode: '0755'
         remote_src: true

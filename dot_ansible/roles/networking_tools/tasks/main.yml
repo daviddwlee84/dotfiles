@@ -113,15 +113,34 @@
         dest: /tmp/doggo.tar.gz
         mode: '0644'
 
+    - name: Create doggo temp directory
+      ansible.builtin.file:
+        path: /tmp/doggo
+        state: directory
+        mode: '0755'
+
     - name: Extract doggo
       ansible.builtin.unarchive:
         src: /tmp/doggo.tar.gz
-        dest: /tmp
+        dest: /tmp/doggo
         remote_src: true
+
+    - name: Find doggo binary
+      ansible.builtin.find:
+        paths: /tmp/doggo
+        patterns: doggo
+        file_type: file
+        recurse: true
+      register: doggo_find
+
+    - name: Fail if doggo binary was not found in extracted archive
+      when: doggo_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "doggo binary was not found under /tmp/doggo after extraction"
 
     - name: Install doggo to ~/.local/bin
       ansible.builtin.copy:
-        src: /tmp/doggo
+        src: "{{ doggo_find.files[0].path }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/doggo"
         mode: '0755'
         remote_src: true
@@ -195,6 +214,34 @@
   changed_when: false
   failed_when: false
 
+- name: Set trippy target mappings
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - trippy_check.rc != 0
+  ansible.builtin.set_fact:
+    trippy_gnu_target: >-
+      {{
+        'x86_64-unknown-linux-gnu' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'aarch64-unknown-linux-gnu' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else 'armv7-unknown-linux-gnueabihf' if ansible_facts['architecture'] in ['armv7l', 'armv7', 'armhf']
+        else ''
+      }}
+    trippy_musl_target: >-
+      {{
+        'x86_64-unknown-linux-musl' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'aarch64-unknown-linux-musl' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else 'armv7-unknown-linux-musleabihf' if ansible_facts['architecture'] in ['armv7l', 'armv7', 'armhf']
+        else ''
+      }}
+
+- name: Fail on unsupported architecture for trippy official downloads
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - trippy_check.rc != 0
+    - trippy_gnu_target == '' or trippy_musl_target == ''
+  ansible.builtin.fail:
+    msg: "Unsupported architecture for trippy official downloads: {{ ansible_facts['architecture'] }}"
+
 - name: Install trippy from GitHub releases (Debian/Ubuntu, system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
@@ -208,20 +255,51 @@
         return_content: true
       register: trippy_release
 
-    - name: Download trippy .deb package
+    - name: Download trippy tarball
       ansible.builtin.get_url:
-        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.deb"
-        dest: /tmp/trippy.deb
+        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ trippy_gnu_target }}.tar.gz"
+        dest: /tmp/trippy.tar.gz
         mode: '0644'
 
-    - name: Install trippy .deb package
-      ansible.builtin.apt:
-        deb: /tmp/trippy.deb
-
-    - name: Clean up trippy .deb
+    - name: Create trippy temp directory
       ansible.builtin.file:
-        path: /tmp/trippy.deb
+        path: /tmp/trippy
+        state: directory
+        mode: '0755'
+
+    - name: Extract trippy
+      ansible.builtin.unarchive:
+        src: /tmp/trippy.tar.gz
+        dest: /tmp/trippy
+        remote_src: true
+
+    - name: Find trip binary
+      ansible.builtin.find:
+        paths: /tmp/trippy
+        patterns: trip
+        file_type: file
+        recurse: true
+      register: trippy_find
+
+    - name: Fail if trip binary was not found in extracted archive
+      when: trippy_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "trip binary was not found under /tmp/trippy after extraction"
+
+    - name: Install trip to /usr/local/bin
+      ansible.builtin.copy:
+        src: "{{ trippy_find.files[0].path }}"
+        dest: /usr/local/bin/trip
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up trippy temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
         state: absent
+      loop:
+        - /tmp/trippy.tar.gz
+        - /tmp/trippy
 
 # --- trippy (user-level fallback) ---
 - name: Re-check if trippy is installed
@@ -250,19 +328,38 @@
 
     - name: Download trippy tarball (user)
       ansible.builtin.get_url:
-        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release_user.json.tag_name }}/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release_user.json.tag_name }}/trippy-{{ trippy_release_user.json.tag_name }}-{{ trippy_musl_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
+
+    - name: Create trippy temp directory (user)
+      ansible.builtin.file:
+        path: /tmp/trippy-user
+        state: directory
+        mode: '0755'
 
     - name: Extract trippy (user)
       ansible.builtin.unarchive:
         src: /tmp/trippy.tar.gz
-        dest: /tmp
+        dest: /tmp/trippy-user
         remote_src: true
+
+    - name: Find trip binary (user)
+      ansible.builtin.find:
+        paths: /tmp/trippy-user
+        patterns: trip
+        file_type: file
+        recurse: true
+      register: trippy_find_user
+
+    - name: Fail if trip binary was not found in extracted archive (user)
+      when: trippy_find_user.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "trip binary was not found under /tmp/trippy-user after extraction"
 
     - name: Install trip to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/trip"
+        src: "{{ trippy_find_user.files[0].path }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/trip"
         mode: '0755'
         remote_src: true
@@ -273,7 +370,7 @@
         state: absent
       loop:
         - /tmp/trippy.tar.gz
-        - "/tmp/trippy-{{ trippy_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+        - /tmp/trippy-user
 
 # --- bandwhich (bandwidth monitor) ---
 - name: Check if bandwhich is installed

@@ -7,8 +7,15 @@
     uv tool install {{ item.name }}
     {% if item.python is defined %}--python {{ item.python }} {% endif %}
     {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
+  register: python_uv_tool_install
+  until: python_uv_tool_install is succeeded
+  retries: 3
+  delay: 5
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
+  environment:
+    UV_HTTP_TIMEOUT: "120"
+    UV_HTTP_RETRIES: "5"
   loop: "{{ python_uv_tools }}"
   loop_control:
     label: "{{ item.name }}"
