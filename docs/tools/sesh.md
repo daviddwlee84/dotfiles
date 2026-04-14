@@ -330,6 +330,45 @@ startup_command = "tmux split-window -h -p 25 'specstory run' && tmux select-pan
 **Pros:** zero extra dependencies.
 **Cons:** fragile, hard to read, hard to maintain.
 
+### Comparing Approaches
+
+Both `coding-agent` (tmuxp) and `coding-agent-mux` (tmuxinator) are configured in `sesh.toml` for A/B comparison:
+
+```bash
+sesh connect coding-agent       # Approach B: tmuxp --append
+sesh connect coding-agent-mux   # Approach C: tmuxinator native
+```
+
+After testing, keep the one you prefer and remove/comment the other.
+
+## try + sesh Integration
+
+[try-cli](https://github.com/tobi/try) creates ephemeral project workspaces under `~/src/tries/`. A sesh wildcard automatically applies `startup_command = "nvim"` to any try project.
+
+### Usage
+
+```bash
+# One-step: open project and start coding session
+try-sesh some-project
+try-sesh https://github.com/user/repo
+
+# Two-step: try first, then sesh
+try some-project
+shere                    # sesh connect "$PWD"
+```
+
+The `try-sesh` function (alias: `tsesh`) runs `try` then immediately `sesh connect "$PWD"`. Session names follow `dir_length=2` convention: `tries/2026-04-14-some-project`.
+
+Source: `~/.config/zsh/tools/32_try.zsh`
+
+## Upstream Issues (tmuxp)
+
+Sesh's `tmuxp` config field is documented in the schema and README, but **not implemented** in the source code. Relevant upstream issues:
+
+- [#87 - Add tmuxp support](https://github.com/joshmedeski/sesh/issues/87) -- Feature request to add tmuxp support. Status: Closed (marked "Done" on project board), but the implementation only added the field to the config struct/schema without wiring it into the connect/startup logic.
+- [#198 - Built-in Window and Pane management](https://github.com/joshmedeski/sesh/issues/198) -- Request for native pane/window layout support (avoiding tmuxp/tmuxinator dependency). Status: Closed. Sesh v2.25 added basic window support but still no pane splits.
+- [#188 - startup_command sent too early](https://github.com/joshmedeski/sesh/issues/188) -- Bug where startup_command is sent before the shell is ready. Status: Open. This can affect Approach B (`tmuxp load -a`) if there's a timing issue.
+
 ## References
 
 - [sesh GitHub](https://github.com/joshmedeski/sesh)

@@ -127,7 +127,7 @@ ansible-playbook playbooks/macos.yml --check
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, sqlit-tui, tmuxp, etc.) |
 | `llm_tools` | Local LLM tools: Ollama, LiteLLM, llmfit, models |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
-| `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, toolkami) |
+| `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, tmuxinator, toolkami) |
 | `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
 | `networking_tools` | Networking CLI tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan |
 

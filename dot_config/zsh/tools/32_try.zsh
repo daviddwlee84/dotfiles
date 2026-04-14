@@ -14,3 +14,24 @@ _try_script=$(ruby -e "require 'rubygems'; puts File.join(Gem::Specification.fin
 
 eval "$(ruby "$_try_script" init)"
 unset _try_script
+
+# ── try + sesh integration ───────────────────────────────────────────────────
+# Open a try project and immediately start a sesh coding session.
+# Usage:
+#   try-sesh some-project       # fuzzy-match or create, then sesh connect
+#   try-sesh https://github.com/user/repo  # clone, then sesh connect
+#
+# The session name follows sesh's dir_length=2 convention:
+#   e.g. "tries/2026-04-14-some-project"
+function try-sesh() {
+    if ! command -v sesh &>/dev/null; then
+        echo "try-sesh: sesh not found" >&2
+        return 1
+    fi
+    # Run try, which cd's into the project directory
+    try "$@" || return $?
+    # Now connect sesh to the directory try landed in
+    sesh connect "$PWD"
+}
+
+alias tsesh='try-sesh'

@@ -139,7 +139,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Markdown reader**: `glow` for terminal Markdown rendering
 - **DuckDB CLI**: `duckdb` (Homebrew on macOS, official installer on Linux)
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
-- **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, plus `toolkami`
+- **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
 - **Coding Agents** (optional): Claude Code, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
 - **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks

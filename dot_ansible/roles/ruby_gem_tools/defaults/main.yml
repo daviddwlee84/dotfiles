@@ -3,3 +3,5 @@
 ruby_gem_tools:
   - name: try-cli
     binary: try
+  - name: tmuxinator
+    binary: tmuxinator

@@ -59,10 +59,25 @@ startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux ki
 # path = "~"
 # tmuxinator = "coding-agent"
 
+# Approach C comparison: tmuxinator with different name (for A/B testing)
+# Uses sesh's native tmuxinator integration. Try both and compare:
+#   sesh connect coding-agent       (tmuxp --append)
+#   sesh connect coding-agent-mux   (tmuxinator native)
+[[session]]
+name = "coding-agent-mux"
+path = "~"
+tmuxinator = "coding-agent-mux"
+
 # ── Wildcards ────────────────────────────────────────────────────────────────
 
 [[wildcard]]
 pattern = "~/repos/*"
+startup_command = "nvim"
+
+# try-cli ephemeral workspaces: `try some-project` → `shere` or `try-sesh`
+# Session name will be "tries/2026-04-14-some-project" (dir_length=2)
+[[wildcard]]
+pattern = "~/src/tries/*"
 startup_command = "nvim"
 
 # ── Windows ──────────────────────────────────────────────────────────────────

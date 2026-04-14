@@ -1,0 +1,32 @@
+# Coding agent workspace layout (tmuxinator version)
+# Compare with tmuxp version: ~/.config/tmuxp/coding-agent.yaml
+#
+# Window 1 "editor": nvim (75%) | specstory run (25%) -- 3:1 ratio via main-vertical
+# Window 2 "monitor": btop for system monitoring
+#
+# ── Usage ────────────────────────────────────────────────────────────────────
+#
+# With sesh (native integration -- uncomment tmuxinator approach in sesh.toml):
+#   sesh connect coding-agent-mux
+#
+# Standalone:
+#   tmuxinator start coding-agent-mux
+#
+# For a specific project directory:
+#   tmuxinator start coding-agent-mux root=~/repos/myproject
+
+name: coding-agent-mux
+root: <%= @settings["root"] || "~" %>
+
+# Set main-pane-width before windows are created (3:1 = 75%)
+on_project_start: tmux set-window-option main-pane-width 75%
+
+windows:
+  - editor:
+      layout: main-vertical
+      panes:
+        - nvim
+        - specstory run
+  - monitor:
+      panes:
+        - btop
