@@ -6,8 +6,8 @@ sort_order = ["tmux", "config", "zoxide"]
 # Use last 2 directory components for session names (e.g. "projects/sesh")
 dir_length = 2
 
-# Hide scratch and underscore-prefixed sessions from the picker
-blacklist = ["^scratch$", "^_"]
+# Hide scratch, underscore-prefixed, and floax sessions from the picker
+blacklist = ["^scratch$", "^_", "^float$"]
 
 [default_session]
 startup_command = "nvim"

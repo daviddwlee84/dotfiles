@@ -69,13 +69,37 @@ Examples below assume `prefix = Ctrl + b`.
 | Keybinding | Action |
 |------------|--------|
 | `prefix + h/j/k/l` | Move between panes |
-| `prefix + H/J/K/L` | Resize panes |
+| `prefix + H/J/K/L` | Resize panes (5 cells, repeatable) |
+| `prefix + M-h/j/k/l` | Fine resize panes (1 cell, repeatable) |
+| `prefix + +` | Set current pane to 75% width |
 | `prefix + \|` | Split vertically |
 | `prefix + -` | Split horizontally |
 | `prefix + c` | New window in current path |
 | `prefix + x` | Kill pane |
 | `prefix + z` | Toggle pane zoom |
 | `prefix + [` | Enter copy mode |
+
+### Layouts
+
+| Keybinding | Action |
+|------------|--------|
+| `M-1` | Even horizontal layout |
+| `M-2` | Even vertical layout |
+| `M-3` | Main horizontal layout |
+| `M-4` | Main vertical layout |
+| `M-5` | Tiled layout |
+| `prefix + E` | Spread panes evenly (built-in) |
+
+These are tmux built-in `M-1` through `M-5` bindings. They work without prefix; just hold Meta (Alt/Option) and press the number.
+
+### Floating Pane (tmux-floax)
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + F` | Toggle floating pane (80% width/height) |
+| `prefix + P` | Open floax popup menu |
+
+The floating pane uses a dedicated tmux session named `float` (hidden from sesh picker via blacklist). It inherits the current pane path. Useful for quick terminal tasks without disrupting your layout.
 
 ### Built-in Useful tmux Keys Still Available
 
@@ -107,6 +131,13 @@ Useful entries in the popup:
 - `N`: new session
 - `X`: kill session (with confirmation)
 - `Q`: kill all sessions / kill server (with confirmation)
+- `z`: zoom toggle (current pane)
+- `E`: even horizontal layout
+- `e`: even vertical layout
+- `v`: main vertical layout
+- `b`: main horizontal layout
+- `T`: tiled layout
+- `=`: resize current pane to 75% width
 - `R`: reload config
 - `D`: detach
 - `?`: list keys
@@ -123,6 +154,17 @@ Useful entries in the popup:
 - `allow-passthrough on` helps terminal image protocols and similar passthrough features.
 
 If `Ctrl+/` still does not work after `prefix + R`, restart the current terminal app or fully restart tmux once to make sure the terminal capability negotiation is fresh.
+
+## Plugins
+
+| Plugin | Purpose |
+|--------|---------|
+| `tmux-resurrect` | Save/restore sessions across tmux restarts |
+| `tmux-continuum` | Automatic session saving |
+| `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
+| `tmux2k` | Status bar theme (onedark) |
+
+Plugins are managed by TPM. Run `prefix + I` to install after first setup.
 
 ## Verify Current Config
 

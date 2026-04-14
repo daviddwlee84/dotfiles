@@ -196,20 +196,20 @@ The tmux config (`dot_tmux.conf`) includes modern best practices for coding agen
 
 | Binding | Action |
 |---------|--------|
-| `prefix + Space` | tmux-which-key popup menu (discoverability) |
+| `prefix + Space` | Native popup menu (layouts, sessions, sesh, resize, etc.) |
 | `prefix + h/j/k/l` | Navigate panes (vim-style) |
-| `prefix + H/J/K/L` | Resize panes |
+| `prefix + H/J/K/L` | Resize panes (5 cells) |
+| `prefix + M-h/j/k/l` | Fine resize panes (1 cell) |
+| `prefix + +` | Set current pane to 75% width |
 | `prefix + \|` | Split pane vertically |
 | `prefix + -` | Split pane horizontally |
-| `prefix + T` | Sesh session picker (fzf popup) |
+| `prefix + F` | Toggle floating pane (tmux-floax) |
+| `prefix + P` | Floax popup menu |
+| `prefix + g` | Sesh session picker (fzf popup) |
 | `prefix + S` | Switch to last session (sesh) |
 | `prefix + 9` | Jump to git root session (sesh) |
 
-Note: `Ctrl+Space` is NOT bound (reserved for input method switching). The tmux-which-key plugin only uses `prefix + Space`.
-
-### tmux-which-key Configuration
-
-Config managed at `dot_config/tmux/plugins/tmux-which-key/config.yaml` (XDG mode). The plugin requires `coreutils` on macOS (installed via devtools ansible role). After changing the YAML, reload tmux config (`prefix + Space` -> `r`) or the plugin rebuilds automatically on TPM init.
+Note: `Ctrl+Space` is NOT bound (reserved for input method switching).
 
 ## Zellij Configuration
 
