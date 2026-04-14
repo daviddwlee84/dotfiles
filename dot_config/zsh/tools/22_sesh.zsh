@@ -39,15 +39,44 @@ function sesh-sessions() {
 }
 
 # Connect to a sesh session for the current directory (creates it if missing).
+# Usage:
+#   shere                              # connect with default startup_command
+#   shere -c "specstory run codex"     # connect with custom command
+#   shere -c "npm run dev" ~/my-proj   # custom command + custom path
 function sesh-here() {
-    sesh connect "${1:-$PWD}"
+    local cmd="" path=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -c|--command) cmd="$2"; shift 2 ;;
+            *) path="$1"; shift ;;
+        esac
+    done
+    path="${path:-$PWD}"
+    if [[ -n "$cmd" ]]; then
+        sesh connect --command "$cmd" "$path"
+    else
+        sesh connect "$path"
+    fi
 }
 
 # Connect to the current git root when available, otherwise use $PWD.
+# Usage:
+#   sroot                              # connect with default startup_command
+#   sroot -c "specstory run codex"     # connect with custom command
 function sesh-root() {
-    local root
+    local cmd="" root
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -c|--command) cmd="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
     root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
-    sesh connect "$root"
+    if [[ -n "$cmd" ]]; then
+        sesh connect --command "$cmd" "$root"
+    else
+        sesh connect "$root"
+    fi
 }
 
 alias shere='sesh-here'
