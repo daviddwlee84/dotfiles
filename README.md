@@ -122,6 +122,8 @@ To change options later: `chezmoi init --force`
 - `~/.ssh/config.d/00-defaults` - SSH global defaults stub (commented examples only)
 - `~/.ssh/config.d/git` - SSH host entries for `github.com` and `gitlab.com` with commented multi-account/Bitwarden examples
 - `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
+- `~/.config/tmuxp/coding-agent.yaml` - tmuxp workspace for coding agent (nvim 75% | specstory 25%, btop tab)
+- `~/.config/tmuxinator/coding-agent.yml` - tmuxinator workspace for coding agent (alternative to tmuxp, native sesh integration)
 - `~/.config/zellij/config.kdl` - Zellij config (locked default mode for coding agent compatibility, kitty keyboard protocol)
 - `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)

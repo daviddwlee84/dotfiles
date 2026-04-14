@@ -32,6 +32,33 @@ name = "home"
 path = "~"
 disable_startup_command = true
 
+# ── Coding agent session (layout: nvim 75% | specstory 25%, btop tab) ────────
+#
+# Approach B (active): tmuxp --append via startup_command
+#   sesh creates the session, then tmuxp appends windows into it.
+#   After appending, kills the initial empty window sesh created.
+#   Requires: tmuxp (pip/uv install tmuxp)
+#
+# Approach C (commented): tmuxinator native integration
+#   sesh delegates entire session creation to tmuxinator.
+#   Cleaner (no empty window to kill), but requires tmuxinator (gem).
+#   To switch: comment out Approach B, uncomment Approach C below.
+#
+# NOTE: sesh's `tmuxp` toml field is dead code as of v2.24 -- the source only
+# implements tmuxinator. See docs/tools/sesh.md for details.
+
+# Approach B: tmuxp --append
+[[session]]
+name = "coding-agent"
+path = "~"
+startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1"
+
+# Approach C: tmuxinator (uncomment to use, comment Approach B above)
+# [[session]]
+# name = "coding-agent"
+# path = "~"
+# tmuxinator = "coding-agent"
+
 # ── Wildcards ────────────────────────────────────────────────────────────────
 
 [[wildcard]]

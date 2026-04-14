@@ -221,6 +221,115 @@ The [sesh Raycast extension](https://www.raycast.com/joshmedeski/sesh) provides 
 
 5. **Multiple windows**: Define `[[window]]` entries and reference them in sessions for multi-pane layouts (e.g., editor + lazygit).
 
+## Pane Layouts (Advanced)
+
+### Sesh Limitations
+
+Sesh **cannot** create pane splits natively. Each `[[window]]` gets exactly one pane with one `startup_script`. There is no `panes`, `layout`, `size`, or `ratio` configuration.
+
+If you need predefined pane layouts (e.g., "left pane = nvim 75%, right pane = specstory run 25%"), you must use an external tool.
+
+### The `tmuxp` Field is Dead Code (as of sesh v2.24)
+
+**Important**: The `tmuxp` field in `sesh.toml` (on `[[session]]` and `[default_session]`) is defined in the Go struct and JSON schema, but **never read or used** by sesh's source code. Only `tmuxinator` has a working integration.
+
+Evidence from source code:
+- `startup/config.go` checks `Tmuxinator` and `StartupCommand` but **not** `Tmuxp`
+- `connector/connect.go` has a `tmuxinatorStrategy` but **no** `tmuxpStrategy`
+- Setting `tmuxp = "..."` in sesh.toml does nothing -- the session falls through to `default_session.startup_command`
+
+### Approach B: tmuxp via `startup_command` (Active)
+
+Use sesh's `startup_command` to call `tmuxp load --append`, which appends windows from a tmuxp YAML into the sesh-created session, then kill the initial empty window.
+
+Config in `sesh.toml`:
+```toml
+[[session]]
+name = "coding-agent"
+path = "~"
+startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1"
+```
+
+Layout defined in `~/.config/tmuxp/coding-agent.yaml`:
+```yaml
+session_name: coding-agent
+windows:
+  - window_name: editor
+    layout: main-vertical
+    options:
+      main-pane-width: 75%    # 3:1 ratio
+    panes:
+      - shell_command: nvim
+      - shell_command: specstory run
+  - window_name: monitor
+    panes:
+      - shell_command: btop
+```
+
+**How it works:**
+1. `sesh connect coding-agent` → sesh creates a tmux session named `coding-agent` at `~`
+2. `startup_command` runs inside the first pane via `tmux send-keys`
+3. `tmuxp load -a -y` appends the "editor" and "monitor" windows to the current session
+4. `tmux kill-window -t coding-agent:1` removes the initial empty window sesh created
+
+**Pros:** tmuxp already installed, declarative YAML, `--append` avoids session conflict.
+**Cons:** brief flash of empty window being killed; `startup_command` is `send-keys` so timing-sensitive.
+
+**Requires:** `tmuxp` (`pip install tmuxp` or `uv tool install tmuxp`)
+
+### Approach C: tmuxinator Native Integration (Alternative)
+
+Sesh has full native support for tmuxinator. When `tmuxinator` field is set, sesh **bypasses** its own `NewSession` + `startup.Exec` and delegates entirely to `tmuxinator start`.
+
+Config in `sesh.toml`:
+```toml
+[[session]]
+name = "coding-agent"
+path = "~"
+tmuxinator = "coding-agent"
+```
+
+Layout defined in `~/.config/tmuxinator/coding-agent.yml`:
+```yaml
+name: coding-agent
+root: <%= @settings["root"] || "~" %>
+on_project_start: tmux set-window-option main-pane-width 75%
+windows:
+  - editor:
+      layout: main-vertical
+      panes:
+        - nvim
+        - specstory run
+  - monitor:
+      panes:
+        - btop
+```
+
+**How it works:**
+1. `sesh connect coding-agent` → sesh detects `tmuxinator` field
+2. `connector/tmuxinator.go` calls `tmuxinator start coding-agent` directly
+3. tmuxinator creates the entire session with all windows and panes
+4. sesh then switches/attaches to the session
+
+**Pros:** cleanest integration, no empty window hack, sesh natively manages the lifecycle.
+**Cons:** requires tmuxinator (`gem install tmuxinator`), Ruby dependency.
+
+**Requires:** `tmuxinator` (installed by `ruby_gem_tools` ansible role)
+
+### Approach A: Pure Shell Script (Fallback)
+
+For environments without tmuxp or tmuxinator, use raw tmux commands:
+
+```toml
+[[session]]
+name = "coding-agent"
+path = "~"
+startup_command = "tmux split-window -h -p 25 'specstory run' && tmux select-pane -L && tmux new-window -n monitor 'btop' && tmux select-window -t 1 && nvim"
+```
+
+**Pros:** zero extra dependencies.
+**Cons:** fragile, hard to read, hard to maintain.
+
 ## References
 
 - [sesh GitHub](https://github.com/joshmedeski/sesh)
