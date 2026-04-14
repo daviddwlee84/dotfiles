@@ -18,8 +18,9 @@
 name: coding-agent-mux
 root: <%= @settings["root"] || "~" %>
 
-# Set main-pane-width before windows are created (3:1 = 75%)
-on_project_start: tmux set-window-option main-pane-width 75%
+# Set main-pane-width after windows are created (3:1 = 75%)
+on_project_start: tmux set-option -g main-pane-width 75%
+on_project_exit: tmux set-option -gu main-pane-width
 
 windows:
   - editor:

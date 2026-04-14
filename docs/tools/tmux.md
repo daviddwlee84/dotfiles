@@ -6,7 +6,9 @@ This setup is tuned for coding-agent and Neovim workflows:
 
 - native popup menu on `prefix + Space`
 - `tmux2k` status line
-- vim-style pane navigation
+- vim-style pane navigation and copy mode
+- URL opening via fzf (`prefix + u`) and tmux-open in copy mode
+- capture pane to clipboard helpers
 - sesh integration for session picking
 - `extended-keys` enabled with `csi-u` so keys like `Ctrl+/` reach Neovim inside tmux
 - OSC 52 clipboard and OSC passthrough enabled
@@ -101,6 +103,51 @@ These are tmux built-in `M-1` through `M-5` bindings. They work without prefix; 
 
 The floating pane uses a dedicated tmux session named `float` (hidden from sesh picker via blacklist). It inherits the current pane path. Useful for quick terminal tasks without disrupting your layout.
 
+### Copy Mode (Vim-Style)
+
+Enter copy mode with `prefix + [`. Navigate with vim keys, then:
+
+| Key | Action |
+|-----|--------|
+| `v` | Begin character selection (visual mode) |
+| `V` | Select entire line |
+| `C-v` | Toggle rectangle/block selection |
+| `y` | Yank selection to system clipboard |
+| `/` | Search forward |
+| `?` | Search backward |
+| `n`/`N` | Next/previous search match |
+| `g`/`G` | Jump to top/bottom |
+| `C-u`/`C-d` | Half-page up/down |
+| `q` or `Escape` | Exit copy mode |
+
+Mouse drag in copy mode also copies the selection to clipboard. Double-click selects a word.
+
+### URL Opening
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + u` | Open fzf popup listing all URLs in the pane (tmux-fzf-url) |
+
+In copy-mode (after selecting text with `v`):
+
+| Key | Action |
+|-----|--------|
+| `o` | Open selected URL/file in default browser/app (tmux-open) |
+| `C-o` | Open selection in `$EDITOR` |
+| `S` | Search selection in default search engine |
+
+Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select + `o` for precise URL opening.
+
+### Capture Pane
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + y` | Copy visible pane content to system clipboard |
+| `prefix + Y` | Copy full scrollback to system clipboard |
+| `prefix + C-y` | Open scrollback in fzf, select lines to copy (Tab=multi) |
+
+Works cross-platform: uses `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 clipboard also works for the vim-style `y` yank in copy mode (even over SSH).
+
 ### Built-in Useful tmux Keys Still Available
 
 | Keybinding | Action |
@@ -162,6 +209,8 @@ If `Ctrl+/` still does not work after `prefix + R`, restart the current terminal
 | `tmux-resurrect` | Save/restore sessions across tmux restarts |
 | `tmux-continuum` | Automatic session saving |
 | `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
+| `tmux-fzf-url` | `prefix+u` opens fzf popup with all URLs in pane |
+| `tmux-open` | In copy-mode: `o` opens selection, `C-o` in editor, `S` search |
 | `tmux2k` | Status bar theme (onedark) |
 
 Plugins are managed by TPM. Run `prefix + I` to install after first setup.

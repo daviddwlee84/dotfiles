@@ -48,10 +48,13 @@ disable_startup_command = true
 # implements tmuxinator. See docs/tools/sesh.md for details.
 
 # Approach B: tmuxp --append
+# After appending windows, kill the empty sesh window, then force the correct
+# 75% width on the main pane (works around tmuxp layout not sizing correctly
+# when appended into an existing tmux session with a different terminal size).
 [[session]]
 name = "coding-agent"
 path = "~"
-startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1"
+startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1 && sleep 0.3 && tmux select-window -t coding-agent:editor && tmux select-pane -t .1 && tmux resize-pane -x 75%"
 
 # Approach C: tmuxinator (uncomment to use, comment Approach B above)
 # [[session]]

@@ -205,6 +205,11 @@ The tmux config (`dot_tmux.conf`) includes modern best practices for coding agen
 | `prefix + -` | Split pane horizontally |
 | `prefix + F` | Toggle floating pane (tmux-floax) |
 | `prefix + P` | Floax popup menu |
+| `prefix + u` | Open fzf URL picker (tmux-fzf-url) |
+| `prefix + [` | Enter vim-style copy mode (v/V/y to select/yank) |
+| `prefix + y` | Copy visible pane to clipboard |
+| `prefix + Y` | Copy full scrollback to clipboard |
+| `prefix + C-y` | fzf line picker from scrollback |
 | `prefix + g` | Sesh session picker (fzf popup) |
 | `prefix + S` | Switch to last session (sesh) |
 | `prefix + 9` | Jump to git root session (sesh) |
