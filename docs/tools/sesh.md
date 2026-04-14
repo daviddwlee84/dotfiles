@@ -25,10 +25,30 @@ The managed zsh config also provides two shell helpers:
 
 | Command | Action |
 |---------|--------|
-| `shere` | Connect to a sesh session for the current directory (`sesh connect "$PWD"`) |
-| `sroot` | Connect to the current git root if present, otherwise `"$PWD"` |
+| `shere` | Connect to a sesh session for the current directory |
+| `sroot` | Connect to the current git root if present, otherwise `$PWD` |
 
 The underlying functions are `sesh-here` and `sesh-root`, so you can call them directly if you prefer function names over aliases.
+
+Both helpers accept a **command** as bare arguments (no quotes needed), which overrides the default `startup_command` from `sesh.toml`:
+
+```bash
+# No args → default startup_command (nvim)
+shere
+sroot
+
+# Bare args → treated as the command to run in the new session
+shere specstory run codex
+shere npm run dev
+sroot specstory run codex
+
+# Explicit flags (also supported)
+shere -c "specstory run codex"       # --command flag
+shere -p ~/repos/my-project          # --path flag (overrides $PWD)
+shere -p ~/repos/my-project npm dev  # path + command
+```
+
+**Note:** `--command` only takes effect when creating a new session. If the session already exists, sesh switches to it and ignores the command.
 
 ### tmux
 

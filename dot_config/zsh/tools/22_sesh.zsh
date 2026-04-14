@@ -39,18 +39,25 @@ function sesh-sessions() {
 }
 
 # Connect to a sesh session for the current directory (creates it if missing).
-# Usage:
-#   shere                              # connect with default startup_command
-#   shere -c "specstory run codex"     # connect with custom command
-#   shere -c "npm run dev" ~/my-proj   # custom command + custom path
+# Smart argument handling:
+#   shere                              # default startup_command (nvim)
+#   shere specstory run codex          # bare args → treated as command
+#   shere -c "specstory run codex"     # explicit --command flag
+#   shere -p ~/my-proj                 # explicit path
+#   shere -p ~/my-proj npm run dev     # explicit path + command
 function sesh-here() {
     local cmd="" path=""
+    # Parse flags first
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -c|--command) cmd="$2"; shift 2 ;;
-            *) path="$1"; shift ;;
+            -p|--path)    path="$2"; shift 2 ;;
+            -*)           echo "sesh-here: unknown flag $1" >&2; return 1 ;;
+            *)            break ;;  # remaining args are the command
         esac
     done
+    # Remaining positional args become the command
+    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
     path="${path:-$PWD}"
     if [[ -n "$cmd" ]]; then
         sesh connect --command "$cmd" "$path"
@@ -60,17 +67,20 @@ function sesh-here() {
 }
 
 # Connect to the current git root when available, otherwise use $PWD.
-# Usage:
-#   sroot                              # connect with default startup_command
-#   sroot -c "specstory run codex"     # connect with custom command
+# Same smart argument handling as sesh-here.
+#   sroot                              # default startup_command
+#   sroot specstory run codex          # bare args → command
+#   sroot -c "specstory run codex"     # explicit --command flag
 function sesh-root() {
     local cmd="" root
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -c|--command) cmd="$2"; shift 2 ;;
-            *) shift ;;
+            -*)           shift ;;
+            *)            break ;;
         esac
     done
+    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
     root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
     if [[ -n "$cmd" ]]; then
         sesh connect --command "$cmd" "$root"
