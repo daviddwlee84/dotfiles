@@ -1,0 +1,77 @@
+# Ghostty & cmux
+
+[Ghostty](https://ghostty.org/) is a fast, native terminal emulator. [cmux](https://github.com/MrPicklePinosaur/cmux) wraps tmux with a session-picker UX commonly used together with Ghostty for coding-agent workflows.
+
+This repo does not manage `~/.config/ghostty/config` (Ghostty has sensible defaults and the config is machine-specific). The items below cover the problems that show up when using Ghostty against new remote hosts.
+
+## `xterm-ghostty` terminfo on remote hosts
+
+When you SSH into a fresh remote, `$TERM=xterm-ghostty` but the remote has no matching terminfo entry. Symptoms: broken line-drawing, garbled prompts, `clear`/`tput` failures, Neovim rendering glitches. This is especially visible on the first cmux/tmux SSH into a new box.
+
+### Option 1 — Ghostty built-in (recommended for interactive shells)
+
+> - [Shell Integration - Features](https://ghostty.org/docs/features/shell-integration#ssh-integration)
+
+Add to `~/.config/ghostty/config`:
+
+```ini
+shell-integration-features = ssh-env,ssh-terminfo
+```
+
+- `ssh-terminfo`: auto-installs `xterm-ghostty` on the remote the first time you `ssh` from an interactive shell with Ghostty shell integration loaded.
+- `ssh-env`: forwards `COLORTERM`, `TERM_PROGRAM`, `TERM_PROGRAM_VERSION` via `SendEnv`, and falls back to `TERM=xterm-256color` where needed. The remote `sshd_config` needs a matching `AcceptEnv` line for the forwarded vars to take effect.
+
+**Limitations**: only triggers from interactive shells with the Ghostty wrapper active. It does not cover `ssh` invoked inside tmux/cmux panes, from scripts, or from wrapper tools (`rsync`, `aws`, `gcloud`, …). For those, use the manual helper below.
+
+### Option 2 — manual helper (works everywhere)
+
+A zsh function `ghostty-ssh-terminfo` is defined in [`dot_config/zsh/10_aliases.zsh`](../../dot_config/zsh/10_aliases.zsh).
+
+```bash
+ghostty-ssh-terminfo <ssh-host>
+```
+
+What it does:
+
+- Validates local `infocmp` and the `xterm-ghostty` entry exist.
+- Pipes `infocmp -x xterm-ghostty` into a **single** SSH call (no double password/MFA prompt).
+- On the remote: probes for `tic`, creates `~/.terminfo`, and runs `TERMINFO="$HOME/.terminfo" tic -x -` — so no root/sudo needed.
+- Suppresses only the harmless `older tic versions may treat the description field as an alias` warning (emitted by ncurses < 6.3). Real errors still surface and set a non-zero exit.
+
+Example:
+
+```bash
+# First time connecting a new box from cmux/tmux
+ghostty-ssh-terminfo remote
+# → Installed xterm-ghostty terminfo on remote (in ~/.terminfo)
+
+# Verify
+ssh remote 'infocmp xterm-ghostty >/dev/null && echo ok'
+```
+
+### Smoke-test against `localhost`
+
+Yes — if `sshd` is running locally you can validate the function without touching a real remote:
+
+```bash
+# Enable sshd (Linux)
+sudo systemctl start ssh
+# or macOS: System Settings → General → Sharing → Remote Login
+
+ghostty-ssh-terminfo localhost
+```
+
+Caveats:
+
+- `localhost` already has your own `$HOME`, so this effectively writes to the *same* `~/.terminfo` your local shell reads. Useful as a wiring/error-path smoke test, not as a representative "fresh remote" check.
+- If you already have the entry locally (which you do, otherwise `infocmp -x xterm-ghostty` would fail), the install is a no-op overwrite — still exercises the full pipeline end-to-end.
+- For a cleaner test, point at a container or a VM where `xterm-ghostty` is definitely missing.
+
+## Why the warning appears (and can't be fully fixed client-side)
+
+The `|`-separated long description in Ghostty's terminfo is interpreted as an extra alias by `tic` / ncurses prior to 6.3. The entry still installs correctly; the warning is cosmetic. The only real fix is upgrading ncurses on the remote.
+
+## See also
+
+- [tmux](tmux.md) — tmux config and keybindings (cmux runs on top of tmux).
+- [sesh](../sesh.md) — session picker used in the tmux setup.

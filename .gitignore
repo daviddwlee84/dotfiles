@@ -23,3 +23,6 @@ Thumbs.db
 # Sidecar & td
 .todos/
 .sidecar/
+
+# Logs
+*.log

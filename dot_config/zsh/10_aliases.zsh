@@ -35,3 +35,44 @@ alias load-nvm='export LOAD_NVM=1 && source "${NVM_DIR:-$HOME/.nvm}/nvm.sh" && s
 
 # Regenerate cached bw completion (run after updating bw CLI)
 alias bw-update-completion='mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh" && bw completion --shell zsh > "${XDG_CACHE_HOME:-$HOME/.cache}/zsh/bw_completion.zsh" 2>/dev/null && echo "bw completion cache updated"'
+
+# Install Ghostty terminfo on a remote host (unprivileged, into ~/.terminfo).
+# Fixes character-rendering issues when SSH'ing into a fresh host from Ghostty/cmux/tmux.
+# Usage: ghostty-ssh-terminfo <ssh-host>
+ghostty-ssh-terminfo() {
+  emulate -L zsh
+  setopt pipefail
+
+  local host="$1"
+
+  if [[ -z "$host" ]]; then
+    echo "Usage: ghostty-ssh-terminfo <ssh-host>" >&2
+    return 1
+  fi
+
+  if ! command -v infocmp >/dev/null 2>&1; then
+    echo "ghostty-ssh-terminfo: local 'infocmp' not found" >&2
+    return 1
+  fi
+
+  if ! infocmp -x xterm-ghostty >/dev/null 2>&1; then
+    echo "ghostty-ssh-terminfo: local terminfo 'xterm-ghostty' not found" >&2
+    return 1
+  fi
+
+  if ! infocmp -x xterm-ghostty \
+      | ssh "$host" '
+          set -e
+          if ! command -v tic >/dev/null 2>&1; then
+            echo "remote: tic not found" >&2
+            exit 127
+          fi
+          mkdir -p "$HOME/.terminfo"
+          TERMINFO="$HOME/.terminfo" tic -x -
+        ' 2> >(grep -Fv "older tic versions may treat the description field as an alias" >&2); then
+    echo "ghostty-ssh-terminfo: failed to install on $host" >&2
+    return 1
+  fi
+
+  echo "Installed xterm-ghostty terminfo on $host (in ~/.terminfo)"
+}
