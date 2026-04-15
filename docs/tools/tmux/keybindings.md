@@ -9,6 +9,9 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + R` | Reload `~/.tmux.conf` |
 | `prefix + Space` | Open the tmux popup menu |
 | `prefix + g` | Open sesh picker |
+| `prefix + T` | Open sesh picker via television (tv) |
+| `prefix + O` | Open sesh built-in picker |
+| `prefix + W` | Open sesh window picker (fzf) |
 | `prefix + S` | Jump to the last sesh session |
 | `prefix + 9` | Jump to the git root session for the current repo |
 | `prefix + N` | New session (prompts for name) |
@@ -163,6 +166,9 @@ Menu accelerator keys match the standalone `prefix + key` bindings wherever poss
 | `C` | Theme: Catppuccin (top bar) | yes (`prefix + M-c`) |
 | `M` | Theme: tmux2k (bottom bar) | yes (`prefix + M-t`) |
 | `g` | Sesh picker | yes |
+| `V` | Sesh TV picker | menu-only (use `prefix + T`) |
+| `O` | Sesh built-in picker | yes |
+| `W` | Sesh window picker | yes |
 | `S` | Last sesh session | yes |
 | `9` | Sesh git root | yes |
 | `R` | Reload config | yes |

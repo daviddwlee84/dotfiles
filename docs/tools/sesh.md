@@ -57,6 +57,9 @@ All keybindings use the tmux prefix (default `Ctrl+B`).
 | Keybinding | Action |
 |------------|--------|
 | `prefix + g` | Open sesh picker popup (fzf with preview, icons, filtering) |
+| `prefix + T` | Open sesh picker via television (tv) in a tmux popup |
+| `prefix + O` | Open sesh built-in picker in a tmux popup |
+| `prefix + W` | Open sesh window picker (fzf) -- switch or create tmux windows |
 | `prefix + S` | Switch to last session (via `sesh last`) |
 | `prefix + 9` | Jump to root of current git repo/worktree |
 
@@ -188,43 +191,17 @@ Sesh uses zoxide's frecency database to suggest directories. Any directory you `
 
 ### Television (tv)
 
-[Television](https://github.com/alexpasmantier/television) has a built-in [sesh channel](https://alexpasmantier.github.io/television/community/channels-unix/#sesh). If tv is installed, you can use it as an alternative picker:
+[Television](https://github.com/alexpasmantier/television) has a built-in [sesh channel](https://alexpasmantier.github.io/television/community/channels-unix/#sesh). Television is installed by the `devtools` ansible role (`brew install television` on macOS, GitHub release binary on Linux).
+
+**tmux keybinding:** `prefix + T` opens television's sesh channel in a tmux popup.
 
 ```
-# tmux keybinding (alternative to fzf)
-bind-key "T" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T 'Sesh' tv sesh
+bind-key "T" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Sesh (tv) ' "tv sesh"
 ```
 
-Television cable channel config (`~/.config/television/cable/sesh.toml`):
+Use `Ctrl-s` to cycle through sources (all, tmux, config, zoxide, fd), and `Ctrl-d` to kill the highlighted session.
 
-```toml
-[metadata]
-name = "sesh"
-description = "Session manager integrating tmux sessions, zoxide directories, and config paths"
-requirements = ["sesh", "fd"]
-
-[source]
-command = ["sesh list --icons", "sesh list -t --icons", "sesh list -c --icons", "sesh list -z --icons", "fd -H -d 2 -t d -E .Trash . ~"]
-ansi = true
-output = "{strip_ansi|split: :1..|join: }"
-
-[preview]
-command = "sesh preview '{strip_ansi|split: :1..|join: }'"
-
-[keybindings]
-enter = "actions:connect"
-ctrl-d = ["actions:kill_session", "reload_source"]
-
-[actions.connect]
-description = "Connect to selected session"
-command = "sesh connect '{strip_ansi|split: :1..|join: }'"
-mode = "execute"
-
-[actions.kill_session]
-description = "Kill selected tmux session"
-command = "tmux kill-session -t '{strip_ansi|split: :1..|join: }'"
-mode = "fork"
-```
+A custom cable channel config at `~/.config/television/cable/sesh.toml` overrides the built-in channel with richer source cycling and actions matching our fzf picker setup.
 
 ### Raycast (macOS)
 

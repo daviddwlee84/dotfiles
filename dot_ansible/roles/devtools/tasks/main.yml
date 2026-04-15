@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils
+# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -36,6 +36,8 @@
       - duckdb
       - rclone
       - coreutils
+      - taplo
+      - television
     state: present
 
 # =============================================================================
@@ -1398,6 +1400,173 @@
         - /tmp/sesh
         - /tmp/README.md
         - /tmp/LICENSE
+
+# --- taplo (TOML language server / formatter) ---
+- name: Check if taplo is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: taplo --version
+  register: taplo_check
+  changed_when: false
+  failed_when: false
+
+- name: Install taplo from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - taplo_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (taplo)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest taplo release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/tamasfe/taplo/releases/latest
+        return_content: true
+      register: taplo_release
+
+    - name: Set taplo architecture mapping
+      ansible.builtin.set_fact:
+        taplo_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Fail on unsupported architecture for taplo
+      when: taplo_arch == ''
+      ansible.builtin.fail:
+        msg: "Unsupported architecture for taplo: {{ ansible_facts['architecture'] }}"
+
+    - name: Download taplo binary (gzipped)
+      ansible.builtin.get_url:
+        url: "https://github.com/tamasfe/taplo/releases/download/{{ taplo_release.json.tag_name }}/taplo-linux-{{ taplo_arch }}.gz"
+        dest: /tmp/taplo.gz
+        mode: '0644'
+
+    - name: Decompress taplo binary
+      ansible.builtin.shell: gunzip -f /tmp/taplo.gz
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Install taplo to ~/.local/bin
+      ansible.builtin.copy:
+        src: /tmp/taplo
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/taplo"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up taplo temp files
+      ansible.builtin.file:
+        path: /tmp/taplo
+        state: absent
+
+# --- television (tv) - fuzzy finder TUI ---
+- name: Check if tv is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: tv --version
+  register: tv_check
+  changed_when: false
+  failed_when: false
+
+- name: Install television from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tv_check.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (television)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest television release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/alexpasmantier/television/releases/latest
+        return_content: true
+      register: tv_release
+
+    - name: Set television architecture mapping
+      ansible.builtin.set_fact:
+        tv_arch: >-
+          {{
+            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Fail on unsupported architecture for television
+      when: tv_arch == ''
+      ansible.builtin.fail:
+        msg: "Unsupported architecture for television: {{ ansible_facts['architecture'] }}"
+
+    - name: Set television download URL
+      ansible.builtin.set_fact:
+        tv_download_url: >-
+          {{
+            (
+              tv_release.json.assets
+              | selectattr('name', 'match', 'tv-.*-' ~ tv_arch ~ '-unknown-linux-gnu\\.tar\\.gz$')
+              | rejectattr('name', 'match', '.*\\.sha256$')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Fail if television download URL could not be determined
+      when: tv_download_url == ''
+      ansible.builtin.fail:
+        msg: "Could not determine television download URL for architecture {{ tv_arch }}"
+
+    - name: Download television tarball
+      ansible.builtin.get_url:
+        url: "{{ tv_download_url }}"
+        dest: /tmp/tv.tar.gz
+        mode: '0644'
+
+    - name: Create television temp directory
+      ansible.builtin.file:
+        path: /tmp/tv
+        state: directory
+        mode: '0755'
+
+    - name: Extract television
+      ansible.builtin.unarchive:
+        src: /tmp/tv.tar.gz
+        dest: /tmp/tv
+        remote_src: true
+
+    - name: Find television binary
+      ansible.builtin.find:
+        paths: /tmp/tv
+        patterns: tv
+        file_type: file
+        recurse: true
+      register: tv_find
+
+    - name: Fail if television binary was not found
+      when: tv_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "tv binary was not found under /tmp/tv after extraction"
+
+    - name: Install television to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ tv_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/tv"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up television temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/tv.tar.gz
+        - /tmp/tv
 
 # =============================================================================
 # TPM (Tmux Plugin Manager) - All platforms
