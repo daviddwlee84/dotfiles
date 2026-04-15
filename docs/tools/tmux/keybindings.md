@@ -22,7 +22,9 @@ All bindings use the default prefix `Ctrl + b`.
 
 | Keybinding | Action |
 |------------|--------|
-| `prefix + h/j/k/l` | Move between panes |
+| `Ctrl + h/j/k/l` | Move between panes — crosses into Neovim splits (vim-tmux-navigator) |
+| `Ctrl + \` | Focus previous pane/split (vim-tmux-navigator) |
+| `prefix + h/j/k/l` | Move between panes (fallback, tmux-only) |
 | `prefix + H/J/K/L` | Resize panes (5 cells, repeatable) |
 | `prefix + M-h/j/k/l` | Fine resize panes (1 cell, repeatable) |
 | `prefix + +` | Set current pane to 75% width |

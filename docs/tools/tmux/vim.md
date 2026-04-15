@@ -28,9 +28,25 @@ See [keybindings.md → Copy Mode](./keybindings.md#copy-mode-vim-style) for the
 
 If `Ctrl+/` still does not work after `prefix + R`, restart the terminal app or `tmux kill-server` once so terminal capability negotiation is fresh. The managed Alacritty config sends `Ctrl+/` as `\u001f`, which matches LazyVim's built-in `<C-_>` fallback for terminal toggle.
 
-## Possible future add-on
+## vim-tmux-navigator
 
-[`christoomey/vim-tmux-navigator`](https://github.com/christoomey/vim-tmux-navigator) — prefix-less `Ctrl+h/j/k/l` navigation that seamlessly crosses tmux panes and Vim splits. Not installed; adopting it would replace the current `prefix + h/j/k/l` bindings.
+[`christoomey/vim-tmux-navigator`](https://github.com/christoomey/vim-tmux-navigator) is installed. Prefix-less `Ctrl+h/j/k/l` moves between panes, transparently crossing tmux pane boundaries and Neovim splits:
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+h` | Focus left (tmux pane or vim split) |
+| `Ctrl+j` | Focus down |
+| `Ctrl+k` | Focus up |
+| `Ctrl+l` | Focus right |
+| `Ctrl+\` | Focus previous (last-visited) |
+
+The Neovim spec lives at [`dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua`](../../../dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua); the matching tmux-side `is_vim` bindings live in [`dot_config/tmux/keybindings.conf`](../../../dot_config/tmux/keybindings.conf). The existing `prefix + h/j/k/l` bindings are kept as a fallback — nothing is removed.
+
+### Caveats
+
+- `Ctrl+h` is historically Backspace in some terminals. If `<BS>` misbehaves in Neovim after this, remap `<C-h>` inside Neovim insert mode or update your terminal's keyboard protocol to csi-u (already enabled in our tmux config via `extended-keys-format csi-u`).
+- `Ctrl+\` may clash with other apps (e.g. some debuggers use it as a signal). Avoid pressing it inside those apps.
+- If you run a nested tmux session, the outer tmux eats the Ctrl+h/j/k/l and they don't reach Neovim. Use `prefix + h/j/k/l` inside nested sessions.
 
 ## Resources
 
