@@ -3839,3 +3839,519 @@ Untracked files:
 [rerun: b13]
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:08:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-commit after hook fix
+
+```bash
+git add .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md && git commit -m "$(cat <<'EOF'
+Modularize tmux config with switchable Catppuccin/tmux2k themes
+
+Split the monolithic dot_tmux.conf into ~/.config/tmux/ modules (entry,
+common, keybindings, per-theme) so shared settings and status-bar styling
+no longer collide. Catppuccin with top status bar becomes the default;
+tmux2k stays as an opt-in alternative. Select via $TMUX_THEME env var,
+@theme_variant tmux option, or prefix + C / prefix + T at runtime. Each
+theme file auto-clones its plugin and runs it explicitly so prefix + R
+reloads work reliably without pure TPM dependency.
+
+Docs reorganized into docs/tools/tmux/ (README, keybindings, themes, vim)
+with troubleshooting notes for the Catppuccin v2 window-list fix and the
+tmux2k bandwidth uint64 underflow.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[main 29b1f40] Modularize tmux config with switchable Catppuccin/tmux2k themes
+ 13 files changed, 4462 insertions(+), 421 deletions(-)
+ create mode 100644 .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+ create mode 100644 docs/tools/tmux/README.md
+ rename docs/tools/{tmux.md => tmux/keybindings.md} (52%)
+ create mode 100644 docs/tools/tmux/themes.md
+ create mode 100644 docs/tools/tmux/vim.md
+ create mode 100644 dot_config/tmux/common.conf
+ create mode 100644 dot_config/tmux/keybindings.conf
+ create mode 100644 dot_config/tmux/theme.catppuccin.conf
+ create mode 100644 dot_config/tmux/theme.tmux2k.conf
+ create mode 100644 dot_config/tmux/tmux.conf
+[rerun: b14]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:09:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Push to remote
+
+`git push 2>&1 | tail`
+
+```text
+Connection closed by 20.205.243.166 port 22
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+[rerun: b15]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:09:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check remote
+
+`git remote -v`
+
+```text
+origin	git@github.com:daviddwlee84/dotfiles.git (fetch)
+origin	git@github.com:daviddwlee84/dotfiles.git (push)
+[rerun: b16]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:10:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry push
+
+`git push 2>&1 | tail`
+
+```text
+Connection closed by 20.205.243.166 port 22
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+[rerun: b17]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:10:49Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:10:54Z)**_
+
+Committed locally (commit `29b1f40`), but `git push` is failing with a network/SSH connection error:
+
+```
+Connection closed by 20.205.243.166 port 22
+```
+
+That IP is GitHub's China-region SSH endpoint — looks like the SSH connection is being dropped upstream. This is outside what I can fix from here. A few things you can try yourself:
+
+- Retry in a moment: `git push`
+- Switch to HTTPS temporarily: `git push https://github.com/daviddwlee84/dotfiles.git main`
+- Or use a VPN / `ssh.github.com` on port 443:
+  ```
+  git remote set-url origin ssh://git@ssh.github.com:443/daviddwlee84/dotfiles.git
+  git push
+  ```
+
+The commit is safe locally and ahead of `origin/main` by 3.
+
+---
+
+_**User (2026-04-15 06:17:16Z)**_
+
+See if it is the ~/.ssh/config.d/01_git problem or Bitwarden SSH agent issue? (I'm sure the jingle key should work)
+
+---
+
+_**Agent (claude-opus-4-6 2026-04-15 06:17:20Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:17:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect ssh config
+
+`ls ~/.ssh/config.d/ 2>/dev/null; echo ---; cat ~/.ssh/config.d/01_git 2>/dev/null; echo ===; cat ~/.ssh/config 2>/dev/null | head -40`
+
+```text
+Exit code 1
+󰡯 00-defaults
+󰡯 01_git
+---
+# ~/.ssh/config.d/git
+#
+# Public host defaults for Git providers.
+
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/jingle
+    IdentitiesOnly yes
+    
+
+Host gitlab.com
+    HostName gitlab.com
+    User git
+    IdentityFile ~/.ssh/jingle
+    IdentitiesOnly yes
+
+# Example: multiple account alias (disabled by default)
+# Host github-work
+#     HostName github.com
+#     User git
+#     IdentityFile ~/.ssh/github_work.pub
+#     IdentitiesOnly yes
+
+# Example: Bitwarden agent pinning (disabled by default)
+# Host gitlab-work
+#     HostName gitlab.com
+#     User git
+#     IdentityFile ~/.ssh/gitlab_work.pub
+#     IdentitiesOnly yes
+(eval):1: == not found
+[rerun: b18]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:17:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read main ssh config + defaults
+
+`cat ~/.ssh/config 2>/dev/null; echo ---; cat ~/.ssh/config.d/00-defaults 2>/dev/null`
+
+```text
+Host mac
+	HostName davids-v2ray.japaneast.cloudapp.azure.com
+	User daviddwlee84
+	Port 6000
+
+Host frp2
+	HostName davids-v2ray.japaneast.cloudapp.azure.com
+	User daviddwlee84
+	Port 6002
+
+Host frp3
+	HostName davids-v2ray.japaneast.cloudapp.azure.com
+	User zhouhanru
+	Port 6003
+
+Host azure
+	HostName davidlee.japaneast.cloudapp.azure.com 
+	User daviddwlee84
+	Port 22
+	IdentityFile ~/.ssh/YetAnotherStupidVM
+
+Host v2ray
+	# HostName david-v2ray.japaneast.cloudapp.azure.com 
+	# HostName davids-v2ray.japaneast.cloudapp.azure.com 
+	# HostName 20.48.49.47
+	HostName 48.210.71.128
+	# User daviddwlee84
+	User david
+	Port 22
+	IdentityFile ~/.ssh/YetAnotherStupidVM
+
+Host ny_trade
+	# HostName trader-newyork.eastus.cloudapp.azure.com
+	HostName 172.171.235.106
+	User hzhou
+	Port 22
+	IdentityFile ~/.ssh/azure_vm1
+
+Host hanru
+	HostName hzhou.japaneast.cloudapp.azure.com 
+	# HostName 172.207.216.70
+	# HostName 20.89.93.34
+	User hzhou
+	Port 22
+	IdentityFile ~/.ssh/azure_vm1
+
+# Jingle.AI
+Host jingle224
+	HostName 192.168.222.224
+	# LDAP_2022@*#ldw
+	User lidawei
+	# LDAP_2022@#$zr
+	# User zhangren
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+# GitLab
+Host 192.168.222.202
+	HostName 192.168.222.202
+	IdentityFile ~/.ssh/jingle
+
+# Research machine
+Host jingle235
+	HostName 192.168.222.235
+	# JG_ldw@2023
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle236
+	HostName 192.168.222.236
+	# JG_ldw@2023
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle237
+	HostName 192.168.222.237
+	# JG_ldw@2023
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle247
+	HostName 192.168.222.247
+	# GY_ldw@2024
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle207_LDAP
+	HostName 192.168.222.207
+	# LDAP_2022@*#ldw
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle207
+	HostName 192.168.222.207
+	# GY_ldw@2024
+	User ldw
+	Port 22
+	ProxyJump mac
+	IdentityFile ~/.ssh/jingle
+	
+Host jingle242
+	HostName 192.168.222.242
+	# JG_ldw@2023
+	User lidawei
+	Port 22
+	IdentityFile ~/.ssh/jingle
+	
+Host jingle234
+        HostName 192.168.222.234
+        # GY_jingle@2022
+        User jingle
+        Port 22
+	IdentityFile ~/.ssh/jingle
+
+Host jingle233
+        HostName 192.168.222.233
+        # GY_jingle@2022
+        User jingle
+        Port 22
+	IdentityFile ~/.ssh/jingle
+
+
+Host pc
+        HostName 192.168.2.46
+        # JG_pc@123
+        User jingle
+        Port 22
+        IdentityFile ~/.ssh/jingle
+
+Host zyc
+	# HostName 35.221.114.225
+	HostName 34.84.165.46
+	# HostName tokyo.breakwall.zyc.com
+        User xcaverybingo
+        Port 22
+        IdentityFile ~/.ssh/jingle
+
+
+Host mac
+	HostName davids-v2ray.japaneast.cloudapp.azure.com
+	User daviddwlee84
+	Port 6000
+
+# GitHub
+Host github.com
+	HostName github.com
+	IdentityFile ~/.ssh/jingle
+
+Host gitlab.com
+	HostName gitlab.com
+	IdentityFile ~/.ssh/jingle
+	IdentitiesOnly yes
+
+Host gitlab.com altssh.gitlab.com
+  	ProxyCommand nc -X 5 -x 127.0.0.1:7890 %h %p
+  	# or: ProxyCommand /usr/bin/nc.openbsd -X 5 -x 127.0.0.1:7891 %h %p
+---
+# ~/.ssh/config.d/00-defaults
+#
+# Stub file for optional global defaults.
+# Intentionally all-commented to avoid duplicating Host * defaults from
+# ~/.ssh/config.
+
+# Host *
+#     AddKeysToAgent yes
+#     IdentitiesOnly yes
+#     PreferredAuthentications publickey
+[rerun: b19]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:17:34Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:18:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+DNS resolution + verbose SSH
+
+`getent hosts github.com; echo ---; ssh -vT git@github.com 2>&1 | head -25`
+
+```text
+20.205.243.166  github.com
+---
+OpenSSH_9.6p1 Ubuntu-3ubuntu13.15, OpenSSL 3.0.13 30 Jan 2024
+debug1: Reading configuration data /home/daviddwlee84/.ssh/config
+debug1: /home/daviddwlee84/.ssh/config line 150: Applying options for github.com
+debug1: Reading configuration data /etc/ssh/ssh_config
+debug1: /etc/ssh/ssh_config line 19: include /etc/ssh/ssh_config.d/*.conf matched no files
+debug1: /etc/ssh/ssh_config line 21: Applying options for *
+debug1: Connecting to github.com [20.205.243.166] port 22.
+debug1: Connection established.
+debug1: identity file /home/daviddwlee84/.ssh/jingle type 0
+debug1: identity file /home/daviddwlee84/.ssh/jingle-cert type -1
+debug1: Local version string SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.15
+debug1: Remote protocol version 2.0, remote software version 3992d52
+debug1: compat_banner: no match: 3992d52
+debug1: Authenticating to github.com:22 as 'git'
+debug1: load_hostkeys: fopen /home/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: SSH2_MSG_KEXINIT sent
+debug1: SSH2_MSG_KEXINIT received
+debug1: kex: algorithm: sntrup761x25519-sha512@openssh.com
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: SSH2_MSG_KEX_ECDH_REPLY received
+[rerun: b20]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:19:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+SSH verbose tail
+
+`ssh -vT git@github.com 2>&1 | tail -30`
+
+```text
+debug1: kex: algorithm: sntrup761x25519-sha512@openssh.com
+debug1: kex: host key algorithm: ssh-ed25519
+debug1: kex: server->client cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: kex: client->server cipher: chacha20-poly1305@openssh.com MAC: <implicit> compression: none
+debug1: expecting SSH2_MSG_KEX_ECDH_REPLY
+debug1: SSH2_MSG_KEX_ECDH_REPLY received
+debug1: Server host key: ssh-ed25519 SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+debug1: load_hostkeys: fopen /home/daviddwlee84/.ssh/known_hosts2: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts: No such file or directory
+debug1: load_hostkeys: fopen /etc/ssh/ssh_known_hosts2: No such file or directory
+debug1: Host 'github.com' is known and matches the ED25519 host key.
+debug1: Found key in /home/daviddwlee84/.ssh/known_hosts:15
+debug1: ssh_packet_send2_wrapped: resetting send seqnr 3
+debug1: rekey out after 134217728 blocks
+debug1: SSH2_MSG_NEWKEYS sent
+debug1: expecting SSH2_MSG_NEWKEYS
+debug1: ssh_packet_read_poll2: resetting read seqnr 3
+debug1: SSH2_MSG_NEWKEYS received
+debug1: rekey in after 134217728 blocks
+debug1: SSH2_MSG_EXT_INFO received
+debug1: kex_ext_info_client_parse: server-sig-algs=<ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,ecdsa-sha2-nistp521,ecdsa-sha2-nistp384,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256,ssh-rsa>
+debug1: kex_ext_info_check_ver: publickey-hostbound@openssh.com=<0>
+debug1: SSH2_MSG_SERVICE_ACCEPT received
+debug1: Authentications that can continue: publickey
+debug1: Next authentication method: publickey
+debug1: get_agent_identities: bound agent to hostkey
+debug1: get_agent_identities: ssh_fetch_identitylist: agent refused operation
+debug1: Will attempt key: /home/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+debug1: Offering public key: /home/daviddwlee84/.ssh/jingle RSA SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw explicit
+Connection closed by 20.205.243.166 port 22
+[rerun: b21]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:19:59Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:20:07Z)**_
+
+Found both issues:
+
+**1. Bitwarden SSH agent is locked / refusing**
+```
+get_agent_identities: ssh_fetch_identitylist: agent refused operation
+```
+The agent is connected (via `SSH_AUTH_SOCK`) but refusing to hand over keys — typical symptom of Bitwarden being locked. Fix: `bw unlock` (or click the Bitwarden desktop icon to unlock), then retry.
+
+**2. `~/.ssh/config.d/01_git` is never loaded**
+The debug output reads only `/home/daviddwlee84/.ssh/config` — there's no `Include config.d/*` in the main config, so your `01_git` (with `IdentitiesOnly yes`) is dead code right now. The main config's `Host github.com` block is what's applied, and it lacks `IdentitiesOnly yes`. Not fatal for the current failure, but worth fixing — add `Include config.d/*` at the top of `~/.ssh/config`.
+
+**3. The actual connection-drop cause**
+SSH offers `jingle` (RSA key, `SHA256:B7ZcVqELH0RQ4YvcDOdEl9ImxJHeS3XZR8PaatW3Tcw`) and GitHub immediately closes. Two possibilities:
+
+- **That specific key isn't registered on GitHub** — dropping right after one offer with no "permission denied" is unusual but happens with GFW interference on the China endpoint `20.205.243.166`.
+- **GFW mid-stream reset** — the China GitHub endpoint often resets port-22 SSH mid-auth.
+
+Confirm which by trying port 443:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:21:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test SSH via port 443
+
+`ssh -o StrictHostKeyChecking=accept-new -T -p 443 git@ssh.github.com 2>&1 | tail -5`
+
+```text
+Warning: Permanently added '[ssh.github.com]:443' (ED25519) to the list of known hosts.
+git@ssh.github.com: Permission denied (publickey).
+[rerun: b22]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:21:17Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:21:24Z)**_
+
+Port 443 gives a clean **`Permission denied (publickey)`** — no GFW issue, the network is fine.
+
+The real problem is the Bitwarden SSH agent being locked:
+
+- With BW unlocked: agent offers its stored keys → one of them is registered on GitHub → auth succeeds.
+- With BW locked (current state): agent refuses → SSH falls back to `~/.ssh/jingle` (RSA, `B7ZcVq…W3Tcw`) → **that specific key file isn't registered on your GitHub account** → denied.
+
+Your "jingle" key that works is probably stored **inside Bitwarden**, not as `~/.ssh/jingle` on disk. They're two different things sharing a name.
+
+### To push now
+
+1. Unlock Bitwarden (open the desktop app and unlock, or `bw unlock` in a shell where `BW_SESSION` then gets exported).
+2. Verify agent sees keys: `ssh-add -l` — should list the Bitwarden-held key.
+3. `git push`.
+
+### Optional cleanup
+
+Add `Include config.d/*` at the top of `~/.ssh/config` so your modular `config.d/01_git` actually takes effect — right now the main config's `github.com` block shadows it and lacks `IdentitiesOnly yes`.
+
+Want me to make that Include change and commit it?
