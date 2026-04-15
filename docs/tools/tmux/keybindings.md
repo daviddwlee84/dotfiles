@@ -154,8 +154,8 @@ Menu accelerator keys match the standalone `prefix + key` bindings wherever poss
 | `x` | Kill pane (confirm) | yes |
 | `X` | Kill session (confirm) | yes |
 | `Q` | Kill all sessions / server | menu-only |
-| `c` | Theme: Catppuccin (top bar) | yes (`prefix + M-c`) |
-| `m` | Theme: tmux2k (bottom bar) | yes (`prefix + M-t`) |
+| `C` | Theme: Catppuccin (top bar) | yes (`prefix + M-c`) |
+| `M` | Theme: tmux2k (bottom bar) | yes (`prefix + M-t`) |
 | `g` | Sesh picker | yes |
 | `S` | Last sesh session | yes |
 | `9` | Sesh git root | yes |
