@@ -66,6 +66,13 @@ This automatically:
 3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
 4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled)
 
+### After install
+
+- `~/.local/bin` is auto-appended to `~/.bashrc` so `chezmoi`, `uv`, and `mise` stay reachable from bash.
+- On sudo-enabled machines, the ansible `zsh` role switches your login shell to zsh automatically. Log out / back in to pick it up, or run `exec zsh` now.
+- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER`.
+- Open a new shell (or `source ~/.bashrc`) after install so PATH changes take effect.
+
 ### Optional Components
 
 During `chezmoi init`, you'll be prompted for optional installs:

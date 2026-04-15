@@ -56,9 +56,10 @@ done
 
 # Remove empty backup dir if nothing was backed up (fresh machine)
 if [[ $BACKED_UP -eq 0 ]]; then
-    rmdir "$BACKUP_DIR" 2>/dev/null
+    rmdir "$BACKUP_DIR" 2>/dev/null || true
 else
     echo "[BACKUP] Backed up $BACKED_UP items to $BACKUP_DIR"
 fi
 
+exit 0
 {{ end -}}

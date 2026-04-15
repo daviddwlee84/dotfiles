@@ -159,4 +159,21 @@ if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
     success "mise tools installed"
 fi
 
+# 6. Ensure ~/.local/bin is on PATH for bash sessions (idempotent)
+# chezmoi, uv, mise all live in ~/.local/bin. Dotfiles only wire this up in
+# zsh; until the user switches shells, bash needs help finding them.
+BASHRC="$HOME/.bashrc"
+LOCAL_BIN_LINE='export PATH="$HOME/.local/bin:$PATH"'
+if [[ -f "$BASHRC" ]] || [[ "${SHELL##*/}" == "bash" ]]; then
+    touch "$BASHRC"
+    if ! grep -qF "$LOCAL_BIN_LINE" "$BASHRC"; then
+        {
+            echo ""
+            echo "# Added by chezmoi bootstrap - ~/.local/bin for uv, mise, chezmoi"
+            echo "$LOCAL_BIN_LINE"
+        } >> "$BASHRC"
+        info "Added ~/.local/bin to PATH in $BASHRC"
+    fi
+fi
+
 success "Bootstrap complete!"
