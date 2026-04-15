@@ -185,7 +185,7 @@ What you **won't get** without root:
 
 The tmux config is modular under `dot_config/tmux/` (deployed to `~/.config/tmux/`), with `dot_tmux.conf` acting as a one-line shim at `~/.tmux.conf`. Structure: `tmux.conf` (entry point + theme selector), `common.conf` (plugins, general options, terminal compat), `keybindings.conf` (all binds + popup menu), `theme.catppuccin.conf` (default, top status bar), `theme.tmux2k.conf` (alternative, bottom bar).
 
-Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option → default `catppuccin`. Switch at runtime with `prefix + C` (Catppuccin) or `prefix + T` (tmux2k). See `docs/tools/tmux/` (README, keybindings, themes, vim) for full details, including a troubleshooting note on the tmux2k bandwidth segment (`18446744073709551615K` = uint64 underflow).
+Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option → default `catppuccin`. Switch at runtime with `prefix + M-c` (Catppuccin) or `prefix + M-t` (tmux2k). See `docs/tools/tmux/` (README, keybindings, themes, vim) for full details, including a troubleshooting note on the tmux2k bandwidth segment (`18446744073709551615K` = uint64 underflow).
 
 ### Key Settings for Coding Agents
 
@@ -218,8 +218,8 @@ Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
 | `prefix + R` | Reload tmux config |
-| `prefix + C` | Switch theme to Catppuccin (top status bar) |
-| `prefix + T` | Switch theme to tmux2k (bottom status bar) |
+| `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
+| `prefix + M-t` | Switch theme to tmux2k (bottom status bar) |
 
 Note: `Ctrl+Space` is NOT bound (reserved for input method switching). Popup menu accelerator keys match standalone `prefix + key` bindings (see `docs/tools/tmux/keybindings.md` for full mapping).
 

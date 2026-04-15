@@ -37,14 +37,14 @@ alias tmuxt='TMUX_THEME=tmux2k tmux'
 
 | Keybinding | Action |
 |------------|--------|
-| `prefix + C` | Switch to Catppuccin |
-| `prefix + T` | Switch to tmux2k |
+| `prefix + M-c` | Switch to Catppuccin |
+| `prefix + M-t` | Switch to tmux2k |
 
 Both entries also live in the `prefix + Space` popup menu.
 
 ### First-time caveat
 
-Only the active theme's plugin is declared to TPM at config load time. The first time you flip to the other theme, the theme file's auto-clone hook fetches the repo, then the explicit `run` loads it. If the status bar still looks off after `prefix + C` / `prefix + T`:
+Only the active theme's plugin is declared to TPM at config load time. The first time you flip to the other theme, the theme file's auto-clone hook fetches the repo, then the explicit `run` loads it. If the status bar still looks off after `prefix + M-c` / `prefix + M-t`:
 
 1. Press `prefix + I` — TPM will (re)install anything missing.
 2. For the cleanest visual result (no leftover style from the previous theme), run `tmux kill-server && tmux`.
@@ -119,7 +119,7 @@ That number is `2^64 − 1` — the uint64 wraparound value. It appears when tmu
 
 Workarounds (pick one):
 
-1. **Switch to Catppuccin**: `prefix + C` — the default theme doesn't render a bandwidth segment at all.
+1. **Switch to Catppuccin**: `prefix + M-c` — the default theme doesn't render a bandwidth segment at all.
 2. **Pin the interface** in `dot_config/tmux/theme.tmux2k.conf`:
 
    ```tmux

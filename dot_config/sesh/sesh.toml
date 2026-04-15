@@ -16,16 +16,21 @@ preview_command = "eza --all --git --icons --color=always {}"
 # ── Named sessions ──────────────────────────────────────────────────────────
 
 [[session]]
-name = "dotfiles"
+name = "chezmoi"
 path = "~/.local/share/chezmoi"
 
-[[session]]
-name = "ansible"
-path = "~/.ansible"
-
-[[session]]
-name = "neovim config"
-path = "~/.config/nvim"
+# Subsets of chezmoi — uncomment if you prefer separate sessions
+# [[session]]
+# name = "dotfiles"
+# path = "~/.local/share/chezmoi"
+#
+# [[session]]
+# name = "ansible"
+# path = "~/.ansible"
+#
+# [[session]]
+# name = "neovim config"
+# path = "~/.config/nvim"
 
 [[session]]
 name = "home"

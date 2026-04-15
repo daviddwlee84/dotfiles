@@ -15,8 +15,8 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + X` | Kill session (with confirmation) |
 | `prefix + d` | Detach |
 | `prefix + t` | Show tmux clock mode |
-| `prefix + C` | Switch theme to Catppuccin (top status bar) |
-| `prefix + T` | Switch theme to tmux2k (bottom status bar) |
+| `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
+| `prefix + M-t` | Switch theme to tmux2k (bottom status bar) |
 
 ## Panes and Windows
 
@@ -154,8 +154,8 @@ Menu accelerator keys match the standalone `prefix + key` bindings wherever poss
 | `x` | Kill pane (confirm) | yes |
 | `X` | Kill session (confirm) | yes |
 | `Q` | Kill all sessions / server | menu-only |
-| `C` | Theme: Catppuccin (top bar) | yes |
-| `M` | Theme: tmux2k (bottom bar) | yes (bound to `prefix + T`) |
+| `c` | Theme: Catppuccin (top bar) | yes (`prefix + M-c`) |
+| `m` | Theme: tmux2k (bottom bar) | yes (`prefix + M-t`) |
 | `g` | Sesh picker | yes |
 | `S` | Last sesh session | yes |
 | `9` | Sesh git root | yes |
