@@ -40,10 +40,11 @@
 
 # Switch the user's login shell to zsh (requires sudo to edit /etc/passwd)
 - name: Locate zsh binary
-  ansible.builtin.command: command -v zsh
+  ansible.builtin.shell: command -v zsh
   register: zsh_path
   changed_when: false
   check_mode: false
+  failed_when: false
 
 - name: Get current login shell
   ansible.builtin.getent:
@@ -59,5 +60,6 @@
     name: "{{ ansible_user_id }}"
     shell: "{{ zsh_path.stdout }}"
   when:
+    - zsh_path.rc == 0
     - zsh_path.stdout | length > 0
     - not getent_passwd[ansible_user_id][5].endswith('/zsh')
