@@ -9,7 +9,7 @@
 
 - name: Set Neovim version fact
   ansible.builtin.set_fact:
-    nvim_current_version: "{{ nvim_version_check.stdout | default('0.0.0') }}"
+    nvim_current_version: "{{ nvim_version_check.stdout | default('0.0.0', true) | trim or '0.0.0' }}"
 
 - name: Display current Neovim version
   ansible.builtin.debug:
