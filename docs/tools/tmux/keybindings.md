@@ -1,60 +1,8 @@
-# tmux
+# tmux — Keybindings
 
-Managed tmux config lives at `~/.tmux.conf` and is sourced from [`dot_tmux.conf`](../../dot_tmux.conf) in this repo.
+All bindings use the default prefix `Ctrl + b`.
 
-This setup is tuned for coding-agent and Neovim workflows:
-
-- native popup menu on `prefix + Space`
-- `tmux2k` status line
-- vim-style pane navigation and copy mode
-- URL opening via fzf (`prefix + u`) and tmux-open in copy mode
-- capture pane to clipboard helpers
-- sesh integration for session picking
-- `extended-keys` enabled with `csi-u` so keys like `Ctrl+/` reach Neovim inside tmux
-- OSC 52 clipboard and OSC passthrough enabled
-
-## Reload Config
-
-Most tmux changes do not require restarting the server.
-
-Reload the config with either:
-
-```bash
-tmux source-file ~/.tmux.conf
-```
-
-Or inside tmux:
-
-```text
-prefix + R
-```
-
-`prefix + R` is the fastest day-to-day option and shows a confirmation message after reloading.
-
-If a change still does not behave correctly, try opening a new pane or window first. Only restart the tmux server when a terminal capability or plugin initialization issue clearly survives a reload.
-
-## Exit vs Detach
-
-- `prefix + d`: detach the current client, leaving the session running
-- `exit`: close the current shell; when the last pane exits, the session ends
-- `prefix + :` then `kill-session`: kill the current session immediately
-- `tmux kill-server`: kill every tmux session and stop the server
-
-This config sets `detach-on-destroy off`, so if other sessions still exist, tmux stays open and switches to one of them after you kill the current session.
-
-## Prefix Key
-
-The prefix remains tmux's default:
-
-```text
-Ctrl + b
-```
-
-Examples below assume `prefix = Ctrl + b`.
-
-## Common Keybindings
-
-### Daily Workflow
+## Daily Workflow
 
 | Keybinding | Action |
 |------------|--------|
@@ -67,8 +15,10 @@ Examples below assume `prefix = Ctrl + b`.
 | `prefix + X` | Kill session (with confirmation) |
 | `prefix + d` | Detach |
 | `prefix + t` | Show tmux clock mode |
+| `prefix + C` | Switch theme to Catppuccin (top status bar) |
+| `prefix + T` | Switch theme to tmux2k (bottom status bar) |
 
-### Panes and Windows
+## Panes and Windows
 
 | Keybinding | Action |
 |------------|--------|
@@ -85,9 +35,9 @@ Examples below assume `prefix = Ctrl + b`.
 | `prefix + }` | Swap pane with next (right/down) |
 | `prefix + [` | Enter copy mode |
 
-Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75%/25% split and swap, the left pane's content moves to the right (25%) and vice versa -- the proportions stay fixed.
+Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75%/25% split and swap, the left pane's content moves to the right (25%) and vice versa — the proportions stay fixed.
 
-### Layouts
+## Layouts
 
 | Keybinding | Action |
 |------------|--------|
@@ -98,9 +48,9 @@ Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75
 | `M-5` | Tiled layout |
 | `prefix + E` | Spread panes evenly (built-in) |
 
-These are tmux built-in `M-1` through `M-5` bindings. They work without prefix; just hold Meta (Alt/Option) and press the number.
+`M-1` through `M-5` are tmux built-ins — no prefix needed; just hold Meta (Alt/Option) and press the number.
 
-### Floating Pane (tmux-floax)
+## Floating Pane (tmux-floax)
 
 | Keybinding | Action |
 |------------|--------|
@@ -109,9 +59,9 @@ These are tmux built-in `M-1` through `M-5` bindings. They work without prefix; 
 
 The floating pane uses a dedicated tmux session named `float` (hidden from sesh picker via blacklist). It inherits the current pane path. Useful for quick terminal tasks without disrupting your layout.
 
-### Copy Mode (Vim-Style)
+## Copy Mode (Vim-Style)
 
-Enter copy mode with `prefix + [`. Navigate with vim keys, then:
+Enter with `prefix + [`. Navigate with vim keys, then:
 
 | Key | Action |
 |-----|--------|
@@ -126,9 +76,9 @@ Enter copy mode with `prefix + [`. Navigate with vim keys, then:
 | `C-u`/`C-d` | Half-page up/down |
 | `q` or `Escape` | Exit copy mode |
 
-Mouse drag in copy mode also copies the selection to clipboard. Double-click selects a word.
+Mouse drag in copy mode also copies to clipboard. Double-click selects a word.
 
-### URL Opening
+## URL Opening
 
 | Keybinding | Action |
 |------------|--------|
@@ -144,7 +94,7 @@ In copy-mode (after selecting text with `v`):
 
 Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select + `o` for precise URL opening.
 
-### Capture Pane
+## Capture Pane
 
 | Keybinding | Action |
 |------------|--------|
@@ -152,9 +102,9 @@ Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select 
 | `prefix + Y` | Copy full scrollback to system clipboard |
 | `prefix + C-y` | Open scrollback in fzf, select lines to copy (Tab=multi) |
 
-Works cross-platform: uses `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 clipboard also works for the vim-style `y` yank in copy mode (even over SSH).
+Cross-platform: `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 also works for the vim-style `y` yank (even over SSH).
 
-### Built-in Useful tmux Keys Still Available
+## Built-in tmux Keys Still Available
 
 | Keybinding | Action |
 |------------|--------|
@@ -166,17 +116,9 @@ Works cross-platform: uses `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 cl
 | `prefix + ?` | List named keybindings |
 | `prefix + /` | Prompt for a key and show what it is bound to |
 
-## Popup Menu
+## Popup Menu (`prefix + Space`)
 
-Open the popup with:
-
-```text
-prefix + Space
-```
-
-Menu accelerator keys match the standalone `prefix + key` bindings wherever possible. Pressing `R` inside the menu does the same thing as `prefix + R` outside it.
-
-Items marked "menu-only" have no standalone binding -- use the popup or `M-1`..`M-5` for layouts.
+Menu accelerator keys match the standalone `prefix + key` bindings wherever possible — pressing `R` inside the menu does the same thing as `prefix + R` outside it. Items marked "menu-only" have no standalone binding.
 
 | Key | Action | Also works as `prefix + key`? |
 |-----|--------|-------------------------------|
@@ -198,6 +140,8 @@ Items marked "menu-only" have no standalone binding -- use the popup or `M-1`..`
 | `x` | Kill pane (confirm) | yes |
 | `X` | Kill session (confirm) | yes |
 | `Q` | Kill all sessions / server | menu-only |
+| `C` | Theme: Catppuccin (top bar) | yes |
+| `M` | Theme: tmux2k (bottom bar) | yes (bound to `prefix + T`) |
 | `g` | Sesh picker | yes |
 | `S` | Last sesh session | yes |
 | `9` | Sesh git root | yes |
@@ -207,39 +151,3 @@ Items marked "menu-only" have no standalone binding -- use the popup or `M-1`..`
 | `d` | Detach | yes (built-in) |
 | `t` | Clock | yes (built-in) |
 | `?` | List keys | yes (built-in) |
-
-## Coding-Agent / Neovim Notes
-
-- `escape-time 0` removes the ESC delay, which helps Neovim feel responsive.
-- `extended-keys always` with `extended-keys-format csi-u` is what allows `Ctrl+/` and similar modified punctuation keys to pass through tmux more reliably.
-- The managed Alacritty config also sends `Ctrl+/` as `\u001f`, which matches LazyVim's built-in `<C-_>` fallback for terminal toggle.
-- `set-clipboard on` enables OSC 52 clipboard copy over SSH.
-- `allow-passthrough on` helps terminal image protocols and similar passthrough features.
-
-If `Ctrl+/` still does not work after `prefix + R`, restart the current terminal app or fully restart tmux once to make sure the terminal capability negotiation is fresh.
-
-## Plugins
-
-| Plugin | Purpose |
-|--------|---------|
-| `tmux-resurrect` | Save/restore sessions across tmux restarts |
-| `tmux-continuum` | Automatic session saving |
-| `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
-| `tmux-fzf-url` | `prefix+u` opens fzf popup with all URLs in pane |
-| `tmux-open` | In copy-mode: `o` opens selection, `C-o` in editor, `S` search |
-| `tmux2k` | Status bar theme (onedark) |
-
-Plugins are managed by TPM. Run `prefix + I` to install after first setup.
-
-## Verify Current Config
-
-```bash
-tmux list-keys -T prefix
-tmux show-options -s | rg 'extended-keys|extended-keys-format|default-terminal'
-tmux show-options -g | rg 'status|focus-events'
-```
-
-## Related Docs
-
-- [Sesh](./sesh.md)
-- [Starship](./starship.md)
