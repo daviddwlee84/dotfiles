@@ -18,6 +18,7 @@ preview_command = "eza --all --git --icons --color=always {}"
 [[session]]
 name = "chezmoi"
 path = "~/.local/share/chezmoi"
+tmuxinator = "chezmoi"
 
 # Subsets of chezmoi — uncomment if you prefer separate sessions
 # [[session]]

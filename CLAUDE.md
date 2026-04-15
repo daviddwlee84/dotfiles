@@ -199,6 +199,8 @@ Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option
 
 | Binding | Action |
 |---------|--------|
+| `Ctrl + 1..9` | Switch to window 1–9 (no prefix, requires CSI-u terminal) |
+| `Ctrl + 0` | Jump to git root session via sesh (no prefix, requires CSI-u) |
 | `prefix + Space` | Native popup menu (layouts, sessions, sesh, resize, etc.) |
 | `prefix + h/j/k/l` | Navigate panes (vim-style) |
 | `prefix + H/J/K/L` | Resize panes (5 cells) |
@@ -222,7 +224,7 @@ Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option
 | `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
 | `prefix + M-t` | Switch theme to tmux2k (bottom status bar) |
 
-Note: `Ctrl+Space` is NOT bound (reserved for input method switching). Popup menu accelerator keys match standalone `prefix + key` bindings (see `docs/tools/tmux/keybindings.md` for full mapping).
+Note: `Ctrl+Space` is NOT bound (reserved for input method switching). `Ctrl+1..9` and `Ctrl+0` require CSI-u terminal support (Ghostty/cmux, Alacritty, Kitty); legacy terminals fall back to `prefix + number`. Popup menu accelerator keys match standalone `prefix + key` bindings (see `docs/tools/tmux/keybindings.md` for full mapping).
 
 ## Zellij Configuration
 

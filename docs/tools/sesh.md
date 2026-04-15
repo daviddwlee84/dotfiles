@@ -127,8 +127,9 @@ Pin frequently used directories with custom names and commands:
 
 ```toml
 [[session]]
-name = "dotfiles"
+name = "chezmoi"
 path = "~/.local/share/chezmoi"
+tmuxinator = "chezmoi"    # delegates to tmuxinator for reliable multi-window setup
 
 [[session]]
 name = "home"

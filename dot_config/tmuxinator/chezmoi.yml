@@ -1,0 +1,27 @@
+# Chezmoi dotfiles workspace
+#
+# Window 1 "shell":     plain shell at chezmoi repo root
+# Window 2 "git":       lazygit for dotfiles version control
+# Window 3 "overrides": nvim with vertical splits for untracked override files
+#
+# ── Usage ────────────────────────────────────────────────────────────────────
+#
+# With sesh (native integration):
+#   sesh connect chezmoi
+#
+# Standalone:
+#   tmuxinator start chezmoi
+
+name: chezmoi
+root: ~/.local/share/chezmoi
+
+windows:
+  - shell:
+      panes:
+        - ""
+  - git:
+      panes:
+        - lazygit
+  - overrides:
+      panes:
+        - nvim -O ~/.zshrc.adhoc ~/.config/zsh/secrets.zsh

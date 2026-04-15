@@ -22,6 +22,8 @@ All bindings use the default prefix `Ctrl + b`.
 
 | Keybinding | Action |
 |------------|--------|
+| `Ctrl + 1..9` | Switch to window 1–9 (requires CSI-u terminal: Ghostty, Alacritty, Kitty) |
+| `Ctrl + 0` | Jump to git root session via sesh (same as `prefix + 9`) |
 | `Ctrl + h/j/k/l` | Move between panes — crosses into Neovim splits (vim-tmux-navigator) |
 | `Ctrl + \` | Focus previous pane/split (vim-tmux-navigator) |
 | `prefix + h/j/k/l` | Move between panes (fallback, tmux-only) |
@@ -36,6 +38,8 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + {` | Swap pane with previous (left/up) |
 | `prefix + }` | Swap pane with next (right/down) |
 | `prefix + [` | Enter copy mode |
+
+`Ctrl+1..9` and `Ctrl+0` require CSI-u terminal support. Ghostty/cmux sends these natively. Alacritty needs explicit `keyboard.bindings` (managed by this repo in `dot_config/alacritty/alacritty.toml`). Legacy terminals (Terminal.app, plain SSH) cannot send these — use `prefix + number` instead.
 
 Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75%/25% split and swap, the left pane's content moves to the right (25%) and vice versa — the proportions stay fixed.
 
