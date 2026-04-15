@@ -1509,8 +1509,8 @@
           {{
             (
               tv_release.json.assets
-              | selectattr('name', 'match', 'tv-.*-' ~ tv_arch ~ '-unknown-linux-gnu\\.tar\\.gz$')
-              | rejectattr('name', 'match', '.*\\.sha256$')
+              | selectattr('name', 'match', 'tv-.*-' ~ tv_arch ~ '-unknown-linux-gnu\.tar\.gz$')
+              | rejectattr('name', 'match', '.*\.sha256$')
               | map(attribute='browser_download_url')
               | first
             )
