@@ -1,8 +1,19 @@
 # Ghostty & cmux
 
-[Ghostty](https://ghostty.org/) is a fast, native terminal emulator. [cmux](https://github.com/MrPicklePinosaur/cmux) wraps tmux with a session-picker UX commonly used together with Ghostty for coding-agent workflows.
+[Ghostty](https://ghostty.org/) is a fast, native terminal emulator. [cmux](https://cmux.dev/) is a lightweight macOS terminal built on Ghostty for managing AI coding agents. Both read the same config file.
 
-This repo does not manage `~/.config/ghostty/config` (Ghostty has sensible defaults and the config is machine-specific). The items below cover the problems that show up when using Ghostty against new remote hosts.
+## Managed config
+
+This repo manages `~/.config/ghostty/config` (via `dot_config/ghostty/config`). cmux reads this file first (before `~/Library/Application Support/com.mitchellh.ghostty/config`).
+
+Key settings:
+
+- **`macos-option-as-alt = left`** — Left Option sends Meta/Esc+ so tmux `M-` keybindings work (theme switching `M-c`/`M-t`, layouts `M-1`..`M-5`, fine resize `M-h/j/k/l`). Right Option retains macOS compose behavior for accents and special characters.
+- **`font-features = -calt, -liga, -dlig`** — Disables ligatures for code readability.
+
+> **Note**: Restart Ghostty/cmux after changing the config — it is read on launch, not hot-reloaded.
+
+Without `macos-option-as-alt`, macOS Option produces Unicode compose characters (e.g. `Option+c` → `ç`) instead of `Esc+c`, silently breaking all tmux Meta bindings. Alacritty and iTerm2 have their own equivalent settings (`window.option_as_alt` and Profiles > Keys > Left Option Key > Esc+ respectively).
 
 ## `xterm-ghostty` terminfo on remote hosts
 

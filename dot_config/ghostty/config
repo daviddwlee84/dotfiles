@@ -1,0 +1,10 @@
+# Ghostty terminal configuration
+# Also read by cmux (Ghostty-based terminal)
+# Docs: https://ghostty.org/docs/config
+
+# Left Option sends Meta/Esc+ for tmux M-key bindings (M-c, M-1..5, M-h/j/k/l, etc.)
+# Right Option retains macOS compose behavior (accents, special characters)
+macos-option-as-alt = left
+
+# Disable ligatures (code readability)
+font-features = -calt, -liga, -dlig

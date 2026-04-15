@@ -99,6 +99,7 @@ To change options later: `chezmoi init --force`
 - `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/alacritty/` - Alacritty terminal config
+- `~/.config/ghostty/config` - Ghostty/cmux terminal config (`macos-option-as-alt` for tmux Meta keybindings, disabled ligatures) ([docs](docs/tools/ghostty.md))
 - `~/.config/starship.toml` - Starship cross-shell prompt config
 - `~/.config/direnv/direnvrc` - direnv helper functions, including `.venv`-aware Python activation
 - `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))

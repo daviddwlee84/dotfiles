@@ -23,6 +23,7 @@ This setup is tuned for coding-agent and Neovim workflows:
 - sesh integration for session picking
 - `extended-keys` with `csi-u` so keys like `Ctrl+/` reach Neovim inside tmux
 - OSC 52 clipboard and OSC passthrough enabled
+- macOS terminal must send Option as Meta for `M-` bindings — see [ghostty.md](../ghostty.md)
 
 ## In this folder
 

@@ -193,6 +193,7 @@ Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option
 - `escape-time 0` -- eliminates ESC delay for Neovim
 - `set-clipboard on` -- OSC 52 clipboard (works over SSH)
 - `allow-passthrough on` -- OSC passthrough for terminal images
+- macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See `docs/tools/ghostty.md`.
 
 ### Tmux Keybindings
 

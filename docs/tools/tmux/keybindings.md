@@ -52,6 +52,8 @@ Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75
 
 `M-1` through `M-5` are tmux built-ins — no prefix needed; just hold Meta (Alt/Option) and press the number.
 
+> **macOS terminal requirement**: Option must send Meta/Esc+ for `M-` bindings to work. Ghostty/cmux: `macos-option-as-alt = left` (managed by this repo in `dot_config/ghostty/config`). Alacritty: `window.option_as_alt: OnlyLeft`. iTerm2: Profiles > Keys > Left Option Key > Esc+. See [docs/tools/ghostty.md](../ghostty.md).
+
 ## Floating Pane (tmux-floax)
 
 | Keybinding | Action |
