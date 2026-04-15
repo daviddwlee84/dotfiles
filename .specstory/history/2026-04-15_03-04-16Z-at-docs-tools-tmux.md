@@ -5696,3 +5696,475 @@ no changes added to commit (use "git add" and/or "git commit -a")
 [rerun: b4]
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:02:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit tmux/docs changes
+
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Fix tmux right-click menu, left-align Catppuccin, add XDG docs
+
+- Rebind MouseDown3Pane/Status/StatusLeft with display-menu -O so the
+  context menu stays open after mouse release.
+- Catppuccin: status-justify left; add directory/user/host modules,
+  drop uptime, tweak directory/date-time text.
+- tmux2k: explicit status-justify centre to avoid leaking the
+  Catppuccin left alignment when switching themes on the same server.
+- New docs/tools/xdg.md primer on XDG Base Directory, linked from
+  the tmux README; module catalog added to themes.md and right-click
+  menu note added to keybindings.md.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[main a0cd010] Fix tmux right-click menu, left-align Catppuccin, add XDG docs
+ 9 files changed, 1691 insertions(+), 5 deletions(-)
+ create mode 100644 docs/tools/xdg.md
+[rerun: b5]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:02:57Z)**_
+
+Committed. Now set up vim-tmux-navigator. Let me check the LazyVim plugin structure:
+
+_**Agent (claude-opus-4-6 2026-04-15 07:02:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List nvim plugin dir
+
+`ls /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/plugins/ 2>/dev/null || ls /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/`
+
+```text
+-- 󰡯 dot_gitignore
+--  dot_neoconf.json
+--  **init.lua
+--  lazy-lock.json
+--  lazyvim.json
+--  LICENSE
+--  **lua
+-- 󰂺 README.md
+--  stylua.toml
+[rerun: b6]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List lua dirs
+
+`ls /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/ /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/plugins/ 2>&1`
+
+```text
+Exit code 2
+"/home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/plugins/": No such file or directory (os error 2)
+--  **config
+--  **exact_plugins
+[rerun: b7]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List plugins dir
+
+`ls /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/exact_plugins/`
+
+```text
+--  **avante.lua
+--  **colorscheme.lua
+--  **copilot.lua
+--  **dashboard.lua
+--  **diffview.lua
+--  **example.lua
+--  **flash.lua
+--  **floating-tui.lua
+--  **gitsigns.lua
+--  **mini-surround.lua
+--  **noice-fix.lua
+--  **nvim-cmp.lua
+--  **vim-visual-multi.lua
+--  **wakatime.lua
+[rerun: b8]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:10Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:11Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/nvim/lua/exact_plugins/flash.lua`
+
+```text
+1	-- Use LazyVim defaults: s = Flash jump, S = Flash treesitter
+2	-- Note: vim's native s (substitute char) = cl, native S (substitute line) = cc
+3	-- So losing s/S to flash is fine since you can still use cl/cc for those operations.
+4	return {}
+5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:14Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/nvim/lua/exact_plugins/vim-visual-multi.lua`
+
+```text
+1	return {
+2	  "mg979/vim-visual-multi",
+3	}
+4
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:31Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```lua
+-- Prefix-less Ctrl+h/j/k/l navigation that seamlessly crosses tmux panes
+-- and Neovim splits. Pairs with the matching bindings in
+-- ~/.config/tmux/keybindings.conf.
+return {
+  {
+    "christoomey/vim-tmux-navigator",
+    lazy = false,
+    cmd = {
+      "TmuxNavigateLeft",
+      "TmuxNavigateDown",
+      "TmuxNavigateUp",
+      "TmuxNavigateRight",
+      "TmuxNavigatePrevious",
+    },
+    keys = {
+      { "<C-h>", "<cmd>TmuxNavigateLeft<cr>", desc = "Window left (tmux-aware)" },
+      { "<C-j>", "<cmd>TmuxNavigateDown<cr>", desc = "Window down (tmux-aware)" },
+      { "<C-k>", "<cmd>TmuxNavigateUp<cr>", desc = "Window up (tmux-aware)" },
+      { "<C-l>", "<cmd>TmuxNavigateRight<cr>", desc = "Window right (tmux-aware)" },
+      { "<C-\\>", "<cmd>TmuxNavigatePrevious<cr>", desc = "Window previous (tmux-aware)" },
+    },
+  },
+}
+
+```
+
+```text
+File created successfully at: /home/daviddwlee84/.local/share/chezmoi/dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:38Z)**_
+
+Now the tmux side. Add to keybindings.conf:
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:47Z)**_
+
+Update vim.md doc:
+
+_**Agent (claude-opus-4-6 2026-04-15 07:03:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/vim.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:00Z)**_
+
+Update keybindings.md to document the new bindings:
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/keybindings.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit vim-tmux-navigator
+
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Add vim-tmux-navigator for seamless pane/split navigation
+
+Ctrl+h/j/k/l now transparently crosses tmux pane boundaries and Neovim
+splits via christoomey/vim-tmux-navigator. Tmux-side bindings use the
+canonical is_vim detection to forward keys when the active pane runs
+vim/nvim, otherwise select the adjacent pane. The existing
+prefix + h/j/k/l bindings are kept as a tmux-only fallback.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Exit code 1
+Detect hardcoded secrets.................................................Failed
+- hook id: gitleaks-system
+- files were modified by this hook
+
+○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+3:04PM INF **0 commits scanned.
+3:04PM INF **scanned ~10340 bytes (10.34 KB) in 77.8ms
+3:04PM INF **no leaks found
+
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[rerun: b9]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit after hook autofix
+
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Add vim-tmux-navigator for seamless pane/split navigation
+
+Ctrl+h/j/k/l now transparently crosses tmux pane boundaries and Neovim
+splits via christoomey/vim-tmux-navigator. Tmux-side bindings use the
+canonical is_vim detection to forward keys when the active pane runs
+vim/nvim, otherwise select the adjacent pane. The existing
+prefix + h/j/k/l bindings are kept as a tmux-only fallback.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Exit code 1
+Detect hardcoded secrets.................................................Failed
+- hook id: gitleaks-system
+- files were modified by this hook
+
+○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+3:04PM INF **0 commits scanned.
+3:04PM INF **scanned ~11968 bytes (11.97 KB) in 77.7ms
+3:04PM INF **no leaks found
+
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[rerun: b10]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:17Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check status
+
+`git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 5 commits.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+	modified:   docs/tools/tmux/keybindings.md
+	modified:   docs/tools/tmux/vim.md
+	new file:   dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua
+	modified:   dot_config/tmux/keybindings.conf
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+[rerun: b11]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:21Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit
+
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Add vim-tmux-navigator for seamless pane/split navigation
+
+Ctrl+h/j/k/l now transparently crosses tmux pane boundaries and Neovim
+splits via christoomey/vim-tmux-navigator. Tmux-side bindings use the
+canonical is_vim detection to forward keys when the active pane runs
+vim/nvim, otherwise select the adjacent pane. The existing
+prefix + h/j/k/l bindings are kept as a tmux-only fallback.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)" && git status
+```
+
+```text
+Exit code 1
+Detect hardcoded secrets.................................................Failed
+- hook id: gitleaks-system
+- files were modified by this hook
+
+○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+3:04PM INF **0 commits scanned.
+3:04PM INF **scanned ~14591 bytes (14.59 KB) in 76.6ms
+3:04PM INF **no leaks found
+
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[rerun: b12]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check status
+
+`git status --short`
+
+```text
+MM .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+M  docs/tools/tmux/keybindings.md
+M  docs/tools/tmux/vim.md
+A  dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua
+M  dot_config/tmux/keybindings.conf
+[rerun: b13]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:32Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit without specstory
+
+```bash
+git reset HEAD .specstory/ 2>&1; git add docs/ dot_config/ && git commit -m "$(cat <<'EOF'
+Add vim-tmux-navigator for seamless pane/split navigation
+
+Ctrl+h/j/k/l now transparently crosses tmux pane boundaries and Neovim
+splits via christoomey/vim-tmux-navigator. Tmux-side bindings use the
+canonical is_vim detection to forward keys when the active pane runs
+vim/nvim, otherwise select the adjacent pane. The existing
+prefix + h/j/k/l bindings are kept as a tmux-only fallback.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Unstaged changes after reset:
+M	.specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1776236674-126150.
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1776236674-126150.
+[main 7da6177] Add vim-tmux-navigator for seamless pane/split navigation
+ 4 files changed, 62 insertions(+), 3 deletions(-)
+ create mode 100644 dot_config/nvim/lua/exact_plugins/vim-tmux-navigator.lua
+[rerun: b14]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 07:04:40Z)**_
+
+Committed both changes.
+
+**Summary:**
+- `a0cd010` — tmux right-click `-O` fix, Catppuccin left-align + richer modules, tmux2k centre reset, XDG docs.
+- `7da6177` — vim-tmux-navigator: Neovim plugin spec + tmux `is_vim` Ctrl+h/j/k/l bindings, docs updated.
+
+After `chezmoi apply`: restart tmux (`tmux kill-server && tmux`) and run `:Lazy sync` in Neovim so the plugin installs. Then `Ctrl+h/j/k/l` will cross between tmux panes and Neovim splits seamlessly.
