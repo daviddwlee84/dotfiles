@@ -71,10 +71,12 @@ The v2 plugin ships a set of prebuilt modules in `~/.tmux/plugins/tmux/status/`.
 | `weather` / `clima` | Weather (network + `curl`) |
 | `pomodoro_plus` | Pomodoro timer |
 
-Current defaults:
+Current defaults (all shown at full width):
 
 - **Left**: `session` → `directory`
 - **Right**: `application` → `user` → `host` → `date_time`
+
+These modules are **responsive** — see [Responsive status bar](#responsive-status-bar-catppuccin) below.
 
 To add `cpu` and `ram` to the right side, for example:
 
@@ -90,6 +92,44 @@ set -g @catppuccin_directory_text "#{b:pane_current_path}"   # basename (default
 set -g @catppuccin_directory_text "#{pane_current_path}"     # full path
 set -g @catppuccin_date_time_text "%Y-%m-%d %H:%M"           # strftime
 ```
+
+## Responsive status bar (Catppuccin)
+
+The Catppuccin theme adapts its status bar modules to terminal width via
+`~/.config/tmux/responsive.sh`. A `client-resized` hook re-runs the script
+whenever the terminal is resized, so it works automatically on everything from
+a phone terminal to a 4K monitor.
+
+### Width tiers
+
+| Width (columns) | Tier | Left | Right |
+|-----------------|------|------|-------|
+| >= 120 | wide | session + directory | application + user + host + date_time |
+| 80-119 | medium | session + directory | host + date_time |
+| < 80 | narrow | session | date_time |
+
+`status-left-length` and `status-right-length` also scale with width (25/40, 40/80, 60/120 respectively) to avoid tmux's default truncation limits.
+
+### Why a shell script instead of pure tmux format conditionals?
+
+Catppuccin module format strings internally contain commas (from
+`#{?client_prefix,red,green}` for the prefix-key color indicator). Nesting
+these inside another `#{?condition,module,}` ternary breaks tmux's format
+parser because it confuses the comma delimiters. A shell script sidesteps this
+by running separate `tmux set -agF` commands for each module, avoiding any
+format nesting.
+
+### Theme switching
+
+When switching from Catppuccin to tmux2k (`prefix + M-t`), the
+`client-resized` hook is automatically removed (`set-hook -gu client-resized`
+in `theme.tmux2k.conf`). Switching back to Catppuccin re-registers the hook.
+
+### Customizing tiers
+
+Edit `~/.config/tmux/responsive.sh` (source: `dot_config/tmux/executable_responsive.sh`).
+The width thresholds and module assignments are plain bash `if` blocks near the
+top of the script.
 
 ## Troubleshooting
 

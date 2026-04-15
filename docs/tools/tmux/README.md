@@ -12,11 +12,13 @@ Managed tmux config lives under `~/.config/tmux/`, with a shim at `~/.tmux.conf`
 | [`dot_config/tmux/keybindings.conf`](../../../dot_config/tmux/keybindings.conf) | — | all bind-keys and popup menu |
 | [`dot_config/tmux/theme.catppuccin.conf`](../../../dot_config/tmux/theme.catppuccin.conf) | — | default theme (top status bar) |
 | [`dot_config/tmux/theme.tmux2k.conf`](../../../dot_config/tmux/theme.tmux2k.conf) | — | alternative theme (bottom status bar) |
+| [`dot_config/tmux/executable_responsive.sh`](../../../dot_config/tmux/executable_responsive.sh) | `~/.config/tmux/responsive.sh` | responsive status bar for Catppuccin |
 
 This setup is tuned for coding-agent and Neovim workflows:
 
 - native popup menu on `prefix + Space`
 - Catppuccin (default, top status bar) or tmux2k (bottom) — switchable at runtime
+- Catppuccin status bar is responsive — modules adapt to terminal width (mobile-friendly)
 - vim-style pane navigation and copy mode
 - URL opening via fzf (`prefix + u`) and tmux-open in copy mode
 - capture pane to clipboard helpers

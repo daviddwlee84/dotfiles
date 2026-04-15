@@ -187,6 +187,8 @@ The tmux config is modular under `dot_config/tmux/` (deployed to `~/.config/tmux
 
 Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option → default `catppuccin`. Switch at runtime with `prefix + M-c` (Catppuccin) or `prefix + M-t` (tmux2k). See `docs/tools/tmux/` (README, keybindings, themes, vim) for full details, including a troubleshooting note on the tmux2k bandwidth segment (`18446744073709551615K` = uint64 underflow).
 
+The Catppuccin status bar is **responsive**: `responsive.sh` + a `client-resized` hook dynamically adjust which modules are shown based on terminal width (>= 120 full, 80-119 medium, < 80 minimal). This makes the status bar usable on mobile terminals. See `docs/tools/tmux/themes.md` for details.
+
 ### Key Settings for Coding Agents
 
 - `extended-keys always` + `terminal-features 'xterm*:extkeys'` -- forwards Shift+Enter, Ctrl+Enter, etc. through tmux to inner applications (Claude Code, Neovim, etc.)
