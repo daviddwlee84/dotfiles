@@ -1,14 +1,22 @@
 # ~/.ssh/config.d/git
 #
 # Public host defaults for Git providers.
+#
+# GitHub uses ssh.github.com:443 as an alternative SSH endpoint.
+# This is more reliable in corporate/restricted networks where port 22
+# may be blocked or filtered. See: https://docs.github.com/en/authentication/
+# troubleshooting-ssh/using-ssh-over-the-https-port
 
 Host github.com
-    HostName github.com
+    HostName ssh.github.com
     User git
+    Port 443
 
 Host gitlab.com
     HostName gitlab.com
     User git
+    # Uncomment for SOCKS5 proxy (e.g. behind GFW):
+    # ProxyCommand nc -X 5 -x 127.0.0.1:7890 %h %p
 
 # Example: multiple account alias (disabled by default)
 # Host github-work

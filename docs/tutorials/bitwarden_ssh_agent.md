@@ -85,9 +85,15 @@ The socket path depends on how Bitwarden was installed:
 | Snap           | --                                                                                        | `~/snap/bitwarden/current/.bitwarden-ssh-agent.sock`                    |
 | Flatpak        | --                                                                                        | `~/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock`       |
 
-This repo auto-detects the socket in `~/.config/zsh/tools/95_bitwarden.zsh`.
-It tries each candidate path in order and exports `SSH_AUTH_SOCK` for the first socket that exists.
+This repo auto-detects the socket in `~/.config/zsh/tools/94_ssh_agent.zsh`.
+It tries each candidate path in order and exports `SSH_AUTH_SOCK` for the first socket found **and responding**.
 No manual shell configuration is needed if you use the managed zsh config.
+
+### Automatic Fallback
+
+If Bitwarden desktop is not running (or its socket is stale), the agent script
+automatically falls back to a persistent `ssh-agent` and loads keys from `~/.ssh/`.
+See [SSH Agent Fallback](../tools/ssh-agent.md) for full details on the fallback chain.
 
 ## 3. Verify
 
@@ -237,9 +243,12 @@ The remote host can then use your Bitwarden-managed keys to authenticate onward
 | SSH uses wrong key / too many auth failures | Too many agent keys tried before the right one | Add `IdentityFile` with `.pub` and `IdentitiesOnly yes` |
 | Git commit signing fails | `user.signingkey` not set or wrong | Verify with `git config --global user.signingkey` |
 | Agent works in terminal but not in IDE | IDE uses its own environment | Configure `SSH_AUTH_SOCK` in IDE settings or launch IDE from terminal |
+| Bitwarden closed but SSH still works | Fallback ssh-agent took over (expected) | See [SSH Agent Fallback](../tools/ssh-agent.md) |
 
 ## Related
 
+- [SSH Agent Fallback](../tools/ssh-agent.md) -- Fallback chain: Bitwarden → existing agent → ssh-agent
 - [Bitwarden SSH Agent official docs](https://bitwarden.com/help/ssh-agent/)
 - [import_ssh_to_bw.sh](../scripts/import_ssh_to_bw.sh.md) -- Bulk import SSH keys to Bitwarden
-- `~/.config/zsh/tools/95_bitwarden.zsh` -- Auto-detection of Bitwarden SSH agent socket
+- `~/.config/zsh/tools/94_ssh_agent.zsh` -- SSH agent auto-detection and fallback
+- `~/.config/zsh/tools/95_bitwarden.zsh` -- Bitwarden CLI zsh completion

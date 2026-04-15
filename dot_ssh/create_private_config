@@ -13,8 +13,11 @@ Host *
     ServerAliveInterval 60
     ServerAliveCountMax 3
 
-    # Optional Bitwarden SSH agent (examples, disabled by default).
-    # Uncomment one IdentityAgent path that matches your installation:
+    # SSH agent selection is handled automatically at the shell level by
+    # ~/.config/zsh/tools/94_ssh_agent.zsh (Bitwarden → existing → ssh-agent).
+    # Only uncomment an IdentityAgent below if you need config-level pinning
+    # (e.g. for cron jobs or non-interactive contexts without shell init).
+    #
     # macOS (.dmg):
     # IdentityAgent ~/.bitwarden-ssh-agent.sock
     # macOS (App Store):
