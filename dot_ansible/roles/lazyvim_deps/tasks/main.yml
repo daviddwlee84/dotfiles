@@ -34,12 +34,26 @@
     mise_bin: /usr/bin/mise
 
 # Install mise tools from ~/.config/mise/config.toml (node@lts)
+# Non-fatal: mise downloads are flaky and some tools (e.g. ruby) may fail on
+# constrained hardware. Partial success is fine — user can re-run `mise install`.
 - name: Install mise global tools (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command:
     cmd: "{{ mise_bin }} install --yes"
   register: mise_install
   changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+  failed_when: false
+
+- name: Warn if mise install had failures
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - mise_install.rc is defined
+    - mise_install.rc != 0
+  ansible.builtin.debug:
+    msg: |
+      mise install exited with rc={{ mise_install.rc }} — some tools may have failed.
+      Re-run manually to retry: `{{ mise_bin }} install --yes`
+      Stderr tail: {{ mise_install.stderr_lines[-5:] | default([]) | join(' | ') }}
 
 # fzf - install via git for latest version (apt version is outdated and lacks --zsh flag)
 - name: Check if fzf is installed via git

@@ -2,6 +2,11 @@
 # mise global configuration
 # https://mise.jdx.dev/configuration.html
 
+[settings]
+# Use precompiled ruby binaries instead of compiling from source.
+# ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
+ruby.compile = false
+
 [tools]
 # Node.js LTS for LazyVim LSP servers and tree-sitter-cli
 node = "lts"
