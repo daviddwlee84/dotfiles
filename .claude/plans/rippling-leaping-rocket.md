@@ -1,4 +1,183 @@
-# Plan: Modularize tmux config + switchable Catppuccin / tmux2k themes, doc updates
+# Plan: Right-click menu fix + Catppuccin polish + XDG docs
+
+## Context
+
+Follow-up pass on the modular tmux config from the previous commit. User hit three issues:
+
+1. **Right-click popup menu vanishes on mouse release** — when right-clicking in a pane, the menu appears briefly but dismisses the moment the mouse button is released, so no item can be selected.
+2. **Catppuccin window tabs are centered** — user wants them left-aligned, and wants more useful modules on the status bar than just `session / application / uptime / date_time`.
+3. **No docs on XDG Base Directory Specification** — useful background for why `~/.config/tmux/tmux.conf` is preferred over `~/.tmux.conf`, and applies to many other configs in this repo.
+
+## Findings
+
+### Right-click menu dismissal
+
+tmux 3.4's built-in `MouseDown3Pane` / `MouseDown3Status` / `MouseDown3StatusLeft` bindings invoke `display-menu` **without** the `-O` flag. Without `-O`, `display-menu` closes if the mouse is released outside an item before a selection is made — which is exactly what happens on a quick right-click-and-release. Adding `-O` ("stay **O**pen until an item is chosen or Escape") makes the menu persist as expected.
+
+Confirmed via `tmux list-keys -T root | grep MouseDown3` — our config doesn't override these; we're getting tmux defaults minus `-O`.
+
+### Catppuccin alignment + modules
+
+- Alignment: `set -g status-justify centre` (tmux default) is what centers the window list. Change to `left`.
+- v2 plugin at `~/.tmux/plugins/tmux/status/` ships these modules: `application`, `battery`, `clima`, `cpu`, `date_time`, `directory`, `gitmux`, `host`, `kube`, `load`, `pomodoro_plus`, `ram`, `session`, `uptime`, `user`, `weather`. Our current theme only uses 4 (`session`, `application`, `uptime`, `date_time`).
+
+Useful additions that don't need extra tooling:
+- `directory` — current pane's `pwd` (basename). Very useful when juggling repos.
+- `host` — hostname. Handy when SSH'd into many boxes.
+- `user` — `$USER`. Cheap situational awareness.
+- `cpu` / `ram` — already covered by tmux2k for users who want sysload; optional in catppuccin.
+- `battery` — only meaningful on laptops (macOS / Linux with power); gracefully shows nothing otherwise.
+
+Proposed composition:
+- **Left**: `session` → `directory`  (what am I in)
+- **Right**: `application` → `user` `@` `host` → `date_time`  (what's running, where, when)
+
+Keep it minimal by default; document the full module list so user can remix.
+
+### XDG Base Directory docs
+
+No existing doc. Most tools in this repo already use XDG paths (`~/.config/nvim`, `~/.config/zellij`, etc.), and the tmux refactor just moved to `~/.config/tmux/`. A short `docs/tools/xdg.md` explaining the spec and listing where our configs live fits the existing `docs/tools/*.md` pattern.
+
+## Changes
+
+### 1. `dot_config/tmux/keybindings.conf` — right-click menu fix
+
+Add, near the top of the file, a block that rebinds the three root-level MouseDown3 events with `-O`:
+
+```tmux
+# =============================================================================
+# Mouse menu persistence (fix: menu dismisses on mouse release without -O)
+# =============================================================================
+
+unbind-key -n MouseDown3Pane
+bind-key -n MouseDown3Pane \
+  if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" \
+    { select-pane -t = ; send-keys -M } \
+    { display-menu -O -T "#[align=centre]#{pane_index} (#{pane_id})" -t = -x M -y M \
+        "Horizontal Split" h { split-window -h } \
+        "Vertical Split"   v { split-window -v } \
+        "" \
+        "Swap Up"     u { swap-pane -U } \
+        "Swap Down"   d { swap-pane -D } \
+        "" \
+        "#{?window_zoomed_flag,Unzoom,Zoom}" z { resize-pane -Z } \
+        "Kill pane"   X { kill-pane } \
+        "Respawn"     R { respawn-pane -k } }
+
+unbind-key -n MouseDown3Status
+bind-key -n MouseDown3Status \
+  display-menu -O -T "#[align=centre]#{window_index}:#{window_name}" -t = -x W -y W \
+    "Swap Left"  l { swap-window -t :-1 } \
+    "Swap Right" r { swap-window -t :+1 } \
+    "" \
+    "Kill window" X { kill-window } \
+    "Rename"      n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } \
+    "" \
+    "New window"  w { new-window }
+
+unbind-key -n MouseDown3StatusLeft
+bind-key -n MouseDown3StatusLeft \
+  display-menu -O -T "#[align=centre]#{session_name}" -t = -x M -y W \
+    Next        n { switch-client -n } \
+    Previous    p { switch-client -p } \
+    "" \
+    Rename      N { command-prompt -I "#S" { rename-session "%%" } } \
+    "" \
+    "New session" s { new-session } \
+    "New window"  w { new-window }
+```
+
+Simplified versus tmux defaults (dropped the copy-mode-specific items and the "mouse word / line / hyperlink" helpers) for readability; users who want that richness can fall back to `prefix + Space`. The important bit is the `-O` flag.
+
+### 2. Left-align windows — Catppuccin only
+
+Per user preference: Catppuccin = left, tmux2k = keep centered (habitual).
+
+- `dot_config/tmux/theme.catppuccin.conf`: add `set -g status-justify left`
+- `dot_config/tmux/theme.tmux2k.conf`: add `set -g status-justify centre` (explicit reset, so switching Catppuccin → tmux2k on the same server doesn't leak `left`)
+- `common.conf`: no change
+
+### 3. `dot_config/tmux/theme.catppuccin.conf` — richer modules
+
+Replace the current status composition with:
+
+```tmux
+set -g status-left ""
+set -g status-right ""
+
+# Left: session + directory
+set -agF status-left "#{E:@catppuccin_status_session}"
+set -agF status-left "#{E:@catppuccin_status_directory}"
+
+# Right: application, user@host, date/time
+set -agF status-right "#{E:@catppuccin_status_application}"
+set -agF status-right "#{E:@catppuccin_status_user}"
+set -agF status-right "#{E:@catppuccin_status_host}"
+set -agF status-right "#{E:@catppuccin_status_date_time}"
+
+# Module tweaks
+set -g @catppuccin_directory_text "#{b:pane_current_path}"   # basename only
+set -g @catppuccin_date_time_text "%Y-%m-%d %H:%M"
+```
+
+Drop `uptime` (noisy, rarely useful). Keep settings minimal; the long list of available modules lives in docs so users can add battery/cpu/gitmux/weather by uncommenting examples.
+
+### 4. `docs/tools/xdg.md` — new
+
+Single-page primer:
+
+- What XDG Base Directory Specification is, link to [freedesktop spec](https://specifications.freedesktop.org/basedir/latest/).
+- The four core vars: `XDG_CONFIG_HOME` (`~/.config`), `XDG_DATA_HOME` (`~/.local/share`), `XDG_STATE_HOME` (`~/.local/state`), `XDG_CACHE_HOME` (`~/.cache`).
+- Why it matters: keeps `$HOME` clean, predictable tooling, easy to back up / sync / delete.
+- Table of **this repo's** config locations, with a column noting whether each tool honors XDG natively or needs a shim. Good ones to list: tmux (native in 3.1+, we use shim `~/.tmux.conf` → `~/.config/tmux/tmux.conf`), neovim, zellij, starship, alacritty, ghostty, yazi, bat, direnv, gh, claude (some still use `~/.*`).
+- Short "how this repo handles it" note pointing at `dot_config/` vs dotfiles in `$HOME`.
+
+### 5. `docs/tools/tmux/README.md` — link to XDG doc
+
+Add under "Related Docs":
+
+```markdown
+- [XDG Base Directory Specification](../xdg.md) — why configs live under `~/.config/tmux/` rather than `~/.tmux.conf`
+```
+
+### 6. `docs/tools/tmux/keybindings.md` — document the mouse menu behavior
+
+Add a short "Right-click menus" subsection under the existing mouse content, explaining that right-click opens a context menu on panes (`MouseDown3Pane`), the window list (`MouseDown3Status`), and session area (`MouseDown3StatusLeft`), and that they stay open until Escape or selection.
+
+### 7. `docs/tools/tmux/themes.md` — catalog Catppuccin modules
+
+Add a section listing every available module from `~/.tmux/plugins/tmux/status/` with a one-line description and a toggle-on example so users can remix. Also note the `@catppuccin_directory_text`, `@catppuccin_date_time_text` knobs.
+
+## Files touched
+
+**Modified:**
+- `dot_config/tmux/keybindings.conf` — add `-O` mouse rebindings
+- `dot_config/tmux/theme.catppuccin.conf` — `status-justify left`, richer modules, directory/user/host
+- `dot_config/tmux/theme.tmux2k.conf` — explicit `status-justify centre` reset
+- `docs/tools/tmux/README.md` — link to XDG doc
+- `docs/tools/tmux/keybindings.md` — mouse menu note
+- `docs/tools/tmux/themes.md` — module catalog
+
+**New:**
+- `docs/tools/xdg.md` — XDG Base Directory primer
+
+## Verification
+
+1. `chezmoi apply`
+2. In a fresh tmux (cleanest: `tmux kill-server && tmux`):
+   - Right-click in a pane → menu opens, stays open on mouse release, Escape or selection to close. Repeat on the window list and the session area on the left of the status bar.
+   - Window tabs are left-aligned right after the session segment.
+   - Status right shows `application`, `user@host`, `YYYY-MM-DD HH:MM`.
+   - Left shows session + current directory basename; open a second pane in a different path, move to it, confirm the basename updates.
+3. `prefix + T` to switch to tmux2k → bottom bar, left-aligned (same `status-justify left` applies).
+4. Render `docs/tools/xdg.md` and the tmux README — XDG link resolves.
+
+## Out of scope
+
+- Not adding battery / weather / gitmux / kube modules by default — documented in themes.md so users can opt in.
+- Not rewriting the rest of the default mouse bindings (drag-to-copy, double-click word select, etc.); those aren't broken.
+- No changes to tmux2k theme file — this pass is about the default (Catppuccin) and shared behavior.
+
 
 ## Context
 

@@ -49,6 +49,48 @@ Only the active theme's plugin is declared to TPM at config load time. The first
 1. Press `prefix + I` — TPM will (re)install anything missing.
 2. For the cleanest visual result (no leftover style from the previous theme), run `tmux kill-server && tmux`.
 
+## Catppuccin status modules
+
+The v2 plugin ships a set of prebuilt modules in `~/.tmux/plugins/tmux/status/`. Compose `status-left` / `status-right` by appending `#{E:@catppuccin_status_<name>}` entries in `theme.catppuccin.conf`.
+
+| Module | What it shows |
+|--------|----------------|
+| `session` | Session name |
+| `directory` | Current pane's directory (tweak with `@catppuccin_directory_text`) |
+| `application` | Foreground command in the active pane |
+| `user` | `$USER` |
+| `host` | Hostname |
+| `date_time` | Date/time (tweak with `@catppuccin_date_time_text`, strftime format) |
+| `uptime` | Host uptime |
+| `cpu` | CPU load |
+| `ram` | RAM usage |
+| `battery` | Battery (laptops; silent otherwise) |
+| `load` | System load average |
+| `gitmux` | [gitmux](https://github.com/arl/gitmux) status (requires `gitmux` binary) |
+| `kube` | kubectl context (requires `kubectl`) |
+| `weather` / `clima` | Weather (network + `curl`) |
+| `pomodoro_plus` | Pomodoro timer |
+
+Current defaults:
+
+- **Left**: `session` → `directory`
+- **Right**: `application` → `user` → `host` → `date_time`
+
+To add `cpu` and `ram` to the right side, for example:
+
+```tmux
+set -agF status-right "#{E:@catppuccin_status_cpu}"
+set -agF status-right "#{E:@catppuccin_status_ram}"
+```
+
+Useful knobs:
+
+```tmux
+set -g @catppuccin_directory_text "#{b:pane_current_path}"   # basename (default)
+set -g @catppuccin_directory_text "#{pane_current_path}"     # full path
+set -g @catppuccin_date_time_text "%Y-%m-%d %H:%M"           # strftime
+```
+
 ## Troubleshooting
 
 ### Catppuccin shows default green tmux status bar

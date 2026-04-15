@@ -87,3 +87,4 @@ tmux show-options -g | rg 'status|focus-events'
 
 - [Sesh](../sesh.md)
 - [Starship](../starship.md)
+- [XDG Base Directory](../xdg.md) — why configs live under `~/.config/tmux/` rather than `~/.tmux.conf`

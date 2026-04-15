@@ -78,6 +78,18 @@ Enter with `prefix + [`. Navigate with vim keys, then:
 
 Mouse drag in copy mode also copies to clipboard. Double-click selects a word.
 
+## Right-click menus
+
+Right-click opens a context menu depending on where you click:
+
+| Target | Menu |
+|--------|------|
+| Pane body (`MouseDown3Pane`) | Split / swap / zoom / kill / respawn |
+| Window list (`MouseDown3Status`) | Swap / rename / kill / new window |
+| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/rename session, new session/window |
+
+Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
+
 ## URL Opening
 
 | Keybinding | Action |

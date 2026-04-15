@@ -4355,3 +4355,1344 @@ Your "jingle" key that works is probably stored **inside Bitwarden**, not as `~/
 Add `Include config.d/*` at the top of `~/.ssh/config` so your modular `config.d/01_git` actually takes effect — right now the main config's `github.com` block shadows it and lacks `IdentitiesOnly yes`.
 
 Want me to make that Include change and commit it?
+
+---
+
+_**User (2026-04-15 06:37:48Z)**_
+
+先不管git push的問題
+tmux目前滑鼠右鍵的選單一放開右鍵就會消失完全選不到選項
+另外我也在想 是不是可以 catppuccin 的window tab 不要置中而是置左 然後是不是有一些比較好用的info可以展示
+然後我想加 XDG Base Directory Specification 的 docs notes https://specifications.freedesktop.org/basedir/latest/ (這也是關於 ~/.config/tmux/tmux.conf vs. ~/.tmux.conf 路徑的解釋）
+
+---
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:07Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:08Z)**_
+
+Quick investigation before planning.
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tmux version + mouse bindings in config
+
+`tmux -V; grep -nE "mouse|Mouse" /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/common.conf /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf 2>&1 | head -30`
+
+```text
+tmux 3.4
+/home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/common.conf:42:# Enable mouse support
+/home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/common.conf:43:setw -g mouse on
+/home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf:19:bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection
+[rerun: b1]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List mouse bindings in running tmux
+
+`tmux list-keys -T root 2>/dev/null | grep -i "mouse\|Mouse" | head -20`
+
+```text
+bind-key -T root MouseDown1Pane         select-pane -t = \; send-keys -M
+bind-key -T root MouseDown1Status       select-window -t =
+bind-key -T root MouseDown2Pane         select-pane -t = \; if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { paste-buffer -p }
+bind-key -T root MouseDown3Pane         if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" { select-pane -t = ; send-keys -M } { display-menu -T "#[align=centre]#{pane_index} (#{pane_id})" -t = -x M -y M "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Top,}" < { send-keys -X history-top } "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Bottom,}" > { send-keys -X history-bottom } '' "#{?mouse_word,Search For #[underscore]#{=/9/...:mouse_word},}" C-r { if-shell -F "#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}" "copy-mode -t=" ; send-keys -X -t = search-backward "#{q:mouse_word}" } "#{?mouse_word,Type #[underscore]#{=/9/...:mouse_word},}" C-y { copy-mode -q ; send-keys -l "#{q:mouse_word}" } "#{?mouse_word,Copy #[underscore]#{=/9/...:mouse_word},}" c { copy-mode -q ; set-buffer "#{q:mouse_word}" } "#{?mouse_line,Copy Line,}" l { copy-mode -q ; set-buffer "#{q:mouse_line}" } '' "#{?mouse_hyperlink,Type #[underscore]#{=/9/...:mouse_hyperlink},}" C-h { copy-mode -q ; send-keys -l "#{q:mouse_hyperlink}" } "#{?mouse_hyperlink,Copy #[underscore]#{=/9/...:mouse_hyperlink},}" h { copy-mode -q ; set-buffer "#{q:mouse_hyperlink}" } '' "Horizontal Split" h { split-window -h } "Vertical Split" v { split-window -v } '' "#{?#{>:#{window_panes},1},,-}Swap Up" u { swap-pane -U } "#{?#{>:#{window_panes},1},,-}Swap Down" d { swap-pane -D } "#{?pane_marked_set,,-}Swap Marked" s { swap-pane } '' Kill X { kill-pane } Respawn R { respawn-pane -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } "#{?#{>:#{window_panes},1},,-}#{?window_zoomed_flag,Unzoom,Zoom}" z { resize-pane -Z } }
+bind-key -T root MouseDown3Status       display-menu -T "#[align=centre]#{window_index}:#{window_name}" -t = -x W -y W "#{?#{>:#{session_windows},1},,-}Swap Left" l { swap-window -t :-1 } "#{?#{>:#{session_windows},1},,-}Swap Right" r { swap-window -t :+1 } "#{?pane_marked_set,,-}Swap Marked" s { swap-window } '' Kill X { kill-window } Respawn R { respawn-window -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } Rename n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } '' "New After" w { new-window -a } "New At End" W { new-window }
+bind-key -T root MouseDown3StatusLeft   display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } '' Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } '' "New Session" s { new-session } "New Window" w { new-window }
+bind-key -T root MouseDrag1Pane         if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }
+bind-key -T root MouseDrag1Border       resize-pane -M
+bind-key -T root WheelUpPane            if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -e }
+bind-key -T root DoubleClick1Pane       select-pane -t = \; if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel }
+bind-key -T root TripleClick1Pane       select-pane -t = \; if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel }
+bind-key -T root M-MouseDown3Pane       display-menu -T "#[align=centre]#{pane_index} (#{pane_id})" -t = -x M -y M "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Top,}" < { send-keys -X history-top } "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Bottom,}" > { send-keys -X history-bottom } '' "#{?mouse_word,Search For #[underscore]#{=/9/...:mouse_word},}" C-r { if-shell -F "#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}" "copy-mode -t=" ; send-keys -X -t = search-backward "#{q:mouse_word}" } "#{?mouse_word,Type #[underscore]#{=/9/...:mouse_word},}" C-y { copy-mode -q ; send-keys -l "#{q:mouse_word}" } "#{?mouse_word,Copy #[underscore]#{=/9/...:mouse_word},}" c { copy-mode -q ; set-buffer "#{q:mouse_word}" } "#{?mouse_line,Copy Line,}" l { copy-mode -q ; set-buffer "#{q:mouse_line}" } '' "#{?mouse_hyperlink,Type #[underscore]#{=/9/...:mouse_hyperlink},}" C-h { copy-mode -q ; send-keys -l "#{q:mouse_hyperlink}" } "#{?mouse_hyperlink,Copy #[underscore]#{=/9/...:mouse_hyperlink},}" h { copy-mode -q ; set-buffer "#{q:mouse_hyperlink}" } '' "Horizontal Split" h { split-window -h } "Vertical Split" v { split-window -v } '' "#{?#{>:#{window_panes},1},,-}Swap Up" u { swap-pane -U } "#{?#{>:#{window_panes},1},,-}Swap Down" d { swap-pane -D } "#{?pane_marked_set,,-}Swap Marked" s { swap-pane } '' Kill X { kill-pane } Respawn R { respawn-pane -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } "#{?#{>:#{window_panes},1},,-}#{?window_zoomed_flag,Unzoom,Zoom}" z { resize-pane -Z }
+bind-key -T root M-MouseDown3Status     display-menu -T "#[align=centre]#{window_index}:#{window_name}" -t = -x W -y W "#{?#{>:#{session_windows},1},,-}Swap Left" l { swap-window -t :-1 } "#{?#{>:#{session_windows},1},,-}Swap Right" r { swap-window -t :+1 } "#{?pane_marked_set,,-}Swap Marked" s { swap-window } '' Kill X { kill-window } Respawn R { respawn-window -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } Rename n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } '' "New After" w { new-window -a } "New At End" W { new-window }
+bind-key -T root M-MouseDown3StatusLeft display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } '' Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } '' "New Session" s { new-session } "New Window" w { new-window }
+[rerun: b2]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:33Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List catppuccin status modules
+
+`ls ~/.tmux/plugins/tmux/status/ 2>/dev/null | head -20; echo ---; ls ~/.tmux/plugins/tmux/custom/ 2>/dev/null | head`
+
+```text
+-- 󱁻 application.conf
+-- 󱁻 battery.conf
+-- 󱁻 clima.conf
+-- 󱁻 cpu.conf
+-- 󱁻 date_time.conf
+-- 󱁻 directory.conf
+-- 󱁻 gitmux.conf
+-- 󱁻 host.conf
+-- 󱁻 kube.conf
+-- 󱁻 load.conf
+-- 󱁻 pomodoro_plus.conf
+-- 󱁻 ram.conf
+-- 󱁻 session.conf
+-- 󱁻 uptime.conf
+-- 󱁻 user.conf
+-- 󱁻 weather.conf
+---
+[rerun: b3]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:38:40Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:39:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md has been updated successfully.
+```
+</details></tool-use>
+
+---
+
+_**User (2026-04-15 06:41:35Z)**_
+
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Summary:
+1. Primary Request and Intent:
+   The user made multiple related requests over the course of this conversation about their tmux configuration managed by chezmoi:
+   
+   **Initial request**: Add references (rothgar/awesome-tmux, SmartBear tmux+vim article) to tmux.md, discuss tmux × vim integration (confirming existing vi scroll/copy support), discuss an alternative theme inspired by omerxx/dotfiles (Catppuccin + top status bar), and investigate tmux2k bandwidth bug showing `18446744073709551615K`.
+   
+   **Extended request**: After reviewing ChatGPT's advice, user wanted to modularize tmux config into `~/.config/tmux/` directory with switchable themes (Catppuccin + top bar as default, tmux2k as alternative) via env var `TMUX_THEME` and keybindings `prefix + C` / `prefix + T`.
+   
+   **Follow-up fixes**: Fix Catppuccin rendering (vanilla green status bar), fix broken theme switching, reorganize docs into `docs/tools/tmux/` folder.
+   
+   **Commit & push**: Commit everything including specstory history and push to origin.
+   
+   **SSH diagnosis**: Investigate why git push failed - check `~/.ssh/config.d/01_git` vs Bitwarden SSH agent issue.
+   
+   **Current request (Plan Mode active)**: 
+   - Fix tmux right-click menu that vanishes on mouse release
+   - Left-align Catppuccin window tabs (currently centered), add more useful status info modules
+   - Add XDG Base Directory Specification docs (https://specifications.freedesktop.org/basedir/latest/) explaining the `~/.config/tmux/tmux.conf` vs `~/.tmux.conf` path choice
+
+2. Key Technical Concepts:
+   - tmux modular config via `source-file` directives
+   - tmux theme switching with `@theme_variant` option + `if-shell` + `if -F`
+   - TPM (Tmux Plugin Manager) vs explicit `run` with auto-clone fallback
+   - Catppuccin/tmux v2 API (differs from v1 - uses `@catppuccin_window_status_style` instead of deprecated `*_format` vars)
+   - tmux `display-menu -O` flag for persistent menus that survive mouse release
+   - tmux `status-justify left` for window list alignment
+   - XDG Base Directory Specification (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, etc.)
+   - chezmoi source-to-deployed mapping (`dot_config/tmux/` → `~/.config/tmux/`)
+   - OpenSSH `Include config.d/*` directive
+   - Bitwarden SSH agent locked state (`agent refused operation`)
+   - GitHub China SSH endpoint `20.205.243.166` vs port 443 `ssh.github.com`
+
+3. Files and Code Sections:
+   
+   - **`dot_config/tmux/tmux.conf`** (CREATED): Entry point with theme selection:
+     ```tmux
+     source-file ~/.config/tmux/common.conf
+     source-file ~/.config/tmux/keybindings.conf
+     if-shell '[ -n "$TMUX_THEME" ]' "set -g @theme_variant '$TMUX_THEME'"
+     if-shell "[ -z \"$(tmux show-options -gqv @theme_variant)\" ]" "set -g @theme_variant 'catppuccin'"
+     if -F '#{==:#{@theme_variant},catppuccin}' 'source-file ~/.config/tmux/theme.catppuccin.conf'
+     if -F '#{==:#{@theme_variant},tmux2k}' 'source-file ~/.config/tmux/theme.tmux2k.conf'
+     run 'PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH" ~/.tmux/plugins/tpm/tpm'
+     ```
+   
+   - **`dot_config/tmux/common.conf`** (CREATED): Theme-agnostic settings - TPM env, plugins (resurrect, continuum, floax, fzf-url, open), `escape-time 0`, `mouse on`, `mode-keys vi`, `history-limit 50000`, `base-index 1`, `focus-events on`, `detach-on-destroy off`, `default-terminal tmux-256color`, `extended-keys always` + csi-u, `set-clipboard on`, `allow-passthrough on`.
+   
+   - **`dot_config/tmux/keybindings.conf`** (CREATED): All bindings including new:
+     ```tmux
+     bind C run-shell "tmux set -g @theme_variant catppuccin; tmux source-file ~/.tmux.conf; tmux display-message 'Theme: catppuccin'"
+     bind T run-shell "tmux set -g @theme_variant tmux2k; tmux source-file ~/.tmux.conf; tmux display-message 'Theme: tmux2k'"
+     ```
+   
+   - **`dot_config/tmux/theme.catppuccin.conf`** (CREATED then FIXED twice):
+     Final working version:
+     ```tmux
+     set -g @plugin 'catppuccin/tmux'
+     if-shell '[ ! -d ~/.tmux/plugins/tmux ]' \
+       'run-shell "git clone --depth 1 https://github.com/catppuccin/tmux.git ~/.tmux/plugins/tmux 2>/dev/null"'
+     set -g status-position top
+     set -g @catppuccin_flavor 'mocha'
+     set -g @catppuccin_window_status_style 'rounded'
+     set -g @catppuccin_window_text ' #W'
+     set -g @catppuccin_window_current_text ' #W'
+     set -g @catppuccin_window_number_position 'left'
+     run '~/.tmux/plugins/tmux/catppuccin.tmux'
+     set -g status-left ""
+     set -g status-right ""
+     set -agF status-left "#{E:@catppuccin_status_session}"
+     set -agF status-right "#{E:@catppuccin_status_application}"
+     set -agF status-right "#{E:@catppuccin_status_uptime}"
+     set -agF status-right "#{E:@catppuccin_status_date_time}"
+     ```
+   
+   - **`dot_config/tmux/theme.tmux2k.conf`** (CREATED): Auto-clone + explicit `run '~/.tmux/plugins/tmux2k/2k.tmux'` (fixed from wrong `tmux2k.tmux`).
+   
+   - **`dot_tmux.conf`** (MODIFIED): Shrunk to 2-line shim:
+     ```tmux
+     source-file ~/.config/tmux/tmux.conf
+     ```
+   
+   - **`docs/tools/tmux/README.md`** (CREATED), **`keybindings.md`** (moved from old tmux.md), **`themes.md`** (CREATED), **`vim.md`** (CREATED): Reorganized docs folder.
+   
+   - **`CLAUDE.md`** and **`README.md`** (MODIFIED): Updated tmux references to new folder location.
+   
+   - **`.claude/plans/rippling-leaping-rocket.md`** (CURRENT - just rewritten): Contains the new plan for right-click fix + Catppuccin polish + XDG docs.
+
+4. Errors and fixes:
+   
+   - **Pre-commit hook auto-fixed files during commit**: Hook modified files (trailing whitespace/EOF). Fixed by re-staging the modified file and re-running commit.
+   
+   - **`tmux2k.tmux` entry script wrong**: Actual plugin entry is `2k.tmux`. Fixed by updating `run` command path.
+   
+   - **Catppuccin showing vanilla green status bar**: Plugin never cloned - TPM auto-clones only on `prefix + I`, not on reload. Fixed by adding `if-shell` auto-clone block and explicit `run '~/.tmux/plugins/tmux/catppuccin.tmux'` in theme file.
+   
+   - **Catppuccin window tabs missing (v1 vs v2 API)**: User reported only session name visible, no tabs. Root cause: I was overriding `window-status-format` with v1-era variable names `#{E:@catppuccin_window_default_format}` that don't exist in v2. Verified by inspecting `~/.tmux/plugins/tmux/tests/window_status_styling_expected.txt`. Fixed by removing the bogus overrides - v2 plugin sets these formats itself based on `@catppuccin_window_status_style`.
+   
+   - **Git push failed**: `Connection closed by 20.205.243.166 port 22`. Diagnosed via `ssh -vT git@github.com` showing Bitwarden agent locked (`agent refused operation`) and `~/.ssh/config.d/01_git` never loaded (no `Include` directive in main config). Port 443 test gave clean `Permission denied (publickey)` confirming network OK but on-disk `~/.ssh/jingle` RSA key not registered with GitHub - the registered key is likely stored in Bitwarden (locked).
+
+5. Problem Solving:
+   Solved: Modularized tmux config with reliable theme switching via auto-clone + explicit `run`. Fixed Catppuccin v2 rendering by removing incorrect v1 overrides. Diagnosed SSH push failure to Bitwarden agent lock + SSH Include issue.
+   
+   Ongoing: User hit new issues - right-click menu dismisses on mouse release (needs `display-menu -O`), wants left-aligned tabs + richer status info, wants XDG docs. Plan written but not yet executed.
+
+6. All user messages:
+   - "我想在 @docs/tools/tmux.md 添加下面這個 [two links] ... 目前我們應該是已經對於scroll/copy mode有vi的support了對吧？... omerxx的windows/tabs是在上面那行 ... tmux下方的status bar似乎有點問題 網路上傳下載會卡在18446744073709551615K不動"
+   - Answer to AskUserQuestion: "只在 docs 寫排錯說明" for bandwidth fix, and for theme default: (long ChatGPT paste) "我想extend tmux的config 變成這兩者有開關(env var）可切換 然後配置變得更organize 然後 Catppuccin + top bar做爲default"
+   - "目前好像 catppuccin 的配置沒有成功 status bar是切換到top了 但是全是default vanilla的那種純綠色 也分不清現在在哪個tab（這需要優先修）... prefix + C or prefix + T 雖然會切換top/bottom status bar 但原本的theme全沒了... tmux的document似乎有點多 感覺可以單獨有一個tmux的folder"
+   - "這是我 prefix + I 的結果 感覺應該是install了 ... 目前好像 catppuccin 是有bug 目前我只看到session name 但沒有各個tab/window的名字... 快速切到 tmux2k 卻是正常的"
+   - "continue"
+   - "所以 auto-clone + explicit run 算是一個更robust的better approach嗎？ 然後幫我git commit (include specstory chat history) and then push"
+   - "See if it is the ~/.ssh/config.d/01_git problem or Bitwarden SSH agent issue? (I'm sure the jingle key should work)"
+   - **MOST RECENT**: "先不管git push的問題 tmux目前滑鼠右鍵的選單一放開右鍵就會消失完全選不到選項 另外我也在想 是不是可以 catppuccin 的window tab 不要置中而是置左 然後是不是有一些比較好用的info可以展示 然後我想加 XDG Base Directory Specification 的 docs notes https://specifications.freedesktop.org/basedir/latest/ (這也是關於 ~/.config/tmux/tmux.conf vs. ~/.tmux.conf 路徑的解釋）"
+
+7. Pending Tasks:
+   - Fix right-click menu dismissal by adding `-O` flag to `display-menu` for `MouseDown3Pane`, `MouseDown3Status`, `MouseDown3StatusLeft` bindings
+   - Left-align window tabs via `set -g status-justify left` in `common.conf`
+   - Enhance Catppuccin status modules (add `directory`, `user`, `host`; drop `uptime`; add `@catppuccin_directory_text`, `@catppuccin_date_time_text`)
+   - Create `docs/tools/xdg.md` with XDG Base Directory spec primer and tool mapping table
+   - Update `docs/tools/tmux/README.md` to link to XDG doc
+   - Update `docs/tools/tmux/keybindings.md` with right-click menu notes
+   - Update `docs/tools/tmux/themes.md` with full Catppuccin module catalog (available: application, battery, clima, cpu, date_time, directory, gitmux, host, kube, load, pomodoro_plus, ram, session, uptime, user, weather)
+   - Call ExitPlanMode to get approval for the updated plan
+
+8. Current Work:
+   I am in **Plan Mode** and just wrote a comprehensive updated plan to `/home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md` using the Edit tool (replacing the previous plan). The new plan addresses the three latest user requests:
+   
+   1. **Right-click menu fix**: Rebind `MouseDown3Pane` / `MouseDown3Status` / `MouseDown3StatusLeft` with `display-menu -O` flag so menu stays open after mouse release. Root cause identified via `tmux list-keys -T root | grep MouseDown3` - tmux 3.4's defaults don't use `-O`.
+   
+   2. **Catppuccin polish**: Change `status-justify` from default centre to `left` (goes in common.conf since it applies to both themes). Enrich modules in theme.catppuccin.conf:
+      - Left: `session` + `directory`
+      - Right: `application` + `user` + `host` + `date_time` (drop uptime)
+      - Add `@catppuccin_directory_text "#{b:pane_current_path}"` for basename only
+   
+   3. **XDG docs**: New `docs/tools/xdg.md` with primer, core vars (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`), table mapping repo's tools to XDG compliance status. Link from tmux README.
+   
+   I verified the tmux version (3.4), checked existing mouse bindings (no overrides in our config), and confirmed Catppuccin v2 modules available at `~/.tmux/plugins/tmux/status/`.
+
+9. Optional Next Step:
+   Call `ExitPlanMode` to request user approval of the plan at `/home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md`. 
+   
+   Direct quote from user's most recent request: "tmux目前滑鼠右鍵的選單一放開右鍵就會消失完全選不到選項 另外我也在想 是不是可以 catppuccin 的window tab 不要置中而是置左 然後是不是有一些比較好用的info可以展示 然後我想加 XDG Base Directory Specification 的 docs notes"
+   
+   Per Plan Mode Phase 5 instructions: "At the very end of your turn, once you have asked the user questions and are happy with your final plan file - you should always call ExitPlanMode". The plan is complete and aligned with the three explicit requests, so the immediate next step is calling ExitPlanMode.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /home/daviddwlee84/.claude/projects/-home-daviddwlee84--local-share-chezmoi/735d40b6-0701-4206-8634-95a69f377708.jsonl
+Continue the conversation from where it left off without asking the user any further questions. Resume directly — do not acknowledge the summary, do not recap what was happening, do not preface with "I'll continue" or similar. Pick up the last task as if the break never happened.
+
+---
+
+_**Agent (claude-opus-4-6 2026-04-15 06:41:38Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 06:41:39Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ToolSearch"><details>
+<summary>Tool use: **ToolSearch**</summary>
+
+**Input:**
+
+- max_results: `1`
+- query: `select:ExitPlanMode`
+
+**Result:**
+
+```
+
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:46:02Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
+<summary>Tool use: **ExitPlanMode**</summary>
+
+```text
+The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). To tell you how to proceed, the user said:
+我只想要 catppuccin theme 是 left 但 tmux2k 仍保持習慣的 center
+
+Note: The user's next message may contain a correction or preference. Pay close attention — if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:46:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:46:13Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.claude/plans/rippling-leaping-rocket.md`
+
+```text
+80	  display-menu -O -T "#[align=centre]#{session_name}" -t = -x M -y W \
+81	    Next        n { switch-client -n } \
+82	    Previous    p { switch-client -p } \
+83	    "" \
+84	    Rename      N { command-prompt -I "#S" { rename-session "%%" } } \
+85	    "" \
+86	    "New session" s { new-session } \
+87	    "New window"  w { new-window }
+88	```
+89	
+90	Simplified versus tmux defaults (dropped the copy-mode-specific items and the "mouse word / line / hyperlink" helpers) for readability; users who want that richness can fall back to `prefix + Space`. The important bit is the `-O` flag.
+91	
+92	### 2. `dot_config/tmux/common.conf` — left-align windows
+93	
+94	Add one line near the status-related settings:
+95	
+96	```tmux
+97	# Left-align the window list in the status bar
+98	set -g status-justify left
+99	```
+100	
+101	This is theme-agnostic (applies to both Catppuccin and tmux2k), so it belongs in common.conf, not a theme file.
+102	
+103	### 3. `dot_config/tmux/theme.catppuccin.conf` — richer modules
+104	
+105	Replace the current status composition with:
+106	
+107	```tmux
+108	set -g status-left ""
+109	set -g status-right ""
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:46:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:46:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:52:42Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
+<summary>Tool use: **ExitPlanMode**</summary>
+
+```text
+User has approved your plan. You can now start coding. Start with updating your todo list if applicable
+
+Your plan has been saved to: /home/daviddwlee84/.local/share/chezmoi/.claude/plans/rippling-leaping-rocket.md
+You can refer back to it if needed during implementation.
+
+## Approved Plan:
+# Plan: Right-click menu fix + Catppuccin polish + XDG docs
+
+## Context
+
+Follow-up pass on the modular tmux config from the previous commit. User hit three issues:
+
+1. **Right-click popup menu vanishes on mouse release** — when right-clicking in a pane, the menu appears briefly but dismisses the moment the mouse button is released, so no item can be selected.
+2. **Catppuccin window tabs are centered** — user wants them left-aligned, and wants more useful modules on the status bar than just `session / application / uptime / date_time`.
+3. **No docs on XDG Base Directory Specification** — useful background for why `~/.config/tmux/tmux.conf` is preferred over `~/.tmux.conf`, and applies to many other configs in this repo.
+
+## Findings
+
+### Right-click menu dismissal
+
+tmux 3.4's built-in `MouseDown3Pane` / `MouseDown3Status` / `MouseDown3StatusLeft` bindings invoke `display-menu` **without** the `-O` flag. Without `-O`, `display-menu` closes if the mouse is released outside an item before a selection is made — which is exactly what happens on a quick right-click-and-release. Adding `-O` ("stay **O**pen until an item is chosen or Escape") makes the menu persist as expected.
+
+Confirmed via `tmux list-keys -T root | grep MouseDown3` — our config doesn't override these; we're getting tmux defaults minus `-O`.
+
+### Catppuccin alignment + modules
+
+- Alignment: `set -g status-justify centre` (tmux default) is what centers the window list. Change to `left`.
+- v2 plugin at `~/.tmux/plugins/tmux/status/` ships these modules: `application`, `battery`, `clima`, `cpu`, `date_time`, `directory`, `gitmux`, `host`, `kube`, `load`, `pomodoro_plus`, `ram`, `session`, `uptime`, `user`, `weather`. Our current theme only uses 4 (`session`, `application`, `uptime`, `date_time`).
+
+Useful additions that don't need extra tooling:
+- `directory` — current pane's `pwd` (basename). Very useful when juggling repos.
+- `host` — hostname. Handy when SSH'd into many boxes.
+- `user` — `$USER`. Cheap situational awareness.
+- `cpu` / `ram` — already covered by tmux2k for users who want sysload; optional in catppuccin.
+- `battery` — only meaningful on laptops (macOS / Linux with power); gracefully shows nothing otherwise.
+
+Proposed composition:
+- **Left**: `session` → `directory`  (what am I in)
+- **Right**: `application` → `user` `@` `host` → `date_time`  (what's running, where, when)
+
+Keep it minimal by default; document the full module list so user can remix.
+
+### XDG Base Directory docs
+
+No existing doc. Most tools in this repo already use XDG paths (`~/.config/nvim`, `~/.config/zellij`, etc.), and the tmux refactor just moved to `~/.config/tmux/`. A short `docs/tools/xdg.md` explaining the spec and listing where our configs live fits the existing `docs/tools/*.md` pattern.
+
+## Changes
+
+### 1. `dot_config/tmux/keybindings.conf` — right-click menu fix
+
+Add, near the top of the file, a block that rebinds the three root-level MouseDown3 events with `-O`:
+
+```tmux
+# =============================================================================
+# Mouse menu persistence (fix: menu dismisses on mouse release without -O)
+# =============================================================================
+
+unbind-key -n MouseDown3Pane
+bind-key -n MouseDown3Pane \
+  if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" \
+    { select-pane -t = ; send-keys -M } \
+    { display-menu -O -T "#[align=centre]#{pane_index} (#{pane_id})" -t = -x M -y M \
+        "Horizontal Split" h { split-window -h } \
+        "Vertical Split"   v { split-window -v } \
+        "" \
+        "Swap Up"     u { swap-pane -U } \
+        "Swap Down"   d { swap-pane -D } \
+        "" \
+        "#{?window_zoomed_flag,Unzoom,Zoom}" z { resize-pane -Z } \
+        "Kill pane"   X { kill-pane } \
+        "Respawn"     R { respawn-pane -k } }
+
+unbind-key -n MouseDown3Status
+bind-key -n MouseDown3Status \
+  display-menu -O -T "#[align=centre]#{window_index}:#{window_name}" -t = -x W -y W \
+    "Swap Left"  l { swap-window -t :-1 } \
+    "Swap Right" r { swap-window -t :+1 } \
+    "" \
+    "Kill window" X { kill-window } \
+    "Rename"      n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } \
+    "" \
+    "New window"  w { new-window }
+
+unbind-key -n MouseDown3StatusLeft
+bind-key -n MouseDown3StatusLeft \
+  display-menu -O -T "#[align=centre]#{session_name}" -t = -x M -y W \
+    Next        n { switch-client -n } \
+    Previous    p { switch-client -p } \
+    "" \
+    Rename      N { command-prompt -I "#S" { rename-session "%%" } } \
+    "" \
+    "New session" s { new-session } \
+    "New window"  w { new-window }
+```
+
+Simplified versus tmux defaults (dropped the copy-mode-specific items and the "mouse word / line / hyperlink" helpers) for readability; users who want that richness can fall back to `prefix + Space`. The important bit is the `-O` flag.
+
+### 2. Left-align windows — Catppuccin only
+
+Per user preference: Catppuccin = left, tmux2k = keep centered (habitual).
+
+- `dot_config/tmux/theme.catppuccin.conf`: add `set -g status-justify left`
+- `dot_config/tmux/theme.tmux2k.conf`: add `set -g status-justify centre` (explicit reset, so switching Catppuccin → tmux2k on the same server doesn't leak `left`)
+- `common.conf`: no change
+
+### 3. `dot_config/tmux/theme.catppuccin.conf` — richer modules
+
+Replace the current status composition with:
+
+```tmux
+set -g status-left ""
+set -g status-right ""
+
+# Left: session + directory
+set -agF status-left "#{E:@catppuccin_status_session}"
+set -agF status-left "#{E:@catppuccin_status_directory}"
+
+# Right: application, user@host, date/time
+set -agF status-right "#{E:@catppuccin_status_application}"
+set -agF status-right "#{E:@catppuccin_status_user}"
+set -agF status-right "#{E:@catppuccin_status_host}"
+set -agF status-right "#{E:@catppuccin_status_date_time}"
+
+# Module tweaks
+set -g @catppuccin_directory_text "#{b:pane_current_path}"   # basename only
+set -g @catppuccin_date_time_text "%Y-%m-%d %H:%M"
+```
+
+Drop `uptime` (noisy, rarely useful). Keep settings minimal; the long list of available modules lives in docs so users can add battery/cpu/gitmux/weather by uncommenting examples.
+
+### 4. `docs/tools/xdg.md` — new
+
+Single-page primer:
+
+- What XDG Base Directory Specification is, link to [freedesktop spec](https://specifications.freedesktop.org/basedir/latest/).
+- The four core vars: `XDG_CONFIG_HOME` (`~/.config`), `XDG_DATA_HOME` (`~/.local/share`), `XDG_STATE_HOME` (`~/.local/state`), `XDG_CACHE_HOME` (`~/.cache`).
+- Why it matters: keeps `$HOME` clean, predictable tooling, easy to back up / sync / delete.
+- Table of **this repo's** config locations, with a column noting whether each tool honors XDG natively or needs a shim. Good ones to list: tmux (native in 3.1+, we use shim `~/.tmux.conf` → `~/.config/tmux/tmux.conf`), neovim, zellij, starship, alacritty, ghostty, yazi, bat, direnv, gh, claude (some still use `~/.*`).
+- Short "how this repo handles it" note pointing at `dot_config/` vs dotfiles in `$HOME`.
+
+### 5. `docs/tools/tmux/README.md` — link to XDG doc
+
+Add under "Related Docs":
+
+```markdown
+- [XDG Base Directory Specification](../xdg.md) — why configs live under `~/.config/tmux/` rather than `~/.tmux.conf`
+```
+
+### 6. `docs/tools/tmux/keybindings.md` — document the mouse menu behavior
+
+Add a short "Right-click menus" subsection under the existing mouse content, explaining that right-click opens a context menu on panes (`MouseDown3Pane`), the window list (`MouseDown3Status`), and session area (`MouseDown3StatusLeft`), and that they stay open until Escape or selection.
+
+### 7. `docs/tools/tmux/themes.md` — catalog Catppuccin modules
+
+Add a section listing every available module from `~/.tmux/plugins/tmux/status/` with a one-line description and a toggle-on example so users can remix. Also note the `@catppuccin_directory_text`, `@catppuccin_date_time_text` knobs.
+
+## Files touched
+
+**Modified:**
+- `dot_config/tmux/keybindings.conf` — add `-O` mouse rebindings
+- `dot_config/tmux/theme.catppuccin.conf` — `status-justify left`, richer modules, directory/user/host
+- `dot_config/tmux/theme.tmux2k.conf` — explicit `status-justify centre` reset
+- `docs/tools/tmux/README.md` — link to XDG doc
+- `docs/tools/tmux/keybindings.md` — mouse menu note
+- `docs/tools/tmux/themes.md` — module catalog
+
+**New:**
+- `docs/tools/xdg.md` — XDG Base Directory primer
+
+## Verification
+
+1. `chezmoi apply`
+2. In a fresh tmux (cleanest: `tmux kill-server && tmux`):
+   - Right-click in a pane → menu opens, stays open on mouse release, Escape or selection to close. Repeat on the window list and the session area on the left of the status bar.
+   - Window tabs are left-aligned right after the session segment.
+   - Status right shows `application`, `user@host`, `YYYY-MM-DD HH:MM`.
+   - Left shows session + current directory basename; open a second pane in a different path, move to it, confirm the basename updates.
+3. `prefix + T` to switch to tmux2k → bottom bar, left-aligned (same `status-justify left` applies).
+4. Render `docs/tools/xdg.md` and the tmux README — XDG link resolves.
+
+## Out of scope
+
+- Not adding battery / weather / gitmux / kube modules by default — documented in themes.md so users can opt in.
+- Not rewriting the rest of the default mouse bindings (drag-to-copy, double-click word select, etc.); those aren't broken.
+- No changes to tmux2k theme file — this pass is about the default (Catppuccin) and shared behavior.
+
+
+## Context
+
+User wants to extend the current tmux setup in three coordinated ways:
+
+1. **Refactor the monolithic `dot_tmux.conf`** into a modular directory layout so shared settings and per-theme settings are cleanly separated.
+2. **Add a second theme (Catppuccin + top status bar)** inspired by [omerxx/dotfiles](https://github.com/omerxx/dotfiles/tree/master/tmux) / [this video](https://www.youtube.com/watch?v=GH3kpsbbERo), and make it the **default**. Keep tmux2k as an opt-in alternative, selectable via env var **or** runtime key-binding.
+3. **Expand `docs/tools/tmux.md`** with: the two reference links the user supplied, a tmux × Neovim section (confirming the existing vi-style copy/scroll support), the new theme-switch mechanics, and a troubleshooting entry for the tmux2k bandwidth bug (`18446744073709551615K` = `UINT64_MAX` underflow).
+
+The bandwidth bug will be **documented only**, not patched in config (per user answer).
+
+## Findings from current `dot_tmux.conf`
+
+- vi copy-mode is already wired: `mode-keys vi` (line 62) + `v / V / C-v / y / g / G / / / ?` (lines 165–180). Doc just needs to cross-reference it in the new Vim section — no config change.
+- Theme = `tmux2k` onedark, status-position **bottom** (lines 39–49, 77).
+- TPM path is `~/.tmux/plugins` (line 9). After refactor, we should keep that path (standard) even though the main config moves to `~/.config/tmux/`.
+- Bandwidth segment comes from `@tmux2k-right-plugins "bandwidth network time"` (line 49). UINT64 underflow is a known tmux2k issue (bandwidth script's `prev − curr` wraps on first tick / when iface changes).
+- Commented-out alternative themes exist at lines 291–297 (dracula, tmux-power, pimux, mem-cpu-load) — safe to drop during refactor; we're adding proper Catppuccin support.
+
+## Target layout (chezmoi source → deployed path)
+
+```
+chezmoi:  dot_config/tmux/                  →  ~/.config/tmux/
+          ├── tmux.conf                     (entry point, selects theme)
+          ├── common.conf                   (everything theme-agnostic)
+          ├── keybindings.conf              (all bind-key / popup menu)
+          ├── theme.catppuccin.conf         (new — default)
+          └── theme.tmux2k.conf             (existing theme, moved)
+```
+
+The legacy `dot_tmux.conf` (→ `~/.tmux.conf`) becomes a one-line shim so existing users / scripts that `source ~/.tmux.conf` keep working:
+
+```tmux
+# ~/.tmux.conf — shim: delegate to XDG location
+source-file ~/.config/tmux/tmux.conf
+```
+
+Rationale: tmux auto-reads `~/.config/tmux/tmux.conf` on modern versions, but keeping the shim avoids breaking anything that references `~/.tmux.conf` (e.g. the `prefix + R` reload binding, install scripts, the `Verify Current Config` snippet in the doc).
+
+## File-by-file plan
+
+### `dot_config/tmux/tmux.conf` (new entry point)
+
+```tmux
+# Shared base (no status/theme styling)
+source-file ~/.config/tmux/common.conf
+source-file ~/.config/tmux/keybindings.conf
+
+# Theme selection — priority:
+#   1. TMUX_THEME env var (catppuccin | tmux2k)
+#   2. tmux option @theme_variant (persisted across reload within server)
+#   3. default: catppuccin
+if-shell '[ -n "$TMUX_THEME" ]' \
+  'set -g @theme_variant "$TMUX_THEME"'
+if-shell '[ -z "#{@theme_variant}" ]' \
+  'set -g @theme_variant "catppuccin"'
+
+if -F '#{==:#{@theme_variant},catppuccin}' \
+  'source-file ~/.config/tmux/theme.catppuccin.conf'
+if -F '#{==:#{@theme_variant},tmux2k}' \
+  'source-file ~/.config/tmux/theme.tmux2k.conf'
+
+# TPM init must be last
+run 'PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH" ~/.tmux/plugins/tpm/tpm'
+```
+
+### `dot_config/tmux/common.conf` (new — theme-agnostic)
+
+Contains, lifted verbatim from `dot_tmux.conf`:
+
+- TPM env + `set -g @plugin 'tmux-plugins/tpm'`
+- Non-theme plugins: `tmux-resurrect`, `tmux-continuum`, `tmux-floax` (+ floax options), `tmux-fzf-url`, `tmux-open` (+ `@open-S`)
+- General settings: `escape-time 0`, `mouse on`, `mode-keys vi`, `history-limit 50000`, `base-index 1`, `pane-base-index 1`, `renumber-windows on`, `focus-events on`, `detach-on-destroy off`
+- Terminal/keys: `default-terminal tmux-256color`, `terminal-features RGB`, `extended-keys always`, csi-u conditional, `set-clipboard on`, `allow-passthrough on`
+- **Both** theme plugins declared (so TPM installs both; only one is activated):
+  ```tmux
+  set -g @plugin 'catppuccin/tmux'
+  set -g @plugin '2kabhishek/tmux2k'
+  ```
+- **Not** included here: `status-position`, `status-left/right`, `window-status-*`, any color/style — those belong to the theme files.
+
+### `dot_config/tmux/keybindings.conf` (new — all bindings & popup menu)
+
+Moved verbatim from `dot_tmux.conf`:
+
+- Copy-mode vi bindings (v/V/C-v/y, mouse drag, double-click)
+- Capture pane helpers (`y`, `Y`, `C-y`)
+- Pane/window: `h/j/k/l`, `H/J/K/L`, `M-h/j/k/l`, `|`, `-`, `+`, `c`, `x`, `R`, `N`, `X`
+- Sesh: `g`, `S`, `9`
+- Popup menu (`prefix + Space`) — full `display-menu` block
+- **New**: `prefix + C` → switch to catppuccin, `prefix + T` → switch to tmux2k:
+  ```tmux
+  bind C run-shell 'tmux set -g @theme_variant catppuccin; \
+    tmux source-file ~/.config/tmux/tmux.conf; \
+    tmux display-message "Theme: catppuccin"'
+  bind T run-shell 'tmux set -g @theme_variant tmux2k; \
+    tmux source-file ~/.config/tmux/tmux.conf; \
+    tmux display-message "Theme: tmux2k"'
+  ```
+  Add corresponding rows to the popup menu ("Theme: catppuccin" / "Theme: tmux2k").
+
+### `dot_config/tmux/theme.catppuccin.conf` (new — default)
+
+```tmux
+# Reset any inherited status styling
+set -g status-left ""
+set -g status-right ""
+set -g window-status-format ""
+set -g window-status-current-format ""
+
+# Top status bar (omerxx-style)
+set -g status-position top
+
+# Catppuccin options
+set -g @catppuccin_flavor "mocha"
+set -g @catppuccin_window_status_style "rounded"
+
+# Load plugin (TPM install path)
+run '~/.tmux/plugins/tmux/catppuccin.tmux'
+
+# Compose status line
+set -g status-left "#{E:@catppuccin_status_session} "
+set -g status-right "#{E:@catppuccin_status_application}"
+set -agF status-right "#{E:@catppuccin_status_uptime}"
+set -agF status-right "#{E:@catppuccin_status_date_time}"
+```
+
+Exact modules/flavour are easy to tweak after first render; the key invariants are `status-position top` and Catppuccin being self-contained.
+
+### `dot_config/tmux/theme.tmux2k.conf` (new — lifted from current config)
+
+```tmux
+# Reset so toggling from catppuccin leaves no residue
+set -g status-left ""
+set -g status-right ""
+set -g window-status-format ""
+set -g window-status-current-format ""
+set -g status-position bottom
+
+set -g @tmux2k-theme 'onedark'
+set -g @tmux2k-start-icon ""
+set -g @tmux2k-left-plugins "git cpu ram"
+set -g @tmux2k-right-plugins "bandwidth network time"
+
+run '~/.tmux/plugins/tmux2k/tmux2k.tmux'
+```
+
+### `dot_tmux.conf` (replace content — becomes a shim)
+
+Shrink the existing 305-line file to the 2-line shim shown above. This is the cleanest migration: chezmoi will rewrite `~/.tmux.conf` on apply, nothing else needs to know about the move.
+
+### `run_once_before_00_bootstrap.sh.tmpl` / TPM
+
+No change needed — TPM lives at `~/.tmux/plugins/tpm`, which is installed independently. `prefix + I` still installs both theme plugins declared in `common.conf`.
+
+### `docs/tools/tmux.md`
+
+Add / update:
+
+1. **Config Layout** section (new, near the top, after "tmux" intro): describe `~/.config/tmux/` structure, the shim at `~/.tmux.conf`, and that the entry point picks a theme via `$TMUX_THEME` env var → `@theme_variant` option → default `catppuccin`.
+2. **Themes** section (new): document the two themes, defaults, how to switch:
+   - Persistent for new tmux servers: `TMUX_THEME=tmux2k tmux` (or shell alias `tmuxt` / `tmuxc`).
+   - Runtime within a session: `prefix + C` (catppuccin) / `prefix + T` (tmux2k), also surfaced in popup menu.
+   - Note the "cleanest switch is `tmux kill-server`" caveat.
+3. **Tmux × Vim / Neovim** (new subsection under existing "Coding-Agent / Neovim Notes"):
+   - Confirm vi copy/scroll already works (cross-link to existing Copy-Mode table). Answers the user's question: *yes, vi support in scroll/copy mode is already on.*
+   - Mention `focus-events on`, extended keys, true color are already configured for Vim.
+   - Flag [`christoomey/vim-tmux-navigator`](https://github.com/christoomey/vim-tmux-navigator) as a possible future add-on (not installed).
+4. **Resources** section (new, before "Related Docs"):
+   - [rothgar/awesome-tmux](https://github.com/rothgar/awesome-tmux)
+   - [Tmux and Vim — even better together (SmartBear)](https://smartbear.com/blog/tmux-and-vim/)
+   - [omerxx/dotfiles — tmux/](https://github.com/omerxx/dotfiles/tree/master/tmux) + [video](https://www.youtube.com/watch?v=GH3kpsbbERo)
+5. **Troubleshooting** section (new):
+   - `tmux2k bandwidth shows 18446744073709551615K`: explain it's `2^64 − 1` uint64 underflow in tmux2k's bandwidth delta calculation (wrong/missing interface, first-tick prev-counter missing). Workarounds: (a) switch to catppuccin default (`prefix + C`), (b) set `@tmux2k-network-name` to a real iface, (c) drop `bandwidth` from `@tmux2k-right-plugins`. No config change applied this pass.
+6. Update the existing **Keybindings → Daily Workflow** table to include `prefix + C` and `prefix + T`, and update the **Popup Menu** table to list the two theme entries.
+7. Update **Verify Current Config** snippet to reference `~/.config/tmux/tmux.conf` in addition to `~/.tmux.conf`.
+
+### `CLAUDE.md`
+
+The top-level `CLAUDE.md` has a "Tmux Configuration" section that currently says "The tmux config (`dot_tmux.conf`) includes …". Update to reference the new layout (`dot_config/tmux/`), add `prefix + C / T` to the keybinding table, and note the default theme is Catppuccin with top status bar. Keep it brief — detailed content stays in `docs/tools/tmux.md`.
+
+### `README.md`
+
+No structural changes needed — the README's "Config Files" list already points to the tmux doc, which will cover the new layout.
+
+## Files touched
+
+**New:**
+- `dot_config/tmux/tmux.conf`
+- `dot_config/tmux/common.conf`
+- `dot_config/tmux/keybindings.conf`
+- `dot_config/tmux/theme.catppuccin.conf`
+- `dot_config/tmux/theme.tmux2k.conf`
+
+**Modified:**
+- `dot_tmux.conf` (shrink to shim)
+- `docs/tools/tmux.md` (add Config Layout, Themes, Vim notes, Resources, Troubleshooting; update keybinding tables)
+- `CLAUDE.md` (update "Tmux Configuration" section)
+
+## Verification
+
+1. `chezmoi diff` — review all new/changed files look right.
+2. `chezmoi apply` — deploy.
+3. Inside a **new** tmux server (cleanest; `tmux kill-server && tmux`):
+   - Status bar appears on **top** with Catppuccin styling. No `18446744073709551615K` anywhere.
+   - `prefix + [` → copy mode; `j/k`, `v`, `y` work (vi confirm).
+   - `prefix + T` → switches to tmux2k (bottom bar, onedark). `prefix + C` → back to catppuccin.
+   - `prefix + I` (TPM) installs `catppuccin/tmux` and `2kabhishek/tmux2k` on first run.
+   - `prefix + R` still reloads without error (the binding sources `~/.tmux.conf`, which is now the shim; verify shim re-sources the XDG entry point).
+4. `TMUX_THEME=tmux2k tmux` in a fresh shell starts in tmux2k.
+5. `tmux show-options -g @theme_variant` reflects the active theme.
+6. `tmux list-keys | grep -E " C | T "` shows the new theme bindings.
+7. Render `docs/tools/tmux.md` (VS Code preview or `glow`); every new link resolves.
+
+## Out of scope (explicit)
+
+- Actually fixing tmux2k's bandwidth underflow in config — user chose docs-only for this pass.
+- Changing sesh / floax / fzf-url / open / resurrect / continuum behavior.
+- Migrating to non-TPM plugin manager.
+- Adding `vim-tmux-navigator` (mentioned in docs as future option only).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:52:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/tmux/keybindings.conf`
+
+```text
+1	# ~/.config/tmux/keybindings.conf
+2	# All bind-key definitions and the prefix + Space popup menu.
+3	# Managed by chezmoi - do not edit directly.
+4	
+5	# =============================================================================
+6	# Vim-Style Copy Mode (prefix + [ to enter, q to exit)
+7	# =============================================================================
+8	#
+9	#   h/j/k/l  move cursor        C-u/C-d  half-page up/down
+10	#   g/G      top/bottom          //?      search forward/backward
+11	#   v        begin selection     V        line selection
+12	#   C-v      rectangle select    y        yank to clipboard
+13	#   Escape   clear selection     q        exit copy mode
+14	
+15	bind -T copy-mode-vi v send-keys -X begin-selection
+16	bind -T copy-mode-vi V send-keys -X select-line
+17	bind -T copy-mode-vi C-v send-keys -X rectangle-toggle
+18	bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+19	bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection
+20	bind -T copy-mode-vi DoubleClick1Pane select-pane \; send-keys -X select-word
+21	
+22	# =============================================================================
+23	# Capture Pane Helpers
+24	# =============================================================================
+25	
+26	# prefix + y: copy visible pane content to system clipboard
+27	bind y run-shell "\
+28	  if command -v pbcopy >/dev/null; then \
+29	    tmux capture-pane -p | pbcopy; \
+30	  elif command -v xclip >/dev/null; then \
+31	    tmux capture-pane -p | xclip -selection clipboard; \
+32	  elif command -v xsel >/dev/null; then \
+33	    tmux capture-pane -p | xsel --clipboard; \
+34	  fi; \
+35	  tmux display-message 'Pane content copied to clipboard'"
+36	
+37	# prefix + Y: copy full scrollback to system clipboard
+38	bind Y run-shell "\
+39	  if command -v pbcopy >/dev/null; then \
+40	    tmux capture-pane -pS - | pbcopy; \
+41	  elif command -v xclip >/dev/null; then \
+42	    tmux capture-pane -pS - | xclip -selection clipboard; \
+43	  elif command -v xsel >/dev/null; then \
+44	    tmux capture-pane -pS - | xsel --clipboard; \
+45	  fi; \
+46	  tmux display-message 'Full scrollback copied to clipboard'"
+47	
+48	# prefix + C-y: capture pane into fzf for line-by-line selection, yank chosen lines
+49	bind C-y run-shell "\
+50	  clip() { \
+51	    if command -v pbcopy >/dev/null; then pbcopy; \
+52	    elif command -v xclip >/dev/null; then xclip -selection clipboard; \
+53	    elif command -v xsel >/dev/null; then xsel --clipboard; \
+54	    fi; \
+55	  }; \
+56	  tmux capture-pane -pS - | fzf-tmux -p 80%,70% --multi --tac --no-sort \
+57	    --header 'Select lines to copy (Tab=multi, Enter=copy)' | clip; \
+58	  tmux display-message 'Selected lines copied'"
+59	
+60	# =============================================================================
+61	# Vim-Style Pane Navigation
+62	# =============================================================================
+63	
+64	bind h select-pane -L
+65	bind j select-pane -D
+66	bind k select-pane -U
+67	bind l select-pane -R
+68	
+69	# Intuitive split bindings (| = left/right, - = top/bottom)
+70	bind | split-window -h -c "#{pane_current_path}"
+71	bind - split-window -v -c "#{pane_current_path}"
+72	
+73	# Resize panes with prefix + H/J/K/L (5 cells)
+74	bind -r H resize-pane -L 5
+75	bind -r J resize-pane -D 5
+76	bind -r K resize-pane -U 5
+77	bind -r L resize-pane -R 5
+78	
+79	# Fine resize with Meta + h/j/k/l (1 cell, repeatable)
+80	bind -r M-h resize-pane -L 1
+81	bind -r M-j resize-pane -D 1
+82	bind -r M-k resize-pane -U 1
+83	bind -r M-l resize-pane -R 1
+84	
+85	# Quick ratio: set current pane to 75% width
+86	bind + resize-pane -x 75%
+87	
+88	# New window/pane inherits current path
+89	bind c new-window -c "#{pane_current_path}"
+90	
+91	# Reload config with prefix + R
+92	bind R source-file "$HOME/.tmux.conf" \; display-message "Sourced ~/.tmux.conf"
+93	
+94	# Session management
+95	bind N command-prompt -p "New session:" "new-session -s '%%'"
+96	bind X confirm-before -p "Kill session #S? (y/n)" kill-session
+97	bind x confirm-before -p "Kill pane? (y/n)" kill-pane
+98	
+99	# =============================================================================
+100	# Theme Switching (Catppuccin <-> tmux2k)
+101	# =============================================================================
+102	# Note: first-time switch requires `prefix + I` to install the target plugin.
+103	
+104	bind C run-shell "tmux set -g @theme_variant catppuccin; \
+105	  tmux source-file ~/.tmux.conf; \
+106	  tmux display-message 'Theme: catppuccin'"
+107	
+108	bind T run-shell "tmux set -g @theme_variant tmux2k; \
+109	  tmux source-file ~/.tmux.conf; \
+110	  tmux display-message 'Theme: tmux2k'"
+111	
+112	# =============================================================================
+113	# Sesh (tmux session manager)
+114	# =============================================================================
+115	
+116	# prefix + g: sesh picker in a tmux popup with fzf
+117	bind-key "g" run-shell "sesh connect \"$(\
+118	  sesh list --icons | fzf-tmux -p 80%,70% \
+119	    --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+120	    --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+121	    --bind 'tab:down,btab:up' \
+122	    --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+123	    --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+124	    --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+125	    --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+126	    --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+127	    --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+128	    --preview-window 'right:55%' \
+129	    --preview 'sesh preview {}' \
+130	)\""
+131	
+132	bind -N "last-session (via sesh)" S run-shell "sesh last"
+133	bind -N "switch to root session (via sesh)" 9 run-shell "sesh connect --root $(pwd)"
+134	
+135	# =============================================================================
+136	# Popup Menu (prefix + Space)
+137	# =============================================================================
+138	
+139	unbind-key Space
+140	bind-key Space display-menu -T "#[align=centre,bold]tmux" -x R -y P \
+141	  "Last window" Tab "last-window" \
+142	  "Last pane" '\;' "last-pane" \
+143	  "" "" "" \
+144	  "Choose window" w "choose-tree -Zw" \
+145	  "Choose session" s "choose-tree -Zs" \
+146	  "Show pane numbers" q "display-panes -d 0" \
+147	  "" "" "" \
+148	  "New window" c "new-window -c '#{pane_current_path}'" \
+149	  "Split left/right |" "|" "split-window -h -c '#{pane_current_path}'" \
+150	  "Split top/bottom -" "-" "split-window -v -c '#{pane_current_path}'" \
+151	  "" "" "" \
+152	  "Pane left" h "select-pane -L" \
+153	  "Pane down" j "select-pane -D" \
+154	  "Pane up" k "select-pane -U" \
+155	  "Pane right" l "select-pane -R" \
+156	  "Zoom toggle" z "resize-pane -Z" \
+157	  "Swap pane left/up" "{" "swap-pane -U" \
+158	  "Swap pane right/down" "}" "swap-pane -D" \
+159	  "" "" "" \
+160	  "Even horizontal (M-1)" E "select-layout even-horizontal" \
+161	  "Even vertical (M-2)" e "select-layout even-vertical" \
+162	  "Main vertical (M-4)" v "select-layout main-vertical" \
+163	  "Main horizontal (M-3)" b "select-layout main-horizontal" \
+164	  "Tiled (M-5)" T "select-layout tiled" \
+165	  "Resize 75%" "+" "resize-pane -x 75%" \
+166	  "" "" "" \
+167	  "Rename session" "$" "command-prompt -I '#S' 'rename-session -- \"%%\"'" \
+168	  "Rename window" "," "command-prompt -I '#W' 'rename-window -- \"%%\"'" \
+169	  "New session" N "command-prompt -p 'New session:' 'new-session -s \"%%\"'" \
+170	  "Kill pane" x "confirm-before -p 'Kill pane? (y/n)' kill-pane" \
+171	  "Kill session" X "confirm-before -p 'Kill session #S? (y/n)' kill-session" \
+172	  "Kill all sessions" Q "confirm-before -p 'Kill ALL sessions (tmux server)? (y/n)' kill-server" \
+173	  "" "" "" \
+174	  "Theme: catppuccin" C "run-shell 'tmux set -g @theme_variant catppuccin; tmux source-file ~/.tmux.conf; tmux display-message \"Theme: catppuccin\"'" \
+175	  "Theme: tmux2k"     M "run-shell 'tmux set -g @theme_variant tmux2k; tmux source-file ~/.tmux.conf; tmux display-message \"Theme: tmux2k\"'" \
+176	  "" "" "" \
+177	  "Sesh picker" g "run-shell 'sesh connect \"$(sesh list --icons | fzf-tmux -p 80%,70% --no-sort --ansi --border-label \" sesh \" --prompt \"⚡  \" --header \"  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find\" --bind \"tab:down,btab:up\" --bind \"ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)\" --bind \"ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)\" --bind \"ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)\" --bind \"ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)\" --bind \"ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)\" --bind \"ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)\" --preview-window \"right:55%\" --preview \"sesh preview {}\")\"'" \
+178	  "Last sesh" S "run-shell 'sesh last'" \
+179	  "Repo root sesh" 9 "run-shell 'sesh connect --root $(pwd)'" \
+180	  "" "" "" \
+181	  "Reload config" R "source-file '$HOME/.tmux.conf' \\; display-message 'Sourced ~/.tmux.conf'" \
+182	  "Install plugins (TPM)" I "run-shell '~/.tmux/plugins/tpm/bindings/install_plugins'" \
+183	  "Update plugins (TPM)" U "run-shell '~/.tmux/plugins/tpm/bindings/update_plugins'" \
+184	  "Detach" d "detach-client" \
+185	  "Clock" t "clock-mode" \
+186	  "List keys" "?" "list-keys -N"
+187
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:05Z)**_
+
+Now update Catppuccin theme:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/theme.catppuccin.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/theme.catppuccin.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:19Z)**_
+
+Now tmux2k - add explicit centre reset:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:19Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/tmux/theme.tmux2k.conf`
+
+```text
+1	# ~/.config/tmux/theme.tmux2k.conf
+2	# tmux2k theme with bottom status bar.
+3	
+4	set -g @plugin '2kabhishek/tmux2k'
+5	
+6	# Auto-clone on first use
+7	if-shell '[ ! -d ~/.tmux/plugins/tmux2k ]' \
+8	  'run-shell "git clone --depth 1 https://github.com/2kabhishek/tmux2k.git ~/.tmux/plugins/tmux2k 2>/dev/null"'
+9	
+10	# Reset so toggling from another theme leaves no residue
+11	set -g status-left ""
+12	set -g status-right ""
+13	set -g window-status-format ""
+14	set -g window-status-current-format ""
+15	
+16	# Bottom status bar
+17	set -g status-position bottom
+18	
+19	# Theme options (must be set before the plugin runs)
+20	set -g @tmux2k-theme 'onedark'
+21	set -g @tmux2k-start-icon ""
+22	set -g @tmux2k-left-plugins "git cpu ram"
+23	# NOTE: the `bandwidth` segment has a known uint64 underflow bug that can
+24	# display 18446744073709551615K. See docs/tools/tmux/themes.md troubleshooting.
+25	set -g @tmux2k-right-plugins "bandwidth network time"
+26	
+27	# Load plugin explicitly so the status bar renders after a prefix + R reload
+28	# (TPM only auto-runs plugins when the server first starts).
+29	run '~/.tmux/plugins/tmux2k/2k.tmux'
+30
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/theme.tmux2k.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:26Z)**_
+
+Now the XDG doc. Let me quickly peek at existing docs folder for style:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:26Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/tmux/README.md`
+
+```text
+1	# tmux
+2	
+3	Managed tmux config lives under `~/.config/tmux/`, with a shim at `~/.tmux.conf` that sources the XDG entry point.
+4	
+5	## Source layout (in this repo)
+6	
+7	| Source | Deployed | Purpose |
+8	|--------|----------|---------|
+9	| [`dot_tmux.conf`](../../../dot_tmux.conf) | `~/.tmux.conf` | one-line shim |
+10	| [`dot_config/tmux/tmux.conf`](../../../dot_config/tmux/tmux.conf) | `~/.config/tmux/tmux.conf` | entry point, picks theme |
+11	| [`dot_config/tmux/common.conf`](../../../dot_config/tmux/common.conf) | — | plugins + theme-agnostic options |
+12	| [`dot_config/tmux/keybindings.conf`](../../../dot_config/tmux/keybindings.conf) | — | all bind-keys and popup menu |
+13	| [`dot_config/tmux/theme.catppuccin.conf`](../../../dot_config/tmux/theme.catppuccin.conf) | — | default theme (top status bar) |
+14	| [`dot_config/tmux/theme.tmux2k.conf`](../../../dot_config/tmux/theme.tmux2k.conf) | — | alternative theme (bottom status bar) |
+15	
+16	This setup is tuned for coding-agent and Neovim workflows:
+17	
+18	- native popup menu on `prefix + Space`
+19	- Catppuccin (default, top status bar) or tmux2k (bottom) — switchable at runtime
+20	- vim-style pane navigation and copy mode
+21	- URL opening via fzf (`prefix + u`) and tmux-open in copy mode
+22	- capture pane to clipboard helpers
+23	- sesh integration for session picking
+24	- `extended-keys` with `csi-u` so keys like `Ctrl+/` reach Neovim inside tmux
+25	- OSC 52 clipboard and OSC passthrough enabled
+26	
+27	## In this folder
+28	
+29	- [keybindings.md](./keybindings.md) — all keybindings and the popup menu
+30	- [themes.md](./themes.md) — Catppuccin / tmux2k selection, switching, troubleshooting
+31	- [vim.md](./vim.md) — tmux × Vim/Neovim notes and external resources
+32	
+33	## First-time setup
+34	
+35	After `chezmoi apply`, start tmux and run `prefix + I` once to let TPM install the plugins. The theme files also auto-clone their plugin on first source as a safety net, but TPM is the canonical installer.
+36	
+37	## Reload Config
+38	
+39	Most changes do not need a server restart.
+40	
+41	```bash
+42	tmux source-file ~/.tmux.conf
+43	```
+44	
+45	Or, inside tmux: `prefix + R` (shows a confirmation message after reloading).
+46	
+47	If a change still behaves wrong, try a new pane/window first. Only `tmux kill-server` when a terminal-capability or plugin-init issue clearly survives a reload — e.g. switching themes without leftover styling.
+48	
+49	## Exit vs Detach
+50	
+51	- `prefix + d` — detach the current client, leaving the session running
+52	- `exit` — close the current shell; when the last pane exits, the session ends
+53	- `prefix + :` then `kill-session` — kill the current session immediately
+54	- `tmux kill-server` — kill every session and stop the server
+55	
+56	`detach-on-destroy off` is set, so when you kill a session tmux switches to another one instead of detaching if other sessions exist.
+57	
+58	## Prefix Key
+59	
+60	Default: `Ctrl + b`. Examples in the sibling docs assume `prefix = Ctrl + b`.
+61	
+62	## Plugins
+63	
+64	| Plugin | Purpose |
+65	|--------|---------|
+66	| `tmux-resurrect` | Save/restore sessions across tmux restarts |
+67	| `tmux-continuum` | Automatic session saving |
+68	| `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
+69	| `tmux-fzf-url` | `prefix+u` opens fzf popup with all URLs in pane |
+70	| `tmux-open` | In copy-mode: `o` opens selection, `C-o` in editor, `S` search |
+71	| `catppuccin/tmux` | Status bar theme (mocha, top bar) — default |
+72	| `tmux2k` | Status bar theme (onedark, bottom bar) — alternative |
+73	
+74	Managed by TPM; `prefix + I` to install, `prefix + U` to update.
+75	
+76	## Verify current config
+77	
+78	```bash
+79	ls ~/.config/tmux/
+80	tmux display-message -p '#{@theme_variant}'
+81	tmux list-keys -T prefix
+82	tmux show-options -s | rg 'extended-keys|extended-keys-format|default-terminal'
+83	tmux show-options -g | rg 'status|focus-events'
+84	```
+85	
+86	## Related Docs
+87	
+88	- [Sesh](../sesh.md)
+89	- [Starship](../starship.md)
+90
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/README.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:34Z)**_
+
+Now update keybindings doc with right-click note, and themes doc with module catalog:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/keybindings.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/themes.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:53:56Z)**_
+
+Now the new XDG doc:
+
+_**Agent (claude-opus-4-6 2026-04-15 06:54:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# XDG Base Directory Specification
+
+Most configs in this repo live under `~/.config/`, `~/.local/share/`, `~/.local/state/`, or `~/.cache/` rather than dot-files in `$HOME`. That layout follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/).
+
+## Core environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `XDG_CONFIG_HOME` | `~/.config` | Per-user config files |
+| `XDG_DATA_HOME` | `~/.local/share` | Per-user application data |
+| `XDG_STATE_HOME` | `~/.local/state` | Per-user state (logs, history, undo) |
+| `XDG_CACHE_HOME` | `~/.cache` | Per-user non-essential cached data |
+| `XDG_RUNTIME_DIR` | (set by login) | Per-session runtime files (sockets, etc.) |
+
+## Why it matters
+
+- **Clean `$HOME`**: the old "every app dumps a `~/.foo` dotfile" pattern gets noisy fast.
+- **Predictable tooling**: backup, sync, dotfile managers (like chezmoi) all benefit from one well-known tree.
+- **Easy to nuke**: wipe `~/.cache/foo` without touching configs; wipe `~/.local/state/foo` without losing settings.
+
+## Tool-by-tool status (in this repo)
+
+| Tool | XDG-native? | Where we put it |
+|------|-------------|------------------|
+| tmux | Yes (3.1+) | `~/.config/tmux/tmux.conf` (+ shim at `~/.tmux.conf`) |
+| Neovim | Yes | `~/.config/nvim/` |
+| Zellij | Yes | `~/.config/zellij/` |
+| Starship | Yes | `~/.config/starship.toml` |
+| Alacritty | Yes | `~/.config/alacritty/` |
+| Ghostty | Yes | `~/.config/ghostty/` |
+| Yazi | Yes | `~/.config/yazi/` |
+| bat | Yes | `~/.config/bat/` |
+| direnv | Yes | `~/.config/direnv/` |
+| gh | Yes | `~/.config/gh/` |
+| gh-dash | Yes | `~/.config/gh-dash/` |
+| LazyGit | Yes | `~/.config/lazygit/` |
+| Sesh | Yes | `~/.config/sesh/` |
+| uv | Yes | `~/.config/uv/` |
+| Bun | Yes | `~/.config/.bunfig.toml` |
+| Homebrew Bundle | N/A | `~/.config/homebrew/` (our convention) |
+| Claude Code | No | `~/.claude/` |
+| SSH | No | `~/.ssh/` (spec doesn't cover it) |
+| Git | Partial | `~/.gitconfig` (repo also uses `~/.config/git/hooks/`) |
+| npm | Yes | `~/.npmrc` (via `$HOME`; XDG support exists but most tooling still writes `~/.npmrc`) |
+| Cargo | Partial | `~/.cargo/config.toml` (respects `CARGO_HOME`, not XDG directly) |
+
+Tools marked "No" or "Partial" keep legacy `$HOME` paths because upstream hasn't migrated or because the tool predates the spec; we follow whatever the tool actually reads.
+
+## How this repo handles it
+
+- chezmoi source paths like `dot_config/<tool>/...` map to `~/.config/<tool>/...` on apply. That is the primary way we opt into XDG.
+- Legacy paths (e.g. `~/.tmux.conf`, `~/.gitconfig`) are kept as shims or top-level files when a tool expects them, often sourcing the real XDG-located config.
+- For state/data/cache: we rarely commit those — they're generated at runtime and deliberately excluded from the repo.
+
+## Further reading
+
+- [freedesktop.org spec](https://specifications.freedesktop.org/basedir/latest/)
+- [Arch Wiki — XDG Base Directory](https://wiki.archlinux.org/title/XDG_Base_Directory) — an up-to-date catalog of which tools honor the spec natively and which need workarounds.
+
+```
+
+```text
+File created successfully at: /home/daviddwlee84/.local/share/chezmoi/docs/tools/xdg.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-6 2026-04-15 06:54:23Z)**_
+
+All changes done. Summary:
+
+- **Right-click menu fix**: Added `MouseDown3Pane/Status/StatusLeft` rebindings with `display-menu -O` at top of `dot_config/tmux/keybindings.conf` so the menu stays open after mouse release.
+- **Catppuccin polish**: `status-justify left`, added `directory`/`user`/`host` modules, dropped `uptime`, added `@catppuccin_directory_text` (basename) and `@catppuccin_date_time_text`. tmux2k explicitly sets `status-justify centre` to avoid leak.
+- **Docs**: new `docs/tools/xdg.md`, Catppuccin module catalog added to `themes.md`, right-click menu section added to `keybindings.md`, XDG link from tmux README.
+
+Verify with `chezmoi apply` then `tmux kill-server && tmux`.
+
+---
+
+_**User (2026-04-15 07:02:44Z)**_
+
+git commit. and then try to setup https://github.com/christoomey/vim-tmux-navigator with our LazyVim
+
+---
+
+_**Agent (claude-opus-4-6 2026-04-15 07:02:47Z)**_
+
+_**Agent (claude-opus-4-6 2026-04-15 07:02:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check repo state
+
+`git status && echo "---" && git diff --stat`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 4 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .claude/plans/rippling-leaping-rocket.md
+	modified:   .specstory/history/2026-04-15_03-04-16Z-at-docs-tools-tmux.md
+	modified:   docs/tools/tmux/README.md
+	modified:   docs/tools/tmux/keybindings.md
+	modified:   docs/tools/tmux/themes.md
+	modified:   dot_config/tmux/keybindings.conf
+	modified:   dot_config/tmux/theme.catppuccin.conf
+	modified:   dot_config/tmux/theme.tmux2k.conf
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	docs/tools/xdg.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---
+ .claude/plans/rippling-leaping-rocket.md           |  181 ++-
+ .../2026-04-15_03-04-16Z-at-docs-tools-tmux.md     | 1293 ++++++++++++++++++++
+ docs/tools/tmux/README.md                          |    1 +
+ docs/tools/tmux/keybindings.md                     |   12 +
+ docs/tools/tmux/themes.md                          |   42 +
+ dot_config/tmux/keybindings.conf                   |   44 +
+ dot_config/tmux/theme.catppuccin.conf              |   13 +-
+ dot_config/tmux/theme.tmux2k.conf                  |    4 +-
+ 8 files changed, 1585 insertions(+), 5 deletions(-)
+[rerun: b4]
+```
+</details></tool-use>
