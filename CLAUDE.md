@@ -32,6 +32,28 @@ This keeps `docs/zsh/aliases.md` as the single quick-reference for all custom sh
 
 This ensures Docker testing works with all configuration options.
 
+## Maintaining Keyboard Shortcuts
+
+**IMPORTANT**: When adding or modifying keybindings in any tool config, cross-check against other tools to avoid conflicts. Multiple tools share the terminal's key namespace — especially `Ctrl+` and `Alt+` modifiers.
+
+**Conflict surfaces to check:**
+
+| Tool | Config file | Key conflict risk |
+|------|-------------|-------------------|
+| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` override global |
+| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+
+**Known conflict zones:**
+
+- `Ctrl+H/J/K/L` — tmux vim-tmux-navigator pane navigation; removed/remapped in TV global config
+- `Ctrl+S/F/R` — TV built-in cycling/reload; avoid in channel actions
+- `Alt+*` — safe namespace for channel-specific actions (used by pueue channel); requires terminal to send Option as Meta
+
+**Resolution precedence:** tmux root-table bindings intercept keys before they reach the inner application. When running TV inside tmux, any `bind-key -n C-*` in tmux will shadow the same `ctrl-*` in TV. Prefer `Alt+` for custom actions to avoid this entirely.
+
 ## Quick Start
 
 ```bash

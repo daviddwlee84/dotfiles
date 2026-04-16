@@ -150,11 +150,28 @@ Provided by `tv update-channels`. Source cycling through session types and direc
 
 ---
 
+## Keybinding Conflicts with tmux
+
+TV's default `ctrl-h/j/k/l` bindings conflict with tmux's `vim-tmux-navigator` root-table pane navigation (`C-h/j/k/l`). The managed config (`dot_config/television/config.toml`) resolves this:
+
+| Default | Action | Remapped to | Notes |
+|---------|--------|-------------|-------|
+| `ctrl-j` | select_next_entry | _(removed)_ | Use `down` or `ctrl-n` |
+| `ctrl-k` | select_prev_entry | _(removed)_ | Use `up` or `ctrl-p` |
+| `ctrl-h` | toggle_help | `f1` | Standard help key |
+| `ctrl-l` | toggle_layout | `alt-l` | Overridden in pueue channel (clean) |
+
+All other TV defaults (`ctrl-s`, `ctrl-f`, `ctrl-r`, `ctrl-y`, etc.) are kept since they don't conflict with tmux root-table bindings.
+
+---
+
 ## Tips
 
 - `Tab` / `Shift+Tab` — navigate results
 - `Ctrl+P` / `Ctrl+N` — move up/down (vim users)
+- `F1` — toggle help panel (remapped from `ctrl-h` to avoid tmux conflict)
 - Channels are defined as `.toml` files in `~/.config/television/cable/`
+- Global config at `~/.config/television/config.toml` (chezmoi-managed from `dot_config/television/config.toml`)
 - Run `tv update-channels` to get/update community channels
 - Custom channels in this repo live at `dot_config/television/cable/` (deployed via chezmoi, won't be overwritten by `update-channels`)
 - See [tv vs fzf](tv-vs-fzf.md) for comparison and channel best practices
