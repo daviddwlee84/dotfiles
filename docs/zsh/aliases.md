@@ -425,6 +425,8 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `tools-picker` | function | `dot_config/zsh/tools/11_tools_picker.zsh` | fzf picker for installed CLI tools; Enter pastes invocation to buffer, Ctrl+E executes (bound to `Alt+T`) |
+| `tv tools` | tv channel | `dot_config/television/cable/tools.toml` | Television picker for CLI tools; Enter executes, Ctrl+T shows tldrf page |
+| `tv aliases` | tv channel | `dot_config/television/cable/aliases.toml` | Television picker for all runtime aliases & functions; Enter executes, Ctrl+Y copies name |
 
 ---
 
