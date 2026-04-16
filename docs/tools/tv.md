@@ -2,7 +2,7 @@
 
 [television](https://github.com/alexpasmantier/television) — blazing-fast TUI fuzzy finder with pluggable "channels".
 
-Config source: `dot_config/television/cable/sesh.toml`
+Custom channels: `dot_config/television/cable/` (chezmoi-managed)
 
 ---
 
@@ -11,10 +11,29 @@ Config source: `dot_config/television/cable/sesh.toml`
 ```bash
 tv                   # Open interactive picker (default channel)
 tv <channel>         # Open a specific channel, e.g. tv sesh
+tv list-channels     # List all available channels
 tv --help            # List all flags
 ```
 
 From tmux: `prefix + T` opens the sesh channel as a popup (see [Tmux Integration](#tmux-integration)).
+
+---
+
+## Community Channels
+
+tv has a built-in channel package manager. Run once after install (and periodically to update):
+
+```bash
+tv update-channels
+```
+
+This downloads [community-maintained channels](https://alexpasmantier.github.io/television/community/channels-unix) into `~/.config/television/cable/`. It:
+
+- **Skips** channels whose requirements aren't met on your system (e.g. `apt-packages` on macOS)
+- **Skips** channels that already exist (won't overwrite custom channels)
+- Covers git, docker, k8s, brew, cargo, GitHub, sesh, tmux, and many more
+
+Notable community channels: `sesh`, `git-branch`, `git-log`, `git-stash`, `git-diff`, `brew-packages`, `docker-containers`, `gh-issues`, `gh-prs`, `just-recipes`, `zoxide`, `zsh-history`, `env`, `dirs`, `files`, `text`.
 
 ---
 
@@ -35,19 +54,19 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 
 ---
 
-### `sesh` channel
+### `sesh` channel (community)
 
-Overrides the built-in sesh channel with richer source cycling and session management.
+Provided by `tv update-channels`. Source cycling through session types and directory search, with connect/kill actions.
 
-**Source cycling keybindings** (shown in picker header):
+**Source cycling** (use `Ctrl+S` to cycle):
 
-| Key | Source | Description |
-|-----|--------|-------------|
-| `Ctrl+A` | All sessions | `sesh list --icons` |
-| `Ctrl+T` | Tmux sessions | `sesh list -t --icons` |
-| `Ctrl+G` | Configured sessions | `sesh list -c --icons` |
-| `Ctrl+X` | Zoxide directories | `sesh list -z --icons` |
-| `Ctrl+F` | File search | `fd -H -d 2 -t d -E .Trash ~` |
+| Source | Description |
+|--------|-------------|
+| All sessions | `sesh list --icons` (default) |
+| Tmux sessions | `sesh list -t --icons` |
+| Configured sessions | `sesh list -c --icons` |
+| Zoxide directories | `sesh list -z --icons` |
+| File search | `fd -H -d 2 -t d -E .Trash ~` |
 
 **Action keybindings:**
 
@@ -56,7 +75,7 @@ Overrides the built-in sesh channel with richer source cycling and session manag
 | `Enter` | Connect to selected session |
 | `Ctrl+D` | Kill selected tmux session + refresh list |
 
-**Preview:** `sesh preview '{selection}'` — right panel, 55% width.
+**Preview:** `sesh preview` — right panel.
 
 ---
 
@@ -76,4 +95,6 @@ Overrides the built-in sesh channel with richer source cycling and session manag
 - `Tab` / `Shift+Tab` — navigate results
 - `Ctrl+P` / `Ctrl+N` — move up/down (vim users)
 - Channels are defined as `.toml` files in `~/.config/television/cable/`
-- Custom channels in this repo live at `dot_config/television/cable/` (deployed via chezmoi)
+- Run `tv update-channels` to get/update community channels
+- Custom channels in this repo live at `dot_config/television/cable/` (deployed via chezmoi, won't be overwritten by `update-channels`)
+- See [tv vs fzf](tv-vs-fzf.md) for comparison and channel best practices

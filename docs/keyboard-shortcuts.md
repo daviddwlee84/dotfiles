@@ -2,7 +2,7 @@
 
 Quick reference for all custom keybindings across tmux, zsh ZLE widgets, and fzf.
 
-For deep dives: [tmux keybindings](tools/tmux/keybindings.md) · [tmux themes](tools/tmux/themes.md) · [fzf](tools/fzf.md) · [tv](tools/tv.md)
+For deep dives: [tmux keybindings](tools/tmux/keybindings.md) · [tmux themes](tools/tmux/themes.md) · [fzf](tools/fzf.md) · [tv](tools/tv.md) · [tv vs fzf](tools/tv-vs-fzf.md)
 
 ---
 
