@@ -8,6 +8,7 @@
     - name: Set target_architecture from gathered facts
       ansible.builtin.set_fact:
         target_architecture: "{{ ansible_facts['architecture'] }}"
+      tags: [always]
 
   roles:
     - role: homebrew

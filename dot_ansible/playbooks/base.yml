@@ -11,6 +11,7 @@
       changed_when: false
       failed_when: false
       when: ansible_facts["os_family"] == "Debian"
+      tags: [always]
 
     - name: Set target_architecture from dpkg
       ansible.builtin.set_fact:
@@ -22,11 +23,13 @@
         - ansible_facts["os_family"] == "Debian"
         - dpkg_arch_result.rc == 0
         - dpkg_arch_result.stdout | trim != ''
+      tags: [always]
 
     - name: Fallback target_architecture to gathered facts
       ansible.builtin.set_fact:
         target_architecture: "{{ ansible_facts['architecture'] }}"
       when: target_architecture is not defined
+      tags: [always]
 
   roles:
     - role: base
