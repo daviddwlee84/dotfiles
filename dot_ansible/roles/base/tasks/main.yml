@@ -216,3 +216,12 @@
         curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to {{ ansible_facts['env']['HOME'] }}/.local/bin
       args:
         creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/just"
+
+# --- locale ---
+- name: Generate en_US.UTF-8 locale (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present

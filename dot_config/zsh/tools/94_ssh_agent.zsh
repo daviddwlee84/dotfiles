@@ -133,7 +133,7 @@ _maybe_add_keys() {
     local -a key_names=(id_ed25519 id_rsa id_ecdsa jingle)
     for k in "${key_names[@]}"; do
         local kf="$HOME/.ssh/$k"
-        [[ -f "$kf" ]] && ssh-add -q "$kf" 2>/dev/null
+        [[ -f "$kf" ]] && ssh-add -q "$kf" </dev/null 2>/dev/null
     done
 }
 

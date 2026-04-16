@@ -35,6 +35,11 @@
 set -e
 export PATH="$HOME/.local/bin:$PATH"
 
+# Override locale to a safe default so ansible can start even before locale
+# packages are installed (e.g. en_US.UTF-8 not yet generated on a fresh machine).
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
 # Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 if [[ -f /opt/homebrew/bin/brew ]]; then
