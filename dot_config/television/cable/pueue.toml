@@ -13,9 +13,9 @@
 # Keybindings (Alt+key avoids conflicts with TV built-ins and tmux):
 #   Enter      Follow running task / view finished task log / show group status
 #   Alt+E      Edit task command (stashed/queued only, opens $EDITOR)
-#   Ctrl+Y     Copy raw command to clipboard (overrides TV default)
+#   Ctrl+Y     Copy raw command to clipboard (overrides TV default; OSC 52 over SSH)
 #   Alt+Y      Copy raw command to clipboard (same as Ctrl+Y)
-#   Alt+A      Copy full `pueue add ...` command to clipboard
+#   Alt+A      Copy full `pueue add ...` command to clipboard (OSC 52 over SSH)
 #   Alt+G      Filter by group (opens new tv with only that group's tasks)
 #   Alt+P      Pause task
 #   Alt+R      Resume (start) task
@@ -85,12 +85,12 @@ mode = "execute"
 
 [actions.copy_command]
 description = "Copy raw command to clipboard"
-command = """pueue status --json 2>/dev/null | jq -j --arg id '{split:\\t:0}' '.tasks[$id].original_command // empty' | { command -v pbcopy >/dev/null && pbcopy || command -v wl-copy >/dev/null && wl-copy || command -v xclip >/dev/null && xclip -selection clipboard; }"""
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; pueue status --json 2>/dev/null | jq -j --arg id '{split:\\t:0}' '.tasks[$id].original_command // empty' | _clip"""
 mode = "fork"
 
 [actions.copy_pueue_add]
 description = "Copy full pueue add command to clipboard"
-command = """pueue status --json 2>/dev/null | jq -j --arg id '{split:\\t:0}' '(.tasks[$id] // empty) | "pueue add" + (if .group != "default" then " -g " + (.group | @sh) else "" end) + (if .label then " -l " + (.label | @sh) else "" end) + (if .priority > 0 then " -o " + (.priority | tostring) else "" end) + (if (.dependencies | length) > 0 then " -a " + (.dependencies | map(tostring) | join(" ")) else "" end) + " -w " + (.path | @sh) + " " + (.original_command | @sh)' | { command -v pbcopy >/dev/null && pbcopy || command -v wl-copy >/dev/null && wl-copy || command -v xclip >/dev/null && xclip -selection clipboard; }"""
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; pueue status --json 2>/dev/null | jq -j --arg id '{split:\\t:0}' '(.tasks[$id] // empty) | "pueue add" + (if .group != "default" then " -g " + (.group | @sh) else "" end) + (if .label then " -l " + (.label | @sh) else "" end) + (if .priority > 0 then " -o " + (.priority | tostring) else "" end) + (if (.dependencies | length) > 0 then " -a " + (.dependencies | map(tostring) | join(" ")) else "" end) + " -w " + (.path | @sh) + " " + (.original_command | @sh)' | _clip"""
 mode = "fork"
 
 [actions.filter_group]

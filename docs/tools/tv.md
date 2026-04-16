@@ -109,7 +109,8 @@ Open with `tv pueue`. Auto-refreshes every 2 seconds.
 
 - All action keybindings use `Alt+` to avoid shadowing TV built-ins (`Ctrl+P`/`Ctrl+K` for navigation, `Ctrl+A`/`Ctrl+E` for input cursor, `Ctrl+R` for reload, etc.) and tmux root-table bindings (`C-h/j/k/l` for vim-tmux-navigator). Requires terminal to send Option as Meta (Ghostty: `macos-option-as-alt = left`).
 - Uses jq's `@tsv` for output formatting — avoids TOML/shell escape conflicts with jq's `\(...)` interpolation syntax
-- Clipboard actions are cross-platform: pbcopy (macOS), wl-copy (Wayland), xclip (X11)
+- Clipboard actions are cross-platform: pbcopy (macOS), wl-copy (Wayland), xclip (X11), with OSC 52 fallback for remote SSH sessions (works through tmux with `set-clipboard on`)
+- `Ctrl+Y` is overridden in the pueue channel to copy just the raw command (TV's default `ctrl-y` copies the full display line including ID, status, and group)
 - `pueue edit` only works on stashed/queued tasks (pueue limitation); for running/finished tasks use `Alt+Y` to copy and re-add manually
 
 ---
