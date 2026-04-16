@@ -12,6 +12,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [File Listing](#file-listing)
 - [Navigation](#navigation)
 - [Git](#git)
+- [Tools Picker](#tools-picker)
 - [Session Management](#session-management)
 - [GitHub / GitLab](#github--gitlab)
 - [AI Usage Tracking](#ai-usage-tracking)
@@ -63,6 +64,16 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `gcam-amend` | function | `dot_config/zsh/10_aliases.zsh` | `git commit --amend -m "<msg>"` (replace message) |
 | `gundo` | function | `dot_config/zsh/10_aliases.zsh` | Undo last commit → back to staged; prints undone commit message |
 | `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | Open lazygit TUI |
+
+---
+
+## Tools Picker
+
+> Requires `fzf`. Data file (`~/.config/docs/tools/cli-tools.md`) must be deployed via `chezmoi apply`.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `tools-picker` | function | `dot_config/zsh/tools/11_tools_picker.zsh` | fzf picker for installed CLI tools; Enter pastes invocation to buffer, Ctrl+E executes (bound to `Alt+T`) |
 
 ---
 

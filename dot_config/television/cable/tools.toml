@@ -1,0 +1,45 @@
+# Custom tools cable channel for television (tv)
+# Parses ~/.config/docs/tools/cli-tools.md at runtime — single source of truth.
+#
+# Usage:
+#   tv tools                               (from shell)
+#   prefix + U in tmux                     (popup)
+#   Alt+T in zsh                           (opens fzf ZLE variant instead)
+#
+# Keybindings:
+#   Enter      Execute selected tool immediately
+#   Ctrl+/     Toggle preview panel
+#
+# Preview shows tldr page or --help output.
+
+[metadata]
+name = "tools"
+description = "CLI tools quick-launch: select a tool to execute it"
+requirements = ["awk"]
+
+[source]
+command = """
+awk -F'|' '/^[[:space:]]*\\|[[:space:]]*`/ {
+  inv=$3; sub(/^[[:space:]]*`/,"",inv); sub(/`[[:space:]]*$/,"",inv)
+  desc=$4; sub(/^[[:space:]]*/,"",desc); sub(/[[:space:]]*$/,"",desc)
+  printf "%-22s  %s\\n", inv, desc
+}' ~/.config/docs/tools/cli-tools.md
+"""
+
+[preview]
+command = """
+tool=$(printf '%s' '{split: :0}' | sed 's/ *$//')
+if command -v tldr >/dev/null 2>&1; then
+  tldr "$tool" 2>/dev/null || "$tool" --help 2>&1 | head -50
+else
+  "$tool" --help 2>&1 | head -50
+fi
+"""
+
+[keybindings]
+enter = "actions:exec"
+
+[actions.exec]
+description = "Execute selected tool"
+command = "{split: :0}"
+mode = "execute"
