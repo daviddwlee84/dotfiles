@@ -158,7 +158,7 @@ TV's default `ctrl-h/j/k/l` bindings conflict with tmux's `vim-tmux-navigator` r
 |---------|--------|-------------|-------|
 | `ctrl-j` | select_next_entry | _(removed)_ | Use `down` or `ctrl-n` |
 | `ctrl-k` | select_prev_entry | _(removed)_ | Use `up` or `ctrl-p` |
-| `ctrl-h` | toggle_help | `ctrl-/` | Common TUI help toggle |
+| `ctrl-h` | toggle_help | `alt-h` | Mnemonic, no conflicts |
 | `ctrl-l` | toggle_layout | `alt-l` | Overridden in pueue channel (clean) |
 
 All other TV defaults (`ctrl-s`, `ctrl-f`, `ctrl-r`, `ctrl-y`, etc.) are kept since they don't conflict with tmux root-table bindings.
@@ -169,7 +169,7 @@ All other TV defaults (`ctrl-s`, `ctrl-f`, `ctrl-r`, `ctrl-y`, etc.) are kept si
 
 - `Tab` / `Shift+Tab` — navigate results
 - `Ctrl+P` / `Ctrl+N` — move up/down (vim users)
-- `Ctrl+/` — toggle help panel (remapped from `ctrl-h` to avoid tmux conflict)
+- `Alt+H` — toggle help panel (remapped from `ctrl-h` to avoid tmux conflict)
 - Channels are defined as `.toml` files in `~/.config/television/cable/`
 - Global config at `~/.config/television/config.toml` (chezmoi-managed from `dot_config/television/config.toml`)
 - Run `tv update-channels` to get/update community channels

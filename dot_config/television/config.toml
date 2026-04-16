@@ -3,7 +3,7 @@
 #
 # Based on tv's auto-generated defaults. Key customization:
 # - Removed ctrl-j/k (conflict with tmux vim-tmux-navigator C-h/j/k/l)
-# - Remapped ctrl-h (toggle_help) → ctrl-/
+# - Remapped ctrl-h (toggle_help) → alt-h
 # - Remapped ctrl-l (toggle_layout) → alt-l
 # Navigation alternatives: down/up arrows, ctrl-n/ctrl-p
 
@@ -80,11 +80,11 @@ ctrl-r = "reload_source"
 ctrl-s = "cycle_sources"
 
 # UI Features
-# NOTE: ctrl-h remapped to ctrl-/ (tmux conflict), ctrl-l remapped to alt-l
+# NOTE: ctrl-h remapped to alt-h (tmux conflict), ctrl-l remapped to alt-l
 ctrl-t = "toggle_remote_control"
 ctrl-x = "toggle_action_picker"
 ctrl-o = "toggle_preview"
-ctrl-/ = "toggle_help"
+alt-h = "toggle_help"
 f12 = "toggle_status_bar"
 alt-l = "toggle_layout"
 
