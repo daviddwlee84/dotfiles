@@ -28,6 +28,14 @@ error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Fix broken locale (e.g. RPi with LC_ALL=en_US.UTF-8 but locale not generated)
+# Ansible uses Python locale.setlocale() which will fail if the locale is missing.
+if ! locale 2>/dev/null | head -1 >/dev/null 2>&1 || locale 2>&1 | grep -qi "cannot set"; then
+    warn "Broken locale detected, falling back to LC_ALL=C"
+    export LC_ALL=C
+    export LANG=C
+fi
+
 # Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
 
