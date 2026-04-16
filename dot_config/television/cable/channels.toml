@@ -1,0 +1,28 @@
+# Cable channel: browse all tv channels with descriptions
+#
+# Usage:
+#   tv channels
+#
+# Keybindings:
+#   Enter      Open selected channel in tv
+#   Ctrl+/     Toggle preview panel
+#
+# Preview shows the full TOML configuration for the selected channel.
+
+[metadata]
+name = "channels"
+description = "Browse all available tv channels with descriptions"
+
+[source]
+command = """awk 'FILENAME!=prev{section=""; prev=FILENAME} /^\\[/{section=$0} section=="[metadata]" && /^name =/{name=$0; gsub(/.*= *"|"$/,"",name)} section=="[metadata]" && /^description =/{desc=$0; gsub(/.*= *"|"$/,"",desc); printf "%-30s │ %s\\n", name, desc}' ~/.config/television/cable/*.toml"""
+
+[preview]
+command = "cat ~/.config/television/cable/'{split: :0}'.toml"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open selected channel in tv"
+command = "tv '{split: :0}'"
+mode = "execute"
