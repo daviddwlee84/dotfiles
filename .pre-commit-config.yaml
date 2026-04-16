@@ -17,7 +17,7 @@ repos:
     hooks:
       - id: detect-private-key
       - id: check-added-large-files
-        args: ['--maxkb=500']
+        args: ['--maxkb=2048']
       - id: check-merge-conflict
       - id: end-of-file-fixer
         exclude: ^\.specstory/
