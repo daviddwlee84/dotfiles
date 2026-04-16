@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
+# Tools: bat, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -18,6 +18,7 @@
     name:
       - bat
       - gh
+      - glab
       - diffnav
       - git-delta
       - git-graph
@@ -188,6 +189,150 @@
       loop:
         - /tmp/gh.tar.gz
         - /tmp/gh-extract
+
+# --- glab ---
+- name: Check if glab is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: glab --version
+  register: glab_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set glab release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glab_check.rc != 0
+  ansible.builtin.set_fact:
+    glab_release_arch: >-
+      {{
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Skip glab on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glab_check.rc != 0
+    - glab_release_arch == ''
+  ansible.builtin.debug:
+    msg: "glab skipped: no release for {{ target_architecture }}"
+
+- name: Install glab from GitLab releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glab_check.rc != 0
+    - glab_release_arch != ''
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest glab release
+      ansible.builtin.uri:
+        url: https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest
+        return_content: true
+      register: glab_release
+
+    - name: Download glab .deb package
+      ansible.builtin.get_url:
+        url: "https://gitlab.com/gitlab-org/cli/-/releases/{{ glab_release.json.tag_name }}/downloads/glab_{{ glab_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ glab_release_arch }}.deb"
+        dest: /tmp/glab.deb
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Install glab .deb package
+      ansible.builtin.apt:
+        deb: /tmp/glab.deb
+
+    - name: Clean up glab .deb
+      ansible.builtin.file:
+        path: /tmp/glab.deb
+        state: absent
+
+  rescue:
+    - name: Warn glab installation failed
+      ansible.builtin.debug:
+        msg: "glab installation failed (likely network timeout) - skipping"
+
+    - name: Clean up glab temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/glab.deb
+
+# --- glab (user-level fallback) ---
+- name: Re-check if glab is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v glab
+  register: glab_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install glab from GitLab releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - glab_recheck.rc != 0
+    - glab_release_arch | default('') != ''
+  block:
+    - name: Ensure ~/.local/bin exists (glab)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest glab release (user)
+      ansible.builtin.uri:
+        url: https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases/permalink/latest
+        return_content: true
+      register: glab_release_user
+
+    - name: Download glab tarball (user)
+      ansible.builtin.get_url:
+        url: "https://gitlab.com/gitlab-org/cli/-/releases/{{ glab_release_user.json.tag_name }}/downloads/glab_{{ glab_release_user.json.tag_name | regex_replace('^v', '') }}_linux_{{ glab_release_arch }}.tar.gz"
+        dest: /tmp/glab.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract and install glab (user)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/glab-extract
+        mkdir -p /tmp/glab-extract
+        tar -xzf /tmp/glab.tar.gz -C /tmp/glab-extract
+        glab_bin="$(find /tmp/glab-extract -type f -path '*/bin/glab' | head -n 1)"
+        install -m 0755 "$glab_bin" "{{ ansible_facts['env']['HOME'] }}/.local/bin/glab"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up glab temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/glab.tar.gz
+        - /tmp/glab-extract
+
+  rescue:
+    - name: Warn glab (user) installation failed
+      ansible.builtin.debug:
+        msg: "glab (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up glab (user) temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/glab.tar.gz
+        - /tmp/glab-extract
 
 # --- bat ---
 - name: Install bat (Debian/Ubuntu)
