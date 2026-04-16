@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
+# Tools: bat, gh, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -28,6 +28,7 @@
       - zoxide
       - direnv
       - yazi
+      - superfile
       - tmux
       - sesh
       - zellij
@@ -1172,6 +1173,138 @@
       ansible.builtin.shell: |
         rm -f /tmp/yazi.zip
         rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+# --- superfile ---
+- name: Check if superfile (spf) is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: spf --version
+  register: spf_check
+  changed_when: false
+  failed_when: false
+
+- name: Map target_architecture to superfile arch name
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - spf_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.set_fact:
+    spf_arch: "{{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[target_architecture] }}"
+
+- name: Install superfile from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - spf_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest superfile release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/yorukot/superfile/releases/latest
+        return_content: true
+      register: spf_release
+
+    - name: Set superfile version fact
+      ansible.builtin.set_fact:
+        spf_version: "{{ spf_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download superfile tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/yorukot/superfile/releases/download/v{{ spf_version }}/superfile-linux-v{{ spf_version }}-{{ spf_arch }}.tar.gz"
+        dest: /tmp/superfile.tar.gz
+        mode: '0644'
+        force: true
+        timeout: 60
+      retries: 3
+      delay: 5
+
+    - name: Extract and install superfile
+      ansible.builtin.shell: |
+        cd /tmp
+        rm -rf /tmp/dist
+        tar xzf superfile.tar.gz
+        cp /tmp/dist/superfile-linux-v{{ spf_version }}-{{ spf_arch }}/spf /usr/local/bin/spf
+        chmod 755 /usr/local/bin/spf
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up superfile files
+      ansible.builtin.shell: |
+        rm -f /tmp/superfile.tar.gz
+        rm -rf /tmp/dist
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+# --- superfile (user-level fallback) ---
+- name: Re-check if superfile (spf) is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v spf
+  register: spf_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Map target_architecture to superfile arch name (user)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - spf_recheck.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.set_fact:
+    spf_arch: "{{ {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[target_architecture] }}"
+
+- name: Install superfile from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - spf_recheck.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (superfile)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest superfile release (user)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/yorukot/superfile/releases/latest
+        return_content: true
+      register: spf_release_user
+
+    - name: Set superfile version fact (user)
+      ansible.builtin.set_fact:
+        spf_version_user: "{{ spf_release_user.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download superfile tarball (user)
+      ansible.builtin.get_url:
+        url: "https://github.com/yorukot/superfile/releases/download/v{{ spf_version_user }}/superfile-linux-v{{ spf_version_user }}-{{ spf_arch }}.tar.gz"
+        dest: /tmp/superfile.tar.gz
+        mode: '0644'
+        force: true
+        timeout: 60
+      retries: 3
+      delay: 5
+
+    - name: Extract and install superfile (user)
+      ansible.builtin.shell: |
+        cd /tmp
+        rm -rf /tmp/dist
+        tar xzf superfile.tar.gz
+        cp /tmp/dist/superfile-linux-v{{ spf_version_user }}-{{ spf_arch }}/spf {{ ansible_facts['env']['HOME'] }}/.local/bin/spf
+        chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/spf
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up superfile files (user)
+      ansible.builtin.shell: |
+        rm -f /tmp/superfile.tar.gz
+        rm -rf /tmp/dist
       args:
         executable: /bin/bash
       changed_when: false
