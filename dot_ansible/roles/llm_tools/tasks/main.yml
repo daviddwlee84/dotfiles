@@ -34,6 +34,16 @@
     curl -fsSL https://llmfit.axjns.dev/install.sh | sh -s -- --local
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/llmfit"
+  failed_when: false
+  register: llmfit_install_result
+
+- name: Warn llmfit installation failed
+  when:
+    - llmfit_install_result is defined
+    - llmfit_install_result.rc is defined
+    - llmfit_install_result.rc != 0
+  ansible.builtin.debug:
+    msg: "llmfit installation failed (likely network timeout) - skipping"
 
 - name: Check if Homebrew is available
   when: ansible_facts["os_family"] == "Debian"
@@ -110,3 +120,13 @@
     curl -fsSL https://ollama.com/install.sh | sh
   args:
     creates: /usr/local/bin/ollama
+  failed_when: false
+  register: ollama_install_result
+
+- name: Warn ollama installation failed
+  when:
+    - ollama_install_result is defined
+    - ollama_install_result.rc is defined
+    - ollama_install_result.rc != 0
+  ansible.builtin.debug:
+    msg: "ollama installation failed (likely network timeout) - skipping"

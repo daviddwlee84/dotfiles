@@ -290,6 +290,16 @@
   environment:
     RTK_INSTALL_DIR: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  failed_when: false
+  register: rtk_install_result
+
+- name: Warn RTK installation failed (Linux)
+  when:
+    - rtk_install_result is defined
+    - rtk_install_result.rc is defined
+    - rtk_install_result.rc != 0
+  ansible.builtin.debug:
+    msg: "RTK installation failed (likely network timeout) - skipping"
 
 # === SpecStory ===
 

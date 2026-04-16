@@ -64,3 +64,12 @@
         curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir {{ ansible_facts['env']['HOME'] }}/.local/bin
       args:
         executable: /bin/bash
+      failed_when: false
+      register: starship_user_install_result
+
+    - name: Warn starship (user-level) installation failed
+      when:
+        - starship_user_install_result.rc is defined
+        - starship_user_install_result.rc != 0
+      ansible.builtin.debug:
+        msg: "starship installation failed (likely network timeout) - skipping"

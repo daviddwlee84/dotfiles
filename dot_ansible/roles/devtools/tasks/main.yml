@@ -291,6 +291,16 @@
     curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
   args:
     creates: "{{ ansible_facts.env.HOME }}/.local/bin/zoxide"
+  failed_when: false
+  register: zoxide_install_result
+
+- name: Warn zoxide installation failed
+  when:
+    - zoxide_install_result is defined
+    - zoxide_install_result.rc is defined
+    - zoxide_install_result.rc != 0
+  ansible.builtin.debug:
+    msg: "zoxide installation failed (likely network timeout) - skipping"
 
 # --- eza ---
 - name: Check if eza is installed
