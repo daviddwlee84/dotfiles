@@ -6,6 +6,67 @@ For deep dives: [tmux keybindings](tools/tmux/keybindings.md) · [tmux themes](t
 
 ---
 
+## Unix Shell (Readline / Zsh ZLE)
+
+These work at any bash/zsh prompt (and most Unix CLI apps that embed readline).
+
+### Cursor Movement
+
+| Binding | Action |
+|---------|--------|
+| `Ctrl+A` | Beginning of line |
+| `Ctrl+E` | End of line |
+| `Alt+F` | Move forward one word |
+| `Alt+B` | Move backward one word |
+| `Ctrl+F` | Move forward one character |
+| `Ctrl+B` | Move backward one character |
+| `Ctrl+XX` | Toggle between current position and beginning of line |
+
+### Edit / Delete
+
+| Binding | Action |
+|---------|--------|
+| `Ctrl+W` | Delete word backward (to previous whitespace) |
+| `Alt+D` | Delete word forward |
+| `Ctrl+K` | Kill (cut) from cursor to end of line |
+| `Ctrl+U` | Kill from cursor to beginning of line |
+| `Ctrl+Y` | Yank (paste) last killed text |
+| `Alt+Y` | Rotate kill-ring and yank previous kill |
+| `Ctrl+D` | Delete character under cursor (or EOF if line is empty) |
+| `Ctrl+H` | Delete character before cursor (same as Backspace) |
+| `Ctrl+T` | Transpose characters around cursor |
+| `Alt+T` | Transpose words around cursor *(zsh: overridden by tools-picker)* |
+| `Alt+U` | Uppercase word from cursor |
+| `Alt+L` | Lowercase word from cursor |
+| `Alt+C` | Capitalize word from cursor *(zsh: overridden by fzf cd)* |
+
+### History
+
+| Binding | Action |
+|---------|--------|
+| `Ctrl+R` | Reverse incremental search *(zsh: opens fzf history picker)* |
+| `Ctrl+S` | Forward incremental search *(may be intercepted by terminal flow control)* |
+| `Ctrl+P` | Previous command (same as Up arrow) |
+| `Ctrl+N` | Next command (same as Down arrow) |
+| `Alt+.` | Insert last argument of previous command (repeat to cycle) |
+| `!!` | Expand to last command |
+| `!$` | Expand to last argument of last command |
+
+### Process Control
+
+| Binding | Action |
+|---------|--------|
+| `Ctrl+C` | Send SIGINT — interrupt/cancel current process |
+| `Ctrl+Z` | Send SIGTSTP — suspend process (resume with `fg`) |
+| `Ctrl+D` | Send EOF — exit shell or end input stream |
+| `Ctrl+L` | Clear screen (keep current line) |
+| `Ctrl+S` | Pause terminal output (XOFF) |
+| `Ctrl+Q` | Resume terminal output (XON) |
+
+> **zsh overrides** in this config: `Ctrl+R` → fzf history, `Ctrl+T` → fzf file picker, `Alt+C` → fzf cd, `Alt+T` → tools-picker, `Alt+S` → sesh-sessions. The readline defaults are shadowed by these ZLE widgets.
+
+---
+
 ## tmux
 
 Prefix key: `Ctrl+B`
