@@ -22,13 +22,6 @@
   ansible.builtin.debug:
     msg: "Homebrew not installed. It should be installed by bootstrap script."
 
-- name: Remove deprecated Superset tap
-  when: homebrew_installed
-  community.general.homebrew_tap:
-    name: superset-sh/superset
-    state: absent
-  ignore_errors: true
-
 - name: Update Homebrew
   when: homebrew_installed
   community.general.homebrew:
