@@ -108,6 +108,13 @@ case "$BREW_REAL_ARCH" in
         ;;
     *)
         warn "Skipping Linuxbrew: unsupported userland architecture '$BREW_REAL_ARCH' (Homebrew requires amd64 or arm64)"
+        # Remove broken Linuxbrew if it was installed before arch detection existed
+        if command -v brew &>/dev/null; then
+            warn "Removing unusable Linuxbrew installation for '$BREW_REAL_ARCH'..."
+            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+                sudo rm -rf /home/linuxbrew/.linuxbrew
+            fi
+        fi
         ;;
 esac
 {{ end -}}
@@ -154,7 +161,13 @@ fi
 # 3. Install ansible if missing
 if ! command -v ansible-playbook &> /dev/null; then
     info "Installing ansible via uv..."
-    uv tool install ansible-core
+{{ $noRootAnsible := false }}{{ if hasKey . "noRoot" }}{{ $noRootAnsible = .noRoot }}{{ end }}
+{{- if not $noRootAnsible }}
+    # ansible-core depends on cryptography -> cffi which needs libffi-dev to compile
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get install -y libffi-dev python3-dev 2>/dev/null || true
+    fi
+{{ end }}    uv tool install ansible-core
     success "ansible installed successfully"
 else
     info "ansible is already installed"
