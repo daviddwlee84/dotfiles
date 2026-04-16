@@ -332,7 +332,7 @@
     - specstory_macos_check.rc != 0
     - specstory_macos_recheck.rc != 0
   ansible.builtin.set_fact:
-    specstory_macos_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'arm64' else 'x86_64' }}"
+    specstory_macos_arch: "{{ 'arm64' if target_architecture == 'arm64' else 'x86_64' }}"
 
 - name: Get latest SpecStory release (macOS fallback)
   when:
@@ -410,8 +410,8 @@
   ansible.builtin.set_fact:
     specstory_linux_arch: >-
       {{
-        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
         else ''
       }}
 
@@ -421,7 +421,7 @@
     - specstory_check.rc != 0
     - specstory_linux_arch | trim == ''
   ansible.builtin.debug:
-    msg: "SpecStory skipped: no release for {{ ansible_facts['architecture'] }}"
+    msg: "SpecStory skipped: no release for {{ target_architecture }}"
 
 - name: Download SpecStory from GitHub release (Linux)
   when:
@@ -470,7 +470,7 @@
 - name: Check if CodexBar is installed (macOS, ARM only)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - ansible_facts["architecture"] == "arm64"
+    - target_architecture == "arm64"
   ansible.builtin.command: which codexbar
   register: codexbar_macos_check
   changed_when: false
@@ -479,7 +479,7 @@
 - name: Tap steipete/tap for CodexBar (macOS, ARM only)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - ansible_facts["architecture"] == "arm64"
+    - target_architecture == "arm64"
     - codexbar_macos_check.rc != 0
   community.general.homebrew_tap:
     name: steipete/tap
@@ -488,7 +488,7 @@
 - name: Install CodexBar (macOS, ARM only)
   when:
     - ansible_facts["os_family"] == "Darwin"
-    - ansible_facts["architecture"] == "arm64"
+    - target_architecture == "arm64"
     - codexbar_macos_check.rc != 0
   community.general.homebrew_cask:
     name: codexbar
@@ -556,9 +556,9 @@
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_release is defined
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.set_fact:
-    codexbar_arch: "{{ ansible_facts['architecture'] }}"
+    codexbar_arch: "{{ target_architecture }}"
     codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"
 
 - name: Compute CodexBar release asset name (Linux fallback)
@@ -773,7 +773,7 @@
     - td_recheck.rc != 0
     - td_release is defined
   ansible.builtin.set_fact:
-    td_linux_arch: "{{ 'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64'] else 'unsupported' }}"
+    td_linux_arch: "{{ 'amd64' if target_architecture in ['x86_64', 'amd64'] else 'arm64' if target_architecture in ['aarch64', 'arm64'] else 'unsupported' }}"
     td_linux_version: "{{ td_release.json.tag_name | regex_replace('^v', '') }}"
     td_linux_tag: "{{ td_release.json.tag_name }}"
 
@@ -784,7 +784,7 @@
     - td_recheck.rc != 0
     - td_linux_arch == "unsupported"
   ansible.builtin.debug:
-    msg: "td fallback skipped: unsupported architecture {{ ansible_facts['architecture'] }}."
+    msg: "td fallback skipped: unsupported architecture {{ target_architecture }}."
 
 - name: Download td release (Linux fallback)
   when:
@@ -953,7 +953,7 @@
     - sidecar_recheck.rc != 0
     - sidecar_release is defined
   ansible.builtin.set_fact:
-    sidecar_linux_arch: "{{ 'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64'] else 'unsupported' }}"
+    sidecar_linux_arch: "{{ 'amd64' if target_architecture in ['x86_64', 'amd64'] else 'arm64' if target_architecture in ['aarch64', 'arm64'] else 'unsupported' }}"
     sidecar_linux_version: "{{ sidecar_release.json.tag_name | regex_replace('^v', '') }}"
     sidecar_linux_tag: "{{ sidecar_release.json.tag_name }}"
 
@@ -964,7 +964,7 @@
     - sidecar_recheck.rc != 0
     - sidecar_linux_arch == "unsupported"
   ansible.builtin.debug:
-    msg: "sidecar fallback skipped: unsupported architecture {{ ansible_facts['architecture'] }}."
+    msg: "sidecar fallback skipped: unsupported architecture {{ target_architecture }}."
 
 - name: Download sidecar release (Linux fallback)
   when:

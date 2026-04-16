@@ -61,8 +61,8 @@
   ansible.builtin.set_fact:
     gh_release_arch: >-
       {{
-        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
         else ''
       }}
 
@@ -72,7 +72,7 @@
     - gh_check.rc != 0
     - gh_release_arch == ''
   ansible.builtin.debug:
-    msg: "gh skipped: no release for {{ ansible_facts['architecture'] }}"
+    msg: "gh skipped: no release for {{ target_architecture }}"
 
 - name: Install gh from GitHub releases (Debian/Ubuntu)
   when:
@@ -203,7 +203,7 @@
 
     - name: Download bat binary
       ansible.builtin.get_url:
-        url: "https://github.com/sharkdp/bat/releases/download/{{ bat_release.json.tag_name }}/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        url: "https://github.com/sharkdp/bat/releases/download/{{ bat_release.json.tag_name }}/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/bat.tar.gz
         mode: '0644'
 
@@ -215,7 +215,7 @@
 
     - name: Install bat to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/bat"
+        src: "/tmp/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl/bat"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/bat"
         mode: '0755'
         remote_src: true
@@ -226,7 +226,7 @@
         state: absent
       loop:
         - /tmp/bat.tar.gz
-        - "/tmp/bat-{{ bat_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+        - "/tmp/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl"
 
 # --- zoxide ---
 - name: Check if zoxide is installed
@@ -291,7 +291,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - eza_recheck.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (eza)
       ansible.builtin.file:
@@ -307,7 +307,7 @@
 
     - name: Download eza binary
       ansible.builtin.get_url:
-        url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/eza.tar.gz
         mode: '0644'
 
@@ -345,7 +345,7 @@
 
     - name: Download delta .deb package
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
         dest: /tmp/git-delta.deb
         mode: '0644'
 
@@ -370,7 +370,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_recheck.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (delta)
       ansible.builtin.file:
@@ -386,7 +386,7 @@
 
     - name: Download delta tarball (user)
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
 
@@ -398,7 +398,7 @@
 
     - name: Install delta to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/delta"
+        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu/delta"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/delta"
         mode: '0755'
         remote_src: true
@@ -409,7 +409,7 @@
         state: absent
       loop:
         - /tmp/delta.tar.gz
-        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu"
 
 # --- diffnav ---
 - name: Check if diffnav is installed
@@ -428,8 +428,8 @@
   ansible.builtin.set_fact:
     diffnav_release_arch: >-
       {{
-        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
         else ''
       }}
 
@@ -439,7 +439,7 @@
     - diffnav_check.rc != 0
     - diffnav_release_arch == ''
   ansible.builtin.debug:
-    msg: "diffnav skipped: no release for {{ ansible_facts['architecture'] }}"
+    msg: "diffnav skipped: no release for {{ target_architecture }}"
 
 - name: Install diffnav from GitHub releases (Debian/Ubuntu)
   when:
@@ -581,7 +581,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - git_graph_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64']  # Only amd64 available
+    - target_architecture in ['x86_64', 'amd64']  # Only amd64 available
   block:
     - name: Ensure ~/.local/bin exists (git-graph)
       ansible.builtin.file:
@@ -685,9 +685,9 @@
   ansible.builtin.set_fact:
     glow_release_arch: >-
       {{
-        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-        else 'arm' if ansible_facts['architecture'] in ['armv7l', 'armv6l', 'arm']
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armv6l', 'arm']
         else ''
       }}
 
@@ -697,7 +697,7 @@
     - glow_check.rc != 0
     - glow_release_arch == ''
   ansible.builtin.debug:
-    msg: "glow skipped: no release for {{ ansible_facts['architecture'] }}"
+    msg: "glow skipped: no release for {{ target_architecture }}"
 
 - name: Install glow from GitHub releases (Debian/Ubuntu, user-level)
   when:
@@ -788,7 +788,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - duckdb_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (duckdb)
       ansible.builtin.file:
@@ -800,8 +800,8 @@
       ansible.builtin.set_fact:
         duckdb_release_arch: >-
           {{
-            'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            'amd64' if target_architecture in ['x86_64', 'amd64']
+            else 'arm64' if target_architecture in ['aarch64', 'arm64']
             else ''
           }}
 
@@ -878,7 +878,7 @@
 - name: Verify DuckDB CLI is available
   when:
     - ansible_facts["os_family"] == "Debian"
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.command: duckdb --version
   changed_when: false
   environment:
@@ -901,10 +901,10 @@
   ansible.builtin.set_fact:
     rclone_release_arch: >-
       {{
-        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-        else 'arm-v7' if ansible_facts['architecture'] == 'armv7l'
-        else 'arm-v6' if ansible_facts['architecture'] == 'armv6l'
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm-v7' if target_architecture == 'armv7l'
+        else 'arm-v6' if target_architecture == 'armv6l'
         else ''
       }}
 
@@ -914,7 +914,7 @@
     - rclone_check.rc != 0
     - rclone_release_arch == ''
   ansible.builtin.fail:
-    msg: "Unsupported architecture for rclone official downloads: {{ ansible_facts['architecture'] }}"
+    msg: "Unsupported architecture for rclone official downloads: {{ target_architecture }}"
 
 - name: Install rclone from official downloads (Debian/Ubuntu, user-level)
   when:
@@ -997,10 +997,10 @@
   ansible.builtin.set_fact:
     direnv_release_arch: >-
       {{
-        'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-        else 'arm' if ansible_facts['architecture'] in ['armv7l', 'armv6l', 'arm']
-        else ansible_facts['architecture']
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armv6l', 'arm']
+        else target_architecture
       }}
 
 - name: Install direnv from GitHub releases (user-level fallback, min v2.32.1)
@@ -1038,7 +1038,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   become: true
   tags: [sudo]
   block:
@@ -1050,7 +1050,7 @@
 
     - name: Download yazi binary
       ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.zip"
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-gnu.zip"
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
@@ -1063,9 +1063,9 @@
     - name: Extract and install yazi
       ansible.builtin.shell: |
         cd /tmp
-        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
         unzip -o yazi.zip
-        cp /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*/yazi /usr/local/bin/yazi
+        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-*/yazi /usr/local/bin/yazi
         chmod 755 /usr/local/bin/yazi
       args:
         executable: /bin/bash
@@ -1074,7 +1074,7 @@
     - name: Clean up yazi files
       ansible.builtin.shell: |
         rm -f /tmp/yazi.zip
-        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
       args:
         executable: /bin/bash
       changed_when: false
@@ -1091,7 +1091,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_recheck.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (yazi)
       ansible.builtin.file:
@@ -1107,7 +1107,7 @@
 
     - name: Download yazi binary (user)
       ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.zip"
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-gnu.zip"
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
@@ -1115,9 +1115,9 @@
     - name: Extract and install yazi (user)
       ansible.builtin.shell: |
         cd /tmp
-        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
         python3 -m zipfile -e yazi.zip .
-        cp /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
+        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-*/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
         chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
       args:
         executable: /bin/bash
@@ -1126,7 +1126,7 @@
     - name: Clean up yazi files (user)
       ansible.builtin.shell: |
         rm -f /tmp/yazi.zip
-        rm -rf /tmp/yazi-{{ ansible_facts['architecture'] }}-unknown-linux-*
+        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
       args:
         executable: /bin/bash
       changed_when: false
@@ -1186,7 +1186,7 @@
 
     - name: Download btop binary
       ansible.builtin.get_url:
-        url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ ansible_facts['architecture'] }}-linux-musl.tbz"
+        url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ target_architecture }}-linux-musl.tbz"
         dest: /tmp/btop.tbz
         mode: '0644'
 
@@ -1230,7 +1230,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - zellij_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   become: true
   tags: [sudo]
   block:
@@ -1242,7 +1242,7 @@
 
     - name: Download zellij binary
       ansible.builtin.get_url:
-        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
+        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ target_architecture | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
 
@@ -1269,7 +1269,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - zellij_recheck.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (zellij)
       ansible.builtin.file:
@@ -1285,7 +1285,7 @@
 
     - name: Download zellij binary (user)
       ansible.builtin.get_url:
-        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release_user.json.tag_name }}/zellij-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release_user.json.tag_name }}/zellij-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
 
@@ -1312,7 +1312,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - sesh_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (sesh)
       ansible.builtin.file:
@@ -1330,15 +1330,15 @@
       ansible.builtin.set_fact:
         sesh_arch: >-
           {{
-            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'arm64' if target_architecture in ['aarch64', 'arm64']
             else ''
           }}
 
     - name: Skip sesh on unsupported architecture
       when: sesh_arch | trim == ''
       ansible.builtin.debug:
-        msg: "sesh skipped: no release for {{ ansible_facts['architecture'] }}"
+        msg: "sesh skipped: no release for {{ target_architecture }}"
 
     - name: Set sesh download URL facts
       ansible.builtin.set_fact:
@@ -1418,7 +1418,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - taplo_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (taplo)
       ansible.builtin.file:
@@ -1436,15 +1436,15 @@
       ansible.builtin.set_fact:
         taplo_arch: >-
           {{
-            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
             else ''
           }}
 
     - name: Skip taplo on unsupported architecture
       when: taplo_arch | trim == ''
       ansible.builtin.debug:
-        msg: "taplo skipped: no release for {{ ansible_facts['architecture'] }}"
+        msg: "taplo skipped: no release for {{ target_architecture }}"
 
     - name: Download taplo binary (gzipped)
       ansible.builtin.get_url:
@@ -1482,7 +1482,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - tv_check.rc != 0
-    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (television)
       ansible.builtin.file:
@@ -1500,15 +1500,15 @@
       ansible.builtin.set_fact:
         tv_arch: >-
           {{
-            'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
             else ''
           }}
 
     - name: Skip television on unsupported architecture
       when: tv_arch | trim == ''
       ansible.builtin.debug:
-        msg: "television skipped: no release for {{ ansible_facts['architecture'] }}"
+        msg: "television skipped: no release for {{ target_architecture }}"
 
     - name: Set television download URL
       ansible.builtin.set_fact:

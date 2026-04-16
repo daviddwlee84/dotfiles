@@ -4,6 +4,11 @@
   hosts: local
   gather_facts: true
 
+  pre_tasks:
+    - name: Set target_architecture from gathered facts
+      ansible.builtin.set_fact:
+        target_architecture: "{{ ansible_facts['architecture'] }}"
+
   roles:
     - role: homebrew
       tags: [homebrew]

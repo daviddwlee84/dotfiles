@@ -72,8 +72,8 @@
   ansible.builtin.set_fact:
     nvim_sys_arch: >-
       {{
-        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
         else ''
       }}
 
@@ -143,7 +143,7 @@
     - nvim_current_version is version(neovim_min_version, '<')
     - nvim_sys_arch | default('') == ''
   ansible.builtin.debug:
-    msg: "Neovim GitHub release not available for {{ ansible_facts['architecture'] }} — keeping apt version or install manually"
+    msg: "Neovim GitHub release not available for {{ target_architecture }} — keeping apt version or install manually"
 
 - name: Install Neovim tarball (user-level, no sudo required)
   when:

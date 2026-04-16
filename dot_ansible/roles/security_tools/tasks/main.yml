@@ -66,16 +66,16 @@
         gitleaks_version: "{{ gitleaks_release.json.tag_name | regex_replace('^v', '') }}"
         gitleaks_arch: >-
           {{
-            'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-            else 'armv7' if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            'x64' if target_architecture in ['x86_64', 'amd64']
+            else 'arm64' if target_architecture in ['aarch64', 'arm64']
+            else 'armv7' if target_architecture in ['armv7l', 'armhf']
             else ''
           }}
 
     - name: Skip gitleaks on unsupported architecture (system)
       when: gitleaks_arch | trim == ''
       ansible.builtin.fail:
-        msg: "Unsupported architecture for gitleaks: {{ ansible_facts['architecture'] }}"
+        msg: "Unsupported architecture for gitleaks: {{ target_architecture }}"
 
     - name: Download gitleaks (system)
       ansible.builtin.get_url:
@@ -137,9 +137,9 @@
         gitleaks_version_user: "{{ gitleaks_release_user.json.tag_name | regex_replace('^v', '') }}"
         gitleaks_arch_user: >-
           {{
-            'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-            else 'armv7' if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            'x64' if target_architecture in ['x86_64', 'amd64']
+            else 'arm64' if target_architecture in ['aarch64', 'arm64']
+            else 'armv7' if target_architecture in ['armv7l', 'armhf']
             else ''
           }}
 

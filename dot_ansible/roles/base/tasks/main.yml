@@ -67,10 +67,10 @@
       ansible.builtin.set_fact:
         rg_target: >-
           {{
-            ansible_facts['architecture'] ~ '-unknown-linux-musl'
-            if ansible_facts['architecture'] in ['x86_64', 'aarch64']
+            target_architecture ~ '-unknown-linux-musl'
+            if target_architecture in ['x86_64', 'aarch64']
             else 'arm-unknown-linux-gnueabihf'
-            if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            if target_architecture in ['armv7l', 'armhf']
             else ''
           }}
 
@@ -135,10 +135,10 @@
       ansible.builtin.set_fact:
         fd_target: >-
           {{
-            ansible_facts['architecture'] ~ '-unknown-linux-gnu'
-            if ansible_facts['architecture'] in ['x86_64', 'aarch64']
+            target_architecture ~ '-unknown-linux-gnu'
+            if target_architecture in ['x86_64', 'aarch64']
             else 'arm-unknown-linux-gnueabihf'
-            if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            if target_architecture in ['armv7l', 'armhf']
             else ''
           }}
 
@@ -201,7 +201,7 @@
 
     - name: Download jq binary
       ansible.builtin.get_url:
-        url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') | replace('armv7l', 'armhf') }}"
+        url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') | replace('armv7l', 'armhf') }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
         mode: '0755'
 

@@ -114,8 +114,8 @@
   ansible.builtin.set_fact:
     lazygit_arch: >-
       {{
-        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
-        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
         else ''
       }}
 

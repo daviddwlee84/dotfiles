@@ -137,16 +137,27 @@ else
 fi
 
 # 2. Install mise if missing (runtime manager for Node.js, etc.)
-if ! command -v mise &> /dev/null; then
+# Use "mise --version" instead of "command -v" to catch arch-mismatch binaries
+# (e.g. aarch64 binary on armhf userland — file exists but cannot execute)
+if ! mise --version &> /dev/null; then
     info "Installing mise..."
+    # Remove broken binary if present (wrong architecture)
+    if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+        warn "Removing non-functional mise binary (possible architecture mismatch)..."
+        rm -f "$(command -v mise)" 2>/dev/null || true
+    fi
     # Try curl installer first (fast, no sudo)
-    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null; then
+    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null && mise --version &> /dev/null; then
         success "mise installed via curl"
 {{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
 {{ if not $noRootMise -}}
     else
-        # Fallback to apt for GFW environments
-        warn "curl installer failed/timed out, trying apt..."
+        # Fallback to apt (for GFW environments or architectures the curl installer gets wrong)
+        warn "curl installer failed or produced non-functional binary, trying apt..."
+        # Clean up broken binary from curl installer
+        if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+            rm -f "$(command -v mise)" 2>/dev/null || true
+        fi
         if command -v apt-get &> /dev/null; then
             sudo apt-get update -y
             sudo apt-get install -y curl gpg

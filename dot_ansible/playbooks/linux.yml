@@ -7,27 +7,28 @@
   pre_tasks:
     # RPi 4 can run a 64-bit kernel (aarch64) with 32-bit userland (armhf).
     # ansible_facts['architecture'] reflects the kernel, which leads to
-    # downloading aarch64 binaries that cannot execute.  Override the fact
-    # with the real userland architecture so every role gets the right value.
+    # downloading aarch64 binaries that cannot execute.  Detect the real
+    # userland architecture and expose it as target_architecture for all roles.
+    # Note: set_fact cannot reliably override ansible_facts['architecture']
+    # when inject_facts_as_vars=False, so we use a dedicated variable instead.
     - name: Detect userland architecture via dpkg
       ansible.builtin.command: dpkg --print-architecture
       register: dpkg_arch_result
       changed_when: false
       failed_when: false
 
-    - name: Map dpkg arch to uname-style value
+    - name: Set target_architecture from dpkg
       ansible.builtin.set_fact:
-        _userland_arch: >-
+        target_architecture: >-
           {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
              [dpkg_arch_result.stdout | trim]
              | default(ansible_facts['architecture']) }}
       when: dpkg_arch_result.rc == 0 and dpkg_arch_result.stdout | trim != ''
 
-    - name: Override ansible_facts architecture to match userland
+    - name: Fallback target_architecture to gathered facts
       ansible.builtin.set_fact:
-        ansible_facts: "{{ ansible_facts | combine({'architecture': _userland_arch | trim}) }}"
-        ansible_architecture: "{{ _userland_arch | trim }}"
-      when: _userland_arch is defined and _userland_arch | trim != ansible_facts['architecture']
+        target_architecture: "{{ ansible_facts['architecture'] }}"
+      when: target_architecture is not defined
 
   roles:
     - role: base
