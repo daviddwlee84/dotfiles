@@ -57,13 +57,364 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## Git
 
+### Custom (this repo)
+
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `gcam` | function | `dot_config/zsh/10_aliases.zsh` | `git add -A && git commit -m "<msg>"` |
-| `gca` | alias | `dot_config/zsh/10_aliases.zsh` | `git commit --amend --no-edit` (keep existing message) |
 | `gcam-amend` | function | `dot_config/zsh/10_aliases.zsh` | `git commit --amend -m "<msg>"` (replace message) |
 | `gundo` | function | `dot_config/zsh/10_aliases.zsh` | Undo last commit → back to staged; prints undone commit message |
 | `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | Open lazygit TUI |
+
+### oh-my-zsh git plugin
+
+> Source: [oh-my-zsh git plugin](https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/git). These are loaded automatically when the `git` plugin is enabled. Do **not** redefine these in custom configs.
+
+<details>
+<summary>Functions</summary>
+
+| Command | Description |
+|---------|-------------|
+| `git_main_branch` | Detect default branch (`main`, `master`, `trunk`, etc.) |
+| `git_develop_branch` | Detect develop branch (`dev`, `devel`, `develop`, etc.) |
+| `grename <old> <new>` | Rename branch locally and on origin |
+| `gunwipall` | Recursively unwip all recent `--wip--` commits |
+| `work_in_progress` | Print "WIP!!" if last commit is a WIP |
+| `gccd` | `git clone` then `cd` into the cloned directory |
+| `gdv` | `git diff -w` piped to `view` |
+| `gdnolock` | `git diff` excluding lock files |
+| `ggu` | `git pull --rebase origin <current-branch>` |
+| `ggl` | `git pull origin <current-branch>` |
+| `ggp` | `git push origin <current-branch>` |
+| `ggf` | `git push --force origin <current-branch>` |
+| `ggfl` | `git push --force-with-lease origin <current-branch>` |
+| `ggpnp` | Pull then push origin |
+| `gbda` | Delete merged branches (except main/develop) |
+| `gbds` | Delete squash-merged branches |
+
+</details>
+
+<details>
+<summary>Aliases — Basic</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `g` | `git` |
+| `grt` | `cd "$(git rev-parse --show-toplevel)"` |
+| `ghh` | `git help` |
+| `gcf` | `git config --list` |
+| `gst` | `git status` |
+| `gss` | `git status --short` |
+| `gsb` | `git status --short --branch` |
+
+</details>
+
+<details>
+<summary>Aliases — Add & Apply</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `ga` | `git add` |
+| `gaa` | `git add --all` |
+| `gapa` | `git add --patch` |
+| `gau` | `git add --update` |
+| `gav` | `git add --verbose` |
+| `gap` | `git apply` |
+| `gapt` | `git apply --3way` |
+
+</details>
+
+<details>
+<summary>Aliases — Branch</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gb` | `git branch` |
+| `gba` | `git branch --all` |
+| `gbd` | `git branch --delete` |
+| `gbD` | `git branch --delete --force` |
+| `gbm` | `git branch --move` |
+| `gbnm` | `git branch --no-merged` |
+| `gbr` | `git branch --remote` |
+| `gbg` | Show branches with gone upstream |
+| `gbgd` | Delete branches with gone upstream |
+| `gbgD` | Force-delete branches with gone upstream |
+| `ggsup` | `git branch --set-upstream-to=origin/<current>` |
+
+</details>
+
+<details>
+<summary>Aliases — Checkout & Switch</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gco` | `git checkout` |
+| `gcor` | `git checkout --recurse-submodules` |
+| `gcb` | `git checkout -b` |
+| `gcB` | `git checkout -B` |
+| `gcm` | `git checkout $(git_main_branch)` |
+| `gcd` | `git checkout $(git_develop_branch)` |
+| `gsw` | `git switch` |
+| `gswc` | `git switch --create` |
+| `gswm` | `git switch $(git_main_branch)` |
+| `gswd` | `git switch $(git_develop_branch)` |
+
+</details>
+
+<details>
+<summary>Aliases — Commit</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gc` | `git commit --verbose` |
+| `gcn` | `git commit --verbose --no-edit` |
+| `gc!` | `git commit --verbose --amend` |
+| `gcn!` | `git commit --verbose --no-edit --amend` |
+| `gca` | `git commit --verbose --all` |
+| `gca!` | `git commit --verbose --all --amend` |
+| `gcan!` | `git commit --verbose --all --no-edit --amend` |
+| `gcans!` | `git commit --verbose --all --signoff --no-edit --amend` |
+| `gcann!` | `git commit --verbose --all --date=now --no-edit --amend` |
+| `gcam` | `git commit --all --message` |
+| `gcmsg` | `git commit --message` |
+| `gcsm` | `git commit --signoff --message` |
+| `gcas` | `git commit --all --signoff` |
+| `gcasm` | `git commit --all --signoff --message` |
+| `gcs` | `git commit --gpg-sign` |
+| `gcss` | `git commit --gpg-sign --signoff` |
+| `gcssm` | `git commit --gpg-sign --signoff --message` |
+| `gcfu` | `git commit --fixup` |
+
+</details>
+
+<details>
+<summary>Aliases — Diff</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gd` | `git diff` |
+| `gdca` | `git diff --cached` |
+| `gdcw` | `git diff --cached --word-diff` |
+| `gds` | `git diff --staged` |
+| `gdw` | `git diff --word-diff` |
+| `gdup` | `git diff @{upstream}` |
+| `gdt` | `git diff-tree --no-commit-id --name-only -r` |
+
+</details>
+
+<details>
+<summary>Aliases — Fetch & Pull</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gf` | `git fetch` |
+| `gfa` | `git fetch --all --tags --prune --jobs=10` |
+| `gfo` | `git fetch origin` |
+| `gl` | `git pull` |
+| `gpr` | `git pull --rebase` |
+| `gprv` | `git pull --rebase -v` |
+| `gpra` | `git pull --rebase --autostash` |
+| `gprav` | `git pull --rebase --autostash -v` |
+| `gprom` | `git pull --rebase origin $(git_main_branch)` |
+| `gprum` | `git pull --rebase upstream $(git_main_branch)` |
+| `ggpull` | `git pull origin <current-branch>` |
+| `gluc` | `git pull upstream $(git_current_branch)` |
+| `glum` | `git pull upstream $(git_main_branch)` |
+
+</details>
+
+<details>
+<summary>Aliases — Push</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gp` | `git push` |
+| `gpd` | `git push --dry-run` |
+| `gpv` | `git push --verbose` |
+| `gpf` | `git push --force-with-lease` |
+| `gpf!` | `git push --force` |
+| `gpsup` | `git push --set-upstream origin <current-branch>` |
+| `gpsupf` | `git push --set-upstream origin <current-branch> --force-with-lease` |
+| `gpoat` | `git push origin --all && git push origin --tags` |
+| `gpod` | `git push origin --delete` |
+| `ggpush` | `git push origin <current-branch>` |
+| `gpu` | `git push upstream` |
+
+</details>
+
+<details>
+<summary>Aliases — Rebase</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `grb` | `git rebase` |
+| `grba` | `git rebase --abort` |
+| `grbc` | `git rebase --continue` |
+| `grbi` | `git rebase --interactive` |
+| `grbo` | `git rebase --onto` |
+| `grbs` | `git rebase --skip` |
+| `grbm` | `git rebase $(git_main_branch)` |
+| `grbd` | `git rebase $(git_develop_branch)` |
+| `grbom` | `git rebase origin/$(git_main_branch)` |
+| `grbum` | `git rebase upstream/$(git_main_branch)` |
+
+</details>
+
+<details>
+<summary>Aliases — Reset & Restore</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `grh` | `git reset` |
+| `gru` | `git reset --` |
+| `grhh` | `git reset --hard` |
+| `grhk` | `git reset --keep` |
+| `grhs` | `git reset --soft` |
+| `groh` | `git reset origin/<current-branch> --hard` |
+| `gpristine` | `git reset --hard && git clean --force -dfx` |
+| `gwipe` | `git reset --hard && git clean --force -df` |
+| `grs` | `git restore` |
+| `grss` | `git restore --source` |
+| `grst` | `git restore --staged` |
+
+</details>
+
+<details>
+<summary>Aliases — Log</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `glo` | `git log --oneline --decorate` |
+| `glog` | `git log --oneline --decorate --graph` |
+| `gloga` | `git log --oneline --decorate --graph --all` |
+| `glg` | `git log --stat` |
+| `glgp` | `git log --stat --patch` |
+| `glgg` | `git log --graph` |
+| `glgga` | `git log --graph --decorate --all` |
+| `glgm` | `git log --graph --max-count=10` |
+| `glol` | `git log --graph --pretty` (short format with author + relative date) |
+| `glols` | Same as `glol` with `--stat` |
+| `glola` | Same as `glol` with `--all` |
+| `glod` | Same as `glol` with absolute date |
+| `glods` | Same as `glod` with `--date=short` |
+| `glp` | `git log --pretty=<format>` |
+
+</details>
+
+<details>
+<summary>Aliases — Merge</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gm` | `git merge` |
+| `gma` | `git merge --abort` |
+| `gmc` | `git merge --continue` |
+| `gms` | `git merge --squash` |
+| `gmff` | `git merge --ff-only` |
+| `gmom` | `git merge origin/$(git_main_branch)` |
+| `gmum` | `git merge upstream/$(git_main_branch)` |
+| `gmtl` | `git mergetool --no-prompt` |
+| `gmtlvim` | `git mergetool --no-prompt --tool=vimdiff` |
+
+</details>
+
+<details>
+<summary>Aliases — Cherry-pick, Revert, Blame</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gcp` | `git cherry-pick` |
+| `gcpa` | `git cherry-pick --abort` |
+| `gcpc` | `git cherry-pick --continue` |
+| `grev` | `git revert` |
+| `greva` | `git revert --abort` |
+| `grevc` | `git revert --continue` |
+| `gbl` | `git blame -w` |
+
+</details>
+
+<details>
+<summary>Aliases — Remote</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gr` | `git remote` |
+| `grv` | `git remote --verbose` |
+| `gra` | `git remote add` |
+| `grrm` | `git remote remove` |
+| `grmv` | `git remote rename` |
+| `grset` | `git remote set-url` |
+| `grup` | `git remote update` |
+
+</details>
+
+<details>
+<summary>Aliases — Stash</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gsta` | `git stash push` |
+| `gstaa` | `git stash apply` |
+| `gstc` | `git stash clear` |
+| `gstd` | `git stash drop` |
+| `gstl` | `git stash list` |
+| `gstp` | `git stash pop` |
+| `gsts` | `git stash show --patch` |
+| `gstall` | `git stash --all` |
+| `gstu` | `git stash --include-untracked` |
+
+</details>
+
+<details>
+<summary>Aliases — Tag, Worktree, Submodule, Bisect & Others</summary>
+
+| Command | Command Expanded |
+|---------|-----------------|
+| `gta` | `git tag --annotate` |
+| `gts` | `git tag --sign` |
+| `gtv` | `git tag \| sort -V` |
+| `gtl` | `git tag --sort=-v:refname -n --list "<pattern>*"` |
+| `gwt` | `git worktree` |
+| `gwta` | `git worktree add` |
+| `gwtls` | `git worktree list` |
+| `gwtmv` | `git worktree move` |
+| `gwtrm` | `git worktree remove` |
+| `gsi` | `git submodule init` |
+| `gsu` | `git submodule update` |
+| `gbs` | `git bisect` |
+| `gbsb` | `git bisect bad` |
+| `gbsg` | `git bisect good` |
+| `gbsn` | `git bisect new` |
+| `gbso` | `git bisect old` |
+| `gbsr` | `git bisect reset` |
+| `gbss` | `git bisect start` |
+| `gclean` | `git clean --interactive -d` |
+| `gcl` | `git clone --recurse-submodules` |
+| `gclf` | `git clone --recursive --shallow-submodules --filter=blob:none` |
+| `gcount` | `git shortlog --summary --numbered` |
+| `gdct` | `git describe --tags` (latest tag) |
+| `gfg` | `git ls-files \| grep` |
+| `gignored` | List ignored files |
+| `gignore` | `git update-index --assume-unchanged` |
+| `gunignore` | `git update-index --no-assume-unchanged` |
+| `grf` | `git reflog` |
+| `gsh` | `git show` |
+| `gsps` | `git show --pretty=short --show-signature` |
+| `gwch` | `git log --patch --abbrev-commit --pretty=medium --raw` |
+| `gam` | `git am` |
+| `gama` | `git am --abort` |
+| `gamc` | `git am --continue` |
+| `gams` | `git am --skip` |
+| `gamscp` | `git am --show-current-patch` |
+| `gg` | `git gui citool` |
+| `gga` | `git gui citool --amend` |
+| `gk` | `gitk --all --branches` |
+| `gke` | `gitk --all` (including reflogs) |
+| `gsd` | `git svn dcommit` |
+| `gsr` | `git svn rebase` |
+| `gwip` | Stage all + WIP commit (skip CI) |
+| `gunwip` | Undo last WIP commit |
+
+</details>
 
 ---
 

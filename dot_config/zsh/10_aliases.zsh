@@ -28,13 +28,12 @@ alias v="nvim"
 # command -v bat &>/dev/null && alias cat="bat"
 
 # Git shortcuts
-gcam() {
-  [[ -z "$1" ]] && { echo "Usage: gcam <message>"; return 1; }
-  git add -A && git commit -m "$1"
-}
+# NOTE: gcam (git commit --all --message) is provided by oh-my-zsh git plugin
+# NOTE: gca (git commit --verbose --all) is provided by oh-my-zsh git plugin
+# NOTE: gca! (git commit --verbose --all --amend) is provided by oh-my-zsh git plugin
+# NOTE: gcan! (git commit --verbose --all --no-edit --amend) is provided by oh-my-zsh git plugin
 
-# Amend last commit (keep message by default; pass -m "new msg" to change it)
-alias gca='git commit --amend --no-edit'
+# Amend last commit message (pass new message as argument)
 gcam-amend() {
   [[ -z "$1" ]] && { echo "Usage: gcam-amend <new message>"; return 1; }
   git commit --amend -m "$1"
