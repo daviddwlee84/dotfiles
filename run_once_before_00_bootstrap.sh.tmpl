@@ -160,24 +160,29 @@ if ! mise --version &> /dev/null; then
 {{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
 {{ if not $noRootMise -}}
     else
-        # Fallback to apt (for GFW environments or architectures the curl installer gets wrong)
-        warn "curl installer failed or produced non-functional binary, trying apt..."
+        # Fallback: try direct binary download with correct userland arch
+        warn "curl installer failed or produced non-functional binary, trying direct download..."
         # Clean up broken binary from curl installer
         if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
             rm -f "$(command -v mise)" 2>/dev/null || true
         fi
-        if command -v apt-get &> /dev/null; then
-            sudo apt-get update -y
-            sudo apt-get install -y curl gpg
-            sudo install -dm 755 /etc/apt/keyrings
-            curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
-            MISE_DEB_ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
-            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=${MISE_DEB_ARCH}] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
-            sudo apt-get update -y
-            sudo apt-get install -y mise
-            success "mise installed via apt"
+        MISE_REAL_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+        case "$MISE_REAL_ARCH" in
+            amd64|x86_64) MISE_BIN_ARCH="x64" ;;
+            arm64|aarch64) MISE_BIN_ARCH="arm64" ;;
+            armhf) MISE_BIN_ARCH="armv7" ;;
+            *) MISE_BIN_ARCH="" ;;
+        esac
+        if [[ -n "$MISE_BIN_ARCH" ]]; then
+            MISE_URL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}"
+            if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && mise --version &> /dev/null; then
+                success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+            else
+                rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+                warn "Could not install mise — skipping (Node.js via mise will not be available)"
+            fi
         else
-            error "Could not install mise - please install manually"
+            warn "Could not install mise — unsupported architecture '$MISE_REAL_ARCH'"
         fi
 {{ end -}}
     fi

@@ -43,5 +43,8 @@ scripts/redact_specstory.py
 # Zsh adhoc file (personal experiments - never track)
 .zshrc.adhoc
 
+# Python bytecode caches
+**/__pycache__
+
 # .local directory (dynamically managed by package managers)
 .local/
