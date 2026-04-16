@@ -10,18 +10,18 @@
 #   3. Failed only
 #   4. Groups overview
 #
-# Keybindings:
-#   Enter      Follow running task / view finished task log
-#   Ctrl+E     Edit task command (stashed/queued only, opens $EDITOR)
-#   Ctrl+Y     Copy raw command to clipboard
-#   Ctrl+A     Copy full `pueue add ...` command to clipboard
-#   Ctrl+G     Filter by group (opens new tv with only that group's tasks)
-#   Ctrl+P     Pause task
-#   Ctrl+R     Resume (start) task
-#   Ctrl+K     Kill task
-#   Ctrl+T     Restart task (in-place)
-#   Ctrl+X     Remove task
-#   Ctrl+L     Clean all finished tasks
+# Keybindings (Alt+key avoids conflicts with TV built-ins and tmux):
+#   Enter      Follow running task / view finished task log / show group status
+#   Alt+E      Edit task command (stashed/queued only, opens $EDITOR)
+#   Alt+Y      Copy raw command to clipboard
+#   Alt+A      Copy full `pueue add ...` command to clipboard
+#   Alt+G      Filter by group (opens new tv with only that group's tasks)
+#   Alt+P      Pause task
+#   Alt+R      Resume (start) task
+#   Alt+K      Kill task
+#   Alt+T      Restart task (in-place)
+#   Alt+X      Remove task
+#   Alt+L      Clean all finished tasks
 #   Ctrl+F     Cycle preview (log output / JSON details)
 #   Ctrl+/     Toggle preview panel
 #
@@ -59,20 +59,20 @@ size = 55
 
 [keybindings]
 enter = "actions:follow"
-ctrl-e = "actions:edit"
-ctrl-y = ["actions:copy_command", "reload_source"]
-ctrl-a = ["actions:copy_pueue_add", "reload_source"]
-ctrl-g = "actions:filter_group"
-ctrl-p = ["actions:pause", "reload_source"]
-ctrl-r = ["actions:resume", "reload_source"]
-ctrl-k = ["actions:kill", "reload_source"]
-ctrl-t = ["actions:restart", "reload_source"]
-ctrl-x = ["actions:remove", "reload_source"]
-ctrl-l = ["actions:clean", "reload_source"]
+alt-e = "actions:edit"
+alt-y = ["actions:copy_command", "reload_source"]
+alt-a = ["actions:copy_pueue_add", "reload_source"]
+alt-g = "actions:filter_group"
+alt-p = ["actions:pause", "reload_source"]
+alt-r = ["actions:resume", "reload_source"]
+alt-k = ["actions:kill", "reload_source"]
+alt-t = ["actions:restart", "reload_source"]
+alt-x = ["actions:remove", "reload_source"]
+alt-l = ["actions:clean", "reload_source"]
 
 [actions.follow]
-description = "Follow running task or view log"
-command = "pueue follow '{split:\\t:0}' 2>/dev/null || pueue log '{split:\\t:0}' 2>/dev/null; echo; echo '[Press any key to exit]'; read -n1"
+description = "Follow running task, view log, or show group status"
+command = "id='{split:\\t:0}'; if [ \"$id\" -eq \"$id\" ] 2>/dev/null; then pueue follow \"$id\" 2>/dev/null || pueue log \"$id\" 2>/dev/null; echo; echo '[Press Enter to exit]'; read -r _; else pueue status -g \"$id\"; echo; echo '[Press Enter to exit]'; read -r _; fi"
 mode = "execute"
 
 [actions.edit]
@@ -94,3 +94,33 @@ mode = "fork"
 description = "Filter tasks by group (opens filtered view)"
 command = """group=$(echo '{split:\\t:2}' | sed 's/^\\[//;s/\\]$//'); tv --source-command "pueue status --json --group $group 2>/dev/null | jq -r '.tasks | to_entries | sort_by(.value.id | tonumber) | reverse | .[].value | (if .status == \\\"Queued\\\" then \\\"Queued\\\" elif .status == \\\"Stashed\\\" then \\\"Stashed\\\" elif (.status | type == \\\"object\\\") then if (.status | has(\\\"Running\\\")) then \\\"Running\\\" elif (.status | has(\\\"Done\\\")) then if .status.Done.result == \\\"Success\\\" then \\\"Done:OK\\\" else \\\"Done:FAIL\\\" end elif (.status | has(\\\"Paused\\\")) then \\\"Paused\\\" else (.status | keys[0]) end else (.status | tostring) end) as \\$st | [(.id | tostring), \\$st, (\\\"[\\\" + .group + \\\"]\\\"), .original_command] | @tsv'" --preview-command "pueue log '{}' --lines 200 2>/dev/null || echo 'No log'" --input-header "Pueue [$group]" """
 mode = "execute"
+
+[actions.pause]
+description = "Pause task"
+command = "pueue pause '{split:\\t:0}'"
+mode = "fork"
+
+[actions.resume]
+description = "Resume/start task"
+command = "pueue start '{split:\\t:0}'"
+mode = "fork"
+
+[actions.kill]
+description = "Kill task"
+command = "pueue kill '{split:\\t:0}'"
+mode = "fork"
+
+[actions.restart]
+description = "Restart task (in-place)"
+command = "pueue restart --in-place '{split:\\t:0}'"
+mode = "fork"
+
+[actions.remove]
+description = "Remove task from list"
+command = "pueue remove '{split:\\t:0}'"
+mode = "fork"
+
+[actions.clean]
+description = "Clean all finished tasks"
+command = "pueue clean"
+mode = "fork"

@@ -69,35 +69,36 @@ Open with `tv pueue`. Auto-refreshes every 2 seconds.
 | Failed only | Tasks that exited non-zero |
 | Groups overview | Pueue groups with status and parallelism |
 
-**Task management:**
+**Task management** (all `Alt+key` to avoid conflicts with TV built-ins and tmux):
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Follow running task output / view finished task log |
-| `Ctrl+E` | Edit task command in `$EDITOR` (stashed/queued only) |
-| `Ctrl+P` | Pause task |
-| `Ctrl+R` | Resume/start task |
-| `Ctrl+K` | Kill task |
-| `Ctrl+T` | Restart task (in-place) |
-| `Ctrl+X` | Remove task from list |
-| `Ctrl+L` | Clean all finished tasks |
+| `Enter` | Follow running task / view finished task log / show group status |
+| `Alt+E` | Edit task command in `$EDITOR` (stashed/queued only) |
+| `Alt+P` | Pause task |
+| `Alt+R` | Resume/start task |
+| `Alt+K` | Kill task |
+| `Alt+T` | Restart task (in-place) |
+| `Alt+X` | Remove task from list |
+| `Alt+L` | Clean all finished tasks |
 
 **Clipboard:**
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+Y` | Copy raw command to clipboard |
-| `Ctrl+A` | Copy full `pueue add -w <path> -g <group> ...` command to clipboard |
+| `Alt+Y` | Copy raw command to clipboard |
+| `Alt+A` | Copy full `pueue add -w <path> -g <group> ...` command to clipboard |
 
-`Ctrl+Y` copies just the original command string. `Ctrl+A` reconstructs a full reproducible `pueue add` invocation including working directory, group, label, priority, and dependencies — useful for re-queuing or sharing tasks.
+`Alt+Y` copies just the original command string. `Alt+A` reconstructs a full reproducible `pueue add` invocation including working directory, group, label, priority, and dependencies — useful for re-queuing or sharing tasks.
 
 **Group filtering:**
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+G` | Open a filtered view showing only the selected task's group |
+| `Enter` | On groups view: show `pueue status -g <name>` text overview |
+| `Alt+G` | Open a filtered view showing only the selected task's group |
 
-`Ctrl+G` extracts the group name from the selected entry and launches a new `tv` instance with `--source-command` filtered to that group. The filtered view has preview but not the full action keybindings. Quit to return to the main `tv pueue` channel.
+`Alt+G` extracts the group name from the selected entry and launches a new `tv` instance with `--source-command` filtered to that group. The filtered view has preview but not the full action keybindings. Quit to return to the main `tv pueue` channel. Enter on the groups source (cycle 4) shows a quick text overview via `pueue status -g`.
 
 **Preview** (`Ctrl+F` cycles):
 
@@ -106,9 +107,10 @@ Open with `tv pueue`. Auto-refreshes every 2 seconds.
 
 **Implementation notes:**
 
+- All action keybindings use `Alt+` to avoid shadowing TV built-ins (`Ctrl+P`/`Ctrl+K` for navigation, `Ctrl+A`/`Ctrl+E` for input cursor, `Ctrl+R` for reload, etc.) and tmux root-table bindings (`C-h/j/k/l` for vim-tmux-navigator). Requires terminal to send Option as Meta (Ghostty: `macos-option-as-alt = left`).
 - Uses jq's `@tsv` for output formatting — avoids TOML/shell escape conflicts with jq's `\(...)` interpolation syntax
 - Clipboard actions are cross-platform: pbcopy (macOS), wl-copy (Wayland), xclip (X11)
-- `pueue edit` only works on stashed/queued tasks (pueue limitation); for running/finished tasks use `Ctrl+Y` to copy and re-add manually
+- `pueue edit` only works on stashed/queued tasks (pueue limitation); for running/finished tasks use `Alt+Y` to copy and re-add manually
 
 ---
 
