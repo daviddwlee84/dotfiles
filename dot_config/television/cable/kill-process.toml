@@ -1,0 +1,55 @@
+# Kill process channel for television (tv)
+# Raycast-style process killer: fuzzy search by name, see CPU/MEM, kill.
+#
+# Usage:
+#   tv kill-process
+#
+# Keybindings:
+#   Enter      Kill the selected process (SIGTERM)
+#   Ctrl+K     Kill and refresh list (stay in picker to kill more)
+#   Ctrl+D     Force kill (SIGKILL) and refresh
+#   Ctrl+/     Toggle preview panel
+#
+# Sorted by memory usage (descending), like Raycast.
+# Preview shows full process tree and open files.
+
+[metadata]
+name = "kill-process"
+description = "Kill process: fuzzy search by name with CPU/MEM stats"
+
+[source]
+command = """
+if [ "$(uname)" = "Darwin" ]; then
+  ps -eo pid,pcpu,pmem,rss,comm -m 2>/dev/null | tail -n +2 | awk '{
+    pid=$1; cpu=$2; mem=$3; rss=$4;
+    n=split($5,a,"/"); name=a[n];
+    mb=rss/1024;
+    printf "%-6s  %-30s  CPU %5s%%  MEM %6.0f MB\\n", pid, name, cpu, mb
+  }'
+else
+  ps -eo pid,pcpu,pmem,rss,comm --sort=-rss 2>/dev/null | tail -n +2 | awk '{
+    pid=$1; cpu=$2; mem=$3; rss=$4;
+    n=split($5,a,"/"); name=a[n];
+    mb=rss/1024;
+    printf "%-6s  %-30s  CPU %5s%%  MEM %6.0f MB\\n", pid, name, cpu, mb
+  }'
+fi
+"""
+
+[preview]
+command = "ps -p '{split: :0}' -o pid,ppid,user,pgid,%cpu,%mem,etime,command 2>/dev/null"
+
+[keybindings]
+enter = ["actions:kill", "reload_source"]
+ctrl-k = ["actions:kill", "reload_source"]
+ctrl-d = ["actions:force_kill", "reload_source"]
+
+[actions.kill]
+description = "Kill process (SIGTERM)"
+command = "kill '{split: :0}'"
+mode = "fork"
+
+[actions.force_kill]
+description = "Force kill (SIGKILL)"
+command = "kill -9 '{split: :0}'"
+mode = "fork"

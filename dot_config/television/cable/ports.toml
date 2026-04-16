@@ -5,7 +5,9 @@
 #   tv ports
 #
 # Keybindings:
-#   Enter      Kill the selected process (with confirmation)
+#   Enter      Show process details
+#   Ctrl+K     Kill the selected process (stays in picker to kill more)
+#   Ctrl+D     Force kill (kill -9)
 #   Ctrl+/     Toggle preview panel
 #
 # Preview shows full process details via `ps`.
@@ -33,9 +35,21 @@ fi
 command = "ps -p '{split: :0}' -o pid,ppid,%cpu,%mem,etime,command 2>/dev/null"
 
 [keybindings]
-enter = "actions:kill"
+enter = "actions:details"
+ctrl-k = ["actions:kill", "reload_source"]
+ctrl-d = ["actions:force_kill", "reload_source"]
+
+[actions.details]
+description = "Show full process details"
+command = "ps -p '{split: :0}' -o pid,ppid,user,%cpu,%mem,etime,command; echo '---'; lsof -i -P -n -p '{split: :0}' 2>/dev/null | grep LISTEN"
+mode = "execute"
 
 [actions.kill]
 description = "Kill the selected process"
 command = "kill '{split: :0}'"
-mode = "execute"
+mode = "fork"
+
+[actions.force_kill]
+description = "Force kill (SIGKILL)"
+command = "kill -9 '{split: :0}'"
+mode = "fork"

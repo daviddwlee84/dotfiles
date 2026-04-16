@@ -432,7 +432,8 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `tv git-log` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television git log browser (bound to `Alt+G`) |
 | `tv env` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television environment variables picker (bound to `Alt+E`) |
 | `tv ssh-config` | tv channel | `dot_config/television/cable/ssh-config.toml` | SSH host picker with `Include config.d/*` support; Enter connects |
-| `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Enter kills process |
+| `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
+| `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
 
 ---
 
