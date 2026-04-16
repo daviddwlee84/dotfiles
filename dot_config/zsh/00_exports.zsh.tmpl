@@ -20,6 +20,15 @@ export LC_ALL="en_US.UTF-8"
 # ~/bin for custom scripts, ~/.local/bin for auto-installed tools (uv, npm, cargo)
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 
+# Snap binaries (Linux only)
+{{ if ne .profile "macos" -}}
+{{ if ne .profile "macos_intel" -}}
+if [[ -d /snap/bin ]]; then
+    export PATH="/snap/bin:$PATH"
+fi
+{{ end -}}
+{{ end -}}
+
 # =============================================================================
 # Homebrew Setup
 # =============================================================================
