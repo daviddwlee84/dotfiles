@@ -1,0 +1,96 @@
+# Pueue task manager channel for television (tv)
+# Fuzzy-search pueue tasks, preview logs, and manage tasks interactively.
+#
+# Usage:
+#   tv pueue
+#
+# Source cycling (Ctrl+S):
+#   1. All tasks (newest first)
+#   2. Active only (Running + Queued + Paused)
+#   3. Failed only
+#   4. Groups overview
+#
+# Keybindings:
+#   Enter      Follow running task / view finished task log
+#   Ctrl+E     Edit task command (stashed/queued only, opens $EDITOR)
+#   Ctrl+Y     Copy raw command to clipboard
+#   Ctrl+A     Copy full `pueue add ...` command to clipboard
+#   Ctrl+G     Filter by group (opens new tv with only that group's tasks)
+#   Ctrl+P     Pause task
+#   Ctrl+R     Resume (start) task
+#   Ctrl+K     Kill task
+#   Ctrl+T     Restart task (in-place)
+#   Ctrl+X     Remove task
+#   Ctrl+L     Clean all finished tasks
+#   Ctrl+F     Cycle preview (log output / JSON details)
+#   Ctrl+/     Toggle preview panel
+#
+# Auto-refreshes every 2 seconds via watch mode.
+
+[metadata]
+name = "pueue"
+description = "Pueue task manager: search, preview logs, pause/resume/kill/restart"
+requirements = ["pueue", "jq"]
+
+[source]
+command = [
+  """pueue status --json 2>/dev/null | jq -r '.tasks | to_entries | sort_by(.value.id | tonumber) | reverse | .[].value | (if .status == "Queued" then "Queued" elif .status == "Stashed" then "Stashed" elif (.status | type == "object") then if (.status | has("Running")) then "Running" elif (.status | has("Done")) then if .status.Done.result == "Success" then "Done:OK" else "Done:FAIL" end elif (.status | has("Paused")) then "Paused" else (.status | keys[0]) end else (.status | tostring) end) as $st | [(.id | tostring), $st, ("[" + .group + "]"), .original_command] | @tsv'""",
+  """pueue status --json 2>/dev/null | jq -r '.tasks | to_entries | sort_by(.value.id | tonumber) | reverse | .[].value | select(.status == "Queued" or (.status | type == "object" and (has("Running") or has("Paused")))) | (if .status == "Queued" then "Queued" elif (.status | has("Running")) then "Running" elif (.status | has("Paused")) then "Paused" else (.status | keys[0]) end) as $st | [(.id | tostring), $st, ("[" + .group + "]"), .original_command] | @tsv'""",
+  """pueue status --json 2>/dev/null | jq -r '.tasks | to_entries | sort_by(.value.id | tonumber) | reverse | .[].value | select(.status | type == "object" and has("Done") and .status.Done.result != "Success") | [(.id | tostring), "Done:FAIL", ("[" + .group + "]"), .original_command] | @tsv'""",
+  """pueue group --json 2>/dev/null | jq -r 'to_entries[] | [.key, .value.status, ("parallel=" + (.value.parallel_tasks | tostring))] | @tsv'""",
+]
+display = "{split:\\t:0}  {split:\\t:1}  {split:\\t:2}  {split:\\t:3}"
+output = "{split:\\t:0}"
+watch = 2.0
+no_sort = true
+
+[preview]
+command = [
+  "pueue log '{split:\\t:0}' --lines 200 2>/dev/null || pueue log '{split:\\t:0}' 2>/dev/null || echo 'No log available for: {split:\\t:0}'",
+  "pueue status --json 2>/dev/null | jq '.tasks[\"{split:\\t:0}\"] | del(.envs)' 2>/dev/null || echo 'No details for: {split:\\t:0}'",
+]
+header = "Task {split:\\t:0} ({split:\\t:1})"
+
+[ui]
+input_header = "Pueue Tasks"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:follow"
+ctrl-e = "actions:edit"
+ctrl-y = ["actions:copy_command", "reload_source"]
+ctrl-a = ["actions:copy_pueue_add", "reload_source"]
+ctrl-g = "actions:filter_group"
+ctrl-p = ["actions:pause", "reload_source"]
+ctrl-r = ["actions:resume", "reload_source"]
+ctrl-k = ["actions:kill", "reload_source"]
+ctrl-t = ["actions:restart", "reload_source"]
+ctrl-x = ["actions:remove", "reload_source"]
+ctrl-l = ["actions:clean", "reload_source"]
+
+[actions.follow]
+description = "Follow running task or view log"
+command = "pueue follow '{split:\\t:0}' 2>/dev/null || pueue log '{split:\\t:0}' 2>/dev/null; echo; echo '[Press any key to exit]'; read -n1"
+mode = "execute"
+
+[actions.edit]
+description = "Edit task command (stashed/queued only)"
+command = "pueue edit '{split:\\t:0}'"
+mode = "execute"
+
+[actions.copy_command]
+description = "Copy raw command to clipboard"
+command = """pueue status --json 2>/dev/null | jq -r --arg id '{split:\\t:0}' '.tasks[$id].original_command // empty' | if command -v pbcopy >/dev/null 2>&1; then pbcopy; elif command -v wl-copy >/dev/null 2>&1; then wl-copy; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard; fi"""
+mode = "fork"
+
+[actions.copy_pueue_add]
+description = "Copy full pueue add command to clipboard"
+command = """pueue status --json 2>/dev/null | jq -r --arg id '{split:\\t:0}' '(.tasks[$id] // empty) | "pueue add" + (if .group != "default" then " -g " + (.group | @sh) else "" end) + (if .label then " -l " + (.label | @sh) else "" end) + (if .priority > 0 then " -o " + (.priority | tostring) else "" end) + (if (.dependencies | length) > 0 then " -a " + (.dependencies | map(tostring) | join(" ")) else "" end) + " -w " + (.path | @sh) + " " + (.original_command | @sh)' | if command -v pbcopy >/dev/null 2>&1; then pbcopy; elif command -v wl-copy >/dev/null 2>&1; then wl-copy; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard; fi"""
+mode = "fork"
+
+[actions.filter_group]
+description = "Filter tasks by group (opens filtered view)"
+command = """group=$(echo '{split:\\t:2}' | sed 's/^\\[//;s/\\]$//'); tv --source-command "pueue status --json --group $group 2>/dev/null | jq -r '.tasks | to_entries | sort_by(.value.id | tonumber) | reverse | .[].value | (if .status == \\\"Queued\\\" then \\\"Queued\\\" elif .status == \\\"Stashed\\\" then \\\"Stashed\\\" elif (.status | type == \\\"object\\\") then if (.status | has(\\\"Running\\\")) then \\\"Running\\\" elif (.status | has(\\\"Done\\\")) then if .status.Done.result == \\\"Success\\\" then \\\"Done:OK\\\" else \\\"Done:FAIL\\\" end elif (.status | has(\\\"Paused\\\")) then \\\"Paused\\\" else (.status | keys[0]) end else (.status | tostring) end) as \\$st | [(.id | tostring), \\$st, (\\\"[\\\" + .group + \\\"]\\\"), .original_command] | @tsv'" --preview-command "pueue log '{}' --lines 200 2>/dev/null || echo 'No log'" --input-header "Pueue [$group]" """
+mode = "execute"

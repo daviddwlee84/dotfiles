@@ -54,6 +54,64 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 
 ---
 
+### `pueue` channel
+
+Interactive task manager for [pueue](https://github.com/Nukesor/pueue) — fuzzy-search tasks, preview logs, and pause/resume/kill/restart without leaving the picker. Parses `pueue status --json` at runtime. Requires `pueue` and `jq`.
+
+Open with `tv pueue`. Auto-refreshes every 2 seconds.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| All tasks | Every task, newest first (default) |
+| Active only | Running + Queued + Paused tasks |
+| Failed only | Tasks that exited non-zero |
+| Groups overview | Pueue groups with status and parallelism |
+
+**Task management:**
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Follow running task output / view finished task log |
+| `Ctrl+E` | Edit task command in `$EDITOR` (stashed/queued only) |
+| `Ctrl+P` | Pause task |
+| `Ctrl+R` | Resume/start task |
+| `Ctrl+K` | Kill task |
+| `Ctrl+T` | Restart task (in-place) |
+| `Ctrl+X` | Remove task from list |
+| `Ctrl+L` | Clean all finished tasks |
+
+**Clipboard:**
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+Y` | Copy raw command to clipboard |
+| `Ctrl+A` | Copy full `pueue add -w <path> -g <group> ...` command to clipboard |
+
+`Ctrl+Y` copies just the original command string. `Ctrl+A` reconstructs a full reproducible `pueue add` invocation including working directory, group, label, priority, and dependencies — useful for re-queuing or sharing tasks.
+
+**Group filtering:**
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+G` | Open a filtered view showing only the selected task's group |
+
+`Ctrl+G` extracts the group name from the selected entry and launches a new `tv` instance with `--source-command` filtered to that group. The filtered view has preview but not the full action keybindings. Quit to return to the main `tv pueue` channel.
+
+**Preview** (`Ctrl+F` cycles):
+
+1. Task log output (`pueue log <id>`)
+2. Full JSON task details (timing, dependencies, result — envs stripped for readability)
+
+**Implementation notes:**
+
+- Uses jq's `@tsv` for output formatting — avoids TOML/shell escape conflicts with jq's `\(...)` interpolation syntax
+- Clipboard actions are cross-platform: pbcopy (macOS), wl-copy (Wayland), xclip (X11)
+- `pueue edit` only works on stashed/queued tasks (pueue limitation); for running/finished tasks use `Ctrl+Y` to copy and re-add manually
+
+---
+
 ### `sesh` channel (community)
 
 Provided by `tv update-channels`. Source cycling through session types and directory search, with connect/kill actions.
