@@ -1568,6 +1568,12 @@
         - /tmp/tv.tar.gz
         - /tmp/tv
 
+- name: Update television channel prototypes
+  ansible.builtin.command: tv update-channels
+  register: tv_update_channels
+  changed_when: "'already exists' not in tv_update_channels.stderr"
+  failed_when: false
+
 # =============================================================================
 # TPM (Tmux Plugin Manager) - All platforms
 # =============================================================================
