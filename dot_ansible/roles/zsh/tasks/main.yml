@@ -46,20 +46,38 @@
   check_mode: false
   failed_when: false
 
-- name: Get current login shell
-  ansible.builtin.getent:
-    database: passwd
-    key: "{{ ansible_user_id }}"
-  register: passwd_entry
+- name: Get current login shell (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command:
+    cmd: "dscl . -read /Users/{{ ansible_facts['user_id'] }} UserShell"
+  register: current_shell_macos
+  changed_when: false
   check_mode: false
+  failed_when: false
+
+- name: Get current login shell (Linux)
+  when: ansible_facts["os_family"] != "Darwin"
+  ansible.builtin.command:
+    cmd: "getent passwd {{ ansible_facts['user_id'] }}"
+  register: current_shell_linux
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Set current shell fact
+  ansible.builtin.set_fact:
+    current_login_shell: >-
+      {{ (current_shell_macos.stdout | default('')).split()[-1]
+         if ansible_facts["os_family"] == "Darwin"
+         else (current_shell_linux.stdout | default('')).split(':')[-1] }}
 
 - name: Change login shell to zsh
   become: true
   tags: [sudo]
   ansible.builtin.user:
-    name: "{{ ansible_user_id }}"
+    name: "{{ ansible_facts['user_id'] }}"
     shell: "{{ zsh_path.stdout }}"
   when:
     - zsh_path.rc == 0
     - zsh_path.stdout | length > 0
-    - not getent_passwd[ansible_user_id][5].endswith('/zsh')
+    - not current_login_shell.endswith('/zsh')
