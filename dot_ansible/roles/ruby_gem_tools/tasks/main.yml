@@ -75,3 +75,6 @@
     url: https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb
     dest: "{{ ansible_facts['env']['HOME'] }}/.local/toolkami.rb"
     mode: '0755'
+    timeout: 60
+  retries: 3
+  delay: 5

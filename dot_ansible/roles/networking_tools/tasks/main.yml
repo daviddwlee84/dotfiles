@@ -113,6 +113,9 @@
         url: "https://github.com/mr-karan/doggo/releases/download/{{ doggo_release.json.tag_name }}/doggo_{{ doggo_version }}_Linux_{{ doggo_arch }}.tar.gz"
         dest: /tmp/doggo.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create doggo temp directory
       ansible.builtin.file:
@@ -196,6 +199,9 @@
         url: "https://github.com/orf/gping/releases/download/{{ gping_release.json.tag_name }}/gping-Linux-musl-{{ gping_arch }}.tar.gz"
         dest: /tmp/gping.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract gping to ~/.local/bin
       ansible.builtin.unarchive:
@@ -262,6 +268,9 @@
         url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ trippy_gnu_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create trippy temp directory
       ansible.builtin.file:
@@ -333,6 +342,9 @@
         url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release_user.json.tag_name }}/trippy-{{ trippy_release_user.json.tag_name }}-{{ trippy_musl_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create trippy temp directory (user)
       ansible.builtin.file:
@@ -405,6 +417,9 @@
         url: "https://github.com/imsnif/bandwhich/releases/download/{{ bandwhich_release.json.tag_name }}/bandwhich-{{ bandwhich_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/bandwhich.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract bandwhich to ~/.local/bin
       ansible.builtin.unarchive:
@@ -454,6 +469,9 @@
         url: "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{{ speedtest_arch }}.tgz"
         dest: /tmp/speedtest.tgz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract speedtest
       ansible.builtin.unarchive:
@@ -512,6 +530,9 @@
         url: "https://github.com/RustScan/RustScan/releases/latest/download/x86_64-linux-rustscan.tar.gz.zip"
         dest: /tmp/rustscan.zip
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Download rustscan archive (aarch64)
       when: rustscan_arch == 'aarch64'
@@ -519,6 +540,9 @@
         url: "https://github.com/RustScan/RustScan/releases/latest/download/aarch64-linux-rustscan.zip"
         dest: /tmp/rustscan.zip
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract and install rustscan (x86_64 - double wrapped)
       when: rustscan_arch == 'x86_64'

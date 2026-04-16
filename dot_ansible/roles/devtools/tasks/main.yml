@@ -139,6 +139,9 @@
         url: "https://github.com/cli/cli/releases/download/{{ gh_release_user.json.tag_name }}/gh_{{ gh_release_user.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.tar.gz"
         dest: /tmp/gh.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract and install gh (user)
       ansible.builtin.shell: |
@@ -209,6 +212,9 @@
         url: "https://github.com/sharkdp/bat/releases/download/{{ bat_release.json.tag_name }}/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/bat.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract bat
       ansible.builtin.unarchive:
@@ -313,6 +319,9 @@
         url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/eza.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract eza to ~/.local/bin
       ansible.builtin.unarchive:
@@ -351,6 +360,9 @@
         url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
         dest: /tmp/git-delta.deb
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Install delta .deb package
       ansible.builtin.apt:
@@ -392,6 +404,9 @@
         url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract delta (user)
       ansible.builtin.unarchive:
@@ -463,6 +478,9 @@
         url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
         dest: /tmp/diffnav.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract and install diffnav
       ansible.builtin.shell: |
@@ -517,6 +535,9 @@
         url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release_user.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
         dest: /tmp/diffnav.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract and install diffnav (user)
       ansible.builtin.shell: |
@@ -603,6 +624,9 @@
         url: "https://github.com/git-bahn/git-graph/releases/download/{{ git_graph_release.json.tag_name }}/git-graph-{{ git_graph_release.json.tag_name }}-linux-amd64.tar.gz"
         dest: /tmp/git-graph.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract git-graph
       ansible.builtin.unarchive:
@@ -729,6 +753,9 @@
         url: "https://github.com/charmbracelet/glow/releases/download/{{ glow_release.json.tag_name }}/glow_{{ glow_version }}_Linux_{{ glow_release_arch }}.tar.gz"
         dest: /tmp/glow.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create glow temp directory
       ansible.builtin.file:
@@ -837,6 +864,9 @@
         url: "{{ duckdb_download_url }}"
         dest: /tmp/duckdb_cli.zip
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create DuckDB temp directory
       ansible.builtin.file:
@@ -937,6 +967,9 @@
         dest: /tmp/rclone.zip
         mode: '0644'
         force: true
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Install rclone to ~/.local/bin
       ansible.builtin.shell: |
@@ -1028,6 +1061,9 @@
         url: "https://github.com/direnv/direnv/releases/download/{{ direnv_release.json.tag_name }}/direnv.linux-{{ direnv_release_arch }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv"
         mode: '0755'
+        timeout: 60
+      retries: 3
+      delay: 5
 
 # --- yazi ---
 - name: Check if yazi is installed
@@ -1057,6 +1093,9 @@
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Install unzip if not present
       ansible.builtin.apt:
@@ -1114,6 +1153,9 @@
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract and install yazi (user)
       ansible.builtin.shell: |
@@ -1192,6 +1234,9 @@
         url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ target_architecture }}-linux-musl.tbz"
         dest: /tmp/btop.tbz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create btop temp directory
       ansible.builtin.file:
@@ -1248,6 +1293,9 @@
         url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ target_architecture | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract zellij
       ansible.builtin.unarchive:
@@ -1291,6 +1339,9 @@
         url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release_user.json.tag_name }}/zellij-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract zellij to ~/.local/bin (user)
       ansible.builtin.unarchive:
@@ -1366,6 +1417,9 @@
         url: "{{ sesh_download_url }}"
         dest: /tmp/sesh.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create sesh temp directory
       ansible.builtin.file:
@@ -1454,6 +1508,9 @@
         url: "https://github.com/tamasfe/taplo/releases/download/{{ taplo_release.json.tag_name }}/taplo-linux-{{ taplo_arch }}.gz"
         dest: /tmp/taplo.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Decompress taplo binary
       ansible.builtin.shell: gunzip -f /tmp/taplo.gz
@@ -1537,6 +1594,9 @@
         url: "{{ tv_download_url }}"
         dest: /tmp/tv.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create television temp directory
       ansible.builtin.file:

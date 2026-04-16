@@ -82,6 +82,9 @@
         url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_linux_{{ gitleaks_arch }}.tar.gz"
         dest: /tmp/gitleaks.tar.gz
         mode: "0644"
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract gitleaks (system)
       ansible.builtin.unarchive:
@@ -148,6 +151,9 @@
         url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version_user }}/gitleaks_{{ gitleaks_version_user }}_linux_{{ gitleaks_arch_user }}.tar.gz"
         dest: /tmp/gitleaks.tar.gz
         mode: "0644"
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract gitleaks (user)
       ansible.builtin.unarchive:

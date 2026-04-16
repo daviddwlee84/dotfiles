@@ -103,6 +103,9 @@
         url: "https://github.com/neovim/neovim/releases/download/{{ nvim_release.json.tag_name }}/nvim-linux-{{ nvim_sys_arch }}.tar.gz"
         dest: /tmp/nvim.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Create /opt/nvim directory
       ansible.builtin.file:
@@ -168,6 +171,8 @@
         dest: "/tmp/nvim.tar.gz"
         mode: '0644'
         timeout: 600
+      retries: 3
+      delay: 5
       environment:
         http_proxy: "{{ lookup('env', 'http_proxy') | default('', true) }}"
         https_proxy: "{{ lookup('env', 'https_proxy') | default('', true) }}"

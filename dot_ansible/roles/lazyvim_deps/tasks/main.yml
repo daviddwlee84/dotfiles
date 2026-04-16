@@ -139,6 +139,9 @@
         url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract lazygit (system)
       ansible.builtin.unarchive:
@@ -184,6 +187,9 @@
         url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract lazygit to user bin (user)
       ansible.builtin.unarchive:

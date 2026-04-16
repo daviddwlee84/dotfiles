@@ -51,6 +51,9 @@
         url: "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip"
         dest: /tmp/Hack.zip
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Extract Hack Nerd Font
       ansible.builtin.unarchive:

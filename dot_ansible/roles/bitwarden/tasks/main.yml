@@ -177,6 +177,8 @@
         dest: /tmp/bitwarden-desktop.deb
         mode: '0644'
         timeout: 120
+      retries: 3
+      delay: 5
 
     - name: Install Bitwarden Desktop .deb package
       ansible.builtin.apt:

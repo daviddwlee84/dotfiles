@@ -365,6 +365,9 @@
     url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_macos_release.json.tag_name }}/SpecStoryCLI_Darwin_{{ specstory_macos_arch }}.zip"
     dest: /tmp/specstory-macos.zip
     mode: "0644"
+    timeout: 60
+  retries: 3
+  delay: 5
 
 - name: Extract SpecStory to ~/.local/bin (macOS fallback)
   when:
@@ -433,6 +436,9 @@
     url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
     dest: /tmp/specstory-linux.tar.gz
     mode: "0644"
+    timeout: 60
+  retries: 3
+  delay: 5
 
 - name: Ensure ~/.local/bin exists (SpecStory)
   when:
@@ -580,6 +586,9 @@
     url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
     dest: /tmp/codexbar.tar.gz
     mode: '0644'
+    timeout: 60
+  retries: 3
+  delay: 5
 
 - name: Create temp directory for CodexBar extraction (Linux fallback)
   when:
@@ -796,6 +805,9 @@
     url: "https://github.com/marcus/td/releases/download/{{ td_linux_tag }}/td_{{ td_linux_version }}_linux_{{ td_linux_arch }}.tar.gz"
     dest: /tmp/td.tar.gz
     mode: "0644"
+    timeout: 60
+  retries: 3
+  delay: 5
 
 - name: Create temp directory for td extraction (Linux fallback)
   when:
@@ -976,6 +988,9 @@
     url: "https://github.com/marcus/sidecar/releases/download/{{ sidecar_linux_tag }}/sidecar_{{ sidecar_linux_version }}_linux_{{ sidecar_linux_arch }}.tar.gz"
     dest: /tmp/sidecar.tar.gz
     mode: "0644"
+    timeout: 60
+  retries: 3
+  delay: 5
 
 - name: Create temp directory for sidecar extraction (Linux fallback)
   when:
