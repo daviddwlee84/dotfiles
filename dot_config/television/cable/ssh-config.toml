@@ -1,0 +1,31 @@
+# Custom SSH config channel for television (tv)
+# Parses Host entries from ~/.ssh/config AND ~/.ssh/config.d/* (Include support).
+# The community ssh-hosts channel only reads ~/.ssh/config directly.
+#
+# Usage:
+#   tv ssh-config
+#
+# Keybindings:
+#   Enter      SSH into selected host
+#   Ctrl+/     Toggle preview panel
+#
+# Preview shows resolved config via `ssh -G`.
+
+[metadata]
+name = "ssh-config"
+description = "SSH hosts (with Include config.d/* support)"
+requirements = ["ssh", "cat", "grep", "awk", "sort"]
+
+[source]
+command = "cat ~/.ssh/config ~/.ssh/config.d/* 2>/dev/null | grep -E '^Host[[:space:]]' | grep -v '[*?]' | awk '{for(i=2;i<=NF;i++) print $i}' | sort -u"
+
+[preview]
+command = "ssh -G '{}' 2>/dev/null | grep -E '^(host|hostname|user|port|identityfile|proxycommand|proxyjump|forwardagent|identityagent|localforward|remoteforward)[[:space:]]'"
+
+[keybindings]
+enter = "actions:connect"
+
+[actions.connect]
+description = "SSH into the selected host"
+command = "ssh '{}'"
+mode = "execute"

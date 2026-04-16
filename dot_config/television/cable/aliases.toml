@@ -23,7 +23,15 @@ description = "Shell aliases & functions: fuzzy search all shortcuts"
 command = "cat ~/.cache/tv/aliases.txt 2>/dev/null || echo 'Cache not found. Open a new shell to generate it.'"
 
 [preview]
-command = "zsh -ic 'type {split: :0}' 2>/dev/null"
+command = """
+name='{split: :0}'
+kind='{split: :1}'
+if [ "$kind" = "alias" ]; then
+  grep "^$name[[:space:]]" ~/.cache/tv/aliases.txt 2>/dev/null
+else
+  zsh --no-rcs -c "autoload -Uz $name 2>/dev/null; whence -f $name 2>/dev/null" 2>/dev/null || echo "$name (function)"
+fi
+"""
 
 [keybindings]
 enter = "actions:exec"

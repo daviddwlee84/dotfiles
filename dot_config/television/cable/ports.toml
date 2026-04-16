@@ -1,0 +1,41 @@
+# Custom listening ports cable channel for television (tv)
+# Shows all listening TCP/UDP ports with PID, process name, and address.
+#
+# Usage:
+#   tv ports
+#
+# Keybindings:
+#   Enter      Kill the selected process (with confirmation)
+#   Ctrl+/     Toggle preview panel
+#
+# Preview shows full process details via `ps`.
+# Cross-platform: uses lsof (macOS) or ss (Linux).
+
+[metadata]
+name = "ports"
+description = "Listening ports: PID, process, address"
+
+[source]
+command = """
+if command -v lsof >/dev/null 2>&1; then
+  lsof -i -P -n 2>/dev/null | grep LISTEN | awk '{printf "%-6s  %-20s  %s\\n", $2, $9, $1}' | sort -u
+elif command -v ss >/dev/null 2>&1; then
+  ss -tlnp 2>/dev/null | tail -n +2 | awk '{
+    addr=$4; pid=$7;
+    gsub(/.*pid=/,"",pid); gsub(/,.*$/,"",pid);
+    gsub(/.*users:\\(\\("/,"",pid);
+    printf "%-6s  %-20s  %s\\n", pid, addr, $7
+  }' | sort -u
+fi
+"""
+
+[preview]
+command = "ps -p '{split: :0}' -o pid,ppid,%cpu,%mem,etime,command 2>/dev/null"
+
+[keybindings]
+enter = "actions:kill"
+
+[actions.kill]
+description = "Kill the selected process"
+command = "kill '{split: :0}'"
+mode = "execute"
