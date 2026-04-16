@@ -155,7 +155,7 @@ if ! mise --version &> /dev/null; then
         rm -f "$(command -v mise)" 2>/dev/null || true
     fi
     # Try curl installer first (fast, no sudo)
-    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh 2>/dev/null && mise --version &> /dev/null; then
+    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh && mise --version &> /dev/null; then
         success "mise installed via curl"
 {{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
 {{ if not $noRootMise -}}
@@ -175,11 +175,27 @@ if ! mise --version &> /dev/null; then
         esac
         if [[ -n "$MISE_BIN_ARCH" ]]; then
             MISE_URL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}"
-            if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && mise --version &> /dev/null; then
-                success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+            info "Downloading mise from ${MISE_URL}..."
+            if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise"; then
+                # Verify the binary actually runs
+                if "$HOME/.local/bin/mise" --version &> /dev/null; then
+                    success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+                else
+                    # Try musl variant (some armhf systems need it)
+                    warn "glibc binary failed, trying musl variant..."
+                    MISE_URL_MUSL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}-musl"
+                    if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL_MUSL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && "$HOME/.local/bin/mise" --version &> /dev/null; then
+                        success "mise installed via direct binary download (linux-${MISE_BIN_ARCH}-musl)"
+                    else
+                        rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+                        warn "Could not install mise — skipping (Node.js via mise will not be available)"
+                        warn "  Tried: linux-${MISE_BIN_ARCH} and linux-${MISE_BIN_ARCH}-musl"
+                        warn "  You can install mise manually: https://mise.jdx.dev/installing-mise.html"
+                    fi
+                fi
             else
                 rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
-                warn "Could not install mise — skipping (Node.js via mise will not be available)"
+                warn "Could not download mise — skipping"
             fi
         else
             warn "Could not install mise — unsupported architecture '$MISE_REAL_ARCH'"
