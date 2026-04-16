@@ -426,7 +426,11 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 |---------|------|-------------|-------------|
 | `tools-picker` | function | `dot_config/zsh/tools/11_tools_picker.zsh` | fzf picker for installed CLI tools; Enter pastes invocation to buffer, Ctrl+E executes (bound to `Alt+T`) |
 | `tv tools` | tv channel | `dot_config/television/cable/tools.toml` | Television picker for CLI tools; Enter executes, Ctrl+T shows tldrf page |
-| `tv aliases` | tv channel | `dot_config/television/cable/aliases.toml` | Television picker for all runtime aliases & functions; Enter executes, Ctrl+Y copies name |
+| `tv aliases` | tv channel | `dot_config/television/cable/aliases.toml` | Television picker for all runtime aliases & functions; Enter executes, Ctrl+Y copies name (bound to `Alt+A`) |
+| `tv files` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television file picker (bound to `Alt+F`) |
+| `tv history` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television shell history search (bound to `Alt+R`) |
+| `tv git-log` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television git log browser (bound to `Alt+G`) |
+| `tv env` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television environment variables picker (bound to `Alt+E`) |
 
 ---
 
