@@ -15,13 +15,19 @@
       changed_when: false
       failed_when: false
 
-    - name: Override ansible_architecture to match userland
+    - name: Map dpkg arch to uname-style value
       ansible.builtin.set_fact:
-        ansible_architecture: >-
+        _userland_arch: >-
           {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
              [dpkg_arch_result.stdout | trim]
              | default(ansible_facts['architecture']) }}
       when: dpkg_arch_result.rc == 0 and dpkg_arch_result.stdout | trim != ''
+
+    - name: Override ansible_facts architecture to match userland
+      ansible.builtin.set_fact:
+        ansible_facts: "{{ ansible_facts | combine({'architecture': _userland_arch | trim}) }}"
+        ansible_architecture: "{{ _userland_arch | trim }}"
+      when: _userland_arch is defined and _userland_arch | trim != ansible_facts['architecture']
 
   roles:
     - role: base

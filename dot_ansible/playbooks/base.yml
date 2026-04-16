@@ -12,9 +12,9 @@
       failed_when: false
       when: ansible_facts["os_family"] == "Debian"
 
-    - name: Override ansible_architecture to match userland
+    - name: Map dpkg arch to uname-style value
       ansible.builtin.set_fact:
-        ansible_architecture: >-
+        _userland_arch: >-
           {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
              [dpkg_arch_result.stdout | trim]
              | default(ansible_facts['architecture']) }}
@@ -22,6 +22,14 @@
         - ansible_facts["os_family"] == "Debian"
         - dpkg_arch_result.rc == 0
         - dpkg_arch_result.stdout | trim != ''
+
+    - name: Override ansible_facts architecture to match userland
+      ansible.builtin.set_fact:
+        ansible_facts: "{{ ansible_facts | combine({'architecture': _userland_arch | trim}) }}"
+        ansible_architecture: "{{ _userland_arch | trim }}"
+      when:
+        - _userland_arch is defined
+        - _userland_arch | trim != ansible_facts['architecture']
 
   roles:
     - role: base

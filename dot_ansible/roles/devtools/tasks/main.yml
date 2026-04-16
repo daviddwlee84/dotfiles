@@ -876,7 +876,9 @@
         - /tmp/duckdb
 
 - name: Verify DuckDB CLI is available
-  when: ansible_facts["os_family"] == "Debian"
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.command: duckdb --version
   changed_when: false
   environment:
