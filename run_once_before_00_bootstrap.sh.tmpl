@@ -136,7 +136,15 @@ else
     info "uv is already installed"
 fi
 
-# 2. Install mise if missing (runtime manager for Node.js, etc.)
+# 2. Install build dependencies needed by mise tools (Ruby) and ansible (cryptography)
+{{ $noRootDeps := false }}{{ if hasKey . "noRoot" }}{{ $noRootDeps = .noRoot }}{{ end -}}
+{{ if not $noRootDeps -}}
+if command -v apt-get &> /dev/null; then
+    sudo apt-get install -y libffi-dev libyaml-dev python3-dev 2>/dev/null || true
+fi
+{{ end -}}
+
+# 3. Install mise if missing (runtime manager for Node.js, etc.)
 # Use "mise --version" instead of "command -v" to catch arch-mismatch binaries
 # (e.g. aarch64 binary on armhf userland — file exists but cannot execute)
 if ! mise --version &> /dev/null; then
@@ -177,22 +185,16 @@ else
     info "mise is already installed"
 fi
 
-# 3. Install ansible if missing
+# 4. Install ansible if missing
 if ! command -v ansible-playbook &> /dev/null; then
     info "Installing ansible via uv..."
-{{ $noRootAnsible := false }}{{ if hasKey . "noRoot" }}{{ $noRootAnsible = .noRoot }}{{ end }}
-{{- if not $noRootAnsible }}
-    # ansible-core depends on cryptography -> cffi which needs libffi-dev to compile
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get install -y libffi-dev python3-dev 2>/dev/null || true
-    fi
-{{ end }}    uv tool install ansible-core
+    uv tool install ansible-core
     success "ansible installed successfully"
 else
     info "ansible is already installed"
 fi
 
-# 4. Install ansible-galaxy collections
+# 5. Install ansible-galaxy collections
 info "Installing ansible-galaxy collections..."
 if ansible-galaxy collection install community.general --force-with-deps; then
     success "ansible-galaxy collections installed"
@@ -207,16 +209,19 @@ else
     fi
 fi
 
-# 5. Install mise global tools (Node.js) if mise config exists
+# 6. Install mise global tools (Node.js) if mise config exists
 MISE_BIN="${HOME}/.local/bin/mise"
 [[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
 if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
     info "Installing mise global tools..."
-    "$MISE_BIN" install --yes
-    success "mise tools installed"
+    if "$MISE_BIN" install --yes; then
+        success "mise tools installed"
+    else
+        warn "mise install had errors (some tools may have failed to build). Continuing..."
+    fi
 fi
 
-# 6. Ensure ~/.local/bin is on PATH for bash sessions (idempotent)
+# 7. Ensure ~/.local/bin is on PATH for bash sessions (idempotent)
 # chezmoi, uv, mise all live in ~/.local/bin. Dotfiles only wire this up in
 # zsh; until the user switches shells, bash needs help finding them.
 BASHRC="$HOME/.bashrc"
