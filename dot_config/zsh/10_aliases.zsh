@@ -27,6 +27,26 @@ alias v="nvim"
 # command -v eza &>/dev/null && alias ls="eza"
 # command -v bat &>/dev/null && alias cat="bat"
 
+# Git shortcuts
+gcam() {
+  [[ -z "$1" ]] && { echo "Usage: gcam <message>"; return 1; }
+  git add -A && git commit -m "$1"
+}
+
+# Amend last commit (keep message by default; pass -m "new msg" to change it)
+alias gca='git commit --amend --no-edit'
+gcam-amend() {
+  [[ -z "$1" ]] && { echo "Usage: gcam-amend <new message>"; return 1; }
+  git commit --amend -m "$1"
+}
+
+# Undo last commit → back to staged, print the undone commit message
+gundo() {
+  local msg
+  msg="$(git log -1 --pretty=%B)" || return 1
+  git reset --soft HEAD~1 && echo "Undone commit:\n  $msg"
+}
+
 # Zsh startup profiling
 alias zsh-profile='ZSH_PROF=1 zsh -i -c exit'
 

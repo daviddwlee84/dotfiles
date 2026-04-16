@@ -13,6 +13,16 @@ Cross-platform dotfiles management using **chezmoi** for configuration files and
 
 Keep README.md concise and user-focused. Technical details belong in CLAUDE.md or docs/.
 
+## Maintaining Custom Aliases & Shell Functions
+
+**IMPORTANT**: When adding or modifying a custom alias or shell function in any `dot_config/zsh/` file, update `docs/zsh/aliases.md`:
+
+- **New entry**: add a row with the command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description
+- **Modified entry**: update the existing row to reflect changes
+- **Removed entry**: delete the row
+
+This keeps `docs/zsh/aliases.md` as the single quick-reference for all custom shell shortcuts.
+
 ## Maintaining Dockerfile
 
 **IMPORTANT**: When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, also update `Dockerfile`:
