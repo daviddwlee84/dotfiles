@@ -355,40 +355,43 @@
     state: directory
     mode: "0755"
 
-- name: Download SpecStory from GitHub release (macOS fallback)
+- name: Install SpecStory from GitHub release (macOS fallback)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - specstory_macos_check.rc != 0
     - specstory_macos_recheck.rc != 0
     - specstory_macos_release is defined
-  ansible.builtin.get_url:
-    url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_macos_release.json.tag_name }}/SpecStoryCLI_Darwin_{{ specstory_macos_arch }}.zip"
-    dest: /tmp/specstory-macos.zip
-    mode: "0644"
-    timeout: 60
-  retries: 3
-  delay: 5
+  block:
+    - name: Download SpecStory from GitHub release (macOS fallback)
+      ansible.builtin.get_url:
+        url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_macos_release.json.tag_name }}/SpecStoryCLI_Darwin_{{ specstory_macos_arch }}.zip"
+        dest: /tmp/specstory-macos.zip
+        mode: "0644"
+        timeout: 120
+      retries: 3
+      delay: 5
 
-- name: Extract SpecStory to ~/.local/bin (macOS fallback)
-  when:
-    - ansible_facts["os_family"] == "Darwin"
-    - specstory_macos_check.rc != 0
-    - specstory_macos_recheck.rc != 0
-    - specstory_macos_release is defined
-  ansible.builtin.unarchive:
-    src: /tmp/specstory-macos.zip
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-    remote_src: true
-    mode: "0755"
+    - name: Extract SpecStory to ~/.local/bin (macOS fallback)
+      ansible.builtin.unarchive:
+        src: /tmp/specstory-macos.zip
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+        mode: "0755"
 
-- name: Clean up SpecStory zip (macOS fallback)
-  when:
-    - ansible_facts["os_family"] == "Darwin"
-    - specstory_macos_check.rc != 0
-    - specstory_macos_recheck.rc != 0
-  ansible.builtin.file:
-    path: /tmp/specstory-macos.zip
-    state: absent
+    - name: Clean up SpecStory zip (macOS fallback)
+      ansible.builtin.file:
+        path: /tmp/specstory-macos.zip
+        state: absent
+
+  rescue:
+    - name: Warn SpecStory installation failed (macOS fallback)
+      ansible.builtin.debug:
+        msg: "SpecStory installation failed (likely network timeout) - skipping"
+
+    - name: Clean up SpecStory temp files after failure (macOS fallback)
+      ansible.builtin.file:
+        path: /tmp/specstory-macos.zip
+        state: absent
 
 - name: Check if SpecStory is installed (Linux)
   when: ansible_facts["os_family"] == "Debian"
@@ -426,50 +429,49 @@
   ansible.builtin.debug:
     msg: "SpecStory skipped: no release for {{ target_architecture }}"
 
-- name: Download SpecStory from GitHub release (Linux)
+- name: Install SpecStory from GitHub release (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
     - specstory_release is defined
     - specstory_linux_arch | trim != ''
-  ansible.builtin.get_url:
-    url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
-    dest: /tmp/specstory-linux.tar.gz
-    mode: "0644"
-    timeout: 60
-  retries: 3
-  delay: 5
+  block:
+    - name: Download SpecStory from GitHub release (Linux)
+      ansible.builtin.get_url:
+        url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
+        dest: /tmp/specstory-linux.tar.gz
+        mode: "0644"
+        timeout: 120
+      retries: 3
+      delay: 5
 
-- name: Ensure ~/.local/bin exists (SpecStory)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - specstory_check.rc != 0
-    - specstory_release is defined
-    - specstory_linux_arch | trim != ''
-  ansible.builtin.file:
-    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-    state: directory
-    mode: "0755"
+    - name: Ensure ~/.local/bin exists (SpecStory)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: "0755"
 
-- name: Extract SpecStory to ~/.local/bin (Linux)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - specstory_check.rc != 0
-    - specstory_release is defined
-    - specstory_linux_arch | trim != ''
-  ansible.builtin.unarchive:
-    src: /tmp/specstory-linux.tar.gz
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-    remote_src: true
-    mode: "0755"
+    - name: Extract SpecStory to ~/.local/bin (Linux)
+      ansible.builtin.unarchive:
+        src: /tmp/specstory-linux.tar.gz
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+        mode: "0755"
 
-- name: Clean up SpecStory tarball (Linux)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - specstory_check.rc != 0
-  ansible.builtin.file:
-    path: /tmp/specstory-linux.tar.gz
-    state: absent
+    - name: Clean up SpecStory tarball (Linux)
+      ansible.builtin.file:
+        path: /tmp/specstory-linux.tar.gz
+        state: absent
+
+  rescue:
+    - name: Warn SpecStory installation failed (Linux)
+      ansible.builtin.debug:
+        msg: "SpecStory installation failed (likely network timeout) - skipping"
+
+    - name: Clean up SpecStory temp files after failure (Linux)
+      ansible.builtin.file:
+        path: /tmp/specstory-linux.tar.gz
+        state: absent
 
 # === CodexBar ===
 
@@ -576,77 +578,69 @@
   ansible.builtin.set_fact:
     codexbar_asset: "CodexBarCLI-{{ codexbar_tag }}-linux-{{ codexbar_arch }}.tar.gz"
 
-- name: Download CodexBar release (Linux fallback)
+- name: Install CodexBar from GitHub releases (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_asset is defined
-  ansible.builtin.get_url:
-    url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
-    dest: /tmp/codexbar.tar.gz
-    mode: '0644'
-    timeout: 60
-  retries: 3
-  delay: 5
+  block:
+    - name: Download CodexBar release (Linux fallback)
+      ansible.builtin.get_url:
+        url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
+        dest: /tmp/codexbar.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
 
-- name: Create temp directory for CodexBar extraction (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
-    - codexbar_asset is defined
-  ansible.builtin.file:
-    path: /tmp/codexbar
-    state: directory
-    mode: '0755'
+    - name: Create temp directory for CodexBar extraction (Linux fallback)
+      ansible.builtin.file:
+        path: /tmp/codexbar
+        state: directory
+        mode: '0755'
 
-- name: Extract CodexBar release (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
-    - codexbar_asset is defined
-  ansible.builtin.unarchive:
-    src: /tmp/codexbar.tar.gz
-    dest: /tmp/codexbar
-    remote_src: true
+    - name: Extract CodexBar release (Linux fallback)
+      ansible.builtin.unarchive:
+        src: /tmp/codexbar.tar.gz
+        dest: /tmp/codexbar
+        remote_src: true
 
-- name: Find codexbar binary (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
-    - codexbar_asset is defined
-  ansible.builtin.find:
-    paths: /tmp/codexbar
-    patterns: CodexBarCLI
-    file_type: file
-  register: codexbar_find
+    - name: Find codexbar binary (Linux fallback)
+      ansible.builtin.find:
+        paths: /tmp/codexbar
+        patterns: CodexBarCLI
+        file_type: file
+      register: codexbar_find
 
-- name: Install CodexBar to ~/.local/bin (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
-    - codexbar_find.matched | default(0) | int > 0
-  ansible.builtin.copy:
-    src: "{{ codexbar_find.files[0].path }}"
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/codexbar"
-    mode: '0755'
-    remote_src: true
+    - name: Install CodexBar to ~/.local/bin (Linux fallback)
+      when: codexbar_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ codexbar_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/codexbar"
+        mode: '0755'
+        remote_src: true
 
-- name: Clean up CodexBar temp files (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - codexbar_check.rc != 0
-    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /tmp/codexbar.tar.gz
-    - /tmp/codexbar
+    - name: Clean up CodexBar temp files (Linux fallback)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/codexbar.tar.gz
+        - /tmp/codexbar
+
+  rescue:
+    - name: Warn CodexBar installation failed
+      ansible.builtin.debug:
+        msg: "CodexBar installation failed (likely network timeout) - skipping"
+
+    - name: Clean up CodexBar temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/codexbar.tar.gz
+        - /tmp/codexbar
 
 # === td ===
 
@@ -795,78 +789,69 @@
   ansible.builtin.debug:
     msg: "td fallback skipped: unsupported architecture {{ target_architecture }}."
 
-- name: Download td release (Linux fallback)
+- name: Install td from GitHub releases (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
-  ansible.builtin.get_url:
-    url: "https://github.com/marcus/td/releases/download/{{ td_linux_tag }}/td_{{ td_linux_version }}_linux_{{ td_linux_arch }}.tar.gz"
-    dest: /tmp/td.tar.gz
-    mode: "0644"
-    timeout: 60
-  retries: 3
-  delay: 5
+  block:
+    - name: Download td release (Linux fallback)
+      ansible.builtin.get_url:
+        url: "https://github.com/marcus/td/releases/download/{{ td_linux_tag }}/td_{{ td_linux_version }}_linux_{{ td_linux_arch }}.tar.gz"
+        dest: /tmp/td.tar.gz
+        mode: "0644"
+        timeout: 120
+      retries: 3
+      delay: 5
 
-- name: Create temp directory for td extraction (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-    - td_recheck.rc != 0
-    - td_linux_arch != "unsupported"
-  ansible.builtin.file:
-    path: /tmp/td
-    state: directory
-    mode: "0755"
+    - name: Create temp directory for td extraction (Linux fallback)
+      ansible.builtin.file:
+        path: /tmp/td
+        state: directory
+        mode: "0755"
 
-- name: Extract td release (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-    - td_recheck.rc != 0
-    - td_linux_arch != "unsupported"
-  ansible.builtin.unarchive:
-    src: /tmp/td.tar.gz
-    dest: /tmp/td
-    remote_src: true
+    - name: Extract td release (Linux fallback)
+      ansible.builtin.unarchive:
+        src: /tmp/td.tar.gz
+        dest: /tmp/td
+        remote_src: true
 
-- name: Find td binary (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-    - td_recheck.rc != 0
-    - td_linux_arch != "unsupported"
-  ansible.builtin.find:
-    paths: /tmp/td
-    patterns: td
-    file_type: file
-  register: td_find
+    - name: Find td binary (Linux fallback)
+      ansible.builtin.find:
+        paths: /tmp/td
+        patterns: td
+        file_type: file
+      register: td_find
 
-- name: Install td to ~/.local/bin (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-    - td_recheck.rc != 0
-    - td_linux_arch != "unsupported"
-    - td_find.matched | default(0) | int > 0
-  ansible.builtin.copy:
-    src: "{{ td_find.files[0].path }}"
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/td"
-    mode: "0755"
-    remote_src: true
+    - name: Install td to ~/.local/bin (Linux fallback)
+      when: td_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ td_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/td"
+        mode: "0755"
+        remote_src: true
 
-- name: Clean up td temp files (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
-    - td_recheck.rc != 0
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /tmp/td.tar.gz
-    - /tmp/td
+    - name: Clean up td temp files (Linux fallback)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/td.tar.gz
+        - /tmp/td
+
+  rescue:
+    - name: Warn td installation failed
+      ansible.builtin.debug:
+        msg: "td installation failed (likely network timeout) - skipping"
+
+    - name: Clean up td temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/td.tar.gz
+        - /tmp/td
 
 # === Sidecar ===
 
@@ -978,78 +963,69 @@
   ansible.builtin.debug:
     msg: "sidecar fallback skipped: unsupported architecture {{ target_architecture }}."
 
-- name: Download sidecar release (Linux fallback)
+- name: Install sidecar from GitHub releases (Linux fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
     - sidecar_linux_arch != "unsupported"
-  ansible.builtin.get_url:
-    url: "https://github.com/marcus/sidecar/releases/download/{{ sidecar_linux_tag }}/sidecar_{{ sidecar_linux_version }}_linux_{{ sidecar_linux_arch }}.tar.gz"
-    dest: /tmp/sidecar.tar.gz
-    mode: "0644"
-    timeout: 60
-  retries: 3
-  delay: 5
+  block:
+    - name: Download sidecar release (Linux fallback)
+      ansible.builtin.get_url:
+        url: "https://github.com/marcus/sidecar/releases/download/{{ sidecar_linux_tag }}/sidecar_{{ sidecar_linux_version }}_linux_{{ sidecar_linux_arch }}.tar.gz"
+        dest: /tmp/sidecar.tar.gz
+        mode: "0644"
+        timeout: 120
+      retries: 3
+      delay: 5
 
-- name: Create temp directory for sidecar extraction (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - sidecar_check.rc != 0
-    - sidecar_recheck.rc != 0
-    - sidecar_linux_arch != "unsupported"
-  ansible.builtin.file:
-    path: /tmp/sidecar
-    state: directory
-    mode: "0755"
+    - name: Create temp directory for sidecar extraction (Linux fallback)
+      ansible.builtin.file:
+        path: /tmp/sidecar
+        state: directory
+        mode: "0755"
 
-- name: Extract sidecar release (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - sidecar_check.rc != 0
-    - sidecar_recheck.rc != 0
-    - sidecar_linux_arch != "unsupported"
-  ansible.builtin.unarchive:
-    src: /tmp/sidecar.tar.gz
-    dest: /tmp/sidecar
-    remote_src: true
+    - name: Extract sidecar release (Linux fallback)
+      ansible.builtin.unarchive:
+        src: /tmp/sidecar.tar.gz
+        dest: /tmp/sidecar
+        remote_src: true
 
-- name: Find sidecar binary (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - sidecar_check.rc != 0
-    - sidecar_recheck.rc != 0
-    - sidecar_linux_arch != "unsupported"
-  ansible.builtin.find:
-    paths: /tmp/sidecar
-    patterns: sidecar
-    file_type: file
-  register: sidecar_find
+    - name: Find sidecar binary (Linux fallback)
+      ansible.builtin.find:
+        paths: /tmp/sidecar
+        patterns: sidecar
+        file_type: file
+      register: sidecar_find
 
-- name: Install sidecar to ~/.local/bin (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - sidecar_check.rc != 0
-    - sidecar_recheck.rc != 0
-    - sidecar_linux_arch != "unsupported"
-    - sidecar_find.matched | default(0) | int > 0
-  ansible.builtin.copy:
-    src: "{{ sidecar_find.files[0].path }}"
-    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sidecar"
-    mode: "0755"
-    remote_src: true
+    - name: Install sidecar to ~/.local/bin (Linux fallback)
+      when: sidecar_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ sidecar_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sidecar"
+        mode: "0755"
+        remote_src: true
 
-- name: Clean up sidecar temp files (Linux fallback)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - sidecar_check.rc != 0
-    - sidecar_recheck.rc != 0
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - /tmp/sidecar.tar.gz
-    - /tmp/sidecar
+    - name: Clean up sidecar temp files (Linux fallback)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/sidecar.tar.gz
+        - /tmp/sidecar
+
+  rescue:
+    - name: Warn sidecar installation failed
+      ansible.builtin.debug:
+        msg: "sidecar installation failed (likely network timeout) - skipping"
+
+    - name: Clean up sidecar temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/sidecar.tar.gz
+        - /tmp/sidecar
 
 # === Specify CLI ===
 

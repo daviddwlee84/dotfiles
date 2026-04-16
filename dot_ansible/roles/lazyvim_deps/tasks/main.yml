@@ -139,7 +139,7 @@
         url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -152,6 +152,15 @@
           - lazygit
 
     - name: Clean up lazygit tarball (system)
+      ansible.builtin.file:
+        path: /tmp/lazygit.tar.gz
+        state: absent
+  rescue:
+    - name: Warn lazygit system install failed
+      ansible.builtin.debug:
+        msg: "lazygit system-level installation failed — skipping"
+
+    - name: Clean up lazygit temp files (system rescue)
       ansible.builtin.file:
         path: /tmp/lazygit.tar.gz
         state: absent
@@ -187,7 +196,7 @@
         url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -200,6 +209,15 @@
           - lazygit
 
     - name: Clean up lazygit tarball (user)
+      ansible.builtin.file:
+        path: /tmp/lazygit.tar.gz
+        state: absent
+  rescue:
+    - name: Warn lazygit user install failed
+      ansible.builtin.debug:
+        msg: "lazygit user-level installation failed — skipping"
+
+    - name: Clean up lazygit temp files (user rescue)
       ansible.builtin.file:
         path: /tmp/lazygit.tar.gz
         state: absent

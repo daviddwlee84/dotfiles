@@ -103,7 +103,7 @@
         url: "https://github.com/neovim/neovim/releases/download/{{ nvim_release.json.tag_name }}/nvim-linux-{{ nvim_sys_arch }}.tar.gz"
         dest: /tmp/nvim.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -135,6 +135,16 @@
     - name: Display installed Neovim version
       ansible.builtin.debug:
         msg: "Installed Neovim {{ nvim_release.json.tag_name }} from GitHub releases"
+
+  rescue:
+    - name: Warn Neovim GitHub install failed (system-level)
+      ansible.builtin.debug:
+        msg: "Failed to install Neovim from GitHub releases — keeping existing version or install manually"
+
+    - name: Clean up temp files after failed Neovim install (system-level)
+      ansible.builtin.file:
+        path: /tmp/nvim.tar.gz
+        state: absent
 
 # =============================================================================
 # User-level install (noRoot mode) - AppImage to ~/.local/bin
@@ -198,3 +208,13 @@
     - name: Display installed Neovim version
       ansible.builtin.debug:
         msg: "Installed Neovim (user-level): {{ nvim_user_version.stdout }}"
+
+  rescue:
+    - name: Warn Neovim user-level install failed
+      ansible.builtin.debug:
+        msg: "Failed to install Neovim from GitHub releases (user-level) — install manually"
+
+    - name: Clean up temp files after failed Neovim install (user-level)
+      ansible.builtin.file:
+        path: /tmp/nvim.tar.gz
+        state: absent

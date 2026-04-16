@@ -113,7 +113,7 @@
         url: "https://github.com/mr-karan/doggo/releases/download/{{ doggo_release.json.tag_name }}/doggo_{{ doggo_version }}_Linux_{{ doggo_arch }}.tar.gz"
         dest: /tmp/doggo.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -158,6 +158,18 @@
         - /tmp/doggo
         - /tmp/LICENSE
         - /tmp/README.md
+  rescue:
+    - name: Warn doggo installation failed
+      ansible.builtin.debug:
+        msg: "doggo installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up doggo temp files (rescue)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/doggo.tar.gz
+        - /tmp/doggo
 
 # --- gping (graphical ping) ---
 - name: Check if gping is installed
@@ -199,7 +211,7 @@
         url: "https://github.com/orf/gping/releases/download/{{ gping_release.json.tag_name }}/gping-Linux-musl-{{ gping_arch }}.tar.gz"
         dest: /tmp/gping.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -210,6 +222,15 @@
         remote_src: true
 
     - name: Clean up gping tarball
+      ansible.builtin.file:
+        path: /tmp/gping.tar.gz
+        state: absent
+  rescue:
+    - name: Warn gping installation failed
+      ansible.builtin.debug:
+        msg: "gping installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up gping temp files (rescue)
       ansible.builtin.file:
         path: /tmp/gping.tar.gz
         state: absent
@@ -268,7 +289,7 @@
         url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ trippy_gnu_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -311,6 +332,18 @@
       loop:
         - /tmp/trippy.tar.gz
         - /tmp/trippy
+  rescue:
+    - name: Warn trippy installation failed (system-level)
+      ansible.builtin.debug:
+        msg: "trippy system-level installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up trippy temp files (rescue)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/trippy.tar.gz
+        - /tmp/trippy
 
 # --- trippy (user-level fallback) ---
 - name: Re-check if trippy is installed
@@ -342,7 +375,7 @@
         url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release_user.json.tag_name }}/trippy-{{ trippy_release_user.json.tag_name }}-{{ trippy_musl_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -385,6 +418,18 @@
       loop:
         - /tmp/trippy.tar.gz
         - /tmp/trippy-user
+  rescue:
+    - name: Warn trippy installation failed (user-level)
+      ansible.builtin.debug:
+        msg: "trippy user-level installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up trippy temp files (user rescue)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/trippy.tar.gz
+        - /tmp/trippy-user
 
 # --- bandwhich (bandwidth monitor) ---
 - name: Check if bandwhich is installed
@@ -417,7 +462,7 @@
         url: "https://github.com/imsnif/bandwhich/releases/download/{{ bandwhich_release.json.tag_name }}/bandwhich-{{ bandwhich_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/bandwhich.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -431,6 +476,15 @@
           - bandwhich
 
     - name: Clean up bandwhich tarball
+      ansible.builtin.file:
+        path: /tmp/bandwhich.tar.gz
+        state: absent
+  rescue:
+    - name: Warn bandwhich installation failed
+      ansible.builtin.debug:
+        msg: "bandwhich installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up bandwhich temp files (rescue)
       ansible.builtin.file:
         path: /tmp/bandwhich.tar.gz
         state: absent
@@ -469,7 +523,7 @@
         url: "https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-{{ speedtest_arch }}.tgz"
         dest: /tmp/speedtest.tgz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -530,7 +584,7 @@
         url: "https://github.com/RustScan/RustScan/releases/latest/download/x86_64-linux-rustscan.tar.gz.zip"
         dest: /tmp/rustscan.zip
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -540,7 +594,7 @@
         url: "https://github.com/RustScan/RustScan/releases/latest/download/aarch64-linux-rustscan.zip"
         dest: /tmp/rustscan.zip
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -570,6 +624,17 @@
       changed_when: true
 
     - name: Clean up rustscan temp files
+      ansible.builtin.shell: |
+        rm -f /tmp/rustscan.zip /tmp/rustscan /tmp/x86_64-linux-rustscan.tar.gz /tmp/aarch64-linux-rustscan
+      args:
+        executable: /bin/bash
+      changed_when: false
+  rescue:
+    - name: Warn rustscan installation failed
+      ansible.builtin.debug:
+        msg: "rustscan installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up rustscan temp files (rescue)
       ansible.builtin.shell: |
         rm -f /tmp/rustscan.zip /tmp/rustscan /tmp/x86_64-linux-rustscan.tar.gz /tmp/aarch64-linux-rustscan
       args:

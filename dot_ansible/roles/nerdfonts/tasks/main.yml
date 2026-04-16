@@ -51,7 +51,7 @@
         url: "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip"
         dest: /tmp/Hack.zip
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -66,6 +66,16 @@
       changed_when: true
 
     - name: Clean up
+      ansible.builtin.file:
+        path: /tmp/Hack.zip
+        state: absent
+
+  rescue:
+    - name: Warn Hack Nerd Font installation failed
+      ansible.builtin.debug:
+        msg: "Hack Nerd Font installation failed — skipping"
+
+    - name: Clean up font temp files after failure
       ansible.builtin.file:
         path: /tmp/Hack.zip
         state: absent

@@ -94,7 +94,7 @@
         url: "https://github.com/cli/cli/releases/download/{{ gh_release.json.tag_name }}/gh_{{ gh_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.deb"
         dest: /tmp/gh.deb
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -106,6 +106,18 @@
       ansible.builtin.file:
         path: /tmp/gh.deb
         state: absent
+
+  rescue:
+    - name: Warn gh installation failed
+      ansible.builtin.debug:
+        msg: "gh installation failed (likely network timeout) - skipping"
+
+    - name: Clean up gh temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gh.deb
 
 # --- gh (user-level fallback) ---
 - name: Re-check if gh is installed
@@ -140,7 +152,7 @@
         url: "https://github.com/cli/cli/releases/download/{{ gh_release_user.json.tag_name }}/gh_{{ gh_release_user.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.tar.gz"
         dest: /tmp/gh.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -157,6 +169,19 @@
       changed_when: true
 
     - name: Clean up gh temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gh.tar.gz
+        - /tmp/gh-extract
+
+  rescue:
+    - name: Warn gh (user) installation failed
+      ansible.builtin.debug:
+        msg: "gh (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up gh (user) temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -213,7 +238,7 @@
         url: "https://github.com/sharkdp/bat/releases/download/{{ bat_release.json.tag_name }}/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/bat.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -237,6 +262,18 @@
       loop:
         - /tmp/bat.tar.gz
         - "/tmp/bat-{{ bat_release.json.tag_name }}-{{ target_architecture }}-unknown-linux-musl"
+
+  rescue:
+    - name: Warn bat installation failed
+      ansible.builtin.debug:
+        msg: "bat installation failed (likely network timeout) - skipping"
+
+    - name: Clean up bat temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/bat.tar.gz
 
 # --- zoxide ---
 - name: Check if zoxide is installed
@@ -320,7 +357,7 @@
         url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/eza.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -334,6 +371,18 @@
       ansible.builtin.file:
         path: /tmp/eza.tar.gz
         state: absent
+
+  rescue:
+    - name: Warn eza installation failed
+      ansible.builtin.debug:
+        msg: "eza installation failed (likely network timeout) - skipping"
+
+    - name: Clean up eza temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/eza.tar.gz
 
 # --- git-delta ---
 - name: Check if delta is installed
@@ -361,7 +410,7 @@
         url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
         dest: /tmp/git-delta.deb
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -373,6 +422,18 @@
       ansible.builtin.file:
         path: /tmp/git-delta.deb
         state: absent
+
+  rescue:
+    - name: Warn git-delta installation failed
+      ansible.builtin.debug:
+        msg: "git-delta installation failed (likely network timeout) - skipping"
+
+    - name: Clean up git-delta temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/git-delta.deb
 
 # --- git-delta (user-level fallback) ---
 - name: Re-check if delta is installed
@@ -405,7 +466,7 @@
         url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -429,6 +490,18 @@
       loop:
         - /tmp/delta.tar.gz
         - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu"
+
+  rescue:
+    - name: Warn git-delta (user) installation failed
+      ansible.builtin.debug:
+        msg: "git-delta (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up git-delta (user) temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/delta.tar.gz
 
 # --- diffnav ---
 - name: Check if diffnav is installed
@@ -479,7 +552,7 @@
         url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
         dest: /tmp/diffnav.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -496,6 +569,19 @@
       changed_when: true
 
     - name: Clean up diffnav temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/diffnav.tar.gz
+        - /tmp/diffnav-extract
+
+  rescue:
+    - name: Warn diffnav installation failed
+      ansible.builtin.debug:
+        msg: "diffnav installation failed (likely network timeout) - skipping"
+
+    - name: Clean up diffnav temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -536,7 +622,7 @@
         url: "https://github.com/dlvhdr/diffnav/releases/download/{{ diffnav_release_user.json.tag_name }}/diffnav_Linux_{{ diffnav_release_arch }}.tar.gz"
         dest: /tmp/diffnav.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -553,6 +639,19 @@
       changed_when: true
 
     - name: Clean up diffnav temp files (user)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/diffnav.tar.gz
+        - /tmp/diffnav-extract
+
+  rescue:
+    - name: Warn diffnav (user) installation failed
+      ansible.builtin.debug:
+        msg: "diffnav (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up diffnav (user) temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -625,7 +724,7 @@
         url: "https://github.com/git-bahn/git-graph/releases/download/{{ git_graph_release.json.tag_name }}/git-graph-{{ git_graph_release.json.tag_name }}-linux-amd64.tar.gz"
         dest: /tmp/git-graph.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -643,6 +742,19 @@
         remote_src: true
 
     - name: Clean up git-graph temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/git-graph.tar.gz
+        - /tmp/git-graph
+
+  rescue:
+    - name: Warn git-graph installation failed
+      ansible.builtin.debug:
+        msg: "git-graph installation failed (likely network timeout) - skipping"
+
+    - name: Clean up git-graph temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -754,7 +866,7 @@
         url: "https://github.com/charmbracelet/glow/releases/download/{{ glow_release.json.tag_name }}/glow_{{ glow_version }}_Linux_{{ glow_release_arch }}.tar.gz"
         dest: /tmp/glow.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -791,6 +903,19 @@
         remote_src: true
 
     - name: Clean up glow temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/glow.tar.gz
+        - /tmp/glow
+
+  rescue:
+    - name: Warn glow installation failed
+      ansible.builtin.debug:
+        msg: "glow installation failed (likely network timeout) - skipping"
+
+    - name: Clean up glow temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -865,7 +990,7 @@
         url: "{{ duckdb_download_url }}"
         dest: /tmp/duckdb_cli.zip
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -902,6 +1027,19 @@
         remote_src: true
 
     - name: Clean up DuckDB temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/duckdb_cli.zip
+        - /tmp/duckdb
+
+  rescue:
+    - name: Warn DuckDB installation failed
+      ansible.builtin.debug:
+        msg: "DuckDB installation failed (likely network timeout) - skipping"
+
+    - name: Clean up DuckDB temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -968,7 +1106,7 @@
         dest: /tmp/rclone.zip
         mode: '0644'
         force: true
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1062,9 +1200,14 @@
         url: "https://github.com/direnv/direnv/releases/download/{{ direnv_release.json.tag_name }}/direnv.linux-{{ direnv_release_arch }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv"
         mode: '0755'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
+
+  rescue:
+    - name: Warn direnv installation failed
+      ansible.builtin.debug:
+        msg: "direnv installation failed (likely network timeout) - skipping"
 
 # --- yazi ---
 - name: Check if yazi is installed
@@ -1094,7 +1237,7 @@
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1121,6 +1264,18 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+  rescue:
+    - name: Warn yazi installation failed
+      ansible.builtin.debug:
+        msg: "yazi installation failed (likely network timeout) - skipping"
+
+    - name: Clean up yazi temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/yazi.zip
 
 # --- yazi (user-level fallback) ---
 - name: Re-check if yazi is installed
@@ -1154,7 +1309,7 @@
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1176,6 +1331,18 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+  rescue:
+    - name: Warn yazi (user) installation failed
+      ansible.builtin.debug:
+        msg: "yazi (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up yazi (user) temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/yazi.zip
 
 # --- superfile ---
 - name: Check if superfile (spf) is installed
@@ -1217,7 +1384,7 @@
         dest: /tmp/superfile.tar.gz
         mode: '0644'
         force: true
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1239,6 +1406,19 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+  rescue:
+    - name: Warn superfile installation failed
+      ansible.builtin.debug:
+        msg: "superfile installation failed (likely network timeout) - skipping"
+
+    - name: Clean up superfile temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/superfile.tar.gz
+        - /tmp/dist
 
 # --- superfile (user-level fallback) ---
 - name: Re-check if superfile (spf) is installed
@@ -1286,7 +1466,7 @@
         dest: /tmp/superfile.tar.gz
         mode: '0644'
         force: true
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1308,6 +1488,19 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+  rescue:
+    - name: Warn superfile (user) installation failed
+      ansible.builtin.debug:
+        msg: "superfile (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up superfile (user) temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/superfile.tar.gz
+        - /tmp/dist
 
 # --- tmux ---
 - name: Install tmux (Debian/Ubuntu)
@@ -1367,7 +1560,7 @@
         url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ target_architecture }}-linux-musl.tbz"
         dest: /tmp/btop.tbz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1392,6 +1585,19 @@
         remote_src: true
 
     - name: Clean up btop temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/btop.tbz
+        - /tmp/btop-extract
+
+  rescue:
+    - name: Warn btop installation failed
+      ansible.builtin.debug:
+        msg: "btop installation failed (likely network timeout) - skipping"
+
+    - name: Clean up btop temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -1426,7 +1632,7 @@
         url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release.json.tag_name }}/zellij-{{ target_architecture | replace('x86_64', 'x86_64') | replace('aarch64', 'aarch64') }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1440,6 +1646,18 @@
       ansible.builtin.file:
         path: /tmp/zellij.tar.gz
         state: absent
+
+  rescue:
+    - name: Warn zellij installation failed
+      ansible.builtin.debug:
+        msg: "zellij installation failed (likely network timeout) - skipping"
+
+    - name: Clean up zellij temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/zellij.tar.gz
 
 # --- zellij (user-level fallback) ---
 - name: Re-check if zellij is installed
@@ -1472,7 +1690,7 @@
         url: "https://github.com/zellij-org/zellij/releases/download/{{ zellij_release_user.json.tag_name }}/zellij-{{ target_architecture }}-unknown-linux-musl.tar.gz"
         dest: /tmp/zellij.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1486,6 +1704,18 @@
       ansible.builtin.file:
         path: /tmp/zellij.tar.gz
         state: absent
+
+  rescue:
+    - name: Warn zellij (user) installation failed
+      ansible.builtin.debug:
+        msg: "zellij (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up zellij (user) temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/zellij.tar.gz
 
 # --- sesh (tmux session manager) ---
 - name: Check if sesh is installed
@@ -1550,7 +1780,7 @@
         url: "{{ sesh_download_url }}"
         dest: /tmp/sesh.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1587,6 +1817,21 @@
         remote_src: true
 
     - name: Clean up sesh temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/sesh.tar.gz
+        - /tmp/sesh
+        - /tmp/README.md
+        - /tmp/LICENSE
+
+  rescue:
+    - name: Warn sesh installation failed
+      ansible.builtin.debug:
+        msg: "sesh installation failed (likely network timeout) - skipping"
+
+    - name: Clean up sesh temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -1641,7 +1886,7 @@
         url: "https://github.com/tamasfe/taplo/releases/download/{{ taplo_release.json.tag_name }}/taplo-linux-{{ taplo_arch }}.gz"
         dest: /tmp/taplo.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1662,6 +1907,11 @@
       ansible.builtin.file:
         path: /tmp/taplo
         state: absent
+
+  rescue:
+    - name: Warn taplo installation failed
+      ansible.builtin.debug:
+        msg: "taplo installation failed (likely network timeout) - skipping"
 
 # --- television (tv) - fuzzy finder TUI ---
 - name: Check if tv is installed
@@ -1727,7 +1977,7 @@
         url: "{{ tv_download_url }}"
         dest: /tmp/tv.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -1764,6 +2014,19 @@
         remote_src: true
 
     - name: Clean up television temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/tv.tar.gz
+        - /tmp/tv
+
+  rescue:
+    - name: Warn television installation failed
+      ansible.builtin.debug:
+        msg: "television installation failed (likely network timeout) - skipping"
+
+    - name: Clean up television temp files after failure
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent

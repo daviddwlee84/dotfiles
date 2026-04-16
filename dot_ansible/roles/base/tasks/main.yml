@@ -87,7 +87,7 @@
         url: "https://github.com/BurntSushi/ripgrep/releases/download/{{ rg_release.json.tag_name }}/ripgrep-{{ rg_release.json.tag_name }}-{{ rg_target }}.tar.gz"
         dest: /tmp/ripgrep.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -114,6 +114,18 @@
       loop:
         - /tmp/ripgrep.tar.gz
         - "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ rg_target }}"
+
+  rescue:
+    - name: Warn ripgrep installation failed
+      ansible.builtin.debug:
+        msg: "ripgrep installation failed (likely network timeout) - skipping"
+
+    - name: Clean up ripgrep temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ripgrep.tar.gz
 
 # --- fd (user-level fallback) ---
 - name: Re-check if fd is installed
@@ -158,7 +170,7 @@
         url: "https://github.com/sharkdp/fd/releases/download/{{ fd_release.json.tag_name }}/fd-{{ fd_release.json.tag_name }}-{{ fd_target }}.tar.gz"
         dest: /tmp/fd.tar.gz
         mode: '0644'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
 
@@ -186,6 +198,18 @@
         - /tmp/fd.tar.gz
         - "/tmp/fd-{{ fd_release.json.tag_name }}-{{ fd_target }}"
 
+  rescue:
+    - name: Warn fd installation failed
+      ansible.builtin.debug:
+        msg: "fd installation failed (likely network timeout) - skipping"
+
+    - name: Clean up fd temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/fd.tar.gz
+
 # --- jq (user-level fallback) ---
 - name: Re-check if jq is installed
   when: ansible_facts["os_family"] == "Debian"
@@ -210,9 +234,19 @@
         url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') | replace('armv7l', 'armhf') }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
         mode: '0755'
-        timeout: 60
+        timeout: 120
       retries: 3
       delay: 5
+
+  rescue:
+    - name: Warn jq installation failed
+      ansible.builtin.debug:
+        msg: "jq installation failed (likely network timeout) - skipping"
+
+    - name: Clean up jq temp files after failure
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
+        state: absent
 
 # --- just ---
 - name: Check if just is installed
