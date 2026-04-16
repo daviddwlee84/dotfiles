@@ -4,11 +4,14 @@
 # - Shows role group headers when role changes
 # - Shows per-task elapsed time
 # - Marks changed tasks with a ✦ indicator
+# - Shows system info header after gathering facts
+# - Shows enhanced RECAP with changed task list and slowest tasks
 # - Shows total playbook elapsed time in PLAY RECAP
 # GNU General Public License v3.0+
 
 from __future__ import annotations
 
+import os
 import time
 
 DOCUMENTATION = """
@@ -21,6 +24,8 @@ DOCUMENTATION = """
         - Shows role group headers when switching between roles.
         - Displays per-task elapsed time and total playbook run time.
         - Marks changed tasks with a visual indicator.
+        - Shows system info (OS, arch, locale, chezmoi config) after facts are gathered.
+        - Enhanced PLAY RECAP with changed task list and slowest tasks.
     extends_documentation_fragment:
       - default_callback
       - result_format_callback
@@ -31,6 +36,12 @@ DOCUMENTATION = """
 from ansible import constants as C
 from ansible.plugins.callback.default import CallbackModule as DefaultCallback
 from ansible.utils.color import colorize, hostcolor
+
+
+# Threshold in seconds for a task to be considered "slow"
+SLOW_TASK_THRESHOLD = 5.0
+# Max number of slow/changed tasks to show in recap
+RECAP_MAX_ITEMS = 10
 
 
 class CallbackModule(DefaultCallback):
@@ -45,13 +56,18 @@ class CallbackModule(DefaultCallback):
         self._current_role = None
         self._task_start_time = None
         self._playbook_start_time = None
+        self._system_info_shown = False
+        # Track changed tasks: list of (task_name, elapsed)
+        self._changed_tasks = []
+        # Track all task timings: list of (task_name, elapsed)
+        self._task_timings = []
+        # Current task name for tracking
+        self._current_task_label = None
 
     @staticmethod
     def _format_duration(seconds):
         """Format seconds into a human-readable duration string."""
-        if seconds < 1:
-            return "%.1fs" % seconds
-        elif seconds < 60:
+        if seconds < 60:
             return "%.1fs" % seconds
         elif seconds < 3600:
             m, s = divmod(seconds, 60)
@@ -66,6 +82,94 @@ class CallbackModule(DefaultCallback):
         if task._role:
             return task._role.get_name()
         return None
+
+    def _show_system_info(self, facts):
+        """Display system information after facts are gathered."""
+        if self._system_info_shown:
+            return
+        self._system_info_shown = True
+
+        info_lines = []
+
+        # OS info
+        distro = facts.get("ansible_distribution", "")
+        distro_ver = facts.get("ansible_distribution_version", "")
+        if distro:
+            info_lines.append(("OS", "%s %s" % (distro, distro_ver)))
+
+        # Architecture
+        arch = facts.get("ansible_architecture", "")
+        if arch:
+            info_lines.append(("Arch", arch))
+
+        # Python
+        py_ver = facts.get("ansible_python_version", "")
+        if py_ver:
+            info_lines.append(("Python", py_ver))
+
+        # Kernel
+        kernel = facts.get("ansible_kernel", "")
+        if kernel:
+            info_lines.append(("Kernel", kernel))
+
+        # Locale from environment
+        locale = os.environ.get("LC_ALL") or os.environ.get("LANG", "")
+        if locale:
+            info_lines.append(("Locale", locale))
+
+        # Chezmoi info from env vars (set during chezmoi apply)
+        chezmoi_os = os.environ.get("CHEZMOI_OS", "")
+        chezmoi_arch = os.environ.get("CHEZMOI_ARCH", "")
+        chezmoi_hostname = os.environ.get("CHEZMOI_HOSTNAME", "")
+        chezmoi_ver = os.environ.get("CHEZMOI_VERSION_VERSION", "")
+        if chezmoi_os:
+            info_lines.append(
+                (
+                    "Chezmoi",
+                    "%s/%s %s (v%s)"
+                    % (chezmoi_os, chezmoi_arch, chezmoi_hostname, chezmoi_ver),
+                )
+                if chezmoi_ver
+                else (
+                    "Chezmoi",
+                    "%s/%s %s" % (chezmoi_os, chezmoi_arch, chezmoi_hostname),
+                )
+            )
+
+        # Ansible tags being run (from extra vars or CLI)
+        tags = os.environ.get("ANSIBLE_RUN_TAGS", "")
+        if not tags:
+            try:
+                from ansible import context
+
+                cli_tags = context.CLIARGS.get("tags", [])
+                if cli_tags:
+                    tags = ",".join(cli_tags)
+            except Exception:
+                pass
+        if tags and tags != "all":
+            # Truncate if too long
+            if len(tags) > 50:
+                tags = tags[:47] + "..."
+            info_lines.append(("Tags", tags))
+
+        if info_lines:
+            self._display.display("┌─ System Info", color="bright cyan")
+            for label, value in info_lines:
+                self._display.display(
+                    "│  %-8s %s" % (label + ":", value), color="bright cyan"
+                )
+            self._display.display("└─", color="bright cyan")
+
+    def _record_task_timing(self, result, changed=False):
+        """Record elapsed time for a task using the result's task name."""
+        if self._task_start_time is not None:
+            elapsed = time.time() - self._task_start_time
+            task_name = result.task.get_name().strip()
+            if task_name:
+                self._task_timings.append((task_name, elapsed))
+                if changed:
+                    self._changed_tasks.append((task_name, elapsed))
 
     def v2_playbook_on_start(self, playbook):
         self._playbook_start_time = time.time()
@@ -141,6 +245,7 @@ class CallbackModule(DefaultCallback):
             )
 
         self._task_counter += 1
+        self._current_task_label = task_name
 
         checkmsg = ""
         if task.check_mode and self.get_option("check_mode_markers"):
@@ -165,17 +270,27 @@ class CallbackModule(DefaultCallback):
         return ""
 
     def v2_runner_on_ok(self, result):
-        """Override to append elapsed time and changed marker."""
+        """Override to append elapsed time, changed marker, and show system info."""
         from ansible.playbook.task_include import TaskInclude
 
         host_label = self.host_label(result)
         elapsed = self._get_elapsed()
+        changed = result.result.get("changed", False)
+
+        # Show system info after Gathering Facts
+        if result.task.action in ("gather_facts", "setup"):
+            facts = result.result.get("ansible_facts", {})
+            if facts:
+                self._show_system_info(facts)
+
+        # Record timing
+        self._record_task_timing(result, changed=changed)
 
         if isinstance(result.task, TaskInclude):
             if self._last_task_banner != result.task._uuid:
                 self._print_task_banner(result.task)
             return
-        elif result.result.get("changed", False):
+        elif changed:
             if self._last_task_banner != result.task._uuid:
                 self._print_task_banner(result.task)
             msg = "✦ changed: [%s]%s" % (host_label, elapsed)
@@ -202,6 +317,9 @@ class CallbackModule(DefaultCallback):
         """Override to append elapsed time."""
         host_label = self.host_label(result)
         elapsed = self._get_elapsed()
+
+        # Record timing
+        self._record_task_timing(result, changed=False)
 
         if self._last_task_banner != result.task._uuid:
             self._print_task_banner(result.task)
@@ -293,6 +411,43 @@ class CallbackModule(DefaultCallback):
                 ),
                 screen_only=True,
             )
+
+        # Changed tasks summary
+        if self._changed_tasks:
+            self._display.display("")
+            self._display.display(
+                "Changed tasks (%d):" % len(self._changed_tasks),
+                color=C.COLOR_CHANGED,
+            )
+            for name, elapsed in self._changed_tasks[:RECAP_MAX_ITEMS]:
+                self._display.display(
+                    "  ✦ %s (%s)" % (name, self._format_duration(elapsed)),
+                    color=C.COLOR_CHANGED,
+                )
+            if len(self._changed_tasks) > RECAP_MAX_ITEMS:
+                self._display.display(
+                    "  ... and %d more" % (len(self._changed_tasks) - RECAP_MAX_ITEMS),
+                    color=C.COLOR_CHANGED,
+                )
+
+        # Slowest tasks
+        slow_tasks = [
+            (name, elapsed)
+            for name, elapsed in self._task_timings
+            if elapsed >= SLOW_TASK_THRESHOLD
+        ]
+        if slow_tasks:
+            slow_tasks.sort(key=lambda x: -x[1])
+            self._display.display("")
+            self._display.display(
+                "Slow tasks (>%.0fs):" % SLOW_TASK_THRESHOLD,
+                color=C.COLOR_WARN,
+            )
+            for name, elapsed in slow_tasks[:RECAP_MAX_ITEMS]:
+                self._display.display(
+                    "  ⏱ %s (%s)" % (name, self._format_duration(elapsed)),
+                    color=C.COLOR_WARN,
+                )
 
         self._display.display("", screen_only=True)
 
