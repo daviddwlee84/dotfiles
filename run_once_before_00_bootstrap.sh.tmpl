@@ -194,8 +194,18 @@ fi
 
 # 4. Install ansible-galaxy collections
 info "Installing ansible-galaxy collections..."
-ansible-galaxy collection install community.general --force-with-deps
-success "ansible-galaxy collections installed"
+if ansible-galaxy collection install community.general --force-with-deps; then
+    success "ansible-galaxy collections installed"
+else
+    # Check if collection is already installed (e.g. network blocked by GFW)
+    if ansible-galaxy collection list community.general 2>/dev/null | grep -q community.general; then
+        warn "Galaxy download failed but community.general is already installed, continuing..."
+    else
+        error "Failed to install community.general collection. Ansible playbooks will not work."
+        error "Try setting: export https_proxy=http://your-proxy:port"
+        exit 1
+    fi
+fi
 
 # 5. Install mise global tools (Node.js) if mise config exists
 MISE_BIN="${HOME}/.local/bin/mise"
