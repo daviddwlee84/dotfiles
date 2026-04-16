@@ -87,9 +87,9 @@
   changed_when: false
   failed_when: false
 
-- name: Install lazygit via PPA (Debian/Ubuntu)
+- name: Install lazygit via PPA (Ubuntu only — PPA has no Debian Release file)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["distribution"] == "Ubuntu"
     - lazygit_check.rc != 0
   become: true
   tags: [sudo]
@@ -113,7 +113,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - lazygit_check.rc != 0
-    - lazygit_apt is not defined or lazygit_apt is failed or lazygit_apt is skipped
+    - (lazygit_apt is not defined) or (lazygit_apt is failed) or (lazygit_apt is skipped)
   become: true
   tags: [sudo]
   block:
