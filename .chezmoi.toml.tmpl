@@ -19,7 +19,11 @@ installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Pytho
 # 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
 installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
 # 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}
+{{ else -}}
+installAiDesktopApps = false
+{{ end -}}
 # 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
 installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)" false }}
 # 是否安裝繁體中文輸入法 (McBopomofo + RIME)
@@ -30,6 +34,8 @@ installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install n
 noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
 # 在 chezmoi apply 之前備份現有的 dotfiles
 backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
+# 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
+allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}
 
 # https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]

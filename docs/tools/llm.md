@@ -2,6 +2,10 @@
 
 Optional role (`installLlmTools`). Install via `chezmoi init --force` and enable the prompt.
 
+## Related Notes
+
+- [OpenCode](opencode.md): local-only OpenCode config notes, known title-generation regression, and current workaround.
+
 ## Tools
 
 | Tool | Binary | Purpose | Install path |

@@ -20,6 +20,7 @@ ARG CHEZMOI_INSTALL_INPUT_METHOD=false
 ARG CHEZMOI_INSTALL_NETWORKING_TOOLS=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_DOTFILES=false
+ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -131,7 +132,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install Traditional Chinese input methods (McBopomofo, RIME)=${CHEZMOI_INSTALL_INPUT_METHOD}" \
     --promptBool "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)=${CHEZMOI_INSTALL_NETWORKING_TOOLS}" \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
-    --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}"
+    --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}" \
+    --promptBool "Allow partial Ansible failures (continue installing other tools if one role fails)=${CHEZMOI_ALLOW_PARTIAL_FAILURE}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

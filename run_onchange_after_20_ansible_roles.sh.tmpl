@@ -182,5 +182,30 @@ info "Profile: {{ .profile }}"
 info "Re-running ansible with tags: $TAGS"
 EXTRA_VARS_ARGS=()
 [[ -n "$EXTRA_VARS" ]] && EXTRA_VARS_ARGS=(--extra-vars "$EXTRA_VARS")
+
+{{ $allowPartialFailure := false }}{{ if hasKey . "allowPartialFailure" }}{{ $allowPartialFailure = .allowPartialFailure }}{{ end -}}
+{{ if $allowPartialFailure -}}
+# Best-effort mode: run each tag separately so one failure doesn't block others
+info "allowPartialFailure=true: running each tag independently"
+FAILED_TAGS=()
+IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
+for tag in "${TAG_ARRAY[@]}"; do
+    info "────── Running tag: $tag ──────"
+    ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$tag" $BECOME_FLAGS "${EXTRA_VARS_ARGS[@]}" || {
+        warn "Tag '$tag' had failures (continuing in best-effort mode)"
+        FAILED_TAGS+=("$tag")
+    }
+done
+if [[ ${#FAILED_TAGS[@]} -gt 0 ]]; then
+    warn "────── Summary ──────"
+    warn "The following tags had failures: ${FAILED_TAGS[*]}"
+    warn "Retry manually:"
+    warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini $PLAYBOOK --tags '$(IFS=,; echo "${FAILED_TAGS[*]}")' $BECOME_FLAGS ${EXTRA_VARS_ARGS[*]}"
+    success "Ansible roles partially updated (${#FAILED_TAGS[@]} tag(s) failed)."
+else
+    success "Ansible roles updated!"
+fi
+{{ else -}}
 ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --tags "$TAGS" $BECOME_FLAGS "${EXTRA_VARS_ARGS[@]}"
 success "Ansible roles updated!"
+{{ end -}}
