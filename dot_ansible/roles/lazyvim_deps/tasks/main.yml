@@ -109,11 +109,22 @@
       register: lazygit_apt
       when: lazygit_ppa is succeeded
 
+- name: Set lazygit release architecture
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.set_fact:
+    lazygit_arch: >-
+      {{
+        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ''
+      }}
+
 - name: Install lazygit from GitHub releases (system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - lazygit_check.rc != 0
     - (lazygit_apt is not defined) or (lazygit_apt is failed) or (lazygit_apt is skipped)
+    - lazygit_arch | trim != ''
   become: true
   tags: [sudo]
   block:
@@ -125,7 +136,7 @@
 
     - name: Download lazygit binary (system)
       ansible.builtin.get_url:
-        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
 
@@ -154,6 +165,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - lazygit_recheck.rc != 0
+    - lazygit_arch | default('') | trim != ''
   block:
     - name: Get latest lazygit release (user)
       ansible.builtin.uri:
@@ -169,7 +181,7 @@
 
     - name: Download lazygit binary (user)
       ansible.builtin.get_url:
-        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
         dest: /tmp/lazygit.tar.gz
         mode: '0644'
 

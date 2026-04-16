@@ -66,13 +66,13 @@
         else ''
       }}
 
-- name: Fail on unsupported architecture for gh official downloads
+- name: Skip gh on unsupported architecture
   when:
     - ansible_facts["os_family"] == "Debian"
     - gh_check.rc != 0
     - gh_release_arch == ''
-  ansible.builtin.fail:
-    msg: "Unsupported architecture for gh official downloads: {{ ansible_facts['architecture'] }}"
+  ansible.builtin.debug:
+    msg: "gh skipped: no release for {{ ansible_facts['architecture'] }}"
 
 - name: Install gh from GitHub releases (Debian/Ubuntu)
   when:
@@ -291,6 +291,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - eza_recheck.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (eza)
       ansible.builtin.file:
@@ -369,6 +370,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_recheck.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (delta)
       ansible.builtin.file:
@@ -431,13 +433,13 @@
         else ''
       }}
 
-- name: Fail on unsupported architecture for diffnav official downloads
+- name: Skip diffnav on unsupported architecture
   when:
     - ansible_facts["os_family"] == "Debian"
     - diffnav_check.rc != 0
     - diffnav_release_arch == ''
-  ansible.builtin.fail:
-    msg: "Unsupported architecture for diffnav official downloads: {{ ansible_facts['architecture'] }}"
+  ansible.builtin.debug:
+    msg: "diffnav skipped: no release for {{ ansible_facts['architecture'] }}"
 
 - name: Install diffnav from GitHub releases (Debian/Ubuntu)
   when:
@@ -689,13 +691,13 @@
         else ''
       }}
 
-- name: Fail on unsupported architecture for glow official downloads
+- name: Skip glow on unsupported architecture
   when:
     - ansible_facts["os_family"] == "Debian"
     - glow_check.rc != 0
     - glow_release_arch == ''
-  ansible.builtin.fail:
-    msg: "Unsupported architecture for glow official downloads: {{ ansible_facts['architecture'] }}"
+  ansible.builtin.debug:
+    msg: "glow skipped: no release for {{ ansible_facts['architecture'] }}"
 
 - name: Install glow from GitHub releases (Debian/Ubuntu, user-level)
   when:
@@ -786,6 +788,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - duckdb_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (duckdb)
       ansible.builtin.file:
@@ -801,11 +804,6 @@
             else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
             else ''
           }}
-
-    - name: Fail on unsupported architecture for DuckDB official downloads
-      when: duckdb_release_arch == ''
-      ansible.builtin.fail:
-        msg: "Unsupported architecture for DuckDB official downloads: {{ ansible_facts['architecture'] }}"
 
     - name: Get latest DuckDB release
       ansible.builtin.uri:
@@ -1038,6 +1036,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   become: true
   tags: [sudo]
   block:
@@ -1090,6 +1089,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_recheck.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (yazi)
       ansible.builtin.file:
@@ -1228,6 +1228,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - zellij_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   become: true
   tags: [sudo]
   block:
@@ -1266,6 +1267,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - zellij_recheck.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (zellij)
       ansible.builtin.file:
@@ -1308,6 +1310,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - sesh_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (sesh)
       ansible.builtin.file:
@@ -1330,10 +1333,10 @@
             else ''
           }}
 
-    - name: Fail on unsupported architecture for sesh official downloads
-      when: sesh_arch == ''
-      ansible.builtin.fail:
-        msg: "Unsupported architecture for sesh official downloads: {{ ansible_facts['architecture'] }}"
+    - name: Skip sesh on unsupported architecture
+      when: sesh_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "sesh skipped: no release for {{ ansible_facts['architecture'] }}"
 
     - name: Set sesh download URL facts
       ansible.builtin.set_fact:
@@ -1348,10 +1351,10 @@
             | default('', true)
           }}
 
-    - name: Fail if sesh download URL could not be determined
-      when: sesh_download_url == ''
-      ansible.builtin.fail:
-        msg: "Could not determine sesh download URL for architecture {{ sesh_arch }} from the latest GitHub release"
+    - name: Skip sesh if download URL could not be determined
+      when: sesh_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "sesh skipped: could not determine download URL for architecture {{ sesh_arch }}"
 
     - name: Download sesh tarball
       ansible.builtin.get_url:
@@ -1413,6 +1416,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - taplo_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (taplo)
       ansible.builtin.file:
@@ -1435,10 +1439,10 @@
             else ''
           }}
 
-    - name: Fail on unsupported architecture for taplo
-      when: taplo_arch == ''
-      ansible.builtin.fail:
-        msg: "Unsupported architecture for taplo: {{ ansible_facts['architecture'] }}"
+    - name: Skip taplo on unsupported architecture
+      when: taplo_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "taplo skipped: no release for {{ ansible_facts['architecture'] }}"
 
     - name: Download taplo binary (gzipped)
       ansible.builtin.get_url:
@@ -1476,6 +1480,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - tv_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (television)
       ansible.builtin.file:
@@ -1498,10 +1503,10 @@
             else ''
           }}
 
-    - name: Fail on unsupported architecture for television
-      when: tv_arch == ''
-      ansible.builtin.fail:
-        msg: "Unsupported architecture for television: {{ ansible_facts['architecture'] }}"
+    - name: Skip television on unsupported architecture
+      when: tv_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "television skipped: no release for {{ ansible_facts['architecture'] }}"
 
     - name: Set television download URL
       ansible.builtin.set_fact:
@@ -1517,10 +1522,10 @@
             | default('', true)
           }}
 
-    - name: Fail if television download URL could not be determined
-      when: tv_download_url == ''
-      ansible.builtin.fail:
-        msg: "Could not determine television download URL for architecture {{ tv_arch }}"
+    - name: Skip television if download URL could not be determined
+      when: tv_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "television skipped: could not determine download URL for architecture {{ tv_arch }}"
 
     - name: Download television tarball
       ansible.builtin.get_url:

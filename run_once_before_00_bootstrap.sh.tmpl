@@ -77,25 +77,39 @@ fi
 # noRoot mode: Skip Linuxbrew (requires sudo for dependencies)
 info "noRoot mode: Skipping Linuxbrew installation (requires sudo)"
 {{ else -}}
-if ! command -v brew &> /dev/null; then
-    info "Installing Linuxbrew..."
-    # Install Linuxbrew dependencies first
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y build-essential procps curl file git
-    fi
-    # Install Linuxbrew
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Add to PATH for this session
-    if [[ -d /home/linuxbrew/.linuxbrew ]]; then
-        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    elif [[ -d "$HOME/.linuxbrew" ]]; then
-        eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
-    fi
-    success "Linuxbrew installed successfully"
+# Detect userland architecture (kernel may differ, e.g. RPi 4: armhf userland + aarch64 kernel)
+if command -v dpkg &>/dev/null; then
+    BREW_REAL_ARCH="$(dpkg --print-architecture)"
 else
-    info "Linuxbrew is already installed"
+    BREW_REAL_ARCH="$(uname -m)"
 fi
+
+case "$BREW_REAL_ARCH" in
+    amd64|x86_64|arm64|aarch64)
+        if ! command -v brew &> /dev/null; then
+            info "Installing Linuxbrew..."
+            # Install Linuxbrew dependencies first
+            if command -v apt-get &> /dev/null; then
+                sudo apt-get update
+                sudo apt-get install -y build-essential procps curl file git
+            fi
+            # Install Linuxbrew
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            # Add to PATH for this session
+            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+                eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+            elif [[ -d "$HOME/.linuxbrew" ]]; then
+                eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+            fi
+            success "Linuxbrew installed successfully"
+        else
+            info "Linuxbrew is already installed"
+        fi
+        ;;
+    *)
+        warn "Skipping Linuxbrew: unsupported userland architecture '$BREW_REAL_ARCH' (Homebrew requires amd64 or arm64)"
+        ;;
+esac
 {{ end -}}
 {{ end -}}
 # 1. Install uv if missing
@@ -123,7 +137,8 @@ if ! command -v mise &> /dev/null; then
             sudo apt-get install -y curl gpg
             sudo install -dm 755 /etc/apt/keyrings
             curl -fsSL https://mise.jdx.dev/gpg-key.pub | sudo tee /etc/apt/keyrings/mise-archive-keyring.pub >/dev/null
-            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=amd64] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
+            MISE_DEB_ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+            echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.pub arch=${MISE_DEB_ARCH}] https://mise.jdx.dev/deb stable main" | sudo tee /etc/apt/sources.list.d/mise.list
             sudo apt-get update -y
             sudo apt-get install -y mise
             success "mise installed via apt"

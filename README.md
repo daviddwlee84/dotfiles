@@ -177,6 +177,8 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 | Ubuntu Desktop | apt + snap | Full support |
 | Ubuntu Server | apt + snap | Full support |
 | Ubuntu Server (no root) | GitHub binaries + mise + cargo + uv | `noRoot=true`, tools installed to `~/.local/bin` |
+| Raspberry Pi 5 (64-bit OS) | apt + Linuxbrew | Full support (same as Ubuntu Server) |
+| Raspberry Pi 4 (32-bit OS) | apt + GitHub binaries | Linuxbrew skipped; some tools without armhf builds are skipped |
 
 ## Manual Commands
 

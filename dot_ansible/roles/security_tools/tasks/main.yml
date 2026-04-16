@@ -64,7 +64,18 @@
     - name: Set gitleaks version and arch (system)
       ansible.builtin.set_fact:
         gitleaks_version: "{{ gitleaks_release.json.tag_name | regex_replace('^v', '') }}"
-        gitleaks_arch: "{{ 'x64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+        gitleaks_arch: >-
+          {{
+            'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else 'armv7' if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            else ''
+          }}
+
+    - name: Skip gitleaks on unsupported architecture (system)
+      when: gitleaks_arch | trim == ''
+      ansible.builtin.fail:
+        msg: "Unsupported architecture for gitleaks: {{ ansible_facts['architecture'] }}"
 
     - name: Download gitleaks (system)
       ansible.builtin.get_url:
@@ -107,6 +118,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - gitleaks_recheck.rc != 0
+    - gitleaks_arch_user | default('') | trim != ''
   block:
     - name: Ensure ~/.local/bin exists (gitleaks)
       ansible.builtin.file:
@@ -123,7 +135,13 @@
     - name: Set gitleaks version and arch (user)
       ansible.builtin.set_fact:
         gitleaks_version_user: "{{ gitleaks_release_user.json.tag_name | regex_replace('^v', '') }}"
-        gitleaks_arch_user: "{{ 'x64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+        gitleaks_arch_user: >-
+          {{
+            'x64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+            else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+            else 'armv7' if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            else ''
+          }}
 
     - name: Download gitleaks (user)
       ansible.builtin.get_url:

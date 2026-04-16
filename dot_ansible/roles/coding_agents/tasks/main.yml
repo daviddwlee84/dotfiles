@@ -408,13 +408,27 @@
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
   ansible.builtin.set_fact:
-    specstory_linux_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+    specstory_linux_arch: >-
+      {{
+        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Skip SpecStory on unsupported architecture (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - specstory_check.rc != 0
+    - specstory_linux_arch | trim == ''
+  ansible.builtin.debug:
+    msg: "SpecStory skipped: no release for {{ ansible_facts['architecture'] }}"
 
 - name: Download SpecStory from GitHub release (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
     - specstory_release is defined
+    - specstory_linux_arch | trim != ''
   ansible.builtin.get_url:
     url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
     dest: /tmp/specstory-linux.tar.gz
@@ -425,6 +439,7 @@
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
     - specstory_release is defined
+    - specstory_linux_arch | trim != ''
   ansible.builtin.file:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
     state: directory
@@ -435,6 +450,7 @@
     - ansible_facts["os_family"] == "Debian"
     - specstory_check.rc != 0
     - specstory_release is defined
+    - specstory_linux_arch | trim != ''
   ansible.builtin.unarchive:
     src: /tmp/specstory-linux.tar.gz
     dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
@@ -540,6 +556,7 @@
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_release is defined
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.set_fact:
     codexbar_arch: "{{ ansible_facts['architecture'] }}"
     codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"

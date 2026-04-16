@@ -63,38 +63,54 @@
         state: directory
         mode: '0755'
 
+    - name: Set ripgrep release target
+      ansible.builtin.set_fact:
+        rg_target: >-
+          {{
+            ansible_facts['architecture'] ~ '-unknown-linux-musl'
+            if ansible_facts['architecture'] in ['x86_64', 'aarch64']
+            else 'arm-unknown-linux-gnueabihf'
+            if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            else ''
+          }}
+
     - name: Get latest ripgrep release
+      when: rg_target | trim != ''
       ansible.builtin.uri:
         url: https://api.github.com/repos/BurntSushi/ripgrep/releases/latest
         return_content: true
       register: rg_release
 
     - name: Download ripgrep binary
+      when: rg_target | trim != ''
       ansible.builtin.get_url:
-        url: "https://github.com/BurntSushi/ripgrep/releases/download/{{ rg_release.json.tag_name }}/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl.tar.gz"
+        url: "https://github.com/BurntSushi/ripgrep/releases/download/{{ rg_release.json.tag_name }}/ripgrep-{{ rg_release.json.tag_name }}-{{ rg_target }}.tar.gz"
         dest: /tmp/ripgrep.tar.gz
         mode: '0644'
 
     - name: Extract ripgrep
+      when: rg_target | trim != ''
       ansible.builtin.unarchive:
         src: /tmp/ripgrep.tar.gz
         dest: /tmp
         remote_src: true
 
     - name: Install ripgrep to ~/.local/bin
+      when: rg_target | trim != ''
       ansible.builtin.copy:
-        src: "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl/rg"
+        src: "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ rg_target }}/rg"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/rg"
         mode: '0755'
         remote_src: true
 
     - name: Clean up ripgrep temp files
+      when: rg_target | trim != ''
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
         - /tmp/ripgrep.tar.gz
-        - "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-musl"
+        - "/tmp/ripgrep-{{ rg_release.json.tag_name }}-{{ rg_target }}"
 
 # --- fd (user-level fallback) ---
 - name: Re-check if fd is installed
@@ -115,38 +131,54 @@
         state: directory
         mode: '0755'
 
+    - name: Set fd release target
+      ansible.builtin.set_fact:
+        fd_target: >-
+          {{
+            ansible_facts['architecture'] ~ '-unknown-linux-gnu'
+            if ansible_facts['architecture'] in ['x86_64', 'aarch64']
+            else 'arm-unknown-linux-gnueabihf'
+            if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            else ''
+          }}
+
     - name: Get latest fd release
+      when: fd_target | trim != ''
       ansible.builtin.uri:
         url: https://api.github.com/repos/sharkdp/fd/releases/latest
         return_content: true
       register: fd_release
 
     - name: Download fd binary
+      when: fd_target | trim != ''
       ansible.builtin.get_url:
-        url: "https://github.com/sharkdp/fd/releases/download/{{ fd_release.json.tag_name }}/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/sharkdp/fd/releases/download/{{ fd_release.json.tag_name }}/fd-{{ fd_release.json.tag_name }}-{{ fd_target }}.tar.gz"
         dest: /tmp/fd.tar.gz
         mode: '0644'
 
     - name: Extract fd
+      when: fd_target | trim != ''
       ansible.builtin.unarchive:
         src: /tmp/fd.tar.gz
         dest: /tmp
         remote_src: true
 
     - name: Install fd to ~/.local/bin
+      when: fd_target | trim != ''
       ansible.builtin.copy:
-        src: "/tmp/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu/fd"
+        src: "/tmp/fd-{{ fd_release.json.tag_name }}-{{ fd_target }}/fd"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/fd"
         mode: '0755'
         remote_src: true
 
     - name: Clean up fd temp files
+      when: fd_target | trim != ''
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
         - /tmp/fd.tar.gz
-        - "/tmp/fd-{{ fd_release.json.tag_name }}-{{ ansible_facts['architecture'] }}-unknown-linux-gnu"
+        - "/tmp/fd-{{ fd_release.json.tag_name }}-{{ fd_target }}"
 
 # --- jq (user-level fallback) ---
 - name: Re-check if jq is installed
@@ -169,7 +201,7 @@
 
     - name: Download jq binary
       ansible.builtin.get_url:
-        url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}"
+        url: "https://github.com/jqlang/jq/releases/latest/download/jq-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') | replace('armv7l', 'armhf') }}"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
         mode: '0755'
 

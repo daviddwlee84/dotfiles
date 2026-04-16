@@ -4,6 +4,25 @@
   hosts: local
   gather_facts: true
 
+  pre_tasks:
+    - name: Detect userland architecture via dpkg
+      ansible.builtin.command: dpkg --print-architecture
+      register: dpkg_arch_result
+      changed_when: false
+      failed_when: false
+      when: ansible_facts["os_family"] == "Debian"
+
+    - name: Override ansible_architecture to match userland
+      ansible.builtin.set_fact:
+        ansible_architecture: >-
+          {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
+             [dpkg_arch_result.stdout | trim]
+             | default(ansible_facts['architecture']) }}
+      when:
+        - ansible_facts["os_family"] == "Debian"
+        - dpkg_arch_result.rc == 0
+        - dpkg_arch_result.stdout | trim != ''
+
   roles:
     - role: base
       tags: [base]

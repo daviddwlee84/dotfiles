@@ -66,12 +66,24 @@
         classic: true
         state: present
 
+- name: Set Neovim tarball architecture (system)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+  ansible.builtin.set_fact:
+    nvim_sys_arch: >-
+      {{
+        'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
+        else 'arm64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
+        else ''
+      }}
+
 - name: Install Neovim from GitHub releases if snap unavailable
   when:
     - ansible_facts["os_family"] == "Debian"
     - nvim_apt_version.stdout is defined
     - nvim_apt_version.stdout is version(neovim_min_version, '<')
     - snap_check.rc != 0
+    - nvim_sys_arch | default('') != ''
   become: true
   tags: [sudo]
   block:
@@ -88,7 +100,7 @@
 
     - name: Download Neovim tarball
       ansible.builtin.get_url:
-        url: "https://github.com/neovim/neovim/releases/download/{{ nvim_release.json.tag_name }}/nvim-linux-{{ ansible_facts['architecture'] | replace('x86_64', 'x86_64') | replace('aarch64', 'arm64') }}.tar.gz"
+        url: "https://github.com/neovim/neovim/releases/download/{{ nvim_release.json.tag_name }}/nvim-linux-{{ nvim_sys_arch }}.tar.gz"
         dest: /tmp/nvim.tar.gz
         mode: '0644'
 
@@ -125,11 +137,20 @@
 # User-level install (noRoot mode) - AppImage to ~/.local/bin
 # =============================================================================
 
+- name: Warn about Neovim on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - nvim_current_version is version(neovim_min_version, '<')
+    - nvim_sys_arch | default('') == ''
+  ansible.builtin.debug:
+    msg: "Neovim GitHub release not available for {{ ansible_facts['architecture'] }} — keeping apt version or install manually"
+
 - name: Install Neovim tarball (user-level, no sudo required)
   when:
     - ansible_facts["os_family"] == "Debian"
     - nvim_current_version is version(neovim_min_version, '<')
     - apt_neovim is not defined  # sudo tasks were skipped
+    - nvim_sys_arch | default('') != ''
   block:
     - name: Ensure ~/.local exists
       ansible.builtin.file:
@@ -139,7 +160,7 @@
 
     - name: Set Neovim tarball architecture
       ansible.builtin.set_fact:
-        nvim_tarball_arch: "{{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'x86_64' }}"
+        nvim_tarball_arch: "{{ nvim_sys_arch }}"
 
     - name: Download Neovim tarball
       ansible.builtin.get_url:

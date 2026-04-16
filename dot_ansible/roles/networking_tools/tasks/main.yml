@@ -81,6 +81,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - doggo_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (doggo)
       ansible.builtin.file:
@@ -167,6 +168,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - gping_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (gping)
       ansible.builtin.file:
@@ -234,13 +236,13 @@
         else ''
       }}
 
-- name: Fail on unsupported architecture for trippy official downloads
+- name: Skip trippy on unsupported architecture
   when:
     - ansible_facts["os_family"] == "Debian"
     - trippy_check.rc != 0
-    - trippy_gnu_target == '' or trippy_musl_target == ''
-  ansible.builtin.fail:
-    msg: "Unsupported architecture for trippy official downloads: {{ ansible_facts['architecture'] }}"
+    - trippy_gnu_target | trim == '' or trippy_musl_target | trim == ''
+  ansible.builtin.debug:
+    msg: "trippy skipped: no release for {{ ansible_facts['architecture'] }}"
 
 - name: Install trippy from GitHub releases (Debian/Ubuntu, system-level)
   when:
@@ -384,6 +386,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - bandwhich_check.rc != 0
+    - ansible_facts['architecture'] in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
     - name: Ensure ~/.local/bin exists (bandwhich)
       ansible.builtin.file:
@@ -442,7 +445,8 @@
           {{
             'x86_64' if ansible_facts['architecture'] in ['x86_64', 'amd64']
             else 'aarch64' if ansible_facts['architecture'] in ['aarch64', 'arm64']
-            else ansible_facts['architecture']
+            else 'armhf' if ansible_facts['architecture'] in ['armv7l', 'armhf']
+            else ''
           }}
 
     - name: Download Ookla Speedtest CLI

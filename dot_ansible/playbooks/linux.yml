@@ -4,6 +4,25 @@
   hosts: local
   gather_facts: true
 
+  pre_tasks:
+    # RPi 4 can run a 64-bit kernel (aarch64) with 32-bit userland (armhf).
+    # ansible_facts['architecture'] reflects the kernel, which leads to
+    # downloading aarch64 binaries that cannot execute.  Override the fact
+    # with the real userland architecture so every role gets the right value.
+    - name: Detect userland architecture via dpkg
+      ansible.builtin.command: dpkg --print-architecture
+      register: dpkg_arch_result
+      changed_when: false
+      failed_when: false
+
+    - name: Override ansible_architecture to match userland
+      ansible.builtin.set_fact:
+        ansible_architecture: >-
+          {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
+             [dpkg_arch_result.stdout | trim]
+             | default(ansible_facts['architecture']) }}
+      when: dpkg_arch_result.rc == 0 and dpkg_arch_result.stdout | trim != ''
+
   roles:
     - role: base
       tags: [base]

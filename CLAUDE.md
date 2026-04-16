@@ -191,6 +191,22 @@ What you **won't get** without root:
 
 **Tip**: Ask your sysadmin to run: `sudo apt install git curl wget zsh tmux htop direnv build-essential tree`
 
+## ARM / Raspberry Pi Support
+
+Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets full tool support. Raspberry Pi 4 may run 32-bit Raspberry Pi OS (armhf userland) with a 64-bit kernel (`arm_64bit=1` default), which causes `uname -m` to report `aarch64` while userland is 32-bit.
+
+**How it's handled:**
+
+- **Bootstrap**: Detects userland architecture via `dpkg --print-architecture`; skips Linuxbrew on armhf (Homebrew requires amd64 or arm64 userland)
+- **Ansible playbooks**: `linux.yml` has `pre_tasks` that override `ansible_architecture` to match the real userland (e.g. `armv7l` instead of `aarch64`), so roles download correct binaries
+- **Tool availability on armhf (32-bit ARM)**: apt packages work fine; GitHub release downloads are skipped for tools without armv7l builds
+
+**Tools with armv7l/armhf releases** (work on RPi 4 32-bit): ripgrep, fd, jq, glow, rclone, direnv, gitleaks, trippy, speedtest
+
+**Tools skipped on armv7l** (no 32-bit ARM release): neovim (GitHub tarball), lazygit, eza, git-delta, yazi, zellij, sesh, taplo, television, duckdb, doggo, gping, bandwhich, SpecStory, CodexBar
+
+**Recommendation**: Use 64-bit Raspberry Pi OS for full tool compatibility.
+
 ## Tmux Configuration
 
 The tmux config is modular under `dot_config/tmux/` (deployed to `~/.config/tmux/`), with `dot_tmux.conf` acting as a one-line shim at `~/.tmux.conf`. Structure: `tmux.conf` (entry point + theme selector), `common.conf` (plugins, general options, terminal compat), `keybindings.conf` (all binds + popup menu), `theme.catppuccin.conf` (default, top status bar), `theme.tmux2k.conf` (alternative, bottom bar).
