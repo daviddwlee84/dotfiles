@@ -93,6 +93,9 @@
         url: "https://github.com/cli/cli/releases/download/{{ gh_release.json.tag_name }}/gh_{{ gh_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.deb"
         dest: /tmp/gh.deb
         mode: '0644'
+        timeout: 60
+      retries: 3
+      delay: 5
 
     - name: Install gh .deb package
       ansible.builtin.apt:
