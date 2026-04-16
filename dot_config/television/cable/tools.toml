@@ -8,9 +8,10 @@
 #
 # Keybindings:
 #   Enter      Execute selected tool immediately
+#   Ctrl+T     Show tldrf page (multi-language fallback) in terminal
 #   Ctrl+/     Toggle preview panel
 #
-# Preview shows tldr page or --help output.
+# Preview shows tldr page (zh_TW → zh → en fallback) or --help output.
 
 [metadata]
 name = "tools"
@@ -30,7 +31,7 @@ awk -F'|' '/^[[:space:]]*\\|[[:space:]]*`/ {
 command = """
 tool=$(printf '%s' '{split: :0}' | sed 's/ *$//')
 if command -v tldr >/dev/null 2>&1; then
-  tldr "$tool" 2>/dev/null || "$tool" --help 2>&1 | head -50
+  tldr -L zh_TW -L zh -L en "$tool" 2>/dev/null || "$tool" --help 2>&1 | head -50
 else
   "$tool" --help 2>&1 | head -50
 fi
@@ -38,8 +39,14 @@ fi
 
 [keybindings]
 enter = "actions:exec"
+ctrl-t = "actions:tldrf"
 
 [actions.exec]
 description = "Execute selected tool"
 command = "{split: :0}"
+mode = "execute"
+
+[actions.tldrf]
+description = "Show tldr page (multi-language fallback)"
+command = "zsh -ic 'tldrf {split: :0}'"
 mode = "execute"
