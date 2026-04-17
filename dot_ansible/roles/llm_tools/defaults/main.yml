@@ -7,5 +7,6 @@ llm_tools_no_root: false
 llm_tools_uv:
   - name: litellm[proxy]
     binary: litellm
+    python: "3.13"  # orjson 3.10.15 (pinned by litellm) lacks cp314 wheels; pin to avoid source build
     with:
       - httpx[socks]

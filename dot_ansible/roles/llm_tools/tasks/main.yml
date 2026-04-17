@@ -15,6 +15,7 @@
 - name: Install LiteLLM via uv
   ansible.builtin.command: >-
     uv tool install {{ item.name }}
+    {% if item.python is defined %}--python {{ item.python }} {% endif %}
     {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
