@@ -134,9 +134,27 @@ fi
 
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
 
-# Handle sudo for Linux
+# Handle sudo
 BECOME_FLAGS=""
-{{ if and (ne .profile "macos") (ne .profile "macos_intel") -}}
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+{{ if $noRoot -}}
+info "noRoot mode enabled on macOS - skipping input_method (requires sudo for pkg installers)"
+TAGS="${TAGS//,input_method/}"
+{{ else -}}
+# Pre-authenticate sudo so Homebrew cask pkg installers (e.g. Squirrel) can run
+# without prompting from a non-TTY child process. Credentials cache for ~5min,
+# which is enough for the short input_method tag. Touch ID works if configured.
+if sudo -n true 2>/dev/null; then
+    :
+elif [[ -t 0 ]]; then
+    info "Sudo password may be needed for pkg-based Homebrew casks (Squirrel, etc.)"
+    sudo -v || warn "sudo pre-auth declined; cask installs needing sudo will be skipped with a warning"
+else
+    warn "Non-interactive mode without passwordless sudo - pkg-based casks will be skipped"
+fi
+{{ end -}}
+{{ else -}}
 {{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
 {{ if $noRoot -}}
 # noRoot mode: skip all sudo-requiring tasks, user-level fallbacks will install tools
