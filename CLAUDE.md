@@ -144,7 +144,7 @@ ansible-playbook playbooks/macos.yml --check
 
 | Tag | Description |
 |-----|-------------|
-| `base` | git, curl, ripgrep, fd, build tools |
+| `base` | git, git-lfs, curl, ripgrep, fd, build tools |
 | `homebrew` | macOS Homebrew update (installation done by bootstrap) |
 | `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting, completions) |
 | `starship` | Starship cross-shell prompt (replaces oh-my-zsh theme) |

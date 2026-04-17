@@ -23,6 +23,7 @@
   ansible.builtin.apt:
     name:
       - git
+      - git-lfs
       - curl
       - wget
       - ripgrep
@@ -247,6 +248,89 @@
       ansible.builtin.file:
         path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/jq"
         state: absent
+
+# --- git-lfs (user-level fallback) ---
+- name: Re-check if git-lfs is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v git-lfs
+  register: git_lfs_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set git-lfs release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - git_lfs_recheck.rc != 0
+  ansible.builtin.set_fact:
+    git_lfs_arch: >-
+      {{
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armhf']
+        else ''
+      }}
+
+- name: Install git-lfs from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - git_lfs_recheck.rc != 0
+    - git_lfs_arch | default('') != ''
+  block:
+    - name: Ensure ~/.local/bin exists (git-lfs)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest git-lfs release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/git-lfs/git-lfs/releases/latest
+        return_content: true
+      register: git_lfs_release
+
+    - name: Download git-lfs tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/git-lfs/git-lfs/releases/download/{{ git_lfs_release.json.tag_name }}/git-lfs-linux-{{ git_lfs_arch }}-{{ git_lfs_release.json.tag_name }}.tar.gz"
+        dest: /tmp/git-lfs.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract and install git-lfs
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/git-lfs-extract
+        mkdir -p /tmp/git-lfs-extract
+        tar -xzf /tmp/git-lfs.tar.gz -C /tmp/git-lfs-extract
+        git_lfs_bin="$(find /tmp/git-lfs-extract -type f -name git-lfs -perm -u+x | head -n 1)"
+        install -m 0755 "$git_lfs_bin" "{{ ansible_facts['env']['HOME'] }}/.local/bin/git-lfs"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up git-lfs temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/git-lfs.tar.gz
+        - /tmp/git-lfs-extract
+
+  rescue:
+    - name: Warn git-lfs installation failed
+      ansible.builtin.debug:
+        msg: "git-lfs installation failed (likely network timeout) - skipping"
+
+    - name: Clean up git-lfs temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/git-lfs.tar.gz
+        - /tmp/git-lfs-extract
 
 # --- just ---
 - name: Check if just is installed
