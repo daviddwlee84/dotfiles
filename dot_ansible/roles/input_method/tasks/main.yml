@@ -38,6 +38,26 @@
   community.general.homebrew_cask:
     name: squirrel
     state: present
+  failed_when: false
+  register: squirrel_install_result
+
+- name: Re-check Squirrel after install attempt (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - not squirrel_check.stat.exists
+  ansible.builtin.stat:
+    path: /Library/Input Methods/Squirrel.app
+  register: squirrel_recheck
+
+- name: Warn Squirrel install requires sudo (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - squirrel_recheck.stat is defined
+    - not squirrel_recheck.stat.exists
+  ansible.builtin.debug:
+    msg: >-
+      Squirrel cask install needs sudo (pkg installer) and chezmoi/ansible runs non-interactively on macOS.
+      Run manually in a terminal: brew install --cask squirrel
 
 # =============================================================================
 # Linux: ibus-rime
