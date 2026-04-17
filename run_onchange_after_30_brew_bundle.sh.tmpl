@@ -74,19 +74,37 @@ fi
 
 info "Running brew bundle..."
 
-# Run shared Brewfile first (installs mas, taps)
-info "Installing shared packages from Brewfile..."
-brew bundle --file="$BREWFILE_DIR/Brewfile" --no-upgrade || {
-    warn "Some packages in Brewfile failed to install (continuing...)"
+# Run brew bundle up to N times. Subsequent attempts only retry items that
+# failed (already-installed packages are skipped quickly). This papers over
+# transient GitHub CDN / HTTP/2 errors that commonly hit large cask lists.
+BUNDLE_MAX_ATTEMPTS="${BUNDLE_MAX_ATTEMPTS:-2}"
+run_bundle_with_retry() {
+    local file="$1"
+    local label="$2"
+    local attempt=1
+    while (( attempt <= BUNDLE_MAX_ATTEMPTS )); do
+        if (( attempt == 1 )); then
+            info "Installing $label..."
+        else
+            info "Retrying $label (attempt $attempt/$BUNDLE_MAX_ATTEMPTS, only missing items)..."
+        fi
+        if brew bundle --file="$file" --no-upgrade; then
+            return 0
+        fi
+        attempt=$(( attempt + 1 ))
+    done
+    warn "Some packages in $label still failed after $BUNDLE_MAX_ATTEMPTS attempts (continuing...)"
+    warn "Rerun later with: brew bundle --file=\"$file\" --no-upgrade"
+    return 0
 }
+
+# Run shared Brewfile first (installs mas, taps)
+run_bundle_with_retry "$BREWFILE_DIR/Brewfile" "shared packages from Brewfile"
 
 # Run platform-specific Brewfile
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.darwin" ]]; then
-    info "Installing macOS packages from Brewfile.darwin..."
-    brew bundle --file="$BREWFILE_DIR/Brewfile.darwin" --no-upgrade || {
-        warn "Some packages in Brewfile.darwin failed to install (continuing...)"
-    }
+    run_bundle_with_retry "$BREWFILE_DIR/Brewfile.darwin" "macOS packages from Brewfile.darwin"
 fi
 
 # Remind about mas sign-in
@@ -98,10 +116,7 @@ if command -v mas &> /dev/null; then
 fi
 {{ else -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.linux" ]]; then
-    info "Installing Linux packages from Brewfile.linux..."
-    brew bundle --file="$BREWFILE_DIR/Brewfile.linux" --no-upgrade || {
-        warn "Some packages in Brewfile.linux failed to install (continuing...)"
-    }
+    run_bundle_with_retry "$BREWFILE_DIR/Brewfile.linux" "Linux packages from Brewfile.linux"
 fi
 {{ end -}}
 
