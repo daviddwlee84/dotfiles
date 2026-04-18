@@ -469,17 +469,28 @@
       args:
         creates: /etc/apt/keyrings/gierens.gpg
 
+    # apt_repository internally runs `apt update`, which fails on machines
+    # with any broken third-party repo (expired GPG, missing Release file, etc.).
+    # Tolerate that and let the GitHub-release fallback below install eza instead.
     - name: Add eza repository
       ansible.builtin.apt_repository:
         repo: "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main"
         state: present
         filename: gierens
+      ignore_errors: true
+      register: eza_repo
 
     - name: Install eza from repository
       ansible.builtin.apt:
         name: eza
         state: present
         update_cache: true
+      when: eza_repo is succeeded
+      ignore_errors: true
+  rescue:
+    - name: Warn eza apt install failed
+      ansible.builtin.debug:
+        msg: "eza apt install failed (likely broken third-party repo) — will try GitHub fallback"
 
 # --- eza (user-level fallback) ---
 - name: Re-check if eza is installed
