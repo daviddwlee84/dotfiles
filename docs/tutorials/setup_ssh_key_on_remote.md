@@ -237,3 +237,18 @@ It will prompt you to:
 5. **Add a host alias** to your local `~/.ssh/config` (with `IdentitiesOnly` option)
 
 Source: `~/.config/zsh/tools/96_ssh_setup.zsh`
+
+## Troubleshooting
+
+### Remote Host Identification Has Changed
+
+If you see `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` when connecting, the server's host key no longer matches what's stored in `~/.ssh/known_hosts`. This commonly happens after reinstalling the OS or reprovisioning a server at the same IP.
+
+Remove the old key and reconnect:
+
+```bash
+ssh-keygen -R <host>
+ssh user@<host>   # accept the new key when prompted
+```
+
+The error message tells you the offending line number (e.g. `Offending ECDSA key in ~/.ssh/known_hosts:89`), but `ssh-keygen -R` handles removal by hostname/IP automatically.

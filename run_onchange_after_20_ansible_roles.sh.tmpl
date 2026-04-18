@@ -182,16 +182,44 @@ else
 fi
 {{ end -}}
 {{ else -}}
+# Detect sudo capability reliably:
+#   1. Real NOPASSWD: invalidate cache first, then `sudo -n true` must still
+#      succeed (otherwise we got a false positive from a recent sudo timestamp
+#      that ansible's become subprocess won't be able to reuse due to tty_tickets).
+#   2. Otherwise try /dev/tty (works even when chezmoi takes over stdin) and
+#      read the password ONCE into a mode-0600 tmpfile, passed to ansible via
+#      `-e @file` so subsequent invocations (partial-failure loop) don't re-prompt.
+#   3. If neither works, print a clear manual command and exit 0 (don't break
+#      the rest of `chezmoi apply`).
+sudo -k 2>/dev/null || true
 if sudo -n true 2>/dev/null; then
-    :
-elif [[ -t 0 ]]; then
-    info "Sudo password required for package installation"
-    BECOME_FLAGS="--ask-become-pass"
+    info "Passwordless sudo detected"
+    BECOME_FLAGS=""
+elif [[ -r /dev/tty && -w /dev/tty ]]; then
+    info "Sudo password required - reading once from /dev/tty"
+    BECOME_PASS_FILE="$(mktemp)"
+    chmod 600 "$BECOME_PASS_FILE"
+    trap 'rm -f "$BECOME_PASS_FILE"' EXIT
+    printf "[sudo] password for %s: " "$USER" > /dev/tty
+    IFS= read -rs SUDO_PASS < /dev/tty
+    echo > /dev/tty
+    # Write as ansible vars file so password never appears in argv / ps / history.
+    # Use printf with %s (no shell interpretation) and escape embedded double quotes.
+    ESCAPED_PASS="${SUDO_PASS//\"/\\\"}"
+    printf 'ansible_become_password: "%s"\n' "$ESCAPED_PASS" > "$BECOME_PASS_FILE"
+    unset SUDO_PASS ESCAPED_PASS
+    BECOME_FLAGS="-e @$BECOME_PASS_FILE"
 else
-    warn "Non-interactive mode without passwordless sudo"
-    warn "To complete setup, run manually:"
-    warn "  cd ~/.ansible && ansible-playbook playbooks/linux.yml --tags \"$TAGS\" --ask-become-pass"
-    BECOME_FLAGS="--skip-tags sudo"
+    warn "Non-interactive mode without passwordless sudo and no /dev/tty access"
+    warn "Skipping ansible run. To complete setup, run manually:"
+    warn ""
+    warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \\"
+    warn "    $PLAYBOOK \\"
+    warn "    --tags '$TAGS' --ask-become-pass"
+    warn ""
+    warn "Or grant passwordless sudo:"
+    warn "  echo '$USER ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/$USER"
+    exit 0
 fi
 {{ end -}}
 {{ end -}}
