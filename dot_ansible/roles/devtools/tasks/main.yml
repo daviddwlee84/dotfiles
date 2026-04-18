@@ -934,10 +934,20 @@
   changed_when: false
   failed_when: false
 
+- name: Check for system npm
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tldr_check.rc != 0
+  ansible.builtin.command: command -v npm
+  register: system_npm_check
+  changed_when: false
+  failed_when: false
+
 - name: Install tldr via npm (Debian/Ubuntu, system-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - tldr_check.rc != 0
+    - system_npm_check.rc == 0
   become: true
   tags: [sudo]
   community.general.npm:
@@ -958,7 +968,6 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - tldr_recheck.rc != 0
-    - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g tldr

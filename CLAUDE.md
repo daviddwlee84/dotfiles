@@ -227,7 +227,7 @@ Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets 
 
 **Tools skipped on armv7l** (no 32-bit ARM release): neovim (GitHub tarball), lazygit, eza, git-delta, yazi, superfile, zellij, sesh, taplo, television, duckdb, doggo, gping, bandwhich, SpecStory, CodexBar, Claude Code (install.sh ships arm64/amd64 only)
 
-**Tools skipped on armv7l via mise** (no armv7l prebuilt): bun, ruby; node pinned to `node@20` (last LTS with armv7l tarball). Downstream: tree-sitter-cli and tldr depend on mise node and are skipped on armv7l.
+**Tools skipped on armv7l via mise** (no armv7l prebuilt): bun, ruby; node pinned to `node@20` (last LTS with armv7l tarball). npm-based tools (tldr, etc.) install via `mise exec -- npm` and work on armv7l. tree-sitter-cli is still skipped (cargo build needs libclang and takes 15+ min on RPi 4).
 
 **Recommendation**: Use 64-bit Raspberry Pi OS for full tool compatibility.
 
