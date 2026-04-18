@@ -72,6 +72,20 @@ if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
     exit 0
 fi
 
+{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+# Pre-authenticate sudo so Homebrew cask pkg installers (e.g. google-drive,
+# squirrel, ollama-app) can invoke /usr/sbin/installer without prompting from
+# a non-TTY child. Credentials cache for ~5min, covering the bundle run.
+if sudo -n true 2>/dev/null; then
+    :
+elif [[ -t 0 ]]; then
+    info "Sudo password may be needed for pkg-based Homebrew casks (google-drive, squirrel, ollama-app)"
+    sudo -v || warn "sudo pre-auth declined; pkg-based casks may fail with 'Input/output error'"
+else
+    warn "Non-interactive mode without passwordless sudo - pkg-based casks may fail"
+fi
+
+{{ end -}}
 info "Running brew bundle..."
 
 # Run brew bundle up to N times. Subsequent attempts only retry items that

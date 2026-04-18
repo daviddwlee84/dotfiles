@@ -547,10 +547,19 @@
   changed_when: false
   failed_when: false
 
+- name: Skip git-delta on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_check.rc != 0
+    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: "git-delta skipped: no release for {{ target_architecture }}"
+
 - name: Install git-delta from GitHub releases (Debian/Ubuntu)
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   become: true
   tags: [sudo]
   block:
@@ -949,6 +958,7 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - tldr_recheck.rc != 0
+    - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g tldr

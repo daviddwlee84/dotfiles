@@ -45,10 +45,19 @@
   changed_when: false
   failed_when: false
 
+- name: Skip Claude Code on unsupported architecture (Linux)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - claude_check.rc != 0
+    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: "Claude Code skipped: install.sh downloads arm64/amd64 binaries; no build for {{ target_architecture }}"
+
 - name: Install Claude Code (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
     - claude_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.shell: |
     curl -fsSL https://claude.ai/install.sh | bash
   args:

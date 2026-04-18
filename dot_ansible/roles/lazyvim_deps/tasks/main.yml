@@ -36,8 +36,25 @@
 # Install mise tools from ~/.config/mise/config.toml (node@lts)
 # Non-fatal: mise downloads are flaky and some tools (e.g. ruby) may fail on
 # constrained hardware. Partial success is fine — user can re-run `mise install`.
+#
+# On armv7l (RPi 4 with 32-bit armhf userland), skip bun (no armv7l build),
+# ruby (ruby-build source compile is too heavy and fragile), and pin node to
+# @20 — the last LTS with armv7l prebuilts. Node 21+ has no armv7l prebuilt and
+# source-builds fail linking (`__atomic_load_8`) without `-latomic`.
+- name: Install mise global tools (Debian/Ubuntu, armv7l)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - target_architecture in ['armv7l', 'armv6l']
+  ansible.builtin.command:
+    cmd: "{{ mise_bin }} install --yes node@20 rust@latest"
+  register: mise_install
+  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+  failed_when: false
+
 - name: Install mise global tools (Debian/Ubuntu)
-  when: ansible_facts["os_family"] == "Debian"
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.command:
     cmd: "{{ mise_bin }} install --yes"
   register: mise_install
@@ -230,10 +247,19 @@
   changed_when: false
   failed_when: false
 
+- name: Skip tree-sitter-cli on armv7l (no working node and cargo build too slow)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - treesitter_check.rc != 0
+    - target_architecture in ['armv7l', 'armv6l']
+  ansible.builtin.debug:
+    msg: "tree-sitter-cli skipped on {{ target_architecture }}: no armv7l node prebuilt; cargo build needs libclang and takes 15+ min"
+
 - name: Install tree-sitter-cli via mise npm (Debian/Ubuntu)
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
+    - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.shell: |
     {{ mise_bin }} exec -- npm install -g tree-sitter-cli
   args:
@@ -242,10 +268,26 @@
   changed_when: "'added' in treesitter_npm.stdout or 'added' in treesitter_npm.stderr"
   ignore_errors: true
 
+# cargo build of tree-sitter-cli requires libclang (via bindgen). Install on
+# Debian/Ubuntu when we might fall through to the cargo path.
+- name: Install libclang-dev for tree-sitter-cli cargo build (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - treesitter_check.rc != 0
+    - target_architecture not in ['armv7l', 'armv6l']
+    - treesitter_npm is failed
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: libclang-dev
+    state: present
+  ignore_errors: true
+
 - name: Install tree-sitter-cli via cargo (fallback)
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
+    - target_architecture not in ['armv7l', 'armv6l']
     - treesitter_npm is failed
   ansible.builtin.shell: |
     if command -v cargo >/dev/null 2>&1; then
