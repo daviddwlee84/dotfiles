@@ -1,0 +1,177 @@
+# LAN devices channel for television (tv)
+# Fuzzy-search local network devices with open ports, MAC/vendor,
+# hostname, latency, and last-seen timestamp.
+#
+# Usage:
+#   tv lan-devices
+#   lanscan                 # shell alias, runs a full scan up front
+#
+# The channel reads ~/.cache/tv/lan-devices.tsv, which is populated by
+# ~/.config/television/lan-scan.sh. `watch = 2.0` makes rows appear as
+# the background scan progresses (state column: discovered / scanning /
+# scanned / stale).
+#
+# Source cycling (Ctrl+S):
+#   1. All discovered devices (sorted by IP)
+#   2. Only devices with open ports
+#   3. Fresh only (last-seen within 5 min)
+#
+# Preview cycling (Ctrl+F):
+#   1. Cached nmap service detail (fast)
+#   2. Live `nmap -sV -Pn` rescan (blocking)
+#   3. ARP + rDNS + mDNS metadata
+#
+# Keybindings (Alt+ namespace to avoid tmux/TV conflicts):
+#   Enter      Full `nmap -sV -A` in execute mode
+#   Alt+R      Rescan ports on selected host + reload
+#   Alt+F      Rescan full subnet (discover + ports) + reload
+#   Alt+D      Re-discover only (no port scan) + reload
+#   Alt+S      Open ssh to host
+#   Alt+H      Open http://host in browser
+#   Alt+C      Clear cache + reload
+#   Ctrl+Y     Copy IP to clipboard (OSC 52 over SSH)
+
+[metadata]
+name = "lan-devices"
+description = "LAN devices: IP, MAC, vendor, hostname, open ports, latency"
+requirements = ["nmap"]
+
+[source]
+# Columns (tab-separated, matches lan-scan.sh TSV_HEADER):
+# 0:ip  1:mac  2:vendor  3:hostname  4:ports  5:top  6:rtt  7:seen  8:state
+command = [
+  """
+  tsv="$HOME/.cache/tv/lan-devices.tsv"
+  if [ ! -s "$tsv" ]; then
+    "$HOME/.config/television/lan-scan.sh" all >/dev/null 2>&1 &
+    printf '...\\t-\\t(scanning — results will stream in)\\t-\\t-\\t-\\t-\\t-\\tscanning\\n'
+    exit 0
+  fi
+  awk -F'\\t' 'NR>1' "$tsv"
+  """,
+  """
+  tsv="$HOME/.cache/tv/lan-devices.tsv"
+  awk -F'\\t' 'NR>1 && $5 ~ /^[1-9]/' "$tsv"
+  """,
+  """
+  tsv="$HOME/.cache/tv/lan-devices.tsv"
+  now=$(date +%s)
+  awk -F'\\t' -v now="$now" 'NR>1 {
+    "date -j -f %H:%M:%S \"" $8 "\" +%s 2>/dev/null || date -d \"" $8 "\" +%s 2>/dev/null" | getline ts
+    if (now - ts < 300) print
+  }' "$tsv"
+  """,
+]
+display = "{split:\\t:0}  {split:\\t:1}  {split:\\t:2}  {split:\\t:3}  [{split:\\t:4}p] {split:\\t:5}  {split:\\t:6}ms  {split:\\t:7}  {split:\\t:8}"
+output = "{split:\\t:0}"
+watch = 2.0
+no_sort = true
+
+[preview]
+command = [
+  """
+  ip='{split:\\t:0}'
+  f="$HOME/.cache/tv/lan-ports/$ip.txt"
+  if [ -s "$f" ]; then
+    cat "$f"
+  else
+    echo "No cached port scan for $ip."
+    echo "Press Alt+R to scan this host, or Ctrl+F to cycle preview."
+  fi
+  """,
+  """
+  ip='{split:\\t:0}'
+  echo "# Live nmap -sV -Pn -F $ip (blocking, ~10-30s)"
+  echo
+  nmap -sV -Pn -F "$ip" 2>/dev/null
+  """,
+  """
+  ip='{split:\\t:0}'
+  echo "# ARP"
+  if [ "$(uname -s)" = "Darwin" ]; then arp -an | grep -F "($ip)" || echo "no ARP entry"; \
+  else ip neigh show "$ip" 2>/dev/null || echo "no ARP entry"; fi
+  echo
+  echo "# Reverse DNS"
+  getent hosts "$ip" 2>/dev/null || dig +short +time=1 +tries=1 -x "$ip" 2>/dev/null || echo "(none)"
+  echo
+  echo "# mDNS"
+  if command -v avahi-resolve >/dev/null 2>&1; then avahi-resolve -a "$ip" 2>/dev/null || echo "(none)"; \
+  elif [ "$(uname -s)" = "Darwin" ]; then dscacheutil -q host -a ip_address "$ip" 2>/dev/null || echo "(none)"; \
+  else echo "(no mDNS tool)"; fi
+  echo
+  echo "# Ping"
+  ping -c 2 "$ip" 2>/dev/null | tail -n 5
+  """,
+]
+header = "Device {split:\\t:0} ({split:\\t:2} / {split:\\t:3})"
+
+[ui]
+input_header = "LAN Devices"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:details"
+alt-r = ["actions:rescan_host", "reload_source"]
+alt-f = ["actions:rescan_all", "reload_source"]
+alt-d = ["actions:rediscover", "reload_source"]
+alt-s = "actions:ssh"
+alt-h = "actions:http"
+alt-c = ["actions:clean", "reload_source"]
+ctrl-y = ["actions:copy_ip", "reload_source"]
+
+[actions.details]
+description = "Full nmap -sV -A scan"
+command = "ip='{split:\\t:0}'; echo \"# nmap -sV -A $ip\"; nmap -sV -A -Pn \"$ip\" 2>/dev/null; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.rescan_host]
+description = "Rescan selected host's open ports"
+command = "$HOME/.config/television/lan-scan.sh ports --host '{split:\\t:0}' >/dev/null 2>&1 &"
+mode = "fork"
+
+[actions.rescan_all]
+description = "Rescan full subnet (discover + ports)"
+command = "$HOME/.config/television/lan-scan.sh all >/dev/null 2>&1 &"
+mode = "fork"
+
+[actions.rediscover]
+description = "Re-discover hosts (no port scan)"
+command = "$HOME/.config/television/lan-scan.sh discover >/dev/null 2>&1 &"
+mode = "fork"
+
+[actions.ssh]
+description = "SSH to selected host"
+command = "ssh '{split:\\t:0}'"
+mode = "execute"
+
+[actions.http]
+description = "Open http://host in browser"
+command = """
+ip='{split:\\t:0}'
+url="http://$ip"
+if [ "$(uname -s)" = "Darwin" ]; then open "$url"
+elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
+else echo "No browser opener; URL: $url"; read -r _
+fi
+"""
+mode = "fork"
+
+[actions.clean]
+description = "Clear LAN scan cache"
+command = "$HOME/.config/television/lan-scan.sh clean >/dev/null 2>&1"
+mode = "fork"
+
+[actions.copy_ip]
+description = "Copy IP to clipboard (OSC 52 over SSH)"
+command = """
+d='{split:\\t:0}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

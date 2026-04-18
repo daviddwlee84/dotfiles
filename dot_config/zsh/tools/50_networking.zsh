@@ -55,3 +55,9 @@ fi
 
 # --- speedtest (Ookla CLI) ---
 # speedtest is already short enough, no alias needed
+
+# --- LAN device scanner (feeds `tv lan-devices`) ---
+if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
+  alias lanscan="$HOME/.config/television/lan-scan.sh all"
+  alias tv-lan='tv lan-devices'
+fi

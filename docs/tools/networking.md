@@ -46,6 +46,11 @@ pingsweep
 
 # Full scan with OS detection
 sudo nmap -sV -O 192.168.1.0/24
+
+# Interactive picker with open ports, MAC/vendor, hostname, latency
+# (auto-detects sudo; falls back to no-sudo discovery when unavailable)
+lanscan            # run a full scan into ~/.cache/tv/
+tv lan-devices     # fuzzy-search devices; see docs/tools/tv.md
 ```
 
 ### Port scanning

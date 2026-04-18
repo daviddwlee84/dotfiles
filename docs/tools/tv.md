@@ -54,6 +54,55 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 
 ---
 
+### `lan-devices` channel
+
+Fuzzy-search devices on the local subnet with open ports, MAC/vendor, hostname (rDNS + mDNS), ping RTT, and last-seen timestamp. Backed by `~/.config/television/lan-scan.sh`, which writes results incrementally to `~/.cache/tv/lan-devices.tsv` and per-host nmap detail to `~/.cache/tv/lan-ports/<ip>.txt`. The channel uses `watch = 2.0`, so rows stream into the picker as the background scan progresses (state column: `discovered` → `scanning` → `scanned`).
+
+Open with `tv lan-devices`, or run a synchronous scan first with the `lanscan` shell alias.
+
+**Sudo-gated with fallback:** when passwordless sudo is available (`sudo -n true`), the script uses `arp-scan -lgq` for the richest MAC/vendor data. Otherwise it falls back to `nmap -sn` ping sweep + OS ARP cache (`arp -an` on macOS, `ip neigh` on Linux). Vendor lookup for the fallback path uses nmap's `nmap-mac-prefixes` OUI database.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| All devices | Every discovered host, sorted by IP (default) |
+| With open ports | Only rows whose port count is ≥ 1 |
+| Fresh only | Hosts seen within the last 5 minutes |
+
+**Preview cycling** (`Ctrl+F`):
+
+1. Cached nmap service detail (fast, from `~/.cache/tv/lan-ports/<ip>.txt`)
+2. Live `nmap -sV -Pn -F` rescan (blocking, ~10–30 s)
+3. ARP + rDNS + mDNS + ping metadata
+
+**Keybindings** (`Alt+` namespace avoids tmux/TV conflicts):
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Full `nmap -sV -A` in execute mode |
+| `Alt+R` | Rescan ports on selected host + reload |
+| `Alt+F` | Rescan full subnet (discover + ports) + reload |
+| `Alt+D` | Re-discover only (no port scan) + reload |
+| `Alt+S` | SSH to selected host |
+| `Alt+H` | Open `http://<ip>` in the system browser |
+| `Alt+C` | Clear scan cache + reload |
+| `Ctrl+Y` | Copy IP to clipboard (OSC 52 over SSH) |
+
+**Cache layout:**
+
+```
+~/.cache/tv/
+├── lan-devices.tsv         # one row per device (watched by tv)
+├── lan-ports/<ip>.txt      # nmap -sV output per host
+├── lan-scan.log            # scan progress log
+└── lan-scan.lock/          # mutex directory (removed on exit)
+```
+
+Requires `nmap`; `rustscan` and `arp-scan` are used when present (all part of the `networking_tools` ansible role).
+
+---
+
 ### `pueue` channel
 
 Interactive task manager for [pueue](https://github.com/Nukesor/pueue) — fuzzy-search tasks, preview logs, and pause/resume/kill/restart without leaving the picker. Parses `pueue status --json` at runtime. Requires `pueue` and `jq`.
