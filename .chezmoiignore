@@ -26,7 +26,7 @@ backups/** # ignore the contents of backups folder but not the folder itself
 
 docs/** # ignore everything in docs/ and its subdirectories
 
-scripts/adhoc/
+scripts/**
 
 # markdownlint (nvim mfussenegger/nvim-lint)
 .markdownlint.jsonc
@@ -35,7 +35,6 @@ scripts/adhoc/
 .pre-commit-config.yaml
 .gitleaks.toml
 .gitignore
-scripts/redact_specstory.py
 
 # Zsh secrets file (API keys, tokens, proxy - never track)
 .config/zsh/secrets.zsh
