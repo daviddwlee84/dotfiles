@@ -103,6 +103,41 @@ Requires `nmap`; `rustscan` and `arp-scan` are used when present (all part of th
 
 ---
 
+### `ansible` channel
+
+Browse the ansible playbooks / roles / tags shipped in `dot_ansible/` (deployed to `~/.ansible/`). Useful for quickly running a playbook, syntax-checking after edits, or copying the full `ansible-playbook` invocation to paste into a shell.
+
+Open with `tv ansible`.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| Playbooks | `~/.ansible/playbooks/*.yml` (base, linux, macos) |
+| Roles | Every role directory under `~/.ansible/roles/` |
+| Tags | Unique tag names extracted from all playbooks |
+
+**Preview cycling** (`Ctrl+F`):
+
+1. Playbook → YAML via `bat`; role → `tasks/main.yml` + `defaults/main.yml`; tag → playbook lines that declare it
+2. Playbook → tag list within the file; role → directory listing; tag → roles referencing the tag
+
+**Keybindings** (`Alt+` namespace avoids tmux/TV conflicts):
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Run playbook (`ansible-playbook playbooks/<name>.yml`); on role/tag, run OS-default playbook filtered by `--tags <name>` |
+| `Alt+C` | Syntax check (`--syntax-check`) |
+| `Alt+D` | Dry run (`--check`) |
+| `Alt+T` | Run OS-default playbook filtered by the selected tag/role |
+| `Alt+E` | Edit file in `$EDITOR` (playbook YAML or role's `tasks/main.yml`) |
+| `Alt+V` | Open role directory in `yazi` (roles source only) |
+| `Ctrl+Y` / `Alt+Y` | Copy full `ansible-playbook ...` command to clipboard (OSC 52 over SSH) |
+
+All actions `cd ~/.ansible` and export `ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg`, matching the manual invocation pattern in `CLAUDE.md`. OS default: `macos.yml` on Darwin, `linux.yml` otherwise.
+
+---
+
 ### `pueue` channel
 
 Interactive task manager for [pueue](https://github.com/Nukesor/pueue) — fuzzy-search tasks, preview logs, and pause/resume/kill/restart without leaving the picker. Parses `pueue status --json` at runtime. Requires `pueue` and `jq`.

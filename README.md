@@ -55,8 +55,14 @@ flowchart TB
 
 ```bash
 # One-liner to initialize and apply (installs chezmoi to ~/.local/bin)
+# Uses HTTPS to avoid SSH key setup on fresh machines.
 export GITHUB_USERNAME=daviddwlee84
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" init --apply git@github.com:$GITHUB_USERNAME/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" init --apply "https://github.com/$GITHUB_USERNAME/dotfiles.git"
+
+# After install, switch the chezmoi source repo to SSH (so future `chezmoi update` uses your SSH key):
+#   chezmoi cd
+#   git remote set-url origin git@github.com:$GITHUB_USERNAME/dotfiles.git
+#   exit
 ```
 
 This automatically:

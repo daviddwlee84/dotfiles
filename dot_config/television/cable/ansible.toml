@@ -1,0 +1,99 @@
+# Ansible channel for television (tv)
+# Browse playbooks, roles, and tags under ~/.ansible/ with inline preview and
+# one-key actions for run / syntax-check / dry-run / copy-command.
+#
+# Usage:
+#   tv ansible
+#
+# Source cycling (Ctrl+S):
+#   1. Playbooks  (~/.ansible/playbooks/*.yml)
+#   2. Roles      (~/.ansible/roles/*/)
+#   3. Tags       (extracted from playbooks)
+#
+# Keybindings:
+#   Enter      Run playbook (or run the OS-default playbook filtered by role/tag)
+#   Alt+C      Syntax check
+#   Alt+D      Dry run (--check)
+#   Alt+T      Run OS-default playbook filtered by selected tag/role
+#   Alt+E      Edit selected file in $EDITOR
+#   Alt+V      Open role directory in yazi (roles only)
+#   Ctrl+Y     Copy full ansible-playbook command to clipboard (overrides TV default)
+#   Alt+Y      Copy full ansible-playbook command to clipboard
+#   Ctrl+F     Cycle preview
+#   Ctrl+O     Toggle preview panel
+#
+# All actions cd into ~/.ansible and export ANSIBLE_CONFIG=~/.ansible/ansible.cfg.
+# OS default: macos.yml on Darwin, linux.yml otherwise.
+
+[metadata]
+name = "ansible"
+description = "Ansible playbooks / roles / tags: browse, syntax-check, run, copy command"
+requirements = ["ansible-playbook"]
+
+[source]
+command = [
+  """find ~/.ansible/playbooks -maxdepth 1 -type f -name '*.yml' 2>/dev/null | sort | awk -F/ '{name=$NF; sub(/\\.yml$/,"",name); printf "playbook\\t%s\\t%s\\n", name, $0}'""",
+  """find ~/.ansible/roles -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | awk -F/ '{printf "role\\t%s\\t%s\\n", $NF, $0}'""",
+  """grep -hoE 'tags: \\[[^]]+\\]' ~/.ansible/playbooks/*.yml 2>/dev/null | sed -E 's/tags: \\[//; s/\\]//; s/,/\\n/g' | tr -d ' ' | sort -u | awk 'NF{printf "tag\\t%s\\t-\\n", $0}'""",
+]
+display = "{split:\\t:0}  {split:\\t:1}"
+output = "{split:\\t:1}"
+no_sort = true
+
+[preview]
+command = [
+  """$HOME/.config/television/ansible-preview.sh main '{split:\\t:0}' '{split:\\t:1}' '{split:\\t:2}'""",
+  """$HOME/.config/television/ansible-preview.sh alt '{split:\\t:0}' '{split:\\t:1}' '{split:\\t:2}'""",
+]
+header = "{split:\\t:0}: {split:\\t:1}"
+
+[ui]
+input_header = "Ansible"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:run"
+alt-c = "actions:syntax_check"
+alt-d = "actions:check"
+alt-t = "actions:run_tag"
+alt-e = "actions:edit"
+alt-v = "actions:yazi"
+ctrl-y = "actions:copy_cmd"
+alt-y = "actions:copy_cmd"
+
+[actions.run]
+description = "Run playbook (or OS-default playbook filtered by role/tag)"
+command = """k='{split:\\t:0}'; n='{split:\\t:1}'; os=$(uname); [ "$os" = "Darwin" ] && pb=macos.yml || pb=linux.yml; cd ~/.ansible || exit 1; export ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg; if [ "$k" = "playbook" ]; then ansible-playbook "playbooks/${n}.yml"; else ansible-playbook "playbooks/${pb}" --tags "$n"; fi; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.syntax_check]
+description = "Syntax check"
+command = """k='{split:\\t:0}'; n='{split:\\t:1}'; os=$(uname); [ "$os" = "Darwin" ] && pb=macos.yml || pb=linux.yml; cd ~/.ansible || exit 1; export ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg; if [ "$k" = "playbook" ]; then ansible-playbook --syntax-check "playbooks/${n}.yml"; else ansible-playbook --syntax-check "playbooks/${pb}" --tags "$n"; fi; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.check]
+description = "Dry run (--check)"
+command = """k='{split:\\t:0}'; n='{split:\\t:1}'; os=$(uname); [ "$os" = "Darwin" ] && pb=macos.yml || pb=linux.yml; cd ~/.ansible || exit 1; export ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg; if [ "$k" = "playbook" ]; then ansible-playbook --check "playbooks/${n}.yml"; else ansible-playbook --check "playbooks/${pb}" --tags "$n"; fi; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.run_tag]
+description = "Run OS-default playbook filtered by selected tag/role name"
+command = """n='{split:\\t:1}'; os=$(uname); [ "$os" = "Darwin" ] && pb=macos.yml || pb=linux.yml; cd ~/.ansible || exit 1; export ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg; ansible-playbook "playbooks/${pb}" --tags "$n"; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.edit]
+description = "Edit selected file (playbook YAML or role's tasks/main.yml)"
+command = """k='{split:\\t:0}'; p='{split:\\t:2}'; if [ "$k" = "playbook" ]; then ${EDITOR:-vi} "$p"; elif [ "$k" = "role" ]; then ${EDITOR:-vi} "$p/tasks/main.yml"; else ${EDITOR:-vi} ~/.ansible/playbooks; fi"""
+mode = "execute"
+
+[actions.yazi]
+description = "Open role directory in yazi"
+command = """k='{split:\\t:0}'; p='{split:\\t:2}'; if [ "$k" = "role" ] && command -v yazi >/dev/null 2>&1; then yazi "$p"; else echo 'yazi action only valid on roles'; sleep 1; fi"""
+mode = "execute"
+
+[actions.copy_cmd]
+description = "Copy full ansible-playbook command to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; k='{split:\\t:0}'; n='{split:\\t:1}'; os=$(uname); [ "$os" = "Darwin" ] && pb=macos.yml || pb=linux.yml; if [ "$k" = "playbook" ]; then printf 'cd ~/.ansible && ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg ansible-playbook playbooks/%s.yml' "$n" | _clip; else printf 'cd ~/.ansible && ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg ansible-playbook playbooks/%s --tags %s' "$pb" "$n" | _clip; fi"""
+mode = "fork"
