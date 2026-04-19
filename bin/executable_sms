@@ -1,0 +1,405 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "huawei-lte-api>=1.10",
+#   "platformdirs>=4",
+#   "rich>=13",
+#   "tyro>=0.8",
+# ]
+# ///
+"""Read SMS from a Huawei HiLink router over its XML API.
+
+Deployed via chezmoi as ~/bin/sms. Uses huawei-lte-api (handles CSRF,
+SCRAM-SHA-256 login, session cookies) instead of scraping the JS SPA.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Annotated, Any, Union
+
+import tyro
+from platformdirs import user_cache_dir, user_config_dir
+
+APP = "sms"
+DEFAULT_HOST = "192.168.168.1"
+DEFAULT_USER = "admin"
+DEFAULT_TTL = 30
+CODE_RE = re.compile(r"(?<!\d)(\d{4,8})(?!\d)")
+CODE_KEYWORDS = re.compile(
+    r"verification|驗證|验证|\bcode\b|OTP|one[- ]?time|密碼|密码", re.I
+)
+
+CONFIG_DIR = Path(user_config_dir(APP))
+CACHE_DIR = Path(user_cache_dir(APP))
+CONFIG_FILE = CONFIG_DIR / "config.toml"
+INBOX_CACHE = CACHE_DIR / "inbox.json"
+
+
+def die(msg: str, code: int = 1) -> None:
+    print(f"sms: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+# ---------- config / cache --------------------------------------------------
+
+def load_config() -> dict[str, str]:
+    cfg: dict[str, str] = {}
+    if CONFIG_FILE.exists():
+        try:
+            cfg = tomllib.loads(CONFIG_FILE.read_text())
+        except Exception as e:
+            die(f"bad config {CONFIG_FILE}: {e}")
+    host = os.environ.get("SMS_ROUTER_HOST") or cfg.get("host") or DEFAULT_HOST
+    user = os.environ.get("SMS_ROUTER_USER") or cfg.get("user") or DEFAULT_USER
+    pw = os.environ.get("SMS_ROUTER_PASS") or cfg.get("password")
+    if not pw:
+        pw = prompt_and_save(host, user)
+    return {"host": host, "user": user, "password": pw}
+
+
+def prompt_and_save(host: str, user: str) -> str:
+    import getpass
+    if not sys.stdin.isatty():
+        die("no password; set SMS_ROUTER_PASS or populate ~/.config/sms/config.toml", 2)
+    print(f"sms: router http://{host}/ user={user} — password not configured", file=sys.stderr)
+    pw = getpass.getpass("Router password: ")
+    if not pw:
+        die("empty password", 2)
+    ans = input("Save to ~/.config/sms/config.toml (chmod 600)? [Y/n] ").strip().lower()
+    if ans in ("", "y", "yes"):
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(
+            f'host = "{host}"\nuser = "{user}"\npassword = "{pw}"\n'
+        )
+        CONFIG_FILE.chmod(0o600)
+        print(f"sms: saved {CONFIG_FILE}", file=sys.stderr)
+    return pw
+
+
+def cache_ttl() -> int:
+    raw = os.environ.get("SMS_CACHE_TTL")
+    if raw is None:
+        return DEFAULT_TTL
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_TTL
+
+
+def read_cache() -> list[dict[str, Any]] | None:
+    ttl = cache_ttl()
+    if ttl == 0 or not INBOX_CACHE.exists():
+        return None
+    age = time.time() - INBOX_CACHE.stat().st_mtime
+    if age > ttl:
+        return None
+    try:
+        return json.loads(INBOX_CACHE.read_text())
+    except Exception:
+        return None
+
+
+def write_cache(messages: list[dict[str, Any]]) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    INBOX_CACHE.write_text(json.dumps(messages, ensure_ascii=False))
+    INBOX_CACHE.chmod(0o600)
+
+
+def clear_cache() -> None:
+    INBOX_CACHE.unlink(missing_ok=True)
+
+
+# ---------- router API ------------------------------------------------------
+
+def _url(cfg: dict[str, str]) -> str:
+    from urllib.parse import quote
+    user = quote(cfg["user"], safe="")
+    pw = quote(cfg["password"], safe="")
+    return f"http://{user}:{pw}@{cfg['host']}/"
+
+
+def fetch_inbox(cfg: dict[str, str], count: int = 50) -> list[dict[str, Any]]:
+    from huawei_lte_api.Client import Client
+    from huawei_lte_api.Connection import Connection
+    from huawei_lte_api.enums.sms import BoxTypeEnum, SortTypeEnum
+
+    try:
+        with Connection(_url(cfg), timeout=10) as conn:
+            raw = Client(conn).sms.get_sms_list(
+                page=1,
+                box_type=BoxTypeEnum.LOCAL_INBOX,
+                read_count=count,
+                sort_type=SortTypeEnum.DATE,
+                ascending=False,
+                unread_preferred=False,
+            )
+    except Exception as e:
+        die(f"router error: {e}")
+
+    msgs_node = (raw or {}).get("Messages") or {}
+    items = msgs_node.get("Message") or []
+    if isinstance(items, dict):
+        items = [items]
+    norm = []
+    for m in items:
+        norm.append({
+            "index": str(m.get("Index", "")),
+            "phone": str(m.get("Phone", "")),
+            "content": str(m.get("Content", "") or ""),
+            "date": str(m.get("Date", "")),
+            "smstat": str(m.get("Smstat", "")),
+            "unread": str(m.get("Smstat", "")) == "0",
+        })
+    return norm
+
+
+def get_messages(cfg: dict[str, str], use_cache: bool = True, count: int = 50) -> list[dict[str, Any]]:
+    if use_cache:
+        cached = read_cache()
+        if cached is not None:
+            return cached
+    msgs = fetch_inbox(cfg, count=count)
+    write_cache(msgs)
+    return msgs
+
+
+# ---------- helpers ---------------------------------------------------------
+
+def extract_code(content: str) -> str | None:
+    for m in CODE_RE.finditer(content):
+        digits = m.group(1)
+        if 4 <= len(digits) <= 8:
+            return digits
+    return None
+
+
+def pick_code(messages: list[dict[str, Any]]) -> tuple[dict[str, Any], str] | None:
+    for m in messages:
+        if CODE_KEYWORDS.search(m["content"]):
+            code = extract_code(m["content"])
+            if code:
+                return m, code
+    for m in messages:
+        code = extract_code(m["content"])
+        if code:
+            return m, code
+    return None
+
+
+def clipboard_copy(text: str) -> bool:
+    x_path = shutil.which("x") or str(Path.home() / "bin" / "x")
+    if Path(x_path).exists():
+        try:
+            subprocess.run([x_path, "copy"], input=text, text=True, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    for tool, args in (
+        ("pbcopy", []),
+        ("wl-copy", []),
+        ("xclip", ["-selection", "clipboard"]),
+        ("xsel", ["--clipboard", "--input"]),
+    ):
+        if shutil.which(tool):
+            try:
+                subprocess.run([tool, *args], input=text, text=True, check=True)
+                return True
+            except subprocess.CalledProcessError:
+                continue
+    return False
+
+
+def render_table(msgs: list[dict[str, Any]]) -> None:
+    from rich.console import Console
+    from rich.table import Table
+
+    table = Table(show_lines=False, expand=True)
+    table.add_column("#", style="dim", no_wrap=True)
+    table.add_column("R", no_wrap=True)
+    table.add_column("From", no_wrap=True)
+    table.add_column("Date", no_wrap=True)
+    table.add_column("Content", overflow="fold")
+    for m in msgs:
+        flag = "●" if m["unread"] else " "
+        content = m["content"].replace("\n", " ")
+        table.add_row(m["index"], flag, m["phone"], m["date"], content)
+    Console().print(table)
+
+
+# ---------- commands (tyro dataclasses) -------------------------------------
+
+@dataclass
+class ListCmd:
+    """List SMS inbox."""
+    limit: int = 0
+    """Max messages to show (0 = all)."""
+    unread: bool = False
+    """Only show unread messages."""
+    json: bool = False
+    """Output as JSON."""
+    no_cache: bool = False
+    """Bypass inbox cache."""
+
+    def run(self) -> int:
+        cfg = load_config()
+        msgs = get_messages(cfg, use_cache=not self.no_cache)
+        if self.unread:
+            msgs = [m for m in msgs if m["unread"]]
+        if self.limit:
+            msgs = msgs[: self.limit]
+        if self.json:
+            json_dump(msgs)
+            return 0
+        render_table(msgs)
+        return 0
+
+
+@dataclass
+class LatestCmd:
+    """Show N most recent messages."""
+    n: tyro.conf.Positional[int] = 5
+    no_cache: bool = False
+
+    def run(self) -> int:
+        return ListCmd(limit=self.n, no_cache=self.no_cache).run()
+
+
+@dataclass
+class ShowCmd:
+    """Show a single message by index."""
+    index: tyro.conf.Positional[str]
+    json: bool = False
+    no_cache: bool = False
+
+    def run(self) -> int:
+        cfg = load_config()
+        msgs = get_messages(cfg, use_cache=not self.no_cache)
+        for m in msgs:
+            if m["index"] == self.index:
+                if self.json:
+                    json_dump(m)
+                else:
+                    print(f"From:  {m['phone']}")
+                    print(f"Date:  {m['date']}")
+                    print(f"State: {'unread' if m['unread'] else 'read'}")
+                    print()
+                    print(m["content"])
+                return 0
+        die(f"no message with index {self.index}")
+        return 1
+
+
+@dataclass
+class CodeCmd:
+    """Print and copy the latest verification code."""
+    copy: bool = True
+    """Copy the code to the clipboard via `x copy` when available."""
+    no_cache: bool = False
+
+    def run(self) -> int:
+        cfg = load_config()
+        msgs = get_messages(cfg, use_cache=not self.no_cache)
+        pick = pick_code(msgs)
+        if not pick:
+            die("no verification code found in recent SMS", 3)
+        msg, code = pick
+        print(code)
+        prefix = "copied — " if self.copy and clipboard_copy(code) else ""
+        print(f"({prefix}from {msg['phone']} at {msg['date']})", file=sys.stderr)
+        return 0
+
+
+@dataclass
+class DeleteCmd:
+    """Delete an SMS by index."""
+    index: tyro.conf.Positional[str]
+
+    def run(self) -> int:
+        from huawei_lte_api.Client import Client
+        from huawei_lte_api.Connection import Connection
+
+        cfg = load_config()
+        try:
+            with Connection(_url(cfg), timeout=10) as conn:
+                Client(conn).sms.delete_sms(int(self.index))
+        except Exception as e:
+            die(f"router error: {e}")
+        clear_cache()
+        print(f"deleted {self.index}")
+        return 0
+
+
+@dataclass
+class RefreshCmd:
+    """Bust the cache and refetch the inbox."""
+
+    def run(self) -> int:
+        clear_cache()
+        cfg = load_config()
+        msgs = get_messages(cfg, use_cache=False)
+        print(f"cached {len(msgs)} messages")
+        return 0
+
+
+@dataclass
+class LoginTestCmd:
+    """Verify credentials by querying device info."""
+
+    def run(self) -> int:
+        from huawei_lte_api.Client import Client
+        from huawei_lte_api.Connection import Connection
+
+        cfg = load_config()
+        try:
+            with Connection(_url(cfg), timeout=10) as conn:
+                info = Client(conn).device.information()
+        except Exception as e:
+            die(f"login failed: {e}")
+        print(f"ok host={cfg['host']} user={cfg['user']}")
+        for k in ("DeviceName", "HardwareVersion", "SoftwareVersion", "Imei", "Msisdn"):
+            if info.get(k):
+                print(f"  {k}: {info[k]}")
+        return 0
+
+
+def json_dump(obj: Any) -> None:
+    json.dump(obj, sys.stdout, ensure_ascii=False)
+    sys.stdout.write("\n")
+
+
+# ---------- entrypoint ------------------------------------------------------
+
+Command = Union[
+    Annotated[ListCmd, tyro.conf.subcommand("list")],
+    Annotated[LatestCmd, tyro.conf.subcommand("latest")],
+    Annotated[ShowCmd, tyro.conf.subcommand("show")],
+    Annotated[CodeCmd, tyro.conf.subcommand("code")],
+    Annotated[DeleteCmd, tyro.conf.subcommand("delete")],
+    Annotated[RefreshCmd, tyro.conf.subcommand("refresh")],
+    Annotated[LoginTestCmd, tyro.conf.subcommand("login-test")],
+]
+
+
+def main() -> int:
+    # Default action when no subcommand given: `code`.
+    if len(sys.argv) == 1:
+        sys.argv.append("code")
+    cmd = tyro.cli(Command, prog="sms", description="Huawei router SMS reader.")
+    return cmd.run()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)

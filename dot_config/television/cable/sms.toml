@@ -1,0 +1,70 @@
+# Huawei router SMS inbox channel for television (tv)
+#
+# Fuzzy-search SMS from the router's SIM card; preview full body; copy
+# verification codes in one keystroke.
+#
+# Usage:
+#   tv sms
+#
+# Source cycling (Ctrl+S):
+#   1. All messages (newest first)
+#   2. Unread only
+#
+# Keybindings (Alt+ namespace, per CLAUDE.md tmux/TV conflict rules):
+#   Enter      Copy message body to clipboard
+#   Alt+C      Extract and copy verification code (digits only)
+#   Alt+R      Refresh cache and reload
+#   Alt+D      Delete selected message + reload
+#   Ctrl+O     Toggle preview panel (TV built-in)
+#
+# Uses the `sms` CLI (deployed by chezmoi to ~/bin/sms).
+
+[metadata]
+name = "sms"
+description = "Huawei router SMS inbox — browse, copy verification codes"
+requirements = ["sms", "jq"]
+
+[source]
+command = [
+  """sms list --json 2>/dev/null | jq -r '.[] | [.index, (if .unread then "●" else " " end), .phone, .date, (.content | gsub("\\n"; " ") | .[0:120])] | @tsv'""",
+  """sms list --json --unread 2>/dev/null | jq -r '.[] | [.index, "●", .phone, .date, (.content | gsub("\\n"; " ") | .[0:120])] | @tsv'""",
+]
+display = "{split:\\t:1}  {split:\\t:2}  {split:\\t:3}  {split:\\t:4}"
+output = "{split:\\t:0}"
+watch = 5.0
+
+[preview]
+command = "sms show '{split:\\t:0}' 2>/dev/null"
+header = "SMS {split:\\t:0} — {split:\\t:2}"
+
+[ui]
+input_header = "SMS Inbox"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:copy_body"
+alt-c = "actions:copy_code"
+alt-r = ["actions:refresh", "reload_source"]
+alt-d = ["actions:delete", "reload_source"]
+
+[actions.copy_body]
+description = "Copy message body to clipboard"
+command = "sms show '{split:\\t:0}' --json 2>/dev/null | jq -r '.content' | x copy"
+mode = "fork"
+
+[actions.copy_code]
+description = "Extract and copy verification code"
+command = "body=$(sms show '{split:\\t:0}' --json 2>/dev/null | jq -r '.content'); code=$(printf '%s' \"$body\" | grep -oE '[0-9]{4,8}' | head -n1); printf '%s' \"$code\" | x copy"
+mode = "fork"
+
+[actions.refresh]
+description = "Refresh SMS cache"
+command = "sms refresh >/dev/null 2>&1"
+mode = "fork"
+
+[actions.delete]
+description = "Delete selected SMS (with confirm)"
+command = "printf 'Delete SMS %s? [y/N] ' '{split:\\t:0}'; read -r a; case \"$a\" in y|Y) sms delete '{split:\\t:0}';; *) echo skipped;; esac; echo; echo '[Press Enter]'; read -r _"
+mode = "execute"

@@ -1,0 +1,11 @@
+# ~/.config/sms/config.toml
+#
+# Copy this file to config.toml and fill in the password, or let `sms`
+# prompt you on first run and save it automatically (chmod 600).
+#
+# Env overrides: SMS_ROUTER_HOST, SMS_ROUTER_USER, SMS_ROUTER_PASS
+# Cache TTL seconds: SMS_CACHE_TTL (default 30, 0 disables)
+
+host = "192.168.168.1"
+user = "admin"
+password = ""
