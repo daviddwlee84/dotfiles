@@ -34,7 +34,27 @@ clipboard_backend_help() {
         "x:   - macOS: pbcopy/pbpaste (built-in)" \
         "x:   - Linux Wayland: wl-clipboard (wl-copy/wl-paste)" \
         "x:   - Linux X11: xclip or xsel" \
-        "x:   - WSL: clip.exe / powershell.exe" >&2
+        "x:   - WSL: clip.exe / powershell.exe" \
+        "x:   - SSH/headless: OSC 52 (needs a TTY and a terminal that supports it)" >&2
+}
+
+# OSC 52 clipboard copy: ships stdin bytes through a terminal escape sequence.
+# Works over SSH with no X/Wayland as long as the terminal (or tmux with
+# set-clipboard on) forwards OSC 52. Writes to /dev/tty so it is not captured
+# by an outer pipeline.
+osc52_copy() {
+    [[ -w /dev/tty ]] || return 1
+    command -v base64 >/dev/null 2>&1 || return 1
+
+    local data
+    data="$(base64 | tr -d '\n')"
+    [[ -n "$data" ]] || return 0
+
+    if [[ -n "${TMUX:-}" ]]; then
+        printf '\033Ptmux;\033\033]52;c;%s\033\033\\\033\\' "$data" > /dev/tty
+    else
+        printf '\033]52;c;%s\033\\' "$data" > /dev/tty
+    fi
 }
 
 open_backend_help() {
@@ -109,7 +129,7 @@ copy_backend() {
         exit 1
     fi
 
-    if command -v xclip >/dev/null 2>&1; then
+    if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
         if xclip -selection clipboard; then
             return 0
         fi
@@ -117,12 +137,17 @@ copy_backend() {
         exit 1
     fi
 
-    if command -v xsel >/dev/null 2>&1; then
+    if [[ -n "${DISPLAY:-}" ]] && command -v xsel >/dev/null 2>&1; then
         if xsel --clipboard --input; then
             return 0
         fi
         err "copy backend failed: xsel"
         exit 1
+    fi
+
+    # Final fallback: OSC 52 (works over SSH, no display needed).
+    if osc52_copy; then
+        return 0
     fi
 
     clipboard_backend_help
