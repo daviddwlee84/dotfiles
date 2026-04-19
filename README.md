@@ -172,6 +172,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television
+- **Alacritty**: GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS; desktop only)
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
 - **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp
 - **NerdFonts**: Hack Nerd Font for terminal emulators

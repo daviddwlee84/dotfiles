@@ -31,6 +31,7 @@
 # starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
 # input_method: {{ include "dot_ansible/roles/input_method/tasks/main.yml" | sha256sum }}
 # networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
+# alacritty: {{ include "dot_ansible/roles/alacritty/tasks/main.yml" | sha256sum }}
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -80,11 +81,11 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
-TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
 {{ else if eq .profile "ubuntu_desktop" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Desktop: full desktop experience (no homebrew)
-TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
 {{ else if eq .profile "ubuntu_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)

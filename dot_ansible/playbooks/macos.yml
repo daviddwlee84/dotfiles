@@ -59,6 +59,9 @@
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
 
+    - role: alacritty
+      tags: [alacritty]
+
     - role: input_method
       tags: [input_method]
 
