@@ -150,7 +150,7 @@ ansible-playbook playbooks/macos.yml --check
 | `starship` | Starship cross-shell prompt (replaces oh-my-zsh theme) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
-| `devtools` | bat, eza, gh, glab, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television |
+| `devtools` | bat, bats, eza, gh, glab, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television |
 | `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory |
@@ -193,7 +193,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 
 **User-level tools** (installed automatically without sudo):
 
-- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, eza, delta, yazi, superfile, zellij, btop, gitleaks, lazygit, fzf, sesh, taplo, television
+- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, bats, eza, delta, yazi, superfile, zellij, btop, gitleaks, lazygit, fzf, sesh, taplo, television
 - **mise**: Node.js, Rust runtime management
 - **Installers**: zoxide, starship, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
@@ -224,7 +224,7 @@ Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets 
 - **Ansible playbooks**: `linux.yml` has `pre_tasks` that override `ansible_architecture` to match the real userland (e.g. `armv7l` instead of `aarch64`), so roles download correct binaries
 - **Tool availability on armhf (32-bit ARM)**: apt packages work fine; GitHub release downloads are skipped for tools without armv7l builds
 
-**Tools with armv7l/armhf releases** (work on RPi 4 32-bit): ripgrep, fd, jq, glow, rclone, direnv, gitleaks, trippy, speedtest
+**Tools with armv7l/armhf releases** (work on RPi 4 32-bit): ripgrep, fd, jq, glow, rclone, direnv, gitleaks, trippy, speedtest, bats (pure-bash, arch-agnostic)
 
 **Tools skipped on armv7l** (no 32-bit ARM release): neovim (GitHub tarball), lazygit, eza, git-delta, yazi, superfile, zellij, sesh, taplo, television, duckdb, doggo, gping, bandwhich, SpecStory, CodexBar, Claude Code (install.sh ships arm64/amd64 only)
 

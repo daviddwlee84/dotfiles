@@ -158,6 +158,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Git review stack**: gh, glab, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
 - **Markdown reader**: `glow` for terminal Markdown rendering
+- **Shell testing**: `bats` (bats-core) — Bash test runner with TAP/JUnit output
 - **DuckDB CLI**: `duckdb` (Homebrew on macOS, official downloads on Linux)
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
@@ -174,7 +175,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Homebrew** (macOS): Package manager for macOS
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
-- **Dev tools**: bat, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television
+- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television
 - **Alacritty**: GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS; desktop only)
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
 - **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp

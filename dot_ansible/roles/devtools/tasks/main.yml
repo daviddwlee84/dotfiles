@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -17,6 +17,7 @@
   community.general.homebrew:
     name:
       - bat
+      - bats-core
       - gh
       - glab
       - diffnav
@@ -419,6 +420,83 @@
         state: absent
       loop:
         - /tmp/bat.tar.gz
+
+# --- bats (bats-core: Bash test runner) ---
+- name: Install bats (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: bats
+    state: present
+
+# --- bats (user-level fallback) ---
+- name: Re-check if bats is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v bats
+  register: bats_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install bats-core from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - bats_recheck.rc != 0
+  block:
+    - name: Ensure ~/.local/bin exists (bats)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest bats-core release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/bats-core/bats-core/releases/latest
+        return_content: true
+      register: bats_release
+
+    - name: Download bats-core tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/bats-core/bats-core/archive/refs/tags/{{ bats_release.json.tag_name }}.tar.gz"
+        dest: /tmp/bats.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract and install bats-core to ~/.local
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rm -rf /tmp/bats-extract
+        mkdir -p /tmp/bats-extract
+        tar -xzf /tmp/bats.tar.gz -C /tmp/bats-extract --strip-components=1
+        /tmp/bats-extract/install.sh "{{ ansible_facts['env']['HOME'] }}/.local"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Clean up bats temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/bats.tar.gz
+        - /tmp/bats-extract
+
+  rescue:
+    - name: Warn bats-core installation failed
+      ansible.builtin.debug:
+        msg: "bats-core installation failed (likely network timeout) - skipping"
+
+    - name: Clean up bats temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/bats.tar.gz
+        - /tmp/bats-extract
 
 # --- zoxide ---
 - name: Check if zoxide is installed
