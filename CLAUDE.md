@@ -194,6 +194,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 **User-level tools** (installed automatically without sudo):
 
 - **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, bats, eza, delta, yazi, superfile, zellij, btop, gitleaks, lazygit, fzf, sesh, taplo, television
+- **tmux-appimage** (x86_64 only): extracted AppImage → `~/.local/share/tmux-appimage/squashfs-root`, shim at `~/.local/bin/tmux`. Runs only when the system `tmux` is older than 3.3 (see "tmux version requirement" below).
 - **mise**: Node.js, Rust runtime management
 - **Installers**: zoxide, starship, pre-commit, thefuck, tldr
 - **cargo tools**: pueue
@@ -204,7 +205,7 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 What you **won't get** without root:
 
 - zsh (needs `/etc/shells` for login shell)
-- tmux, htop (require system libraries)
+- htop (requires system libraries)
 - direnv (apt only)
 - Docker (kernel features, daemon)
 - Ollama (system service install)
@@ -233,6 +234,8 @@ Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets 
 **Recommendation**: Use 64-bit Raspberry Pi OS for full tool compatibility.
 
 ## Tmux Configuration
+
+**Minimum version: tmux >= 3.3.** The popup menu on `prefix + Space` uses `display-menu -x R -y P`; tmux 3.2a places the menu past the terminal edge and silently suppresses it ("_If the menu is too large to fit on the terminal, it is not displayed._"), while 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically: Linuxbrew when present, otherwise a user-level install of [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`. After the upgrade, run `tmux kill-server` once so existing sessions switch over to the new binary (running servers keep the old binary in memory).
 
 The tmux config is modular under `dot_config/tmux/` (deployed to `~/.config/tmux/`), with `dot_tmux.conf` acting as a one-line shim at `~/.tmux.conf`. Structure: `tmux.conf` (entry point + theme selector), `common.conf` (plugins, general options, terminal compat), `keybindings.conf` (all binds + popup menu), `theme.catppuccin.conf` (default, top status bar), `theme.tmux2k.conf` (alternative, bottom bar).
 

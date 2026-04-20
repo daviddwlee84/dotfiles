@@ -37,6 +37,30 @@ This setup is tuned for coding-agent and Neovim workflows:
 
 After `chezmoi apply`, start tmux and run `prefix + I` once to let TPM install the plugins. The theme files also auto-clone their plugin on first source as a safety net, but TPM is the canonical installer.
 
+## Version requirement: tmux >= 3.3
+
+The popup menu at `prefix + Space` uses `display-menu -x R -y P`. On tmux 3.2a (shipped by Ubuntu 22.04 apt) the menu is positioned past the terminal's right edge and silently suppressed — the man page explicitly states _"If the menu is too large to fit on the terminal, it is not displayed."_ tmux 3.3 introduced position clamping and arithmetic in `-x`/`-y`, so the menu renders correctly.
+
+The ansible `devtools` role now checks the tmux version and, when it is below 3.3, upgrades automatically:
+
+1. **Linuxbrew present** → `brew install tmux` (latest stable).
+2. **No Linuxbrew, x86_64 Linux** → download [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage), extract to `~/.local/share/tmux-appimage/squashfs-root/` (no FUSE needed), and install a shim at `~/.local/bin/tmux` that exec's the bundled binary. `~/.local/bin` sits ahead of `/usr/bin` in PATH so the newer binary wins.
+3. **No Linuxbrew, non-x86_64** (e.g. armv7l, aarch64 servers without brew) → ansible prints a warning; build from source or enable Linuxbrew.
+
+### Switching a running server to the new binary
+
+After an upgrade, existing tmux servers keep running the old binary (a live process doesn't re-exec on PATH change). Clients attaching to the same socket also stay on the old version. To switch over:
+
+```bash
+# lose current sessions but get a clean 3.3+ server
+tmux kill-server
+
+# or: start the new server on a new socket and migrate sessions manually
+tmux -L new new-session -s work
+```
+
+Verify with `tmux -V` (binary version) and, inside tmux, `#{version}` in a format string (server version).
+
 ## Reload Config
 
 Most changes do not need a server restart.

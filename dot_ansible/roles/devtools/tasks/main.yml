@@ -1766,13 +1766,173 @@
         - /tmp/dist
 
 # --- tmux ---
-- name: Install tmux (Debian/Ubuntu)
+# The dotfiles tmux config uses features (display-menu positioning clamping,
+# popup-style options, etc.) that require tmux >= 3.3. Ubuntu 22.04 apt ships
+# 3.2a, which silently suppresses the prefix + Space popup menu. We therefore:
+#   1. install the apt package as a baseline (when sudo is available),
+#   2. check the resulting version, and
+#   3. upgrade via Linuxbrew (preferred) or tmux-appimage (user-level) if too old.
+- name: Install tmux (Debian/Ubuntu, apt baseline)
   when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
     name: tmux
     state: present
+
+- name: Detect current tmux version (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: |
+    if command -v tmux >/dev/null 2>&1; then
+      tmux -V | awk '{print $2}' | sed 's/[^0-9.]//g'
+    else
+      echo ""
+    fi
+  args:
+    executable: /bin/bash
+  register: tmux_version_probe
+  changed_when: false
+  failed_when: false
+
+- name: Decide whether to upgrade tmux (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.set_fact:
+    tmux_min_version: "3.3"
+    tmux_current_version: "{{ tmux_version_probe.stdout | default('') | trim }}"
+    tmux_upgrade_needed: >-
+      {{
+        (tmux_version_probe.stdout | default('') | trim == '')
+        or (tmux_version_probe.stdout | default('') | trim is version('3.3', '<'))
+      }}
+
+- name: Detect Linuxbrew for tmux upgrade (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tmux_upgrade_needed | bool
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: tmux_brew_probe
+  changed_when: false
+
+- name: Upgrade tmux via Linuxbrew (Debian/Ubuntu, tmux < 3.3, brew available)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tmux_upgrade_needed | bool
+    - tmux_brew_probe is defined
+    - tmux_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: tmux
+    state: present
+
+- name: Upgrade tmux via tmux-appimage (Debian/Ubuntu, user-level, x86_64, no brew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tmux_upgrade_needed | bool
+    - target_architecture in ['x86_64', 'amd64']
+    - (tmux_brew_probe is not defined) or (tmux_brew_probe.stdout | default('') | trim == '')
+  block:
+    - name: Ensure ~/.local/bin exists (tmux-appimage)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure tmux-appimage install dir exists
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/share/tmux-appimage"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest tmux-appimage release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/nelsonenzo/tmux-appimage/releases/latest
+        return_content: true
+      register: tmux_appimage_release
+
+    - name: Set tmux-appimage download URL
+      ansible.builtin.set_fact:
+        tmux_appimage_url: >-
+          {{
+            (
+              tmux_appimage_release.json.assets
+              | selectattr('name', 'equalto', 'tmux.appimage')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Fail if tmux-appimage asset is missing
+      when: tmux_appimage_url | trim == ''
+      ansible.builtin.fail:
+        msg: "tmux-appimage release has no 'tmux.appimage' asset"
+
+    - name: Download tmux-appimage
+      ansible.builtin.get_url:
+        url: "{{ tmux_appimage_url }}"
+        dest: /tmp/tmux.appimage
+        mode: '0755'
+        timeout: 180
+      retries: 3
+      delay: 5
+
+    - name: Remove previous tmux-appimage extraction
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/share/tmux-appimage/squashfs-root"
+        state: absent
+
+    - name: Extract tmux-appimage (avoids FUSE dependency)
+      ansible.builtin.shell: |
+        set -e
+        cd "$HOME/.local/share/tmux-appimage"
+        /tmp/tmux.appimage --appimage-extract
+      args:
+        executable: /bin/bash
+      environment:
+        HOME: "{{ ansible_facts['env']['HOME'] }}"
+      changed_when: true
+
+    - name: Install tmux shim in ~/.local/bin
+      ansible.builtin.copy:
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/tmux"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          # Wrapper around tmux-appimage extracted at ~/.local/share/tmux-appimage.
+          # Calls the bundled tmux binary directly so system terminfo is preserved;
+          # RPATH in the binary pulls bundled libevent/libncurses automatically.
+          exec "$HOME/.local/share/tmux-appimage/squashfs-root/usr/bin/tmux" "$@"
+
+    - name: Clean up tmux-appimage download
+      ansible.builtin.file:
+        path: /tmp/tmux.appimage
+        state: absent
+
+  rescue:
+    - name: Warn tmux-appimage install failed
+      ansible.builtin.debug:
+        msg: >-
+          tmux-appimage installation failed — system tmux '{{ tmux_current_version }}'
+          may be too old for the dotfiles config (need >= {{ tmux_min_version }}).
+
+    - name: Clean up tmux-appimage temp files after failure
+      ansible.builtin.file:
+        path: /tmp/tmux.appimage
+        state: absent
+
+- name: Warn when tmux cannot be upgraded (non-x86_64, no brew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tmux_upgrade_needed | bool
+    - target_architecture not in ['x86_64', 'amd64']
+    - (tmux_brew_probe is not defined) or (tmux_brew_probe.stdout | default('') | trim == '')
+  ansible.builtin.debug:
+    msg: >-
+      Cannot upgrade tmux automatically: current '{{ tmux_current_version }}'
+      < required {{ tmux_min_version }}, but Linuxbrew is unavailable and
+      tmux-appimage only ships x86_64 builds. Build tmux from source or
+      enable Linuxbrew to get a newer version.
 
 # --- htop ---
 - name: Install htop (Debian/Ubuntu)
