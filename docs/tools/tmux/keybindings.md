@@ -16,6 +16,9 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + 9` | Jump to the git root session for the current repo |
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
+| `prefix + M` | Move current window to another session (prompts for `session[:index]`) |
+| `prefix + B` | Break current pane into a new window and move it to a session (tab tear-out) |
+| `prefix + A` | Link current window into another session (window appears in both) |
 | `prefix + d` | Detach |
 | `prefix + t` | Show tmux clock mode |
 | `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
@@ -127,6 +130,22 @@ Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select 
 
 Cross-platform: `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 also works for the vim-style `y` yank (even over SSH).
 
+## Moving Windows Across Sessions
+
+Like dragging a browser tab into a new window. The target prompt accepts:
+
+- `session:` — append to next free index in `session`
+- `session:N` — specific index in `session` (fails if taken; tmux's `-k` flag would overwrite, but our binds omit it for safety — rename or use a free index)
+- `session:` where `session` doesn't yet exist — fails; create first with `prefix + N` or `tmux new -ds session`
+
+| Key | Underlying command | Effect |
+|-----|-------------------|--------|
+| `prefix + M` | `move-window -t '%%'` | **Cut** current window out of this session and **paste** into target |
+| `prefix + B` | `break-pane -t '%%'` | Pull current **pane** out as a new window in target session |
+| `prefix + A` | `link-window -t '%%'` | **Link** (not copy): same window appears in both sessions; edits stay in sync. `unlink-window` removes one side without killing |
+
+Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for picking the destination session name before invoking `M`/`B`/`A`.
+
 ## Built-in tmux Keys Still Available
 
 | Keybinding | Action |
@@ -160,6 +179,9 @@ Menu accelerator keys match the standalone `prefix + key` bindings wherever poss
 | `$` | Rename session | yes (built-in) |
 | `,` | Rename window | yes (built-in) |
 | `N` | New session | yes |
+| `m` | Move window to session | yes (`prefix + M`) |
+| `r` | Break pane to new window in session | yes (`prefix + B`) |
+| `L` | Link window to session | yes (`prefix + A`) |
 | `x` | Kill pane (confirm) | yes |
 | `X` | Kill session (confirm) | yes |
 | `Q` | Kill all sessions / server | menu-only |

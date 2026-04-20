@@ -279,6 +279,9 @@ The Catppuccin status bar is **responsive**: `responsive.sh` + a `client-resized
 | `prefix + 9` | Jump to git root session (sesh) |
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
+| `prefix + M` | Move window to another session (tab tear-out) |
+| `prefix + B` | Break pane into new window in another session |
+| `prefix + A` | Link window into another session (shared, not copied) |
 | `prefix + R` | Reload tmux config |
 | `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
 | `prefix + M-t` | Switch theme to tmux2k (bottom status bar) |
