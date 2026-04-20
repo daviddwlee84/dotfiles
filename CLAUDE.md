@@ -333,6 +333,8 @@ ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansib
 - Brewfile manages casks (GUI apps) and mas (App Store) separately
 - On Linux, Ansible uses apt; Linuxbrew is available for newer packages
 
+For a deeper comparison of Linux package sources (apt / snap / Linuxbrew / GitHub binaries) and the policy the ansible roles follow when picking between them, see [docs/linux-package-sources.md](docs/linux-package-sources.md).
+
 ## Brewfile (GUI Apps - Opt-in)
 
 GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
