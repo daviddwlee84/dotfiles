@@ -90,3 +90,6 @@
 
     - role: networking_tools
       tags: [networking_tools]
+
+    - role: iac_tools
+      tags: [iac_tools]

@@ -163,6 +163,7 @@ ansible-playbook playbooks/macos.yml --check
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, tmuxinator, toolkami) |
 | `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
 | `networking_tools` | Networking CLI tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan |
+| `iac_tools` | Infrastructure-as-Code CLIs: Azure CLI (`az`), Terraform, OpenTofu (`tofu`) |
 | `alacritty` | GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS) |
 
 ## Profiles
@@ -178,7 +179,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, js_cli_tools, llm_tools, input_method (desktop only), networking_tools
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, js_cli_tools, llm_tools, input_method (desktop only), networking_tools, iac_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 

@@ -71,5 +71,8 @@
     - role: networking_tools
       tags: [networking_tools]
 
+    - role: iac_tools
+      tags: [iac_tools]
+
     # Note: brew_bundle is now managed by chezmoi run_onchange script
     # See run_onchange_after_30_brew_bundle.sh.tmpl

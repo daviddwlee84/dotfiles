@@ -683,3 +683,571 @@ Status: **completed**
 <summary>Tool use: **todo_write**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Now I'll add the superfile Linux tasks (check + sudo block + user-level fallback) right after the yazi section and before the tmux section.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add &#96;superfile&#96; to the Homebrew install list in devtools macOS section",
+      "id": "devtools-macos",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile Linux tasks: check + sudo block (GitHub release -\u003e /usr/local/bin/spf)",
+      "id": "devtools-linux-sudo",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile user-level fallback (GitHub release -\u003e ~/.local/bin/spf)",
+      "id": "devtools-linux-user",
+      "status": "completed"
+    },
+    {
+      "content": "Update tool comment in devtools, CLAUDE.md devtools tag, and README.md",
+      "id": "update-docs",
+      "status": "in_progress"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add &#96;superfile&#96; to the Homebrew install list in devtools macOS section",
+      "id": "devtools-macos",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile Linux tasks: check + sudo block (GitHub release -\u003e /usr/local/bin/spf)",
+      "id": "devtools-linux-sudo",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add superfile user-level fallback (GitHub release -\u003e ~/.local/bin/spf)",
+      "id": "devtools-linux-user",
+      "status": "pending"
+    },
+    {
+      "content": "Update tool comment in devtools, CLAUDE.md devtools tag, and README.md",
+      "id": "update-docs",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Now let me update CLAUDE.md and README.md.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 3,
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "devtools|superfile"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "devtools|superfile",
+  "topFiles": [
+    {
+      "matchCount": 7,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 2,
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "yazi|devtools"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "yazi|devtools",
+  "topFiles": [
+    {
+      "matchCount": 16,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 4
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Now update CLAUDE.md and README.md to include superfile.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Now let me also update the CLAUDE.md no-root section that lists user-level GitHub binaries, since superfile will also be available there.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 1,
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "GitHub binaries.*yazi"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "GitHub binaries.*yazi",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": "CLAUDE.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Let me also check the "Tools skipped on armv7l" section since superfile has no armv7l release.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 1,
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Tools skipped on armv7l"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Tools skipped on armv7l",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": "CLAUDE.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Now let me run the ansible syntax check to verify the YAML is valid.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml 2>&1</summary>
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml 2>&1
+```
+
+```
+
+playbook: dot_ansible/playbooks/macos.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml 2>&1</summary>
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml 2>&1
+```
+
+```
+
+playbook: dot_ansible/playbooks/linux.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Both playbooks pass syntax checks. Let me also verify the AGENTS.md (which mirrors CLAUDE.md) needs updating.
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 0,
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/AGENTS.md",
+  "pattern": "devtools.*yazi|GitHub binaries.*yazi|armv7l.*yazi"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/AGENTS.md",
+  "pattern": "devtools.*yazi|GitHub binaries.*yazi|armv7l.*yazi",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": "AGENTS.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 3
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+AGENTS.md already has the updates (it appears to be a symlink or auto-synced copy of CLAUDE.md).
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add &#96;superfile&#96; to the Homebrew install list in devtools macOS section",
+      "id": "devtools-macos",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile Linux tasks: check + sudo block (GitHub release -\u003e /usr/local/bin/spf)",
+      "id": "devtools-linux-sudo",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile user-level fallback (GitHub release -\u003e ~/.local/bin/spf)",
+      "id": "devtools-linux-user",
+      "status": "completed"
+    },
+    {
+      "content": "Update tool comment in devtools, CLAUDE.md devtools tag, and README.md",
+      "id": "update-docs",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add &#96;superfile&#96; to the Homebrew install list in devtools macOS section",
+      "id": "devtools-macos",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile Linux tasks: check + sudo block (GitHub release -\u003e /usr/local/bin/spf)",
+      "id": "devtools-linux-sudo",
+      "status": "completed"
+    },
+    {
+      "content": "Add superfile user-level fallback (GitHub release -\u003e ~/.local/bin/spf)",
+      "id": "devtools-linux-user",
+      "status": "completed"
+    },
+    {
+      "content": "Update tool comment in devtools, CLAUDE.md devtools tag, and README.md",
+      "id": "update-docs",
+      "status": "in_progress"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+All done. Here's a summary of what was changed:
+
+**`dot_ansible/roles/devtools/tasks/main.yml`**
+- Added `superfile` to the macOS Homebrew install list (alongside yazi)
+- Added `superfile` tools comment at the top
+- Added Linux installation: `spf --version` check, architecture mapping (`x86_64`/`aarch64` -> `amd64`/`arm64`), GitHub latest release download of `.tar.gz`, extraction, and copy to `/usr/local/bin/spf` (sudo block)
+- Added user-level fallback: same flow but installs to `~/.local/bin/spf` (no sudo required)
+
+**`CLAUDE.md` / `AGENTS.md`**
+- Added `superfile` to the `devtools` tag description
+- Added `superfile` to the "GitHub binaries" list under No Root Mode
+- Added `superfile` to the "Tools skipped on armv7l" list
+
+**`README.md`**
+- Added `superfile` to the Dev tools list
+
+Both `macos.yml` and `linux.yml` playbooks pass ansible syntax checks. On macOS it installs via `brew install superfile`; on Linux it downloads the GitHub release tarball and extracts the `spf` binary, with automatic fallback to `~/.local/bin` when sudo is unavailable.

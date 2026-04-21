@@ -1,0 +1,363 @@
+---
+# Infrastructure-as-Code tools role
+# Tools: Azure CLI (az), Terraform (terraform), OpenTofu (tofu)
+
+# =============================================================================
+# macOS - all via Homebrew
+# =============================================================================
+
+- name: Install Azure CLI (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - iac_install_azure_cli
+  community.general.homebrew:
+    name: azure-cli
+    state: present
+
+- name: Tap hashicorp/tap (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - iac_install_terraform
+  block:
+    - name: Check if hashicorp/tap is present
+      ansible.builtin.command: brew tap
+      register: hashicorp_taps
+      changed_when: false
+
+    - name: Tap hashicorp/tap
+      ansible.builtin.command: brew tap hashicorp/tap
+      when: "'hashicorp/tap' not in hashicorp_taps.stdout_lines"
+
+- name: Install Terraform (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - iac_install_terraform
+  community.general.homebrew:
+    name: hashicorp/tap/terraform
+    state: present
+
+- name: Install OpenTofu (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - iac_install_opentofu
+  community.general.homebrew:
+    name: opentofu
+    state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu) - apt with sudo
+# =============================================================================
+
+# --- Azure CLI via Microsoft apt repo ---
+- name: Install Azure CLI from Microsoft apt repo (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_azure_cli
+  become: true
+  tags: [sudo]
+  block:
+    - name: Install Azure CLI prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Create keyrings directory for Azure CLI
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Microsoft signing key
+      ansible.builtin.shell: |
+        curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+        chmod go+r /etc/apt/keyrings/microsoft.gpg
+      args:
+        executable: /bin/bash
+        creates: /etc/apt/keyrings/microsoft.gpg
+
+    - name: Add Azure CLI apt repository
+      ansible.builtin.shell: |
+        AZ_DIST=$(lsb_release -cs)
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ ${AZ_DIST} main" > /etc/apt/sources.list.d/azure-cli.list
+      args:
+        executable: /bin/bash
+        creates: /etc/apt/sources.list.d/azure-cli.list
+
+    - name: Update apt cache for Azure CLI
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install azure-cli package
+      ansible.builtin.apt:
+        name: azure-cli
+        state: present
+  rescue:
+    - name: Warn Azure CLI installation failed
+      ansible.builtin.debug:
+        msg: "Azure CLI installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+# --- Terraform via HashiCorp apt repo ---
+- name: Install Terraform from HashiCorp apt repo (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_terraform
+  become: true
+  tags: [sudo]
+  block:
+    - name: Install Terraform prerequisites
+      ansible.builtin.apt:
+        name:
+          - gnupg
+          - software-properties-common
+        state: present
+
+    - name: Create keyrings directory for HashiCorp
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download HashiCorp GPG key
+      ansible.builtin.shell: |
+        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      args:
+        executable: /bin/bash
+        creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+    - name: Add HashiCorp apt repository
+      ansible.builtin.shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list
+      args:
+        executable: /bin/bash
+        creates: /etc/apt/sources.list.d/hashicorp.list
+
+    - name: Update apt cache for HashiCorp
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install terraform package
+      ansible.builtin.apt:
+        name: terraform
+        state: present
+  rescue:
+    - name: Warn Terraform installation failed
+      ansible.builtin.debug:
+        msg: "Terraform installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+# --- OpenTofu via official deb repo ---
+- name: Install OpenTofu from official repo (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_opentofu
+  become: true
+  tags: [sudo]
+  block:
+    - name: Install OpenTofu prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+        state: present
+
+    - name: Create keyrings directory for OpenTofu
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install OpenTofu repo and package
+      ansible.builtin.shell: |
+        set -e
+        curl -fsSL https://get.opentofu.org/opentofu.gpg | tee /etc/apt/keyrings/opentofu.gpg > /dev/null
+        curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey | gpg --no-tty --batch --dearmor -o /etc/apt/keyrings/opentofu-repo.gpg 2>/dev/null
+        echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main
+        deb-src [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" > /etc/apt/sources.list.d/opentofu.list
+        apt-get update
+        apt-get install -y tofu
+      args:
+        executable: /bin/bash
+      changed_when: true
+  rescue:
+    - name: Warn OpenTofu installation failed
+      ansible.builtin.debug:
+        msg: "OpenTofu installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+# =============================================================================
+# Linux - user-level fallbacks (noRoot / no sudo)
+# =============================================================================
+
+# --- Architecture mapping ---
+- name: Set IaC tools release architecture
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.set_fact:
+    iac_arch: >-
+      {{
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else ''
+      }}
+
+# --- Azure CLI user-level via uv (pip-installable) ---
+- name: Check if az is installed
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_azure_cli
+  ansible.builtin.shell: command -v az
+  register: az_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Azure CLI via uv tool (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_azure_cli
+    - az_check.rc != 0
+  block:
+    - name: Check if uv is available
+      ansible.builtin.shell: command -v uv
+      register: uv_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install azure-cli via uv tool
+      when: uv_check.rc == 0
+      ansible.builtin.command: uv tool install azure-cli
+      register: az_uv_install
+      changed_when: "'Installed' in az_uv_install.stdout"
+
+    - name: Warn uv not available for Azure CLI
+      when: uv_check.rc != 0
+      ansible.builtin.debug:
+        msg: "uv not found — cannot install Azure CLI in user-level mode. Install uv first or use sudo."
+  rescue:
+    - name: Warn Azure CLI user-level installation failed
+      ansible.builtin.debug:
+        msg: "Azure CLI user-level installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+# --- Terraform user-level via GitHub releases ---
+- name: Check if terraform is installed
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_terraform
+  ansible.builtin.shell: command -v terraform
+  register: terraform_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Terraform from releases.hashicorp.com (user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_terraform
+    - terraform_check.rc != 0
+    - iac_arch | trim != ''
+  block:
+    - name: Ensure ~/.local/bin exists (terraform)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest Terraform version from checkpoint API
+      ansible.builtin.uri:
+        url: https://checkpoint-api.hashicorp.com/v1/check/terraform
+        return_content: true
+      register: terraform_version_check
+
+    - name: Set Terraform version
+      ansible.builtin.set_fact:
+        terraform_version: "{{ terraform_version_check.json.current_version }}"
+
+    - name: Download Terraform zip
+      ansible.builtin.get_url:
+        url: "https://releases.hashicorp.com/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_{{ iac_arch | trim }}.zip"
+        dest: /tmp/terraform.zip
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract Terraform to ~/.local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/terraform.zip
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+
+    - name: Clean up Terraform zip
+      ansible.builtin.file:
+        path: /tmp/terraform.zip
+        state: absent
+  rescue:
+    - name: Warn Terraform user-level installation failed
+      ansible.builtin.debug:
+        msg: "Terraform user-level installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up Terraform temp files (rescue)
+      ansible.builtin.file:
+        path: /tmp/terraform.zip
+        state: absent
+
+# --- OpenTofu user-level via GitHub releases ---
+- name: Check if tofu is installed
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_opentofu
+  ansible.builtin.shell: command -v tofu
+  register: tofu_check
+  changed_when: false
+  failed_when: false
+
+- name: Install OpenTofu from GitHub releases (user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - iac_install_opentofu
+    - tofu_check.rc != 0
+    - iac_arch | trim != ''
+  block:
+    - name: Ensure ~/.local/bin exists (tofu)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest OpenTofu release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/opentofu/opentofu/releases/latest
+        return_content: true
+      register: tofu_release
+
+    - name: Set OpenTofu version (strip v prefix)
+      ansible.builtin.set_fact:
+        tofu_version: "{{ tofu_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download OpenTofu zip
+      ansible.builtin.get_url:
+        url: "https://github.com/opentofu/opentofu/releases/download/{{ tofu_release.json.tag_name }}/tofu_{{ tofu_version }}_linux_{{ iac_arch | trim }}.zip"
+        dest: /tmp/tofu.zip
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Extract OpenTofu to ~/.local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/tofu.zip
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        remote_src: true
+
+    - name: Clean up OpenTofu zip
+      ansible.builtin.file:
+        path: /tmp/tofu.zip
+        state: absent
+  rescue:
+    - name: Warn OpenTofu user-level installation failed
+      ansible.builtin.debug:
+        msg: "OpenTofu user-level installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up OpenTofu temp files (rescue)
+      ansible.builtin.file:
+        path: /tmp/tofu.zip
+        state: absent

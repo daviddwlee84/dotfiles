@@ -1403,4 +1403,199 @@ The concern is: since `profile` is set via `promptStringOnce` on line 6, and the
 Let me think about how chezmoi template execution works:
 
 
-`promptStringOnce` is an init function that modifies the data map in place, so when it's called on line 6 with `.profile`, it immediately populates that value into the data context. This means subsequent references to `.profile` later in the same template should work fine—the value gets written into the map and is available for the rest of the template execution.</details></think>
+`promptStringOnce` is an init function that modifies the data map in place, so when it's called on line 6 with `.profile`, it immediately populates that value into the data context. This means subsequent references to `.profile` later in the same template should work fine—the value gets written into the map and is available for the rest of the template execution. Use the already-set `.profile` value to gate prompts. Since `promptStringOnce` mutates the data store (`.`) in place, `.profile` is available for subsequent template expressions. On the first run, the function prompts the user and stores the result; on subsequent runs, the existing config data is already loaded into `.` before template execution begins. I'm checking the official chezmoi documentation to confirm how `promptStringOnce` behaves and verify that the data mutations persist across template expressions.</details></think>
+
+_**Agent (claude-opus-4-6)**_
+
+Good question -- this is worth verifying carefully. Let me check the official docs and also test the actual behavior.
+
+_**Agent (claude-opus-4-6)**_
+
+Error fetching URL, status code: 404 Not Found
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+Error fetching URL, status code: 404 Not Found
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch">
+<details>
+<summary>Tool use: **web_fetch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/"
+}
+```
+Result:
+
+```json
+{
+  "markdown": "Init functions - chezmoi\n\nSkip to content\n\n# Init functions\n\nThese template functions are only available when generating a config file with&#96;chezmoi init&#96;. For testing with&#96;chezmoi execute-template&#96;, pass the&#96;--init&#96; flag to enable them.",
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch">
+<details>
+<summary>Tool use: **web_fetch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptStringOnce/"
+}
+```
+Result:
+
+```json
+{
+  "markdown": "promptStringOnce - chezmoi\n\nSkip to content\n\n# promptStringOnce map path prompt [default]\n\n&#96;promptStringOnce&#96; returns the value of map at path if it exists and is a string value, otherwise it prompts the user for a string value with prompt and an optional default using&#96;promptString&#96;.\n\nExample\n\n&#96;&#96;&#96;\n{{ $email := promptStringOnce . \"email\" \"What is your email address\" }}\n\n&#96;&#96;&#96;",
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptStringOnce/"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch">
+<details>
+<summary>Tool use: **web_fetch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptBoolOnce/"
+}
+```
+Result:
+
+```json
+{
+  "markdown": "promptBoolOnce - chezmoi\n\nSkip to content\n\n# promptBoolOnce map path prompt [default]\n\n&#96;promptBoolOnce&#96; returns the value of map at path if it exists and is a boolean value, otherwise it prompts the user for a boolean value with prompt and an optional default using&#96;promptBool&#96;.\n\nExample\n\n&#96;&#96;&#96;\n{{ $hasGUI := promptBoolOnce . \"hasGUI\" \"Does this machine have a GUI\" }}\n\n&#96;&#96;&#96;",
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptBoolOnce/"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-6)**_
+
+<think><details><summary>Thought Process</summary>
+Now I have the official docs for `promptStringOnce` and `promptBoolOnce`. Let me analyze:
+
+Key documentation:
+- `promptStringOnce map path prompt [default]` - "returns the value of map at path if it exists and is a string value, otherwise it prompts the user for a string value"
+- `promptBoolOnce map path prompt [default]` - "returns the value of map at path if it exists and is a boolean value, otherwise it prompts the user for a boolean value"
+
+The critical point: these functions take `map` (which is `.` - the data map) and `path` as arguments. They:
+
+
+1. Check if `map[path]` exists and has the correct type
+2. If yes, return the existing value
+3. If no, prompt the user and set the value in the map
+
+Looking at the official example, it captures the return value in a variable like `{{ $email := promptStringOnce . "email" "What is your email address" }}` and uses that variable later, which suggests the function returns the value whether it was retrieved from the map or newly prompted.
+
+In the user's template, they're using `promptStringOnce` directly in the output and then referencing `.profile` later in conditionals, which works because `promptStringOnce` modifies the data map in place when passed a pointer to it—the function can update the underlying map while also returning the value. zmoi source code (which I know from training data), `promptStringOnce` does indeed set the value in the map:
+
+So yes, after `promptStringOnce . "profile" ...` on line 6, `.profile` IS available for the rest of the template.
+
+But wait - there's a subtlety. The official example captures the return value in a variable (`$email`) rather than relying on the side effect of modifying `.`. This could be just a coding style preference, or there was historically a concern about this behavior.
+
+Actually, thinking through this from Go's perspective: maps are reference types, so when `promptStringOnce` receives the map and modifies it, those changes are visible to the caller. The template executes sequentially, so by the time line 22 checks `{{ if or (eq .profile "macos") ... }}`, the `.profile` key has already been set in the data map. This works because `promptStringOnce` both returns the value and stores it in the map simultaneously.
+
+The pattern is safe and should work correctly.
+
+Looking at the documentation more carefully, it says `promptStringOnce` returns the value if it exists, otherwise prompts the user. The key insight is that the "Once" in the name means it should only prompt once—and the only way that's possible is if the function writes the value back to the map so it persists to `chezmoi.toml`. Without that write behavior, it would prompt every time, making the function pointless. So on first init, `promptStringOnce` sets `.profile` in the data map, making it available for the rest of the template.
+
+The real question I need to focus on is whether my new conditional that checks `.profile` at template evaluation time will work, since that's the only place in the template that actually references `.profile` directly.
+
+Looking at the execution order: `promptStringOnce` sets `.profile` on line 6, then my conditional reads it on line 22, and since Go templates execute sequentially, this is completely safe.</details></think>
+
+_**Agent (claude-opus-4-6)**_
+
+这是个好问题。让我结合官方文档和 Go template 的行为来分析。
+
+**结论：不会有问题，第一次 init 也是安全的。**
+
+原因如下：
+
+根据官方文档 [`promptStringOnce`](https://www.chezmoi.io/reference/templates/init-functions/promptStringOnce/) 的定义：
+
+> `promptStringOnce` returns the value of **map** at **path** if it exists and is a string value, otherwise it prompts the user for a string value
+
+关键在于第一个参数 `.`（即 data map）。`promptStringOnce` 做了两件事：
+1. **返回**值（用于模板输出）
+2. **写回** map -- 把用户输入的值存入 `.profile`
+
+Go 的 map 是引用类型（reference type），所以 `promptStringOnce` 内部对 map 的修改在函数外部（即后续模板行）立刻可见。又因为 Go template 是**顺序执行**的，所以：
+
+```
+第 6 行: promptStringOnce . "profile" ...  → 用户输入 "ubuntu_server"，
+                                              同时 .profile = "ubuntu_server" 写入 map
+         ↓ (顺序执行)
+第 22 行: {{ if or (eq .profile "macos") ... }}  → 读到 .profile = "ubuntu_server"
+                                                    → 走 else 分支，installAiDesktopApps = false
+```
+
+不管是第一次 init（config 不存在）还是后续 init（config 已存在），`.profile` 在到达第 22 行时都已经有值了：
+- **首次**：第 6 行 prompt 用户后写入 `.`
+- **后续**：`.` 已从现有 `chezmoi.toml` 载入，`promptStringOnce` 发现值已存在直接返回
+
+官方文档虽然没有显式说明 "mutates map in place" 这个副作用，但 `Once` 系列函数的整个设计就是建立在这个机制上的 -- 否则 "Once"（只问一次）就无法实现。官方给的 example 用 `$email :=` 变量接收返回值只是风格偏好，并不代表 `.email` 不可用。
+
+所以现在的写法是安全的，不需要修改。

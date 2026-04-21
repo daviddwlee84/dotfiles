@@ -93,6 +93,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps) |
 | `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux) |
 | `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
+| `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
 
 To change options later: `chezmoi init --force`

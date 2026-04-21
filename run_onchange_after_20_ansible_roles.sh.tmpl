@@ -33,6 +33,8 @@
 # starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
 # input_method: {{ include "dot_ansible/roles/input_method/tasks/main.yml" | sha256sum }}
 # networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
+# iac_tools tasks: {{ include "dot_ansible/roles/iac_tools/tasks/main.yml" | sha256sum }}
+# iac_tools defaults: {{ include "dot_ansible/roles/iac_tools/defaults/main.yml" | sha256sum }}
 # alacritty: {{ include "dot_ansible/roles/alacritty/tasks/main.yml" | sha256sum }}
 
 set -e
@@ -123,6 +125,10 @@ TAGS="${TAGS},input_method"
 {{ $installNetworkingTools := false }}{{ if hasKey . "installNetworkingTools" }}{{ $installNetworkingTools = .installNetworkingTools }}{{ end -}}
 {{ if $installNetworkingTools -}}
 TAGS="${TAGS},networking_tools"
+{{ end -}}
+{{ $installIacTools := false }}{{ if hasKey . "installIacTools" }}{{ $installIacTools = .installIacTools }}{{ end -}}
+{{ if $installIacTools -}}
+TAGS="${TAGS},iac_tools"
 {{ end -}}
 
 # Extra vars for role-level configuration

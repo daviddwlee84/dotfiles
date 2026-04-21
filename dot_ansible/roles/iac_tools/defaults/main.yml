@@ -1,0 +1,7 @@
+---
+# Per-tool toggles for the iac_tools role.
+# Override via --extra-vars to disable individual tools while keeping
+# the single installIacTools chezmoi prompt.
+iac_install_azure_cli: true
+iac_install_terraform: true
+iac_install_opentofu: true
