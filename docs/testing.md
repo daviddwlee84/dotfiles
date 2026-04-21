@@ -204,6 +204,11 @@ Then bats asserts on the `$output`:
 
 [shellcheck](https://www.shellcheck.net/) is a static analyser for shell scripts. [shfmt](https://github.com/mvdan/sh) is a formatter / format-check. Both run via pre-commit in this repo.
 
+Pre-commit hook sources (see `.pre-commit-config.yaml`):
+
+- [`shellcheck-py`](https://github.com/shellcheck-py/shellcheck-py) — ships a Python-installable wheel of shellcheck, so pre-commit environments don't need a system-wide `shellcheck` binary.
+- [`pre-commit-shfmt`](https://github.com/scop/pre-commit-shfmt) — pre-commit wrapper around `shfmt` with no Go toolchain required.
+
 Hook scope (see `.pre-commit-config.yaml`): **`^scripts/[^/]+\.sh$` only**. This excludes:
 
 - `dot_config/zsh/**/*.zsh` — zsh-specific syntax (`(( ... ))` math, `${(P)v}` expansion flags, `print -u2`, `emulate -L zsh`, `zmodload`) trips shellcheck's bash parser and produces too many false positives.
@@ -256,9 +261,9 @@ Rule of thumb for deciding whether a test is worth adding: **would a silent regr
 
 ## References
 
-- [bats-core docs](https://bats-core.readthedocs.io/)
-- [ZUnit repo](https://github.com/zunit-zsh/zunit)
-- [ShellSpec docs](https://shellspec.info/)
-- [shellcheck wiki](https://www.shellcheck.net/wiki/)
-- [shfmt flags](https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd)
+- [bats-core docs](https://bats-core.readthedocs.io/) · [bats-assert](https://github.com/bats-core/bats-assert) · [bats-file](https://github.com/bats-core/bats-file) · [bats-support](https://github.com/bats-core/bats-support)
+- [ZUnit repo](https://github.com/zunit-zsh/zunit) (needs [Revolver](https://github.com/molovo/revolver))
+- [ShellSpec docs](https://shellspec.info/) · [ShellSpec repo](https://github.com/shellspec/shellspec)
+- [shellcheck wiki](https://www.shellcheck.net/wiki/) · pre-commit hook: [shellcheck-py](https://github.com/shellcheck-py/shellcheck-py)
+- [shfmt flags](https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd) · pre-commit hook: [pre-commit-shfmt](https://github.com/scop/pre-commit-shfmt)
 - Install location in this repo: `dot_ansible/roles/devtools/tasks/main.yml` (bats-core is cross-platform; no companion libraries installed by default).
