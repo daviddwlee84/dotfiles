@@ -1,7 +1,12 @@
 ---
 # Docker role - Container runtime installation
 # macOS: OrbStack (skip if Docker Desktop exists)
-# Linux: Docker Engine via convenience script
+# Linux: rootless Docker Engine (systemctl --user lifecycle)
+#
+# Design rationale: user-scoped config lives under chezmoi
+# (~/.config/docker/daemon.json, ~/.docker/config.json). Installing rootful
+# docker would put the daemon config at /etc/docker/daemon.json and silently
+# ignore the chezmoi-managed one. See docs/tools/container-config-map.md.
 
 # ============================================
 # macOS: OrbStack installation
@@ -22,10 +27,29 @@
     state: present
 
 # ============================================
-# Linux: Docker Engine installation
+# Linux: rootless Docker Engine installation
 # ============================================
 
-- name: Check if Docker is installed (Debian/Ubuntu)
+- name: Install rootless Docker prerequisites (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      # user-namespace mapping (newuidmap / newgidmap)
+      - uidmap
+      # systemctl --user works over SSH / non-login shells
+      - dbus-user-session
+      # rootless overlay storage
+      - fuse-overlayfs
+      # rootless port publishing
+      - slirp4netns
+      # userland firewall (required by rootlesskit for port forwarding)
+      - iptables
+    state: present
+    update_cache: true
+
+- name: Check if Docker CLI is installed (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: docker --version
   register: docker_check
@@ -33,6 +57,9 @@
   failed_when: false
 
 - name: Install Docker via convenience script (Debian/Ubuntu)
+  # Also pulls docker-ce-rootless-extras (provides dockerd-rootless-setuptool.sh).
+  # We will disable the rootful unit in the next step; we only wanted the
+  # packages.
   when:
     - ansible_facts["os_family"] == "Debian"
     - docker_check.rc != 0
@@ -45,24 +72,76 @@
   args:
     creates: /usr/bin/docker
 
-- name: Ensure docker group exists (Debian/Ubuntu)
+- name: Ensure docker-ce-rootless-extras is installed (Debian/Ubuntu)
+  # On some distro/version combos the convenience script doesn't include it by
+  # default. Installing explicitly is idempotent.
   when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
-  ansible.builtin.group:
-    name: docker
+  ansible.builtin.apt:
+    name: docker-ce-rootless-extras
     state: present
+  failed_when: false
 
-- name: Add user to docker group (Debian/Ubuntu)
+- name: Disable and stop rootful docker system units (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
-  ansible.builtin.user:
-    name: "{{ ansible_facts['env']['USER'] }}"
-    groups: docker
-    append: true
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - docker.service
+    - docker.socket
+  failed_when: false
 
-- name: Notify about docker group change (Debian/Ubuntu)
+- name: Enable user linger so rootless daemon survives logout (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.command: "loginctl enable-linger {{ ansible_facts['env']['USER'] }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ ansible_facts['env']['USER'] }}"
+
+- name: Check if rootless docker user unit already exists (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.stat:
+    path: "{{ ansible_env.HOME }}/.config/systemd/user/docker.service"
+  register: rootless_docker_unit
+
+- name: Run dockerd-rootless-setuptool.sh install (Debian/Ubuntu)
+  # Installs the systemd --user unit and writes user-scoped helpers.
+  # Needs XDG_RUNTIME_DIR and DBUS_SESSION_BUS_ADDRESS; with linger + a user
+  # session these are set up automatically.
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - not rootless_docker_unit.stat.exists
+  ansible.builtin.command: dockerd-rootless-setuptool.sh install
+  args:
+    creates: "{{ ansible_env.HOME }}/.config/systemd/user/docker.service"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+    PATH: "/usr/bin:{{ ansible_env.PATH }}"
+
+- name: Enable and start rootless docker user service (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.systemd_service:
+    name: docker
+    scope: user
+    enabled: true
+    state: started
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+
+- name: Remind about DOCKER_HOST env (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.debug:
-    msg: "NOTE: You may need to log out and back in for docker group membership to take effect."
+    msg: |
+      Rootless Docker is installed. The CLI talks to
+      unix:///run/user/{{ ansible_facts['user_uid'] }}/docker.sock.
+      dot_config/zsh/tools/50_networking.zsh exports $DOCKER_HOST
+      automatically for new zsh sessions; for existing shells, either
+      start a new shell or export it manually:
+        export DOCKER_HOST="unix:///run/user/$UID/docker.sock"
+      See docs/tools/container-config-map.md for the full picture.

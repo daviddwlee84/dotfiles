@@ -2,6 +2,8 @@
 
 Operating notes for Docker / OrbStack / Docker Desktop / Podman across the four real-world install variants, with a focus on what this repo auto-manages vs what stays in the "apply when needed" manual-recipe book.
 
+For the "who reads which config file" reference (CLI vs daemon vs systemd vs Desktop app, rootful vs rootless), see [container-config-map.md](container-config-map.md). This doc focuses on how to operate your box; the map doc focuses on understanding the landscape.
+
 Primary pain points this doc addresses:
 
 - **Which config file do I edit?** The answer depends on runtime and install mode; there are at least four different locations with overlapping schemas.
@@ -35,7 +37,7 @@ Source files:
 | [OrbStack](https://orbstack.dev) | macOS (Apple Silicon + Intel) | Lightweight VM | The macOS default in this repo; fast boot, low idle RAM, native ARM | macOS-only (no Windows/Linux); no enterprise support contracts |
 | [Podman](https://podman.io) | Linux + Mac (via `podman machine`) | Daemonless, rootless-by-default | License-clean swap; matches rootless Docker's security story without systemd unit | `podman compose` lags `docker compose` on some networking edge cases; no Swarm; BuildKit parity gaps |
 
-Repo default: OrbStack on macOS, Docker Engine convenience script on Ubuntu. See [dot_ansible/roles/docker/tasks/main.yml](../../dot_ansible/roles/docker/tasks/main.yml).
+Repo default: OrbStack on macOS, **rootless Docker Engine on Ubuntu** (installed by the ansible role; `systemctl --user` lifecycle, no `sudo` for day-to-day config). See [dot_ansible/roles/docker/tasks/main.yml](../../dot_ansible/roles/docker/tasks/main.yml). System (rootful) Docker remains available as a fallback if you need the machine-wide daemon for specific tooling, but it's no longer the installed-by-default path.
 
 ## Where each install variant stores config
 
@@ -43,10 +45,10 @@ Four installs, three distinct file schemas, two layers (client vs daemon). Summa
 
 | Install | Daemon proxy | Daemon registry-mirrors | Client proxy (`docker run`) |
 |---------|--------------|--------------------------|------------------------------|
-| Docker Desktop (macOS/Win) | GUI: Settings > Resources > Proxies | GUI: Settings > Docker Engine > `registry-mirrors` JSON | `~/.docker/config.json` (chezmoi-managed) |
-| OrbStack (macOS) | GUI: Settings > Network > Proxy | `~/.orbstack/config/docker.json` (`registry-mirrors` key, or GUI) | `~/.docker/config.json` (chezmoi-managed) |
-| System Docker Engine (Linux) | `/etc/systemd/system/docker.service.d/http-proxy.conf` (sudo) | `/etc/docker/daemon.json` (sudo) | `~/.docker/config.json` (chezmoi-managed) |
-| Rootless Docker Engine (Linux) | `~/.config/systemd/user/docker.service.d/proxy.conf` | `~/.config/docker/daemon.json` (chezmoi-managed) | `~/.docker/config.json` (chezmoi-managed) |
+| **Rootless Docker Engine (Linux, repo default)** | `~/.config/systemd/user/docker.service.d/proxy.conf` | `~/.config/docker/daemon.json` (chezmoi-managed) | `~/.docker/config.json` (chezmoi-managed) |
+| OrbStack (macOS, repo default) | GUI: Settings > Network > Proxy | `~/.orbstack/config/docker.json` (`registry-mirrors` key, or GUI) | `~/.docker/config.json` (chezmoi-managed) |
+| Docker Desktop (macOS/Win, fallback) | GUI: Settings > Resources > Proxies | GUI: Settings > Docker Engine > `registry-mirrors` JSON | `~/.docker/config.json` (chezmoi-managed) |
+| System Docker Engine (Linux, fallback) | `/etc/systemd/system/docker.service.d/http-proxy.conf` (sudo) | `/etc/docker/daemon.json` (sudo) | `~/.docker/config.json` (chezmoi-managed) |
 
 Notes:
 
@@ -200,7 +202,7 @@ docker info | grep -A10 'Registry Mirrors'
 
 #### Where to put it per install variant
 
-- **Rootless Docker (Linux)** — `~/.config/docker/daemon.json`. **Chezmoi-managed** via [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl), gated on `useChineseMirror=true` + Linux OS. After apply, run:
+- **Rootless Docker (Linux, repo default)** — `~/.config/docker/daemon.json`. **Chezmoi-managed** via [dot_config/docker/modify_daemon.json.tmpl](../../dot_config/docker/modify_daemon.json.tmpl), gated on `useChineseMirror=true` + Linux OS. After apply, run:
 
   ```bash
   systemctl --user daemon-reload && systemctl --user restart docker
@@ -208,7 +210,11 @@ docker info | grep -A10 'Registry Mirrors'
 
   chezmoi intentionally does not auto-restart (would kill running containers; not safe for an implicit apply).
 
-- **System Docker Engine (Linux)** — `/etc/docker/daemon.json`. Not chezmoi-managed (requires sudo). Recipe:
+- **OrbStack** — `~/.orbstack/config/docker.json` or GUI Settings > Docker > "Docker daemon config". OrbStack reapplies on save.
+
+- **Docker Desktop** — GUI: Settings > Docker Engine, paste `registry-mirrors` into the JSON editor, apply + restart.
+
+- **System Docker Engine (Linux, fallback)** — `/etc/docker/daemon.json`. Not chezmoi-managed (requires sudo; the chezmoi-managed rootless path doesn't apply here). Recipe:
 
   ```bash
   sudo mkdir -p /etc/docker
@@ -224,9 +230,14 @@ docker info | grep -A10 'Registry Mirrors'
   sudo systemctl daemon-reload && sudo systemctl restart docker
   ```
 
-- **OrbStack** — `~/.orbstack/config/docker.json` or GUI Settings > Docker > "Docker daemon config". OrbStack reapplies on save.
+##### Migration note: pre-pivot rootful installs
 
-- **Docker Desktop** — GUI: Settings > Docker Engine, paste `registry-mirrors` into the JSON editor, apply + restart.
+If this repo set up your Linux box before the rootless pivot (i.e. via the old `get.docker.com` convenience-script task that left only rootful `dockerd` running), the chezmoi-managed `~/.config/docker/daemon.json` mirrors were silently ignored — the rootful daemon only reads `/etc/docker/daemon.json`. Verify with `docker info | grep -A10 'Registry Mirrors'`; if it's empty despite `useChineseMirror=true` and `~/.config/docker/daemon.json` has content, you're in this state.
+
+Two ways out:
+
+1. **Pivot to rootless (recommended)** — matches the repo default. Re-run the ansible role: it now installs `docker-ce-rootless-extras` + prereqs, disables the rootful daemon, runs `dockerd-rootless-setuptool.sh install`, and enables `loginctl enable-linger`. After it finishes, `systemctl --user daemon-reload && systemctl --user restart docker`, then verify `docker info` shows your mirrors.
+2. **Stay rootful** — copy the mirrors into `/etc/docker/daemon.json` using the recipe above, restart the system daemon, and set `useChineseMirror=false` in chezmoi (or accept the no-op rootless file sitting unused).
 
 #### Toggling the chezmoi-managed one
 
@@ -376,6 +387,7 @@ chezmoi diff ~/.docker/config.json ~/.config/docker/daemon.json
 
 ## Related
 
+- [docs/tools/container-config-map.md](container-config-map.md) — reference map for every container config file (who reads it, rootful vs rootless, native vs compat).
 - [docs/tools/web-reader.md](web-reader.md) — the `$LOCAL_PROXY_URL` convention and shell proxy helpers shared with this setup.
 - [docs/zsh/aliases.md](../zsh/aliases.md) — `proxy-on` / `proxy-off` / `withproxy` / `try_direct_then_proxy` quick reference.
 - [docs/linux-package-sources.md](../linux-package-sources.md) — broader Linux package policy (apt vs snap vs brew vs GitHub binaries) if you're deciding whether to install Docker via apt or Linuxbrew.

@@ -216,3 +216,20 @@ proxy-refresh() {
 if [[ "$LOCAL_PROXY_AUTO_ACTIVATE" == "1" ]]; then
   proxy-on -q
 fi
+
+# --- Rootless Docker socket ---
+# Point the Docker CLI at the user-scoped socket when rootless Docker is
+# installed. Without this, `docker` defaults to /var/run/docker.sock (the
+# rootful path) and fails with "Cannot connect to the Docker daemon".
+# Guarded on socket existence so this is a no-op on:
+#   - macOS (OrbStack / Docker Desktop publish their own sockets, don't need this)
+#   - Linux boxes still running rootful Docker (the rootful socket is under /var/run)
+# Respect a pre-existing $DOCKER_HOST so a user-set value wins.
+# See docs/tools/container-config-map.md for the full install-variant map.
+if [[ "$(uname -s)" == "Linux" && -z "$DOCKER_HOST" ]]; then
+  _zsh_net_xdg_runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+  if [[ -S "${_zsh_net_xdg_runtime}/docker.sock" ]]; then
+    export DOCKER_HOST="unix://${_zsh_net_xdg_runtime}/docker.sock"
+  fi
+  unset _zsh_net_xdg_runtime
+fi

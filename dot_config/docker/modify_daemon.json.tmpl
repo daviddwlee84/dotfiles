@@ -1,8 +1,10 @@
 #!/bin/sh
 # Managed by chezmoi. Sets `registry-mirrors` in ~/.config/docker/daemon.json
-# for rootless Docker on Linux when `useChineseMirror` is true. Preserves any
-# other keys (e.g. `data-root`, `dns`, `experimental`, `features`) a user or
-# installer wrote to this file.
+# when `useChineseMirror` is true. This is the rootless Docker daemon config
+# path on Linux; the repo installs rootless Docker by default (see
+# dot_ansible/roles/docker/tasks/main.yml). Preserves any other keys
+# (e.g. `data-root`, `dns`, `experimental`, `features`) a user or installer
+# wrote to this file.
 #
 # Post-apply reminder: daemon.json changes only take effect after
 #   systemctl --user daemon-reload && systemctl --user restart docker
@@ -12,8 +14,11 @@
 # it); the script below short-circuits before any template branching so no
 # file is created there.
 #
-# See docs/tools/containers.md for the per-install-variant config map and the
-# kubesre prefix-substitution strategy (complementary to registry-mirrors).
+# If you are running rootful Docker on Linux instead, this file is a no-op --
+# the rootful daemon only reads /etc/docker/daemon.json (sudo). See
+# docs/tools/containers.md#migration-note-pre-pivot-rootful-installs for the
+# recipe. For the full who-reads-what map across Docker / OrbStack / Desktop /
+# Podman, see docs/tools/container-config-map.md.
 
 set -eu
 
