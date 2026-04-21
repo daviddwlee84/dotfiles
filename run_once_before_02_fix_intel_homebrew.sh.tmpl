@@ -1,10 +1,10 @@
 #!/bin/bash
 # Fix Intel Mac Homebrew issues: directory permissions, Xcode CLT, stale links
-# Only runs on macOS — separate from bootstrap so existing machines get the fix
-# Profile: {{ .profile }}
+# Only runs on Intel macOS — separate from bootstrap so existing machines get the fix
+# OS: {{ .chezmoi.os }}, arch: {{ .chezmoi.arch }}
 
-{{ if ne .profile "macos_intel" -}}
-# Not Intel macOS profile — nothing to do
+{{ if or (ne .chezmoi.os "darwin") (ne .chezmoi.arch "amd64") -}}
+# Not Intel macOS — nothing to do
 exit 0
 {{ else -}}
 

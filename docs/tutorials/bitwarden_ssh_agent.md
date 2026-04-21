@@ -11,7 +11,7 @@ Use the Bitwarden desktop app as your SSH agent so private keys never leave the 
 
 When `installBitwarden` is enabled during `chezmoi init`, the ansible bitwarden role automatically installs:
 - **CLI** (`bw`): via npm on all profiles
-- **Desktop app**: on desktop profiles only (`ubuntu_desktop`, `macos`, `macos_intel`)
+- **Desktop app**: on desktop profiles only (`ubuntu_desktop`, `macos`)
   - **macOS**: via Homebrew Cask (`brew install --cask bitwarden`)
   - **Ubuntu**: via Snap (primary) or `.deb` download (fallback)
 

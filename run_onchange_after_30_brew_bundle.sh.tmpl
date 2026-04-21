@@ -5,13 +5,13 @@
 # installBrewApps: {{ .installBrewApps }}
 # installAiDesktopApps: {{ .installAiDesktopApps }}
 
-{{ if and (not .installBrewApps) (or (and (ne .profile "macos") (ne .profile "macos_intel")) (not .installAiDesktopApps)) -}}
+{{ if and (not .installBrewApps) (or (ne .chezmoi.os "darwin") (not .installAiDesktopApps)) -}}
 # Brew app installation is disabled for this profile
 # To enable, run: chezmoi init --force
 exit 0
 {{ end -}}
 
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # === Brewfile Hashes (changes trigger re-run) ===
 # Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
 # Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
@@ -36,7 +36,7 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Setup Homebrew PATH
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -f /usr/local/bin/brew ]]; then
@@ -53,7 +53,7 @@ fi
 
 # Check if brew is available
 if ! command -v brew &> /dev/null; then
-    {{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+    {{ if eq .chezmoi.os "darwin" -}}
     error "Homebrew not found. It should have been installed by bootstrap."
     exit 1
     {{ else -}}
@@ -72,7 +72,7 @@ if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
     exit 0
 fi
 
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # Pre-authenticate sudo so Homebrew cask pkg installers (e.g. google-drive,
 # squirrel, ollama-app) can invoke /usr/sbin/installer without prompting from
 # a non-TTY child. Credentials cache for ~5min, covering the bundle run.
@@ -116,7 +116,7 @@ run_bundle_with_retry() {
 run_bundle_with_retry "$BREWFILE_DIR/Brewfile" "shared packages from Brewfile"
 
 # Run platform-specific Brewfile
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 if [[ -f "$BREWFILE_DIR/Brewfile.darwin" ]]; then
     run_bundle_with_retry "$BREWFILE_DIR/Brewfile.darwin" "macOS packages from Brewfile.darwin"
 fi

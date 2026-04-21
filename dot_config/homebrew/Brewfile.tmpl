@@ -16,7 +16,7 @@ tap "nikitabobko/tap"  # aerospace (macOS window manager)
 # Only add formulas here that you want to manage via Brewfile
 
 # The following Formulas are MacOS only
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)
 brew "mas"
 brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)

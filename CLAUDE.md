@@ -32,6 +32,22 @@ This keeps `docs/zsh/aliases.md` as the single quick-reference for all custom sh
 
 This ensures Docker testing works with all configuration options.
 
+## Chezmoi Templating Conventions
+
+**IMPORTANT**: Before adding a `{{ if eq .profile ... }}` branch, ask: is the predicate auto-detectable? If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
+
+| Predicate | Use |
+|---|---|
+| Any macOS (Apple Silicon or Intel) | `eq .chezmoi.os "darwin"` |
+| Any Linux | `eq .chezmoi.os "linux"` |
+| Apple Silicon only | `eq .chezmoi.arch "arm64"` (inside darwin-scoped files) or `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64")` |
+| Intel Mac only | `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "amd64")` |
+| Desktop vs headless (user role) | `.profile` — `ubuntu_desktop` / `ubuntu_server`; macOS side covered by `eq .chezmoi.os "darwin"` |
+
+Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. Do **not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
+
+Full decision table, before/after examples, and the `macos_intel` migration snippet: see [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
+
 ## Maintaining Agent Artifact Redaction
 
 **IMPORTANT**: SpecStory transcripts and coding-agent plan files commonly paste in shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:

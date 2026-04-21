@@ -40,7 +40,7 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 
 # Add Homebrew to PATH if installed
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # macOS: Apple Silicon and Intel paths
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -63,7 +63,7 @@ fi
 # Linux: Optional - only install if installBrewApps is enabled
 # =============================================================================
 
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # macOS: Install Homebrew (required for package management)
 if ! command -v brew &> /dev/null; then
     info "Installing Homebrew (macOS)..."

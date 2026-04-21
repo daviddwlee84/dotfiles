@@ -46,7 +46,7 @@ export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
 # Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 elif [[ -f /usr/local/bin/brew ]]; then
@@ -82,7 +82,7 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 #   macOS:   homebrew
 #   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
 
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
 TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
@@ -133,7 +133,7 @@ TAGS="${TAGS},iac_tools"
 
 # Extra vars for role-level configuration
 EXTRA_VARS=""
-{{ if and $installBitwarden (or (eq .profile "ubuntu_desktop") (eq .profile "macos") (eq .profile "macos_intel")) -}}
+{{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles
 EXTRA_VARS="bitwarden_install_desktop=true"
 {{ end -}}
@@ -149,7 +149,7 @@ fi
 
 # Handle sudo
 BECOME_FLAGS=""
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 {{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
 {{ if $noRoot -}}
 info "noRoot mode enabled on macOS - skipping input_method (requires sudo for pkg installers)"

@@ -3,7 +3,14 @@
 [data]
 # 只在 init 才需要問一次：你之後都讀這個值
 # TODO: not all the things we want to change all the time we chezmoi init
-{{- $profile := promptStringOnce . "profile" "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)" "macos" }}
+#
+# Profile only encodes user-role choices that can't be auto-detected
+# (desktop vs server). OS/arch facts come from .chezmoi.os / .chezmoi.arch;
+# see docs/tools/chezmoi-templating.md for the full rule.
+{{- $profileChoices := list "macos" "ubuntu_desktop" "ubuntu_server" }}
+{{- $defaultProfile := "ubuntu_server" }}
+{{- if eq .chezmoi.os "darwin" }}{{ $defaultProfile = "macos" }}{{ end }}
+{{- $profile := promptChoiceOnce . "profile" "Which profile" $profileChoices $defaultProfile }}
 profile = {{ $profile | quote }}
 email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee84@gmail.com" | quote }}
 name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
@@ -22,7 +29,7 @@ installJsCliTools = {{ promptBoolOnce . "installJsCliTools" "Install standalone 
 # 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
 installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
 # 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
-{{ if or (eq $profile "macos") (eq $profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}
 {{ else -}}
 installAiDesktopApps = false

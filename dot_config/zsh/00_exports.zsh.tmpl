@@ -1,5 +1,5 @@
 # 00_exports.zsh - Environment variables
-# Profile: {{ .profile }}
+# Profile: {{ .profile }} (OS: {{ .chezmoi.os }}, arch: {{ .chezmoi.arch }})
 
 # Editor
 # if [[ -n $SSH_CONNECTION ]]; then
@@ -21,18 +21,16 @@ export LC_ALL="en_US.UTF-8"
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 
 # Snap binaries (Linux only)
-{{ if ne .profile "macos" -}}
-{{ if ne .profile "macos_intel" -}}
+{{ if eq .chezmoi.os "linux" -}}
 if [[ -d /snap/bin ]]; then
     export PATH="/snap/bin:$PATH"
 fi
-{{ end -}}
 {{ end -}}
 
 # =============================================================================
 # Homebrew Setup
 # =============================================================================
-{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+{{ if eq .chezmoi.os "darwin" -}}
 # macOS: Initialize Homebrew (Apple Silicon or Intel)
 if [[ -f /opt/homebrew/bin/brew ]]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
