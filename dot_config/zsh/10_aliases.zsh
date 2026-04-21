@@ -27,6 +27,12 @@ alias v="nvim"
 # command -v eza &>/dev/null && alias ls="eza"
 # command -v bat &>/dev/null && alias cat="bat"
 
+# Chezmoi
+# https://www.chezmoi.io/user-guide/frequently-asked-questions/design/#why-does-chezmoi-cd-spawn-a-shell-instead-of-just-changing-directory
+chezmoi-cd() {
+  cd $(chezmoi source-path)
+}
+
 # Git shortcuts
 # NOTE: gcam (git commit --all --message) is provided by oh-my-zsh git plugin
 # NOTE: gca (git commit --verbose --all) is provided by oh-my-zsh git plugin

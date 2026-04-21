@@ -122,8 +122,63 @@ The Ansible role installs the latest stable version via OS package managers (Hom
 
 These are not installed by default but can be added manually.
 
+## Troubleshooting
+
+### macOS: `curl: (18) Transferred a partial file` during brew install
+
+Homebrew downloads bottles from `ghcr.io`, which can be slow or unstable on some networks (ISP throttling, GFW, etc.). Symptoms: single `brew install azure-cli` / `terraform` / `opentofu` taking 10+ minutes and occasionally failing mid-download.
+
+The `iac_tools` role already retries each brew install 3 times with a 20s delay and wraps each tool in its own rescue block so one failure doesn't stop the others. If you still hit persistent failures:
+
+1. **Manually retry** — brew resumes partial downloads:
+
+   ```bash
+   brew install azure-cli terraform opentofu
+   ```
+
+2. **Use a Homebrew bottle mirror** (recommended if you're behind GFW). Add to `~/.zshenv` or `~/.zshrc` before sourcing brew:
+
+   ```bash
+   # Tsinghua mirror (中国大陆)
+   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+   ```
+
+   Then re-run the install. See [Homebrew docs on environment variables](https://docs.brew.sh/Manpage#environment) for alternatives (USTC, SJTU, etc.).
+
+3. **Fall back to Terraform/OpenTofu from GitHub releases** — they're single static binaries, no Homebrew needed:
+
+   ```bash
+   # Terraform
+   curl -LO https://releases.hashicorp.com/terraform/$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r .current_version)/terraform_$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform | jq -r .current_version)_darwin_arm64.zip
+   unzip terraform_*_darwin_arm64.zip -d ~/.local/bin/
+
+   # OpenTofu
+   VERSION=$(gh release view -R opentofu/opentofu --json tagName -q .tagName | sed 's/^v//')
+   curl -LO "https://github.com/opentofu/opentofu/releases/download/v${VERSION}/tofu_${VERSION}_darwin_arm64.zip"
+   unzip "tofu_${VERSION}_darwin_arm64.zip" -d ~/.local/bin/
+   ```
+
+### Linux: apt repo key / signing issues
+
+If `apt update` complains about Microsoft / HashiCorp / OpenTofu keys, the role installs keyrings to:
+
+- Azure CLI: `/etc/apt/keyrings/microsoft.gpg` + `/etc/apt/sources.list.d/azure-cli.list`
+- Terraform: `/usr/share/keyrings/hashicorp-archive-keyring.gpg` + `/etc/apt/sources.list.d/hashicorp.list`
+- OpenTofu: `/etc/apt/keyrings/opentofu.gpg` + `/etc/apt/keyrings/opentofu-repo.gpg` + `/etc/apt/sources.list.d/opentofu.list`
+
+To force re-creation, delete the keyring + source list file and re-run the role:
+
+```bash
+cd ~/.ansible
+ansible-playbook playbooks/linux.yml --tags iac_tools
+```
+
 ## Related
 
 - [Azure CLI install docs](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
 - [Terraform install docs](https://developer.hashicorp.com/terraform/install)
 - [OpenTofu install docs](https://opentofu.org/docs/intro/install/)
+- [Homebrew environment variables](https://docs.brew.sh/Manpage#environment) — `HOMEBREW_BOTTLE_DOMAIN`, `HOMEBREW_API_DOMAIN`, etc.

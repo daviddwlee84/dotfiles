@@ -6,13 +6,31 @@
 # macOS - all via Homebrew
 # =============================================================================
 
+# Each brew install is wrapped in block + rescue with retries because
+# ghcr.io (Homebrew's bottle CDN) can be slow/unstable on some networks
+# (especially behind GFW), and `community.general.homebrew` has no built-in
+# retry. Without retries, a single `curl: (18) Transferred a partial file`
+# would fail the whole task. Tools also install independently so one failure
+# doesn't block the others. For GFW users: set `HOMEBREW_BOTTLE_DOMAIN` to a
+# mirror (see docs/tools/infrastructure-as-code.md).
+
 - name: Install Azure CLI (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - iac_install_azure_cli
-  community.general.homebrew:
-    name: azure-cli
-    state: present
+  block:
+    - name: Install azure-cli via Homebrew
+      community.general.homebrew:
+        name: azure-cli
+        state: present
+      register: az_brew_install
+      until: az_brew_install is succeeded
+      retries: 3
+      delay: 20
+  rescue:
+    - name: Warn Azure CLI installation failed (macOS)
+      ansible.builtin.debug:
+        msg: "Azure CLI installation failed after retries — skipping. {{ ansible_failed_result.msg | default('unknown') | truncate(200) }}"
 
 - name: Tap hashicorp/tap (macOS)
   when:
@@ -27,22 +45,47 @@
     - name: Tap hashicorp/tap
       ansible.builtin.command: brew tap hashicorp/tap
       when: "'hashicorp/tap' not in hashicorp_taps.stdout_lines"
+      register: hashicorp_tap_result
+      until: hashicorp_tap_result is succeeded
+      retries: 3
+      delay: 20
+      changed_when: hashicorp_tap_result.rc == 0
 
 - name: Install Terraform (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - iac_install_terraform
-  community.general.homebrew:
-    name: hashicorp/tap/terraform
-    state: present
+  block:
+    - name: Install terraform via Homebrew
+      community.general.homebrew:
+        name: hashicorp/tap/terraform
+        state: present
+      register: terraform_brew_install
+      until: terraform_brew_install is succeeded
+      retries: 3
+      delay: 20
+  rescue:
+    - name: Warn Terraform installation failed (macOS)
+      ansible.builtin.debug:
+        msg: "Terraform installation failed after retries — skipping. {{ ansible_failed_result.msg | default('unknown') | truncate(200) }}"
 
 - name: Install OpenTofu (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - iac_install_opentofu
-  community.general.homebrew:
-    name: opentofu
-    state: present
+  block:
+    - name: Install opentofu via Homebrew
+      community.general.homebrew:
+        name: opentofu
+        state: present
+      register: opentofu_brew_install
+      until: opentofu_brew_install is succeeded
+      retries: 3
+      delay: 20
+  rescue:
+    - name: Warn OpenTofu installation failed (macOS)
+      ansible.builtin.debug:
+        msg: "OpenTofu installation failed after retries — skipping. {{ ansible_failed_result.msg | default('unknown') | truncate(200) }}"
 
 # =============================================================================
 # Linux (Debian/Ubuntu) - apt with sudo

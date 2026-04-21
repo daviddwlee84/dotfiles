@@ -913,3 +913,1119 @@ mkdir -p dot_ansible/roles/iac_tools/tasks dot_ansible/roles/iac_tools/defaults
 <summary>Tool use: **run_terminal_command_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/iac_tools/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/iac_tools/defaults/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "in_progress"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "pending"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "pending"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/iac.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "pending"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "pending"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "pending"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "pending"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/iac.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "pending"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now let me add the chezmoi prompt and register the role in playbooks.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/playbooks/macos.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/playbooks/linux.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/iac.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "pending"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "in_progress"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "pending"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "pending"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/iac.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "pending"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update the run_onchange script with role hashes and the optional-tag block.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now add the optional-tag block. I'll add it right after the `installNetworkingTools` block.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update the Dockerfile.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/Dockerfile</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/Dockerfile</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "completed"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/infrastructure-as-code.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "in_progress"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/iac.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "pending"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/infrastructure-as-code.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update CLAUDE.md and README.md.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "completed"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/infrastructure-as-code.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "completed"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "completed"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/infrastructure-as-code.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "in_progress"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "pending"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+The string to replace was not found in the file.
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Let me check the exact format of the tags table.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update the Optional tag categories line.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update README.md. Let me find the exact spot.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 2,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "installNetworkingTools|installIacTools|Optional Components|noRoot"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "installNetworkingTools|installIacTools|Optional Components|noRoot",
+  "topFiles": [
+    {
+      "matchCount": 19,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 5
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "completed"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/infrastructure-as-code.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "completed"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Create dot_ansible/roles/iac_tools/tasks/main.yml with macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot) blocks for Azure CLI / Terraform / OpenTofu",
+      "id": "role-tasks",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_ansible/roles/iac_tools/defaults/main.yml with per-tool toggles (iac_install_azure_cli / terraform / opentofu)",
+      "id": "role-defaults",
+      "status": "completed"
+    },
+    {
+      "content": "Add installIacTools promptBoolOnce to .chezmoi.toml.tmpl",
+      "id": "chezmoi-prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Register iac_tools role in dot_ansible/playbooks/macos.yml and linux.yml",
+      "id": "playbooks",
+      "status": "completed"
+    },
+    {
+      "content": "Add iac_tools role hashes + optional-tag block to run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "run-onchange",
+      "status": "completed"
+    },
+    {
+      "content": "Add CHEZMOI_INSTALL_IAC_TOOLS ARG and --promptBool flag to Dockerfile",
+      "id": "dockerfile",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/infrastructure-as-code.md with install/usage notes for Azure CLI, Terraform, OpenTofu",
+      "id": "docs-iac",
+      "status": "completed"
+    },
+    {
+      "content": "Update CLAUDE.md tags table and Optional profiles list with iac_tools",
+      "id": "claudemd",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add installIacTools row to README.md Optional Components table",
+      "id": "readme",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All todos are complete. Now let me run the ansible syntax check to validate the playbooks.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml && echo "---macos OK---" && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml && echo "---linux OK---"</summary>
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml && echo "---macos OK---" && ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml && echo "---linux OK---"
+```
+
+```
+
+playbook: dot_ansible/playbooks/macos.yml
+---macos OK---
+
+playbook: dot_ansible/playbooks/linux.yml
+---linux OK---
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Both playbooks pass syntax check. Let me also quickly verify the edited files don't have any issues.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "dot_ansible/roles/iac_tools/tasks/main.yml",
+    "dot_ansible/roles/iac_tools/defaults/main.yml",
+    ".chezmoi.toml.tmpl",
+    "Dockerfile"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "dot_ansible/roles/iac_tools/tasks/main.yml"
+    },
+    {
+      "relativeWorkspacePath": "dot_ansible/roles/iac_tools/defaults/main.yml"
+    },
+    {
+      "errors": [
+        {
+          "message": "Expected \"#\", \"'\", \"[\", \"\\\"\", \"\\n\", \"\\r\", [ \\t], [A-Za-z0-9_\\-] or end of input but \"{\" found.",
+          "range": {
+            "endPosition": {
+              "column": 3,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 2,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_ERROR",
+          "source": "Toml Parser"
+        }
+      ],
+      "relativeWorkspacePath": ".chezmoi.toml.tmpl"
+    },
+    {
+      "relativeWorkspacePath": "Dockerfile"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+That TOML linter error is a false positive caused by Go template syntax `{{-` which is standard for chezmoi templates, not raw TOML. This pre-existing pattern exists on every line of the file. No action needed.
+
+Let me do a final review of the key files to make sure everything looks right.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Everything is consistent and properly wired. Here's a summary of all changes made:
+
+**New files created:**
+- `dot_ansible/roles/iac_tools/tasks/main.yml` — Full cross-platform install tasks for Azure CLI, Terraform, and OpenTofu with three install paths: macOS Homebrew, Linux apt (sudo), and Linux user-level (noRoot fallback via GitHub releases / `uv tool`)
+- `dot_ansible/roles/iac_tools/defaults/main.yml` — Per-tool toggles (`iac_install_azure_cli`, `iac_install_terraform`, `iac_install_opentofu`) for fine-grained control via `--extra-vars`
+- `docs/tools/infrastructure-as-code.md` — Usage notes with quick reference for `az`, `terraform`, and `tofu`, install matrix, Terraform vs OpenTofu comparison, and version management tips
+
+**Files edited:**
+- `.chezmoi.toml.tmpl` — Added `installIacTools` promptBoolOnce (default `false`)
+- `dot_ansible/playbooks/macos.yml` — Registered `iac_tools` role after `networking_tools`
+- `dot_ansible/playbooks/linux.yml` — Same registration
+- `run_onchange_after_20_ansible_roles.sh.tmpl` — Added SHA256 hashes for change detection + optional-tag block
+- `Dockerfile` — Added `CHEZMOI_INSTALL_IAC_TOOLS` ARG and `--promptBool` flag
+- `CLAUDE.md` — Added `iac_tools` to the Available Tags table and Optional tag category
+- `README.md` — Added `installIacTools` row to Optional Components table
+
+Both playbooks pass `ansible-playbook --syntax-check` successfully.
+
+---
+
+_**User**_
+
+@/Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/terminals/3.txt:117-431 似乎安裝opentofu掛了 不知道是不是網路問題還是timeout問題 檢修一下
+
+---
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Looking at the installation results, most tools completed successfully—Azure CLI in about 15 minutes, the Homebrew tap in under a minute, and Terraform in roughly 17 minutes—but OpenTofu hit a network issue partway through its download, failing after 13 minutes with a partial file transfer error from the container registry.
+
+The slow install times for Azure CLI and Terraform suggest the user's connection to GitHub Container Registry is either unstable or geographically constrained, possibly due to network restrictions in China. The OpenTofu failure is a direct result of this—the download was interrupted mid-transfer.
+
+I should check whether OpenTofu actually installed despite the failure, then offer practical solutions like retrying the installation manually, configuring a Homebrew mirror through environment variables, or switching to a direct binary installation from GitHub releases. The core problem is that the Homebrew Ansible module lacks built-in retry logic, so when curl times out, the task fails immediately without recovery attempts.
+
+I can fix this by adding retry logic to the Ansible tasks—using `retries` and `until` conditions to automatically retry failed Homebrew installs a few times with delays between attempts. I should also add rescue blocks for graceful degradation, matching the pattern already used elsewhere in the playbook for handling network failures on Linux. This way, transient network hiccups won't cause the entire playbook to fail, especially for these larger tool installations that hit ghcr.io.</details></think>
