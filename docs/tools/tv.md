@@ -140,7 +140,9 @@ All actions `cd ~/.ansible` and export `ANSIBLE_CONFIG=$HOME/.ansible/ansible.cf
 
 ### `git-ops` channel
 
-Fuzzy-search the full VSCode Source Control + GitLens command palette (~130 entries: pull/push, commit variants incl. amend, undo-last-commit, branch, rebase, cherry-pick, stash, tags, worktrees, submodule, config). Backed by `~/.config/docs/tools/git-ops.md` — the markdown table is the single source of truth; edit the table to change the channel.
+Fuzzy-search the full VSCode Source Control + GitLens command palette (~150 entries: pull/push, commit variants incl. amend, undo-last-commit, branch, rebase, cherry-pick, stash, tags, worktrees, submodule, config). Backed by `~/.config/docs/tools/git-ops.md` — the markdown table is the single source of truth; edit the table to change the channel.
+
+Each row also shows the matching **oh-my-zsh `git` plugin alias** (`gc!`, `gcam`, `gpf!`, `gst`, `grhh`, `gstp`, …) or repo-custom function (prefixed `*`, e.g. `*gcam-amend`, `*gundo`, `*lg`). That means you can fuzzy-search either by semantic name (`amend`, `undo`, `force push`), by the full `git …` invocation, **or** by the alias you half-remember — any of them lands on the same row.
 
 Open with `tv git-ops` (standalone) or press `Alt+I` in zsh to paste the selected command straight into the shell prompt.
 
@@ -158,16 +160,19 @@ Destructive rows (`commit --amend`, `reset --hard`, `push --force`, `branch -D`,
 
 Use-cases this solves:
 
-- "What's the exact `git commit --amend --no-edit` flag again?" — type `amend`, Enter, done.
-- "How do I undo the last commit without losing work?" — type `undo`, you see all three variants (soft / mixed / hard with the destructive tag).
+- "What's the exact `git commit --amend --no-edit` flag again?" — type `amend` or `gcn!`, Enter, done.
+- "How do I undo the last commit without losing work?" — type `undo` or `gundo`, you see all three variants (soft / mixed / hard with the destructive tag).
+- "Which alias force-pushes safely?" — type `force`, see `gpf` (with-lease, safe) next to `gpf!` (raw `--force`, destructive).
 - Copy a command into a Cursor chat or a teammate's Slack without typing — `Ctrl+Y`.
 - `git worktree`, `git submodule`, `git cherry-pick` — the commands nobody remembers the flags for.
 
 Adding a new command: append a row to the appropriate section of `dot_config/docs/tools/git-ops.md`:
 
 ```markdown
-| Menu Label | `git some-command --flag` | Short description | destructive |
+| Menu Label | `git some-command --flag` | `gsf` | Short description | destructive |
 ```
+
+Columns are `Menu | Command | Alias | Description | Notes`. Leave the alias column blank (`| |`) if there's no oh-my-zsh alias; prefix with `*` if you're adding a custom function that lives in `dot_config/zsh/10_aliases.zsh`. See `docs/zsh/aliases.md` for the full OMZ alias reference.
 
 Re-run `chezmoi apply` (md is deployed to `~/.config/docs/tools/`); no channel reload needed — it's parsed at runtime.
 

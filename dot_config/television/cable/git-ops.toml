@@ -2,7 +2,7 @@
 # Parses ~/.config/docs/tools/git-ops.md at runtime — single source of truth.
 #
 # Usage:
-#   tv git-ops                             (standalone: Enter prints, Ctrl+Y copies, Ctrl+E execs)
+#   tv git-ops                             (standalone: Enter prints, Ctrl+Y copies, Alt+E execs)
 #   Alt+I in zsh                           (ZLE widget: pastes selected command into LBUFFER)
 #
 # Keybindings:
@@ -18,6 +18,7 @@
 #   1. label      (human-readable menu name matching VSCode/GitLens)
 #   2. description
 #   3. tag        ("⚠" for destructive, " " otherwise)
+#   4. alias      (padded 10ch; oh-my-zsh git alias or *custom — searchable via fuzzy)
 
 [metadata]
 name = "git-ops"
@@ -27,16 +28,19 @@ requirements = ["awk", "git"]
 [source]
 command = """
 awk -F'|' '/^[[:space:]]*\\|/ && $3 ~ /`/ {
-  label=$2; cmd=$3; desc=$4; notes=$5
+  label=$2; cmd=$3; alias_=$4; desc=$5; notes=$6
   gsub(/^[[:space:]]+|[[:space:]]+$/, "", label)
+  gsub(/^[[:space:]]+|[[:space:]]+$/, "", alias_)
+  gsub(/`/, "", alias_)
   gsub(/^[[:space:]]+|[[:space:]]+$/, "", desc)
   gsub(/^[[:space:]]+|[[:space:]]+$/, "", notes)
   sub(/^[[:space:]]*`/, "", cmd); sub(/`[[:space:]]*$/, "", cmd)
   tag = (notes ~ /destructive/) ? "⚠" : " "
-  printf "%s\\t%s\\t%s\\t%s\\n", cmd, label, desc, tag
+  aliaspad = sprintf("%-11s", alias_)
+  printf "%s\\t%s\\t%s\\t%s\\t%s\\n", cmd, label, desc, tag, aliaspad
 }' ~/.config/docs/tools/git-ops.md
 """
-display = "{split:\\t:3} {split:\\t:1}  │  {split:\\t:0}  │  {split:\\t:2}"
+display = "{split:\\t:3} {split:\\t:4} {split:\\t:1}  │  {split:\\t:0}  │  {split:\\t:2}"
 output = "{split:\\t:0}"
 
 [preview]
@@ -44,7 +48,7 @@ command = [
   """label='{split:\\t:1}'; awk -v L="$label" 'BEGIN{FS="|"} $0 ~ "^\\\\| *"L" *\\\\|" {print; getline; print; exit}' ~/.config/docs/tools/git-ops.md | bat -l md --plain --color=always 2>/dev/null || awk -v L="$label" 'BEGIN{FS="|"} $0 ~ "^\\\\| *"L" *\\\\|" {print}' ~/.config/docs/tools/git-ops.md""",
   """cmd='{split:\\t:0}'; sub=$(printf '%s' "$cmd" | awk '{print $2}'); git help "$sub" 2>/dev/null | head -80 || printf 'No help page for: %s\\n' "$cmd" """,
 ]
-header = "{split:\\t:1}"
+header = "{split:\\t:4} {split:\\t:1}"
 
 [ui.preview_panel]
 size = 55
