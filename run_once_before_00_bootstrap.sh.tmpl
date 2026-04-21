@@ -39,6 +39,18 @@ fi
 # Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
 
+{{ if .useChineseMirror -}}
+# Homebrew TUNA mirror (GFW users). Must be set BEFORE `brew install`
+# (Homebrew installer and `brew update`) so the very first bottle fetch
+# and the brew.git/homebrew-core.git clones also use the mirror.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+info "useChineseMirror=true: Homebrew using TUNA (Tsinghua) mirror"
+{{ end -}}
+
 # Add Homebrew to PATH if installed
 {{ if eq .chezmoi.os "darwin" -}}
 # macOS: Apple Silicon and Intel paths

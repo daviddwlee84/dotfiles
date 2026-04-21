@@ -50,6 +50,17 @@ fi
 # Set default Brewfile location (XDG-compliant)
 export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
 
+{{ if .useChineseMirror -}}
+# Homebrew TUNA (Tsinghua) mirror for GFW users.
+# Covers bottles (ghcr.io default → partial-transfer errors) and brew.git/core.
+# Managed by chezmoi; disable by answering 'n' to useChineseMirror at init.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+{{ end -}}
+
 # --- Suggested exports (uncomment to enable) ---
 # History configuration (oh-my-zsh handles this, but can customize)
 # export HISTSIZE=10000

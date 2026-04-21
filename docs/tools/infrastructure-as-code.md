@@ -136,17 +136,23 @@ The `iac_tools` role already retries each brew install 3 times with a 20s delay 
    brew install azure-cli terraform opentofu
    ```
 
-2. **Use a Homebrew bottle mirror** (recommended if you're behind GFW). Add to `~/.zshenv` or `~/.zshrc` before sourcing brew:
+2. **Enable the built-in TUNA mirror** (recommended for GFW). If you answered `y` to `useChineseMirror` at `chezmoi init`, the four `HOMEBREW_*` env vars below are already exported in three places:
+
+   - `~/.config/zsh/00_exports.zsh` — for interactive shells
+   - `run_once_before_00_bootstrap.sh` — for the first-run Homebrew installer
+   - `run_onchange_after_20_ansible_roles.sh` — so ansible's `community.general.homebrew` subprocess inherits them
+
+   If you didn't enable it at init, re-run `chezmoi init` (or edit `~/.config/chezmoi/chezmoi.toml` and set `useChineseMirror = true`) then `chezmoi apply`. To set it manually for a one-off session:
 
    ```bash
-   # Tsinghua mirror (中国大陆)
+   # Tsinghua mirror (中国大陆) — see https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
    export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
    ```
 
-   Then re-run the install. See [Homebrew docs on environment variables](https://docs.brew.sh/Manpage#environment) for alternatives (USTC, SJTU, etc.).
+   See [Homebrew docs on environment variables](https://docs.brew.sh/Manpage#environment) for alternatives (USTC, SJTU, etc.).
 
 3. **Fall back to Terraform/OpenTofu from GitHub releases** — they're single static binaries, no Homebrew needed:
 

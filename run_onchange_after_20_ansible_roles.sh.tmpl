@@ -61,6 +61,18 @@ elif [[ -d "$HOME/.linuxbrew" ]]; then
 fi
 {{ end -}}
 
+{{ if .useChineseMirror -}}
+# Homebrew TUNA mirror (GFW users) — exported so ansible's homebrew module
+# (community.general.homebrew) inherits these env vars in its brew subprocess.
+# Without this, ghcr.io bottle downloads frequently fail with
+# `curl: (18) Transferred a partial file` on constrained networks.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+{{ end -}}
+
 # Colors
 info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
 success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }

@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: todo-1776764546232-kc2u4p3mn
     content: git commit with specstory chat history
-    status: in_progress
+    status: completed
 isProject: false
 ---
 
