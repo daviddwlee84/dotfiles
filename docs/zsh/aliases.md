@@ -502,7 +502,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ### Proxy helpers
 
-> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL`; otherwise probes ports 7890/7891/1087/8118/8080 with `nc -z -w1` and caches the result per shell.
+> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL` (+ optional `$LOCAL_PROXY_SOCKS_URL` for split Clash `socks-port:` configs); otherwise probes ports 7890/7891/1087/8118/8080 with `nc -z -w1` and caches the result per shell. Set `$LOCAL_PROXY_AUTO_ACTIVATE=1` to auto-export env vars on shell startup. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md).
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
@@ -515,7 +515,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ### Web reader
 
-> Render web pages as markdown in the terminal. All functions use `try_direct_then_proxy` so non-GFW'd URLs pay zero proxy overhead. Pick the extractor by function name.
+> Render web pages as markdown in the terminal. All functions use `try_direct_then_proxy` so non-GFW'd URLs pay zero proxy overhead. Pick the extractor by function name. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md).
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|

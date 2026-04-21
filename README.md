@@ -157,7 +157,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Neovim**: >= 0.11.2 with LazyVim dependencies
 - **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
 - **Git review stack**: gh, glab, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
-- **Markdown reader**: `glow` for terminal Markdown rendering, plus `readurl <url>` / `readlocal` / `readnode` / `readraw` to render web pages as markdown in the terminal with auto proxy fallback (see [docs/zsh/aliases.md](docs/zsh/aliases.md#web-reader))
+- **Markdown reader**: `glow` for terminal Markdown rendering, plus `readurl <url>` / `readlocal` / `readnode` / `readraw` to render web pages as markdown in the terminal with auto proxy fallback (see [docs/tools/web-reader.md](docs/tools/web-reader.md))
 - **Shell testing**: `bats` (bats-core) — Bash test runner with TAP/JUnit output
 - **DuckDB CLI**: `duckdb` (Homebrew on macOS, official downloads on Linux)
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
