@@ -4,6 +4,8 @@ Operating notes for Docker / OrbStack / Docker Desktop / Podman across the four 
 
 For the "who reads which config file" reference (CLI vs daemon vs systemd vs Desktop app, rootful vs rootless), see [container-config-map.md](container-config-map.md). This doc focuses on how to operate your box; the map doc focuses on understanding the landscape.
 
+See also: [docs/infra/virtualization.md](../infra/virtualization.md#desktop-vm-managers) for OrbStack's VM-manager side (vs Proxmox / UTM / VirtualBox), and [docs/infra/shared-storage.md](../infra/shared-storage.md#storage-for-containers-and-k8s) for when container volumes hit CSI / CephFS / NFS in a multi-node cluster.
+
 Primary pain points this doc addresses:
 
 - **Which config file do I edit?** The answer depends on runtime and install mode; there are at least four different locations with overlapping schemas.

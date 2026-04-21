@@ -182,3 +182,4 @@ ansible-playbook playbooks/linux.yml --tags iac_tools
 - [Terraform install docs](https://developer.hashicorp.com/terraform/install)
 - [OpenTofu install docs](https://opentofu.org/docs/intro/install/)
 - [Homebrew environment variables](https://docs.brew.sh/Manpage#environment) — `HOMEBREW_BOTTLE_DOMAIN`, `HOMEBREW_API_DOMAIN`, etc.
+- [docs/infra/](../infra/) — the infrastructure itself that Terraform/OpenTofu would provision: virtualization (Proxmox / ESXi / KubeVirt), shared storage (CephFS / BeeGFS), compute scheduling (SLURM / Kubernetes), identity (FreeIPA). IaC is the "how to provision"; that folder is the "what you're provisioning."
