@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -41,6 +41,7 @@
       - coreutils
       - taplo
       - television
+      - pandoc
     state: present
 
 # =============================================================================
@@ -1941,6 +1942,19 @@
   tags: [sudo]
   ansible.builtin.apt:
     name: htop
+    state: present
+
+# --- pandoc ---
+# Used by the `readraw` zsh function (dot_config/zsh/tools/55_web_reader.zsh)
+# to convert raw HTML pages to markdown. Package is in the default Ubuntu
+# repos; no-root / armv7l installs simply won't get it and `readraw` will
+# print an install hint.
+- name: Install pandoc (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: pandoc
     state: present
 
 # --- btop ---

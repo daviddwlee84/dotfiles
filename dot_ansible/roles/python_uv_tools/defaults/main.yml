@@ -34,3 +34,5 @@ python_uv_tools:
       - pyarrow  # To be able open feather file
   - name: copyparty
     binary: copyparty
+  - name: trafilatura
+    binary: trafilatura

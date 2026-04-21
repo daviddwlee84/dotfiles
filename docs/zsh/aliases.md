@@ -500,6 +500,30 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `lanscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Run full LAN device + port scan into `~/.cache/tv/` (feeds `tv lan-devices`) |
 | `tv-lan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Open the `lan-devices` Television channel |
 
+### Proxy helpers
+
+> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL`; otherwise probes ports 7890/7891/1087/8118/8080 with `nc -z -w1` and caches the result per shell.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `withproxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a single command with proxy env vars exported to the child only (e.g. `withproxy curl ...`) |
+| `try_direct_then_proxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a command direct; on failure, retry via `withproxy`. Used as the default for reader functions. |
+| `proxy-on` | function | `dot_config/zsh/tools/50_networking.zsh` | Export `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` in the current shell |
+| `proxy-off` | function | `dot_config/zsh/tools/50_networking.zsh` | Unset all proxy env vars in the current shell |
+| `proxy-status` | function | `dot_config/zsh/tools/50_networking.zsh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
+| `proxy-refresh` | function | `dot_config/zsh/tools/50_networking.zsh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
+
+### Web reader
+
+> Render web pages as markdown in the terminal. All functions use `try_direct_then_proxy` so non-GFW'd URLs pay zero proxy overhead. Pick the extractor by function name.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `readurl` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via jina.ai Reader + glow (remote, zero local deps beyond glow) |
+| `readlocal` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
+| `readnode` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
+| `readraw` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
+
 ---
 
 ## Shell Utilities
