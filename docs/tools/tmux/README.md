@@ -61,6 +61,41 @@ tmux -L new new-session -s work
 
 Verify with `tmux -V` (binary version) and, inside tmux, `#{version}` in a format string (server version).
 
+## OSC 52 Clipboard (SSH-friendly yank)
+
+Full cross-layer explainer (terminal ↔ tmux ↔ Neovim ↔ `x` CLI): see [**clipboard.md**](../clipboard.md). Summary of what tmux contributes:
+
+`set-clipboard on` + `allow-passthrough on` in [`common.conf`](../../../dot_config/tmux/common.conf) let tmux relay OSC 52 escape sequences from inner TUIs to the outer terminal emulator, so yanks reach the local machine's clipboard even over SSH. The same file declares the `clipboard` terminal-feature for `xterm*`, `ghostty*`, and `alacritty*` so tmux doesn't need a `Ms` entry in terminfo to emit OSC 52.
+
+The capture-pane helpers (`prefix + y` / `Y` / `C-y` in [`keybindings.conf`](../../../dot_config/tmux/keybindings.conf)) pipe through `tmux load-buffer -w -` rather than `pbcopy`/`xclip`, so they also work over SSH (the `-w` flag tells tmux to forward the buffer via OSC 52 alongside the paste buffer).
+
+The Neovim side is paired in [`dot_config/nvim/lua/config/options.lua`](../../../dot_config/nvim/lua/config/options.lua): when `SSH_CONNECTION`/`SSH_TTY` is set, `vim.g.clipboard` is overridden to `vim.ui.clipboard.osc52` (builtin since Neovim 0.10). Local sessions keep the default `pbcopy`/`xclip` provider so paste still works.
+
+### Verify it's wired up
+
+```bash
+# tmux should report clipboard support for the current client
+tmux info | grep -Ei 'clipboard|Ms:'
+# look for: clipboard: true, and an Ms entry that's NOT [missing]
+
+# inside Neovim
+:checkhealth provider.clipboard
+# expect the "OSC 52" provider to be active under SSH
+```
+
+If `tmux info` still shows `Ms: [missing]` and yanks fail after editing `common.conf`, a running tmux server keeps its old capability table. Do `tmux kill-server` (loses sessions — `tmux-resurrect` can restore them) and attach fresh.
+
+Terminal support:
+
+| Terminal | OSC 52 write | OSC 52 read |
+|----------|--------------|-------------|
+| Ghostty / cmux | ✅ `clipboard-write = allow` (explicit in `dot_config/ghostty/config`) | prompts (`clipboard-read = ask`) |
+| Alacritty | ✅ native | ❌ not supported |
+| iTerm2 | ✅ | requires opt-in in Preferences |
+| kitty / WezTerm | ✅ | ✅ |
+
+Paste from the system clipboard over OSC 52 is therefore best-effort; yank is the reliable direction. If remote paste matters more than remote yank, use SSH's `LocalForward`/`ForwardAgent` workflows or a dedicated clipboard bridge (e.g. `lemonade`).
+
 ## Reload Config
 
 Most changes do not need a server restart.

@@ -247,7 +247,7 @@ The Catppuccin status bar is **responsive**: `responsive.sh` + a `client-resized
 
 - `extended-keys always` + `terminal-features 'xterm*:extkeys'` -- forwards Shift+Enter, Ctrl+Enter, etc. through tmux to inner applications (Claude Code, Neovim, etc.)
 - `escape-time 0` -- eliminates ESC delay for Neovim
-- `set-clipboard on` -- OSC 52 clipboard (works over SSH)
+- `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) -- OSC 52 clipboard works over SSH without relying on terminfo `Ms`. Paired with an SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua` so remote Neovim yanks reach the local clipboard. See `docs/tools/tmux/README.md` → "OSC 52 Clipboard" for verification steps.
 - `allow-passthrough on` -- OSC passthrough for terminal images
 - macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See `docs/tools/ghostty.md`.
 

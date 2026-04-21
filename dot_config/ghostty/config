@@ -8,3 +8,11 @@ macos-option-as-alt = left
 
 # Disable ligatures (code readability)
 font-features = -calt, -liga, -dlig
+
+# OSC 52 clipboard policy (pairs with tmux set-clipboard + Neovim SSH clipboard
+# override in dot_config/nvim/lua/config/options.lua).
+# - write = allow : let inner apps (Neovim, tmux) set the system clipboard
+# - read  = ask   : prompt before handing clipboard contents back to inner apps
+#                   (safer default; flip to "allow" if prompts get annoying)
+clipboard-write = allow
+clipboard-read = ask
