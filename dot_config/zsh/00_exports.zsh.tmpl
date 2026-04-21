@@ -27,6 +27,20 @@ if [[ -d /snap/bin ]]; then
 fi
 {{ end -}}
 
+# .NET global tools (e.g. azure-cost-cli via `dotnet tool install --global`).
+# Default install location per `dotnet-install.sh` and Homebrew's dotnet cask.
+# Only prepend if the directory exists, so we don't pollute PATH on hosts
+# without .NET installed.
+if [[ -d "$HOME/.dotnet/tools" ]]; then
+    export PATH="$HOME/.dotnet/tools:$PATH"
+fi
+# dotnet itself (noRoot Linux install target; macOS/Linux-sudo install to
+# system locations already on $PATH).
+if [[ -x "$HOME/.dotnet/dotnet" ]]; then
+    export PATH="$HOME/.dotnet:$PATH"
+    export DOTNET_ROOT="$HOME/.dotnet"
+fi
+
 # =============================================================================
 # Homebrew Setup
 # =============================================================================

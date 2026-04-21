@@ -5,3 +5,9 @@
 iac_install_azure_cli: true
 iac_install_terraform: true
 iac_install_opentofu: true
+
+# Opt-in add-ons (default off — pull in heavier dependencies)
+# azure-cost-cli: https://github.com/mivano/azure-cost-cli
+#   Requires .NET SDK 8.0+ (installed on demand if missing).
+#   Enable via: --extra-vars "iac_install_azure_cost_cli=true"
+iac_install_azure_cost_cli: false
