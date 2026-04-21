@@ -1,0 +1,33 @@
+#!/bin/sh
+# Managed by chezmoi. Merges `proxies.default` into ~/.docker/config.json
+# based on $LOCAL_PROXY_URL / $LOCAL_PROXY_SOCKS_URL at apply time. Preserves
+# `auths`, `credsStore`, `credHelpers`, `currentContext` written by
+# `docker login` / the Docker CLI itself.
+#
+# See docs/tools/containers.md for the full picture (client-side proxy vs
+# daemon-side proxy vs registry mirrors) and dot_config/zsh/tools/50_networking.zsh
+# for the $LOCAL_PROXY_URL convention this script shares with the shell helpers.
+
+set -eu
+
+input=$(cat)
+[ -z "$input" ] && input='{}'
+
+# If jq is missing (fresh box, bootstrap hasn't finished), pass through
+# unchanged so we don't corrupt the file. The next `chezmoi apply` after
+# `base` ansible role runs will fill in the real config.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+{{ if env "LOCAL_PROXY_URL" -}}
+printf '%s' "$input" | jq \
+  --arg http  {{ env "LOCAL_PROXY_URL" | quote }} \
+  --arg https {{ env "LOCAL_PROXY_URL" | quote }} \
+  --arg all   {{ or (env "LOCAL_PROXY_SOCKS_URL") (env "LOCAL_PROXY_URL") | quote }} \
+  --arg no    'localhost,127.0.0.1,.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16' \
+  '.proxies.default = {httpProxy: $http, httpsProxy: $https, allProxy: $all, noProxy: $no}'
+{{- else -}}
+printf '%s' "$input" | jq 'del(.proxies.default) | if (.proxies // null) == {} then del(.proxies) else . end'
+{{- end }}

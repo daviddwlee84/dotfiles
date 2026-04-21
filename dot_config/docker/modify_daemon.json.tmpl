@@ -1,0 +1,40 @@
+#!/bin/sh
+# Managed by chezmoi. Sets `registry-mirrors` in ~/.config/docker/daemon.json
+# for rootless Docker on Linux when `useChineseMirror` is true. Preserves any
+# other keys (e.g. `data-root`, `dns`, `experimental`, `features`) a user or
+# installer wrote to this file.
+#
+# Post-apply reminder: daemon.json changes only take effect after
+#   systemctl --user daemon-reload && systemctl --user restart docker
+# chezmoi does not auto-restart the daemon (would kill running containers).
+#
+# On macOS this file is meaningless (Docker Desktop and OrbStack do not read
+# it); the script below short-circuits before any template branching so no
+# file is created there.
+#
+# See docs/tools/containers.md for the per-install-variant config map and the
+# kubesre prefix-substitution strategy (complementary to registry-mirrors).
+
+set -eu
+
+input=$(cat)
+[ -z "$input" ] && input='{}'
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+{{ if and (eq .chezmoi.os "linux") .useChineseMirror -}}
+printf '%s' "$input" | jq '.["registry-mirrors"] = [
+  "https://docker.m.daocloud.io",
+  "https://docker.mirrors.ustc.edu.cn",
+  "https://docker.nju.edu.cn",
+  "https://mirror.iscas.ac.cn",
+  "https://mirror.baidubce.com",
+  "https://dockerhub.azk8s.cn",
+  "https://dockerproxy.com"
+]'
+{{- else -}}
+printf '%s' "$input" | jq 'del(.["registry-mirrors"]) | if . == {} then empty else . end'
+{{- end }}

@@ -990,6 +990,15 @@
       "provider": "claude",
       "last_updated": "2026-03-12T10:20:04Z"
     },
+    "e8260d7c-5bc5-469f-b55f-4d266be18768": {
+      "user_message_count": 4,
+      "agent_message_count": 42,
+      "start_timestamp": "2026-04-21T14:02:30+08:00",
+      "end_timestamp": "2026-04-21T14:02:30+08:00",
+      "markdown_size_bytes": 83814,
+      "provider": "cursoride",
+      "last_updated": "2026-04-21T06:35:15Z"
+    },
     "e8b2c7f6-52f8-44b9-8143-29e6e6d5581a": {
       "user_message_count": 2,
       "agent_message_count": 55,

@@ -112,6 +112,8 @@ To change options later: `chezmoi init --force`
 - `~/.cargo/config.toml` - Cargo registry mirror config (GFW)
 - `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
 - `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
+- `~/.docker/config.json` - Docker client `proxies.default` block (auto-injected from `$LOCAL_PROXY_URL` / `$LOCAL_PROXY_SOCKS_URL`; preserves `auths` / `credsStore` via chezmoi modify-script) ([docs](docs/tools/containers.md))
+- `~/.config/docker/daemon.json` - Rootless Docker `registry-mirrors` (DaoCloud / USTC / NJU / ...; Linux + `useChineseMirror` only) ([docs](docs/tools/containers.md#strategy-a-registry-mirrors-in-daemonjson))
 - `~/.config/alacritty/` - Alacritty terminal config (CSI-u keybindings for `Ctrl+Number` tmux window switching, `option_as_alt` for Meta keys)
 - `~/.config/ghostty/config` - Ghostty/cmux terminal config (`macos-option-as-alt` for tmux Meta keybindings, disabled ligatures, explicit `clipboard-write = allow` / `clipboard-read = ask` for OSC 52) ([docs](docs/tools/ghostty.md))
 - `~/.config/starship.toml` - Starship cross-shell prompt config
