@@ -70,6 +70,9 @@
     - role: python_uv_tools
       tags: [python_uv_tools]
 
+    - role: js_cli_tools
+      tags: [js_cli_tools]
+
     - role: rust_cargo_tools
       tags: [rust_cargo_tools]
 

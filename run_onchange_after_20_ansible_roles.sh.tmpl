@@ -22,6 +22,8 @@
 # security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
 # python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+# js_cli_tools tasks: {{ include "dot_ansible/roles/js_cli_tools/tasks/main.yml" | sha256sum }}
+# js_cli_tools defaults: {{ include "dot_ansible/roles/js_cli_tools/defaults/main.yml" | sha256sum }}
 # llm_tools tasks: {{ include "dot_ansible/roles/llm_tools/tasks/main.yml" | sha256sum }}
 # llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
 # rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
@@ -105,6 +107,10 @@ TAGS="${TAGS},bitwarden"
 {{ end -}}
 {{ if .installPythonUvTools -}}
 TAGS="${TAGS},python_uv_tools"
+{{ end -}}
+{{ $installJsCliTools := false }}{{ if hasKey . "installJsCliTools" }}{{ $installJsCliTools = .installJsCliTools }}{{ end -}}
+{{ if $installJsCliTools -}}
+TAGS="${TAGS},js_cli_tools"
 {{ end -}}
 {{ $installLlmTools := false }}{{ if hasKey . "installLlmTools" }}{{ $installLlmTools = .installLlmTools }}{{ end -}}
 {{ if $installLlmTools -}}

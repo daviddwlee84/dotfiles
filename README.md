@@ -179,6 +179,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 - **Alacritty**: GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS; desktop only)
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
 - **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp, trafilatura
+- **JS CLI tools (via npm)** (optional): readability-cli (`readable` — Mozilla Readability for `readnode` terminal web reader)
 - **NerdFonts**: Hack Nerd Font for terminal emulators
 
 ## Supported Platforms

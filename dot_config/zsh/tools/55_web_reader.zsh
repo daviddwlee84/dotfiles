@@ -60,7 +60,7 @@ readnode() {
     print -u2 "usage: readnode <url>"
     return 2
   fi
-  __zsh_reader_require readable "npm install -g readability-cli" || return
+  __zsh_reader_require readable "npm install -g readability-cli  (or enable the js_cli_tools ansible role)" || return
   __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
   local url; url="$(_norm_url "$raw")"
   try_direct_then_proxy readable "$url" | glow -

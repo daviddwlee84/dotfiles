@@ -1,0 +1,106 @@
+---
+# Install standalone JS/npm CLI utilities globally.
+# Mirrors the bitwarden role's npm install strategy: prefers `npm` on PATH,
+# falls back to `mise exec -- npm` when npm is only reachable via mise shims.
+
+- name: Detect whether npm is on PATH
+  ansible.builtin.command: npm --version
+  register: js_cli_npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Locate user-installed mise (js_cli_tools fallback)
+  when: js_cli_npm_check.rc != 0
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: js_cli_mise_user_bin
+
+- name: Set mise binary path (user install)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_user_bin.stat.exists | default(false)
+  ansible.builtin.set_fact:
+    js_cli_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+
+- name: Detect system-installed mise (js_cli_tools fallback)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+  ansible.builtin.command: mise --version
+  register: js_cli_mise_system_check
+  changed_when: false
+  failed_when: false
+
+- name: Set mise binary path (system install)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+    - js_cli_mise_system_check.rc == 0
+  ansible.builtin.set_fact:
+    js_cli_mise_bin: mise
+
+- name: Warn when neither npm nor mise is available
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+  ansible.builtin.debug:
+    msg: >-
+      js_cli_tools: neither npm nor mise found on PATH -- skipping
+      {{ js_cli_tools | map(attribute='name') | list | join(', ') }}.
+      Ensure Node.js is available (e.g. via the lazyvim_deps role) and re-run.
+
+# --- Check which tools are already installed (idempotency) ---
+- name: Check whether each js_cli_tool binary is present
+  ansible.builtin.command: command -v {{ item.binary }}
+  register: js_cli_tool_presence
+  changed_when: false
+  failed_when: false
+  loop: "{{ js_cli_tools }}"
+  loop_control:
+    label: "{{ item.binary }}"
+
+- name: Build list of tools still missing
+  ansible.builtin.set_fact:
+    js_cli_tools_to_install: >-
+      {{
+        js_cli_tool_presence.results
+        | selectattr('rc', 'ne', 0)
+        | map(attribute='item')
+        | list
+      }}
+
+# --- Install via npm (preferred) ---
+- name: Install missing js_cli_tools via npm
+  when:
+    - js_cli_npm_check.rc == 0
+    - js_cli_tools_to_install | length > 0
+  community.general.npm:
+    name: "{{ item.name }}"
+    global: true
+    state: present
+  register: js_cli_npm_install
+  until: js_cli_npm_install is succeeded
+  retries: 3
+  delay: 5
+  loop: "{{ js_cli_tools_to_install }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# --- Install via mise npm fallback ---
+- name: Install missing js_cli_tools via mise npm fallback
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is defined
+    - js_cli_tools_to_install | length > 0
+  ansible.builtin.shell: |
+    {{ js_cli_mise_bin }} exec -- npm install -g {{ item.name }}
+  args:
+    executable: /bin/bash
+  register: js_cli_mise_npm_install
+  until: js_cli_mise_npm_install is succeeded
+  retries: 3
+  delay: 5
+  changed_when: true
+  loop: "{{ js_cli_tools_to_install }}"
+  loop_control:
+    label: "{{ item.name }}"

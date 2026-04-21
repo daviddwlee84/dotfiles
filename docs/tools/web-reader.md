@@ -150,7 +150,7 @@ Pairs naturally with `LOCAL_PROXY_URL` + `LOCAL_PROXY_SOCKS_URL` for determinist
 | `glow` | `brew install glow` | GitHub binary | `devtools` role |
 | `pandoc` | `brew install pandoc` | `apt install pandoc` | `devtools` role |
 | `trafilatura` | `uv tool install trafilatura` | `uv tool install trafilatura` | `python_uv_tools` role (enabled via `chezmoi init --force`) |
-| `readable` (readability-cli) | `npm install -g readability-cli` | `npm install -g readability-cli` | user-opt-in (not auto-installed) |
+| `readable` (readability-cli) | `npm install -g readability-cli` | `npm install -g readability-cli` | `js_cli_tools` role (enabled via `installJsCliTools=true`, default on) |
 | `curl`, `nc` | preinstalled | preinstalled | — |
 
 Each reader checks its dependencies at call time and prints a one-line install hint if something is missing, so `readnode` on a fresh machine will tell you exactly what to run.

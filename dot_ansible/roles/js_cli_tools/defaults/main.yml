@@ -1,0 +1,13 @@
+---
+# Standalone JS/npm CLI utilities installed globally via npm.
+# Tools that belong to a feature area (@bitwarden/cli, Copilot/Gemini CLI,
+# tree-sitter-cli) are installed by their respective roles, not here -- this
+# role is only for tools that don't have a natural home elsewhere.
+#
+# Each entry:
+#   - name:   npm package name (can be scoped: "@scope/pkg")
+#   - binary: executable name to check for idempotency
+
+js_cli_tools:
+  - name: readability-cli
+    binary: readable

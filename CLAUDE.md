@@ -157,6 +157,7 @@ ansible-playbook playbooks/macos.yml --check
 | `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
 | `security_tools` | pre-commit, gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, sqlit-tui, tmuxp, etc.) |
+| `js_cli_tools` | Standalone JS/npm CLI utilities (readability-cli for `readnode` terminal web reader) |
 | `llm_tools` | Local LLM tools: Ollama, LiteLLM, llmfit, models |
 | `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
 | `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, tmuxinator, toolkami) |
@@ -177,7 +178,7 @@ ansible-playbook playbooks/macos.yml --check
 - **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
 - **Desktop** (macos, ubuntu_desktop): nerdfonts
 - **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, llm_tools, input_method (desktop only), networking_tools
+- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, js_cli_tools, llm_tools, input_method (desktop only), networking_tools
 
 Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
 

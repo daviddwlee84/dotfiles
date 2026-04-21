@@ -17,6 +17,8 @@ installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding 
 installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion" false }}
 # 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
+# 是否安裝 standalone JS/npm CLI utilities (readability-cli for `readnode`, etc.)
+installJsCliTools = {{ promptBoolOnce . "installJsCliTools" "Install standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.)" true }}
 # 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
 installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
 # 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)

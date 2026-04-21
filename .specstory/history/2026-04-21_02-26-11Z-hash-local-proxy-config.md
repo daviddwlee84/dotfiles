@@ -5040,3 +5040,4216 @@ Done. Two commits on `main`:
 **2. Split HTTP / SOCKS5:** new `LOCAL_PROXY_SOCKS_URL` env var. When set, `ALL_PROXY` / `all_proxy` point at the SOCKS endpoint while `http_proxy` / `https_proxy` keep the HTTP URL. Covers Clash configs that use separate `port:` + `socks-port:` instead of `mixed-port:`. Falls back to the HTTP URL when unset, so your current mixed-port 7891 setup keeps working unchanged. `proxy-status` now shows both URLs when they differ.
 
 **3. Docs:** new `docs/tools/web-reader.md` — a standalone guide covering the broader "read web as markdown in the terminal" topic: tool landscape (Jina AI Reader, trafilatura, Mozilla Readability, pandoc; also mentions monolith, w3m/lynx, single-file-cli as alternatives), usage recipes (save to file, pipe to LLM), proxy behavior, split-port config, auto-activate, and install matrix. Cross-linked from `docs/zsh/aliases.md` and `README.md`.
+
+---
+
+_**User (2026-04-21 02:59:46Z)**_
+
+readability-cli 似乎沒有自動安裝 是不是能加入到什麼 js_bun_node_tools 之類的ansible roles裡面？ 順便幫我評估一下是不是一些工具能放進來之類的 然後到底用npm install還是弄成bun tool 之類的哪個更好
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-21 02:59:54Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 02:59:54Z)**_
+
+Good question. Let me first survey what's already installed via npm/bun across the repo before recommending a new role.
+
+_**Agent (claude-opus-4-7 2026-04-21 03:00:54Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="Agent"><details>
+<summary>Tool use: **Agent**</summary>
+Survey npm/bun/node tool installs across repo
+
+```text
+Perfect. Now I have enough information to compile the inventory. Let me create a comprehensive report:
+
+## Node/npm/bun CLI Tools Inventory
+
+### 1. Ansible Roles Installing npm-based Tools
+
+**coding_agents** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml`):
+- **Line 139-146**: GitHub Copilot CLI via `community.general.npm` module
+  - Tool: `@githubnext/github-copilot-cli`
+  - Method: `npm install -g` (via Ansible module)
+  - Prerequisites: npm must be available
+  - Wrapper: idempotency checks with `which npm` (line 127)
+
+- **Line 224-233**: Gemini CLI npm fallback (macOS)
+  - Tool: `@google/gemini-cli`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available; Homebrew install attempted first (line 207-213)
+  - Conditional: Lines 225-229
+
+- **Line 244-252**: Gemini CLI (Linux)
+  - Tool: `@google/gemini-cli`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available, Linux only
+
+- **Line 1093-1101**: OpenChamber
+  - Tool: `@openchamber/web`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available
+
+**bitwarden** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bitwarden/tasks/main.yml`):
+- **Line 78-90**: Bitwarden CLI via npm
+  - Tool: `@bitwarden/cli` (from defaults: `/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bitwarden/defaults/main.yml` line 3)
+  - Method: `community.general.npm` module with retry logic (3x, 5s delay)
+  - Prerequisites: npm check (line 18-25), fallback to mise npm exec (line 92-106)
+  - Wrapper: Checks `npm --version` (line 22)
+
+- **Line 92-106**: Bitwarden CLI via mise npm fallback
+  - Tool: `@bitwarden/cli`
+  - Method: Shell exec via `mise exec -- npm install -g`
+  - Fallback: When npm not in PATH but mise available
+
+**lazyvim_deps** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml`):
+- **Line 258-269**: tree-sitter-cli via mise npm
+  - Tool: `tree-sitter-cli`
+  - Method: `{{ mise_bin }} exec -- npm install -g tree-sitter-cli`
+  - Prerequisite: mise binary available, architecture check (armv7l/armv6l skipped)
+  - Fallback: cargo build if npm fails (line 286-303)
+
+---
+
+### 2. npm/bun Tool References Outside Ansible
+
+**Shell configuration** (`dot_config/zsh/tools/55_web_reader.zsh`):
+- **Line 63**: `readability-cli` npm install hint
+  - Context: `__zsh_reader_require readable "npm install -g readability-cli"`
+  - Not auto-installed; user hint only
+
+**Shell configuration** (`dot_config/zsh/tools/07_bunx_cli.zsh`):
+- **Line 5**: `ccusage` alias via bunx
+  - Command: `alias ccusage="bunx ccusage"`
+  - Tool: `ccusage` (npm package run via bun)
+  - Method: `bunx` (Bun's package runner)
+
+**Documentation** (`docs/tools/web-reader.md`):
+- **Line 153**: `readability-cli` installation note
+  - Context: `npm install -g readability-cli`
+  - Not auto-installed; user-opt-in only
+
+**Mise configuration** (`dot_config/mise/config.toml.tmpl`):
+- **Line 12**: Node.js LTS
+  - Tool: `node = "lts"`
+- **Line 14**: Bun latest
+  - Tool: `bun = "latest"`
+  - Context: "Bun for bunx CLI tools"
+
+---
+
+### 3. Bun Installation
+
+**Status**: Installed via mise (not explicit ansible task).
+
+- **Mise config** (`dot_config/mise/config.toml.tmpl` line 14): `bun = "latest"`
+- **Install mechanism**: Via `lazyvim_deps` role's `mise install --yes` command
+  - macOS: `mise` installed via Homebrew → calls mise tools (no explicit node/bun ansible task)
+  - Linux: `mise install --yes` in `lazyvim_deps` role (line 54-62)
+  - **Architecture gating**: Bun skipped on armv7l/armv6l (line 40, comment line 40-43)
+
+---
+
+### 4. Node.js / mise Installation Coverage
+
+**macOS**:
+- **Installed via**: Homebrew `node` package (lazyvim_deps role line 12)
+- **Default**: Always installed (non-conditional)
+- **Mise**: Not explicitly managed via ansible on macOS
+
+**Linux (Debian/Ubuntu)**:
+- **Installed via**: Mise runtime manager
+  - Bootstrap script sets up mise (`run_once_before_00_bootstrap.sh.tmpl` line 147+)
+  - `lazyvim_deps` role runs `mise install --yes` (line 54-62)
+  - **Node version**: `@lts` by default; `@20` forced on armv7l/armv6l (line 49)
+- **Default**: Always installed (non-conditional, though can fail gracefully line 62: `failed_when: false`)
+
+---
+
+### 5. Chezmoi Init Prompts for JS/Coding Tools
+
+File: `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl`
+
+- **Line 14-15**: `installCodingAgents` prompt
+  - Text: "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)"
+  - Default: `true`
+  - Covers: Claude Code, OpenCode, Cursor CLI, GitHub Copilot CLI, Gemini CLI, RTK, SpecStory, CodexBar, td, sidecar
+
+- **Line 16-17**: `installBitwarden` prompt
+  - Text: "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion"
+  - Default: `false`
+  - Covers: `@bitwarden/cli` via npm
+
+---
+
+### 6. Documentation on npm vs bun
+
+**None found.** No docs compare npm vs bun for CLI tool installation or discuss installation strategy differences.
+
+The only mention is in `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md` line 153, which notes `readability-cli` can be installed manually via `npm install -g readability-cli` (not auto-installed; not a bun alternative suggested).
+
+---
+
+## Summary
+
+**Current state**: 
+- **6 npm tools** installed via Ansible (`@bitwarden/cli`, `@githubnext/github-copilot-cli`, `@google/gemini-cli`, `@openchamber/web`, `tree-sitter-cli`, implicit `node` for LazyVim)
+- **1 bun tool** (ccusage via `bunx`) referenced in zsh config only, no ansible installation
+- **1 optional npm tool** (readability-cli) documented but not auto-installed
+- **All installations use `npm install -g`** via Ansible `npm` module or `mise exec -- npm`
+- **Bun installed via mise** (not explicit ansible), always on macOS/Linux except armv7l
+- **No consolidation** — tools scattered across `coding_agents`, `bitwarden`, `lazyvim_deps` roles
+- **No bun install -g / bun x adoption** despite bun available; only ccusage alias exists for bunx
+```
+</details></tool-use>
+
+_**Agent - sidechain (2026-04-21 03:00:09Z)**_
+
+I need a complete inventory of how Node/npm/bun-based CLI tools are currently installed in this chezmoi dotfiles repo, so I can evaluate whether to consolidate them into a new `js_bun_node_tools` ansible role and whether to use `npm install -g` vs `bun add -g` / `bun x`.
+
+Investigate and report back (concise, under 500 words):
+
+1. **Which ansible roles currently install npm-based tools?** Search `dot_ansible/roles/*/tasks/main.yml` for usage of `npm install`, `npm_package`, `community.general.npm`, `bun add`, `bun install`, or any npm/bun invocation. For each hit: role name, line number, tool(s) being installed, install method (`npm install -g` via command, dedicated ansible module, etc.), and any wrapping / prerequisite checks (node via mise, etc.).
+
+2. **What npm/bun tools are referenced elsewhere in the repo?** Grep shell configs, Brewfiles, docs for:
+   - `npm install -g`, `npm i -g`, `npm install --global`
+   - `bun add -g`, `bun install -g`, `bunx`, `bun x`
+   - Specific known tools: `claude-code`, `@anthropic-ai/claude-code`, `bitwarden-cli`, `@openai/codex`, `@google/gemini-cli`, `opencode`, `readability-cli`, `cursor-cli`, `copilot-cli`, `@postlight/parser`
+   Report each occurrence with file path + line number + one-line context.
+
+3. **Is bun installed? Via what?** Check `dot_ansible/roles/*/tasks/main.yml` and `run_once_before_*` templates for bun installation. Report how (official installer vs mise vs brew), and whether it's always installed or conditional.
+
+4. **Is mise + node always installed?** Check the `lazyvim_deps` role (or wherever node is installed). Is node available by default on both macOS and Linux for all profiles, or gated behind a flag?
+
+5. **chezmoi init prompts for JS/coding-agent stuff?** Read `.chezmoi.toml.tmpl` (or equivalent) and list any prompts that gate installation of JS tools (e.g. `installCodingAgents`, `installBitwarden`).
+
+6. **Existing doc/comparison**: Is there any note anywhere in `docs/` comparing npm vs bun for CLI tools, or discussing why a certain tool was installed one way vs another?
+
+Report as structured sections, not prose. Include exact file:line references so I can verify.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:11Z)**_
+
+I'll systematically investigate the chezmoi dotfiles repo to inventory Node/npm/bun CLI tools and installation methods.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:11Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ pattern `dot_ansible/roles/*/tasks/main.yml`
+
+```text
+dot_ansible/roles/docker/tasks/main.yml
+dot_ansible/roles/rust_cargo_tools/tasks/main.yml
+dot_ansible/roles/python_uv_tools/tasks/main.yml
+dot_ansible/roles/zsh/tasks/main.yml
+dot_ansible/roles/homebrew/tasks/main.yml
+dot_ansible/roles/bitwarden/tasks/main.yml
+dot_ansible/roles/alacritty/tasks/main.yml
+dot_ansible/roles/base/tasks/main.yml
+dot_ansible/roles/coding_agents/tasks/main.yml
+dot_ansible/roles/input_method/tasks/main.yml
+dot_ansible/roles/lazyvim_deps/tasks/main.yml
+dot_ansible/roles/llm_tools/tasks/main.yml
+dot_ansible/roles/neovim/tasks/main.yml
+dot_ansible/roles/nerdfonts/tasks/main.yml
+dot_ansible/roles/networking_tools/tasks/main.yml
+dot_ansible/roles/ruby_gem_tools/tasks/main.yml
+dot_ansible/roles/security_tools/tasks/main.yml
+dot_ansible/roles/starship/tasks/main.yml
+dot_ansible/roles/devtools/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:11Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ pattern `run_once_before_*`
+
+```text
+run_once_before_02_fix_intel_homebrew.sh.tmpl
+run_once_before_00_bootstrap.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:12Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ pattern `.chezmoi*.tmpl`
+
+```text
+.chezmoi.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:12Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ pattern `docs/*`
+
+```text
+docs/ansible.md
+docs/cheatsheet.md
+docs/keyboard-shortcuts.md
+docs/locale.md
+docs/linux-package-sources.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:14Z)**_
+
+Now let me search for npm/bun-related configurations in the relevant roles and files:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:15Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./dot_ansible/roles` pattern `npm install|npm_package|community\.general\.npm|bun add|bun install`
+
+```text
+Found 5 files
+dot_ansible/roles/devtools/tasks/main.yml
+dot_ansible/roles/lazyvim_deps/tasks/main.yml
+dot_ansible/roles/coding_agents/tasks/main.yml
+dot_ansible/roles/bitwarden/tasks/main.yml
+dot_ansible/roles/bitwarden/defaults/main.yml
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:16Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./` pattern `npm i -g|npm install -g|npm install --global|bun add -g|bun install -g|bunx|bun x`
+
+```text
+Found 83 files
+.specstory/history/2026-04-21_02-26-11Z-hash-local-proxy-config.md
+.specstory/history/2026-04-21_02-51-02Z.md
+docs/zsh/aliases.md
+docs/tools/web-reader.md
+dot_ansible/roles/devtools/tasks/main.yml
+dot_config/zsh/tools/55_web_reader.zsh
+.claude/plans/local-spicy-panda.md
+.specstory/history/2026-04-21_01-03-47Z-clipboard-sync-osc52-settings.md
+.specstory/history/2026-04-20_09-48-14Z-bats-bash-bash-exit.md
+dot_ansible/roles/lazyvim_deps/tasks/main.yml
+.specstory/history/2026-04-18_17-47-40Z-alacritty-ubuntu-desktop-profile.md
+.specstory/history/2026-04-18_10-14-43Z-tv-channel-local-network.md
+.specstory/history/2026-04-17_08-41-06Z.md
+.specstory/history/2026-04-15_14-00-20Z-keithkslee-at-raspberrypi-sh.md
+.specstory/history/2026-02-11_10-00-56Z-chezmoi-create-ssh-config.md
+.specstory/history/2026-02-09_11-20-35Z-wrapper-terminal-copy-paste.md
+.specstory/history/2026-02-10_07-55-02Z-coding-agents-https-github.md
+.specstory/history/2026-02-09_07-22-32Z-at-dot-config-zsh.md
+dot_ansible/roles/bitwarden/tasks/main.yml
+.specstory/history/2026-04-16_02-30-35Z.md
+.specstory/history/2026-04-16_02-07-54Z-git-add-a-git.md
+.specstory/history/2026-04-16_01-59-30Z-neovim-zsh-command-not.md
+dot_config/mise/config.toml.tmpl
+.specstory/history/2026-04-15_02-20-36Z-infocmp-x-xterm-ghostty.md
+.specstory/history/2026-02-12_06-45-14Z-proud-otter.md
+.specstory/history/2026-02-12_06-45-19Z-silent-cabin.md
+.specstory/history/2026-02-13_02-08-25Z-neon-lagoon.md
+.specstory/history/2026-02-13_02-08-36Z-sunny-wizard.md
+.specstory/history/2026-02-13_07-22-37Z-crisp-mountain.md
+.specstory/history/2026-03-10_02-05-39Z-lucky-squid.md
+.specstory/history/2026-04-08_01-51-12Z-try-graduate-ctrl-g.md
+.specstory/history/2026-02-13_13-53-04Z-sidecar-td-bash-which.md
+.specstory/history/2026-02-13_13-50-00Z-tailscale-cli-desktop-app.md
+.specstory/history/2026-02-06_14-00-45Z-chezmoi-apply-codex-gemini.md
+.specstory/history/2026-02-07_12-08-36Z-intel-mac.md
+.specstory/history/2026-04-02_05-45-13Z-zoxide-fzf-cd-fuzzy.md
+.specstory/history/2026-04-03_08-10-31Z-ll-subdir-git.md
+.specstory/history/2026-04-03_08-43-02Z-lazygit-alias-lg-ls.md
+.specstory/history/2026-04-01_09-08-57Z-glow-https-github-com.md
+.specstory/history/2026-04-01_05-58-32Z-marimo-shell-completion-eval.md
+.specstory/history/2026-03-31_06-53-34Z-git-diff-tool-docs.md
+.specstory/history/2026-03-16_08-57-37Z.md
+.specstory/history/2026-03-24_01-50-29Z-spawn-a-subagent-to.md
+.specstory/history/2026-03-30_03-20-14Z-utility-function-bash-hash.md
+.specstory/history/2026-03-30_11-20-14+0800-utility-function-bash-hash.md
+.specstory/history/2026-03-29_09-14-12Z.md
+.specstory/history/2026-03-16_08-57-37Z-command-name-model-command.md
+.specstory/history/2026-02-09_11-57-46Z-help-me-check-out.md
+.specstory/history/2026-02-04_06-04-52Z-local-share-chezmoi-dot.md
+.specstory/history/2026-03-12_09-34-05Z-zsh-config-direnv-activate.md
+.specstory/history/2026-02-12_05-39-30Z-command-name-model-command.md
+.specstory/history/2026-02-05_15-20-39Z-now-use-mise-install.md
+.specstory/history/2026-02-04_16-37-19Z-implement-the-following-plan.md
+.specstory/history/2026-02-03_09-44-45Z-init-i-am-using.md
+.specstory/history/2026-02-05_14-03-50Z-run-chezmoi-update-and.md
+.specstory/history/2026-02-05_01-36-34Z-i-want-to-use.md
+.specstory/history/2026-02-13_06-58-20Z-implement-the-following-plan.md
+.specstory/history/2026-02-13_06-32-24Z-implement-the-following-plan.md
+.specstory/history/2026-02-13_06-19-44Z-command-name-model-command.md
+.specstory/history/2026-02-04_15-04-28Z-now-we-would-like.md
+.specstory/history/2026-02-04_16-21-34Z-command-name-clear-command.md
+.specstory/history/2026-02-05_05-27-37Z-now-lets-setup-docker.md
+.specstory/history/2026-02-05_11-52-19Z-chezmoi-update-already-up.md
+.specstory/history/2026-02-09_02-01-39Z-is-it-possible-to.md
+.specstory/history/2026-02-09_09-39-41Z-tldr-config-toml-dot.md
+.specstory/history/2026-02-09_11-16-11Z-bitwarden-cli-npm-install.md
+.specstory/history/2026-02-11_08-47-34Z-task-bitwarden-check-if.md
+.specstory/history/2026-02-12_02-51-02Z-coding-agents-sidecar-td.md
+.specstory/history/2026-02-12_09-14-40Z-duckdb-cli-document-and.md
+.specstory/history/2026-03-10_01-36-30Z-add-this-to-make.md
+.specstory/history/2026-02-04_16-58-01Z-help-me-setup-rust.md
+.specstory/history/2026-02-12_16-48-56Z-command-name-clear-command.md
+.specstory/history/2026-02-12_14-32-15Z-i-want-to-add.md
+.specstory/history/2026-02-11_06-50-07Z-command-name-extra-usage.md
+.specstory/history/2026-02-09_14-02-40Z-command-name-extra-usage.md
+.specstory/history/2026-02-07_05-14-32Z-implement-the-following-plan.md
+.specstory/history/2026-02-07_05-09-19Z-please-fix-two-error.md
+.specstory/history/2026-02-06_02-13-41Z-for-non-root-user.md
+dot_config/zsh/tools/07_bunx_cli.zsh
+.specstory/history/2026-02-05_03-04-09Z-why-we-have-this.md
+.specstory/history/2026-02-04_17-06-49Z-implement-the-following-plan.md
+.specstory/history/2026-02-04_13-41-32Z-i-found-my-fzf.md
+.specstory/history/2026-02-04_12-18-56Z-eexport-github-username-daviddwlee84.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:16Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoi.toml.tmpl`
+
+```text
+1	# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+2	
+3	[data]
+4	# 只在 init 才需要問一次：你之後都讀這個值
+5	# TODO: not all the things we want to change all the time we chezmoi init
+6	{{- $profile := promptStringOnce . "profile" "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)" "macos" }}
+7	profile = {{ $profile | quote }}
+8	email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee84@gmail.com" | quote }}
+9	name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
+10	# 是否在中國大陸 GFW 內，需要使用鏡像源
+11	useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (behind GFW) and need to use mirrors" false }}
+12	# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+13	gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)" false }}
+14	# 是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)
+15	installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
+16	# 是否安裝 Bitwarden CLI 並啟用 SSH Agent 自動偵測 + Zsh completion
+17	installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion" false }}
+18	# 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
+19	installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
+20	# 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
+21	installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
+22	# 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
+23	{{ if or (eq $profile "macos") (eq $profile "macos_intel") -}}
+24	installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}
+25	{{ else -}}
+26	installAiDesktopApps = false
+27	{{ end -}}
+28	# 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
+29	installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)" false }}
+30	# 是否安裝繁體中文輸入法 (McBopomofo + RIME)
+31	installInputMethod = {{ promptBoolOnce . "installInputMethod" "Install Traditional Chinese input methods (McBopomofo, RIME)" false }}
+32	# 是否安裝網路診斷工具 (nmap, mtr, httpie, gping, trippy, etc.)
+33	installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
+34	# 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
+35	noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
+36	# 在 chezmoi apply 之前備份現有的 dotfiles
+37	backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
+38	# 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
+39	allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}
+40	
+41	# https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
+42	[diff]
+43	    exclude = ["scripts"]
+44	{{- if lookPath "delta" }}
+45	    # Side-by-side diff: left = current (before apply), right = target (after apply)
+46	    pager = "delta --side-by-side --line-numbers --navigate --paging=always --file-style=yellow --file-decoration-style='yellow ul' --hunk-header-decoration-style='blue box'"
+47	{{- end }}
+48	[status]
+49	    exclude = ["scripts"]
+50
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:17Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/coding_agents/tasks/main.yml`
+
+```text
+1	---
+2	# Coding Agents Installation
+3	# Installs various AI coding assistants and companion tools
+4	# All installations include idempotency checks to avoid slow reinstalls
+5	
+6	# === Notification Tools (from claude_deps) ===
+7	
+8	# macOS - terminal-notifier
+9	- name: Install terminal-notifier (macOS)
+10	  when: ansible_facts["os_family"] == "Darwin"
+11	  community.general.homebrew:
+12	    name: terminal-notifier
+13	    state: present
+14	
+15	# Linux - libnotify-bin (provides notify-send)
+16	- name: Install libnotify-bin (Debian/Ubuntu)
+17	  when: ansible_facts["os_family"] == "Debian"
+18	  become: true
+19	  tags: [sudo]
+20	  ansible.builtin.apt:
+21	    name: libnotify-bin
+22	    state: present
+23	
+24	# === Claude Code ===
+25	
+26	- name: Check if Claude Code is installed (macOS)
+27	  when: ansible_facts["os_family"] == "Darwin"
+28	  ansible.builtin.command: which claude
+29	  register: claude_macos_check
+30	  changed_when: false
+31	  failed_when: false
+32	
+33	- name: Install Claude Code (macOS)
+34	  when:
+35	    - ansible_facts["os_family"] == "Darwin"
+36	    - claude_macos_check.rc != 0
+37	  community.general.homebrew_cask:
+38	    name: claude-code
+39	    state: present
+40	
+41	- name: Check if Claude Code is installed (Linux)
+42	  when: ansible_facts["os_family"] == "Debian"
+43	  ansible.builtin.command: which claude
+44	  register: claude_check
+45	  changed_when: false
+46	  failed_when: false
+47	
+48	- name: Skip Claude Code on unsupported architecture (Linux)
+49	  when:
+50	    - ansible_facts["os_family"] == "Debian"
+51	    - claude_check.rc != 0
+52	    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+53	  ansible.builtin.debug:
+54	    msg: "Claude Code skipped: install.sh downloads arm64/amd64 binaries; no build for {{ target_architecture }}"
+55	
+56	- name: Install Claude Code (Linux)
+57	  when:
+58	    - ansible_facts["os_family"] == "Debian"
+59	    - claude_check.rc != 0
+60	    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+61	  ansible.builtin.shell: |
+62	    curl -fsSL https://claude.ai/install.sh | bash
+63	  args:
+64	    creates: "{{ ansible_facts['env']['HOME'] }}/.claude/local/bin/claude"
+65	
+66	# === OpenCode ===
+67	
+68	- name: Check if OpenCode is installed (macOS)
+69	  when: ansible_facts["os_family"] == "Darwin"
+70	  ansible.builtin.command: which opencode
+71	  register: opencode_macos_check
+72	  changed_when: false
+73	  failed_when: false
+74	
+75	- name: Tap anomalyco/tap for OpenCode (macOS)
+76	  when:
+77	    - ansible_facts["os_family"] == "Darwin"
+78	    - opencode_macos_check.rc != 0
+79	  community.general.homebrew_tap:
+80	    name: anomalyco/tap
+81	    state: present
+82	
+83	- name: Install OpenCode (macOS)
+84	  when:
+85	    - ansible_facts["os_family"] == "Darwin"
+86	    - opencode_macos_check.rc != 0
+87	  community.general.homebrew:
+88	    name: opencode
+89	    state: present
+90	
+91	- name: Check if OpenCode is installed (Linux)
+92	  when: ansible_facts["os_family"] == "Debian"
+93	  ansible.builtin.command: which opencode
+94	  register: opencode_check
+95	  changed_when: false
+96	  failed_when: false
+97	
+98	- name: Install OpenCode (Linux)
+99	  when:
+100	    - ansible_facts["os_family"] == "Debian"
+101	    - opencode_check.rc != 0
+102	  ansible.builtin.shell: |
+103	    curl -fsSL https://opencode.ai/install | bash
+104	  args:
+105	    creates: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
+106	
+107	# === Cursor CLI ===
+108	# Use official install script instead of Homebrew cask (cursor-cli cask has code signing issues on macOS)
+109	
+110	- name: Check if Cursor CLI is installed
+111	  ansible.builtin.command: which cursor-agent
+112	  register: cursor_check
+113	  changed_when: false
+114	  failed_when: false
+115	
+116	- name: Install Cursor CLI
+117	  when: cursor_check.rc != 0
+118	  ansible.builtin.shell: |
+119	    curl -fsSL https://cursor.com/install | bash
+120	  args:
+121	    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/cursor-agent"
+122	  ignore_errors: true
+123	
+124	# === GitHub Copilot CLI ===
+125	
+126	- name: Check if npm is available
+127	  ansible.builtin.command: which npm
+128	  register: npm_check
+129	  changed_when: false
+130	  failed_when: false
+131	
+132	- name: Check if GitHub Copilot CLI is installed
+133	  when: npm_check.rc == 0
+134	  ansible.builtin.command: which github-copilot-cli
+135	  register: copilot_check
+136	  changed_when: false
+137	  failed_when: false
+138	
+139	- name: Install GitHub Copilot CLI (npm)
+140	  when:
+141	    - npm_check.rc == 0
+142	    - copilot_check.rc != 0
+143	  community.general.npm:
+144	    name: "@githubnext/github-copilot-cli"
+145	    global: true
+146	    state: present
+147	  ignore_errors: true
+148	
+149	# === OpenAI Codex CLI ===
+150	
+151	- name: Check if OpenAI Codex CLI is installed via Homebrew cask (macOS)
+152	  when: ansible_facts["os_family"] == "Darwin"
+153	  ansible.builtin.command: brew list --cask codex
+154	  register: codex_macos_brew_check
+155	  changed_when: false
+156	  failed_when: false
+157	
+158	- name: Install OpenAI Codex CLI (Homebrew cask - macOS)
+159	  when:
+160	    - ansible_facts["os_family"] == "Darwin"
+161	    - codex_macos_brew_check.rc != 0
+162	  community.general.homebrew_cask:
+163	    name: codex
+164	    state: present
+165	
+166	- name: Get Homebrew prefix (macOS)
+167	  when: ansible_facts["os_family"] == "Darwin"
+168	  ansible.builtin.command: brew --prefix
+169	  register: codex_macos_brew_prefix
+170	  changed_when: false
+171	
+172	- name: Verify OpenAI Codex CLI binary is available from Homebrew path (macOS)
+173	  when: ansible_facts["os_family"] == "Darwin"
+174	  ansible.builtin.stat:
+175	    path: "{{ codex_macos_brew_prefix.stdout }}/bin/codex"
+176	  register: codex_macos_bin_stat
+177	  failed_when: not codex_macos_bin_stat.stat.exists
+178	
+179	- name: Check if OpenAI Codex CLI is installed via npm (Linux)
+180	  when:
+181	    - ansible_facts["os_family"] == "Debian"
+182	    - npm_check.rc == 0
+183	  ansible.builtin.command: npm list -g --depth=0 @openai/codex
+184	  register: codex_linux_npm_check
+185	  changed_when: false
+186	  failed_when: false
+187	
+188	- name: Install OpenAI Codex CLI (npm - Linux fallback)
+189	  when:
+190	    - ansible_facts["os_family"] == "Debian"
+191	    - npm_check.rc == 0
+192	    - codex_linux_npm_check.rc != 0
+193	  community.general.npm:
+194	    name: "@openai/codex"
+195	    global: true
+196	    state: present
+197	
+198	# === Gemini CLI ===
+199	
+200	- name: Check if Gemini CLI is installed (macOS)
+201	  when: ansible_facts["os_family"] == "Darwin"
+202	  ansible.builtin.command: which gemini
+203	  register: gemini_macos_check
+204	  changed_when: false
+205	  failed_when: false
+206	
+207	- name: Install Gemini CLI (macOS)
+208	  when:
+209	    - ansible_facts["os_family"] == "Darwin"
+210	    - gemini_macos_check.rc != 0
+211	  community.general.homebrew:
+212	    name: gemini-cli
+213	    state: present
+214	
+215	- name: Re-check Gemini CLI after Homebrew install (macOS)
+216	  when:
+217	    - ansible_facts["os_family"] == "Darwin"
+218	    - gemini_macos_check.rc != 0
+219	  ansible.builtin.command: which gemini
+220	  register: gemini_macos_postbrew_check
+221	  changed_when: false
+222	  failed_when: false
+223	
+224	- name: Install Gemini CLI via npm fallback (macOS)
+225	  when:
+226	    - ansible_facts["os_family"] == "Darwin"
+227	    - gemini_macos_check.rc != 0
+228	    - gemini_macos_postbrew_check.rc != 0
+229	    - npm_check.rc == 0
+230	  community.general.npm:
+231	    name: "@google/gemini-cli"
+232	    global: true
+233	    state: present
+234	
+235	- name: Check if Gemini CLI is installed (Linux)
+236	  when:
+237	    - ansible_facts["os_family"] == "Debian"
+238	    - npm_check.rc == 0
+239	  ansible.builtin.command: which gemini
+240	  register: gemini_check
+241	  changed_when: false
+242	  failed_when: false
+243	
+244	- name: Install Gemini CLI (npm - Linux)
+245	  when:
+246	    - ansible_facts["os_family"] == "Debian"
+247	    - npm_check.rc == 0
+248	    - gemini_check.rc != 0
+249	  community.general.npm:
+250	    name: "@google/gemini-cli"
+251	    global: true
+252	    state: present
+253	  ignore_errors: true
+254	
+255	# === RTK ===
+256	
+257	- name: Check if RTK is installed (macOS)
+258	  when: ansible_facts["os_family"] == "Darwin"
+259	  ansible.builtin.command: which rtk
+260	  register: rtk_macos_check
+261	  changed_when: false
+262	  failed_when: false
+263	
+264	- name: Install RTK (macOS)
+265	  when:
+266	    - ansible_facts["os_family"] == "Darwin"
+267	    - rtk_macos_check.rc != 0
+268	  community.general.homebrew:
+269	    name: rtk
+270	    state: present
+271	
+272	- name: Check if RTK is installed (Linux)
+273	  when: ansible_facts["os_family"] == "Debian"
+274	  ansible.builtin.command: which rtk
+275	  register: rtk_check
+276	  changed_when: false
+277	  failed_when: false
+278	  environment:
+279	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+280	
+281	- name: Ensure ~/.local/bin exists (RTK)
+282	  when:
+283	    - ansible_facts["os_family"] == "Debian"
+284	    - rtk_check.rc != 0
+285	  ansible.builtin.file:
+286	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+287	    state: directory
+288	    mode: "0755"
+289	
+290	- name: Install RTK (Linux)
+291	  when:
+292	    - ansible_facts["os_family"] == "Debian"
+293	    - rtk_check.rc != 0
+294	  ansible.builtin.shell: |
+295	    curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+296	  args:
+297	    executable: /bin/bash
+298	    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/rtk"
+299	  environment:
+300	    RTK_INSTALL_DIR: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+301	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+302	  failed_when: false
+303	  register: rtk_install_result
+304	
+305	- name: Warn RTK installation failed (Linux)
+306	  when:
+307	    - rtk_install_result is defined
+308	    - rtk_install_result.rc is defined
+309	    - rtk_install_result.rc != 0
+310	  ansible.builtin.debug:
+311	    msg: "RTK installation failed (likely network timeout) - skipping"
+312	
+313	# === SpecStory ===
+314	
+315	- name: Check if SpecStory is installed (macOS)
+316	  when: ansible_facts["os_family"] == "Darwin"
+317	  ansible.builtin.command: which specstory
+318	  register: specstory_macos_check
+319	  changed_when: false
+320	  failed_when: false
+321	
+322	- name: Tap specstoryai/tap for SpecStory (macOS)
+323	  when:
+324	    - ansible_facts["os_family"] == "Darwin"
+325	    - specstory_macos_check.rc != 0
+326	  community.general.homebrew_tap:
+327	    name: specstoryai/tap
+328	    state: present
+329	
+330	- name: Install SpecStory via Homebrew (macOS)
+331	  when:
+332	    - ansible_facts["os_family"] == "Darwin"
+333	    - specstory_macos_check.rc != 0
+334	  community.general.homebrew:
+335	    name: specstory
+336	    state: present
+337	  ignore_errors: true
+338	
+339	- name: Re-check if SpecStory is installed after Homebrew attempt (macOS)
+340	  when:
+341	    - ansible_facts["os_family"] == "Darwin"
+342	    - specstory_macos_check.rc != 0
+343	  ansible.builtin.command: which specstory
+344	  register: specstory_macos_recheck
+345	  changed_when: false
+346	  failed_when: false
+347	
+348	- name: Set SpecStory architecture for GitHub release (macOS)
+349	  when:
+350	    - ansible_facts["os_family"] == "Darwin"
+351	    - specstory_macos_check.rc != 0
+352	    - specstory_macos_recheck.rc != 0
+353	  ansible.builtin.set_fact:
+354	    specstory_macos_arch: "{{ 'arm64' if target_architecture == 'arm64' else 'x86_64' }}"
+355	
+356	- name: Get latest SpecStory release (macOS fallback)
+357	  when:
+358	    - ansible_facts["os_family"] == "Darwin"
+359	    - specstory_macos_check.rc != 0
+360	    - specstory_macos_recheck.rc != 0
+361	  ansible.builtin.uri:
+362	    url: https://api.github.com/repos/specstoryai/getspecstory/releases/latest
+363	    return_content: true
+364	  register: specstory_macos_release
+365	
+366	- name: Ensure ~/.local/bin exists (SpecStory macOS fallback)
+367	  when:
+368	    - ansible_facts["os_family"] == "Darwin"
+369	    - specstory_macos_check.rc != 0
+370	    - specstory_macos_recheck.rc != 0
+371	    - specstory_macos_release is defined
+372	  ansible.builtin.file:
+373	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+374	    state: directory
+375	    mode: "0755"
+376	
+377	- name: Install SpecStory from GitHub release (macOS fallback)
+378	  when:
+379	    - ansible_facts["os_family"] == "Darwin"
+380	    - specstory_macos_check.rc != 0
+381	    - specstory_macos_recheck.rc != 0
+382	    - specstory_macos_release is defined
+383	  block:
+384	    - name: Download SpecStory from GitHub release (macOS fallback)
+385	      ansible.builtin.get_url:
+386	        url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_macos_release.json.tag_name }}/SpecStoryCLI_Darwin_{{ specstory_macos_arch }}.zip"
+387	        dest: /tmp/specstory-macos.zip
+388	        mode: "0644"
+389	        timeout: 120
+390	      retries: 3
+391	      delay: 5
+392	
+393	    - name: Extract SpecStory to ~/.local/bin (macOS fallback)
+394	      ansible.builtin.unarchive:
+395	        src: /tmp/specstory-macos.zip
+396	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+397	        remote_src: true
+398	        mode: "0755"
+399	
+400	    - name: Clean up SpecStory zip (macOS fallback)
+401	      ansible.builtin.file:
+402	        path: /tmp/specstory-macos.zip
+403	        state: absent
+404	
+405	  rescue:
+406	    - name: Warn SpecStory installation failed (macOS fallback)
+407	      ansible.builtin.debug:
+408	        msg: "SpecStory installation failed (likely network timeout) - skipping"
+409	
+410	    - name: Clean up SpecStory temp files after failure (macOS fallback)
+411	      ansible.builtin.file:
+412	        path: /tmp/specstory-macos.zip
+413	        state: absent
+414	
+415	- name: Check if SpecStory is installed (Linux)
+416	  when: ansible_facts["os_family"] == "Debian"
+417	  ansible.builtin.command: which specstory
+418	  register: specstory_check
+419	  changed_when: false
+420	  failed_when: false
+421	
+422	- name: Get latest SpecStory release version (Linux)
+423	  when:
+424	    - ansible_facts["os_family"] == "Debian"
+425	    - specstory_check.rc != 0
+426	  ansible.builtin.uri:
+427	    url: https://api.github.com/repos/specstoryai/getspecstory/releases/latest
+428	    return_content: true
+429	  register: specstory_release
+430	
+431	- name: Set SpecStory architecture (Linux)
+432	  when:
+433	    - ansible_facts["os_family"] == "Debian"
+434	    - specstory_check.rc != 0
+435	  ansible.builtin.set_fact:
+436	    specstory_linux_arch: >-
+437	      {{
+438	        'x86_64' if target_architecture in ['x86_64', 'amd64']
+439	        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+440	        else ''
+441	      }}
+442	
+443	- name: Skip SpecStory on unsupported architecture (Linux)
+444	  when:
+445	    - ansible_facts["os_family"] == "Debian"
+446	    - specstory_check.rc != 0
+447	    - specstory_linux_arch | trim == ''
+448	  ansible.builtin.debug:
+449	    msg: "SpecStory skipped: no release for {{ target_architecture }}"
+450	
+451	- name: Install SpecStory from GitHub release (Linux)
+452	  when:
+453	    - ansible_facts["os_family"] == "Debian"
+454	    - specstory_check.rc != 0
+455	    - specstory_release is defined
+456	    - specstory_linux_arch | trim != ''
+457	  block:
+458	    - name: Download SpecStory from GitHub release (Linux)
+459	      ansible.builtin.get_url:
+460	        url: "https://github.com/specstoryai/getspecstory/releases/download/{{ specstory_release.json.tag_name }}/SpecStoryCLI_Linux_{{ specstory_linux_arch }}.tar.gz"
+461	        dest: /tmp/specstory-linux.tar.gz
+462	        mode: "0644"
+463	        timeout: 120
+464	      retries: 3
+465	      delay: 5
+466	
+467	    - name: Ensure ~/.local/bin exists (SpecStory)
+468	      ansible.builtin.file:
+469	        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+470	        state: directory
+471	        mode: "0755"
+472	
+473	    - name: Extract SpecStory to ~/.local/bin (Linux)
+474	      ansible.builtin.unarchive:
+475	        src: /tmp/specstory-linux.tar.gz
+476	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+477	        remote_src: true
+478	        mode: "0755"
+479	
+480	    - name: Clean up SpecStory tarball (Linux)
+481	      ansible.builtin.file:
+482	        path: /tmp/specstory-linux.tar.gz
+483	        state: absent
+484	
+485	  rescue:
+486	    - name: Warn SpecStory installation failed (Linux)
+487	      ansible.builtin.debug:
+488	        msg: "SpecStory installation failed (likely network timeout) - skipping"
+489	
+490	    - name: Clean up SpecStory temp files after failure (Linux)
+491	      ansible.builtin.file:
+492	        path: /tmp/specstory-linux.tar.gz
+493	        state: absent
+494	
+495	# === CodexBar ===
+496	
+497	- name: Check if CodexBar is installed (macOS, ARM only)
+498	  when:
+499	    - ansible_facts["os_family"] == "Darwin"
+500	    - target_architecture == "arm64"
+501	  ansible.builtin.command: which codexbar
+502	  register: codexbar_macos_check
+503	  changed_when: false
+504	  failed_when: false
+505	
+506	- name: Tap steipete/tap for CodexBar (macOS, ARM only)
+507	  when:
+508	    - ansible_facts["os_family"] == "Darwin"
+509	    - target_architecture == "arm64"
+510	    - codexbar_macos_check.rc != 0
+511	  community.general.homebrew_tap:
+512	    name: steipete/tap
+513	    state: present
+514	
+515	- name: Install CodexBar (macOS, ARM only)
+516	  when:
+517	    - ansible_facts["os_family"] == "Darwin"
+518	    - target_architecture == "arm64"
+519	    - codexbar_macos_check.rc != 0
+520	  community.general.homebrew_cask:
+521	    name: codexbar
+522	    state: present
+523	
+524	- name: Check if CodexBar is installed (Linux)
+525	  when: ansible_facts["os_family"] == "Debian"
+526	  ansible.builtin.command: which codexbar
+527	  register: codexbar_check
+528	  changed_when: false
+529	  failed_when: false
+530	
+531	- name: Check if Homebrew (Linuxbrew) is available
+532	  when:
+533	    - ansible_facts["os_family"] == "Debian"
+534	    - codexbar_check.rc != 0
+535	  ansible.builtin.command: command -v brew
+536	  register: codexbar_brew_check
+537	  changed_when: false
+538	  failed_when: false
+539	
+540	- name: Install CodexBar via Linuxbrew (preferred)
+541	  when:
+542	    - ansible_facts["os_family"] == "Debian"
+543	    - codexbar_check.rc != 0
+544	    - codexbar_brew_check.rc == 0
+545	  block:
+546	    - name: Tap steipete/tap for CodexBar (Linuxbrew)
+547	      community.general.homebrew_tap:
+548	        name: steipete/tap
+549	        state: present
+550	
+551	    - name: Install CodexBar (Linuxbrew)
+552	      community.general.homebrew:
+553	        name: codexbar
+554	        state: present
+555	  rescue:
+556	    - name: Mark Linuxbrew install as failed
+557	      ansible.builtin.set_fact:
+558	        codexbar_brew_failed: true
+559	
+560	- name: Ensure ~/.local/bin exists (CodexBar fallback)
+561	  when:
+562	    - ansible_facts["os_family"] == "Debian"
+563	    - codexbar_check.rc != 0
+564	    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+565	  ansible.builtin.file:
+566	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+567	    state: directory
+568	    mode: '0755'
+569	
+570	- name: Get latest CodexBar release (Linux fallback)
+571	  when:
+572	    - ansible_facts["os_family"] == "Debian"
+573	    - codexbar_check.rc != 0
+574	    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+575	  ansible.builtin.uri:
+576	    url: https://api.github.com/repos/steipete/CodexBar/releases/latest
+577	    return_content: true
+578	  register: codexbar_release
+579	
+580	- name: Compute CodexBar arch and tag (Linux fallback)
+581	  when:
+582	    - ansible_facts["os_family"] == "Debian"
+583	    - codexbar_check.rc != 0
+584	    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+585	    - codexbar_release is defined
+586	    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+587	  ansible.builtin.set_fact:
+588	    codexbar_arch: "{{ target_architecture }}"
+589	    codexbar_tag: "{{ codexbar_release.json.tag_name.startswith('v') | ternary(codexbar_release.json.tag_name, 'v' ~ codexbar_release.json.tag_name) }}"
+590	
+591	- name: Compute CodexBar release asset name (Linux fallback)
+592	  when:
+593	    - ansible_facts["os_family"] == "Debian"
+594	    - codexbar_check.rc != 0
+595	    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+596	    - codexbar_tag is defined
+597	  ansible.builtin.set_fact:
+598	    codexbar_asset: "CodexBarCLI-{{ codexbar_tag }}-linux-{{ codexbar_arch }}.tar.gz"
+599	
+600	- name: Install CodexBar from GitHub releases (Linux fallback)
+601	  when:
+602	    - ansible_facts["os_family"] == "Debian"
+603	    - codexbar_check.rc != 0
+604	    - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
+605	    - codexbar_asset is defined
+606	  block:
+607	    - name: Download CodexBar release (Linux fallback)
+608	      ansible.builtin.get_url:
+609	        url: "https://github.com/steipete/CodexBar/releases/download/{{ codexbar_tag }}/{{ codexbar_asset }}"
+610	        dest: /tmp/codexbar.tar.gz
+611	        mode: '0644'
+612	        timeout: 120
+613	      retries: 3
+614	      delay: 5
+615	
+616	    - name: Create temp directory for CodexBar extraction (Linux fallback)
+617	      ansible.builtin.file:
+618	        path: /tmp/codexbar
+619	        state: directory
+620	        mode: '0755'
+621	
+622	    - name: Extract CodexBar release (Linux fallback)
+623	      ansible.builtin.unarchive:
+624	        src: /tmp/codexbar.tar.gz
+625	        dest: /tmp/codexbar
+626	        remote_src: true
+627	
+628	    - name: Find codexbar binary (Linux fallback)
+629	      ansible.builtin.find:
+630	        paths: /tmp/codexbar
+631	        patterns: CodexBarCLI
+632	        file_type: file
+633	      register: codexbar_find
+634	
+635	    - name: Install CodexBar to ~/.local/bin (Linux fallback)
+636	      when: codexbar_find.matched | default(0) | int > 0
+637	      ansible.builtin.copy:
+638	        src: "{{ codexbar_find.files[0].path }}"
+639	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/codexbar"
+640	        mode: '0755'
+641	        remote_src: true
+642	
+643	    - name: Clean up CodexBar temp files (Linux fallback)
+644	      ansible.builtin.file:
+645	        path: "{{ item }}"
+646	        state: absent
+647	      loop:
+648	        - /tmp/codexbar.tar.gz
+649	        - /tmp/codexbar
+650	
+651	  rescue:
+652	    - name: Warn CodexBar installation failed
+653	      ansible.builtin.debug:
+654	        msg: "CodexBar installation failed (likely network timeout) - skipping"
+655	
+656	    - name: Clean up CodexBar temp files after failure
+657	      ansible.builtin.file:
+658	        path: "{{ item }}"
+659	        state: absent
+660	      loop:
+661	        - /tmp/codexbar.tar.gz
+662	        - /tmp/codexbar
+663	
+664	# === td ===
+665	
+666	- name: Check if td is installed (macOS)
+667	  when: ansible_facts["os_family"] == "Darwin"
+668	  ansible.builtin.command: which td
+669	  register: td_macos_check
+670	  changed_when: false
+671	  failed_when: false
+672	
+673	- name: Check whether installed td is Sidecar-compatible (macOS)
+674	  when:
+675	    - ansible_facts["os_family"] == "Darwin"
+676	    - td_macos_check.rc == 0
+677	  ansible.builtin.shell: td --help 2>&1 | grep -Eq '\bsession\b'
+678	  register: td_macos_compatible_check
+679	  changed_when: false
+680	  failed_when: false
+681	
+682	- name: Remove conflicting td formula (macOS)
+683	  when:
+684	    - ansible_facts["os_family"] == "Darwin"
+685	    - td_macos_check.rc == 0
+686	    - td_macos_compatible_check.rc != 0
+687	  community.general.homebrew:
+688	    name: td
+689	    state: absent
+690	
+691	- name: Tap marcus/tap for td (macOS)
+692	  when:
+693	    - ansible_facts["os_family"] == "Darwin"
+694	    - td_macos_check.rc != 0 or (td_macos_compatible_check.rc is defined and td_macos_compatible_check.rc != 0)
+695	  community.general.homebrew_tap:
+696	    name: marcus/tap
+697	    state: present
+698	
+699	- name: Install td (macOS)
+700	  when:
+701	    - ansible_facts["os_family"] == "Darwin"
+702	    - td_macos_check.rc != 0 or (td_macos_compatible_check.rc is defined and td_macos_compatible_check.rc != 0)
+703	  community.general.homebrew:
+704	    name: marcus/tap/td
+705	    state: present
+706	
+707	- name: Check if td is installed (Linux)
+708	  when: ansible_facts["os_family"] == "Debian"
+709	  ansible.builtin.command: which td
+710	  register: td_check
+711	  changed_when: false
+712	  failed_when: false
+713	
+714	- name: Check whether installed td is Sidecar-compatible (Linux)
+715	  when:
+716	    - ansible_facts["os_family"] == "Debian"
+717	    - td_check.rc == 0
+718	  ansible.builtin.shell: td --help 2>&1 | grep -Eq '\bsession\b'
+719	  register: td_compatible_check
+720	  changed_when: false
+721	  failed_when: false
+722	
+723	- name: Check if Homebrew (Linuxbrew) is available for td
+724	  when:
+725	    - ansible_facts["os_family"] == "Debian"
+726	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+727	  ansible.builtin.command: command -v brew
+728	  register: td_brew_check
+729	  changed_when: false
+730	  failed_when: false
+731	
+732	- name: Remove conflicting td formula (Linuxbrew)
+733	  when:
+734	    - ansible_facts["os_family"] == "Debian"
+735	    - td_check.rc == 0
+736	    - td_compatible_check.rc != 0
+737	    - td_brew_check.rc == 0
+738	  community.general.homebrew:
+739	    name: td
+740	    state: absent
+741	
+742	- name: Install td via Linuxbrew (preferred)
+743	  when:
+744	    - ansible_facts["os_family"] == "Debian"
+745	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+746	    - td_brew_check.rc == 0
+747	  block:
+748	    - name: Tap marcus/tap for td (Linuxbrew)
+749	      community.general.homebrew_tap:
+750	        name: marcus/tap
+751	        state: present
+752	
+753	    - name: Install td (Linuxbrew)
+754	      community.general.homebrew:
+755	        name: marcus/tap/td
+756	        state: present
+757	  rescue:
+758	    - name: Continue with GitHub release fallback when td Linuxbrew install fails
+759	      ansible.builtin.debug:
+760	        msg: "td Linuxbrew installation failed, continuing with GitHub release fallback."
+761	
+762	- name: Re-check if td is installed after Linuxbrew attempt
+763	  when:
+764	    - ansible_facts["os_family"] == "Debian"
+765	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+766	  ansible.builtin.command: which td
+767	  register: td_recheck
+768	  changed_when: false
+769	  failed_when: false
+770	
+771	- name: Ensure ~/.local/bin exists (td fallback)
+772	  when:
+773	    - ansible_facts["os_family"] == "Debian"
+774	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+775	    - td_recheck.rc != 0
+776	  ansible.builtin.file:
+777	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+778	    state: directory
+779	    mode: "0755"
+780	
+781	- name: Get latest td release (Linux fallback)
+782	  when:
+783	    - ansible_facts["os_family"] == "Debian"
+784	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+785	    - td_recheck.rc != 0
+786	  ansible.builtin.uri:
+787	    url: https://api.github.com/repos/marcus/td/releases/latest
+788	    return_content: true
+789	  register: td_release
+790	
+791	- name: Compute td release arch and version (Linux fallback)
+792	  when:
+793	    - ansible_facts["os_family"] == "Debian"
+794	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+795	    - td_recheck.rc != 0
+796	    - td_release is defined
+797	  ansible.builtin.set_fact:
+798	    td_linux_arch: "{{ 'amd64' if target_architecture in ['x86_64', 'amd64'] else 'arm64' if target_architecture in ['aarch64', 'arm64'] else 'unsupported' }}"
+799	    td_linux_version: "{{ td_release.json.tag_name | regex_replace('^v', '') }}"
+800	    td_linux_tag: "{{ td_release.json.tag_name }}"
+801	
+802	- name: Warn when td release fallback does not support current architecture
+803	  when:
+804	    - ansible_facts["os_family"] == "Debian"
+805	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+806	    - td_recheck.rc != 0
+807	    - td_linux_arch == "unsupported"
+808	  ansible.builtin.debug:
+809	    msg: "td fallback skipped: unsupported architecture {{ target_architecture }}."
+810	
+811	- name: Install td from GitHub releases (Linux fallback)
+812	  when:
+813	    - ansible_facts["os_family"] == "Debian"
+814	    - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
+815	    - td_recheck.rc != 0
+816	    - td_linux_arch != "unsupported"
+817	  block:
+818	    - name: Download td release (Linux fallback)
+819	      ansible.builtin.get_url:
+820	        url: "https://github.com/marcus/td/releases/download/{{ td_linux_tag }}/td_{{ td_linux_version }}_linux_{{ td_linux_arch }}.tar.gz"
+821	        dest: /tmp/td.tar.gz
+822	        mode: "0644"
+823	        timeout: 120
+824	      retries: 3
+825	      delay: 5
+826	
+827	    - name: Create temp directory for td extraction (Linux fallback)
+828	      ansible.builtin.file:
+829	        path: /tmp/td
+830	        state: directory
+831	        mode: "0755"
+832	
+833	    - name: Extract td release (Linux fallback)
+834	      ansible.builtin.unarchive:
+835	        src: /tmp/td.tar.gz
+836	        dest: /tmp/td
+837	        remote_src: true
+838	
+839	    - name: Find td binary (Linux fallback)
+840	      ansible.builtin.find:
+841	        paths: /tmp/td
+842	        patterns: td
+843	        file_type: file
+844	      register: td_find
+845	
+846	    - name: Install td to ~/.local/bin (Linux fallback)
+847	      when: td_find.matched | default(0) | int > 0
+848	      ansible.builtin.copy:
+849	        src: "{{ td_find.files[0].path }}"
+850	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/td"
+851	        mode: "0755"
+852	        remote_src: true
+853	
+854	    - name: Clean up td temp files (Linux fallback)
+855	      ansible.builtin.file:
+856	        path: "{{ item }}"
+857	        state: absent
+858	      loop:
+859	        - /tmp/td.tar.gz
+860	        - /tmp/td
+861	
+862	  rescue:
+863	    - name: Warn td installation failed
+864	      ansible.builtin.debug:
+865	        msg: "td installation failed (likely network timeout) - skipping"
+866	
+867	    - name: Clean up td temp files after failure
+868	      ansible.builtin.file:
+869	        path: "{{ item }}"
+870	        state: absent
+871	      loop:
+872	        - /tmp/td.tar.gz
+873	        - /tmp/td
+874	
+875	# === Sidecar ===
+876	
+877	- name: Check if sidecar is installed (macOS)
+878	  when: ansible_facts["os_family"] == "Darwin"
+879	  ansible.builtin.command: which sidecar
+880	  register: sidecar_macos_check
+881	  changed_when: false
+882	  failed_when: false
+883	
+884	- name: Tap marcus/tap for sidecar (macOS)
+885	  when:
+886	    - ansible_facts["os_family"] == "Darwin"
+887	    - sidecar_macos_check.rc != 0
+888	  community.general.homebrew_tap:
+889	    name: marcus/tap
+890	    state: present
+891	
+892	- name: Install sidecar (macOS)
+893	  when:
+894	    - ansible_facts["os_family"] == "Darwin"
+895	    - sidecar_macos_check.rc != 0
+896	  community.general.homebrew:
+897	    name: marcus/tap/sidecar
+898	    state: present
+899	
+900	- name: Check if sidecar is installed (Linux)
+901	  when: ansible_facts["os_family"] == "Debian"
+902	  ansible.builtin.command: which sidecar
+903	  register: sidecar_check
+904	  changed_when: false
+905	  failed_when: false
+906	
+907	- name: Check if Homebrew (Linuxbrew) is available for sidecar
+908	  when:
+909	    - ansible_facts["os_family"] == "Debian"
+910	    - sidecar_check.rc != 0
+911	  ansible.builtin.command: command -v brew
+912	  register: sidecar_brew_check
+913	  changed_when: false
+914	  failed_when: false
+915	
+916	- name: Install sidecar via Linuxbrew (preferred)
+917	  when:
+918	    - ansible_facts["os_family"] == "Debian"
+919	    - sidecar_check.rc != 0
+920	    - sidecar_brew_check.rc == 0
+921	  block:
+922	    - name: Tap marcus/tap for sidecar (Linuxbrew)
+923	      community.general.homebrew_tap:
+924	        name: marcus/tap
+925	        state: present
+926	
+927	    - name: Install sidecar (Linuxbrew)
+928	      community.general.homebrew:
+929	        name: marcus/tap/sidecar
+930	        state: present
+931	  rescue:
+932	    - name: Continue with GitHub release fallback when sidecar Linuxbrew install fails
+933	      ansible.builtin.debug:
+934	        msg: "sidecar Linuxbrew installation failed, continuing with GitHub release fallback."
+935	
+936	- name: Re-check if sidecar is installed after Linuxbrew attempt
+937	  when:
+938	    - ansible_facts["os_family"] == "Debian"
+939	    - sidecar_check.rc != 0
+940	  ansible.builtin.command: which sidecar
+941	  register: sidecar_recheck
+942	  changed_when: false
+943	  failed_when: false
+944	
+945	- name: Ensure ~/.local/bin exists (sidecar fallback)
+946	  when:
+947	    - ansible_facts["os_family"] == "Debian"
+948	    - sidecar_check.rc != 0
+949	    - sidecar_recheck.rc != 0
+950	  ansible.builtin.file:
+951	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+952	    state: directory
+953	    mode: "0755"
+954	
+955	- name: Get latest sidecar release (Linux fallback)
+956	  when:
+957	    - ansible_facts["os_family"] == "Debian"
+958	    - sidecar_check.rc != 0
+959	    - sidecar_recheck.rc != 0
+960	  ansible.builtin.uri:
+961	    url: https://api.github.com/repos/marcus/sidecar/releases/latest
+962	    return_content: true
+963	  register: sidecar_release
+964	
+965	- name: Compute sidecar release arch and version (Linux fallback)
+966	  when:
+967	    - ansible_facts["os_family"] == "Debian"
+968	    - sidecar_check.rc != 0
+969	    - sidecar_recheck.rc != 0
+970	    - sidecar_release is defined
+971	  ansible.builtin.set_fact:
+972	    sidecar_linux_arch: "{{ 'amd64' if target_architecture in ['x86_64', 'amd64'] else 'arm64' if target_architecture in ['aarch64', 'arm64'] else 'unsupported' }}"
+973	    sidecar_linux_version: "{{ sidecar_release.json.tag_name | regex_replace('^v', '') }}"
+974	    sidecar_linux_tag: "{{ sidecar_release.json.tag_name }}"
+975	
+976	- name: Warn when sidecar release fallback does not support current architecture
+977	  when:
+978	    - ansible_facts["os_family"] == "Debian"
+979	    - sidecar_check.rc != 0
+980	    - sidecar_recheck.rc != 0
+981	    - sidecar_linux_arch == "unsupported"
+982	  ansible.builtin.debug:
+983	    msg: "sidecar fallback skipped: unsupported architecture {{ target_architecture }}."
+984	
+985	- name: Install sidecar from GitHub releases (Linux fallback)
+986	  when:
+987	    - ansible_facts["os_family"] == "Debian"
+988	    - sidecar_check.rc != 0
+989	    - sidecar_recheck.rc != 0
+990	    - sidecar_linux_arch != "unsupported"
+991	  block:
+992	    - name: Download sidecar release (Linux fallback)
+993	      ansible.builtin.get_url:
+994	        url: "https://github.com/marcus/sidecar/releases/download/{{ sidecar_linux_tag }}/sidecar_{{ sidecar_linux_version }}_linux_{{ sidecar_linux_arch }}.tar.gz"
+995	        dest: /tmp/sidecar.tar.gz
+996	        mode: "0644"
+997	        timeout: 120
+998	      retries: 3
+999	      delay: 5
+1000	
+1001	    - name: Create temp directory for sidecar extraction (Linux fallback)
+1002	      ansible.builtin.file:
+1003	        path: /tmp/sidecar
+1004	        state: directory
+1005	        mode: "0755"
+1006	
+1007	    - name: Extract sidecar release (Linux fallback)
+1008	      ansible.builtin.unarchive:
+1009	        src: /tmp/sidecar.tar.gz
+1010	        dest: /tmp/sidecar
+1011	        remote_src: true
+1012	
+1013	    - name: Find sidecar binary (Linux fallback)
+1014	      ansible.builtin.find:
+1015	        paths: /tmp/sidecar
+1016	        patterns: sidecar
+1017	        file_type: file
+1018	      register: sidecar_find
+1019	
+1020	    - name: Install sidecar to ~/.local/bin (Linux fallback)
+1021	      when: sidecar_find.matched | default(0) | int > 0
+1022	      ansible.builtin.copy:
+1023	        src: "{{ sidecar_find.files[0].path }}"
+1024	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/sidecar"
+1025	        mode: "0755"
+1026	        remote_src: true
+1027	
+1028	    - name: Clean up sidecar temp files (Linux fallback)
+1029	      ansible.builtin.file:
+1030	        path: "{{ item }}"
+1031	        state: absent
+1032	      loop:
+1033	        - /tmp/sidecar.tar.gz
+1034	        - /tmp/sidecar
+1035	
+1036	  rescue:
+1037	    - name: Warn sidecar installation failed
+1038	      ansible.builtin.debug:
+1039	        msg: "sidecar installation failed (likely network timeout) - skipping"
+1040	
+1041	    - name: Clean up sidecar temp files after failure
+1042	      ansible.builtin.file:
+1043	        path: "{{ item }}"
+1044	        state: absent
+1045	      loop:
+1046	        - /tmp/sidecar.tar.gz
+1047	        - /tmp/sidecar
+1048	
+1049	# === Specify CLI ===
+1050	
+1051	- name: Check if uv is available
+1052	  ansible.builtin.command: which uv
+1053	  register: uv_check
+1054	  changed_when: false
+1055	  failed_when: false
+1056	
+1057	- name: Check if Specify CLI is installed
+1058	  ansible.builtin.command: which specify
+1059	  register: specify_check
+1060	  changed_when: false
+1061	  failed_when: false
+1062	
+1063	- name: Install Specify CLI via uv
+1064	  when:
+1065	    - uv_check.rc == 0
+1066	    - specify_check.rc != 0
+1067	  ansible.builtin.command: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+1068	  register: specify_install
+1069	  until: specify_install is succeeded
+1070	  retries: 3
+1071	  delay: 5
+1072	  args:
+1073	    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/specify"
+1074	  environment:
+1075	    GIT_HTTP_VERSION: HTTP/1.1
+1076	
+1077	- name: Warn when uv is missing and Specify CLI is not installed
+1078	  when:
+1079	    - uv_check.rc != 0
+1080	    - specify_check.rc != 0
+1081	  ansible.builtin.debug:
+1082	    msg: "uv not found; skipping Specify CLI installation. Install uv first or install specify manually."
+1083	
+1084	# === OpenChamber ===
+1085	
+1086	- name: Check if OpenChamber is installed
+1087	  when: npm_check.rc == 0
+1088	  ansible.builtin.command: which openchamber
+1089	  register: openchamber_check
+1090	  changed_when: false
+1091	  failed_when: false
+1092	
+1093	- name: Install OpenChamber (npm)
+1094	  when:
+1095	    - npm_check.rc == 0
+1096	    - openchamber_check.rc != 0
+1097	  community.general.npm:
+1098	    name: "@openchamber/web"
+1099	    global: true
+1100	    state: present
+1101	  ignore_errors: true
+1102	
+1103	# === Claude HUD Plugin ===
+1104	
+1105	- name: Check if claude-hud plugin is already installed
+1106	  ansible.builtin.stat:
+1107	    path: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud"
+1108	  register: claude_hud_cache
+1109	
+1110	- name: Get latest claude-hud release
+1111	  when: not claude_hud_cache.stat.exists
+1112	  ansible.builtin.uri:
+1113	    url: https://api.github.com/repos/jarrodwatts/claude-hud/releases/latest
+1114	    return_content: true
+1115	  register: claude_hud_release
+1116	
+1117	- name: Set claude-hud version facts
+1118	  when:
+1119	    - not claude_hud_cache.stat.exists
+1120	    - claude_hud_release is not skipped
+1121	  ansible.builtin.set_fact:
+1122	    claude_hud_version: "{{ claude_hud_release.json.tag_name | regex_replace('^v', '') }}"
+1123	    claude_hud_tag: "{{ claude_hud_release.json.tag_name }}"
+1124	
+1125	- name: Clone claude-hud plugin to cache
+1126	  when: claude_hud_version is defined
+1127	  ansible.builtin.git:
+1128	    repo: https://github.com/jarrodwatts/claude-hud.git
+1129	    dest: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud/claude-hud/{{ claude_hud_version }}"
+1130	    version: "{{ claude_hud_tag }}"
+1131	    depth: 1
+1132	  ignore_errors: true
+1133	
+1134	- name: Get claude-hud commit SHA
+1135	  when: claude_hud_version is defined
+1136	  ansible.builtin.command:
+1137	    cmd: git rev-parse HEAD
+1138	    chdir: "{{ ansible_facts['env']['HOME'] }}/.claude/plugins/cache/claude-hud/claude-hud/{{ claude_hud_version }}"
+1139	  register: claude_hud_commit
+1140	  changed_when: false
+1141	  failed_when: false
+1142	
+1143	- name: Register claude-hud in installed_plugins.json
+1144	  when:
+1145	    - claude_hud_version is defined
+1146	    - claude_hud_commit.rc | default(1) == 0
+1147	  ansible.builtin.shell: |
+1148	    python3 << 'EOF'
+1149	    import json, os
+1150	    from datetime import datetime, timezone
+1151	
+1152	    home = os.path.expanduser('~')
+1153	    path = os.path.join(home, '.claude', 'plugins', 'installed_plugins.json')
+1154	
+1155	    try:
+1156	        with open(path) as f:
+1157	            data = json.load(f)
+1158	    except (FileNotFoundError, json.JSONDecodeError):
+1159	        data = {'version': 2, 'plugins': {}}
+1160	
+1161	    plugin_key = 'claude-hud@claude-hud'
+1162	    version = '{{ claude_hud_version }}'
+1163	
+1164	    if any(e.get('version') == version for e in data.get('plugins', {}).get(plugin_key, [])):
+1165	        exit(0)
+1166	
+1167	    now = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+1168	
+1169	    data.setdefault('plugins', {})[plugin_key] = [{
+1170	        'scope': 'user',
+1171	        'installPath': os.path.join(home, '.claude', 'plugins', 'cache', 'claude-hud', 'claude-hud', version),
+1172	        'version': version,
+1173	        'installedAt': now,
+1174	        'lastUpdated': now,
+1175	        'gitCommitSha': '{{ claude_hud_commit.stdout }}'
+1176	    }]
+1177	
+1178	    os.makedirs(os.path.dirname(path), exist_ok=True)
+1179	    with open(path, 'w') as f:
+1180	        json.dump(data, f, indent=2)
+1181	    EOF
+1182	  changed_when: true
+1183
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:18Z)**_
+
+Now let me search for more npm-specific details and check other roles:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:19Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/bitwarden/tasks/main.yml`
+
+```text
+1	---
+2	# Bitwarden role - CLI installation + Desktop app (for SSH agent)
+3	# CLI: Installs @bitwarden/cli via npm, with mise fallback when npm is not in PATH.
+4	# Desktop: Installs Bitwarden desktop app (snap/deb on Linux, Homebrew cask on macOS)
+5	#          when bitwarden_install_desktop=true (passed via --extra-vars)
+6	
+7	# =============================================================================
+8	# CLI Installation
+9	# =============================================================================
+10	
+11	- name: Check if Bitwarden CLI is already installed
+12	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+13	  ansible.builtin.command: which bw
+14	  register: bitwarden_cli_check
+15	  changed_when: false
+16	  failed_when: false
+17	
+18	- name: Check if npm is available for Bitwarden CLI install
+19	  when:
+20	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+21	    - bitwarden_cli_check.rc != 0
+22	  ansible.builtin.command: npm --version
+23	  register: bitwarden_npm_check
+24	  changed_when: false
+25	  failed_when: false
+26	
+27	- name: Check for user-installed mise (Bitwarden fallback)
+28	  when:
+29	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+30	    - bitwarden_cli_check.rc != 0
+31	    - bitwarden_npm_check.rc != 0
+32	  ansible.builtin.stat:
+33	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+34	  register: bitwarden_mise_user_bin
+35	
+36	- name: Set Bitwarden mise binary path (user install)
+37	  when:
+38	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+39	    - bitwarden_cli_check.rc != 0
+40	    - bitwarden_npm_check.rc != 0
+41	    - bitwarden_mise_user_bin.stat.exists | default(false)
+42	  ansible.builtin.set_fact:
+43	    bitwarden_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+44	
+45	- name: Check for system mise (Bitwarden fallback)
+46	  when:
+47	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+48	    - bitwarden_cli_check.rc != 0
+49	    - bitwarden_npm_check.rc != 0
+50	    - bitwarden_mise_bin is not defined
+51	  ansible.builtin.command: mise --version
+52	  register: bitwarden_mise_system_check
+53	  changed_when: false
+54	  failed_when: false
+55	
+56	- name: Set Bitwarden mise binary path (system install)
+57	  when:
+58	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+59	    - bitwarden_cli_check.rc != 0
+60	    - bitwarden_npm_check.rc != 0
+61	    - bitwarden_mise_bin is not defined
+62	    - bitwarden_mise_system_check.rc == 0
+63	  ansible.builtin.set_fact:
+64	    bitwarden_mise_bin: mise
+65	
+66	- name: Fail when neither npm nor mise is available for Bitwarden install
+67	  when:
+68	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+69	    - bitwarden_cli_check.rc != 0
+70	    - bitwarden_npm_check.rc != 0
+71	    - bitwarden_mise_bin is not defined
+72	  ansible.builtin.fail:
+73	    msg: >-
+74	      installBitwarden=true requires npm or mise (with npm runtime) to install
+75	      {{ bitwarden_cli_npm_package }}. Ensure Node.js is installed (e.g. via mise)
+76	      and re-run ansible.
+77	
+78	- name: Install Bitwarden CLI via npm
+79	  when:
+80	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+81	    - bitwarden_cli_check.rc != 0
+82	    - bitwarden_npm_check.rc == 0
+83	  community.general.npm:
+84	    name: "{{ bitwarden_cli_npm_package }}"
+85	    global: true
+86	    state: present
+87	  register: bitwarden_npm_install
+88	  until: bitwarden_npm_install is succeeded
+89	  retries: 3
+90	  delay: 5
+91	
+92	- name: Install Bitwarden CLI via mise npm fallback
+93	  when:
+94	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+95	    - bitwarden_cli_check.rc != 0
+96	    - bitwarden_npm_check.rc != 0
+97	    - bitwarden_mise_bin is defined
+98	  ansible.builtin.shell: |
+99	    {{ bitwarden_mise_bin }} exec -- npm install -g {{ bitwarden_cli_npm_package }}
+100	  args:
+101	    executable: /bin/bash
+102	  register: bitwarden_mise_npm_install
+103	  until: bitwarden_mise_npm_install is succeeded
+104	  retries: 3
+105	  delay: 5
+106	  changed_when: true
+107	
+108	# =============================================================================
+109	# Desktop App Installation (for SSH agent support)
+110	# Only runs when bitwarden_install_desktop=true (set via --extra-vars)
+111	# =============================================================================
+112	
+113	# --- macOS: Homebrew Cask ---
+114	
+115	- name: Check if Bitwarden Desktop is installed (macOS)
+116	  when:
+117	    - bitwarden_install_desktop | bool
+118	    - ansible_facts["os_family"] == "Darwin"
+119	  ansible.builtin.stat:
+120	    path: /Applications/Bitwarden.app
+121	  register: bitwarden_desktop_macos
+122	
+123	- name: Install Bitwarden Desktop via Homebrew Cask (macOS)
+124	  when:
+125	    - bitwarden_install_desktop | bool
+126	    - ansible_facts["os_family"] == "Darwin"
+127	    - not (bitwarden_desktop_macos.stat.exists | default(false))
+128	  community.general.homebrew_cask:
+129	    name: bitwarden
+130	    state: present
+131	
+132	# --- Linux: Snap (primary) with .deb fallback ---
+133	
+134	- name: Check if Bitwarden Desktop is already installed (Linux)
+135	  when:
+136	    - bitwarden_install_desktop | bool
+137	    - ansible_facts["os_family"] == "Debian"
+138	  ansible.builtin.shell: command -v bitwarden || snap list bitwarden 2>/dev/null
+139	  register: bitwarden_desktop_linux_check
+140	  changed_when: false
+141	  failed_when: false
+142	
+143	- name: Check if snap is available (Bitwarden Desktop)
+144	  when:
+145	    - bitwarden_install_desktop | bool
+146	    - ansible_facts["os_family"] == "Debian"
+147	    - bitwarden_desktop_linux_check.rc != 0
+148	  ansible.builtin.command: which snap
+149	  register: bitwarden_snap_check
+150	  changed_when: false
+151	  failed_when: false
+152	
+153	- name: Install Bitwarden Desktop via snap (Linux)
+154	  when:
+155	    - bitwarden_install_desktop | bool
+156	    - ansible_facts["os_family"] == "Debian"
+157	    - bitwarden_desktop_linux_check.rc != 0
+158	    - bitwarden_snap_check.rc == 0
+159	  become: true
+160	  tags: [sudo]
+161	  community.general.snap:
+162	    name: bitwarden
+163	    state: present
+164	
+165	- name: Install Bitwarden Desktop via .deb fallback (Linux)
+166	  when:
+167	    - bitwarden_install_desktop | bool
+168	    - ansible_facts["os_family"] == "Debian"
+169	    - bitwarden_desktop_linux_check.rc != 0
+170	    - bitwarden_snap_check.rc != 0
+171	  become: true
+172	  tags: [sudo]
+173	  block:
+174	    - name: Download Bitwarden Desktop .deb package
+175	      ansible.builtin.get_url:
+176	        url: "https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=deb"
+177	        dest: /tmp/bitwarden-desktop.deb
+178	        mode: '0644'
+179	        timeout: 120
+180	      retries: 3
+181	      delay: 5
+182	
+183	    - name: Install Bitwarden Desktop .deb package
+184	      ansible.builtin.apt:
+185	        deb: /tmp/bitwarden-desktop.deb
+186	
+187	    - name: Clean up Bitwarden Desktop .deb
+188	      ansible.builtin.file:
+189	        path: /tmp/bitwarden-desktop.deb
+190	        state: absent
+191	
+192	- name: Remind user to enable SSH agent (Bitwarden Desktop)
+193	  when:
+194	    - bitwarden_install_desktop | bool
+195	    - (((bitwarden_desktop_linux_check | default({})).rc | default(0)) != 0) or
+196	      (bitwarden_desktop_macos is defined and not (bitwarden_desktop_macos.stat.exists | default(true)))
+197	  ansible.builtin.debug:
+198	    msg: >-
+199	      Bitwarden Desktop installed. To use the SSH agent:
+200	      1. Open Bitwarden Desktop and log in
+201	      2. Go to Settings > Enable SSH agent
+202	      3. Import your SSH keys into the vault
+203	      4. Open a new terminal -- SSH_AUTH_SOCK will be auto-detected
+204
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/lazyvim_deps/tasks/main.yml`
+
+```text
+1	---
+2	# LazyVim dependencies role
+3	
+4	# macOS - all via Homebrew
+5	- name: Install LazyVim dependencies (macOS)
+6	  when: ansible_facts["os_family"] == "Darwin"
+7	  community.general.homebrew:
+8	    name:
+9	      - fzf
+10	      - lazygit
+11	      - tree-sitter
+12	      - node
+13	    state: present
+14	
+15	# Linux - find mise binary (installed by bootstrap)
+16	- name: Check for user-installed mise
+17	  when: ansible_facts["os_family"] == "Debian"
+18	  ansible.builtin.stat:
+19	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+20	  register: mise_user_bin
+21	
+22	- name: Set mise binary path (user install)
+23	  when:
+24	    - ansible_facts["os_family"] == "Debian"
+25	    - mise_user_bin.stat.exists | default(false)
+26	  ansible.builtin.set_fact:
+27	    mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+28	
+29	- name: Set mise binary path (system install)
+30	  when:
+31	    - ansible_facts["os_family"] == "Debian"
+32	    - mise_bin is not defined
+33	  ansible.builtin.set_fact:
+34	    mise_bin: /usr/bin/mise
+35	
+36	# Install mise tools from ~/.config/mise/config.toml (node@lts)
+37	# Non-fatal: mise downloads are flaky and some tools (e.g. ruby) may fail on
+38	# constrained hardware. Partial success is fine — user can re-run `mise install`.
+39	#
+40	# On armv7l (RPi 4 with 32-bit armhf userland), skip bun (no armv7l build),
+41	# ruby (ruby-build source compile is too heavy and fragile), and pin node to
+42	# @20 — the last LTS with armv7l prebuilts. Node 21+ has no armv7l prebuilt and
+43	# source-builds fail linking (`__atomic_load_8`) without `-latomic`.
+44	- name: Install mise global tools (Debian/Ubuntu, armv7l)
+45	  when:
+46	    - ansible_facts["os_family"] == "Debian"
+47	    - target_architecture in ['armv7l', 'armv6l']
+48	  ansible.builtin.command:
+49	    cmd: "{{ mise_bin }} install --yes node@20 rust@latest"
+50	  register: mise_install
+51	  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+52	  failed_when: false
+53	
+54	- name: Install mise global tools (Debian/Ubuntu)
+55	  when:
+56	    - ansible_facts["os_family"] == "Debian"
+57	    - target_architecture not in ['armv7l', 'armv6l']
+58	  ansible.builtin.command:
+59	    cmd: "{{ mise_bin }} install --yes"
+60	  register: mise_install
+61	  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+62	  failed_when: false
+63	
+64	- name: Warn if mise install had failures
+65	  when:
+66	    - ansible_facts["os_family"] == "Debian"
+67	    - mise_install.rc is defined
+68	    - mise_install.rc != 0
+69	  ansible.builtin.debug:
+70	    msg: |
+71	      mise install exited with rc={{ mise_install.rc }} — some tools may have failed.
+72	      Re-run manually to retry: `{{ mise_bin }} install --yes`
+73	      Stderr tail: {{ mise_install.stderr_lines[-5:] | default([]) | join(' | ') }}
+74	
+75	# fzf - install via git for latest version (apt version is outdated and lacks --zsh flag)
+76	- name: Check if fzf is installed via git
+77	  when: ansible_facts["os_family"] == "Debian"
+78	  ansible.builtin.stat:
+79	    path: "{{ ansible_facts['env']['HOME'] }}/.fzf"
+80	  register: fzf_git_dir
+81	
+82	- name: Clone fzf from GitHub
+83	  when:
+84	    - ansible_facts["os_family"] == "Debian"
+85	    - not fzf_git_dir.stat.exists
+86	  ansible.builtin.git:
+87	    repo: https://github.com/junegunn/fzf.git
+88	    dest: "{{ ansible_facts['env']['HOME'] }}/.fzf"
+89	    depth: 1
+90	
+91	- name: Install fzf (binary only, shell integration handled by zsh config)
+92	  when:
+93	    - ansible_facts["os_family"] == "Debian"
+94	    - not fzf_git_dir.stat.exists
+95	  ansible.builtin.command:
+96	    cmd: "{{ ansible_facts['env']['HOME'] }}/.fzf/install --bin"
+97	  changed_when: true
+98	
+99	# lazygit
+100	- name: Check if lazygit is installed
+101	  when: ansible_facts["os_family"] == "Debian"
+102	  ansible.builtin.command: lazygit --version
+103	  register: lazygit_check
+104	  changed_when: false
+105	  failed_when: false
+106	
+107	- name: Install lazygit via PPA (Ubuntu only — PPA has no Debian Release file)
+108	  when:
+109	    - ansible_facts["distribution"] == "Ubuntu"
+110	    - lazygit_check.rc != 0
+111	  become: true
+112	  tags: [sudo]
+113	  block:
+114	    - name: Add lazygit PPA
+115	      ansible.builtin.apt_repository:
+116	        repo: ppa:lazygit-team/release
+117	        state: present
+118	      ignore_errors: true
+119	      register: lazygit_ppa
+120	
+121	    - name: Install lazygit from apt
+122	      ansible.builtin.apt:
+123	        name: lazygit
+124	        state: present
+125	      ignore_errors: true
+126	      register: lazygit_apt
+127	      when: lazygit_ppa is succeeded
+128	
+129	- name: Set lazygit release architecture
+130	  when: ansible_facts["os_family"] == "Debian"
+131	  ansible.builtin.set_fact:
+132	    lazygit_arch: >-
+133	      {{
+134	        'x86_64' if target_architecture in ['x86_64', 'amd64']
+135	        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+136	        else ''
+137	      }}
+138	
+139	- name: Install lazygit from GitHub releases (system-level)
+140	  when:
+141	    - ansible_facts["os_family"] == "Debian"
+142	    - lazygit_check.rc != 0
+143	    - (lazygit_apt is not defined) or (lazygit_apt is failed) or (lazygit_apt is skipped)
+144	    - lazygit_arch | trim != ''
+145	  become: true
+146	  tags: [sudo]
+147	  block:
+148	    - name: Get latest lazygit release (system)
+149	      ansible.builtin.uri:
+150	        url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+151	        return_content: true
+152	      register: lazygit_release
+153	
+154	    - name: Download lazygit binary (system)
+155	      ansible.builtin.get_url:
+156	        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release.json.tag_name }}/lazygit_{{ lazygit_release.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
+157	        dest: /tmp/lazygit.tar.gz
+158	        mode: '0644'
+159	        timeout: 120
+160	      retries: 3
+161	      delay: 5
+162	
+163	    - name: Extract lazygit (system)
+164	      ansible.builtin.unarchive:
+165	        src: /tmp/lazygit.tar.gz
+166	        dest: /usr/local/bin
+167	        remote_src: true
+168	        extra_opts:
+169	          - lazygit
+170	
+171	    - name: Clean up lazygit tarball (system)
+172	      ansible.builtin.file:
+173	        path: /tmp/lazygit.tar.gz
+174	        state: absent
+175	  rescue:
+176	    - name: Warn lazygit system install failed
+177	      ansible.builtin.debug:
+178	        msg: "lazygit system-level installation failed — skipping"
+179	
+180	    - name: Clean up lazygit temp files (system rescue)
+181	      ansible.builtin.file:
+182	        path: /tmp/lazygit.tar.gz
+183	        state: absent
+184	
+185	# User-level install (no sudo required) - runs if system install was skipped
+186	- name: Re-check if lazygit is installed after system install attempt
+187	  when: ansible_facts["os_family"] == "Debian"
+188	  ansible.builtin.command: lazygit --version
+189	  register: lazygit_recheck
+190	  changed_when: false
+191	  failed_when: false
+192	
+193	- name: Install lazygit from GitHub releases (user-level, no sudo)
+194	  when:
+195	    - ansible_facts["os_family"] == "Debian"
+196	    - lazygit_recheck.rc != 0
+197	    - lazygit_arch | default('') | trim != ''
+198	  block:
+199	    - name: Get latest lazygit release (user)
+200	      ansible.builtin.uri:
+201	        url: https://api.github.com/repos/jesseduffield/lazygit/releases/latest
+202	        return_content: true
+203	      register: lazygit_release_user
+204	
+205	    - name: Ensure ~/.local/bin exists
+206	      ansible.builtin.file:
+207	        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+208	        state: directory
+209	        mode: '0755'
+210	
+211	    - name: Download lazygit binary (user)
+212	      ansible.builtin.get_url:
+213	        url: "https://github.com/jesseduffield/lazygit/releases/download/{{ lazygit_release_user.json.tag_name }}/lazygit_{{ lazygit_release_user.json.tag_name | regex_replace('^v', '') }}_Linux_{{ lazygit_arch }}.tar.gz"
+214	        dest: /tmp/lazygit.tar.gz
+215	        mode: '0644'
+216	        timeout: 120
+217	      retries: 3
+218	      delay: 5
+219	
+220	    - name: Extract lazygit to user bin (user)
+221	      ansible.builtin.unarchive:
+222	        src: /tmp/lazygit.tar.gz
+223	        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+224	        remote_src: true
+225	        extra_opts:
+226	          - lazygit
+227	
+228	    - name: Clean up lazygit tarball (user)
+229	      ansible.builtin.file:
+230	        path: /tmp/lazygit.tar.gz
+231	        state: absent
+232	  rescue:
+233	    - name: Warn lazygit user install failed
+234	      ansible.builtin.debug:
+235	        msg: "lazygit user-level installation failed — skipping"
+236	
+237	    - name: Clean up lazygit temp files (user rescue)
+238	      ansible.builtin.file:
+239	        path: /tmp/lazygit.tar.gz
+240	        state: absent
+241	
+242	# tree-sitter-cli
+243	- name: Check if tree-sitter is installed
+244	  when: ansible_facts["os_family"] == "Debian"
+245	  ansible.builtin.command: tree-sitter --version
+246	  register: treesitter_check
+247	  changed_when: false
+248	  failed_when: false
+249	
+250	- name: Skip tree-sitter-cli on armv7l (no working node and cargo build too slow)
+251	  when:
+252	    - ansible_facts["os_family"] == "Debian"
+253	    - treesitter_check.rc != 0
+254	    - target_architecture in ['armv7l', 'armv6l']
+255	  ansible.builtin.debug:
+256	    msg: "tree-sitter-cli skipped on {{ target_architecture }}: no armv7l node prebuilt; cargo build needs libclang and takes 15+ min"
+257	
+258	- name: Install tree-sitter-cli via mise npm (Debian/Ubuntu)
+259	  when:
+260	    - ansible_facts["os_family"] == "Debian"
+261	    - treesitter_check.rc != 0
+262	    - target_architecture not in ['armv7l', 'armv6l']
+263	  ansible.builtin.shell: |
+264	    {{ mise_bin }} exec -- npm install -g tree-sitter-cli
+265	  args:
+266	    executable: /bin/bash
+267	  register: treesitter_npm
+268	  changed_when: "'added' in treesitter_npm.stdout or 'added' in treesitter_npm.stderr"
+269	  ignore_errors: true
+270	
+271	# cargo build of tree-sitter-cli requires libclang (via bindgen). Install on
+272	# Debian/Ubuntu when we might fall through to the cargo path.
+273	- name: Install libclang-dev for tree-sitter-cli cargo build (Debian/Ubuntu)
+274	  when:
+275	    - ansible_facts["os_family"] == "Debian"
+276	    - treesitter_check.rc != 0
+277	    - target_architecture not in ['armv7l', 'armv6l']
+278	    - treesitter_npm is failed
+279	  become: true
+280	  tags: [sudo]
+281	  ansible.builtin.apt:
+282	    name: libclang-dev
+283	    state: present
+284	  ignore_errors: true
+285	
+286	- name: Install tree-sitter-cli via cargo (fallback)
+287	  when:
+288	    - ansible_facts["os_family"] == "Debian"
+289	    - treesitter_check.rc != 0
+290	    - target_architecture not in ['armv7l', 'armv6l']
+291	    - treesitter_npm is failed
+292	  ansible.builtin.shell: |
+293	    if command -v cargo >/dev/null 2>&1; then
+294	      cargo install tree-sitter-cli
+295	    else
+296	      echo "Neither Node.js nor cargo available for tree-sitter-cli"
+297	      echo "Install manually: cargo install tree-sitter-cli"
+298	      exit 0
+299	    fi
+300	  args:
+301	    executable: /bin/bash
+302	  changed_when: true
+303	  ignore_errors: true
+304
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+1	---
+2	# Developer CLI tools role
+3	# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc
+4	
+5	# =============================================================================
+6	# macOS - all via Homebrew
+7	# =============================================================================
+8	
+9	- name: Tap diffnav formula (macOS)
+10	  when: ansible_facts["os_family"] == "Darwin"
+11	  community.general.homebrew_tap:
+12	    name: dlvhdr/formulae
+13	    state: present
+14	
+15	- name: Install developer CLI tools (macOS)
+16	  when: ansible_facts["os_family"] == "Darwin"
+17	  community.general.homebrew:
+18	    name:
+19	      - bat
+20	      - bats-core
+21	      - gh
+22	      - glab
+23	      - diffnav
+24	      - git-delta
+25	      - git-graph
+26	      - eza
+27	      - tlrc
+28	      - glow
+29	      - thefuck
+30	      - zoxide
+31	      - direnv
+32	      - yazi
+33	      - superfile
+34	      - tmux
+35	      - sesh
+36	      - zellij
+37	      - btop
+38	      - htop
+39	      - duckdb
+40	      - rclone
+41	      - coreutils
+42	      - taplo
+43	      - television
+44	      - pandoc
+45	    state: present
+46	
+47	# =============================================================================
+48	# Linux (Debian/Ubuntu)
+49	# =============================================================================
+50	
+51	# --- gh ---
+52	- name: Check if gh is installed
+53	  when: ansible_facts["os_family"] == "Debian"
+54	  ansible.builtin.command: gh --version
+55	  register: gh_check
+56	  changed_when: false
+57	  failed_when: false
+58	  environment:
+59	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+60	
+61	- name: Set gh release architecture
+62	  when:
+63	    - ansible_facts["os_family"] == "Debian"
+64	    - gh_check.rc != 0
+65	  ansible.builtin.set_fact:
+66	    gh_release_arch: >-
+67	      {{
+68	        'amd64' if target_architecture in ['x86_64', 'amd64']
+69	        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+70	        else ''
+71	      }}
+72	
+73	- name: Skip gh on unsupported architecture
+74	  when:
+75	    - ansible_facts["os_family"] == "Debian"
+76	    - gh_check.rc != 0
+77	    - gh_release_arch == ''
+78	  ansible.builtin.debug:
+79	    msg: "gh skipped: no release for {{ target_architecture }}"
+80	
+81	- name: Install gh from GitHub releases (Debian/Ubuntu)
+82	  when:
+83	    - ansible_facts["os_family"] == "Debian"
+84	    - gh_check.rc != 0
+85	    - gh_release_arch != ''
+86	  become: true
+87	  tags: [sudo]
+88	  block:
+89	    - name: Get latest gh release
+90	      ansible.builtin.uri:
+91	        url: https://api.github.com/repos/cli/cli/releases/latest
+92	        return_content: true
+93	      register: gh_release
+94	
+95	    - name: Download gh .deb package
+96	      ansible.builtin.get_url:
+97	        url: "https://github.com/cli/cli/releases/download/{{ gh_release.json.tag_name }}/gh_{{ gh_release.json.tag_name | regex_replace('^v', '') }}_linux_{{ gh_release_arch }}.deb"
+98	        dest: /tmp/gh.deb
+99	        mode: '0644'
+100	        timeout: 120
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:22Z)**_
+
+Now let me search for bun installation, node/mise setup, and other npm/bun references:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:23Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./dot_config/mise/config.toml.tmpl` pattern `bun`
+
+```text
+13:# Bun for bunx CLI tools
+14:bun = "latest"
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "bun" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles --include="*.yml" -n 2>/dev/null | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/security_tools/tasks/main.yml:22:- name: Install pre-commit via uv (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/security_tools/tasks/main.yml:57:- name: Install gitleaks binary (Debian/Ubuntu, system-level)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/docker/tasks/main.yml:28:- name: Check if Docker is installed (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/docker/tasks/main.yml:35:- name: Install Docker via convenience script (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/docker/tasks/main.yml:48:- name: Ensure docker group exists (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/docker/tasks/main.yml:56:- name: Add user to docker group (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/docker/tasks/main.yml:65:- name: Notify about docker group change (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/starship/tasks/main.yml:16:# Linux (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/starship/tasks/main.yml:29:- name: Install starship via official installer (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml:16:- name: Install libnotify-bin (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:43:# Linux (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:47:- name: Install networking tools from apt (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:80:- name: Install doggo from GitHub releases (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:182:- name: Install gping from GitHub releases (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:274:- name: Install trippy from GitHub releases (Debian/Ubuntu, system-level)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:442:- name: Install bandwhich from GitHub releases (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:500:- name: Install Ookla Speedtest CLI (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:561:- name: Install rustscan from GitHub releases (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml:9:- name: Install Ruby compile dependencies (Debian/Ubuntu)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:40:# On armv7l (RPi 4 with 32-bit armhf userland), skip bun (no armv7l build),
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:24Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/07_bunx_cli.zsh`
+
+```text
+1	# 07_bunx_cli.zsh - bunx CLI tool aliases
+2	# These tools run via bunx (Bun's package runner)
+3	
+4	# ccusage - Claude Code usage tracker
+5	alias ccusage="bunx ccusage"
+6
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:24Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/mise/config.toml.tmpl`
+
+```text
+1	{{- $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+2	# mise global configuration
+3	# https://mise.jdx.dev/configuration.html
+4	
+5	[settings]
+6	# Use precompiled ruby binaries instead of compiling from source.
+7	# ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
+8	ruby.compile = false
+9	
+10	[tools]
+11	# Node.js LTS for LazyVim LSP servers and tree-sitter-cli
+12	node = "lts"
+13	# Bun for bunx CLI tools
+14	bun = "latest"
+15	# Rust toolchain for cargo tools
+16	rust = "latest"
+17	{{ if not $noRoot -}}
+18	# Ruby for gem tools
+19	ruby = "3"
+20	{{ else -}}
+21	# Ruby skipped in noRoot mode: ruby-build requires libffi-dev (needs sudo)
+22	{{ end -}}
+23
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:27Z)**_
+
+Now let me check for bitwarden defaults and look for any docs on npm vs bun:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/bitwarden/defaults/main.yml`
+
+```text
+1	---
+2	# Default variables for bitwarden role
+3	bitwarden_cli_npm_package: "@bitwarden/cli"
+4	
+5	# Whether to install the Bitwarden desktop app (for SSH agent support)
+6	# Override via --extra-vars "bitwarden_install_desktop=true"
+7	# Only meaningful on ubuntu_desktop (snap/deb) and macOS (homebrew cask)
+8	bitwarden_install_desktop: false
+9
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/docs -type f -name "*.md" 2>/dev/null | xargs grep -l "npm\|bun\|node" 2>/dev/null`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/docs/input_methods/README.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/linux-package-sources.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/locale.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/xdg.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/starship.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/sesh.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/README.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/llm.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/initial_setup/1_ApplyToNewMachine.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/initial_setup/0_ManualSetupRecord.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/cheatsheet.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/ansible.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tutorials/bitwarden_ssh_agent.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/zsh-completions.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/neovim/floating-tui.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/web-reader.md`
+
+```text
+1	# Read the Web as Markdown in the Terminal
+2	
+3	Focus-mode reading (think Safari Reader / Firefox Reader View) but driven from a terminal: fetch a page, strip it down to the article body, render as markdown in a pager. Useful for offline reading, piping into LLMs, or just avoiding browser chrome when you already live in the shell.
+4	
+5	This repo ships four interchangeable readers covering the common combinations of **remote vs local**, **article extraction vs full page**, and **different extractor strategies**. Pick the one that fits the page at hand.
+6	
+7	## TL;DR
+8	
+9	| Command | Extractor | Local / remote | Best for |
+10	|---------|-----------|----------------|----------|
+11	| `readurl <url>` | [Jina AI Reader](https://jina.ai/reader) (`r.jina.ai`) | remote | Default. Any page, zero local deps beyond `glow`. Fast. |
+12	| `readlocal <url>` | [trafilatura](https://trafilatura.readthedocs.io/) | local (Python) | Privacy-sensitive or offline. Well-tuned for news/blog articles. |
+13	| `readnode <url>` | [readability-cli](https://gitlab.com/gardenappl/readability-cli) (Mozilla Readability port) | local (Node) | Same algorithm as Firefox/Safari Reader View. Often the best article fidelity. |
+14	| `readraw <url>` | `curl \| pandoc -f html -t gfm` | local | Escape hatch: docs / reference pages where article extraction strips too much. |
+15	
+16	All four pipe into [`glow`](https://github.com/charmbracelet/glow) for rendering and paging, and all four wrap the fetch in `try_direct_then_proxy` so pages reachable without a proxy pay zero overhead.
+17	
+18	Source: `dot_config/zsh/tools/55_web_reader.zsh` (readers) and `dot_config/zsh/tools/50_networking.zsh` (proxy helpers).
+19	
+20	## The landscape — why four tools, not one
+21	
+22	"Read a webpage as markdown" decomposes into three independent choices:
+23	
+24	1. **Fetch** — `curl`, headless browser (for JS-heavy pages), or a remote service that fetches on your behalf.
+25	2. **Extract** — strip navigation, ads, comments, footers; keep the article. Or don't, if you want the whole page.
+26	3. **Render** — markdown into the terminal; `glow`, `mdcat`, or plain stdout.
+27	
+28	No single tool owns the full pipeline well:
+29	
+30	- [**Jina AI Reader**](https://jina.ai/reader) collapses fetch + extract into a single HTTP GET: `https://r.jina.ai/<url>` returns ready-to-read markdown. Zero install. Trade-offs: remote service (privacy / availability), and may itself be blocked from some networks — fall back through a proxy in that case.
+31	- [**trafilatura**](https://trafilatura.readthedocs.io/) is a Python library + CLI focused on article extraction. Local, offline, battle-tested on news/blog corpora. Weakness: built-in fetcher is bare — sites with heavy anti-bot measures can trip it.
+32	- [**readability-cli**](https://gitlab.com/gardenappl/readability-cli) (binary: `readable`) wraps Mozilla's Readability library — the exact algorithm behind Firefox / Safari Reader View. Excellent fidelity on article-shaped pages.
+33	- [**pandoc**](https://pandoc.org/) does no extraction; it converts full HTML to GFM markdown. Handy when the "article body" is the whole page (e.g. a man-page-style spec, a GitHub README rendered HTML, a single-column docs page).
+34	
+35	Other options considered but not wired up (install manually if you want them):
+36	
+37	- [**monolith**](https://github.com/Y2Z/monolith) — saves a whole page (+ assets) as a single-file HTML. Good for archival, but doesn't help with focus reading.
+38	- [**w3m / lynx / elinks -dump**](https://w3m.sourceforge.net/) — text-mode browsers that render to plaintext (not markdown). Useful when all else fails; no extraction.
+39	- [**Postlight Parser**](https://github.com/postlight/parser) — older, less maintained than readability-cli, same family.
+40	- [**single-file-cli**](https://github.com/gildas-lormeau/single-file-cli) — headless-Chrome based; overkill for reading, great for archival.
+41	- [**mdcat**](https://github.com/swsnr/mdcat) — alternative markdown renderer (hyperlinked terminals); `glow -p` remains the default here because it pages.
+42	
+43	## Usage
+44	
+45	```bash
+46	# jina.ai Reader — default, zero-install (beyond glow)
+47	readurl nytimes.com/2024/.../some-article
+48	
+49	# trafilatura — fully local, no third-party
+50	readlocal example.com/some-article
+51	
+52	# Mozilla Readability — best article fidelity
+53	readnode example.com/some-article
+54	
+55	# No extraction — full page HTML → GFM markdown
+56	readraw docs.example.com/reference/api
+57	```
+58	
+59	URLs don't need a scheme — `_norm_url` prepends `https://` if missing.
+60	
+61	### Recipes
+62	
+63	**Save the extracted markdown to a file**
+64	
+65	```bash
+66	trafilatura -u "https://example.com/post" --markdown > post.md
+67	readable "https://example.com/post" > post.md
+68	curl -fsSL https://r.jina.ai/https://example.com/post > post.md
+69	```
+70	
+71	**Pipe into a chat / LLM CLI**
+72	
+73	```bash
+74	trafilatura -u "$url" --markdown | llm -s "Summarize in 5 bullets"
+75	readable "$url" | claude -p "Extract the key claims"
+76	```
+77	
+78	**Render with color in the terminal but no pager (useful in pipes)**
+79	
+80	```bash
+81	readurl example.com | cat      # glow still formats; cat drops the pager
+82	```
+83	
+84	## Proxy behavior
+85	
+86	Every reader wraps its fetch in `try_direct_then_proxy` (from `50_networking.zsh`). That means:
+87	
+88	1. First attempt is direct — no proxy, no env mangling. Cheap.
+89	2. On failure (non-zero exit), and only if a local proxy is detected, retry via `withproxy`.
+90	3. If no proxy is available, the original exit code is preserved.
+91	
+92	A note appears on stderr when the retry happens: `[retry via proxy http://127.0.0.1:7890]`.
+93	
+94	### Detection priority
+95	
+96	1. `$LOCAL_PROXY_URL` if exported (e.g. `http://127.0.0.1:7890`).
+97	2. Otherwise, auto-probe loopback ports in this order: `7890 7891 1087 8118 8080`. First TCP-accepting port wins.
+98	3. Otherwise, proxy is marked unavailable.
+99	
+100	The result is cached per shell in `_ZSH_NET_PROXY_CACHE`. Call `proxy-refresh` after starting or stopping your local proxy to re-probe.
+101	
+102	### Split HTTP / SOCKS5 ports (Clash `port:` + `socks-port:`)
+103	
+104	Clash's mixed-port config (`mixed-port: 7890`) serves both HTTP and SOCKS5 on one port — the default behavior here Just Works.
+105	
+106	If your config splits them (e.g. `port: 7890` for HTTP, `socks-port: 7891` for SOCKS5), set both explicitly:
+107	
+108	```bash
+109	export LOCAL_PROXY_URL="http://127.0.0.1:7890"           # HTTP/HTTPS
+110	export LOCAL_PROXY_SOCKS_URL="socks5://127.0.0.1:7891"   # SOCKS5
+111	```
+112	
+113	`withproxy` and `proxy-on` then export:
+114	
+115	| Env var | Uses |
+116	|---|---|
+117	| `http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY` | `LOCAL_PROXY_URL` |
+118	| `ALL_PROXY`, `all_proxy` | `LOCAL_PROXY_SOCKS_URL` (fallback: `LOCAL_PROXY_URL`) |
+119	
+120	`proxy-status` shows both URLs when they differ.
+121	
+122	### Auto-activate on shell startup
+123	
+124	For machines that always route through the local proxy, auto-export the env vars at shell startup:
+125	
+126	```bash
+127	# e.g. in a machine-local zsh file, or ~/.zshenv
+128	export LOCAL_PROXY_AUTO_ACTIVATE=1
+129	```
+130	
+131	When `50_networking.zsh` is sourced, it silently runs `proxy-on -q` if a proxy is detected. Nothing happens on machines without a proxy running.
+132	
+133	Pairs naturally with `LOCAL_PROXY_URL` + `LOCAL_PROXY_SOCKS_URL` for deterministic behavior, or on its own to rely on port auto-probing.
+134	
+135	## Proxy helper cheat sheet
+136	
+137	| Helper | Scope | Notes |
+138	|---|---|---|
+139	| `withproxy <cmd…>` | one child process | `withproxy curl …`, `withproxy pip install …` |
+140	| `try_direct_then_proxy <cmd…>` | one child, direct → proxy fallback | what the readers use internally |
+141	| `proxy-on` / `proxy-on -q` | current shell, exports env vars | `-q` skips the success print |
+142	| `proxy-off` | current shell, unsets env vars | also clears `ALL_PROXY`/`all_proxy`/`NO_PROXY` |
+143	| `proxy-status` | read-only | reports **active** / **available** / **unavailable** + HTTP / SOCKS URLs |
+144	| `proxy-refresh` | invalidate cache, re-probe | run after starting/stopping your proxy |
+145	
+146	## Installation
+147	
+148	| Tool | macOS | Debian/Ubuntu | Via ansible |
+149	|---|---|---|---|
+150	| `glow` | `brew install glow` | GitHub binary | `devtools` role |
+151	| `pandoc` | `brew install pandoc` | `apt install pandoc` | `devtools` role |
+152	| `trafilatura` | `uv tool install trafilatura` | `uv tool install trafilatura` | `python_uv_tools` role (enabled via `chezmoi init --force`) |
+153	| `readable` (readability-cli) | `npm install -g readability-cli` | `npm install -g readability-cli` | user-opt-in (not auto-installed) |
+154	| `curl`, `nc` | preinstalled | preinstalled | — |
+155	
+156	Each reader checks its dependencies at call time and prints a one-line install hint if something is missing, so `readnode` on a fresh machine will tell you exactly what to run.
+157	
+158	## Related
+159	
+160	- `docs/zsh/aliases.md` — the single-line reference table for all shell shortcuts.
+161	- `docs/tools/networking.md` — the broader networking-CLI doc (nmap, doggo, bandwhich, etc.).
+162	- `dot_config/zsh/tools/50_networking.zsh` — proxy helper implementation.
+163	- `dot_config/zsh/tools/55_web_reader.zsh` — reader function implementation.
+164
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:30Z)**_
+
+Let me check the shell config for any other npm/bun references:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/55_web_reader.zsh`
+
+```text
+1	# 55_web_reader.zsh - Render web pages as markdown in the terminal
+2	#
+3	# Four extractors, pick by function name:
+4	#   readurl   - jina.ai Reader (remote, zero local deps beyond glow)
+5	#   readlocal - trafilatura (local, Python; offline article extraction)
+6	#   readnode  - readability-cli / `readable` (local, Node; Mozilla Readability)
+7	#   readraw   - curl + pandoc (full page -> GFM; no article extraction)
+8	#
+9	# All wrap the underlying fetch in `try_direct_then_proxy` from 50_networking.zsh,
+10	# so non-GFW'd URLs pay zero proxy overhead and only fall back if direct fetch fails.
+11	
+12	# Normalize URL: prepend https:// if scheme missing.
+13	_norm_url() {
+14	  local url="$1"
+15	  if [[ "$url" != http://* && "$url" != https://* ]]; then
+16	    url="https://$url"
+17	  fi
+18	  printf '%s\n' "$url"
+19	}
+20	
+21	# Missing-binary guard: print a one-line install hint and return 127.
+22	__zsh_reader_require() {
+23	  local bin="$1" hint="$2"
+24	  if ! command -v "$bin" &>/dev/null; then
+25	    print -u2 "$bin not found -- install: $hint"
+26	    return 127
+27	  fi
+28	  return 0
+29	}
+30	
+31	# readurl <url> - jina.ai Reader + glow. The default convenience.
+32	readurl() {
+33	  local raw="$1"
+34	  if [[ -z "$raw" ]]; then
+35	    print -u2 "usage: readurl <url>"
+36	    return 2
+37	  fi
+38	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+39	  local url; url="$(_norm_url "$raw")"
+40	  try_direct_then_proxy glow -p "https://r.jina.ai/$url"
+41	}
+42	
+43	# readlocal <url> - trafilatura (offline article extraction) + glow.
+44	readlocal() {
+45	  local raw="$1"
+46	  if [[ -z "$raw" ]]; then
+47	    print -u2 "usage: readlocal <url>"
+48	    return 2
+49	  fi
+50	  __zsh_reader_require trafilatura "uv tool install trafilatura  (or enable the python_uv_tools ansible role)" || return
+51	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+52	  local url; url="$(_norm_url "$raw")"
+53	  try_direct_then_proxy trafilatura -u "$url" --markdown | glow -
+54	}
+55	
+56	# readnode <url> - readability-cli (`readable`) + glow.
+57	readnode() {
+58	  local raw="$1"
+59	  if [[ -z "$raw" ]]; then
+60	    print -u2 "usage: readnode <url>"
+61	    return 2
+62	  fi
+63	  __zsh_reader_require readable "npm install -g readability-cli" || return
+64	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+65	  local url; url="$(_norm_url "$raw")"
+66	  try_direct_then_proxy readable "$url" | glow -
+67	}
+68	
+69	# readraw <url> - full-page HTML -> markdown via pandoc (no article extraction).
+70	readraw() {
+71	  local raw="$1"
+72	  if [[ -z "$raw" ]]; then
+73	    print -u2 "usage: readraw <url>"
+74	    return 2
+75	  fi
+76	  __zsh_reader_require curl "apt install curl  (usually preinstalled)" || return
+77	  __zsh_reader_require pandoc "brew install pandoc  (or apt install pandoc)" || return
+78	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+79	  local url; url="$(_norm_url "$raw")"
+80	  try_direct_then_proxy curl -fsSL "$url" | pandoc -f html -t gfm | glow -
+81	}
+82
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -rn "readability-cli\|@postlight/parser\|npm install\|bun install\|bun x\|bunx" /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh --include="*.zsh" 2>/dev/null`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/55_web_reader.zsh:6:#   readnode  - readability-cli / `readable` (local, Node; Mozilla Readability)
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/55_web_reader.zsh:56:# readnode <url> - readability-cli (`readable`) + glow.
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/55_web_reader.zsh:63:  __zsh_reader_require readable "npm install -g readability-cli" || return
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/07_bunx_cli.zsh:1:# 07_bunx_cli.zsh - bunx CLI tool aliases
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/07_bunx_cli.zsh:2:# These tools run via bunx (Bun's package runner)
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/07_bunx_cli.zsh:5:alias ccusage="bunx ccusage"
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:32Z)**_
+
+Now let me check the run_once bootstrap scripts to see node/bun initialization:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:33Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+1	#!/bin/bash
+2	# Bootstrap script - installs Homebrew, uv, ansible, mise, and galaxy collections
+3	# Runs BEFORE any ansible playbooks
+4	# Profile: {{ .profile }}
+5	
+6	set -e
+7	
+8	# Colors for output
+9	RED='\033[0;31m'
+10	GREEN='\033[0;32m'
+11	YELLOW='\033[1;33m'
+12	BLUE='\033[0;34m'
+13	NC='\033[0m' # No Color
+14	
+15	info() {
+16	    echo -e "${BLUE}[INFO]${NC} $1"
+17	}
+18	
+19	success() {
+20	    echo -e "${GREEN}[SUCCESS]${NC} $1"
+21	}
+22	
+23	warn() {
+24	    echo -e "${YELLOW}[WARN]${NC} $1"
+25	}
+26	
+27	error() {
+28	    echo -e "${RED}[ERROR]${NC} $1"
+29	}
+30	
+31	# Fix broken locale (e.g. RPi with LC_ALL=en_US.UTF-8 but locale not generated)
+32	# Ansible requires UTF-8 encoding, so fall back to C.UTF-8 (not plain C).
+33	if locale 2>&1 | grep -qi "cannot set"; then
+34	    warn "Broken locale detected, falling back to LC_ALL=C.UTF-8"
+35	    export LC_ALL=C.UTF-8
+36	    export LANG=C.UTF-8
+37	fi
+38	
+39	# Ensure PATH includes local bin and Homebrew
+40	export PATH="$HOME/.local/bin:$PATH"
+41	
+42	# Add Homebrew to PATH if installed
+43	{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+44	# macOS: Apple Silicon and Intel paths
+45	if [[ -f /opt/homebrew/bin/brew ]]; then
+46	    eval "$(/opt/homebrew/bin/brew shellenv)"
+47	elif [[ -f /usr/local/bin/brew ]]; then
+48	    eval "$(/usr/local/bin/brew shellenv)"
+49	fi
+50	{{ else -}}
+51	# Linux: Linuxbrew paths
+52	if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+53	    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+54	elif [[ -d "$HOME/.linuxbrew" ]]; then
+55	    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+56	fi
+57	{{ end -}}
+58	
+59	# =============================================================================
+60	# 0. Homebrew Installation
+61	# =============================================================================
+62	# macOS: Always install Homebrew (required for ansible roles)
+63	# Linux: Optional - only install if installBrewApps is enabled
+64	# =============================================================================
+65	
+66	{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+67	# macOS: Install Homebrew (required for package management)
+68	if ! command -v brew &> /dev/null; then
+69	    info "Installing Homebrew (macOS)..."
+70	    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+71	    # Add to PATH for this session
+72	    if [[ -f /opt/homebrew/bin/brew ]]; then
+73	        eval "$(/opt/homebrew/bin/brew shellenv)"
+74	    elif [[ -f /usr/local/bin/brew ]]; then
+75	        eval "$(/usr/local/bin/brew shellenv)"
+76	    fi
+77	    success "Homebrew installed successfully"
+78	else
+79	    info "Homebrew is already installed"
+80	fi
+81	{{ else -}}
+82	# Linux: Install Linuxbrew (useful for packages not available or outdated in apt)
+83	{{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+84	{{ if $noRoot -}}
+85	# noRoot mode: Skip Linuxbrew (requires sudo for dependencies)
+86	info "noRoot mode: Skipping Linuxbrew installation (requires sudo)"
+87	{{ else -}}
+88	# Detect userland architecture (kernel may differ, e.g. RPi 4: armhf userland + aarch64 kernel)
+89	if command -v dpkg &>/dev/null; then
+90	    BREW_REAL_ARCH="$(dpkg --print-architecture)"
+91	else
+92	    BREW_REAL_ARCH="$(uname -m)"
+93	fi
+94	
+95	case "$BREW_REAL_ARCH" in
+96	    amd64|x86_64|arm64|aarch64)
+97	        if ! command -v brew &> /dev/null; then
+98	            info "Installing Linuxbrew..."
+99	            # Install Linuxbrew dependencies first
+100	            if command -v apt-get &> /dev/null; then
+101	                sudo apt-get update
+102	                sudo apt-get install -y build-essential procps curl file git
+103	            fi
+104	            # Install Linuxbrew
+105	            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+106	            # Add to PATH for this session
+107	            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+108	                eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+109	            elif [[ -d "$HOME/.linuxbrew" ]]; then
+110	                eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+111	            fi
+112	            success "Linuxbrew installed successfully"
+113	        else
+114	            info "Linuxbrew is already installed"
+115	        fi
+116	        ;;
+117	    *)
+118	        warn "Skipping Linuxbrew: unsupported userland architecture '$BREW_REAL_ARCH' (Homebrew requires amd64 or arm64)"
+119	        # Remove broken Linuxbrew if it was installed before arch detection existed
+120	        if command -v brew &>/dev/null; then
+121	            warn "Removing unusable Linuxbrew installation for '$BREW_REAL_ARCH'..."
+122	            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+123	                sudo rm -rf /home/linuxbrew/.linuxbrew
+124	            fi
+125	        fi
+126	        ;;
+127	esac
+128	{{ end -}}
+129	{{ end -}}
+130	# 1. Install uv if missing
+131	if ! command -v uv &> /dev/null; then
+132	    info "Installing uv..."
+133	    curl -LsSf https://astral.sh/uv/install.sh | sh
+134	    success "uv installed successfully"
+135	else
+136	    info "uv is already installed"
+137	fi
+138	
+139	# 2. Install build dependencies needed by mise tools (Ruby) and ansible (cryptography)
+140	{{ $noRootDeps := false }}{{ if hasKey . "noRoot" }}{{ $noRootDeps = .noRoot }}{{ end -}}
+141	{{ if not $noRootDeps -}}
+142	if command -v apt-get &> /dev/null; then
+143	    sudo apt-get install -y libffi-dev libyaml-dev python3-dev 2>/dev/null || true
+144	fi
+145	{{ end -}}
+146	
+147	# 3. Install mise if missing (runtime manager for Node.js, etc.)
+148	# Use "mise --version" instead of "command -v" to catch arch-mismatch binaries
+149	# (e.g. aarch64 binary on armhf userland — file exists but cannot execute)
+150	if ! mise --version &> /dev/null; then
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-21 03:00:54Z)**_
+
+Perfect. Now I have enough information to compile the inventory. Let me create a comprehensive report:
+
+## Node/npm/bun CLI Tools Inventory
+
+### 1. Ansible Roles Installing npm-based Tools
+
+**coding_agents** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml`):
+- **Line 139-146**: GitHub Copilot CLI via `community.general.npm` module
+  - Tool: `@githubnext/github-copilot-cli`
+  - Method: `npm install -g` (via Ansible module)
+  - Prerequisites: npm must be available
+  - Wrapper: idempotency checks with `which npm` (line 127)
+
+- **Line 224-233**: Gemini CLI npm fallback (macOS)
+  - Tool: `@google/gemini-cli`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available; Homebrew install attempted first (line 207-213)
+  - Conditional: Lines 225-229
+
+- **Line 244-252**: Gemini CLI (Linux)
+  - Tool: `@google/gemini-cli`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available, Linux only
+
+- **Line 1093-1101**: OpenChamber
+  - Tool: `@openchamber/web`
+  - Method: `npm install -g` (Ansible module)
+  - Prerequisite: npm available
+
+**bitwarden** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bitwarden/tasks/main.yml`):
+- **Line 78-90**: Bitwarden CLI via npm
+  - Tool: `@bitwarden/cli` (from defaults: `/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bitwarden/defaults/main.yml` line 3)
+  - Method: `community.general.npm` module with retry logic (3x, 5s delay)
+  - Prerequisites: npm check (line 18-25), fallback to mise npm exec (line 92-106)
+  - Wrapper: Checks `npm --version` (line 22)
+
+- **Line 92-106**: Bitwarden CLI via mise npm fallback
+  - Tool: `@bitwarden/cli`
+  - Method: Shell exec via `mise exec -- npm install -g`
+  - Fallback: When npm not in PATH but mise available
+
+**lazyvim_deps** role (`/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml`):
+- **Line 258-269**: tree-sitter-cli via mise npm
+  - Tool: `tree-sitter-cli`
+  - Method: `{{ mise_bin }} exec -- npm install -g tree-sitter-cli`
+  - Prerequisite: mise binary available, architecture check (armv7l/armv6l skipped)
+  - Fallback: cargo build if npm fails (line 286-303)
+
+---
+
+### 2. npm/bun Tool References Outside Ansible
+
+**Shell configuration** (`dot_config/zsh/tools/55_web_reader.zsh`):
+- **Line 63**: `readability-cli` npm install hint
+  - Context: `__zsh_reader_require readable "npm install -g readability-cli"`
+  - Not auto-installed; user hint only
+
+**Shell configuration** (`dot_config/zsh/tools/07_bunx_cli.zsh`):
+- **Line 5**: `ccusage` alias via bunx
+  - Command: `alias ccusage="bunx ccusage"`
+  - Tool: `ccusage` (npm package run via bun)
+  - Method: `bunx` (Bun's package runner)
+
+**Documentation** (`docs/tools/web-reader.md`):
+- **Line 153**: `readability-cli` installation note
+  - Context: `npm install -g readability-cli`
+  - Not auto-installed; user-opt-in only
+
+**Mise configuration** (`dot_config/mise/config.toml.tmpl`):
+- **Line 12**: Node.js LTS
+  - Tool: `node = "lts"`
+- **Line 14**: Bun latest
+  - Tool: `bun = "latest"`
+  - Context: "Bun for bunx CLI tools"
+
+---
+
+### 3. Bun Installation
+
+**Status**: Installed via mise (not explicit ansible task).
+
+- **Mise config** (`dot_config/mise/config.toml.tmpl` line 14): `bun = "latest"`
+- **Install mechanism**: Via `lazyvim_deps` role's `mise install --yes` command
+  - macOS: `mise` installed via Homebrew → calls mise tools (no explicit node/bun ansible task)
+  - Linux: `mise install --yes` in `lazyvim_deps` role (line 54-62)
+  - **Architecture gating**: Bun skipped on armv7l/armv6l (line 40, comment line 40-43)
+
+---
+
+### 4. Node.js / mise Installation Coverage
+
+**macOS**:
+- **Installed via**: Homebrew `node` package (lazyvim_deps role line 12)
+- **Default**: Always installed (non-conditional)
+- **Mise**: Not explicitly managed via ansible on macOS
+
+**Linux (Debian/Ubuntu)**:
+- **Installed via**: Mise runtime manager
+  - Bootstrap script sets up mise (`run_once_before_00_bootstrap.sh.tmpl` line 147+)
+  - `lazyvim_deps` role runs `mise install --yes` (line 54-62)
+  - **Node version**: `@lts` by default; `@20` forced on armv7l/armv6l (line 49)
+- **Default**: Always installed (non-conditional, though can fail gracefully line 62: `failed_when: false`)
+
+---
+
+### 5. Chezmoi Init Prompts for JS/Coding Tools
+
+File: `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl`
+
+- **Line 14-15**: `installCodingAgents` prompt
+  - Text: "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)"
+  - Default: `true`
+  - Covers: Claude Code, OpenCode, Cursor CLI, GitHub Copilot CLI, Gemini CLI, RTK, SpecStory, CodexBar, td, sidecar
+
+- **Line 16-17**: `installBitwarden` prompt
+  - Text: "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion"
+  - Default: `false`
+  - Covers: `@bitwarden/cli` via npm
+
+---
+
+### 6. Documentation on npm vs bun
+
+**None found.** No docs compare npm vs bun for CLI tool installation or discuss installation strategy differences.
+
+The only mention is in `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md` line 153, which notes `readability-cli` can be installed manually via `npm install -g readability-cli` (not auto-installed; not a bun alternative suggested).
+
+---
+
+## Summary
+
+**Current state**: 
+- **6 npm tools** installed via Ansible (`@bitwarden/cli`, `@githubnext/github-copilot-cli`, `@google/gemini-cli`, `@openchamber/web`, `tree-sitter-cli`, implicit `node` for LazyVim)
+- **1 bun tool** (ccusage via `bunx`) referenced in zsh config only, no ansible installation
+- **1 optional npm tool** (readability-cli) documented but not auto-installed
+- **All installations use `npm install -g`** via Ansible `npm` module or `mise exec -- npm`
+- **Bun installed via mise** (not explicit ansible), always on macOS/Linux except armv7l
+- **No consolidation** — tools scattered across `coding_agents`, `bitwarden`, `lazyvim_deps` roles
+- **No bun install -g / bun x adoption** despite bun available; only ccusage alias exists for bunx
+
+_**Agent (claude-opus-4-7 2026-04-21 03:01:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:01:58Z)**_
+
+Good inventory. Let me check how the existing npm installs are structured so the new role follows the same pattern.
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/bitwarden/tasks/main.yml`
+
+```text
+1	---
+2	# Bitwarden role - CLI installation + Desktop app (for SSH agent)
+3	# CLI: Installs @bitwarden/cli via npm, with mise fallback when npm is not in PATH.
+4	# Desktop: Installs Bitwarden desktop app (snap/deb on Linux, Homebrew cask on macOS)
+5	#          when bitwarden_install_desktop=true (passed via --extra-vars)
+6	
+7	# =============================================================================
+8	# CLI Installation
+9	# =============================================================================
+10	
+11	- name: Check if Bitwarden CLI is already installed
+12	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+13	  ansible.builtin.command: which bw
+14	  register: bitwarden_cli_check
+15	  changed_when: false
+16	  failed_when: false
+17	
+18	- name: Check if npm is available for Bitwarden CLI install
+19	  when:
+20	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+21	    - bitwarden_cli_check.rc != 0
+22	  ansible.builtin.command: npm --version
+23	  register: bitwarden_npm_check
+24	  changed_when: false
+25	  failed_when: false
+26	
+27	- name: Check for user-installed mise (Bitwarden fallback)
+28	  when:
+29	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+30	    - bitwarden_cli_check.rc != 0
+31	    - bitwarden_npm_check.rc != 0
+32	  ansible.builtin.stat:
+33	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+34	  register: bitwarden_mise_user_bin
+35	
+36	- name: Set Bitwarden mise binary path (user install)
+37	  when:
+38	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+39	    - bitwarden_cli_check.rc != 0
+40	    - bitwarden_npm_check.rc != 0
+41	    - bitwarden_mise_user_bin.stat.exists | default(false)
+42	  ansible.builtin.set_fact:
+43	    bitwarden_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+44	
+45	- name: Check for system mise (Bitwarden fallback)
+46	  when:
+47	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+48	    - bitwarden_cli_check.rc != 0
+49	    - bitwarden_npm_check.rc != 0
+50	    - bitwarden_mise_bin is not defined
+51	  ansible.builtin.command: mise --version
+52	  register: bitwarden_mise_system_check
+53	  changed_when: false
+54	  failed_when: false
+55	
+56	- name: Set Bitwarden mise binary path (system install)
+57	  when:
+58	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+59	    - bitwarden_cli_check.rc != 0
+60	    - bitwarden_npm_check.rc != 0
+61	    - bitwarden_mise_bin is not defined
+62	    - bitwarden_mise_system_check.rc == 0
+63	  ansible.builtin.set_fact:
+64	    bitwarden_mise_bin: mise
+65	
+66	- name: Fail when neither npm nor mise is available for Bitwarden install
+67	  when:
+68	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+69	    - bitwarden_cli_check.rc != 0
+70	    - bitwarden_npm_check.rc != 0
+71	    - bitwarden_mise_bin is not defined
+72	  ansible.builtin.fail:
+73	    msg: >-
+74	      installBitwarden=true requires npm or mise (with npm runtime) to install
+75	      {{ bitwarden_cli_npm_package }}. Ensure Node.js is installed (e.g. via mise)
+76	      and re-run ansible.
+77	
+78	- name: Install Bitwarden CLI via npm
+79	  when:
+80	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+81	    - bitwarden_cli_check.rc != 0
+82	    - bitwarden_npm_check.rc == 0
+83	  community.general.npm:
+84	    name: "{{ bitwarden_cli_npm_package }}"
+85	    global: true
+86	    state: present
+87	  register: bitwarden_npm_install
+88	  until: bitwarden_npm_install is succeeded
+89	  retries: 3
+90	  delay: 5
+91	
+92	- name: Install Bitwarden CLI via mise npm fallback
+93	  when:
+94	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+95	    - bitwarden_cli_check.rc != 0
+96	    - bitwarden_npm_check.rc != 0
+97	    - bitwarden_mise_bin is defined
+98	  ansible.builtin.shell: |
+99	    {{ bitwarden_mise_bin }} exec -- npm install -g {{ bitwarden_cli_npm_package }}
+100	  args:
+101	    executable: /bin/bash
+102	  register: bitwarden_mise_npm_install
+103	  until: bitwarden_mise_npm_install is succeeded
+104	  retries: 3
+105	  delay: 5
+106	  changed_when: true
+107	
+108	# =============================================================================
+109	# Desktop App Installation (for SSH agent support)
+110	# Only runs when bitwarden_install_desktop=true (set via --extra-vars)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/bitwarden/defaults/main.yml`
+
+```text
+1	---
+2	# Default variables for bitwarden role
+3	bitwarden_cli_npm_package: "@bitwarden/cli"
+4	
+5	# Whether to install the Bitwarden desktop app (for SSH agent support)
+6	# Override via --extra-vars "bitwarden_install_desktop=true"
+7	# Only meaningful on ubuntu_desktop (snap/deb) and macOS (homebrew cask)
+8	bitwarden_install_desktop: false
+9
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:01Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/playbooks/macos.yml`
+
+```text
+1	---
+2	# macOS playbook - Homebrew-based setup
+3	- name: macOS setup
+4	  hosts: local
+5	  gather_facts: true
+6	
+7	  pre_tasks:
+8	    - name: Set target_architecture from gathered facts
+9	      ansible.builtin.set_fact:
+10	        target_architecture: "{{ ansible_facts['architecture'] }}"
+11	      tags: [always]
+12	
+13	  roles:
+14	    - role: homebrew
+15	      tags: [homebrew]
+16	
+17	    - role: base
+18	      tags: [base]
+19	
+20	    - role: zsh
+21	      tags: [zsh]
+22	
+23	    - role: starship
+24	      tags: [starship]
+25	
+26	    - role: neovim
+27	      tags: [neovim]
+28	
+29	    - role: lazyvim_deps
+30	      tags: [lazyvim_deps]
+31	
+32	    - role: devtools
+33	      tags: [devtools]
+34	
+35	    - role: docker
+36	      tags: [docker]
+37	
+38	    - role: nerdfonts
+39	      tags: [nerdfonts]
+40	
+41	    - role: coding_agents
+42	      tags: [coding_agents]
+43	
+44	    - role: bitwarden
+45	      tags: [bitwarden]
+46	
+47	    - role: security_tools
+48	      tags: [security_tools]
+49	
+50	    - role: python_uv_tools
+51	      tags: [python_uv_tools]
+52	
+53	    - role: rust_cargo_tools
+54	      tags: [rust_cargo_tools]
+55	
+56	    - role: llm_tools
+57	      tags: [llm_tools]
+58	
+59	    - role: ruby_gem_tools
+60	      tags: [ruby_gem_tools]
+61	
+62	    - role: alacritty
+63	      tags: [alacritty]
+64	
+65	    - role: input_method
+66	      tags: [input_method]
+67	
+68	    - role: networking_tools
+69	      tags: [networking_tools]
+70	
+71	    # Note: brew_bundle is now managed by chezmoi run_onchange script
+72	    # See run_onchange_after_30_brew_bundle.sh.tmpl
+73
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:01Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/playbooks/linux.yml`
+
+```text
+1	---
+2	# Linux playbook - Ubuntu/Debian setup
+3	- name: Linux setup
+4	  hosts: local
+5	  gather_facts: true
+6	
+7	  pre_tasks:
+8	    # RPi 4 can run a 64-bit kernel (aarch64) with 32-bit userland (armhf).
+9	    # ansible_facts['architecture'] reflects the kernel, which leads to
+10	    # downloading aarch64 binaries that cannot execute.  Detect the real
+11	    # userland architecture and expose it as target_architecture for all roles.
+12	    # Note: set_fact cannot reliably override ansible_facts['architecture']
+13	    # when inject_facts_as_vars=False, so we use a dedicated variable instead.
+14	    - name: Detect userland architecture via dpkg
+15	      ansible.builtin.command: dpkg --print-architecture
+16	      register: dpkg_arch_result
+17	      changed_when: false
+18	      failed_when: false
+19	      tags: [always]
+20	
+21	    - name: Set target_architecture from dpkg
+22	      ansible.builtin.set_fact:
+23	        target_architecture: >-
+24	          {{ {'amd64': 'x86_64', 'arm64': 'aarch64', 'armhf': 'armv7l', 'armel': 'armv6l', 'i386': 'i686'}
+25	             [dpkg_arch_result.stdout | trim]
+26	             | default(ansible_facts['architecture']) }}
+27	      when: dpkg_arch_result.rc == 0 and dpkg_arch_result.stdout | trim != ''
+28	      tags: [always]
+29	
+30	    - name: Fallback target_architecture to gathered facts
+31	      ansible.builtin.set_fact:
+32	        target_architecture: "{{ ansible_facts['architecture'] }}"
+33	      when: target_architecture is not defined
+34	      tags: [always]
+35	
+36	  roles:
+37	    - role: base
+38	      tags: [base]
+39	
+40	    - role: zsh
+41	      tags: [zsh]
+42	
+43	    - role: starship
+44	      tags: [starship]
+45	
+46	    - role: neovim
+47	      tags: [neovim]
+48	
+49	    - role: lazyvim_deps
+50	      tags: [lazyvim_deps]
+51	
+52	    - role: devtools
+53	      tags: [devtools]
+54	
+55	    - role: docker
+56	      tags: [docker]
+57	
+58	    - role: nerdfonts
+59	      tags: [nerdfonts]
+60	
+61	    - role: coding_agents
+62	      tags: [coding_agents]
+63	
+64	    - role: bitwarden
+65	      tags: [bitwarden]
+66	
+67	    - role: security_tools
+68	      tags: [security_tools]
+69	
+70	    - role: python_uv_tools
+71	      tags: [python_uv_tools]
+72	
+73	    - role: rust_cargo_tools
+74	      tags: [rust_cargo_tools]
+75	
+76	    - role: llm_tools
+77	      tags: [llm_tools]
+78	
+79	    - role: ruby_gem_tools
+80	      tags: [ruby_gem_tools]
+81	
+82	    - role: alacritty
+83	      tags: [alacritty]
+84	
+85	    - role: input_method
+86	      tags: [input_method]
+87	
+88	    - role: networking_tools
+89	      tags: [networking_tools]
+90
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:30Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:31Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoi.toml.tmpl`
+
+```text
+1	# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+2	
+3	[data]
+4	# 只在 init 才需要問一次：你之後都讀這個值
+5	# TODO: not all the things we want to change all the time we chezmoi init
+6	{{- $profile := promptStringOnce . "profile" "profile (ubuntu_server|ubuntu_desktop|macos|macos_intel)" "macos" }}
+7	profile = {{ $profile | quote }}
+8	email   = {{ promptStringOnce . "email" "What is your email address" "daviddwlee84@gmail.com" | quote }}
+9	name    = {{ promptStringOnce . "name" "What is your full name" "Da-Wei Lee" | quote }}
+10	# 是否在中國大陸 GFW 內，需要使用鏡像源
+11	useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (behind GFW) and need to use mirrors" false }}
+12	# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+13	gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)" false }}
+14	# 是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)
+15	installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
+16	# 是否安裝 Bitwarden CLI 並啟用 SSH Agent 自動偵測 + Zsh completion
+17	installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion" false }}
+18	# 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
+19	installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
+20	# 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
+21	installLlmTools = {{ promptBoolOnce . "installLlmTools" "Install local LLM tools (Ollama, LiteLLM, llmfit, models)" false }}
+22	# 是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)
+23	{{ if or (eq $profile "macos") (eq $profile "macos_intel") -}}
+24	installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)" false }}
+25	{{ else -}}
+26	installAiDesktopApps = false
+27	{{ end -}}
+28	# 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
+29	installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)" false }}
+30	# 是否安裝繁體中文輸入法 (McBopomofo + RIME)
+31	installInputMethod = {{ promptBoolOnce . "installInputMethod" "Install Traditional Chinese input methods (McBopomofo, RIME)" false }}
+32	# 是否安裝網路診斷工具 (nmap, mtr, httpie, gping, trippy, etc.)
+33	installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
+34	# 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
+35	noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
+36	# 在 chezmoi apply 之前備份現有的 dotfiles
+37	backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
+38	# 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
+39	allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}
+40	
+41	# https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
+42	[diff]
+43	    exclude = ["scripts"]
+44	{{- if lookPath "delta" }}
+45	    # Side-by-side diff: left = current (before apply), right = target (after apply)
+46	    pager = "delta --side-by-side --line-numbers --navigate --paging=always --file-style=yellow --file-decoration-style='yellow ul' --hunk-header-decoration-style='blue box'"
+47	{{- end }}
+48	[status]
+49	    exclude = ["scripts"]
+50
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:32Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./dot_ansible` pattern `python_uv_tools|installPythonUvTools|installLlmTools|installBitwarden|installCodingAgents`
+
+```text
+dot_ansible/playbooks/macos.yml:50:    - role: python_uv_tools
+dot_ansible/playbooks/macos.yml:51:      tags: [python_uv_tools]
+dot_ansible/playbooks/linux.yml:70:    - role: python_uv_tools
+dot_ansible/playbooks/linux.yml:71:      tags: [python_uv_tools]
+dot_ansible/roles/bitwarden/tasks/main.yml:74:      installBitwarden=true requires npm or mise (with npm runtime) to install
+dot_ansible/roles/devtools/tasks/main.yml:1405:# NOTE: thefuck is now installed via uv tool (python_uv_tools role)
+dot_ansible/roles/python_uv_tools/defaults/main.yml:8:python_uv_tools:
+dot_ansible/roles/python_uv_tools/tasks/main.yml:19:  loop: "{{ python_uv_tools }}"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:38Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/python_uv_tools/tasks/main.yml`
+
+```text
+1	---
+2	# Python CLI tools via uv
+3	# uv is bootstrapped before ansible runs
+4	
+5	- name: Install Python CLI tools via uv
+6	  ansible.builtin.command: >-
+7	    uv tool install {{ item.name }}
+8	    {% if item.python is defined %}--python {{ item.python }} {% endif %}
+9	    {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
+10	  register: python_uv_tool_install
+11	  until: python_uv_tool_install is succeeded
+12	  retries: 3
+13	  delay: 5
+14	  args:
+15	    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
+16	  environment:
+17	    UV_HTTP_TIMEOUT: "120"
+18	    UV_HTTP_RETRIES: "5"
+19	  loop: "{{ python_uv_tools }}"
+20	  loop_control:
+21	    label: "{{ item.name }}"
+22
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List run_onchange scripts
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/run_onchange* 2>/dev/null`
+
+```text
+--  /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl
+--  /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_25_bat_theme.sh.tmpl
+--  /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:45Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./run_onchange_after_20_ansible_roles.sh.tmpl` pattern `installPythonUvTools|installCodingAgents|installBitwarden|python_uv_tools|bitwarden|coding_agents`
+
+```text
+18:# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+19:# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+20:# bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}
+21:# bitwarden defaults: {{ include "dot_ansible/roles/bitwarden/defaults/main.yml" | sha256sum }}
+23:# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+24:# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+79:#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
+99:{{ if .installCodingAgents -}}
+100:TAGS="${TAGS},coding_agents"
+102:{{ $installBitwarden := false }}{{ if hasKey . "installBitwarden" }}{{ $installBitwarden = .installBitwarden }}{{ end -}}
+103:{{ if $installBitwarden -}}
+104:TAGS="${TAGS},bitwarden"
+106:{{ if .installPythonUvTools -}}
+107:TAGS="${TAGS},python_uv_tools"
+124:{{ if and $installBitwarden (or (eq .profile "ubuntu_desktop") (eq .profile "macos") (eq .profile "macos_intel")) -}}
+126:EXTRA_VARS="bitwarden_install_desktop=true"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:02:49Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_onchange_after_20_ansible_roles.sh.tmpl`
+
+```text
+70	
+71	# === Profile-based tag selection ===
+72	# Profile: {{ .profile }}
+73	#
+74	# Tag categories:
+75	#   Core:    base, zsh, starship, neovim, lazyvim_deps, security_tools
+76	#   Desktop: devtools, docker, nerdfonts
+77	#   Server:  devtools, docker (no nerdfonts - no GUI)
+78	#   macOS:   homebrew
+79	#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
+80	
+81	{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+82	PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+83	# macOS: full desktop experience
+84	TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
+85	{{ else if eq .profile "ubuntu_desktop" -}}
+86	PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+87	# Ubuntu Desktop: full desktop experience (no homebrew)
+88	TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
+89	{{ else if eq .profile "ubuntu_server" -}}
+90	PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+91	# Ubuntu Server: no GUI stuff (no nerdfonts)
+92	TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+93	{{ else -}}
+94	warn "Unknown profile: {{ .profile }}"
+95	exit 0
+96	{{ end -}}
+97	
+98	# Add optional tags based on chezmoi config
+99	{{ if .installCodingAgents -}}
+100	TAGS="${TAGS},coding_agents"
+101	{{ end -}}
+102	{{ $installBitwarden := false }}{{ if hasKey . "installBitwarden" }}{{ $installBitwarden = .installBitwarden }}{{ end -}}
+103	{{ if $installBitwarden -}}
+104	TAGS="${TAGS},bitwarden"
+105	{{ end -}}
+106	{{ if .installPythonUvTools -}}
+107	TAGS="${TAGS},python_uv_tools"
+108	{{ end -}}
+109	{{ $installLlmTools := false }}{{ if hasKey . "installLlmTools" }}{{ $installLlmTools = .installLlmTools }}{{ end -}}
+110	{{ if $installLlmTools -}}
+111	TAGS="${TAGS},llm_tools"
+112	{{ end -}}
+113	{{ $installInputMethod := false }}{{ if hasKey . "installInputMethod" }}{{ $installInputMethod = .installInputMethod }}{{ end -}}
+114	{{ if $installInputMethod -}}
+115	TAGS="${TAGS},input_method"
+116	{{ end -}}
+117	{{ $installNetworkingTools := false }}{{ if hasKey . "installNetworkingTools" }}{{ $installNetworkingTools = .installNetworkingTools }}{{ end -}}
+118	{{ if $installNetworkingTools -}}
+119	TAGS="${TAGS},networking_tools"
+120	{{ end -}}
+121	
+122	# Extra vars for role-level configuration
+123	EXTRA_VARS=""
+124	{{ if and $installBitwarden (or (eq .profile "ubuntu_desktop") (eq .profile "macos") (eq .profile "macos_intel")) -}}
+125	# Install Bitwarden Desktop app (for SSH agent) on desktop profiles
+126	EXTRA_VARS="bitwarden_install_desktop=true"
+127	{{ end -}}
+128	{{ if $installLlmTools -}}
+129	if [[ -z "$EXTRA_VARS" ]]; then
+130	    EXTRA_VARS="llm_tools_install_brew_apps={{ .installBrewApps }}"
+131	else
+132	    EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
+133	fi
+134	{{ end -}}
+135	
+136	[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+137	
+138	# Handle sudo
+139	BECOME_FLAGS=""
+140	{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+141	{{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+142	{{ if $noRoot -}}
+143	info "noRoot mode enabled on macOS - skipping input_method (requires sudo for pkg installers)"
+144	TAGS="${TAGS//,input_method/}"
+145	{{ else -}}
+146	# Pre-authenticate sudo so Homebrew cask pkg installers (e.g. Squirrel) can run
+147	# without prompting from a non-TTY child process. Credentials cache for ~5min,
+148	# which is enough for the short input_method tag. Touch ID works if configured.
+149	if sudo -n true 2>/dev/null; then
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:28Z)**_
+
+Let me give my analysis and then implement. Short answer on npm vs bun first:
+
+**npm vs bun for CLI install** — keep what's already working:
+- **For ansible-managed installs**: stick with `npm install -g` (via `community.general.npm`). It's universal, battle-tested (bitwarden/coding_agents/lazyvim_deps all use it), has full postinstall/native-dep compatibility, and the one-time install-speed penalty is negligible.
+- **For on-demand / experimental**: use `bunx <pkg>` (what you already do for `ccusage`). Zero disk footprint, always latest, ~10x faster startup than `npx`.
+- **`bun install -g`** isn't clearly worth switching to — needs PATH tweaks (`~/.bun/install/global/bin`) and a small compatibility risk for tools with native deps. The speed wins are on the install step, which runs once.
+
+**Role design** — create a small `js_cli_tools` role mirroring `python_uv_tools`:
+- Gated by new chezmoi prompt `installJsCliTools` (default `true`).
+- Defaults list: `[{name, binary}]`, iterated via `community.general.npm` + mise-npm fallback (same pattern as `bitwarden`).
+- Starts with just `readability-cli`. Easy to grow.
+
+**What NOT to migrate**:
+- `@bitwarden/cli` stays in `bitwarden/` (coupled with completion + SSH-agent + desktop app).
+- Copilot/Gemini CLI stays in `coding_agents/` (shares the `installCodingAgents` gate).
+- `tree-sitter-cli` stays in `lazyvim_deps/` (Neovim dependency, not standalone).
+
+**Other reasonable future adds**: `markdownlint-cli`, `@mermaid-js/mermaid-cli` (heavy — pulls Chromium for rendering), `serve` (ad-hoc static server). I'll leave these out until you ask — starting minimal.
+
+Executing now.
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:30Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+New role with defaults + tasks following bitwarden npm-install pattern with mise fallback. Starts with readability-cli.
+
+```text
+Task #12 created successfully: Create js_cli_tools ansible role
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:33Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Register role in macos.yml, linux.yml, run_onchange_after_20, and .chezmoi.toml.tmpl (installJsCliTools prompt).
+
+```text
+Task #13 created successfully: Wire role into playbooks + onchange + chezmoi prompt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:33Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Reflect that readability-cli is now auto-installed via js_cli_tools role.
+
+```text
+Task #14 created successfully: Update docs (CLAUDE.md, README.md, web-reader.md, 55_web_reader.zsh hint)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:34Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+ansible-playbook --syntax-check both playbooks; commit.
+
+```text
+Task #15 created successfully: Syntax-check playbooks and commit
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:35Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #12 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```yaml
+---
+# Standalone JS/npm CLI utilities installed globally via npm.
+# Tools that belong to a feature area (@bitwarden/cli, Copilot/Gemini CLI,
+# tree-sitter-cli) are installed by their respective roles, not here -- this
+# role is only for tools that don't have a natural home elsewhere.
+#
+# Each entry:
+#   - name:   npm package name (can be scoped: "@scope/pkg")
+#   - binary: executable name to check for idempotency
+
+js_cli_tools:
+  - name: readability-cli
+    binary: readable
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/js_cli_tools/defaults/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```yaml
+---
+# Install standalone JS/npm CLI utilities globally.
+# Mirrors the bitwarden role's npm install strategy: prefers `npm` on PATH,
+# falls back to `mise exec -- npm` when npm is only reachable via mise shims.
+
+- name: Detect whether npm is on PATH
+  ansible.builtin.command: npm --version
+  register: js_cli_npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Locate user-installed mise (js_cli_tools fallback)
+  when: js_cli_npm_check.rc != 0
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+  register: js_cli_mise_user_bin
+
+- name: Set mise binary path (user install)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_user_bin.stat.exists | default(false)
+  ansible.builtin.set_fact:
+    js_cli_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+
+- name: Detect system-installed mise (js_cli_tools fallback)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+  ansible.builtin.command: mise --version
+  register: js_cli_mise_system_check
+  changed_when: false
+  failed_when: false
+
+- name: Set mise binary path (system install)
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+    - js_cli_mise_system_check.rc == 0
+  ansible.builtin.set_fact:
+    js_cli_mise_bin: mise
+
+- name: Warn when neither npm nor mise is available
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is not defined
+  ansible.builtin.debug:
+    msg: >-
+      js_cli_tools: neither npm nor mise found on PATH -- skipping
+      {{ js_cli_tools | map(attribute='name') | list | join(', ') }}.
+      Ensure Node.js is available (e.g. via the lazyvim_deps role) and re-run.
+
+# --- Check which tools are already installed (idempotency) ---
+- name: Check whether each js_cli_tool binary is present
+  ansible.builtin.command: command -v {{ item.binary }}
+  register: js_cli_tool_presence
+  changed_when: false
+  failed_when: false
+  loop: "{{ js_cli_tools }}"
+  loop_control:
+    label: "{{ item.binary }}"
+
+- name: Build list of tools still missing
+  ansible.builtin.set_fact:
+    js_cli_tools_to_install: >-
+      {{
+        js_cli_tool_presence.results
+        | selectattr('rc', 'ne', 0)
+        | map(attribute='item')
+        | list
+      }}
+
+# --- Install via npm (preferred) ---
+- name: Install missing js_cli_tools via npm
+  when:
+    - js_cli_npm_check.rc == 0
+    - js_cli_tools_to_install | length > 0
+  community.general.npm:
+    name: "{{ item.name }}"
+    global: true
+    state: present
+  register: js_cli_npm_install
+  until: js_cli_npm_install is succeeded
+  retries: 3
+  delay: 5
+  loop: "{{ js_cli_tools_to_install }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# --- Install via mise npm fallback ---
+- name: Install missing js_cli_tools via mise npm fallback
+  when:
+    - js_cli_npm_check.rc != 0
+    - js_cli_mise_bin is defined
+    - js_cli_tools_to_install | length > 0
+  ansible.builtin.shell: |
+    {{ js_cli_mise_bin }} exec -- npm install -g {{ item.name }}
+  args:
+    executable: /bin/bash
+  register: js_cli_mise_npm_install
+  until: js_cli_mise_npm_install is succeeded
+  retries: 3
+  delay: 5
+  changed_when: true
+  loop: "{{ js_cli_tools_to_install }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/js_cli_tools/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:59Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #12 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:03:59Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #13 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/playbooks/macos.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/playbooks/linux.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:15Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:15Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_onchange_after_20_ansible_roles.sh.tmpl`
+
+```text
+1	#!/bin/bash
+2	# Re-run ansible when any role changes
+3	# Triggers on changes to any role's tasks or defaults files
+4	# Profile: {{ .profile }}
+5	
+6	# === Role Hashes (changes trigger re-run) ===
+7	# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+8	# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+9	# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+10	# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+11	# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+12	# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+13	# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+14	# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+15	# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+16	# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+17	# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+18	# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+19	# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+20	# bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}
+21	# bitwarden defaults: {{ include "dot_ansible/roles/bitwarden/defaults/main.yml" | sha256sum }}
+22	# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+23	# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+24	# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+25	# llm_tools tasks: {{ include "dot_ansible/roles/llm_tools/tasks/main.yml" | sha256sum }}
+26	# llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
+27	# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+28	# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+29	# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+30	# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+31	# starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
+32	# input_method: {{ include "dot_ansible/roles/input_method/tasks/main.yml" | sha256sum }}
+33	# networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
+34	# alacritty: {{ include "dot_ansible/roles/alacritty/tasks/main.yml" | sha256sum }}
+35	
+36	set -e
+37	export PATH="$HOME/.local/bin:$PATH"
+38	
+39	# Override locale to a safe default so ansible can start even before locale
+40	# packages are installed (e.g. en_US.UTF-8 not yet generated on a fresh machine).
+41	export LC_ALL=C.UTF-8
+42	export LANG=C.UTF-8
+43	
+44	# Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
+45	{{ if or (eq .profile "macos") (eq .profile "macos_intel") -}}
+46	if [[ -f /opt/homebrew/bin/brew ]]; then
+47	    eval "$(/opt/homebrew/bin/brew shellenv)"
+48	elif [[ -f /usr/local/bin/brew ]]; then
+49	    eval "$(/usr/local/bin/brew shellenv)"
+50	fi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #13 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #14 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:25Z)**_
+
+Now the docs and the install-hint in the reader.
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:28Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/README.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/55_web_reader.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:50Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #14 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:50Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #15 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check both playbooks and the reader zsh file
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml 2>&1 | tail -5
+echo "---"
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml 2>&1 | tail -5
+echo "---"
+zsh -n dot_config/zsh/tools/55_web_reader.zsh && echo "zsh ok"
+```
+
+```text
+playbook: dot_ansible/playbooks/macos.yml
+---
+
+playbook: dot_ansible/playbooks/linux.yml
+---
+zsh ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:04:59Z)**_
+
+Syntax clean. Let me also verify the role lints by running it in check mode against localhost quickly, then commit.
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Dry-run the js_cli_tools tag to verify role logic executes cleanly
+
+`ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --check --tags js_cli_tools -i "localhost," -c local dot_ansible/playbooks/macos.yml 2>&1 | tail -25`
+
+```text
+[WARNING]: Could not match supplied host pattern, ignoring: local
+
+────────────────────────────────────────────────────────────
+PLAY [macOS setup]
+────────────────────────────────────────────────────────────
+skipping: no hosts matched
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (0.0s)
+────────────────────────────────────────────────────────────
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check changes before commit
+
+`git -C /Users/daviddwlee84/.local/share/chezmoi status -s`
+
+```text
+ M .chezmoi.toml.tmpl
+ M .specstory/history/2026-04-21_02-26-11Z-hash-local-proxy-config.md
+ M CLAUDE.md
+ M README.md
+ M docs/tools/web-reader.md
+ M dot_ansible/playbooks/linux.yml
+ M dot_ansible/playbooks/macos.yml
+ M dot_config/zsh/tools/55_web_reader.zsh
+ M run_onchange_after_20_ansible_roles.sh.tmpl
+?? .specstory/history/2026-04-21_02-51-02Z.md
+?? dot_ansible/roles/js_cli_tools/
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit js_cli_tools role + wiring + docs
+
+```bash
+git -C /Users/daviddwlee84/.local/share/chezmoi add .chezmoi.toml.tmpl CLAUDE.md README.md docs/tools/web-reader.md dot_ansible/playbooks/linux.yml dot_ansible/playbooks/macos.yml dot_ansible/roles/js_cli_tools/ dot_config/zsh/tools/55_web_reader.zsh run_onchange_after_20_ansible_roles.sh.tmpl && git -C /Users/daviddwlee84/.local/share/chezmoi commit -m "$(cat <<'EOF'
+Add js_cli_tools ansible role for npm CLI utilities
+
+New role for standalone JS/npm CLI utilities that don't have a natural
+home in a feature-specific role (@bitwarden/cli stays with bitwarden,
+Copilot/Gemini CLI stay with coding_agents, tree-sitter-cli stays with
+lazyvim_deps). Starts with a single entry: readability-cli, which
+provides the `readable` binary used by `readnode` in the terminal web
+reader.
+
+The role mirrors the bitwarden pattern: checks binary presence first
+(idempotent), then installs via `community.general.npm` when npm is on
+PATH, or falls back to `mise exec -- npm install -g` when npm is only
+reachable through mise shims. Tool list lives in `defaults/main.yml`
+as `[{name, binary}]` entries so new tools are a single-line add.
+
+Install strategy stays on `npm install -g` (not `bun install -g`): it
+is consistent with bitwarden / coding_agents / lazyvim_deps, has full
+postinstall + native-dep compatibility, and the one-time install cost
+is negligible. `bunx` remains the right tool for on-demand / occasional
+use (already used for ccusage) and is not affected by this role.
+
+Gated by a new `installJsCliTools` chezmoi prompt (default true) and
+wired into macos.yml + linux.yml + the run_onchange ansible script
+(tag + sha256 tracking) so changes to the role's defaults trigger a
+re-run. Docs updated: CLAUDE.md tag table, README.md, web-reader.md
+install matrix, and 55_web_reader.zsh install hint.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1776740724-80992.
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check that executables have shebangs.................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1776740724-80992.
+[main 69c874b] Add js_cli_tools ansible role for npm CLI utilities
+ 10 files changed, 138 insertions(+), 3 deletions(-)
+ create mode 100644 dot_ansible/roles/js_cli_tools/defaults/main.yml
+ create mode 100644 dot_ansible/roles/js_cli_tools/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:34Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #15 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-21 03:05:48Z)**_
+
+Committed as `69c874b`.
+
+**What's in place now**
+
+- New role `dot_ansible/roles/js_cli_tools/` — `defaults/main.yml` holds the `[{name, binary}]` list (currently just `readability-cli`); `tasks/main.yml` does the npm install with mise-npm fallback, mirroring the bitwarden pattern.
+- New chezmoi prompt `installJsCliTools` (default `true`). Wired into the onchange script with tag + sha256 tracking.
+- Registered in both `macos.yml` and `linux.yml` playbooks.
+- Docs updated: `CLAUDE.md` tag table, `README.md`, `docs/tools/web-reader.md` install matrix, and the `readnode` install hint now points at the role.
+
+**After your next `chezmoi apply`**: if this is an existing machine, you'll get the prompt for `installJsCliTools` on the next `chezmoi init --force`; to enable it without re-init, set it directly in `~/.config/chezmoi/chezmoi.toml`:
+
+```toml
+[data]
+installJsCliTools = true
+```
+
+Then `chezmoi state delete-bucket --bucket=scriptState && chezmoi apply` re-runs the onchange script which picks up the new tag.
+
+**Answer to "npm vs bun" recap**:
+- Keep `npm install -g` for ansible-managed installs (consistency, compatibility, one-time cost).
+- Keep `bunx` for on-demand / experimental CLI use (already how you use `ccusage`).
+- `bun install -g` isn't worth switching to for this repo — PATH setup + edge-case compatibility risk without a meaningful payoff on the install-once path.
+
+**Easy future adds** to `js_cli_tools/defaults/main.yml` if you want them:
+- `markdownlint-cli` (`markdownlint`) — doc linting
+- `@mermaid-js/mermaid-cli` (`mmdc`) — mermaid → SVG/PNG; **warning: pulls Chromium**, not lightweight
+- `serve` or `http-server` — ad-hoc static file server
+- `json-diff` (`json-diff`) — structured JSON diff CLI
+
+Each is a one-line add to the list.
