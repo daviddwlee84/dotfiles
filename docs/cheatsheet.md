@@ -159,9 +159,14 @@ just pre-commit-run-all        # Run on all files
 just pre-commit-update         # Update hook versions
 just pre-commit-uninstall      # Remove git hooks
 
-# Secret scanning
+# Secret scanning (specstory history + .claude/plans + .cursor/plans + .opencode/plans)
 just gitleaks-scan             # Scan working tree for secrets
 just gitleaks-scan-history     # Scan full git history
-just check-specstory           # Check .specstory files for secrets
-just redact-specstory          # Auto-redact secrets in .specstory files
+just check-secrets             # Check staged agent artifacts for secrets
+just redact-secrets            # Auto-redact secrets in staged agent artifacts
+just check-secrets-workdir     # Check working dir (not just staged)
+just add-and-redact            # git add -A + redact + git add -A
+# Legacy specstory-only aliases:
+just check-specstory           # Check only .specstory files
+just redact-specstory          # Redact only .specstory files
 ```

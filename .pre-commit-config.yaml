@@ -3,6 +3,19 @@
 # Run `just pre-commit-setup` to install hooks
 
 repos:
+  # Auto-redact secrets in agent artifacts (specstory history + coding-agent
+  # plan dirs) BEFORE gitleaks runs. If the script rewrites any file,
+  # pre-commit reports "files were modified by this hook" and the user must
+  # `git add` + re-commit -- same UX as trailing-whitespace / end-of-file-fixer.
+  - repo: local
+    hooks:
+      - id: redact-agent-secrets
+        name: Auto-redact secrets in agent artifacts
+        entry: ./scripts/redact_secrets.py --fix
+        language: system
+        pass_filenames: false
+        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.opencode/plans)/.*\.md$
+
   # Gitleaks - detect secrets (blocks commit if secrets found)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.22.1

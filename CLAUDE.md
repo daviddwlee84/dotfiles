@@ -32,6 +32,26 @@ This keeps `docs/zsh/aliases.md` as the single quick-reference for all custom sh
 
 This ensures Docker testing works with all configuration options.
 
+## Maintaining Agent Artifact Redaction
+
+**IMPORTANT**: SpecStory transcripts and coding-agent plan files commonly paste in shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+
+| Prefix | Source |
+|--------|--------|
+| `.specstory/history/` | SpecStory chat transcripts |
+| `.claude/plans/` | Claude Code plan files |
+| `.cursor/plans/` | Cursor plan files |
+| `.opencode/plans/` | OpenCode plan files |
+
+Tooling:
+
+- `scripts/redact_secrets.py` — runs `gitleaks` + a `PRIVATE KEY` pattern check, then redacts in place. Accepts `--paths PREFIX ...`; defaults to all four prefixes above. `scripts/redact_specstory.py` is a thin legacy shim scoped to `.specstory/history`.
+- `just check-secrets` / `just redact-secrets` / `just check-secrets-workdir` — staged + workdir entry points.
+- `just add-and-redact` — `git add -A` → redact → `git add -A`.
+- Pre-commit hook `redact-agent-secrets` (see `.pre-commit-config.yaml`) runs `--fix` before `gitleaks-system`. If it rewrites a file, pre-commit fails the commit with "files were modified by this hook"; stage the redacted file and retry.
+
+When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+
 ## Maintaining Keyboard Shortcuts
 
 **IMPORTANT**: When adding or modifying keybindings in any tool config, cross-check against other tools to avoid conflicts. Multiple tools share the terminal's key namespace — especially `Ctrl+` and `Alt+` modifiers.

@@ -163,17 +163,27 @@ pre-commit-update:
 pre-commit-uninstall:
     pre-commit uninstall
 
-# Check for secrets in staged .specstory files (reports only)
+# Check for secrets in staged agent artifacts (specstory + coding-agent plans; reports only)
+check-secrets:
+    ./scripts/redact_secrets.py || true
+
+# Auto-redact secrets in staged agent artifacts (review with git diff, then stage manually)
+redact-secrets:
+    ./scripts/redact_secrets.py --fix
+
+# Check for secrets in working directory agent artifacts
+check-secrets-workdir:
+    ./scripts/redact_secrets.py --working-dir || true
+
+# Legacy specstory-only shortcuts (thin wrappers over redact_secrets.py)
 check-specstory:
-    ./scripts/redact_specstory.py || true
+    ./scripts/redact_secrets.py --paths .specstory/history || true
 
-# Auto-redact secrets in staged .specstory files (review with git diff, then stage manually)
 redact-specstory:
-    ./scripts/redact_specstory.py --fix
+    ./scripts/redact_secrets.py --fix --paths .specstory/history
 
-# Check for secrets in working directory .specstory files
 check-specstory-workdir:
-    ./scripts/redact_specstory.py --working-dir || true
+    ./scripts/redact_secrets.py --working-dir --paths .specstory/history || true
 
 # Scan entire repository for secrets with gitleaks
 gitleaks-scan:
@@ -211,10 +221,11 @@ status:
 diff:
     @git diff
 
-# Stage all changes and redact .specstory files and stage again
+# Stage all changes, auto-redact secrets across agent artifacts (specstory +
+# .claude/plans + .cursor/plans + .opencode/plans), and re-stage.
 add-and-redact:
     @git add -A
-    @just redact-specstory
+    @just redact-secrets
     @git add -A
 
 # ============================================================================

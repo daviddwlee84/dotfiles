@@ -810,6 +810,15 @@
       "provider": "cursor",
       "last_updated": "2026-04-21T05:10:18Z"
     },
+    "a5047e13-65b1-44b1-9a2c-623ea4b0514a": {
+      "user_message_count": 2,
+      "agent_message_count": 19,
+      "start_timestamp": "2026-04-21T15:09:05+08:00",
+      "end_timestamp": "2026-04-21T15:09:05+08:00",
+      "markdown_size_bytes": 27570,
+      "provider": "cursoride",
+      "last_updated": "2026-04-21T07:15:16Z"
+    },
     "a905696c-7e44-4738-8435-af8624995a37": {
       "user_message_count": 5,
       "agent_message_count": 101,
