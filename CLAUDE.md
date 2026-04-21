@@ -137,9 +137,17 @@ chezmoi edit <file>       # Edit source file
 chezmoi cd                # Go to source directory
 ```
 
-## Selective File Management (`modify_` and `create_`)
+## Selective File Management (case studies)
 
-Two chezmoi source prefixes are used to tame files that would otherwise churn on every apply. Reference: [Manage part but not all of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
+For the full prefix reference (`dot_`, `private_`, `create_`, `modify_`, `exact_`, `encrypted_`, …), the `chezmoi add` safety table, and the allowed prefix-ordering matrix, see [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md).
+
+**Agent guideline before `chezmoi add`**:
+
+- Decide which prefix bucket the target belongs to (see the safety table in the doc above).
+- Never `chezmoi add` a `create_` or `modify_` target — `chezmoi add` **strips the prefix**, silently promoting a seed-only / script-managed file to a plain tracked file. For `create_` baselines use `cp "$(chezmoi source-path <target>)"`; for `modify_` scripts edit the source directly (`chezmoi edit <target>`).
+- `chezmoi re-add` silently skips `create_` and refuses `modify_`, so it is a safer default when picking up drift on already-tracked files.
+
+The two case studies below cover the repo-specific patterns agents are most likely to encounter.
 
 ### `dot_claude/modify_settings.json` — partial JSON management via jq
 

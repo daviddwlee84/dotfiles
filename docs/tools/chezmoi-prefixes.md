@@ -1,0 +1,242 @@
+# chezmoi Source-State Prefixes
+
+A practical reference for the filename prefixes (`dot_`, `private_`, `create_`, `modify_`, …) that chezmoi uses to encode target metadata in the source directory, with an opinionated "is it safe to `chezmoi add`?" decision table and a playbook tailored to this repo.
+
+## Canonical references
+
+- [Source state attributes](https://www.chezmoi.io/reference/source-state-attributes/) — full list of prefixes and suffixes, plus the allowed ordering per target type. This is the source of truth; skim it once and bookmark it.
+- [Manage different types of file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/) — practical recipes, including [Manage part, but not all, of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (the `modify_` pattern) and create-only seeding.
+- [`chezmoi chattr`](https://www.chezmoi.io/reference/commands/chattr/) — toggle prefixes without manually renaming files (e.g. `chezmoi chattr +create,+private ~/.ssh/config`).
+
+## `chezmoi add` safety decision table
+
+When the live file diverges from the source and you want to resync, the first question is "which bucket does this prefix fall into?". **The prefix changes the semantics of `chezmoi add` / `re-add`** — the command is not a dumb copy.
+
+| Bucket | Prefixes | What `chezmoi add <target>` does | Action |
+|---|---|---|---|
+| Green-light | `dot_`, `private_`, `executable_`, `readonly_`, `empty_` | Rewrites the source file with the live contents. Prefixes are preserved. | Use freely. |
+| Add-safe but re-check semantics | `create_`, `exact_`, `literal_` | Works, but can **silently change the semantic contract** (see notes below). | Use, then `git diff` the source filename to confirm the prefix is still what you expect. |
+| Do NOT treat as a normal tracked file | `modify_`, `encrypted_`, `remove_`, `symlink_`, scripts (`run_*`) | `chezmoi add` would strip the prefix or overwrite the script body with live data. | Edit the source file directly, or use `cp "$(chezmoi source-path <target>)"` / `chezmoi edit`. |
+
+Notes on the middle bucket:
+
+- `create_`: `chezmoi add` **strips** the `create_` prefix, silently promoting a seed-only file to a fully managed one. `chezmoi re-add` is a no-op for `create_` (by design — contents are not managed after initial create).
+- `exact_` (dir-only): adding a file inside an `exact_` directory is fine, but remember the directory will prune anything not present in source on next apply.
+- `literal_`: the whole point is to suppress attribute parsing. Adding a new file with the same base name re-parses the prefix — you may need to rename manually.
+
+## Per-prefix reference
+
+Each entry links to the relevant row in [Source state attributes](https://www.chezmoi.io/reference/source-state-attributes/).
+
+### `dot_` — leading dot rename
+
+- **Effect**: `dot_foo` in source becomes `.foo` in target. Purely a name mapping so dotfiles stay visible in `git ls-files`.
+- **`chezmoi add`**: green-light.
+- **Typical use**: `dot_zshrc`, `dot_gitconfig`, `dot_config/…`, `dot_ssh/…`.
+
+### `private_` — tighten file mode to 0600 (dir: 0700)
+
+- **Effect**: Removes group/world permissions on the target. Enforced on every `chezmoi apply`.
+- **`chezmoi add`**: green-light. `chezmoi add` of a file that already has 0600 mode automatically encodes `private_` for you.
+- **Risk**: This is only a permission bit — it does **not** encrypt the file. Committing a `private_` file with secrets still commits them in plaintext. For secrets, reach for `encrypted_` or a password-manager template function.
+- **Typical use**: `private_dot_ssh/config`, `private_dot_netrc`, Claude Code config files that contain account hints.
+
+### `executable_` — add +x bit
+
+- **Effect**: Ensures the target has the executable bit on every apply.
+- **`chezmoi add`**: green-light. Auto-detected when adding a file that already has +x.
+- **Typical use**: personal scripts under `~/bin/` or `~/.local/bin/` (e.g. `executable_x`, `executable_sms`), helper wrappers, `~/.local/share/tmux-*` shims.
+
+### `readonly_` — drop all write bits
+
+- **Effect**: Strips write permissions from the target. Runs on every apply, so the file will be reset to read-only even if you `chmod +w` it.
+- **`chezmoi add`**: green-light, but note that re-adding can be annoying because you must `chmod +w` locally first.
+- **Typical use**: frozen baselines you do not want to edit by mistake. Rarely useful in a personal dotfiles repo.
+
+### `create_` — seed once, then leave alone
+
+- **Effect**: Writes the file **only if the target does not already exist**. After that, chezmoi never touches the contents again.
+- **`chezmoi add`**: use with care — `chezmoi add` **strips** the `create_` prefix, which silently promotes the file to a regular managed file (losing the seed-only contract).
+- **`chezmoi re-add`**: intentionally **skips** `create_` files.
+- **Refresh recipe**: to update the baseline, copy the live file into the source path (preserves the prefix):
+
+  ```bash
+  cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock.json)"
+  ```
+
+- **Typical use**: LazyVim `lazy-lock.json` (see the case study in [CLAUDE.md](../../CLAUDE.md#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite)), SSH `config` skeleton, first-run app baselines.
+
+### `modify_` — content is a script, not a file
+
+- **Effect**: The source file is an executable **script**. chezmoi pipes the current target contents into stdin; the script writes the new target contents to stdout. Lets you manage part of a file (e.g. via `jq`, `sed`, `awk`) while leaving the rest alone.
+- **`chezmoi add`**: do **not** `chezmoi add` a `modify_` target — it would overwrite your script with the live file contents.
+- **Alternative form**: put `chezmoi:modify-template` in the script body to switch it into template mode (the current contents arrive as `.chezmoi.stdin`). See [Manage part, but not all, of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
+- **Typical use**: Claude Code `settings.json` (see the case study in [CLAUDE.md](../../CLAUDE.md#dot_claudemodify_settingsjson--partial-json-management-via-jq)), Docker `config.json` proxies, INI files with a mix of managed and runtime-written keys.
+
+### `exact_` — directory is canonical (prune extras)
+
+- **Effect**: On apply, chezmoi **removes** any file inside the target directory that is not present in source. Directory-only prefix.
+- **`chezmoi add`**: safe for individual files inside the directory, but be aware of the semantic trap — next apply will clean up anything that drifted in.
+- **Risk**: Very easy to accidentally delete machine-local artifacts (caches, plugin installs) that happen to live inside the directory.
+- **Typical use**: directories you truly own end-to-end and that are small / stable. Avoid for any directory that mixes managed config with runtime state.
+
+### `literal_` — stop parsing attributes
+
+- **Effect**: Tells chezmoi to stop interpreting the rest of the filename as attributes. Used when an actual filename starts with something like `create` or `run` and you want chezmoi to treat it literally.
+- **`chezmoi add`**: green-light, but remember the prefix exists for a filename-level reason — blindly renaming it later can break the mapping.
+- **Typical use**: uncommon. Corner cases like a literal `run_` or `dot_` in a filename.
+
+### `remove_` — assert removal
+
+- **Effect**: Declares that the target should be **absent**. On apply, chezmoi removes the file/symlink (or empty directory) if it exists. The source file's body is not a content source — it is a presence assertion.
+- **`chezmoi add`**: does not apply (there is no live content to sync back).
+- **Typical use**: cleaning up stale configs after migrating tools. Often combined with a template so it only fires on specific hosts.
+
+### `encrypted_` — encrypt at rest
+
+- **Effect**: The source file is stored encrypted (age or gpg, depending on `encryption` config). chezmoi decrypts on apply. The on-disk suffix is `.age` or `.asc` (stripped in the target).
+- **`chezmoi add`**: supported (chezmoi re-encrypts), but this only makes sense if you have already committed to a secrets workflow (age keys, gpg setup).
+- **Alternative**: use a template function (`onepassword`, `bitwarden`, `keyring`, `vault`, …) to fetch secrets at apply time instead of committing them encrypted.
+- **Typical use**: small number of credential files you want to keep inside the repo history.
+
+### `symlink_` — create a symlink, not a file
+
+- **Effect**: Target is a symlink whose contents are the first line of the source file (often a template that expands to a path).
+- **`chezmoi add`**: adding an existing symlink produces a `symlink_` source automatically.
+- **Typical use**: point a dotfile at an externally-managed file (`~/.config/Code/User/settings.json` → `{{ .chezmoi.sourceDir }}/settings.json`, see the official recipe for handling externally-modified configs).
+
+### `empty_` — allow empty files
+
+- **Effect**: By default chezmoi removes zero-byte files; `empty_` says "this one is intentionally empty".
+- **Typical use**: marker files, empty `.hushlogin`.
+
+### `external_` — don't parse attributes of children
+
+- **Effect**: Directory-only. Stops chezmoi from interpreting the attributes of files inside. Usually paired with `.chezmoiexternal.<format>` sources that deliver whole subtrees.
+- **Typical use**: vendored plugin directories, `git-repo` externals.
+
+### Script family — `run_`, `once_`, `onchange_`, `before_`, `after_`
+
+- **Effect**: Source file is a **script** that chezmoi executes at apply time. No target file is created. The modifiers compose:
+  - `run_` — the base marker.
+  - `once_` — run only once per script body (hash-keyed).
+  - `onchange_` — run when the script body changes (filename-keyed; unlike `once_`, editing the script re-runs it).
+  - `before_` / `after_` — run before / after applying target files.
+- **`chezmoi add`**: does not apply — scripts have no file target.
+- **Already in this repo**: `run_once_before_00_bootstrap.sh.tmpl`, `run_onchange_after_20_ansible_roles.sh.tmpl`, `run_onchange_after_30_brew_bundle.sh.tmpl`. See [CLAUDE.md → Auto-run Scripts](../../CLAUDE.md#auto-run-scripts).
+
+## Allowed prefix ordering
+
+When multiple prefixes apply, order matters. From [Source state attributes](https://www.chezmoi.io/reference/source-state-attributes/):
+
+| Target type | Allowed prefixes (in order) | Allowed suffixes |
+|---|---|---|
+| Directory | `remove_`, `external_`, `exact_`, `private_`, `readonly_`, `dot_` | — |
+| Regular file | `encrypted_`, `private_`, `readonly_`, `empty_`, `executable_`, `dot_` | `.tmpl` |
+| Create file | `create_`, `encrypted_`, `private_`, `readonly_`, `empty_`, `executable_`, `dot_` | `.tmpl` |
+| Modify file | `modify_`, `encrypted_`, `private_`, `readonly_`, `executable_`, `dot_` | `.tmpl` |
+| Remove file | `remove_`, `dot_` | — |
+| Script | `run_`, (`once_` or `onchange_`), (`before_` or `after_`) | `.tmpl` |
+| Symlink | `symlink_`, `dot_` | `.tmpl` |
+
+Worked examples:
+
+- `private_executable_dot_ssh/private_readonly_id_ed25519` — directory is private, file is private+readonly. (In practice: don't check in private keys; shown for ordering only.)
+- `create_private_dot_ssh/create_private_config` — create-once SSH config that is 0600 on creation.
+- `modify_private_dot_claude/modify_settings.json` — the actual pattern used in this repo (see case study in CLAUDE.md).
+
+If you ever lose the stacking order, `chezmoi chattr` will normalize it for you:
+
+```bash
+chezmoi chattr +private,+readonly ~/.config/foo/bar
+```
+
+## Playbook: what to use where in this repo
+
+### A. Everyday configs — `dot_` (+ `private_` if sensitive)
+
+Track normally, `chezmoi add` freely, let `chezmoi re-add` pick up drift.
+
+- `dot_zshrc`, `dot_gitconfig`, `dot_tmux.conf`, `dot_config/nvim/lua/*`, `dot_config/starship.toml`, `dot_config/tmux/*`, `dot_config/zsh/tools/*`, `dot_config/sesh/*`, `dot_config/zellij/*`, …
+- Sensitive-ish (account hints, but not secrets): add `private_` (e.g. `private_dot_ssh/…`, `private_dot_claude/…`).
+
+### B. Personal scripts — `executable_` (+ `dot_` where needed)
+
+- `~/bin/sms` → `executable_sms` in source.
+- `~/.local/bin/x` → lives under `dot_local/bin/executable_x`.
+- Any helper shell script you want on PATH.
+
+### C. Seed-once baselines — `create_`
+
+Files that an app rewrites in-place after first launch, and where you only care about the initial state.
+
+- **`~/.config/nvim/lazy-lock.json`** → `create_lazy-lock.json`. See the case study in [CLAUDE.md](../../CLAUDE.md#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite). Refresh baseline with `cp … "$(chezmoi source-path …)"`.
+- **`~/.ssh/config`** → create-only template that `Include ~/.ssh/config.d/*` and ships conservative defaults. See the SSH notes in [README.md](../../README.md).
+- First-run app JSONs where further changes are user-local (settings files that are a mix of state and preferences).
+
+### D. Partial-content management — `modify_` via script
+
+Files an app actively rewrites at runtime (adding keys, reordering, …), where you only want to enforce a subset of keys.
+
+- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`, a `jq` script that deep-merges a managed overlay. See [CLAUDE.md → `dot_claude/modify_settings.json`](../../CLAUDE.md#dot_claudemodify_settingsjson--partial-json-management-via-jq).
+- **`~/.docker/config.json`** → a modify-script that rewrites `proxies.default` while preserving `auths` / `credsStore`. See [docs/tools/containers.md](containers.md).
+- Rule of thumb: if an app owns the file and you only care about N keys, `modify_` beats a full managed template.
+
+### E. Machine-local / runtime / cache — `.chezmoiignore`, not a prefix
+
+Do **not** try to track these even with `create_`. They belong in `.chezmoiignore` or simply outside the source tree.
+
+- Editor swap / shada / session files
+- Plugin install artifacts (LazyVim plugin source, tmux TPM repos, …)
+- Logs, caches, `lazy-install.log`, `.DS_Store`
+- Per-host runtime state
+
+### F. Secrets — prefer templating over `encrypted_`
+
+Order of preference for secrets in this repo:
+
+1. **Template function** that fetches at apply-time: `{{ bitwarden … }}`, `{{ onepassword … }}`, `{{ keyring … }}`, `{{ vault … }}`. Nothing secret hits git.
+2. **`encrypted_`** with age or gpg, if you need the value in-repo (e.g. for an offline machine). Commit only after you have `encryption` set and a key workflow in place.
+3. **Never** commit a plain `private_` file with a real token — `private_` is a permission bit, not encryption.
+
+## Refresh / maintenance recipes
+
+### `chezmoi re-add` vs `chezmoi add`
+
+| Situation | Command |
+|---|---|
+| File already tracked, just pick up drift | `chezmoi re-add <target>` (preserves prefix, fails loudly on `modify_`, silently skips `create_`) |
+| Adding a new file for the first time | `chezmoi add <target>` |
+| Updating a `create_` baseline | `cp <target> "$(chezmoi source-path <target>)"` |
+| Updating a `modify_` script | Edit the source script directly (`chezmoi edit <target>`) |
+| Changing prefixes on an existing source file | `chezmoi chattr +create,+private <target>` (or `-executable`, etc.) |
+
+### Preview before committing
+
+```bash
+chezmoi diff <target>           # See target diff
+chezmoi apply --dry-run -v      # See what would happen on this machine
+chezmoi status                  # Which files are in A/M/D state
+```
+
+### When `chezmoi add` seems to have "done the wrong thing"
+
+Most often the prefix was silently stripped:
+
+```bash
+chezmoi source-path <target>    # Where does it live?
+ls "$(dirname "$(chezmoi source-path <target>)")"  # Inspect neighbors — did the prefix disappear?
+chezmoi chattr +create <target> # Put it back
+```
+
+For a `modify_` target, rewind the script from git:
+
+```bash
+git -C "$(chezmoi source-path)" checkout -- <relative/path/to/modify_file>
+```
+
+## See also
+
+- [CLAUDE.md → Selective File Management (case studies)](../../CLAUDE.md#selective-file-management-case-studies) — repo-specific `modify_` / `create_` walkthroughs with failure modes.
+- [docs/cheatsheet.md → chezmoi](../cheatsheet.md#chezmoi) — command-level quick reference.
+- [chezmoi docs — Concepts](https://www.chezmoi.io/reference/concepts/) — source state vs destination state vs target state.
