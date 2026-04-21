@@ -154,6 +154,17 @@ To change options later: `chezmoi init --force`
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
 
+### Upstream Clones (via `.chezmoiexternal.toml.tmpl`)
+
+Vendored upstream sources are declared in [`.chezmoiexternal.toml.tmpl`](.chezmoiexternal.toml.tmpl) and auto-refreshed weekly by chezmoi (`refreshPeriod = "168h"`). Force an immediate pull with `chezmoi apply --refresh-externals`.
+
+- `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
+- `~/.tmux/plugins/tpm` (TPM)
+- `~/.fzf` (Linux only; apt version lacks `--zsh`)
+- `~/.local/toolkami.rb`
+
+See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat) for details and when to add entries here vs. ansible.
+
 ### Tools (via ansible)
 
 - **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools

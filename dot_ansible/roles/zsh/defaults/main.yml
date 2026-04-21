@@ -1,13 +1,8 @@
 ---
 # zsh role defaults
-oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
-
-zsh_plugins:
-  - name: zsh-autosuggestions
-    repo: https://github.com/zsh-users/zsh-autosuggestions.git
-  - name: zsh-syntax-highlighting
-    repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
-  - name: zsh-completions
-    repo: https://github.com/zsh-users/zsh-completions.git
-  - name: zsh-vi-mode
-    repo: https://github.com/jeffreytse/zsh-vi-mode.git
+#
+# oh-my-zsh and its custom plugins (zsh-autosuggestions, zsh-syntax-highlighting,
+# zsh-completions, zsh-vi-mode) are managed declaratively via chezmoi externals
+# at the repo root: `.chezmoiexternal.toml.tmpl`. That file is the source of
+# truth for upstream URLs and the weekly refresh cadence. Add new plugins there
+# rather than here.

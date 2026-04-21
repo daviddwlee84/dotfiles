@@ -1,0 +1,107 @@
+# https://www.chezmoi.io/reference/special-files-and-directories/chezmoiexternal-format/
+# https://www.chezmoi.io/user-guide/include-files-from-elsewhere/
+#
+# Upstream sources that used to be cloned/downloaded by Ansible are declared
+# here so chezmoi can refresh them automatically on `chezmoi apply`.
+#
+# refreshPeriod = "168h" -> re-pull once a week. Force an immediate refresh
+# with `chezmoi apply --refresh-externals`.
+#
+# All git-repo entries use --depth 1 (shallow) and --ff-only on pull so a
+# dirty working tree in the clone won't be clobbered silently.
+
+# -----------------------------------------------------------------------------
+# Oh-My-Zsh core + custom plugins
+# -----------------------------------------------------------------------------
+# Nested externals are safe: chezmoi does `git pull` on refresh (not re-clone),
+# so plugin subdirs under .oh-my-zsh/custom/plugins/ are preserved.
+
+[".oh-my-zsh"]
+    type = "git-repo"
+    url = "https://github.com/ohmyzsh/ohmyzsh.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh".pull]
+        args = ["--ff-only"]
+
+[".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh/custom/plugins/zsh-autosuggestions".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh/custom/plugins/zsh-autosuggestions".pull]
+        args = ["--ff-only"]
+
+[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".pull]
+        args = ["--ff-only"]
+
+[".oh-my-zsh/custom/plugins/zsh-completions"]
+    type = "git-repo"
+    url = "https://github.com/zsh-users/zsh-completions.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh/custom/plugins/zsh-completions".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh/custom/plugins/zsh-completions".pull]
+        args = ["--ff-only"]
+
+[".oh-my-zsh/custom/plugins/zsh-vi-mode"]
+    type = "git-repo"
+    url = "https://github.com/jeffreytse/zsh-vi-mode.git"
+    refreshPeriod = "168h"
+    [".oh-my-zsh/custom/plugins/zsh-vi-mode".clone]
+        args = ["--depth", "1"]
+    [".oh-my-zsh/custom/plugins/zsh-vi-mode".pull]
+        args = ["--ff-only"]
+
+# -----------------------------------------------------------------------------
+# TPM (Tmux Plugin Manager) -- all platforms
+# -----------------------------------------------------------------------------
+# The `tpm install_plugins` step that populates ~/.tmux/plugins/* stays in
+# the ansible `devtools` role (it needs a running tmux + the tmux config).
+
+[".tmux/plugins/tpm"]
+    type = "git-repo"
+    url = "https://github.com/tmux-plugins/tpm.git"
+    refreshPeriod = "168h"
+    [".tmux/plugins/tpm".clone]
+        args = ["--depth", "1"]
+    [".tmux/plugins/tpm".pull]
+        args = ["--ff-only"]
+
+{{ if ne .chezmoi.os "darwin" -}}
+# -----------------------------------------------------------------------------
+# fzf (Linux only)
+# -----------------------------------------------------------------------------
+# macOS installs fzf via Homebrew (see roles/lazyvim_deps). On Linux the apt
+# package is too old and lacks `--zsh`, so we clone upstream and let ansible
+# run `~/.fzf/install --bin` to populate ~/.fzf/bin/fzf.
+
+[".fzf"]
+    type = "git-repo"
+    url = "https://github.com/junegunn/fzf.git"
+    refreshPeriod = "168h"
+    [".fzf".clone]
+        args = ["--depth", "1"]
+    [".fzf".pull]
+        args = ["--ff-only"]
+{{ end -}}
+
+# -----------------------------------------------------------------------------
+# toolkami.rb (single-file Ruby tool, sourced by dot_config/zsh/tools/33_toolkami.zsh)
+# -----------------------------------------------------------------------------
+# Harmless to always download: the zsh autoloader only eval's it when ruby is
+# available, so noRoot machines without ruby just ignore the file.
+
+[".local/toolkami.rb"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb"
+    refreshPeriod = "168h"
+    executable = true

@@ -61,32 +61,7 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['PATH'] }}"
 
 # =============================================================================
-# Install toolkami (single-file Ruby tool from GitHub)
+# toolkami (single-file Ruby tool from GitHub)
 # =============================================================================
-
-- name: Create ~/.local directory for toolkami
-  ansible.builtin.file:
-    path: "{{ ansible_facts['env']['HOME'] }}/.local"
-    state: directory
-    mode: '0755'
-
-- name: Download toolkami.rb from GitHub
-  block:
-    - name: Download toolkami.rb
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb
-        dest: "{{ ansible_facts['env']['HOME'] }}/.local/toolkami.rb"
-        mode: '0755'
-        timeout: 120
-      retries: 3
-      delay: 5
-
-  rescue:
-    - name: Warn toolkami download failed
-      ansible.builtin.debug:
-        msg: "toolkami.rb download failed — skipping"
-
-    - name: Clean up toolkami temp files after failure
-      ansible.builtin.file:
-        path: "{{ ansible_facts['env']['HOME'] }}/.local/toolkami.rb"
-        state: absent
+# Managed by .chezmoiexternal.toml.tmpl as a `file` external pointing to
+# raw.githubusercontent.com. chezmoi refreshes it weekly; nothing to do here.

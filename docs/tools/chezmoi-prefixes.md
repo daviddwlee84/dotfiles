@@ -114,6 +114,7 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
 
 - **Effect**: Directory-only. Stops chezmoi from interpreting the attributes of files inside. Usually paired with `.chezmoiexternal.<format>` sources that deliver whole subtrees.
 - **Typical use**: vendored plugin directories, `git-repo` externals.
+- **Companion file**: `.chezmoiexternal.<format>` at the repo root (see [`.chezmoiexternal.toml.tmpl` in this repo](../../.chezmoiexternal.toml.tmpl) and the section below).
 
 ### Script family — `run_`, `once_`, `onchange_`, `before_`, `after_`
 
@@ -235,8 +236,69 @@ For a `modify_` target, rewind the script from git:
 git -C "$(chezmoi source-path)" checkout -- <relative/path/to/modify_file>
 ```
 
+## Companion file: `.chezmoiexternal.<format>`
+
+Not a prefix, but a repo-level companion mechanism: a single declarative file at the repo root that tells chezmoi to fetch upstream content (git repos, single files, archives) into the target tree. Reference: [Include files from elsewhere](https://www.chezmoi.io/user-guide/include-files-from-elsewhere/) and [`.chezmoiexternal.<format>` reference](https://www.chezmoi.io/reference/special-files-and-directories/chezmoiexternal-format/).
+
+### In this repo: [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl)
+
+Source of truth for upstream clones that used to live in ansible roles. Entries today:
+
+| Target | Type | URL | Previously in |
+|---|---|---|---|
+| `~/.oh-my-zsh` | `git-repo` | `ohmyzsh/ohmyzsh` | `dot_ansible/roles/zsh` |
+| `~/.oh-my-zsh/custom/plugins/zsh-autosuggestions` | `git-repo` | `zsh-users/zsh-autosuggestions` | `dot_ansible/roles/zsh` |
+| `~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting` | `git-repo` | `zsh-users/zsh-syntax-highlighting` | `dot_ansible/roles/zsh` |
+| `~/.oh-my-zsh/custom/plugins/zsh-completions` | `git-repo` | `zsh-users/zsh-completions` | `dot_ansible/roles/zsh` |
+| `~/.oh-my-zsh/custom/plugins/zsh-vi-mode` | `git-repo` | `jeffreytse/zsh-vi-mode` | `dot_ansible/roles/zsh` |
+| `~/.tmux/plugins/tpm` | `git-repo` | `tmux-plugins/tpm` | `dot_ansible/roles/devtools` |
+| `~/.fzf` (Linux only) | `git-repo` | `junegunn/fzf` | `dot_ansible/roles/lazyvim_deps` |
+| `~/.local/toolkami.rb` | `file` | `aperoc/toolkami/main/toolkami.rb` | `dot_ansible/roles/ruby_gem_tools` |
+
+All `git-repo` entries use `--depth 1` and `--ff-only` on pull; all entries have `refreshPeriod = "168h"` (weekly auto-refresh).
+
+### How updates propagate
+
+```bash
+chezmoi apply                 # normal cadence: checks refreshPeriod,
+                              # pulls upstream only when older than 168h
+chezmoi apply --refresh-externals   # force: pull every external now
+```
+
+Externals are evaluated **before** `run_onchange_after_20_ansible_roles.sh.tmpl`, so by the time ansible runs, `~/.oh-my-zsh`, `~/.tmux/plugins/tpm`, `~/.fzf`, and `~/.local/toolkami.rb` already exist. Ansible's remaining responsibilities for these tools:
+
+- `zsh` role: install the `zsh` package + change login shell (sudo).
+- `devtools` role: run `tpm/bin/install_plugins` once (sentinel at `~/.tmux/plugins/.ansible-installed`).
+- `lazyvim_deps` role: run `~/.fzf/install --bin` (idempotent via `creates: ~/.fzf/bin/fzf`).
+
+### Nested externals
+
+`.oh-my-zsh` and `.oh-my-zsh/custom/plugins/<name>` are both declared as separate `git-repo` externals. chezmoi does `git pull` on refresh (not re-clone), so the subdirectories are preserved across refreshes — this is the standard oh-my-zsh install pattern.
+
+### When to add an entry here vs. keep it in ansible
+
+Good fit for `.chezmoiexternal`:
+
+- Plain git clone or single-file download, no arch / OS logic other than `.chezmoi.os` conditional.
+- No post-clone build step (or the build step is idempotent and lives in ansible).
+- You want the upstream pulled automatically on a schedule.
+
+Keep in ansible:
+
+- Conditional arch / `noRoot` / `armv7l` skip logic (GitHub release binaries).
+- Clones whose destination path contains a dynamic version (e.g. `claude-hud` uses `v<tag>` in path and writes `installed_plugins.json`).
+- Anything that needs `become: true` after the clone.
+
+### Editing workflow
+
+1. Add / remove entries in `.chezmoiexternal.toml.tmpl`.
+2. `chezmoi diff` — verify no unexpected target diffs (externals don't show per-file diff; you'll see the TOML change).
+3. `chezmoi apply --refresh-externals` — fetch and apply.
+4. If you removed an entry, chezmoi does **not** delete the destination directory (it's not managed anymore). Remove it manually if you want a clean state.
+
 ## See also
 
 - [CLAUDE.md → Selective File Management (case studies)](../../CLAUDE.md#selective-file-management-case-studies) — repo-specific `modify_` / `create_` walkthroughs with failure modes.
 - [docs/cheatsheet.md → chezmoi](../cheatsheet.md#chezmoi) — command-level quick reference.
 - [chezmoi docs — Concepts](https://www.chezmoi.io/reference/concepts/) — source state vs destination state vs target state.
+- [chezmoi docs — Include files from elsewhere](https://www.chezmoi.io/user-guide/include-files-from-elsewhere/) — `.chezmoiexternal.<format>` user guide.

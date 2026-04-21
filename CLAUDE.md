@@ -137,17 +137,9 @@ chezmoi edit <file>       # Edit source file
 chezmoi cd                # Go to source directory
 ```
 
-## Selective File Management (case studies)
+## Selective File Management (`modify_` and `create_`)
 
-For the full prefix reference (`dot_`, `private_`, `create_`, `modify_`, `exact_`, `encrypted_`, …), the `chezmoi add` safety table, and the allowed prefix-ordering matrix, see [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md).
-
-**Agent guideline before `chezmoi add`**:
-
-- Decide which prefix bucket the target belongs to (see the safety table in the doc above).
-- Never `chezmoi add` a `create_` or `modify_` target — `chezmoi add` **strips the prefix**, silently promoting a seed-only / script-managed file to a plain tracked file. For `create_` baselines use `cp "$(chezmoi source-path <target>)"`; for `modify_` scripts edit the source directly (`chezmoi edit <target>`).
-- `chezmoi re-add` silently skips `create_` and refuses `modify_`, so it is a safer default when picking up drift on already-tracked files.
-
-The two case studies below cover the repo-specific patterns agents are most likely to encounter.
+Two chezmoi source prefixes are used to tame files that would otherwise churn on every apply. Reference: [Manage part but not all of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
 
 ### `dot_claude/modify_settings.json` — partial JSON management via jq
 
@@ -181,6 +173,28 @@ This is an explicit, opt-in step instead of constant apply noise.
 ### Failure modes of the `modify_` script
 
 If the live `~/.claude/settings.json` contains invalid JSON (e.g. Claude Code writes a stray trailing comma), `jq` aborts with a parse error and the script exits non-zero. chezmoi then logs `chezmoi: .claude/settings.json: exit status 5` and skips the file for that apply; the broken live file is left untouched for manual inspection. No partial / corrupt output is ever written. Fix or delete the live file and re-run `chezmoi apply`.
+
+## Upstream Clones via `.chezmoiexternal.toml.tmpl`
+
+Upstream git repos and single-file downloads that used to be cloned by Ansible are declared in `.chezmoiexternal.toml.tmpl` at the repo root. chezmoi fetches them during `chezmoi apply` and re-pulls weekly (`refreshPeriod = "168h"`). This is the source of truth for:
+
+- oh-my-zsh core + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
+- TPM (tmux plugin manager, `~/.tmux/plugins/tpm`)
+- fzf git source (Linux only, `~/.fzf`; apt version lacks `--zsh`)
+- toolkami.rb (`~/.local/toolkami.rb`)
+
+```bash
+chezmoi apply                          # normal: pull if older than 168h
+chezmoi apply --refresh-externals      # force: pull every external now
+```
+
+Ansible retains only the post-clone steps that externals can't do:
+
+- `zsh` role — install `zsh` package + change login shell.
+- `devtools` role — run `tpm/bin/install_plugins` once (sentinel: `~/.tmux/plugins/.ansible-installed`).
+- `lazyvim_deps` role — run `~/.fzf/install --bin` (idempotent via `creates:`).
+
+Add new entries to `.chezmoiexternal.toml.tmpl` when the content is a plain clone / single file and the only conditional is `.chezmoi.os`. Keep things in Ansible when they need arch / `noRoot` / `armv7l` logic, dynamic version paths, or `become: true`. Full rationale + schema notes live in [docs/tools/chezmoi-prefixes.md → Companion file: `.chezmoiexternal.<format>`](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat).
 
 ## Ansible Usage
 

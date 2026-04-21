@@ -72,29 +72,15 @@
       Re-run manually to retry: `{{ mise_bin }} install --yes`
       Stderr tail: {{ mise_install.stderr_lines[-5:] | default([]) | join(' | ') }}
 
-# fzf - install via git for latest version (apt version is outdated and lacks --zsh flag)
-- name: Check if fzf is installed via git
-  when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.stat:
-    path: "{{ ansible_facts['env']['HOME'] }}/.fzf"
-  register: fzf_git_dir
-
-- name: Clone fzf from GitHub
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - not fzf_git_dir.stat.exists
-  ansible.builtin.git:
-    repo: https://github.com/junegunn/fzf.git
-    dest: "{{ ansible_facts['env']['HOME'] }}/.fzf"
-    depth: 1
-
+# fzf - upstream clone is managed by .chezmoiexternal.toml.tmpl (Linux only,
+# since the apt version is outdated and lacks --zsh). We only need to build
+# the binary here; `creates:` makes the task idempotent and lets it re-run
+# after chezmoi pulls a new release that bumps ~/.fzf/install.
 - name: Install fzf (binary only, shell integration handled by zsh config)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - not fzf_git_dir.stat.exists
+  when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command:
     cmd: "{{ ansible_facts['env']['HOME'] }}/.fzf/install --bin"
-  changed_when: true
+    creates: "{{ ansible_facts['env']['HOME'] }}/.fzf/bin/fzf"
 
 # lazygit
 - name: Check if lazygit is installed
