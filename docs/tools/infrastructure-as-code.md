@@ -136,7 +136,7 @@ The `iac_tools` role already retries each brew install 3 times with a 20s delay 
    brew install azure-cli terraform opentofu
    ```
 
-2. **Enable the built-in TUNA mirror** (recommended for GFW). If you answered `y` to `useChineseMirror` at `chezmoi init`, the four `HOMEBREW_*` env vars below are already exported in three places:
+2. **Enable the built-in TUNA mirror** (recommended for GFW). If you answered `y` to `useChineseMirror` at `chezmoi init`, the four `HOMEBREW_*` env vars below are already exported in three places — see the full coverage map in [docs/tools/mirrors.md](./mirrors.md):
 
    - `~/.config/zsh/00_exports.zsh` — for interactive shells
    - `run_once_before_00_bootstrap.sh` — for the first-run Homebrew installer

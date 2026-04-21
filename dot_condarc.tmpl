@@ -1,0 +1,48 @@
+# ~/.condarc - Conda/Mamba configuration
+# Managed by chezmoi ONLY when useChineseMirror=true (see .chezmoiignore.tmpl).
+# If useChineseMirror=false, this file is NOT managed and any existing
+# ~/.condarc stays untouched.
+#
+# TUNA anaconda mirror — covers defaults (main/r/msys2) and common cloud
+# channels (conda-forge, bioconda, pytorch, nvidia, etc.). Rewrites channel
+# URLs on the client side so `conda install` and `mamba install` hit the
+# mirror instead of the blocked repo.anaconda.com.
+#
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/anaconda/
+#
+# NOTE: chezmoi fully manages this file. `conda config --set ...` writes
+# here will be reverted on next `chezmoi apply`. To customize, edit
+# dot_condarc.tmpl in the chezmoi source and re-apply, or disable
+# management by setting useChineseMirror=false.
+#
+# Cached package metadata under ~/.conda/ may need a one-time refresh
+# after switching mirrors:   conda clean -i
+
+# Primary channel search order.
+channels:
+  - conda-forge
+  - defaults
+
+# Auto-activate the base environment on shell start (matches user preference).
+auto_activate_base: true
+
+# Show fully-qualified channel URLs (useful for mirror debugging).
+show_channel_urls: true
+
+# Override the URLs the `defaults` meta-channel resolves to.
+default_channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
+
+# Per-channel URL overrides. Any channel not listed here falls back to its
+# default repo.anaconda.com URL.
+custom_channels:
+  conda-forge: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  bioconda: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  menpo: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  pytorch-lts: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  deepmodeling: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  nvidia: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud

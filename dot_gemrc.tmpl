@@ -1,0 +1,23 @@
+# ~/.gemrc - Ruby Gems configuration
+# Managed by chezmoi
+
+{{- if .useChineseMirror }}
+# RubyGems TUNA (Tsinghua) mirror for GFW users.
+# Affects `gem install` in the ruby_gem_tools ansible role and any manual
+# `gem install`. Read before the default rubygems.org source.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/rubygems/
+:sources:
+  - https://mirrors.tuna.tsinghua.edu.cn/rubygems/
+{{- else }}
+# Default rubygems.org source (no override needed — just an anchor so this
+# file stays idempotent across useChineseMirror toggles).
+:sources:
+  - https://rubygems.org/
+{{- end }}
+
+# Common options (applied regardless of mirror)
+gem: --no-document
+:verbose: true
+:update_sources: true
+:backtrace: false
+:bulk_threshold: 1000

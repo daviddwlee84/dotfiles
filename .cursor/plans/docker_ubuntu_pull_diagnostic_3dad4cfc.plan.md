@@ -4,19 +4,19 @@ overview: Run a 3-phase diagnostic on this chezmoi-setup Mac to verify whether o
 todos:
   - id: phase1_smoke
     content: "Phase 1: baseline `docker pull ubuntu:24.04` (both arches) + `apt-get update` inside amd64 and arm64 to reproduce (or disprove) the ports.ubuntu.com failure on this network"
-    status: in_progress
+    status: completed
   - id: phase2_proxy
     content: "Phase 2 (conditional on Phase 1 failing): probe Clash from a container via host.docker.internal:7891, then one-shot `LOCAL_PROXY_URL=http://host.docker.internal:7891 chezmoi apply`, verify `proxies.default` injected, and retest arm64 apt-get"
-    status: pending
+    status: completed
   - id: phase3_mirror
     content: "Phase 3 (fallback): document the `sed` snippet that rewrites ports.ubuntu.com to mirrors.tuna.tsinghua.edu.cn/ubuntu-ports inside the Dockerfile, independent of any host proxy"
-    status: pending
+    status: completed
   - id: phase4_revert
     content: "Phase 4: `unset LOCAL_PROXY_URL && chezmoi apply` to revert ~/.docker/config.json; verify `.proxies` back to null; no commits to this repo"
-    status: pending
+    status: completed
   - id: writeup
     content: "Summarize findings for the V2Ray project: whether Clash-via-host.docker.internal fixed the arm64 apt case, and hand over the mirror-swap snippet as a no-proxy fallback (the real fix for a VPN project's test harness: bootstrap cannot depend on the VPN being up)"
-    status: pending
+    status: completed
 isProject: false
 ---
 

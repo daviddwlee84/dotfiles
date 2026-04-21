@@ -47,3 +47,10 @@ scripts/**
 
 # .local directory (dynamically managed by package managers)
 .local/
+
+# GFW-only managed files — only manage when useChineseMirror=true,
+# otherwise leave any existing user file untouched.
+{{- if not .useChineseMirror }}
+.condarc
+.gemrc
+{{- end }}

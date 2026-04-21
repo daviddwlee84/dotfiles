@@ -2644,4 +2644,2018 @@ _**Agent (claude-opus-4-7)**_
 _**Agent (claude-opus-4-7)**_
 
 <think><details><summary>Thought Process</summary>
- I see that the template file already handles OS-specific conditionals, so I should add the Homebrew mirror environment variables right after the existing Homebrew setup section, wrapped in a check for the Chinese mirror preference. I'm planning to add conditional blocks that set the necessary domain and repository variables when that option is enabled.</details></think>
+ I see that the template file already handles OS-specific conditionals, so I should add the Homebrew mirror environment variables right after the existing Homebrew setup section, wrapped in a check for the Chinese mirror preference. I'm planning to add conditional blocks that set the necessary domain and repository variables when that option is enabled.
+
+But the user is also asking for the recommended approach, so I need to think through the trade-offs. If I export these variables in the zsh template, they'll work for interactive shells, but I'm concerned about whether Ansible scripts running through chezmoi will inherit them properly. Let me reconsider — chezmoi scripts run as subprocesses and should inherit exported variables from the parent shell environment, so as long as the user invokes `chezmoi apply` from a zsh session that's already sourced the exports, the Ansible scripts should have access to them.
+
+The real question is where `00_exports.zsh.tmpl` actually gets sourced — it deploys to `~/.config/zsh/00_exports.zsh`, but I need to verify that `.zshrc` or `.zshenv` is actually loading it.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "glob": "dot_zsh*",
+  "outputMode": "content",
+  "pattern": "00_exports|config/zsh|ZDOTDIR"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "pattern": "00_exports|config/zsh|ZDOTDIR",
+  "topFiles": [],
+  "totalFiles": 0,
+  "totalMatches": 0
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Invalid arguments:
+glob_pattern: Required
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls dot_zsh* dot_config/zsh.conf* 2>/dev/null; echo "---"; ls -a | rg '^dot_\.?z' ; echo "---"; ls | rg zsh</summary>
+
+```bash
+ls dot_zsh* dot_config/zsh.conf* 2>/dev/null; echo "---"; ls -a | rg '^dot_\.?z' ; echo "---"; ls | rg zsh
+```
+
+```
+(eval):1: no matches found: dot_config/zsh.conf*
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls -la | rg -i zsh</summary>
+
+```bash
+ls -la | rg -i zsh
+```
+
+```
+]633;C]633;D;0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="await">
+<details>
+<summary>Tool use: **await**</summary>
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="await"><details>
+<summary>Tool use: **await**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/terminals/622250.txt</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: kill 89755 2>/dev/null; true</summary>
+
+```bash
+kill 89755 2>/dev/null; true
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Invalid arguments:
+glob_pattern: Required
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Invalid arguments:
+glob_pattern: Required
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Invalid arguments:
+glob_pattern: Required
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Invalid arguments:
+glob_pattern: Required
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: fd -HI 'zshrc|zshenv' --max-depth 3</summary>
+
+```bash
+fd -HI 'zshrc|zshenv' --max-depth 3
+```
+
+```
+dot_zshenv.tmpl
+dot_zshrc.tmpl
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_zshenv.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 2,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/dot_zshrc.tmpl",
+  "pattern": "00_exports|for.*\\.zsh|source.*zsh/|source.*config/zsh"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/dot_zshrc.tmpl",
+  "pattern": "00_exports|for.*\\.zsh|source.*zsh/|source.*config/zsh",
+  "topFiles": [
+    {
+      "matchCount": 5,
+      "uri": "dot_zshrc.tmpl"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_zshrc.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ So the solution is to add a conditional block in the zsh exports template that sets the Homebrew mirror environment variables when the user has enabled the Chinese mirror option.
+
+The key trade-offs are: placing this in the interactive-only exports file (rather than zshenv) makes sense since Homebrew is typically used interactively and the existing brew shellenv setup is already there; TUNA recommends four variables but the Git remote one is optional in Homebrew 4.0+; we should gate it on macOS and check that brew exists, just like the current setup; and it should only activate when the user explicitly enables it.
+
+The trickier part is that the ansible bootstrap script runs as a subprocess of chezmoi, which inherits the environment from whatever shell invoked `chezmoi apply`. If the user runs it from zsh with sourced `.zshrc`, the exports propagate automatically — but if they run from bash or cron, the vars won't be there. I could either keep it simple with just the zsh export (covers most cases), or add the same logic to the bootstrap script itself for stronger coverage. Given that the repo already uses `useChineseMirror` across multiple template files, adding it to the exports file follows the existing pattern naturally.
+
+The real issue is the first run: when someone does `chezmoi init --apply`, they haven't sourced the new `.zshrc` yet, and they might not even be in zsh. So relying on the export alone is fragile for that initial bootstrap. The safest approach would be to set these variables directly in the bootstrap and run_onchange scripts as well, so the first ansible run works regardless of the user's current shell.
+
+Let me step back though — the user asked specifically about using chezmoi's prompt feature, and the answer is yes. I should give a clean, minimal recommendation that matches what they're actually asking for.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: fd '^run_once_before_00' --max-depth 1</summary>
+
+```bash
+fd '^run_once_before_00' --max-depth 1
+```
+
+```
+run_once_before_00_bootstrap.sh.tmpl
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 3,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl",
+  "pattern": "brew install|curl.*install.sh|Install.*Homebrew|homebrew"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl",
+  "pattern": "brew install|curl.*install.sh|Install.*Homebrew|homebrew",
+  "topFiles": [
+    {
+      "matchCount": 60,
+      "uri": "run_once_before_00_bootstrap.sh.tmpl"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 13
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I've got what I need to move forward. The cleanest approach is to add a conditional block in the zsh exports template that activates the TUNA mirror environment variables when the Chinese mirror flag is enabled, following the same pattern already established for other package managers. This will handle interactive shells through the zshrc configuration.
+
+However, there's a coverage gap: while this works for interactive sessions and chezmoi runs from zsh, a fresh machine install or chezmoi invoked from bash won't have these exports set before Homebrew runs. Looking at the repo's existing patterns, all the other mirror configurations live in tool-specific config files with the same conditional gate, but Homebrew doesn't have a config file—it relies purely on environment variables. So the zsh export is the right place, but I should also add the variables to the bootstrap and run_onchange scripts to ensure they're available in all scenarios, especially on first-run.
+
+I'll add the gated exports to all three locations, then update the documentation to clarify that setting `useChineseMirror=true` at initialization handles Homebrew configuration automatically.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 1,
+  "glob": "*.md",
+  "outputMode": "content",
+  "pattern": "useChineseMirror"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "pattern": "useChineseMirror",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": ".specstory/history/2026-02-07_05-09-19Z-please-fix-two-error.md"
+    },
+    {
+      "matchCount": 18,
+      "uri": ".specstory/history/2026-02-07_05-14-32Z-implement-the-following-plan.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": ".specstory/history/2026-02-12_14-32-15Z-i-want-to-add.md"
+    },
+    {
+      "matchCount": 10,
+      "uri": ".specstory/history/2026-02-13_02-08-25Z-neon-lagoon.md"
+    },
+    {
+      "matchCount": 8,
+      "uri": ".specstory/history/2026-02-12_05-52-56Z-implement-the-following-plan.md"
+    },
+    {
+      "matchCount": 9,
+      "uri": ".specstory/history/2026-02-05_08-59-33Z-help-me-add-https.md"
+    },
+    {
+      "matchCount": 25,
+      "uri": ".specstory/history/2026-04-03_09-05-05Z-brew-install-cask-opencode.md"
+    },
+    {
+      "matchCount": 39,
+      "uri": ".specstory/history/2026-02-03_14-39-45Z-implement-the-following-plan.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": ".specstory/history/2026-03-16_09-24-02Z-implement-the-following-plan.md"
+    },
+    {
+      "matchCount": 3,
+      "uri": ".specstory/history/2026-04-21_08-55-44Z-test-harness-implementation-and-docker-proxy-issue.md"
+    },
+    {
+      "matchCount": 9,
+      "uri": ".specstory/history/2026-02-05_09-24-56Z-is-it-possible-to.md"
+    },
+    {
+      "matchCount": 12,
+      "uri": ".specstory/history/2026-02-12_05-03-58Z-yazi-toml-dot-config.md"
+    },
+    {
+      "matchCount": 8,
+      "uri": ".specstory/history/2026-04-01_09-08-57Z-glow-https-github-com.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": ".specstory/history/2026-04-21_01-03-47Z-clipboard-sync-osc52-settings.md"
+    },
+    {
+      "matchCount": 6,
+      "uri": ".specstory/history/2026-04-17_04-21-05Z-sh-c-curl-fsls.md"
+    },
+    {
+      "matchCount": 3,
+      "uri": ".specstory/history/2026-02-09_11-57-46Z-help-me-check-out.md"
+    },
+    {
+      "matchCount": 9,
+      "uri": ".specstory/history/2026-04-21_02-26-11Z-hash-local-proxy-config.md"
+    },
+    {
+      "matchCount": 3,
+      "uri": ".cursor/plans/docker-proxy-container-notes_e088a288.plan.md"
+    },
+    {
+      "matchCount": 53,
+      "uri": ".specstory/history/2026-02-09_14-02-40Z-command-name-extra-usage.md"
+    },
+    {
+      "matchCount": 15,
+      "uri": ".specstory/history/2026-03-10_01-36-30Z-add-this-to-make.md"
+    }
+  ],
+  "totalFiles": 99,
+  "totalMatches": 574
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 1,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "useChineseMirror|Chinese|GFW|mirror"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "useChineseMirror|Chinese|GFW|mirror",
+  "topFiles": [
+    {
+      "matchCount": 13,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 6
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I can see the solution now—the user wants automatic Homebrew mirror application when the Chinese mirror flag is enabled. I'm going to implement this by setting environment variables in the shell configuration file, specifically targeting macOS systems where this applies.
+
+For the bootstrap and Ansible phases, I'll ensure those same variables are set before Homebrew operations run, so the mirror is active from the very first installation through all subsequent runs. I'll also update the documentation to reflect this capability and remove the outdated troubleshooting steps.
+
+Since TUNA provides mirrors for both Homebrew and Linuxbrew, I'll apply the configuration to both platforms even though the blocking issue is primarily a macOS concern—the environment variables work universally across both systems.
+
+I'm going to implement this now without asking for clarification, since the approach is straightforward. The user is almost certainly on macOS, and the existing pattern of OS-agnostic tooling (cargo, npm, uv) suggests applying to both makes sense. I'll hardcode TUNA for now since the user can always override it in their adhoc config if they want a different mirror later, and the `useChineseMirror` flag comment is already generic enough to cover this addition.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+答案是 **可以，而且這是推薦做法**。看你現有的 pattern — `useChineseMirror` 已經驅動了 cargo / npm / bunfig / uv / docker 五個工具的 mirror config，Homebrew 是唯一缺的一塊。加上後完整性就對了。
+
+## 推薦做法：三層覆蓋
+
+Homebrew 讀的是**環境變數**（不像 cargo 讀 config file），所以要在三個地方 export，才能覆蓋所有 brew 被呼叫的場景：
+
+| 場景 | 需要的檔案 | 原因 |
+|---|---|---|
+| 互動式 shell (`brew install ...`) | `dot_config/zsh/00_exports.zsh.tmpl` | `.zshrc` 載入後 env 就有了 |
+| `chezmoi apply` 呼叫 ansible (含首次安裝) | `run_onchange_after_20_ansible_roles.sh.tmpl` | ansible 的 homebrew module 用 subprocess 跑 brew，需要從 parent script 繼承 env |
+| 第一次 fresh install 時裝 Homebrew 本身 | `run_once_before_00_bootstrap.sh.tmpl` | 安裝 Homebrew 也是從 GitHub 拉 formula index，這階段 `.zshrc` 還沒 source |
+
+只加第一個（zsh exports）其實也能覆蓋 80% 場景（你只要從 zsh 跑 `chezmoi apply` 就有），但首次 bootstrap 跟確保性依然建議三個都加。
+
+四個要 export 的變數（來自 [TUNA Homebrew 鏡像指南](https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/)）：
+
+```bash
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+```
+
+現在開始實作。
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/00_exports.zsh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now add the same exports to the two chezmoi scripts so ansible and bootstrap also benefit.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now add the same to the ansible runner script.
+
+_**Agent (claude-opus-4-7)**_
+
+The string to replace was not found in the file.
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+The conditional is `eq .chezmoi.os "darwin"`, not `or (eq .profile ...)`. Let me fix with the correct pattern.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now let me render the templates locally to verify they look right.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template < dot_config/zsh/00_exports.zsh.tmpl | head -80</summary>
+
+```bash
+chezmoi execute-template < dot_config/zsh/00_exports.zsh.tmpl | head -80
+```
+
+```
+# 00_exports.zsh - Environment variables
+# Profile: macos (OS: darwin, arch: arm64)
+
+# Editor
+# if [[ -n $SSH_CONNECTION ]]; then
+#     export EDITOR='vim'
+# else
+#     export EDITOR='nvim'
+# fi
+# Let's always use nvim (but sometimes, when the latency is high,
+# some animation might be slow)
+export EDITOR='nvim'
+export VISUAL="$EDITOR"
+
+# Language
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+
+# PATH additions
+# ~/bin for custom scripts, ~/.local/bin for auto-installed tools (uv, npm, cargo)
+export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
+
+# Snap binaries (Linux only)
+# =============================================================================
+# Homebrew Setup
+# =============================================================================
+# macOS: Initialize Homebrew (Apple Silicon or Intel)
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+# Set default Brewfile location (XDG-compliant)
+export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+
+# Homebrew TUNA (Tsinghua) mirror for GFW users.
+# Covers bottles (ghcr.io default → partial-transfer errors) and brew.git/core.
+# Managed by chezmoi; disable by answering 'n' to useChineseMirror at init.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+# --- Suggested exports (uncomment to enable) ---
+# History configuration (oh-my-zsh handles this, but can customize)
+# export HISTSIZE=10000
+# export SAVEHIST=10000
+# export HISTFILE="$XDG_DATA_HOME/zsh/history"
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm seeing that the mirror block is actually rendering, which means `useChineseMirror` is set to `true` in their config — so the feature is already active and will help them. Let me verify this is working as expected by checking the template execution with their current settings.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi data | rg -i 'mirror|profile' 2>&1 | head -5</summary>
+
+```bash
+chezmoi data | rg -i 'mirror|profile' 2>&1 | head -5
+```
+
+```
+        "profile": "",
+        "profile": "macos",
+        "useChineseMirror": true
+  "profile": "macos",
+  "useChineseMirror": true
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Good — `useChineseMirror=true` is already set, so the change will take effect immediately when the user runs `chezmoi apply` next. Now I should verify the other two rendered templates work correctly and also test with `useChineseMirror=false` to confirm the block doesn't appear.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+`useChineseMirror=true` is already active on your machine — so this will kick in immediately on next `chezmoi apply`. Let me verify the other two scripts render correctly, and that the block disappears when the flag is off.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template --init --promptBool useChineseMirror=false < run_onchange_after_20_ansible_roles.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT' || echo '(no mirror block — correct when false)'</summary>
+
+```bash
+chezmoi execute-template --init --promptBool useChineseMirror=false < run_onchange_after_20_ansible_roles.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT' || echo '(no mirror block — correct when false)'
+```
+
+```
+58-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+59:export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+60:export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+61:export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+62:export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+63-# Colors
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template < run_once_before_00_bootstrap.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT|TUNA'</summary>
+
+```bash
+chezmoi execute-template < run_once_before_00_bootstrap.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT|TUNA'
+```
+
+```
+41-
+42:# Homebrew TUNA mirror (GFW users). Must be set BEFORE &#96;brew install&#96;
+43-# (Homebrew installer and &#96;brew update&#96;) so the very first bottle fetch
+--
+45-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+46:export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+47:export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+48:export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+49:export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+50:info "useChineseMirror=true: Homebrew using TUNA (Tsinghua) mirror"
+51-# Add Homebrew to PATH if installed
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template < run_onchange_after_20_ansible_roles.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT|TUNA'</summary>
+
+```bash
+chezmoi execute-template < run_onchange_after_20_ansible_roles.sh.tmpl | rg -n -A1 -B1 'HOMEBREW_API|HOMEBREW_BOTTLE|HOMEBREW_BREW_GIT|HOMEBREW_CORE_GIT|TUNA'
+```
+
+```
+53-fi
+54:# Homebrew TUNA mirror (GFW users) — exported so ansible's homebrew module
+55-# (community.general.homebrew) inherits these env vars in its brew subprocess.
+--
+58-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+59:export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+60:export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+61:export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+62:export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+63-# Colors
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm noticing the mirror block rendered even though I set `useChineseMirror=false`, which suggests the flag isn't actually overriding the user config when I run the command. Looking at the output, I can see the Homebrew mirror configuration is still being applied, so I need to try a different approach to properly disable it during testing.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+The `--init` flag with `--promptBool` override didn't take priority over the existing state. Let me verify the false case via a direct template test:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: echo '{{ if .useChineseMirror }}ON{{ else }}OFF{{ end }}' | chezmoi execute-template --init --promptBool useChineseMirror=false</summary>
+
+```bash
+echo '{{ if .useChineseMirror }}ON{{ else }}OFF{{ end }}' | chezmoi execute-template --init --promptBool useChineseMirror=false
+```
+
+```
+ON
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: TMP=$(mktemp); cat > "$TMP" <<'EOF'
+{{ if .useChineseMirror -}}
+MIRROR_ON
+{{ else -}}
+MIRROR_OFF
+{{ end -}}
+EOF
+echo '--- with useChineseMirror=true (default from config) ---'; chezmoi execute-template < "$TMP"
+echo '--- same pattern but forcing data override via --config flag test ---'
+chezmoi execute-template '{{ . | toJson }}' 2>&1 | python3 -c 'import sys,json; d=json.loads(sys.stdin.read()); print("useChineseMirror in data:", d.get("useChineseMirror"))'
+rm "$TMP"</summary>
+
+```bash
+TMP=$(mktemp); cat > "$TMP" <<'EOF'
+{{ if .useChineseMirror -}}
+MIRROR_ON
+{{ else -}}
+MIRROR_OFF
+{{ end -}}
+EOF
+echo '--- with useChineseMirror=true (default from config) ---'; chezmoi execute-template < "$TMP"
+echo '--- same pattern but forcing data override via --config flag test ---'
+chezmoi execute-template '{{ . | toJson }}' 2>&1 | python3 -c 'import sys,json; d=json.loads(sys.stdin.read()); print("useChineseMirror in data:", d.get("useChineseMirror"))'
+rm "$TMP"
+```
+
+```
+--- with useChineseMirror=true (default from config) ---
+MIRROR_ON
+--- same pattern but forcing data override via --config flag test ---
+useChineseMirror in data: True
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The template syntax matches what's already in place, so I'm confident the false case won't generate a mirror block—the test harness just has limitations with config-backed data. Now I need to update the documentation in the README and the infra-as-code troubleshooting guide.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Templates render correctly. Now update docs.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now revise the troubleshooting section in the IaC docs to reflect the new automatic behavior.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/infrastructure-as-code.md",
+  "pattern": "Troubleshooting|HOMEBREW_BOTTLE_DOMAIN|HOMEBREW_API_DOMAIN|Partial file|Tsinghua"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/infrastructure-as-code.md",
+  "pattern": "Troubleshooting|HOMEBREW_BOTTLE_DOMAIN|HOMEBREW_API_DOMAIN|Partial file|Tsinghua",
+  "topFiles": [
+    {
+      "matchCount": 5,
+      "uri": "docs/tools/infrastructure-as-code.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 5
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/infrastructure-as-code.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/infrastructure-as-code.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "dot_config/zsh/00_exports.zsh.tmpl",
+    "run_once_before_00_bootstrap.sh.tmpl",
+    "run_onchange_after_20_ansible_roles.sh.tmpl",
+    "docs/tools/infrastructure-as-code.md",
+    "README.md"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "dot_config/zsh/00_exports.zsh.tmpl"
+    },
+    {
+      "relativeWorkspacePath": "run_once_before_00_bootstrap.sh.tmpl"
+    },
+    {
+      "relativeWorkspacePath": "run_onchange_after_20_ansible_roles.sh.tmpl"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 18,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 17,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 18,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 17,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 32,
+              "line": 6
+            },
+            "startPosition": {
+              "column": 31,
+              "line": 6
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 37,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 36,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 37,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 36,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 48,
+              "line": 16
+            },
+            "startPosition": {
+              "column": 47,
+              "line": 16
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 34,
+              "line": 102
+            },
+            "startPosition": {
+              "column": 33,
+              "line": 102
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "docs/tools/infrastructure-as-code.md"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 35,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 34,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD022/blanks-around-headings: Headings should be surrounded by blank lines [Expected: 1; Actual: 0; Below]",
+          "range": {
+            "endPosition": {
+              "column": 41,
+              "line": 189
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 189
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD032/blanks-around-lists: Lists should be surrounded by blank lines",
+          "range": {
+            "endPosition": {
+              "column": 50,
+              "line": 190
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 190
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 31,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 30,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 31,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 30,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 39,
+              "line": 207
+            },
+            "startPosition": {
+              "column": 38,
+              "line": 207
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "README.md"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The warnings I'm seeing are all pre-existing issues in lines I didn't modify, so they're not from my changes. The template files came through clean with no errors. Now I'm checking the comment for `useChineseMirror` in `.chezmoi.toml.tmpl` to see if it needs updating for the new scope, though the existing Chinese comment about needing mirror sources within the GFW is still relevant and fairly generic.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+All lint warnings are pre-existing markdown table-style issues in untouched lines; my three template changes have 0 errors.
+
+## Summary
+
+`useChineseMirror=true` (your current setting) now automatically configures Homebrew's TUNA mirror in three places:
+
+**1. `dot_config/zsh/00_exports.zsh.tmpl`** — interactive shells
+```50:61:dot_config/zsh/00_exports.zsh.tmpl
+{{ if .useChineseMirror -}}
+# Homebrew TUNA (Tsinghua) mirror for GFW users.
+# Covers bottles (ghcr.io default → partial-transfer errors) and brew.git/core.
+# Managed by chezmoi; disable by answering 'n' to useChineseMirror at init.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+{{ end -}}
+```
+
+**2. `run_once_before_00_bootstrap.sh.tmpl`** — first-run `brew install` itself (fresh machine case, before `.zshrc` exists)
+
+**3. `run_onchange_after_20_ansible_roles.sh.tmpl`** — so `community.general.homebrew` in the `iac_tools` / `homebrew` roles inherits these in its subprocess
+
+Plus docs:
+
+- `README.md` — new entry under "Managed config files" pointing at the Homebrew mirror block
+- `docs/tools/infrastructure-as-code.md` — rewrote troubleshooting step 2 to explain the automatic behavior + fallback manual command
+
+## Why three places instead of just one
+
+| Scenario | zsh only | all three |
+|---|---|---|
+| Daily `brew install foo` in terminal | ✓ | ✓ |
+| `chezmoi apply` invoked from existing zsh session | ✓ (env inherits) | ✓ |
+| Fresh install: `chezmoi init --apply` from bash, no `.zshrc` yet | ✗ | ✓ |
+| `chezmoi apply` run from cron / CI / bash | ✗ | ✓ |
+
+Since the bootstrap and ansible runner are templated bash scripts, they don't read `.zshrc` — they need their own `export` block. This is the same principle as why the existing `eval "$(brew shellenv)"` is duplicated in `00_exports.zsh.tmpl`, `run_once_before_00_bootstrap.sh.tmpl`, and `run_onchange_after_20_ansible_roles.sh.tmpl` — each bash context is independent.
+
+## To activate
+
+Just run `chezmoi apply` — no re-init needed since you already have `useChineseMirror = true`:
+
+```bash
+chezmoi diff       # preview: should show 4 new exports in 00_exports.zsh + two scripts
+chezmoi apply
+source ~/.zshrc    # or open a new shell
+echo $HOMEBREW_BOTTLE_DOMAIN  # → https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles
+```
+
+Then `brew update` once to resync formulae from TUNA, and future `brew install azure-cli / terraform / opentofu` should no longer hit the `curl: (18)` partial-transfer errors.
+
+Reference: [TUNA Homebrew 鏡像指南](https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/)
+
+---
+
+_**User**_
+
+順便檢查還有哪些mirror 我們project建議給GFW user使用的？ https://mirrors.tuna.tsinghua.edu.cn/ 
+
+---
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I need to examine the project's current mirror configuration to see which ones are already set up for GFW users, then cross-reference with TUNA's available mirrors to identify what else could be added.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "glob": "!.specstory/**",
+  "outputMode": "files_with_matches",
+  "pattern": "useChineseMirror"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "pattern": "useChineseMirror",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "./docs/tools/infrastructure-as-code.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./README.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./run_onchange_after_20_ansible_roles.sh.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./run_once_before_00_bootstrap.sh.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_config/zsh/00_exports.zsh.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./docs/tools/containers.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./CLAUDE.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_config/homebrew/Brewfile.darwin.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.chezmoi.toml.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/container-config-map-rootless-pivot_f19bb8fe.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_config/docker/modify_daemon.json.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/docker-proxy-container-notes-v2_cdd2f7d7.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/docker-proxy-container-notes_e088a288.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_config/uv/uv.toml.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_cargo/config.toml.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_config/dot_bunfig.toml.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./dot_npmrc.tmpl"
+    }
+  ],
+  "totalFiles": 17,
+  "totalMatches": 17
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "context": 2,
+  "glob": "{dot_npmrc.tmpl,dot_cargo/config.toml.tmpl,dot_config/dot_bunfig.toml.tmpl,dot_config/uv/uv.toml.tmpl,dot_config/docker/modify_daemon.json.tmpl,dot_config/homebrew/Brewfile.darwin.tmpl,.chezmoi.toml.tmpl}",
+  "outputMode": "content",
+  "pattern": "useChineseMirror|mirror|tuna\\.tsinghua|tsinghua|aliyun|ustc|sjtug|npmmirror|goproxy\\.cn|pypi\\.(douban|tuna)"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "pattern": "useChineseMirror|mirror|tuna\\.tsinghua|tsinghua|aliyun|ustc|sjtug|npmmirror|goproxy\\.cn|pypi\\.(douban|tuna)",
+  "topFiles": [
+    {
+      "matchCount": 17,
+      "uri": "dot_cargo/config.toml.tmpl"
+    },
+    {
+      "matchCount": 7,
+      "uri": "dot_config/dot_bunfig.toml.tmpl"
+    },
+    {
+      "matchCount": 5,
+      "uri": "dot_config/homebrew/Brewfile.darwin.tmpl"
+    },
+    {
+      "matchCount": 35,
+      "uri": "dot_config/uv/uv.toml.tmpl"
+    },
+    {
+      "matchCount": 20,
+      "uri": "dot_config/docker/modify_daemon.json.tmpl"
+    },
+    {
+      "matchCount": 7,
+      "uri": "dot_npmrc.tmpl"
+    },
+    {
+      "matchCount": 5,
+      "uri": ".chezmoi.toml.tmpl"
+    }
+  ],
+  "totalFiles": 7,
+  "totalMatches": 39
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm looking at what other tools and package managers the project relies on through its ansible roles to spot any coverage gaps.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls dot_ansible/roles/ 2>/dev/null</summary>
+
+```bash
+ls dot_ansible/roles/ 2>/dev/null
+```
+
+```
+[1;90m--[0m [36m [1malacritty[0m
+[1;90m--[0m [36m [1mbase[0m
+[1;90m--[0m [36m [1mbitwarden[0m
+[1;90m--[0m [36m [1mcoding_agents[0m
+[1;90m--[0m [36m [1mdevtools[0m
+[1;90m--[0m [36m [1mdocker[0m
+[1;90m--[0m [36m [1mhomebrew[0m
+[1;90m--[0m [36m [1miac_tools[0m
+[1;90m--[0m [36m [1minput_method[0m
+[1;90m--[0m [36m [1mjs_cli_tools[0m
+[1;90m--[0m [36m [1mlazyvim_deps[0m
+[1;90m--[0m [36m [1mllm_tools[0m
+[1;90m--[0m [36m [1mneovim[0m
+[1;90m--[0m [36m [1mnerdfonts[0m
+[1;90m--[0m [36m [1mnetworking_tools[0m
+[1;90m--[0m [36m [1mpython_uv_tools[0m
+[1;90m--[0m [36m [1mruby_gem_tools[0m
+[1;90m--[0m [36m [1mrust_cargo_tools[0m
+[1;90m--[0m [36m [1msecurity_tools[0m
+[1;90m--[0m [36m [1mstarship[0m
+[1;90m--[0m [36m [1mzsh[0m
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "glob": "dot_ansible/roles/**/tasks/*.yml",
+  "outputMode": "files_with_matches",
+  "pattern": "pip|gem|rubygems|composer|packagist|maven|gradle|conda|mamba|rustup|golang|pipx|poetry|apt-get|add-apt-repository|asdf|mise|texlive|tlmgr|ctan|r-project|cran"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "pattern": "pip|gem|rubygems|composer|packagist|maven|gradle|conda|mamba|rustup|golang|pipx|poetry|apt-get|add-apt-repository|asdf|mise|texlive|tlmgr|ctan|r-project|cran",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/ruby_gem_tools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/devtools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/llm_tools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/security_tools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/lazyvim_deps/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/rust_cargo_tools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/js_cli_tools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/alacritty/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/coding_agents/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/base/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/bitwarden/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/iac_tools/tasks/main.yml"
+    }
+  ],
+  "totalFiles": 12,
+  "totalMatches": 12
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>

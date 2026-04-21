@@ -62,15 +62,20 @@ fi
 {{ end -}}
 
 {{ if .useChineseMirror -}}
-# Homebrew TUNA mirror (GFW users) — exported so ansible's homebrew module
-# (community.general.homebrew) inherits these env vars in its brew subprocess.
-# Without this, ghcr.io bottle downloads frequently fail with
-# `curl: (18) Transferred a partial file` on constrained networks.
-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+# GFW mirrors (useChineseMirror=true) — exported so ansible subprocesses
+# (community.general.homebrew, mise, rustup, gem) inherit them. Without
+# this, ghcr.io bottle downloads frequently fail with
+# `curl: (18) Transferred a partial file` and rust-lang.org / nodejs.org
+# downloads time out on constrained networks.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/
 export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
 export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
 export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
 export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
 {{ end -}}
 
 # Colors

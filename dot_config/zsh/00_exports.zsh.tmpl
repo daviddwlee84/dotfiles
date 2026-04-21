@@ -51,14 +51,39 @@ fi
 export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
 
 {{ if .useChineseMirror -}}
-# Homebrew TUNA (Tsinghua) mirror for GFW users.
-# Covers bottles (ghcr.io default → partial-transfer errors) and brew.git/core.
-# Managed by chezmoi; disable by answering 'n' to useChineseMirror at init.
+# =============================================================================
+# GFW Mirrors (useChineseMirror=true) — env-var driven package ecosystems.
+# Config-file driven ecosystems (PyPI/uv, npm, Bun, cargo, docker registry)
+# live in their own templates under dot_config/ and dot_cargo/.
+# =============================================================================
+
+# Homebrew: bottles (ghcr.io default → partial-transfer errors) + brew.git + core.
 # Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
 export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
 export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
 export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
 export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+
+# Rustup: affects `rustup install`, `rustup update`, `rustup self update`,
+# and mise's rust plugin (which invokes rustup internally).
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/rustup/
+export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+
+# mise runtime downloads: Node.js prebuilt archives.
+# Python is usually fine since mise pulls pre-compiled binaries from the
+# python-build-standalone GitHub releases (not blocked). If you hit issues,
+# set PYTHON_BUILD_MIRROR_URL manually.
+# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/
+export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+
+# Go modules: goproxy.cn is the Qiniu-hosted de-facto standard for China;
+# TUNA does not host a Go module proxy. `direct` fallback preserves private
+# repo support.
+# Ref: https://goproxy.cn/
+export GOPROXY="https://goproxy.cn,direct"
+export GOSUMDB="sum.golang.google.cn"
 {{ end -}}
 
 # --- Suggested exports (uncomment to enable) ---
