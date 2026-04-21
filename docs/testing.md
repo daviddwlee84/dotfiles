@@ -85,7 +85,9 @@ This repo falls in the last row — most "zsh" code here is really "zsh script i
 tests/
 ├── test_helper.bash          # shared helpers, sourced by every .bats file
 ├── unit/
-│   └── zsh_proxy.bats        # fast, no Docker, no network
+│   ├── zsh_proxy.bats        # proxy helpers in 50_networking.zsh
+│   ├── ghget.bats            # GitHub tree-URL parsing in 41_github.zsh
+│   └── lan_scan.bats         # pure helpers in lan-scan.sh
 └── smoke/
     └── docker_install.bats   # runs inside Docker after full install
 ```
@@ -113,6 +115,25 @@ Exercises the proxy helpers in `dot_config/zsh/tools/50_networking.zsh`:
 - `proxy-status` exit codes: `1` when unavailable, `0` when available.
 
 Key technique: each test runs `zsh -f -c '...'` (no startup files) so the in-file cache (`$_ZSH_NET_PROXY_CACHE`) can't leak between tests, and `nc` is stubbed via a temp dir on `PATH` — no real network traffic.
+
+### `tests/unit/ghget.bats`
+
+Pins URL parsing for `ghget` in `dot_config/zsh/tools/41_github.zsh`:
+
+- Rejects missing / non-GitHub / `/blob/` (file, not tree) URLs with exit 1.
+- For valid URLs, checks that `owner`, `repo`, `branch`, and the subdir path all reach the `curl` + `tar` invocations intact. Query strings and trailing slashes are stripped.
+- Refuses to overwrite an existing destination directory before touching the network.
+
+Key technique: `curl` and `tar` are stubbed with bash scripts that log their args to `$CAPTURE_LOG`. The `tar` stub also fabricates the expected extracted directory (reading `-C` target and the last positional) so the post-extract `mv` in `ghget` succeeds — no real network, no real tarball.
+
+### `tests/unit/lan_scan.bats`
+
+Pins pure helpers in `dot_config/television/executable_lan-scan.sh`:
+
+- `is_usable_ip` — accepts normal host IPs; rejects link-local (`169.254/16`), multicast (`224–239/4`), broadcast, network address, and `.0` / `.255` in the host octet.
+- `vendor_for_mac` — normalises colon / dash / no-sep MAC formats, looks up the 6-hex prefix in an nmap-style OUI database.
+
+Key technique: the script dispatches at load time (line 325+), so bare `source` runs the `all` subcommand and tries to probe the network. Work around by sourcing with `clean` as the first positional arg against an isolated `$XDG_CACHE_HOME` — `clean` is harmless under an isolated cache dir, and the function definitions remain in scope afterwards.
 
 ### `tests/smoke/docker_install.bats`
 
@@ -208,6 +229,17 @@ Pre-commit hook sources (see `.pre-commit-config.yaml`):
 
 - [`shellcheck-py`](https://github.com/shellcheck-py/shellcheck-py) — ships a Python-installable wheel of shellcheck, so pre-commit environments don't need a system-wide `shellcheck` binary.
 - [`pre-commit-shfmt`](https://github.com/scop/pre-commit-shfmt) — pre-commit wrapper around `shfmt` with no Go toolchain required.
+
+### Other config-file syntax checks
+
+In addition to shell tooling, `.pre-commit-config.yaml` runs these [pre-commit/pre-commit-hooks](https://github.com/pre-commit/pre-commit-hooks) validators:
+
+- `check-yaml` — ansible playbooks, role definitions, docker-compose, pre-commit itself.
+- `check-toml` — TV cable channel configs, starship, yazi, alacritty, etc. `.tmpl` files are excluded because chezmoi's `{{ ... }}` go-template tokens aren't valid TOML until rendered.
+- `check-json` — VS Code settings, claude config, lazyvim lockfile, etc.
+- `check-merge-conflict`, `check-added-large-files`, `detect-private-key`, `end-of-file-fixer`, `trailing-whitespace`.
+
+Ansible **playbook syntax** is checked via `just ansible-syntax-check` / `just lint`, not pre-commit — running a full playbook parse on every commit is too slow for the pre-commit hot path. Run `just lint` manually before pushing ansible-touching changes.
 
 Hook scope (see `.pre-commit-config.yaml`): **`^scripts/[^/]+\.sh$` only**. This excludes:
 

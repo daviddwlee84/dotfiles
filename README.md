@@ -208,7 +208,7 @@ cd ~/.ansible && ansible-playbook playbooks/macos.yml
 
 Two layers, both opt-in — this is a personal dotfiles repo, tests only cover painful-regression zones:
 
-- **`just bats`** — fast unit tests (no Docker, no network). Today: proxy-helper behaviour in `dot_config/zsh/tools/50_networking.zsh` (`tests/unit/zsh_proxy.bats`).
+- **`just bats`** — fast unit tests (no Docker, no network). Covers proxy helpers (`tests/unit/zsh_proxy.bats`), `ghget` URL parsing (`tests/unit/ghget.bats`), and `lan-scan.sh` pure helpers (`tests/unit/lan_scan.bats`).
 - **`just docker-test`** — smoke tests in a clean Ubuntu container: re-apply idempotency, zsh config parses, `oh-my-zsh` plugins present, core CLI tools on PATH, nested unit tests pass under Ubuntu zsh (`tests/smoke/docker_install.bats`).
 - **`just check-all`** — everything: ansible syntax + pre-commit + `bats` + `docker-test`.
 

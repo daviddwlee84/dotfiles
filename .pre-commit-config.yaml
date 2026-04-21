@@ -27,6 +27,11 @@ repos:
       - id: check-yaml
         args: [--allow-multiple-documents]
         exclude: ^\.specstory/
+      - id: check-toml
+        # chezmoi .tmpl files contain `{{ ... }}` go-template tokens that
+        # aren't valid TOML — their rendered output is what ends up on disk.
+        exclude: ^.*\.tmpl$
+      - id: check-json
       - id: check-executables-have-shebangs
 
   # shellcheck - static analysis for bash scripts in scripts/
