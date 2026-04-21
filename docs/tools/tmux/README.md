@@ -61,6 +61,23 @@ tmux -L new new-session -s work
 
 Verify with `tmux -V` (binary version) and, inside tmux, `#{version}` in a format string (server version).
 
+### Terminfo (`missing or unsuitable terminal`)
+
+If `tmux attach` fails with `missing or unsuitable terminal: <name>`, the host is missing the terminfo entry for whatever `$TERM` your outer terminal advertises (common on minimal Ubuntu installs, Docker images, and freshly provisioned servers — base ncurses ships only `xterm`, `vt100`, `linux`, …).
+
+On Debian/Ubuntu the `devtools` role now installs [`ncurses-term`](https://packages.ubuntu.com/jammy/ncurses-term) alongside the tmux baseline, which adds entries for `tmux-256color`, `alacritty`, `ghostty`, `rxvt-unicode-256color`, `screen-256color`, and friends. macOS ships the extended catalog by default.
+
+Fallbacks if you can't install the package (e.g. `noRoot` mode on a locked-down host):
+
+```bash
+# quick test — pick a terminfo that's already present
+TERM=xterm-256color tmux a
+
+# user-local install: copy your local terminfo entry over SSH
+infocmp -x | ssh remote -- tic -x -
+# lands in ~/.terminfo/, no sudo needed
+```
+
 ## OSC 52 Clipboard (SSH-friendly yank)
 
 Full cross-layer explainer (terminal ↔ tmux ↔ Neovim ↔ `x` CLI): see [**clipboard.md**](../clipboard.md). Summary of what tmux contributes:

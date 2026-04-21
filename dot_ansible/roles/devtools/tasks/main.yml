@@ -1778,7 +1778,16 @@
   become: true
   tags: [sudo]
   ansible.builtin.apt:
-    name: tmux
+    name:
+      # Baseline tmux; may be upgraded below via Linuxbrew/tmux-appimage when
+      # the apt version is older than tmux_min_version (3.3).
+      - tmux
+      # Extended terminfo database: provides entries for tmux-256color,
+      # alacritty, ghostty, rxvt-unicode-256color, screen-256color, etc.
+      # Without this, `tmux attach` from a fresh shell where $TERM points at
+      # one of those entries fails with "missing or unsuitable terminal".
+      # Base ncurses ships only a minimal set (xterm, vt100, linux, ...).
+      - ncurses-term
     state: present
 
 - name: Detect current tmux version (Debian/Ubuntu)
