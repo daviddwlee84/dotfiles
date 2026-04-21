@@ -117,6 +117,43 @@ chezmoi edit <file>       # Edit source file
 chezmoi cd                # Go to source directory
 ```
 
+## Selective File Management (`modify_` and `create_`)
+
+Two chezmoi source prefixes are used to tame files that would otherwise churn on every apply. Reference: [Manage part but not all of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
+
+### `dot_claude/modify_settings.json` — partial JSON management via jq
+
+Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `skipAutoPermissionPrompt`, reorders keys). A static managed file would produce diff on every apply.
+
+`modify_` files are executable scripts: chezmoi pipes the current target contents into stdin and expects the new contents on stdout. The script uses `jq '. * $overlay'` to deep-merge a managed overlay over the live file:
+
+- Keys in the overlay are enforced by chezmoi: `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `statusLine`.
+- Any other keys Claude Code adds (model, permissions, skipAutoPermissionPrompt, etc.) are preserved verbatim.
+- Arrays in the overlay replace their counterparts wholesale, so `hooks.Notification` won't accumulate duplicates.
+
+To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
+
+### `dot_config/nvim/create_lazy-lock.json` — seed-once, never overwrite
+
+LazyVim rewrites `~/.config/nvim/lazy-lock.json` on every `:Lazy update` and the tracked plugin list differs across OSes. `create_` only writes when the target file does not yet exist (new-machine seed), so subsequent edits produce zero chezmoi diff.
+
+**Refreshing the baseline after a deliberate plugin bump.** Neither `chezmoi re-add` nor `chezmoi add` is the right tool here:
+
+- `chezmoi re-add` silently **skips** `create_` files (by design — `create_` means contents are not managed).
+- `chezmoi add` would **strip** the `create_` prefix, promoting it to a plain managed file (defeating the whole point).
+
+Instead, copy the live file directly into the source path (this preserves the prefix):
+
+```bash
+cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock.json)"
+```
+
+This is an explicit, opt-in step instead of constant apply noise.
+
+### Failure modes of the `modify_` script
+
+If the live `~/.claude/settings.json` contains invalid JSON (e.g. Claude Code writes a stray trailing comma), `jq` aborts with a parse error and the script exits non-zero. chezmoi then logs `chezmoi: .claude/settings.json: exit status 5` and skips the file for that apply; the broken live file is left untouched for manual inspection. No partial / corrupt output is ever written. Fix or delete the live file and re-run `chezmoi apply`.
+
 ## Ansible Usage
 
 Ansible playbooks run automatically via `chezmoi apply` when playbook files change. For manual runs, use `~/.ansible/` directory:

@@ -32,6 +32,9 @@ repos:
         # aren't valid TOML — their rendered output is what ends up on disk.
         exclude: ^.*\.tmpl$
       - id: check-json
+        # chezmoi `modify_*.json` source files are shell scripts that emit
+        # JSON on stdout, not static JSON themselves; skip JSON syntax check.
+        exclude: (^|/)modify_[^/]+\.json$
       - id: check-executables-have-shebangs
 
   # shellcheck - static analysis for bash scripts in scripts/
