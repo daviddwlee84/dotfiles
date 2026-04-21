@@ -102,7 +102,10 @@ cask "anki"
 # =============================================================================
 # Casks - Network & VPN
 # =============================================================================
-# Tailscale is managed via Mac App Store (mas) below to avoid pkg sudo prompts.
+# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+# but Tailscale was delisted from the Mac App Store (mas install now fails with
+# "No apps found in the App Store for ADAM ID 1475387142").
+cask "tailscale-app"
 # cask "openvpn-connect"
 # cask "vibetunnel"
 # cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
@@ -135,7 +138,7 @@ cask "superset"
 # Mac App Store Apps (via mas)
 # Requires: mas signin (or sign in via App Store.app)
 # =============================================================================
-mas "Tailscale", id: 1475387142
+# mas "Tailscale", id: 1475387142  # delisted from MAS — use cask "tailscale-app" above instead
 # mas "LINE", id: 539883307
 # mas "Keynote", id: 409183694
 # mas "Numbers", id: 409203825

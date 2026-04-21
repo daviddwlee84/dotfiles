@@ -57,8 +57,14 @@ fi
 # 2. Check and update Xcode Command Line Tools
 # =============================================================================
 
-if ! xcodebuild -version &>/dev/null; then
-    warn "Xcode Command Line Tools are missing or outdated — attempting install..."
+# Detect CLT via pkgutil receipt + presence of the toolchain dir.
+# Don't use `xcodebuild -version`: it requires a full Xcode.app and always
+# fails on CLT-only machines, causing a bogus "missing or outdated" warning
+# and a slow `softwareupdate -i` re-install attempt on every run.
+CLT_DIR="/Library/Developer/CommandLineTools"
+if ! pkgutil --pkg-info=com.apple.pkg.CLTools_Executables &>/dev/null \
+    || [[ ! -x "$CLT_DIR/usr/bin/git" ]]; then
+    warn "Xcode Command Line Tools are missing — attempting install..."
 
     # Create placeholder to trigger softwareupdate listing
     touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
@@ -74,7 +80,7 @@ if ! xcodebuild -version &>/dev/null; then
         info "Installing: $CLT_PKG"
         sudo softwareupdate -i "$CLT_PKG" --verbose 2>/dev/null || true
         rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-        if xcodebuild -version &>/dev/null; then
+        if pkgutil --pkg-info=com.apple.pkg.CLTools_Executables &>/dev/null; then
             success "Xcode Command Line Tools installed successfully"
         else
             warn "Auto-install may have failed. Please run: xcode-select --install"
@@ -84,7 +90,9 @@ if ! xcodebuild -version &>/dev/null; then
         warn "Could not find CLT package via softwareupdate. Please run: xcode-select --install"
     fi
 else
-    info "Xcode Command Line Tools are up to date"
+    CLT_VERSION=$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null \
+        | awk -F': ' '/^version:/ {print $2}')
+    info "Xcode Command Line Tools are installed (version: ${CLT_VERSION:-unknown})"
 fi
 
 # =============================================================================
