@@ -1,0 +1,18 @@
+---
+# .NET global tools installed via `dotnet tool install --global`.
+# The .NET SDK itself is installed via mise (same pattern as rust_cargo_tools
+# pulls in Rust via mise), so no system-level package manager or Microsoft apt
+# repo is required -- everything lands under ~/.local/share/mise and
+# ~/.dotnet/tools.
+#
+# Each entry:
+#   - name:   NuGet package id (e.g. azure-cost-cli)
+#   - binary: executable name to check for idempotency (e.g. azure-cost)
+
+# mise channel/version for dotnet. "latest" tracks the newest stable SDK.
+# Pin to e.g. "8" or "8.0" if a specific LTS is required.
+dotnet_version: latest
+
+dotnet_tools:
+  - name: azure-cost-cli
+    binary: azure-cost

@@ -74,5 +74,8 @@
     - role: iac_tools
       tags: [iac_tools]
 
+    - role: dotnet_tools
+      tags: [dotnet_tools]
+
     # Note: brew_bundle is now managed by chezmoi run_onchange script
     # See run_onchange_after_30_brew_bundle.sh.tmpl

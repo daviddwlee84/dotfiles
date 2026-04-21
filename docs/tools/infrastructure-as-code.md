@@ -8,45 +8,37 @@ Opt-in via `installIacTools = true` during `chezmoi init`. Installs:
 | [Terraform](https://developer.hashicorp.com/terraform) | `terraform` | HashiCorp's infrastructure provisioning tool (BSL license) |
 | [OpenTofu](https://opentofu.org/) | `tofu` | Linux Foundation fork of Terraform (MPL-2.0 license) |
 
-Optional add-ons (opt-in per-tool, default off):
+Related add-ons (separate opt-in):
 
-| Tool | Binary | Flag (--extra-vars) | Description |
-|------|--------|---------------------|-------------|
-| [azure-cost-cli](https://github.com/mivano/azure-cost-cli) | `azure-cost` | `iac_install_azure_cost_cli=true` | Cost analysis / anomaly detection for Azure subscriptions (requires .NET SDK) |
+- **Azure cost & .NET tooling** — [`azure-cost-cli`](https://github.com/mivano/azure-cost-cli) for cost analysis, anomaly detection, and CI cost gates. Handled by the dedicated [dotnet_tools role](./dotnet-tools.md) (separate `installDotnetTools` toggle) so enabling IaC CLIs doesn't drag in the .NET SDK.
 
 Terraform and OpenTofu install side-by-side (different binary names) — no conflict.
 
 ## Installation matrix
 
-| Platform | Azure CLI | Terraform | OpenTofu | azure-cost-cli (opt-in) |
-|----------|-----------|-----------|----------|--------------------------|
-| macOS | `brew install azure-cli` | `hashicorp/tap/terraform` | `brew install opentofu` | `brew install dotnet` → `dotnet tool install -g` |
-| Linux (sudo) | Microsoft apt repo | HashiCorp apt repo | OpenTofu deb repo | `dotnet-sdk-8.0` via Microsoft repo → `dotnet tool install -g` |
-| Linux (noRoot) | `uv tool install azure-cli` | GitHub release → `~/.local/bin/` | GitHub release → `~/.local/bin/` | `dotnet-install.sh` → `~/.dotnet/` → `dotnet tool install -g` |
+| Platform | Azure CLI | Terraform | OpenTofu |
+|----------|-----------|-----------|----------|
+| macOS | `brew install azure-cli` | `hashicorp/tap/terraform` | `brew install opentofu` |
+| Linux (sudo) | Microsoft apt repo | HashiCorp apt repo | OpenTofu deb repo |
+| Linux (noRoot) | `uv tool install azure-cli` | GitHub release → `~/.local/bin/` | GitHub release → `~/.local/bin/` |
 
 ### Per-tool toggles
 
-The role installs the three core tools by default. Disable individual tools (or enable the opt-in add-ons) via `--extra-vars`:
+The role installs all three by default. Disable individual tools via `--extra-vars`:
 
 ```bash
 cd ~/.ansible
-# Disable Terraform but keep the rest
 ansible-playbook playbooks/macos.yml --tags iac_tools \
   --extra-vars "iac_install_terraform=false"
-
-# Enable azure-cost-cli (pulls in .NET SDK as a prerequisite)
-ansible-playbook playbooks/macos.yml --tags iac_tools \
-  --extra-vars "iac_install_azure_cost_cli=true"
 ```
 
-Available per-tool flags (all boolean):
+Available per-tool flags (all boolean, default `true`):
 
-| Flag | Default | Installs |
-|------|---------|----------|
-| `iac_install_azure_cli` | `true` | `az` |
-| `iac_install_terraform` | `true` | `terraform` |
-| `iac_install_opentofu` | `true` | `tofu` |
-| `iac_install_azure_cost_cli` | `false` | `azure-cost` (also installs .NET SDK if missing) |
+- `iac_install_azure_cli` → `az`
+- `iac_install_terraform` → `terraform`
+- `iac_install_opentofu` → `tofu`
+
+For `azure-cost-cli` and other .NET global tools, see the [dotnet_tools role docs](./dotnet-tools.md).
 
 ## Quick reference
 
@@ -102,65 +94,7 @@ Useful references:
 - [JMESPath `--query` cookbook](https://learn.microsoft.com/en-us/cli/azure/query-azure-cli)
 - [Managing extensions](https://learn.microsoft.com/en-us/cli/azure/azure-cli-extensions-overview)
 
-### azure-cost-cli (opt-in)
-
-[`azure-cost-cli`](https://github.com/mivano/azure-cost-cli) adds a friendly CLI on top of the Azure Cost Management API — accumulated cost, daily trends, anomaly detection, budget status, `what-if` scenarios, and a cost-gate flag for CI/CD (`--fail-if-over`). It reuses the same `az login` token, so as long as Azure CLI is authenticated it "just works".
-
-**Why opt-in?** It's a .NET 8 global tool (`dotnet tool install --global azure-cost-cli`), so enabling it pulls in the .NET SDK (~400–800MB). The role leaves it off by default; set `iac_install_azure_cost_cli=true` to install it.
-
-Enable + install:
-
-```bash
-# One-shot from chezmoi (persists for future runs)
-chezmoi apply
-ansible-playbook ~/.ansible/playbooks/macos.yml --tags iac_tools \
-  --extra-vars "iac_install_azure_cost_cli=true"
-```
-
-On `noRoot` Linux the role falls back to Microsoft's [`dotnet-install.sh`](https://learn.microsoft.com/en-us/dotnet/core/install/linux-scripted-manual#scripted-install) which installs the SDK to `$HOME/.dotnet` — no sudo needed.
-
-The role appends `~/.dotnet/tools` to `PATH` via `~/.config/zsh/00_exports.zsh` so `azure-cost` is reachable from a fresh shell. For bash, add manually:
-
-```bash
-echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> ~/.bashrc
-```
-
-Quick reference:
-
-```bash
-# Accumulated cost (current billing month, active subscription)
-azure-cost accumulatedCost
-
-# Pin a specific subscription and force USD
-azure-cost accumulatedCost -s <sub-id> --useUSD
-
-# Top 10 costliest resources, markdown output (for PR comments / Job Summary)
-azure-cost costByResource --top 10 -o markdown
-
-# Daily trends grouped by service
-azure-cost dailyCosts --dimension MeterCategory
-
-# Anomaly detection on the last 30 days
-azure-cost detectAnomalies --recent-activity-days 7
-
-# Cost by tag (e.g. show-back to teams)
-azure-cost costByTag --tag cost-center --tag owner
-
-# Budgets + 🟢 OK / 🟡 AT-RISK / 🔴 EXCEEDED status
-azure-cost budgets
-
-# CI cost gate: exit 1 if total > $500
-azure-cost accumulatedCost -s <sub-id> -o json --fail-if-over 500 > costs.json
-
-# Upgrade later (same command, runs under the existing dotnet install)
-dotnet tool update --global azure-cost-cli
-```
-
-Authentication notes:
-
-- Uses `ChainedTokenCredential` — picks up `az login` first, then env vars / managed identity
-- The account needs **Cost Management Reader** (or higher) on the target scope
-- Not all subscription types expose the Cost Management API (sponsored / CSP-tier). See the [upstream README](https://github.com/mivano/azure-cost-cli#usage) for the quota-id compatibility check.
+> **Azure cost analysis:** for `azure-cost-cli` (anomaly detection, daily trends, CI cost gates) see [docs/tools/dotnet-tools.md](./dotnet-tools.md) — it rides on the shared `installDotnetTools` opt-in so the .NET SDK isn't forced on IaC users.
 
 ### Terraform
 
