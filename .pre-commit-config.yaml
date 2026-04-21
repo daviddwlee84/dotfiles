@@ -28,3 +28,23 @@ repos:
         args: [--allow-multiple-documents]
         exclude: ^\.specstory/
       - id: check-executables-have-shebangs
+
+  # shellcheck - static analysis for bash scripts in scripts/
+  # Scoped narrowly: top-level scripts only. `.tmpl` files and zsh modules
+  # have syntax shellcheck's bash parser rejects (go-template `{{ ... }}`,
+  # zsh `(( ))`, `${(P)v}`, `print -u2`, etc). Broaden later if useful.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        files: '^scripts/[^/]+\.sh$'
+        args: [--shell=bash, --severity=warning]
+
+  # shfmt - format check for bash scripts. Diff mode (-d) fails but does not
+  # rewrite; run `shfmt -w scripts/*.sh` manually to apply fixes.
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.10.0-2
+    hooks:
+      - id: shfmt
+        files: '^scripts/[^/]+\.sh$'
+        args: [-i, "2", -ci, -bn, -d]

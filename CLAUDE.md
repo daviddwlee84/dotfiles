@@ -310,6 +310,22 @@ After `chezmoi apply`:
 - Config files in `~/.*`
 - Ansible playbooks in `~/.ansible/`
 
+## Testing
+
+See [docs/testing.md](docs/testing.md) for the full guide (framework comparison — bats vs ZUnit vs ShellSpec — directory structure, patterns for testing zsh from bats, PATH stubbing, shellcheck/shfmt scope).
+
+Small, opt-in layers. This is a personal dotfiles repo — tests cover only painful-regression zones, not broad coverage.
+
+- **`just bats`** — unit tests (`tests/unit/*.bats`), no Docker, sub-second. Current: proxy-helper logic in `dot_config/zsh/tools/50_networking.zsh` (env precedence, port probe order, HTTP/SOCKS split, `proxy-on`/`proxy-off` env var handling).
+- **`just docker-test`** — smoke tests (`tests/smoke/docker_install.bats`) inside a clean Ubuntu container post-install: re-apply idempotency, `zsh -n` on `~/.zshrc`/`~/.zshenv` and every `~/.config/zsh/**/*.zsh`, `nvim --headless` works, core CLI tools on PATH, `oh-my-zsh` plugins present, unit tests pass under the container's zsh.
+- **`just check-all`** — `lint + bats + docker-test`.
+
+Shared helper: `tests/test_helper.bash` (sets `$REPO_ROOT`; `setup_path_stub` writes the stub dir to `$BATS_STUB_DIR` rather than stdout, so PATH export survives — don't wrap it in `$(...)`). No `bats-assert`/`bats-file`/`bats-support` vendored; plain bats built-ins (`run`, `$status`, `$output`, `[ ]`) are sufficient.
+
+**Out of scope by design**: ansible-role tests (use `just ansible-syntax-check`), bootstrap/`run_once` tests, chezmoi-template expansion tests, Python script tests, GitHub Actions CI. When a new high-risk pure-logic shell helper lands, extend `tests/unit/`; don't expand smoke tests.
+
+`shellcheck` + `shfmt` run via pre-commit on `scripts/*.sh` only. Zsh modules and `.sh.tmpl` files are out of shellcheck scope (zsh syntax + go-template tokens produce too many false positives).
+
 ## Development
 
 After modifying ansible playbooks or roles, run syntax check:

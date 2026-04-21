@@ -190,8 +190,15 @@ gitleaks-scan-history:
 # Run all linting checks
 lint: ansible-syntax-check pre-commit-run-all
 
+# Run bats unit tests (fast, no Docker, no network)
+bats:
+    bats tests/unit
+
 # Run tests (docker test suite)
 test: docker-test
+
+# Full check: ansible syntax + pre-commit + bats unit + docker smoke
+check-all: lint bats docker-test
 
 # Full check (lint + dry-run)
 check: lint chezmoi-dry-run
