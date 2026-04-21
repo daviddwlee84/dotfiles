@@ -107,7 +107,7 @@
 - name: Check if rootless docker user unit already exists (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.stat:
-    path: "{{ ansible_env.HOME }}/.config/systemd/user/docker.service"
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user/docker.service"
   register: rootless_docker_unit
 
 - name: Run dockerd-rootless-setuptool.sh install (Debian/Ubuntu)
@@ -119,10 +119,10 @@
     - not rootless_docker_unit.stat.exists
   ansible.builtin.command: dockerd-rootless-setuptool.sh install
   args:
-    creates: "{{ ansible_env.HOME }}/.config/systemd/user/docker.service"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user/docker.service"
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
-    PATH: "/usr/bin:{{ ansible_env.PATH }}"
+    PATH: "/usr/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Enable and start rootless docker user service (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
