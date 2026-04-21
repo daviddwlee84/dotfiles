@@ -502,7 +502,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ### Proxy helpers
 
-> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL` (+ optional `$LOCAL_PROXY_SOCKS_URL` for split Clash `socks-port:` configs); otherwise probes ports 7890/7891/1087/8118/8080 with `nc -z -w1` and caches the result per shell. Set `$LOCAL_PROXY_AUTO_ACTIVATE=1` to auto-export env vars on shell startup. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md). See also: [docs/tools/containers.md](../tools/containers.md) for how `$LOCAL_PROXY_URL` feeds the chezmoi-managed `~/.docker/config.json` `proxies.default` block.
+> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL` (+ optional `$LOCAL_PROXY_SOCKS_URL` for split Clash `socks-port:` configs); otherwise prefers an active Clash config (`mixed-port:` or `port:`/`socks-port:` from `~/.config/clash/config.yaml` or `~/Library/Application Support/clash/config.yaml`) before falling back to probing ports 7890/7891/1087/8118/8080 with `nc -z -w1`. Detection is cached per shell; `proxy-off` and `proxy-refresh` clear that cache before the next lookup. Set `$LOCAL_PROXY_AUTO_ACTIVATE=1` to auto-export env vars on shell startup. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md). See also: [docs/tools/containers.md](../tools/containers.md) for how `$LOCAL_PROXY_URL` feeds the chezmoi-managed `~/.docker/config.json` `proxies.default` block.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|

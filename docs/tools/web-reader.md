@@ -94,14 +94,15 @@ A note appears on stderr when the retry happens: `[retry via proxy http://127.0.
 ### Detection priority
 
 1. `$LOCAL_PROXY_URL` if exported (e.g. `http://127.0.0.1:7890`).
-2. Otherwise, auto-probe loopback ports in this order: `7890 7891 1087 8118 8080`. First TCP-accepting port wins.
-3. Otherwise, proxy is marked unavailable.
+2. Otherwise, if an active Clash config exists at `~/.config/clash/config.yaml` or `~/Library/Application Support/clash/config.yaml`, use its reachable `mixed-port:` or `port:`/`socks-port:` values.
+3. Otherwise, auto-probe loopback ports in this order: `7890 7891 1087 8118 8080`. First TCP-accepting port wins.
+4. Otherwise, proxy is marked unavailable.
 
-The result is cached per shell in `_ZSH_NET_PROXY_CACHE`. Call `proxy-refresh` after starting or stopping your local proxy to re-probe.
+The result is cached per shell in `_ZSH_NET_PROXY_CACHE`. `proxy-off` and `proxy-refresh` clear that cache before the next lookup. Call `proxy-refresh` after starting or stopping your local proxy to force an immediate re-probe.
 
 ### Split HTTP / SOCKS5 ports (Clash `port:` + `socks-port:`)
 
-Clash's mixed-port config (`mixed-port: 7890`) serves both HTTP and SOCKS5 on one port — the default behavior here Just Works.
+Clash's mixed-port config (`mixed-port: 7890`) serves both HTTP and SOCKS5 on one port — the default behavior here Just Works, and the helper now picks that port directly from Clash's active config when available.
 
 If your config splits them (e.g. `port: 7890` for HTTP, `socks-port: 7891` for SOCKS5), set both explicitly:
 
@@ -109,6 +110,8 @@ If your config splits them (e.g. `port: 7890` for HTTP, `socks-port: 7891` for S
 export LOCAL_PROXY_URL="http://127.0.0.1:7890"           # HTTP/HTTPS
 export LOCAL_PROXY_SOCKS_URL="socks5://127.0.0.1:7891"   # SOCKS5
 ```
+
+This repo also seeds a create-only machine-local stub at `~/.config/zsh/99_local_proxy.zsh`. Uncomment and adjust the block there if you want a persistent local override that won't create future chezmoi diffs.
 
 `withproxy` and `proxy-on` then export:
 
@@ -124,7 +127,7 @@ export LOCAL_PROXY_SOCKS_URL="socks5://127.0.0.1:7891"   # SOCKS5
 For machines that always route through the local proxy, auto-export the env vars at shell startup:
 
 ```bash
-# e.g. in a machine-local zsh file, or ~/.zshenv
+# e.g. in ~/.config/zsh/99_local_proxy.zsh, another machine-local zsh file, or ~/.zshenv
 export LOCAL_PROXY_AUTO_ACTIVATE=1
 ```
 

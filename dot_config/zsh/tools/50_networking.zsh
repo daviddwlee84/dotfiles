@@ -63,10 +63,11 @@ if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
 fi
 
 # --- Proxy helpers (generic) ---
-# Portable proxy management: honor $LOCAL_PROXY_URL, else auto-probe common
-# loopback ports (Clash 7890/7891, ClashX 1087, Privoxy 8118, generic 8080).
-# Detection result is cached per-shell in _ZSH_NET_PROXY_CACHE; use
-# `proxy-refresh` after starting/stopping the proxy.
+# Portable proxy management: honor $LOCAL_PROXY_URL, else prefer an active
+# Clash config, else auto-probe common loopback ports (Clash 7890/7891,
+# ClashX 1087, Privoxy 8118, generic 8080). Detection result is cached
+# per-shell in _ZSH_NET_PROXY_CACHE; use `proxy-refresh` after
+# starting/stopping the proxy.
 #
 # Environment variables honored:
 #   LOCAL_PROXY_URL         HTTP/HTTPS proxy URL (e.g. http://127.0.0.1:7890).
@@ -82,22 +83,117 @@ fi
 #                           that always route through the local proxy.
 
 : "${_ZSH_NET_PROXY_CACHE:=}"
+: "${_ZSH_NET_PROXY_SOCKS_CACHE:=}"
+: "${_ZSH_NET_PROXY_SOURCE_CACHE:=}"
 __ZSH_NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
+__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES=(
+  "$HOME/.config/clash/config.yaml"
+  "$HOME/.config/clash/config.yml"
+  "$HOME/Library/Application Support/clash/config.yaml"
+  "$HOME/Library/Application Support/clash/config.yml"
+)
+
+__zsh_net_clear_proxy_cache() {
+  _ZSH_NET_PROXY_CACHE=""
+  _ZSH_NET_PROXY_SOCKS_CACHE=""
+  _ZSH_NET_PROXY_SOURCE_CACHE=""
+}
+
+__zsh_net_set_proxy_cache() {
+  _ZSH_NET_PROXY_CACHE="$1"
+  _ZSH_NET_PROXY_SOCKS_CACHE="$2"
+  _ZSH_NET_PROXY_SOURCE_CACHE="$3"
+}
+
+__zsh_net_port_open() {
+  nc -z -w1 127.0.0.1 "$1" 2>/dev/null
+}
+
+__zsh_net_find_clash_config() {
+  local candidate
+  for candidate in "${__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      print -r -- "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+__zsh_net_yaml_scalar() {
+  local key="$1"
+  local config_path="$2"
+  awk -v key="$key" '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line ~ /^[[:space:]]*#/) {
+        next
+      }
+      sub(/[[:space:]]+#.*/, "", line)
+      if (line ~ "^[[:space:]]*" key ":[[:space:]]*") {
+        sub("^[[:space:]]*" key ":[[:space:]]*", "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        gsub(/^["'"'"']|["'"'"']$/, "", line)
+        print line
+        exit
+      }
+    }
+  ' "$config_path"
+}
+
+__zsh_net_detect_clash_proxy() {
+  local config_path mixed_port http_port socks_port socks_url=""
+  config_path="$(__zsh_net_find_clash_config)" || return 1
+
+  mixed_port="$(__zsh_net_yaml_scalar "mixed-port" "$config_path")"
+  if [[ -n "$mixed_port" ]] && __zsh_net_port_open "$mixed_port"; then
+    __zsh_net_set_proxy_cache \
+      "http://127.0.0.1:$mixed_port" \
+      "socks5://127.0.0.1:$mixed_port" \
+      "clash config"
+    return 0
+  fi
+
+  http_port="$(__zsh_net_yaml_scalar "port" "$config_path")"
+  socks_port="$(__zsh_net_yaml_scalar "socks-port" "$config_path")"
+  if [[ -n "$http_port" ]] && __zsh_net_port_open "$http_port"; then
+    if [[ -n "$socks_port" ]] && __zsh_net_port_open "$socks_port"; then
+      socks_url="socks5://127.0.0.1:$socks_port"
+    fi
+    __zsh_net_set_proxy_cache \
+      "http://127.0.0.1:$http_port" \
+      "$socks_url" \
+      "clash config"
+    return 0
+  fi
+
+  return 1
+}
 
 __zsh_net_detect_proxy() {
-  [[ -n "$_ZSH_NET_PROXY_CACHE" ]] && return 0
   if [[ -n "$LOCAL_PROXY_URL" ]]; then
-    _ZSH_NET_PROXY_CACHE="$LOCAL_PROXY_URL"
+    __zsh_net_set_proxy_cache \
+      "$LOCAL_PROXY_URL" \
+      "$LOCAL_PROXY_SOCKS_URL" \
+      "LOCAL_PROXY_URL env"
+    return 0
+  fi
+  if __zsh_net_detect_clash_proxy; then
+    return 0
+  fi
+  if [[ -n "$_ZSH_NET_PROXY_CACHE" ]]; then
+    [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]] && return 1
     return 0
   fi
   local port
   for port in "${__ZSH_NET_PROXY_PROBE_PORTS[@]}"; do
-    if nc -z -w1 127.0.0.1 "$port" 2>/dev/null; then
-      _ZSH_NET_PROXY_CACHE="http://127.0.0.1:$port"
+    if __zsh_net_port_open "$port"; then
+      __zsh_net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
       return 0
     fi
   done
-  _ZSH_NET_PROXY_CACHE="none"
+  __zsh_net_set_proxy_cache "none" "" "probe"
   return 1
 }
 
@@ -107,6 +203,8 @@ __zsh_net_detect_proxy() {
 __zsh_net_all_proxy_url() {
   if [[ -n "$LOCAL_PROXY_SOCKS_URL" ]]; then
     print -r -- "$LOCAL_PROXY_SOCKS_URL"
+  elif [[ -n "$_ZSH_NET_PROXY_SOCKS_CACHE" ]]; then
+    print -r -- "$_ZSH_NET_PROXY_SOCKS_CACHE"
   else
     print -r -- "$_ZSH_NET_PROXY_CACHE"
   fi
@@ -172,6 +270,7 @@ proxy-on() {
 # Unset all proxy env vars from the current shell.
 proxy-off() {
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy
+  __zsh_net_clear_proxy_cache
   print "proxy OFF"
 }
 
@@ -182,8 +281,7 @@ proxy-status() {
   if [[ -n "$http_proxy$https_proxy$ALL_PROXY" ]]; then
     shell_active="yes"
   fi
-  local source="probe"
-  [[ -n "$LOCAL_PROXY_URL" ]] && source="LOCAL_PROXY_URL env"
+  local source="${_ZSH_NET_PROXY_SOURCE_CACHE:-probe}"
 
   if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
     print "proxy: unavailable (no \$LOCAL_PROXY_URL; no loopback port from ${__ZSH_NET_PROXY_PROBE_PORTS[*]} reachable)"
@@ -195,16 +293,20 @@ proxy-status() {
   [[ -n "$shell_active" ]] && state="active   "
   local hint="(not exported; use \`withproxy\`, \`try_direct_then_proxy\`, or \`proxy-on\`)"
   [[ -n "$shell_active" ]] && hint="(exported in current shell)"
+  local all_url all_source
+  all_url="$(__zsh_net_all_proxy_url)"
+  all_source="$source"
+  [[ -n "$LOCAL_PROXY_SOCKS_URL" ]] && all_source="LOCAL_PROXY_SOCKS_URL env"
 
   print "proxy: $state http=$_ZSH_NET_PROXY_CACHE  source=$source  $hint"
-  if [[ -n "$LOCAL_PROXY_SOCKS_URL" ]]; then
-    print "  socks=$LOCAL_PROXY_SOCKS_URL  source=LOCAL_PROXY_SOCKS_URL env"
+  if [[ -n "$all_url" && "$all_url" != "$_ZSH_NET_PROXY_CACHE" ]]; then
+    print "  socks=$all_url  source=$all_source"
   fi
 }
 
 # Clear the cached detection and re-probe; call after toggling your proxy.
 proxy-refresh() {
-  _ZSH_NET_PROXY_CACHE=""
+  __zsh_net_clear_proxy_cache
   __zsh_net_detect_proxy
   proxy-status
 }

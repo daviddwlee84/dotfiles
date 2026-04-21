@@ -106,12 +106,13 @@ Small helper library (<40 lines). Provides:
 Exercises the proxy helpers in `dot_config/zsh/tools/50_networking.zsh`:
 
 - `$LOCAL_PROXY_URL` takes precedence over probing.
+- Active Clash config (`mixed-port:` or `port:`/`socks-port:`) takes precedence over generic loopback probing.
 - Port probe order: `7890 → 7891 → 1087 → 8118 → 8080`.
 - `_ZSH_NET_PROXY_CACHE=none` when nothing responds.
 - `__zsh_net_all_proxy_url` returns `$LOCAL_PROXY_SOCKS_URL` when set; falls back to the HTTP cache otherwise.
 - `proxy-on` exports all six env vars (`http_proxy`, `https_proxy`, `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `all_proxy`).
 - Split HTTP / SOCKS wiring regression guard (commit `fa4c063`).
-- `proxy-off` clears all six plus `NO_PROXY` / `no_proxy`.
+- `proxy-off` clears all six plus `NO_PROXY` / `no_proxy`, and drops cached detection state.
 - `proxy-status` exit codes: `1` when unavailable, `0` when available.
 
 Key technique: each test runs `zsh -f -c '...'` (no startup files) so the in-file cache (`$_ZSH_NET_PROXY_CACHE`) can't leak between tests, and `nc` is stubbed via a temp dir on `PATH` — no real network traffic.

@@ -47,6 +47,64 @@ STUB
   [ "$result" = "http://127.0.0.1:1087" ]
 }
 
+@test "detect_proxy: prefers Clash mixed-port over generic probe order" {
+  setup_path_stub
+  cat > "$BATS_STUB_DIR/nc" <<'EOF'
+#!/usr/bin/env bash
+port=""
+while [ $# -gt 0 ]; do port="$1"; shift; done
+case "$port" in
+  7890|7891) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+  chmod +x "$BATS_STUB_DIR/nc"
+
+  local home="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$home/.config/clash"
+  cat > "$home/.config/clash/config.yaml" <<'EOF'
+mixed-port: 7891
+EOF
+
+  result="$(HOME="$home" zsh -f -c "
+    source '$PROXY_FILE'
+    __zsh_net_detect_proxy
+    printf 'http=%s\nall=%s\nsource=%s\n' \"\$_ZSH_NET_PROXY_CACHE\" \"\$(__zsh_net_all_proxy_url)\" \"\$_ZSH_NET_PROXY_SOURCE_CACHE\"
+  ")"
+  [[ "$result" == *"http=http://127.0.0.1:7891"* ]]
+  [[ "$result" == *"all=socks5://127.0.0.1:7891"* ]]
+  [[ "$result" == *"source=clash config"* ]]
+}
+
+@test "detect_proxy: uses Clash split HTTP and SOCKS ports" {
+  setup_path_stub
+  cat > "$BATS_STUB_DIR/nc" <<'EOF'
+#!/usr/bin/env bash
+port=""
+while [ $# -gt 0 ]; do port="$1"; shift; done
+case "$port" in
+  7890|7891) exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+  chmod +x "$BATS_STUB_DIR/nc"
+
+  local home="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$home/.config/clash"
+  cat > "$home/.config/clash/config.yaml" <<'EOF'
+port: 7890
+socks-port: 7891
+EOF
+
+  result="$(HOME="$home" zsh -f -c "
+    source '$PROXY_FILE'
+    __zsh_net_detect_proxy
+    printf 'http=%s\nall=%s\n' \"\$_ZSH_NET_PROXY_CACHE\" \"\$(__zsh_net_all_proxy_url)\"
+  ")"
+  [[ "$result" == *"http=http://127.0.0.1:7890"* ]]
+  [[ "$result" == *"all=socks5://127.0.0.1:7891"* ]]
+}
+
 @test "detect_proxy: no responder sets cache=none and returns non-zero" {
   setup_path_stub
   # nc that always fails
@@ -111,7 +169,7 @@ EOF
   [[ "$output" == *"all=socks5://s:2"* ]]
 }
 
-@test "proxy-off: clears all six proxy vars plus NO_PROXY / no_proxy" {
+@test "proxy-off: clears proxy env vars and cached detection state" {
   output="$(LOCAL_PROXY_URL=http://x:1 zsh -f -c "
     source '$PROXY_FILE'
     proxy-on -q
@@ -120,6 +178,9 @@ EOF
     for v in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy; do
       if [[ -n \"\${(P)v}\" ]]; then printf '%s=still-set\n' \"\$v\"; fi
     done
+    if [[ -n \"\$_ZSH_NET_PROXY_CACHE\$_ZSH_NET_PROXY_SOCKS_CACHE\$_ZSH_NET_PROXY_SOURCE_CACHE\" ]]; then
+      print cache=still-set
+    fi
   ")"
   [ -z "$output" ]
 }
