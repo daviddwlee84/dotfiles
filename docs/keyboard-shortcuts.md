@@ -189,6 +189,12 @@ Interactive pickers that open at the shell prompt without leaving the current li
 |---------|---------|--------|
 | `tv tools` | `prefix + U` (tmux) | CLI tools picker; Enter executes, preview shows tldr |
 | `tv sesh` | `prefix + T` (tmux) | Sesh session picker; Enter connects |
+| `tv git-ops` | `Alt+I` (zsh) | VSCode/GitLens Git command palette; Enter pastes to prompt, `Ctrl+Y` copies, `Alt+E` confirms + execs |
+| `tv aliases` | `Alt+A` (zsh) | All runtime aliases & functions |
+| `tv files` | `Alt+P` (zsh) | File/path picker |
+| `tv git-log` | `Alt+G` (zsh) | Git log browser |
+| `tv env` | `Alt+E` (zsh) | Environment variables |
+| `tv` shell history | `Alt+R` (zsh) | tv-style history search (complements `Ctrl+R` fzf) |
 
 ### Inside any tv picker
 

@@ -10,6 +10,7 @@
 #   Alt+G  tv git-log           (git log browser)
 #   Alt+E  tv env               (environment variables)
 #   Alt+A  tv aliases           (all aliases & functions)
+#   Alt+I  tv git-ops           (insert git command from VSCode/GitLens menu)
 #
 # fzf keeps Ctrl+T / Ctrl+R / Alt+C (muscle memory).
 # tv gets Alt namespace for advanced pickers.
@@ -73,12 +74,14 @@ _tv_files()   { _tv_channel_widget "files"; }
 _tv_gitlog()  { _tv_channel_widget "git-log"; }
 _tv_env()     { _tv_channel_widget "env"; }
 _tv_aliases() { _tv_channel_widget "aliases"; }
+_tv_gitops()  { _tv_channel_widget "git-ops"; }
 
 zle -N tv-history  _tv_history
 zle -N tv-files    _tv_files
 zle -N tv-gitlog   _tv_gitlog
 zle -N tv-env      _tv_env
 zle -N tv-aliases  _tv_aliases
+zle -N tv-gitops   _tv_gitops
 
 # --- Keybindings (Alt namespace) ---
 # Note: Alt+F is reserved for forward-word (emacs mode default).
@@ -87,3 +90,4 @@ bindkey '\ep' tv-files     # Alt+P (path/pick)
 bindkey '\eg' tv-gitlog    # Alt+G
 bindkey '\ee' tv-env       # Alt+E
 bindkey '\ea' tv-aliases   # Alt+A
+bindkey '\ei' tv-gitops    # Alt+I (insert git op)

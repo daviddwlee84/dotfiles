@@ -1,0 +1,66 @@
+# Git operations cable channel for television (tv)
+# Parses ~/.config/docs/tools/git-ops.md at runtime — single source of truth.
+#
+# Usage:
+#   tv git-ops                             (standalone: Enter prints, Ctrl+Y copies, Ctrl+E execs)
+#   Alt+I in zsh                           (ZLE widget: pastes selected command into LBUFFER)
+#
+# Keybindings:
+#   Enter      Print command to stdout (default; captured by Alt+I ZLE widget)
+#   Ctrl+Y     Copy command to clipboard (overrides TV default; pbcopy/wl-copy/xclip/OSC 52)
+#   Alt+E      Confirm then execute the command
+#              (Ctrl+E is intentionally left as TV's global `go_to_input_end`)
+#   Ctrl+O     Toggle preview panel (TV global)
+#   Ctrl+F     Cycle preview (markdown row ↔ `git help` page)
+#
+# Source format (TSV columns):
+#   0. command    (raw; what gets printed / copied / executed)
+#   1. label      (human-readable menu name matching VSCode/GitLens)
+#   2. description
+#   3. tag        ("⚠" for destructive, " " otherwise)
+
+[metadata]
+name = "git-ops"
+description = "VSCode + GitLens Git operations: search, paste, copy, or exec"
+requirements = ["awk", "git"]
+
+[source]
+command = """
+awk -F'|' '/^[[:space:]]*\\|/ && $3 ~ /`/ {
+  label=$2; cmd=$3; desc=$4; notes=$5
+  gsub(/^[[:space:]]+|[[:space:]]+$/, "", label)
+  gsub(/^[[:space:]]+|[[:space:]]+$/, "", desc)
+  gsub(/^[[:space:]]+|[[:space:]]+$/, "", notes)
+  sub(/^[[:space:]]*`/, "", cmd); sub(/`[[:space:]]*$/, "", cmd)
+  tag = (notes ~ /destructive/) ? "⚠" : " "
+  printf "%s\\t%s\\t%s\\t%s\\n", cmd, label, desc, tag
+}' ~/.config/docs/tools/git-ops.md
+"""
+display = "{split:\\t:3} {split:\\t:1}  │  {split:\\t:0}  │  {split:\\t:2}"
+output = "{split:\\t:0}"
+
+[preview]
+command = [
+  """label='{split:\\t:1}'; awk -v L="$label" 'BEGIN{FS="|"} $0 ~ "^\\\\| *"L" *\\\\|" {print; getline; print; exit}' ~/.config/docs/tools/git-ops.md | bat -l md --plain --color=always 2>/dev/null || awk -v L="$label" 'BEGIN{FS="|"} $0 ~ "^\\\\| *"L" *\\\\|" {print}' ~/.config/docs/tools/git-ops.md""",
+  """cmd='{split:\\t:0}'; sub=$(printf '%s' "$cmd" | awk '{print $2}'); git help "$sub" 2>/dev/null | head -80 || printf 'No help page for: %s\\n' "$cmd" """,
+]
+header = "{split:\\t:1}"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+# Override TV global ctrl-y (copies full display line) to copy just the command.
+# Alt+E chosen for exec so we keep TV's global ctrl-e = go_to_input_end.
+ctrl-y = "actions:copy"
+alt-e = "actions:exec"
+
+[actions.copy]
+description = "Copy command to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:0}' | _clip"""
+mode = "fork"
+
+[actions.exec]
+description = "Confirm then execute the command"
+command = """cmd='{split:\\t:0}'; tag='{split:\\t:3}'; printf '\\n\\033[1mCommand:\\033[0m %s\\n' "$cmd"; if [ "$tag" = "⚠" ]; then printf '\\033[1;31m⚠  destructive operation — double check!\\033[0m\\n'; fi; printf 'Run it now? [y/N]: '; read -r ans; case "$ans" in y|Y|yes|YES) eval "$cmd" ;; *) printf 'Aborted.\\n' ;; esac; printf '\\n[Press Enter to close]'; read -r _"""
+mode = "execute"

@@ -138,6 +138,41 @@ All actions `cd ~/.ansible` and export `ANSIBLE_CONFIG=$HOME/.ansible/ansible.cf
 
 ---
 
+### `git-ops` channel
+
+Fuzzy-search the full VSCode Source Control + GitLens command palette (~130 entries: pull/push, commit variants incl. amend, undo-last-commit, branch, rebase, cherry-pick, stash, tags, worktrees, submodule, config). Backed by `~/.config/docs/tools/git-ops.md` — the markdown table is the single source of truth; edit the table to change the channel.
+
+Open with `tv git-ops` (standalone) or press `Alt+I` in zsh to paste the selected command straight into the shell prompt.
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Print selected command to stdout — captured by the `Alt+I` ZLE widget and inserted into `LBUFFER` |
+| `Ctrl+Y` | Copy command to clipboard (overrides TV default; pbcopy / wl-copy / xclip / OSC 52 fallback) |
+| `Alt+E` | Confirm-prompt then `eval` the command (y/N); aborts by default on anything else |
+| `Ctrl+F` | Cycle preview: matching row from `git-ops.md` ↔ `git help <subcommand>` |
+| `Ctrl+O` | Toggle preview panel (TV global) |
+
+> `Alt+E` (not `Ctrl+E`) is used for execute so that TV's global `Ctrl+E = go_to_input_end` muscle memory is preserved inside the picker.
+
+Destructive rows (`commit --amend`, `reset --hard`, `push --force`, `branch -D`, `clean -fd`, `stash drop/clear`, `tag -d` on remote, rebase, etc.) are prefixed with `⚠` in the display line and trigger a red warning banner under `Alt+E`.
+
+Use-cases this solves:
+
+- "What's the exact `git commit --amend --no-edit` flag again?" — type `amend`, Enter, done.
+- "How do I undo the last commit without losing work?" — type `undo`, you see all three variants (soft / mixed / hard with the destructive tag).
+- Copy a command into a Cursor chat or a teammate's Slack without typing — `Ctrl+Y`.
+- `git worktree`, `git submodule`, `git cherry-pick` — the commands nobody remembers the flags for.
+
+Adding a new command: append a row to the appropriate section of `dot_config/docs/tools/git-ops.md`:
+
+```markdown
+| Menu Label | `git some-command --flag` | Short description | destructive |
+```
+
+Re-run `chezmoi apply` (md is deployed to `~/.config/docs/tools/`); no channel reload needed — it's parsed at runtime.
+
+---
+
 ### `pueue` channel
 
 Interactive task manager for [pueue](https://github.com/Nukesor/pueue) — fuzzy-search tasks, preview logs, and pause/resume/kill/restart without leaving the picker. Parses `pueue status --json` at runtime. Requires `pueue` and `jq`.
