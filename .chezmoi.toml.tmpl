@@ -41,5 +41,9 @@ allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial A
 # https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]
     exclude = ["scripts"]
+{{- if lookPath "delta" }}
+    # Side-by-side diff: left = current (before apply), right = target (after apply)
+    pager = "delta --side-by-side --line-numbers --navigate --paging=always --file-style=yellow --file-decoration-style='yellow ul' --hunk-header-decoration-style='blue box'"
+{{- end }}
 [status]
     exclude = ["scripts"]
