@@ -1,9 +1,19 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
+  "default_agent": "build",
+  "small_model": "github-copilot/gpt-5-mini",
   "agent": {
     "title": {
       "reasoningEffort": "low"
+    }
+  },
+  "provider": {
+    "github-copilot": {
+      "options": {
+        "timeout": 600000,
+        "chunkTimeout": 20000
+      }
     }
   }
 }

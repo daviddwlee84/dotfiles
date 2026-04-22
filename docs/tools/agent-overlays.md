@@ -39,13 +39,24 @@ The `modify_` overlay model deep-merges only the keys we explicitly enforce; eve
 {
   "$schema": "https://opencode.ai/config.json",
   "autoupdate": true,
-  "agent": { "title": { "reasoningEffort": "low" } }
+  "default_agent": "build",
+  "small_model": "github-copilot/gpt-5-mini",
+  "agent": { "title": { "reasoningEffort": "low" } },
+  "provider": {
+    "github-copilot": {
+      "options": { "timeout": 600000, "chunkTimeout": 20000 }
+    }
+  }
 }
 ```
 
 - `$schema` — keeps editors aware of the schema for autocomplete.
 - `autoupdate = true` — let the CLI self-update.
+- `default_agent = "build"` — primary agent on TUI/CLI startup. Override per-session via `--agent` or the picker.
+- `small_model = "github-copilot/gpt-5-mini"` — cheap model for title generation, summarisation, and other lightweight calls. Avoids billing Claude Opus quota for trivial tasks. Pairs with `agent.title.reasoningEffort = "low"`.
 - `agent.title.reasoningEffort = "low"` — cheap completions for short title generation; sibling `agent.*` entries (per-agent provider, model overrides) survive.
+- `provider.github-copilot.options.timeout = 600000` (10 min) — request-level timeout. Default is 5 min; bumped to give long Claude Opus generations more room before the SDK aborts the whole call.
+- `provider.github-copilot.options.chunkTimeout = 20000` (20 s) — abort an in-flight stream if no SSE chunk arrives for 20 s. Counter-intuitive but **this is the fix for the "Tool execution aborted" loop on Copilot's Claude Opus channel**: the Copilot proxy occasionally stalls a stream past its own ~60 s server-side idle window, after which the connection silently dies. With no `chunkTimeout` set, the SDK waits the full request `timeout` for a chunk that will never come; with 20 s the SDK cancels and retries early, getting unstuck in seconds instead of minutes. See [docs/tools/opencode.md](opencode.md#claude-opus-stream-stall-on-github-copilot) for the diagnosis from log evidence.
 
 ### Codex — [`agents/codex.config.overlay.toml`](../../.chezmoitemplates/agents/codex.config.overlay.toml)
 

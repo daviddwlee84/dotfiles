@@ -101,6 +101,12 @@ _have_chezmoi() {
   echo "$output" | jq -e '.autoupdate == true' >/dev/null
   # Overlay sets agent.title.reasoningEffort=low.
   echo "$output" | jq -e '.["agent"].title.reasoningEffort == "low"' >/dev/null
+  # default_agent and small_model enforced by overlay.
+  echo "$output" | jq -e '.default_agent == "build"' >/dev/null
+  echo "$output" | jq -e '.small_model == "github-copilot/gpt-5-mini"' >/dev/null
+  # Copilot stream-stall mitigation enforced.
+  echo "$output" | jq -e '.provider["github-copilot"].options.timeout == 600000' >/dev/null
+  echo "$output" | jq -e '.provider["github-copilot"].options.chunkTimeout == 20000' >/dev/null
   # Sibling agent.build untouched.
   echo "$output" | jq -e '.["agent"].build.model == "x"' >/dev/null
   # Local plugin path preserved verbatim (machine-local).
