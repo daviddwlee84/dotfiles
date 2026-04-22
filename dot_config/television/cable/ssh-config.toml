@@ -2,6 +2,10 @@
 # Parses Host entries from ~/.ssh/config AND ~/.ssh/config.d/* (Include support).
 # The community ssh-hosts channel only reads ~/.ssh/config directly.
 #
+# Each entry shows which file the host is defined in, so duplicates across
+# config.d/* are easy to spot. The output (what gets passed to ssh / actions)
+# is just the bare hostname.
+#
 # Usage:
 #   tv ssh-config
 #
@@ -17,14 +21,32 @@
 [metadata]
 name = "ssh-config"
 description = "SSH hosts (with Include config.d/* support)"
-requirements = ["ssh", "cat", "grep", "awk", "sort"]
+requirements = ["ssh", "awk", "sort"]
 
 [source]
-command = "cat ~/.ssh/config ~/.ssh/config.d/* 2>/dev/null | grep -E '^Host[[:space:]]' | grep -v '[*?]' | awk '{for(i=2;i<=NF;i++) print $i}' | sort -u"
+# Emit "<source-file>\t<hostname>" so the picker shows the origin file but
+# actions still receive a clean hostname via {split:\t:1}.
+command = """
+for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
+  [ -f "$f" ] || continue
+  rel=${f#$HOME/}
+  awk -v src="$rel" '
+    /^[[:space:]]*Host[[:space:]]/ {
+      for (i=2; i<=NF; i++) {
+        if ($i !~ /[*?]/) printf "%s\\t%s\\n", src, $i
+      }
+    }' "$f"
+done | sort -u -t '\t' -k2,2
+"""
+display = "{split:\\t:1}  ({split:\\t:0})"
+output = "{split:\\t:1}"
 
 [preview]
 command = """
-host='{}'
+host='{split:\\t:1}'
+src='{split:\\t:0}'
+echo "# defined in: $src"
+echo
 ssh -G "$host" 2>/dev/null | grep -E '^(host|hostname|user|port|identityfile|proxycommand|proxyjump|forwardagent|identityagent|localforward|remoteforward)[[:space:]]'
 echo
 echo '--- local key check (offline) ---'
@@ -55,13 +77,13 @@ alt-a = "actions:scan_all"
 
 [actions.connect]
 description = "SSH into the selected host"
-command = "ssh '{}'"
+command = "ssh '{split:\\t:1}'"
 mode = "execute"
 
 [actions.probe]
 description = "Probe selected host with BatchMode (no password prompt allowed)"
 command = """
-host='{}'
+host='{split:\\t:1}'
 echo "# Probing $host with BatchMode=yes (ConnectTimeout=3)"
 echo "# Exit 0 = passwordless login works; non-zero = needs password / unreachable / key not authorized"
 echo
@@ -90,31 +112,35 @@ echo "# Scanning all hosts (offline — no network) ..."
 echo "# Legend: [OK] = at least one IdentityFile present locally"
 echo "#         [--] = no key file on disk (password / agent / unconfigured)"
 echo
-cat ~/.ssh/config ~/.ssh/config.d/* 2>/dev/null \\
-  | grep -E '^Host[[:space:]]' \\
-  | grep -v '[*?]' \\
-  | awk '{for(i=2;i<=NF;i++) print $i}' \\
-  | sort -u \\
-  | while IFS= read -r host; do
-      keyline=""
-      found=0
-      while IFS= read -r f; do
-        [ -z "$f" ] && continue
-        case "$f" in '~/'*) f="$HOME/${f#'~/'}";; '~') f="$HOME";; esac
-        if [ -f "$f" ]; then
-          keyline="$f"
-          found=1
-          break
-        fi
-      done <<EOF
+for f in $HOME/.ssh/config $HOME/.ssh/config.d/*; do
+  [ -f "$f" ] || continue
+  rel=${f#$HOME/}
+  awk -v src="$rel" '
+    /^[[:space:]]*Host[[:space:]]/ {
+      for (i=2; i<=NF; i++) {
+        if ($i !~ /[*?]/) printf "%s\\t%s\\n", src, $i
+      }
+    }' "$f"
+done | sort -u -t '\t' -k2,2 | while IFS=$'\\t' read -r src host; do
+  keyline=""
+  found=0
+  while IFS= read -r kf; do
+    [ -z "$kf" ] && continue
+    case "$kf" in '~/'*) kf="$HOME/${kf#'~/'}";; '~') kf="$HOME";; esac
+    if [ -f "$kf" ]; then
+      keyline="$kf"
+      found=1
+      break
+    fi
+  done <<EOF
 $(ssh -G "$host" 2>/dev/null | awk '/^identityfile / {print $2}')
 EOF
-      if [ "$found" -eq 1 ]; then
-        printf '  [OK] %-30s -> %s\\n' "$host" "$keyline"
-      else
-        printf '  [--] %-30s    (no local key)\\n' "$host"
-      fi
-    done
+  if [ "$found" -eq 1 ]; then
+    printf '  [OK] %-28s %-22s -> %s\\n' "$host" "($src)" "$keyline"
+  else
+    printf '  [--] %-28s %-22s    (no local key)\\n' "$host" "($src)"
+  fi
+done
 echo
 echo '[Press Enter to exit]'
 read -r _
