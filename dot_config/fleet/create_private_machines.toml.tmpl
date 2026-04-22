@@ -52,3 +52,13 @@ command_timeout = 1800
 # ssh_alias       = "throwaway-vm"
 # no_root_machine = false
 # password_source = { type = "plain", value = "hunter2" }
+
+# 5) Local execution (this machine, no SSH). Useful when you want
+#    `just fleet-apply` to keep the orchestrator itself in sync along
+#    with the SSH hosts. ssh_alias / hostname / user / port /
+#    identity_file are ignored. Sudo is inherited from the parent
+#    terminal (chezmoi may prompt for password if it needs root).
+# [[hosts]]
+# name            = "self"
+# local           = true
+# no_root_machine = true                                    # set false if your local apply needs sudo

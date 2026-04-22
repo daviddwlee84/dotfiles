@@ -69,6 +69,16 @@ class Host:
     identity_file: str | None = None
     no_root_machine: bool = False
     chezmoi_path: str = "auto"
+    # When True, bypass SSH entirely and run chezmoi as a local
+    # subprocess on the orchestrator machine. Useful for including the
+    # control box itself in a fleet apply (e.g. you keep your own
+    # workstation in sync with the same `just fleet-apply` invocation).
+    # Local hosts skip all SSH-specific config (ssh_alias/hostname/
+    # user/port/identity_file are ignored) and reuse the caller's
+    # ambient PATH so chezmoi_path = "auto" still works without the
+    # remote-style PATH augmentation. Sudo password injection is
+    # skipped — chezmoi inherits the caller's tty/sudoers state.
+    local: bool = False
     extra_env: dict[str, str] = dataclasses.field(default_factory=dict)
     # Resolved later (not from TOML directly)
     password_source_type: PasswordSourceType = "none"
@@ -134,11 +144,12 @@ def load_hosts(path: Path) -> tuple[list[Host], dict]:
             password_source_arg=ps_arg,
         )
 
-        # Validation: at least one of ssh_alias / hostname.
-        if not host.ssh_alias and not host.hostname:
+        # Validation: at least one of ssh_alias / hostname (skipped for local hosts).
+        if not host.local and not host.ssh_alias and not host.hostname:
             raise ValueError(
                 f"{path}: host {name!r} must define either `ssh_alias` "
-                f"(preferred) or `hostname`."
+                f"(preferred) or `hostname` (or set `local = true` to run "
+                f"on the orchestrator machine without SSH)."
             )
         hosts.append(host)
     return hosts, defaults
@@ -406,6 +417,98 @@ def _connect_kwargs(host: Host) -> dict:
     return kwargs
 
 
+async def run_one_local(
+    status: HostStatus,
+    log_dir: Path,
+    mode: Literal["update", "apply", "diff"],
+    init: bool,
+    command_timeout: int,
+    force: bool = False,
+    keep_going: bool = False,
+) -> None:
+    """Execute one local host: spawn `chezmoi` directly via subprocess.
+
+    Bypasses asyncssh entirely. Reuses the orchestrator's PATH, sudoers
+    state (no password injection — chezmoi inherits the parent tty),
+    and `~/.local/share/chezmoi` source. Output is streamed to the same
+    per-host log file used by SSH hosts so the rich live table is
+    consistent. command_timeout is honoured via asyncio.wait_for.
+    """
+    host = status.host
+    log_path = log_dir / f"{host.name}.log"
+    status.log_path = log_path
+    loop = asyncio.get_running_loop()
+    status.started_at = loop.time()
+
+    # Build a flat argv (no shell) so we don't need quoting / pager dance.
+    chezmoi_bin = host.chezmoi_path if (host.chezmoi_path and host.chezmoi_path != "auto") else "chezmoi"
+    argv: list[str] = [chezmoi_bin, "--no-pager"]
+    if mode == "update":
+        argv.append("update")
+        if init:
+            argv.append("--init")
+    elif mode == "apply":
+        argv.append("apply")
+    else:
+        argv.append("diff")
+    if mode != "diff":
+        if force:
+            argv.append("--force")
+        if keep_going:
+            argv.append("--keep-going")
+
+    log_fp = log_path.open("w", buffering=1)
+    log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init} (local)\n")
+    log_fp.write(f"# argv: {argv}\n\n")
+
+    env = {**os.environ, "PAGER": "cat", "GIT_PAGER": "cat", **host.extra_env}
+    proc = None
+    try:
+        status.state = "running"
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+
+        async def _drain(stream: asyncio.StreamReader, prefix: str) -> None:
+            while True:
+                line = await stream.readline()
+                if not line:
+                    return
+                text = line.decode("utf-8", errors="replace").rstrip("\n")
+                log_fp.write(f"[{prefix}] {text}\n")
+                status.last_line = text
+
+        async with asyncio.timeout(command_timeout):
+            await asyncio.gather(
+                _drain(proc.stdout, "out"),  # type: ignore[arg-type]
+                _drain(proc.stderr, "err"),  # type: ignore[arg-type]
+                proc.wait(),
+            )
+        status.rc = proc.returncode or 0
+        status.state = "done" if status.rc == 0 else "failed"
+    except TimeoutError:
+        status.state = "failed"
+        status.rc = -1
+        status.error = f"command_timeout {command_timeout}s exceeded"
+        if proc and proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=5)
+            except TimeoutError:
+                proc.kill()
+    except Exception as e:  # noqa: BLE001
+        status.state = "failed"
+        status.rc = -1
+        status.error = str(e)
+        log_fp.write(f"\n# exception: {type(e).__name__}: {e}\n")
+    finally:
+        status.elapsed = loop.time() - (status.started_at or loop.time())
+        log_fp.close()
+
+
 async def run_one(
     status: HostStatus,
     log_dir: Path,
@@ -418,6 +521,12 @@ async def run_one(
 ) -> None:
     """Execute one host: connect, stream output to log + status, set rc/state."""
     host = status.host
+    if host.local:
+        await run_one_local(
+            status, log_dir, mode, init, command_timeout,
+            force=force, keep_going=keep_going,
+        )
+        return
     log_path = log_dir / f"{host.name}.log"
     status.log_path = log_path
     loop = asyncio.get_running_loop()
@@ -743,6 +852,13 @@ def _run_kill(
 
     async def _kill_one(h: Host) -> None:
         nonlocal failures
+        if h.local:
+            # Local hosts share the orchestrator's process namespace; killing
+            # `chezmoi` here would kill THIS process if `just fleet-apply
+            # --kill-orphans` was itself launched from a chezmoi wrapper.
+            # Use plain `pkill` outside fleet-apply if you actually need this.
+            console.print(f"[yellow]·[/] {h.name} (local) — skipped")
+            return
         target = h.ssh_alias or h.hostname
         try:
             async with asyncio.timeout(connect_timeout):
@@ -790,7 +906,11 @@ def _run(
     runnable: list[HostStatus] = []
     for h in selected:
         st = HostStatus(host=h)
-        if not h.no_root_machine and h.sudo_password is None:
+        # Local hosts inherit the orchestrator's sudoers / TTY state, so they
+        # never need the wrapper-injected sudo password — skip the password
+        # gate entirely. If the apply needs sudo, chezmoi will prompt on the
+        # parent terminal (or fail noisily under no-tty).
+        if not h.local and not h.no_root_machine and h.sudo_password is None:
             st.state = "skipped"
             st.error = (
                 "no_root_machine=false but no sudo password resolved "

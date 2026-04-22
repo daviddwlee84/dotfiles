@@ -57,6 +57,8 @@ identity_file   = "~/.ssh/id_ed25519"
 no_root_machine = false       # MUST mirror the chezmoi `noRoot=` value used at
                               # `chezmoi init` time on that remote (see below)
 chezmoi_path    = "chezmoi"   # override defaults per-host
+local           = false       # set true to run chezmoi locally (no SSH); see
+                              # "Local host execution" section below
 extra_env       = { FOO = "bar" }   # extra env vars for the remote chezmoi run
 
 password_source = { type = "...", ... }   # see "Password sources" below
@@ -129,6 +131,32 @@ ssh_alias = "lab-box"          # ← inherits everything above, including ProxyJ
 
 If a host has no ssh_config entry, fall back to explicit
 `hostname` / `user` / `port` / `identity_file`.
+
+## Local host execution (`local = true`)
+
+To include the orchestrator machine itself in a fleet apply, add a host
+with `local = true`:
+
+```toml
+[[hosts]]
+name            = "self"
+local           = true
+no_root_machine = true   # set false if your local apply needs sudo
+```
+
+Local hosts skip asyncssh entirely — chezmoi runs as a direct
+subprocess (`asyncio.create_subprocess_exec`) inheriting the
+orchestrator's PATH, sudoers state, and tty. Sudo password injection
+is not used; if chezmoi needs root it'll prompt on the parent terminal.
+The `kill-orphans` subcommand also skips local hosts (killing local
+chezmoi processes from the same shell session would kill `fleet_apply`
+itself). All other features — log files, live table, `--force`,
+`--keep-going`, `--command-timeout`, parallelism — work identically.
+
+`ssh_alias`, `hostname`, `user`, `port`, `identity_file` are ignored
+when `local = true`. `chezmoi_path = "auto"` still works (subprocess
+inherits the calling shell's PATH, which is where the orchestrator
+itself found `chezmoi`).
 
 ## Commands
 
