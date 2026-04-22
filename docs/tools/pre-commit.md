@@ -44,17 +44,25 @@ SKIP=hook-id-1,hook-id-2 git commit   # skip specific hooks
 
 `autoupdate` does not *run* the hooks — it just rewrites `rev:` pins and says "remember to actually run them once". This repo wires it into `just upgrade-plugins`.
 
-## Using `uv` to pin pre-commit's Python
+## How this repo installs pre-commit (single source of truth)
 
-[Astral's uv guide for pre-commit](https://docs.astral.sh/uv/guides/integration/pre-commit/) covers a different angle — providing `uv-*` hooks *inside* `.pre-commit-config.yaml` (e.g. `uv-lock`, `uv-export`, `pip-compile`). That is orthogonal to the question "which Python runs `pre-commit` itself?"
-
-The trick relevant here: install `pre-commit` as a `uv tool`, pinned to a Python that works.
+This repo installs `pre-commit` **the same way on every OS**: as a uv-managed tool pinned to CPython 3.13.
 
 ```bash
 uv tool install --force pre-commit --python 3.13
 ```
 
-This does three things:
+That exact command is the single source of truth. It runs in three places and all three converge on `~/.local/bin/pre-commit`:
+
+| Entry point | File | When it runs |
+|---|---|---|
+| Ansible role | [`dot_ansible/roles/security_tools/tasks/main.yml`](../../dot_ansible/roles/security_tools/tasks/main.yml) | `chezmoi apply` → `ansible-playbook macos.yml/linux.yml`, and `just ansible-security` |
+| Justfile recipe | [`justfile`](../../justfile) `pre-commit-install-tool` (depended on by `pre-commit-setup` and `setup-dev`) | `just pre-commit-setup`, `just setup-dev` |
+| Doctor recipe | [`scripts/pre-commit-doctor.sh`](../../scripts/pre-commit-doctor.sh) via `just pre-commit-doctor` | On demand, when hooks break |
+
+`uv` itself is installed by [`run_once_before_00_bootstrap.sh.tmpl`](../../run_once_before_00_bootstrap.sh.tmpl) before any ansible role runs, so the install command above always has `uv` available.
+
+What `uv tool install --force pre-commit --python 3.13` actually does:
 
 1. Downloads a clean CPython 3.13 into `~/.local/share/uv/python/` (isolated from whatever Homebrew or the system is doing).
 2. Creates a dedicated venv under `~/.local/share/uv/tools/pre-commit/`.
@@ -62,33 +70,62 @@ This does three things:
 
 After that, `pre-commit` runs under a Python **you control**, independent of Homebrew/system upgrades. New hook environments will be bootstrapped by that 3.13, which means they'll use 3.13 too (unless a hook declares `language_version:` overrides).
 
-### Make sure the uv-managed pre-commit wins on PATH
+### Why pinned 3.13 (not Homebrew Python)
 
-If you also have `/opt/homebrew/bin/pre-commit` (Homebrew), or `/usr/bin/pre-commit`, put `~/.local/bin` **earlier** in PATH, or uninstall the others:
+Homebrew's `python@3.14` has historically shipped with a bundled `libexpat` whose ABI disagreed with the system `/usr/lib/libexpat.1.dylib` on macOS, breaking every `virtualenv` call that `pre-commit` issues to build hook repos (symptom: `Symbol not found: _XML_SetAllocTrackerActivationThreshold` on import of `pyexpat`). Pinning to CPython 3.13 side-steps that whole class of brew-python-upgrade breakage — and it makes the hook cache key (which pre-commit derives from the bootstrap Python version) stable across machines and teammates.
 
-```bash
-# Option A: fix PATH
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+### PATH precedence: how `~/.local/bin/pre-commit` wins
 
-# Option B: uninstall the brew copy
-brew uninstall pre-commit
+The uv install only helps if `~/.local/bin` beats brew's `/opt/homebrew/bin` and conda's `~/miniforge3/bin` on PATH. This repo's zsh export ([`dot_config/zsh/00_exports.zsh.tmpl:21`](../../dot_config/zsh/00_exports.zsh.tmpl)) handles that:
 
-# Verify
-which pre-commit     # → ~/.local/bin/pre-commit (symlink into uv tools)
-pre-commit --version
+```sh
+export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 ```
 
-### When to use this trick
+Because this export runs before conda's lazy init ([`dot_config/zsh/tools/04_conda_mamba.zsh`](../../dot_config/zsh/tools/04_conda_mamba.zsh)), the uv-managed binary wins. Verify:
 
-- A brew Python upgrade just broke `pre-commit` and you don't want to wait for an upstream fix.
-- You work across machines with different system Python versions and want the dev experience to be identical.
-- You want the hook cache key (`pre-commit` computes it from the bootstrap Python version) to be stable across the team — pin everyone to `--python 3.13` and the cache path matches.
+```bash
+which pre-commit        # → ~/.local/bin/pre-commit
+which -a pre-commit     # lists all copies, in PATH order
+```
 
-### Caveat
+### The conda-shadow failure mode
 
-If the team shares `.pre-commit-config.yaml` but half the team uses Homebrew-installed pre-commit and half uses uv-pinned, each group will build and maintain a separate cache under `~/.cache/pre-commit/`. Harmless, just slightly wasteful. Cache keys are per-user anyway, so there is no cross-user invalidation risk.
+If you see `which pre-commit` return `~/miniforge3/bin/pre-commit` (or similar), conda installed `pre-commit` transitively into its `base` env and something in your PATH ordering put conda ahead of `~/.local/bin`. Fix options:
+
+```bash
+# Option A: just ask the doctor
+just pre-commit-doctor
+
+# Option B: drop conda's copy
+conda remove -n base pre-commit     # if it was installed into base
+conda deactivate                    # or just leave base
+
+# Option C: uninstall brew's copy (if that's the shadow instead)
+brew uninstall pre-commit
+```
+
+The PATH-shadow case is the usual reason "I ran `just setup-dev` but `pre-commit --version` shows a different version than the ansible role installed."
+
+### Team / multi-machine caveat
+
+If the team shares `.pre-commit-config.yaml` but some teammates use Homebrew-installed pre-commit and others use uv-pinned, each group will build and maintain a separate cache under `~/.cache/pre-commit/`. Harmless, just slightly wasteful. Cache keys are per-user anyway, so there is no cross-user invalidation risk — but for a fully reproducible cache key, have everyone run the ansible role / `just pre-commit-setup` so they all end up on the same uv-pinned 3.13.
+
+### Not to be confused with `uv-*` hooks
+
+[Astral's uv guide for pre-commit](https://docs.astral.sh/uv/guides/integration/pre-commit/) covers a different angle — providing `uv-*` hooks *inside* `.pre-commit-config.yaml` (e.g. `uv-lock`, `uv-export`, `pip-compile`). That is orthogonal to the question "which Python runs `pre-commit` itself?" (which is what this section is about). This repo doesn't currently use any `uv-*` hooks in `.pre-commit-config.yaml`.
 
 ## Debugging broken hook environments
+
+Before diving into the buckets below, **try the doctor first** — it covers 90% of cases:
+
+```bash
+just pre-commit-doctor                 # diagnose + auto-repair via uv
+just pre-commit-doctor --run-hooks     # same, plus smoke-test hook envs
+./scripts/pre-commit-doctor.sh --check # diagnose-only (no reinstall)
+```
+
+The doctor checks `uv` is present, confirms `pre-commit` resolves to `~/.local/bin/pre-commit` (not a conda/brew shadow), scans for the known-bad `pyexpat` / `virtualenv` error signatures, and re-runs `uv tool install --force pre-commit --python 3.13` + `pre-commit clean` if anything is wrong.
 
 Pre-commit errors usually fall into a few buckets:
 
@@ -96,8 +133,8 @@ Pre-commit errors usually fall into a few buckets:
 
 The bootstrap Python failed to build a virtualenv for one of the hook repos. Typical causes:
 
-- **Broken `pyexpat` / standard-library shared object after a Python point-release upgrade.** Symptom: `ImportError: dlopen(...pyexpat...Symbol not found: _XML_SetAllocTrackerActivationThreshold`. That is a mismatch between the Python's bundled `libexpat` ABI and the system `/usr/lib/libexpat.1.dylib`. Fix: upgrade Python (`brew reinstall python@3.14` if brew has a patch release out) or side-step with the `uv tool install --python 3.13` trick above.
-- **System `libssl` / `libcrypto` version mismatch** — similar class of issue.
+- **Broken `pyexpat` / standard-library shared object after a Python point-release upgrade.** Symptom: `ImportError: dlopen(...pyexpat...Symbol not found: _XML_SetAllocTrackerActivationThreshold`. That is a mismatch between the Python's bundled `libexpat` ABI and the system `/usr/lib/libexpat.1.dylib`. **Fix:** `just pre-commit-doctor` — it re-installs pre-commit under a uv-pinned CPython 3.13 that isn't affected. (Manual equivalent: `uv tool install --force pre-commit --python 3.13 && pre-commit clean`.)
+- **System `libssl` / `libcrypto` version mismatch** — similar class of issue. Same fix: re-pin via the doctor.
 - **Disk full / permissions** on `~/.cache/pre-commit/`.
 
 ### 2. A hook fails but you don't know why

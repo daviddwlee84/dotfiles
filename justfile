@@ -119,27 +119,19 @@ ansible-security:
 # Security & Pre-commit
 # ============================================================================
 
-# Install pre-commit tool (auto-detects brew on macOS, uv, or pip)
+# Install pre-commit via uv (pinned to Python 3.13 — same command as the
+# security_tools ansible role, so both paths converge on ~/.local/bin/pre-commit).
+# Avoids the macOS Homebrew python@3.14 pyexpat ABI mismatch that breaks hook
+# virtualenv creation. Run `just pre-commit-doctor` if hooks start failing.
 pre-commit-install-tool:
     #!/usr/bin/env bash
-    if command -v pre-commit &> /dev/null; then
-        echo "pre-commit is already installed: $(pre-commit --version)"
-        exit 0
-    fi
-    if [[ "$(uname -s)" == "Darwin" ]] && command -v brew &> /dev/null; then
-        echo "Installing pre-commit via Homebrew..."
-        brew install pre-commit
-    elif command -v uv &> /dev/null; then
-        echo "Installing pre-commit via uv..."
-        uv tool install pre-commit
-    elif command -v pip &> /dev/null; then
-        echo "Installing pre-commit via pip..."
-        pip install pre-commit
-    else
-        echo "Error: No package manager found. Install brew, uv, or pip first."
+    set -euo pipefail
+    if ! command -v uv &>/dev/null; then
+        echo "Error: uv not found on PATH. Run chezmoi bootstrap first (installs uv into ~/.local/bin), or install uv manually from https://astral.sh/uv." >&2
         exit 1
     fi
-    echo "pre-commit installed: $(pre-commit --version)"
+    uv tool install --force pre-commit --python 3.13
+    echo "pre-commit installed: $(pre-commit --version) @ $(command -v pre-commit)"
 
 # Set up pre-commit hooks in the repository
 pre-commit-setup: pre-commit-install-tool
@@ -162,6 +154,12 @@ pre-commit-update:
 # Uninstall pre-commit hooks
 pre-commit-uninstall:
     pre-commit uninstall
+
+# Diagnose broken pre-commit envs (pyexpat/virtualenv errors, conda/brew PATH
+# shadowing) and re-install under uv if needed. First-line fix when
+# `git commit` aborts with "An unexpected error has occurred: CalledProcessError".
+pre-commit-doctor:
+    ./scripts/pre-commit-doctor.sh
 
 # Check for secrets in staged agent artifacts (specstory + coding-agent plans; reports only)
 check-secrets:

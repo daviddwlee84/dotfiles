@@ -360,7 +360,7 @@ ansible-playbook playbooks/macos.yml --check
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory |
 | `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
-| `security_tools` | pre-commit, gitleaks |
+| `security_tools` | `pre-commit` (via `uv tool install --python 3.13` on all OSes — single source of truth; run `just pre-commit-doctor` if hook envs break), gitleaks |
 | `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, sqlit-tui, tmuxp, etc.) |
 | `js_cli_tools` | Standalone JS/npm CLI utilities (readability-cli for `readnode` terminal web reader) |
 | `llm_tools` | Local LLM tools: Ollama, LiteLLM, llmfit, models |
@@ -403,9 +403,9 @@ This skips all tasks tagged with `[sudo]` (apt packages, system-level installati
 - **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, bats, eza, delta, yazi, superfile, zellij, btop, gitleaks, lazygit, fzf, sesh, taplo, television
 - **tmux-appimage** (x86_64 only): extracted AppImage → `~/.local/share/tmux-appimage/squashfs-root`, shim at `~/.local/bin/tmux`. Runs only when the system `tmux` is older than 3.3 (see "tmux version requirement" below).
 - **mise**: Node.js, Rust runtime management
-- **Installers**: zoxide, starship, pre-commit, thefuck, tldr
+- **Installers**: zoxide, starship, thefuck, tldr
 - **cargo tools**: pueue
-- **uv tools**: mlflow, sqlit-tui, tmuxp, etc.
+- **uv tools**: `pre-commit` (pinned to `--python 3.13`, see [docs/tools/pre-commit.md](docs/tools/pre-commit.md)), mlflow, sqlit-tui, tmuxp, etc.
 - **llm tools**: ollama, litellm, llmfit, models
 - **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
 

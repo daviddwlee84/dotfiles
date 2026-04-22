@@ -1,42 +1,42 @@
 ---
 # Security tools role - pre-commit and gitleaks for secret scanning
+#
+# pre-commit is installed via `uv tool install --python 3.13` on BOTH macOS and
+# Linux so the Python bootstrap is identical across machines. This avoids the
+# macOS Homebrew `python@3.14` pyexpat / libexpat ABI mismatch that breaks
+# virtualenv creation for hook repos (symptom:
+# `Symbol not found: _XML_SetAllocTrackerActivationThreshold`). See
+# `docs/tools/pre-commit.md` for the full rationale.
+#
+# `uv` itself is installed by `run_once_before_00_bootstrap.sh.tmpl` before any
+# ansible role runs, so we can depend on it here unconditionally.
 
-# macOS: Install via Homebrew
-- name: Install security tools (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
-  community.general.homebrew:
-    name:
-      - pre-commit
-      - gitleaks
-      - go
-    state: present
-
-# Linux: Install pre-commit via pipx/uv, gitleaks via binary
-- name: Check if pre-commit is installed
-  when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: pre-commit --version
-  register: precommit_check
+- name: Check uv is available (prereq for pre-commit install)
+  ansible.builtin.command: uv --version
+  register: uv_check
   changed_when: false
   failed_when: false
 
-- name: Install pre-commit via uv (Debian/Ubuntu)
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - precommit_check.rc != 0
-  ansible.builtin.shell: |
-    if command -v uv >/dev/null 2>&1; then
-      uv tool install pre-commit
-    elif command -v pipx >/dev/null 2>&1; then
-      pipx install pre-commit
-    elif command -v pip >/dev/null 2>&1; then
-      pip install --user pre-commit
-    else
-      echo "No Python package manager found (uv/pipx/pip)" >&2
-      exit 1
-    fi
-  args:
-    executable: /bin/bash
-  changed_when: true
+- name: Fail if uv is missing
+  when: uv_check.rc != 0
+  ansible.builtin.fail:
+    msg: >-
+      `uv` not found on PATH — pre-commit install depends on it.
+      Re-run `chezmoi apply` so `run_once_before_00_bootstrap.sh.tmpl`
+      can install uv, or install it manually from https://astral.sh/uv.
+
+- name: Install pre-commit via uv (pinned Python 3.13, all OSes)
+  ansible.builtin.command: uv tool install --force pre-commit --python 3.13
+  register: precommit_install
+  changed_when: "'already installed' not in (precommit_install.stdout | default('') ~ precommit_install.stderr | default(''))"
+
+- name: Install gitleaks + go (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name:
+      - gitleaks
+      - go
+    state: present
 
 - name: Check if gitleaks is installed
   when: ansible_facts["os_family"] == "Debian"
