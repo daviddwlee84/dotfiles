@@ -299,6 +299,25 @@ channel **and** closes the channel (which delivers SIGHUP to the remote
 shell, which the wrapper's trap propagates to chezmoi). The remote should
 fully exit within seconds.
 
+### When a host hangs
+
+`command_timeout` is the **outer** budget — it kills the entire chezmoi+ansible chain when blown. Ansible itself has **no per-task timeout**, so a stuck `npm install`, `apt update` retry loop, or `git clone` against a slow mirror will burn the whole 2-hour budget if you let it.
+
+Typical hang symptoms:
+
+- `--status` shows the host as `running pids=...` for tens of minutes
+- `--tail HOST` log stops at a `[N] TASK · …` line and never advances
+- Drilling into the remote: `ssh HOST pstree -p $PID` shows `python3 → /bin/sh -c "… npm install …"` (or apt / git / cargo equivalents) at the leaf
+
+Recovery flow:
+
+1. **Identify the stuck task** via `--tail HOST` (last visible TASK number) and `ssh HOST pstree` to confirm the leaf process.
+2. **Kill the run**: `just fleet-apply-kill --hosts HOST` — broadcasts `pkill -TERM` then `-KILL` to chezmoi/ansible/orphans.
+3. **Bound the next attempt**: re-run with `--command-timeout 600` (or whatever's reasonable for steady-state) so a recurrence won't burn 2 hours again.
+4. **If the same task keeps stuck**: it's an ansible role / network issue, not a fleet-apply bug. Add `timeout: 300` or `async: 600 poll: 30` to the offending ansible task in `dot_ansible/roles/<role>/tasks/main.yml`.
+
+`abandoned` state in `--status` (red, "no sentinel — wrapper SIGKILL'd?") means a previous run died abnormally — the wrapper got SIGKILL before its trap could write the exit sentinel. Common causes: parent OOM-killed, manual `kill -9`, or process-tree teardown cascading from a hung child. Treat it as a failure that left no recovery breadcrumb.
+
 ## Killing orphans, checking status, re-attaching
 
 Local Ctrl+C, network drop, laptop sleep, or any other premature

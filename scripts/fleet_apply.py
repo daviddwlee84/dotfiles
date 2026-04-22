@@ -1011,7 +1011,13 @@ def cli(
                 "to accommodate first-run apply (Linuxbrew install + 22 ansible "
                 "roles + GUI cask downloads can easily exceed 30 min). "
                 "Steady-state re-apply on a warm machine usually finishes in "
-                "1–5 min — drop to e.g. 600 once your fleet is past first-run."
+                "1–5 min — drop to e.g. 600 once your fleet is past first-run. "
+                "Note: this is the BLUNT outer timeout that kills the entire "
+                "chezmoi+ansible chain via SIGHUP; ansible has no per-task "
+                "timeout, so a stuck `npm install` / `apt update` will burn "
+                "the whole budget. If a host is stuck, use --status to see "
+                "where, then --command-timeout 600 + fleet-apply-kill to "
+                "force-bound the next attempt."
             )
         ),
     ] = 7200,
@@ -1291,19 +1297,53 @@ def _run_kill(
 # behaviour with backslashes varies across shells).
 _STATUS_PROBE_CMD = (
     # 1) Find live chezmoi/ansible PIDs owned by this user.
-    "_pids=$(pgrep -u \"$(id -un)\" -x -d, 'chezmoi|ansible-playbook|ansible' "
-    "  2>/dev/null || true); "
+    #    POSITIVE filter on cmdline (not just process name) to avoid false
+    #    positives from `chezmoi cd` interactive shells, `chezmoi shell`,
+    #    or editor processes whose argv contains "chezmoi" because the
+    #    workspace folder is named that. fleet-apply wrappers always
+    #    invoke chezmoi with the verb `update` or `apply`; ansible-playbook
+    #    is unambiguous (only ansible spawns it). awk filters the cmdline
+    #    column from `pgrep -lf` output, then re-emits a comma-joined PID
+    #    list compatible with the rest of this snippet. NB: `-l` works on
+    #    both procps-ng (Linux) and BSD pgrep (macOS).
+    #
+    #    SELF-MATCH HAZARD: this probe snippet ITSELF contains the literal
+    #    strings `chezmoi`, `update`, `apply` (in this very comment + the
+    #    awk regex). pgrep -lf will see our wrapping shell's cmdline and
+    #    match it. Workaround: exclude $$ (probe shell PID) and its parent
+    #    (sshd or zsh -c). We can't use $PPID reliably across shells, so
+    #    we capture both at the start.
+    "_self_pid=$$; _parent_pid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d ' '); "
+    "_pids=$(pgrep -u \"$(id -un)\" -lf 'chezmoi|ansible-playbook' 2>/dev/null "
+    "  | awk -v self=\"$_self_pid\" -v parent=\"$_parent_pid\" "
+    "        '{ pid=$1; if (pid==self || pid==parent) next; "
+    "           $1=\"\"; sub(/^ /, \"\"); "
+    "           if ($0 ~ /ansible-playbook/) { print pid; next } "
+    "           if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/)) { print pid } }' "
+    "  | paste -sd, - || true); "
     # 2) Find the most recent run log + sentinel.
     "_dir=\"$HOME/.cache/chezmoi-fleet/logs\"; "
     "_latest=$(ls -t \"$_dir\"/*.log 2>/dev/null | head -1); "
     "_run_id=$(basename \"${_latest:-}\" .log 2>/dev/null); "
     # 3) Decide state.
+    #    - running:   live PIDs found
+    #    - finished:  log + sentinel both present (sentinel was written)
+    #    - abandoned: log present BUT sentinel missing AND no live PIDs.
+    #                 Means the wrapper got SIGKILL (not TERM/INT/HUP)
+    #                 before its trap could write `echo $_rc > sentinel`.
+    #                 Common cause: parent OOM-killed, manual `kill -9`,
+    #                 or one of ansible's child processes (npm, apt, etc.)
+    #                 cascaded into a process tree teardown.
+    #    - idle:      no log at all (host has never been hit by fleet-apply,
+    #                 or all logs were GC'd).
     "if [ -n \"$_pids\" ]; then "
     "  printf 'STATE=running\\n'; "
     "  printf 'PIDS=%s\\n' \"$_pids\"; "
     "elif [ -n \"$_latest\" ] && [ -f \"$_dir/$_run_id.exit\" ]; then "
     "  printf 'STATE=finished\\n'; "
     "  printf 'EXIT=%s\\n' \"$(cat \"$_dir/$_run_id.exit\" 2>/dev/null)\"; "
+    "elif [ -n \"$_latest\" ]; then "
+    "  printf 'STATE=abandoned\\n'; "
     "else "
     "  printf 'STATE=idle\\n'; "
     "fi; "
@@ -1337,15 +1377,45 @@ def _probe_local() -> tuple[dict, str]:
     latest = logs[0] if logs else None
     run_id = latest.stem if latest else ""
 
-    # pgrep for live processes owned by us.
+    # pgrep for live processes owned by us. We do POSITIVE matching on the
+    # full cmdline because plain `pgrep -x chezmoi` matches:
+    #   - `chezmoi cd` interactive shells (long-lived, common during dev)
+    #   - `chezmoi shell` invocations
+    #   - Editor extension hosts whose argv contains the word "chezmoi"
+    #     because the workspace folder is named that (e.g. Cursor's
+    #     "Cursor Helper (Plugin): extension-host chezmoi [...]")
+    # All three are NOT fleet-apply siblings and would falsely flip self
+    # into 'running'. fleet-apply wrappers always invoke chezmoi as either
+    # `chezmoi … update …` or `chezmoi … apply …`, so match on those verbs
+    # explicitly. ansible-playbook is unambiguous (only ansible spawns it).
+    #
+    # Trade-off: a hand-typed `chezmoi diff` from another shell would also
+    # match our `--apply` filter? No — `diff` isn't in our positive list.
+    # The cost is missing manual `chezmoi apply` from another shell — but
+    # that's literally indistinguishable from a fleet-apply local run, and
+    # the user wouldn't run both at once anyway.
+    pid_list: list[str] = []
     try:
+        # -lf: long format (PID + full cmdline) so we can grep verbs.
+        # Works identically on Linux procps-ng and macOS BSD pgrep.
         result = subprocess.run(
-            ["pgrep", "-u", str(os.getuid()), "-x", "chezmoi|ansible-playbook|ansible"],
+            ["pgrep", "-u", str(os.getuid()), "-lf",
+             "chezmoi|ansible-playbook"],
             capture_output=True, text=True, check=False,
         )
-        pids = ",".join(result.stdout.split())
+        for line in result.stdout.splitlines():
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            pid_s, cmd = parts
+            # Positive match: chezmoi running update/apply, OR ansible-playbook.
+            if "ansible-playbook" in cmd:
+                pid_list.append(pid_s)
+            elif "chezmoi" in cmd and (" update" in cmd or " apply" in cmd):
+                pid_list.append(pid_s)
     except FileNotFoundError:
-        pids = ""
+        pass
+    pids = ",".join(pid_list)
 
     # Exclude our own PID and parents — the controller running this probe
     # IS chezmoi-adjacent in some setups (e.g. invoked from `chezmoi
@@ -1364,6 +1434,13 @@ def _probe_local() -> tuple[dict, str]:
             fields["EXIT"] = (LOCAL_LOG_DIR / f"{run_id}.exit").read_text().strip()
         except OSError:
             fields["EXIT"] = "?"
+    elif latest:
+        # Log present but no sentinel and no live PIDs → the wrapper was
+        # SIGKILL'd (or never installed its trap). See _STATUS_PROBE_CMD
+        # for full reasoning. Distinguishing this from 'idle' (no log at
+        # all) lets `--watch` know there's nothing to wait for AND that
+        # something went wrong.
+        fields["STATE"] = "abandoned"
     else:
         fields["STATE"] = "idle"
     fields["RUN_ID"] = run_id
@@ -1447,6 +1524,7 @@ def _run_status(
         state_color = {
             "running": "yellow",
             "finished": "green",
+            "abandoned": "red",
             "idle": "dim",
             "skipped": "magenta",
             "error": "red bold",
@@ -1459,6 +1537,8 @@ def _run_status(
                 detail = f"pids={fields.get('PIDS', '?')}"
             elif st == "finished":
                 detail = f"exit={fields.get('EXIT', '?')}"
+            elif st == "abandoned":
+                detail = "no sentinel — wrapper SIGKILL'd?"
             else:
                 detail = ""
             color = state_color.get(st, "white")
@@ -1479,7 +1559,12 @@ def _run_status(
                 if fields.get("STATE") in {"idle", "skipped"} or not tail.strip():
                     continue
                 console.print(f"\n[bold cyan]── {h.name} (last 5 log lines) ──[/]")
-                console.print(tail.rstrip())
+                # markup=False because ansible's prettier callback wraps
+                # task names in `[role : Task description]` which Rich
+                # would otherwise eat as malformed markup tags (silently
+                # dropping the bracketed text). highlight=False stops
+                # Rich auto-colouring numeric values like (1.3s).
+                console.print(tail.rstrip(), markup=False, highlight=False)
 
         if any_running:
             console.print(
@@ -1568,10 +1653,16 @@ def _run_tail(
                 async def _drain(stream, is_err):
                     async for line in stream:
                         text = line.decode("utf-8", errors="replace").rstrip("\n")
-                        if is_err:
-                            console.print(f"[dim]{text}[/]")
-                        else:
-                            console.print(text)
+                        # markup=False to avoid Rich eating ansible's
+                        # `[role : task]` brackets as malformed tags.
+                        # Use the `style=` kwarg for dim instead of inline
+                        # `[dim]...[/]` markup which would be disabled.
+                        console.print(
+                            text,
+                            markup=False,
+                            highlight=False,
+                            style="dim" if is_err else None,
+                        )
 
                 async def _watch_sentinel():
                     while True:
@@ -1652,10 +1743,14 @@ def _run_tail(
                 async def _drain(stream, is_err: bool) -> None:
                     async for line in stream:
                         text = line.rstrip("\n")
-                        if is_err:
-                            console.print(f"[dim]{text}[/]")
-                        else:
-                            console.print(text)
+                        # See remote-tail _drain above for markup=False rationale
+                        # (ansible `[role : task]` brackets get eaten by Rich).
+                        console.print(
+                            text,
+                            markup=False,
+                            highlight=False,
+                            style="dim" if is_err else None,
+                        )
 
                 await asyncio.gather(
                     _drain(proc.stdout, False),
