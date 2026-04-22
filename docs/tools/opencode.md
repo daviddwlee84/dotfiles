@@ -72,7 +72,14 @@ When using the `github-copilot/claude-opus-4.x` channel for long-running tool ca
 
 GitHub Copilot's proxy in front of the Anthropic upstream enforces an idle timeout (community-observed at ~60 s) on streaming responses. Claude Opus generating a very large single tool-call payload can stay below the chunk emission threshold long enough to trip this, after which the connection silently dies. Direct Anthropic API does not have this behaviour. Sonnet trips it less often than Opus because it generates faster.
 
-There is **no client-side flag to disable the proxy's idle timeout** — it's enforced server-side. The two viable mitigations are: (1) cancel-and-retry early so the SDK isn't blocked the full request timeout waiting for chunks that will never arrive, and (2) avoid emitting one giant tool call in the first place.
+There is **no client-side flag to disable the proxy's idle timeout** — it's enforced server-side.
+
+### Upstream tracking
+
+- [anomalyco/opencode#17578](https://github.com/anomalyco/opencode/issues/17578) — exact symptom match: `Write tool SSE timeout with claude-opus-4.x via GitHub Copilot when generating long markdown files`. Reporter found that **Pyright LSP diagnostics get appended to tool responses** and inflate the SSE payload, making the stall more likely. Even writing a `.md` file can trigger a full project re-scan in repos containing Python sources without a configured venv. Fix in PR `#18894` (not merged at time of writing).
+- [anomalyco/opencode#17574](https://github.com/anomalyco/opencode/issues/17574), [#17307](https://github.com/anomalyco/opencode/issues/17307), [#17318](https://github.com/anomalyco/opencode/issues/17318), [#17336](https://github.com/anomalyco/opencode/issues/17336) — additional reports of the same SSE-stall pattern; `#17307` is the original issue under which `chunkTimeout` was added as a stop-gap.
+- [anomalyco/opencode#20466](https://github.com/anomalyco/opencode/issues/20466) — **`chunkTimeout` does not actually retry**: when the chunk-timeout fires, the resulting `SSE read timed out` error is wrapped as `NamedError.Unknown` and the `retryable()` predicate in `retry.ts` rejects it (fails the `JSON.parse()` branch). Net effect: setting `chunkTimeout` converts a silent multi-minute hang into a hard failure with **no automatic retry**, which is often worse UX than leaving it unset and relying on the SDK's request-level retry. Fix in PRs `#21727` and `#23501` (neither merged).
+- [anomalyco/opencode#21173](https://github.com/anomalyco/opencode/issues/21173) — analogous problem on the OpenAI Responses provider (different transport, same shape).
 
 ### Mitigation (managed)
 
@@ -82,29 +89,36 @@ The overlay sets:
 {
   "provider": {
     "github-copilot": {
-      "options": { "timeout": 600000, "chunkTimeout": 20000 }
+      "options": { "timeout": 600000 }
     }
   }
 }
 ```
 
-- `chunkTimeout: 20000` cancels a stalled stream after 20 s of silence and lets the SDK reconnect, instead of waiting the full request `timeout`.
-- `timeout: 600000` (10 min) extends the request-level cap so legitimately long generations aren't aborted prematurely after the first reconnect succeeds.
+- `timeout: 600000` (10 min) extends the request-level cap so legitimately long generations aren't aborted prematurely.
+- **`chunkTimeout` is intentionally NOT set.** A previous version of this overlay set `chunkTimeout: 20000` on the assumption that early cancel-and-retry would unstick the stream faster than waiting the full request timeout. Live testing on this machine showed the setting fires correctly (`SSE read timed out` at ~20 s, visible in `~/.local/share/opencode/log/2026-04-22T105313.log` lines 183, 257) but the error is **not retried** because of upstream bug `#20466` — `retryable()` in `retry.ts` rejects the error class. Net result was "20 s hang then hard fail with no recovery", which is worse than "silent hang then SDK request-level retry". Removed pending one of the linked PRs landing.
 
-This shrinks the visible "stuck" window from ~minutes to ~tens of seconds and lets retries actually make progress instead of hitting the same dead connection.
+### LSP-payload aggravator (Action 3 — managed at repo root)
+
+Per `#17578` the SSE payload includes diagnostics from any LSP server OpenCode auto-spawns for files in the working tree. In a chezmoi-managed dotfiles repo with stray Python scripts using PEP 723 inline-script-deps (`#!/usr/bin/env -S uv run --script`), Pyright cannot resolve the inline-declared dependencies and emits dozens of `reportMissingImports` diagnostics per file, which then ride along on every tool response. To suppress this noise the chezmoi repo root carries a [`pyrightconfig.json`](../../pyrightconfig.json) that:
+
+- excludes ansible role trees, chezmoi source dirs (`dot_*/`), agent transcript dirs (`.specstory/`, `.claude/`, `.cursor/`, `.opencode/`), and `backups/`,
+- sets `reportMissingImports = "none"` so PEP 723 scripts stop polluting the diagnostics channel.
+
+This file lives at the repo root (not under any `dot_*/` source path) so it is part of the chezmoi git repo but never deployed to `$HOME`.
 
 ### Behavioural mitigation (not managed)
 
 If a generation is still failing repeatedly, prompt the agent to:
 
 1. write a minimal skeleton first via a small `write`,
-2. fill each section incrementally via multiple `edit` calls.
+2. fill each section incrementally via multiple `edit` calls (~50–80 lines each, one logical block per call).
 
-This avoids the giant single-tool-call payload that triggers the stall in the first place. Not enforced via global `instructions` because that bloats every session's system prompt; better to add it as a per-project `AGENTS.md` rule when the repo is known to produce large generated files.
+This avoids the giant single-tool-call payload that triggers the stall in the first place. Empirically the most reliable fix in this session — far more effective than any client-side timeout tuning. Not enforced via global `instructions` because that bloats every session's system prompt; better to add it as a per-project `AGENTS.md` rule when the repo is known to produce large generated files.
 
-### When to remove the mitigation
+### When to revisit
 
-The `chunkTimeout` override can stay indefinitely — it's a defensive setting that doesn't hurt. Reconsider when:
-
-- GitHub Copilot publishes that the proxy idle timeout has been raised or removed for the Anthropic channel, or
-- you switch to direct Anthropic API (`provider.anthropic.options.apiKey`) and stop using the Copilot channel for Claude entirely.
+- If `#20466` lands (one of PRs `#21727` / `#23501`), re-add `chunkTimeout` to the overlay — it will then actually retry instead of hard-failing.
+- If `#17578` / PR `#18894` lands, the LSP-payload aggravator goes away upstream and the root `pyrightconfig.json` becomes a belt-and-suspenders defence rather than a load-bearing fix.
+- If GitHub Copilot raises the proxy idle timeout, the entire section can be deleted and the overlay's `timeout` reverted to the upstream default.
+- If you switch to direct Anthropic API (`provider.anthropic.options.apiKey`) and stop using the Copilot channel for Claude entirely, the overlay's `provider.github-copilot` block can be dropped.

@@ -104,9 +104,10 @@ _have_chezmoi() {
   # default_agent and small_model enforced by overlay.
   echo "$output" | jq -e '.default_agent == "build"' >/dev/null
   echo "$output" | jq -e '.small_model == "github-copilot/gpt-5-mini"' >/dev/null
-  # Copilot stream-stall mitigation enforced.
+  # Copilot stream-stall mitigation enforced (timeout only; chunkTimeout
+  # intentionally absent — see docs/tools/opencode.md).
   echo "$output" | jq -e '.provider["github-copilot"].options.timeout == 600000' >/dev/null
-  echo "$output" | jq -e '.provider["github-copilot"].options.chunkTimeout == 20000' >/dev/null
+  echo "$output" | jq -e '.provider["github-copilot"].options | has("chunkTimeout") | not' >/dev/null
   # Sibling agent.build untouched.
   echo "$output" | jq -e '.["agent"].build.model == "x"' >/dev/null
   # Local plugin path preserved verbatim (machine-local).

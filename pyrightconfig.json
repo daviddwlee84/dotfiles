@@ -1,0 +1,24 @@
+{
+  "//": "Suppresses Pyright LSP noise from PEP 723 inline-script-deps Python files in this chezmoi repo. Auto-spawned LSPs append diagnostics to OpenCode tool responses (see docs/tools/opencode.md), inflating SSE payload size and aggravating GitHub Copilot proxy idle-timeout stalls — anomalyco/opencode#17578. This file lives at the chezmoi repo root, not under any dot_*/ source path, so it is git-tracked but never deployed to $HOME.",
+  "exclude": [
+    "**/.git",
+    "**/.specstory",
+    "**/.claude/plans",
+    "**/.cursor/plans",
+    "**/.opencode/plans",
+    "**/node_modules",
+    "**/__pycache__",
+    "backups",
+    "dot_ansible",
+    "dot_*",
+    "private_dot_*",
+    "exact_dot_*",
+    "tests/**/snapshots"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportMissingTypeStubs": "none",
+  "useLibraryCodeForTypes": true,
+  "venvPath": ".",
+  "venv": ".venv"
+}

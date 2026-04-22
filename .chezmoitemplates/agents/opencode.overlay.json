@@ -11,8 +11,7 @@
   "provider": {
     "github-copilot": {
       "options": {
-        "timeout": 600000,
-        "chunkTimeout": 20000
+        "timeout": 600000
       }
     }
   }
