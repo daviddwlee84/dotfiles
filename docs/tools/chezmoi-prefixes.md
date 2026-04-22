@@ -253,7 +253,7 @@ Source of truth for upstream clones that used to live in ansible roles. Entries 
 | `~/.oh-my-zsh/custom/plugins/zsh-vi-mode` | `git-repo` | `jeffreytse/zsh-vi-mode` | `dot_ansible/roles/zsh` |
 | `~/.tmux/plugins/tpm` | `git-repo` | `tmux-plugins/tpm` | `dot_ansible/roles/devtools` |
 | `~/.fzf` (Linux only) | `git-repo` | `junegunn/fzf` | `dot_ansible/roles/lazyvim_deps` |
-| `~/.local/toolkami.rb` | `file` | `aperoc/toolkami/main/toolkami.rb` | `dot_ansible/roles/ruby_gem_tools` |
+| `~/.local/share/toolkami/toolkami.rb` | `file` | `aperoc/toolkami/main/toolkami.rb` | `dot_ansible/roles/ruby_gem_tools` |
 
 All `git-repo` entries use `--depth 1` and `--ff-only` on pull; all entries have `refreshPeriod = "168h"` (weekly auto-refresh).
 
@@ -265,7 +265,7 @@ chezmoi apply                 # normal cadence: checks refreshPeriod,
 chezmoi apply --refresh-externals   # force: pull every external now
 ```
 
-Externals are evaluated **before** `run_onchange_after_20_ansible_roles.sh.tmpl`, so by the time ansible runs, `~/.oh-my-zsh`, `~/.tmux/plugins/tpm`, `~/.fzf`, and `~/.local/toolkami.rb` already exist. Ansible's remaining responsibilities for these tools:
+Externals are evaluated **before** `run_onchange_after_20_ansible_roles.sh.tmpl`, so by the time ansible runs, `~/.oh-my-zsh`, `~/.tmux/plugins/tpm`, `~/.fzf`, and `~/.local/share/toolkami/toolkami.rb` already exist. Ansible's remaining responsibilities for these tools:
 
 - `zsh` role: install the `zsh` package + change login shell (sudo).
 - `devtools` role: run `tpm/bin/install_plugins` once (sentinel at `~/.tmux/plugins/.ansible-installed`).

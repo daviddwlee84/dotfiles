@@ -45,7 +45,7 @@ Upstream git repos / single-file downloads that used to be cloned by Ansible are
 - oh-my-zsh core + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
 - TPM (tmux plugin manager, `~/.tmux/plugins/tpm`)
 - fzf git source (Linux only, `~/.fzf`; apt version lacks `--zsh`)
-- toolkami.rb (`~/.local/toolkami.rb`)
+- toolkami.rb (`~/.local/share/toolkami/toolkami.rb`)
 
 ```bash
 chezmoi apply                          # normal: pull if older than 168h

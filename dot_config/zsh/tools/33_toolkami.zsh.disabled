@@ -1,6 +1,14 @@
 # 33_toolkami.zsh - toolkami configuration (MCP server tool)
 # https://github.com/aperoc/toolkami
+#
+# Source path is .local/share/toolkami/toolkami.rb (XDG data dir),
+# downloaded by .chezmoiexternal.toml.tmpl. Old location was
+# ~/.local/toolkami.rb but that made chezmoi imply ownership of ~/.local
+# with mode 0775, causing a recurring mode-only diff against system-set
+# 0700/0755 on every apply.
 
-[[ -f "$HOME/.local/toolkami.rb" ]] || return 0
+_toolkami_rb="$HOME/.local/share/toolkami/toolkami.rb"
+[[ -f "$_toolkami_rb" ]] || return 0
 
-eval "$(ruby ~/.local/toolkami.rb init)"
+eval "$(ruby "$_toolkami_rb" init)"
+unset _toolkami_rb

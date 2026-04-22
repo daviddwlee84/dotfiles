@@ -99,8 +99,15 @@
 # -----------------------------------------------------------------------------
 # Harmless to always download: the zsh autoloader only eval's it when ruby is
 # available, so noRoot machines without ruby just ignore the file.
+#
+# Path lives under .local/share/ (XDG data dir) on purpose — putting it
+# directly at .local/toolkami.rb made chezmoi imply ownership of ~/.local
+# itself with mode 0775, which then conflicted with system-set 0700/0755
+# on every apply ("mode-only diff" on .local). Nesting under share/
+# pushes the chezmoi-implied parent down to a directory nobody else
+# manages, eliminating the drift.
 
-[".local/toolkami.rb"]
+[".local/share/toolkami/toolkami.rb"]
     type = "file"
     url = "https://raw.githubusercontent.com/aperoc/toolkami/refs/heads/main/toolkami.rb"
     refreshPeriod = "168h"

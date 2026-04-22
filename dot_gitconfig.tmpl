@@ -20,3 +20,11 @@
     navigate = true
     side-by-side = true
 {{- end }}
+# Per-machine overrides (safe, credential, http.proxy, etc.) live in
+# ~/.gitconfig.local so they don't conflict with chezmoi-managed updates
+# to this template. The file is git-ignored by chezmoi (.chezmoiignore)
+# and silently skipped by git if it doesn't exist — see
+# https://git-scm.com/docs/git-config#_includes. Same pattern as
+# ~/.zshrc.adhoc for shell customisations.
+[include]
+    path = ~/.gitconfig.local

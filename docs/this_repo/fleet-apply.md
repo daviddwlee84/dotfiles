@@ -145,6 +145,65 @@ just fleet-apply --command-timeout 600          # tighter timeout for warm fleet
 just fleet-apply-kill                           # kill orphan chezmoi/ansible on every host
 ```
 
+## Conflict handling: `--force` vs `--keep-going`
+
+When a remote file has drifted from what chezmoi last wrote (someone
+edited it directly on the host), chezmoi normally prompts on `/dev/tty`
+to ask whether to overwrite. fleet_apply runs without a PTY, so that
+prompt dies with `chezmoi: <file>: could not open a new TTY: open
+/dev/tty: no such device or address`. Two flags control the response:
+
+| Flag | Default | Effect on the conflicting file | Effect on the rest of the apply |
+|---|---|---|---|
+| `--keep-going` / `--no-keep-going` | **on** | Left **unchanged** (no override) | Continues — other files still apply |
+| `--force` / `--no-force` | **off** | **Overwritten** with template render | Same |
+
+Default combination (`--keep-going`, no `--force`) = **non-destructive**:
+all clean files apply, drifted files are skipped. The host's exit code
+will still be non-zero so drift is visible in the summary table; SSH in
+and run `chezmoi diff <file>` to see what changed. After deciding, either:
+
+- Migrate the drift into a per-machine override file (e.g. `~/.gitconfig.local`,
+  see below) and re-run.
+- Or run `just fleet-apply --force` once to let the canonical template win.
+
+## Per-machine git overrides (`~/.gitconfig.local`)
+
+Common drift on `.gitconfig` is host-specific git config that legitimately
+belongs to that one machine — `[safe] directory = /mnt/NAS/...` (host-mounted
+NAS), `[credential "https://gitlab.com"]` (glab CLI helper), `[http] proxy = ...`
+(corporate proxy), etc. Putting these in the chezmoi-managed
+`dot_gitconfig.tmpl` is wrong (they don't apply to other hosts);
+hand-editing them onto each remote also fails because every fleet apply
+then trips the "drifted from template" prompt.
+
+`dot_gitconfig.tmpl` therefore ends with:
+
+```gitconfig
+[include]
+    path = ~/.gitconfig.local
+```
+
+`include.path` is silently skipped by git when the file doesn't exist
+(no error), so machines without overrides are unaffected. `~/.gitconfig.local`
+is git-ignored by chezmoi via `.chezmoiignore` — chezmoi will never seed,
+overwrite, or diff it. Same self-managed pattern as `~/.zshrc.adhoc`
+for shell customisations.
+
+To migrate per-host lines that already drifted on a remote:
+
+```bash
+ssh <host> 'chezmoi --no-pager diff .gitconfig'   # see what diverged
+ssh <host> bash -s <<'EOF'
+  # Move the host-specific block out of the managed file:
+  # (manually copy the [safe] / [credential] / [http] sections from
+  # ~/.gitconfig into ~/.gitconfig.local with your editor of choice)
+  ${EDITOR:-vi} ~/.gitconfig.local
+  ${EDITOR:-vi} ~/.gitconfig         # delete the migrated lines
+EOF
+just fleet-apply-one <host>                       # should now be clean
+```
+
 ## Timeouts
 
 | Flag | Default | Rationale |
@@ -221,6 +280,14 @@ your local `.gitignore` if you don't already have one for build artifacts.
   ```
   Run `ssh <host> command -v chezmoi` (interactive) vs
   `ssh <host> 'command -v chezmoi'` (non-interactive) to see the gap.
+- **`chezmoi: <file>: could not open a new TTY: open /dev/tty: no such device or address`** —
+  the file drifted on the remote and chezmoi tried to prompt. With the
+  default `--keep-going`, the file is left untouched and the rest of
+  the apply continues (host still reports rc!=0 so drift is visible).
+  See [Conflict handling](#conflict-handling---force-vs---keep-going)
+  for the resolution flow; for `.gitconfig` specifically, migrate the
+  per-host lines to [`~/.gitconfig.local`](#per-machine-git-overrides-gitconfiglocal)
+  instead of using `--force`.
 - **`bw get password` fails** — run `bw unlock`, then `export BW_SESSION=...`.
 - **`asyncssh.PermissionDenied`** — the alias resolves but auth failed.
   Test with `ssh <alias> echo ok` first; if you use the 1Password agent,

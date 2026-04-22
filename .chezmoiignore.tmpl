@@ -45,6 +45,12 @@ pyrightconfig.json
 # Zsh adhoc file (personal experiments - never track)
 .zshrc.adhoc
 
+# Per-machine git overrides (host-specific [safe], [credential],
+# [http.proxy], etc.). Same self-managed pattern as .zshrc.adhoc:
+# silently included by ~/.gitconfig (`[include] path = ~/.gitconfig.local`)
+# when present, ignored by git when absent. See dot_gitconfig.tmpl.
+.gitconfig.local
+
 # Python bytecode caches
 **/__pycache__
 

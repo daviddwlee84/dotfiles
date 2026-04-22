@@ -175,7 +175,7 @@ Vendored upstream sources are declared in [`.chezmoiexternal.toml.tmpl`](.chezmo
 - `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
 - `~/.tmux/plugins/tpm` (TPM)
 - `~/.fzf` (Linux only; apt version lacks `--zsh`)
-- `~/.local/toolkami.rb`
+- `~/.local/share/toolkami/toolkami.rb`
 
 See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat) for details and when to add entries here vs. ansible.
 
@@ -291,8 +291,13 @@ Per-host log: `logs/fleet-apply/<UTC-timestamp>/<host>.log`. Exit code = number
 of failed hosts. Inventory file is seeded once by chezmoi as a
 `create_private_` template, so your edits are never overwritten.
 
-Full schema, password-source semantics, and troubleshooting:
-[docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md).
+Conflict-handling defaults match the "push canonical config" mental model:
+`--keep-going` is **on** (skip drifted files non-destructively, continue
+the rest), `--force` is **off** (don't auto-overwrite). Pass
+`--no-keep-going` to fail-fast, or `--force` to silently overwrite local
+drift on the remote — see [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
+for the full flag reference and per-machine git override convention
+(`~/.gitconfig.local`, same self-managed pattern as `~/.zshrc.adhoc`).
 
 ## Testing
 
