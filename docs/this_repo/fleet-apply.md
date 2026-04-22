@@ -9,6 +9,11 @@
 Implementation: [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py)
 (uv inline-script: `asyncssh` + `tyro` + `rich`).
 
+See also: [fleet-apply-vs-fabric.md](fleet-apply-vs-fabric.md) for an
+archaeological comparison against the author's 2018-era Fabric `fabfile.py`
+on RaspPi-Cluster — same problem shape, ~7 years of operational lessons
+encoded into the current implementation.
+
 ## When to use
 
 You edited dotfiles on the workstation, pushed to the repo's git remote, and
