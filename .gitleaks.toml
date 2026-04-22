@@ -7,12 +7,75 @@ title = "Dotfiles Gitleaks Config"
 [extend]
 useDefault = true
 
-# Allow chezmoi template patterns (not secrets)
+# Allow chezmoi template patterns + our redaction sentinels (not secrets)
 [allowlist]
-  description = "Chezmoi templates"
+  description = "Chezmoi templates + redaction sentinels"
   regexes = [
     # Chezmoi template variables: {{ .email }}, {{ .name }}
     '''(?i)\{\{\s*\.?\w+\s*\}\}''',
     # Chezmoi prompt functions: {{ promptString ... }}
     '''(?i)\{\{\s*prompt(String|Bool)(Once)?\s+.*\}\}''',
+    # Already-redacted sentinels emitted by scripts/redact_secrets.py
+    # (e.g. waka_REDACTED_WAKATIME_KEY) so history-rewrites stay clean.
+    '''\b[A-Za-z0-9_-]+_REDACTED(?:_[A-Z_]+)?\b''',
   ]
+
+# ---------------------------------------------------------------------------
+# Custom rules -- patterns GitHub Push Protection detects but gitleaks
+# default ruleset misses (or under-specifies). Curated "pragmatic" subset;
+# keep entropy lax since the prefix anchors are already strong.
+# ---------------------------------------------------------------------------
+
+[[rules]]
+  id          = "wakatime-api-key"
+  description = "WakaTime API key (waka_ + RFC-4122 UUID)"
+  regex       = '''\bwaka_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b'''
+  tags        = ["key", "wakatime", "auto"]
+
+[[rules]]
+  id          = "openai-project-key"
+  description = "OpenAI project-scoped API key (sk-proj-...)"
+  regex       = '''\bsk-proj-[A-Za-z0-9_-]{80,}\b'''
+  tags        = ["key", "openai", "auto"]
+
+[[rules]]
+  id          = "anthropic-api-key-strict"
+  description = "Anthropic API key (sk-ant-apiNN-..., strict length)"
+  regex       = '''\bsk-ant-api\d{2}-[A-Za-z0-9_-]{93}AA\b'''
+  tags        = ["key", "anthropic", "auto"]
+
+[[rules]]
+  id          = "cursor-api-key"
+  description = "Cursor API key (cursor- prefixed)"
+  regex       = '''\bcursor-[A-Za-z0-9]{40,}\b'''
+  tags        = ["key", "cursor", "auto"]
+
+[[rules]]
+  id          = "huggingface-token"
+  description = "Hugging Face user access token (hf_...)"
+  regex       = '''\bhf_[A-Za-z0-9]{34,40}\b'''
+  tags        = ["key", "huggingface", "auto"]
+
+[[rules]]
+  id          = "supabase-service-pat"
+  description = "Supabase service / personal access token (sbp_...)"
+  regex       = '''\bsbp_[a-f0-9]{40}\b'''
+  tags        = ["key", "supabase", "auto"]
+
+[[rules]]
+  id          = "linear-api-key"
+  description = "Linear API key (lin_api_...)"
+  regex       = '''\blin_api_[A-Za-z0-9]{40}\b'''
+  tags        = ["key", "linear", "auto"]
+
+[[rules]]
+  id          = "tailscale-auth-key"
+  description = "Tailscale auth/client/api key (tskey-...)"
+  regex       = '''\btskey-(?:auth|client|api)-[A-Za-z0-9]+-[A-Za-z0-9]{24,}\b'''
+  tags        = ["key", "tailscale", "auto"]
+
+[[rules]]
+  id          = "notion-integration-token"
+  description = "Notion internal integration token (ntn_...)"
+  regex       = '''\bntn_[A-Za-z0-9]{40,}\b'''
+  tags        = ["key", "notion", "auto"]

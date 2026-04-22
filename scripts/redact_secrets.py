@@ -37,6 +37,10 @@ DEFAULT_PATHS = [
     ".opencode/plans",
 ]
 
+# Repo-root gitleaks config; we pass it explicitly so custom rules apply
+# even when the script is invoked from a different CWD (pre-commit etc.).
+GITLEAKS_CONFIG = ".gitleaks.toml"
+
 
 def read_text(path: Path) -> str:
     """Read as UTF-8 while preserving invalid bytes via surrogate escape."""
@@ -53,22 +57,21 @@ def run_gitleaks_staged() -> list[dict]:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         report_path = f.name
 
+    cmd = [
+        "gitleaks",
+        "protect",
+        "--staged",
+        "--report-format",
+        "json",
+        "--report-path",
+        report_path,
+        "--exit-code",
+        "0",
+    ]
+    if Path(GITLEAKS_CONFIG).is_file():
+        cmd.extend(["--config", GITLEAKS_CONFIG])
     try:
-        subprocess.run(
-            [
-                "gitleaks",
-                "protect",
-                "--staged",
-                "--report-format",
-                "json",
-                "--report-path",
-                report_path,
-                "--exit-code",
-                "0",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run(cmd, capture_output=True, text=True)
         content = read_text(Path(report_path))
         if not content.strip():
             return []
@@ -84,24 +87,23 @@ def run_gitleaks_workdir(target_path: str) -> list[dict]:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         report_path = f.name
 
+    cmd = [
+        "gitleaks",
+        "detect",
+        "--source",
+        target_path,
+        "--report-format",
+        "json",
+        "--report-path",
+        report_path,
+        "--no-git",
+        "--exit-code",
+        "0",
+    ]
+    if Path(GITLEAKS_CONFIG).is_file():
+        cmd.extend(["--config", GITLEAKS_CONFIG])
     try:
-        subprocess.run(
-            [
-                "gitleaks",
-                "detect",
-                "--source",
-                target_path,
-                "--report-format",
-                "json",
-                "--report-path",
-                report_path,
-                "--no-git",
-                "--exit-code",
-                "0",
-            ],
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run(cmd, capture_output=True, text=True)
         content = read_text(Path(report_path))
         if not content.strip():
             return []
