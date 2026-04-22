@@ -1,7 +1,13 @@
 # 10_fzf.zsh - fzf configuration
 
-# Add git-installed fzf to PATH if present
-[[ -d "$HOME/.fzf/bin" ]] && export PATH="$HOME/.fzf/bin:$PATH"
+# Add git-installed fzf to PATH if present (Linux only).
+# On macOS, fzf is managed by Homebrew (/opt/homebrew/bin/fzf) — prepending
+# ~/.fzf/bin would shadow brew with a stale clone. The chezmoi external that
+# clones https://github.com/junegunn/fzf is gated to non-darwin in
+# .chezmoiexternal.toml.tmpl for the same reason.
+if [[ "$OSTYPE" == linux* && -d "$HOME/.fzf/bin" ]]; then
+    export PATH="$HOME/.fzf/bin:$PATH"
+fi
 
 # Check if fzf is installed
 command -v fzf &>/dev/null || return 0
