@@ -234,6 +234,8 @@ def build_remote_command(
     host: Host,
     mode: Literal["update", "apply", "diff"],
     init: bool,
+    force: bool = False,
+    keep_going: bool = False,
 ) -> str:
     """Build the single shell command sent over SSH.
 
@@ -291,13 +293,31 @@ def build_remote_command(
         cz = shlex.quote(chezmoi_path)
         path_prefix = ""
     cz_global = f"{cz} --no-pager"
+    # `--force` makes chezmoi auto-overwrite local drift on the remote
+    # (the "X has changed since chezmoi last wrote it" prompt) instead of
+    # opening /dev/tty for input — we run without a PTY, so the prompt
+    # would die with "could not open a new TTY". `--keep-going` continues
+    # past per-file errors so one bad template doesn't abort the whole
+    # apply. Both are off by default; opt in via CLI.
+    #
+    # `--force` is destructive: any hand-edits made on the remote box are
+    # silently replaced with the canonical template render. Acceptable
+    # for a "push the dotfiles repo to my fleet" workflow because managed
+    # files shouldn't be edited in place.
+    sub_flags = ""
+    if force:
+        sub_flags += " --force"
+    if keep_going:
+        sub_flags += " --keep-going"
     if mode == "update":
-        sub = f"{cz_global} update"
+        sub = f"{cz_global} update{sub_flags}"
         if init:
             sub += " --init"
     elif mode == "apply":
-        sub = f"{cz_global} apply"
+        sub = f"{cz_global} apply{sub_flags}"
     else:  # diff
+        # `chezmoi diff` doesn't take --force / --keep-going — it's
+        # read-only and never prompts.
         sub = f"{cz_global} diff"
 
     # Belt-and-braces: if any sub-tool chezmoi invokes (git, ansible) honours
@@ -393,6 +413,8 @@ async def run_one(
     init: bool,
     connect_timeout: int,
     command_timeout: int,
+    force: bool = False,
+    keep_going: bool = False,
 ) -> None:
     """Execute one host: connect, stream output to log + status, set rc/state."""
     host = status.host
@@ -401,7 +423,9 @@ async def run_one(
     loop = asyncio.get_running_loop()
     status.started_at = loop.time()
 
-    cmd = build_remote_command(host, mode=mode, init=init)
+    cmd = build_remote_command(
+        host, mode=mode, init=init, force=force, keep_going=keep_going,
+    )
     log_fp = log_path.open("w", buffering=1)  # line-buffered
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init}\n")
     log_fp.write(f"# remote-cmd: {cmd}\n\n")
@@ -627,6 +651,34 @@ def cli(
             )
         ),
     ] = False,
+    force: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Pass --force to chezmoi update/apply on every host: silently "
+                "overwrite local drift instead of prompting on a non-existent "
+                "TTY (the prompt would die with 'could not open a new TTY'). "
+                "Destructive — replaces hand-edits to managed files with the "
+                "canonical template render. Recommended for fleet workflows "
+                "where the repo is the source of truth."
+            )
+        ),
+    ] = False,
+    keep_going: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Pass -k/--keep-going to chezmoi (default ON): continue past "
+                "per-file errors instead of aborting the whole apply on the "
+                "first failure. This includes the 'could not open a new TTY' "
+                "error from a non-PTY conflict prompt — the conflicting file "
+                "is left UNCHANGED (no override) and chezmoi proceeds to the "
+                "next file. The host still reports rc!=0 in the summary so "
+                "you know there was drift; use --force to actually overwrite. "
+                "Pass --no-keep-going to disable (fail-fast)."
+            )
+        ),
+    ] = True,
 ) -> int:
     """Apply chezmoi to a fleet of hosts in parallel. Exit code = failed-host count."""
     console = Console()
@@ -658,7 +710,7 @@ def cli(
 
     return _run(
         console, selected, mode, init, log_dir, serial, max_parallel,
-        connect_timeout, command_timeout,
+        connect_timeout, command_timeout, force=force, keep_going=keep_going,
     )
 
 
@@ -727,6 +779,8 @@ def _run(
     max_parallel: int,
     connect_timeout: int,
     command_timeout: int,
+    force: bool = False,
+    keep_going: bool = False,
 ) -> int:
     # Resolve passwords up-front (interactive prompts happen here).
     resolve_passwords(selected, console)
@@ -767,6 +821,8 @@ def _run(
                 init=init,
                 connect_timeout=connect_timeout,
                 command_timeout=command_timeout,
+                force=force,
+                keep_going=keep_going,
             )
 
     async def _orchestrate() -> None:
