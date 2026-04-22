@@ -124,7 +124,7 @@ replicated for all similar cases in the repo — was:
   system-level path is aligned with the user fallback on `*-unknown-linux-musl`.
 
 This matches the general "install vs upgrade is split on purpose" philosophy
-in [CLAUDE.md → Upgrades](../CLAUDE.md): `chezmoi apply` should never surprise
+in [CLAUDE.md → Hard repo invariants](../CLAUDE.md#install-vs-upgrade-is-split-on-purpose): `chezmoi apply` should never surprise
 a running box by installing a binary that won't run.
 
 If you hit a `GLIBC_2.X not found` failure **after** applying this repo
@@ -164,4 +164,4 @@ This is the pattern to replicate whenever an apt-shipped tool is too old for wha
 
 - [this_repo/ansible_customization.md](this_repo/ansible_customization.md) — how to run and customise the ansible roles
 - [tools/tmux/README.md](tools/tmux/README.md) — the tmux ≥ 3.3 requirement and fallback install
-- Root [CLAUDE.md](../CLAUDE.md) — "Ansible vs Homebrew" section and per-tag tool breakdown
+- [this_repo/architecture.md](this_repo/architecture.md) — "Ansible vs Homebrew" section and per-tag tool breakdown

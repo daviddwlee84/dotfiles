@@ -242,7 +242,7 @@ cd ~/.ansible && ansible-playbook playbooks/macos.yml
 `chezmoi apply` is deliberately **install-only** — ansible roles mostly use
 `state: present` / `creates:` idempotency so re-applying never silently bumps
 every tool on your machine. For explicit upgrades, use the dedicated entry
-points (see `## Upgrades` in [AGENTS.md](AGENTS.md) for the full matrix):
+points (see [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md) for the full matrix):
 
 ```bash
 just upgrade-all          # externals + brew + mise + uv + npm + cargo + dotnet + gem + agents + plugins

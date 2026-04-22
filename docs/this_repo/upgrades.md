@@ -158,7 +158,7 @@ Keep the return-value contract: `0` = success, `77` = skipped (prerequisite miss
 
 ## Cross-references
 
-- [`AGENTS.md` § Upgrades](../../AGENTS.md) — short version written for AI agents touching this repo.
+- [`AGENTS.md` § Hard repo invariants](../../AGENTS.md#install-vs-upgrade-is-split-on-purpose) — short version (install-vs-upgrade rule) written for AI agents touching this repo.
 - [`README.md` § Keeping tools up-to-date](../../README.md) — short version written for humans arriving from the front page.
 - [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh) — the implementation.
 - [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) — the sudo-session helper reused for macOS cask installers.

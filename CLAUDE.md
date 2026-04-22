@@ -1,40 +1,71 @@
-# Dotfiles Repository
+# Dotfiles Repository — Agent Contract
 
-Cross-platform dotfiles management using **chezmoi** for configuration files and **ansible** for system dependencies.
+Cross-platform dotfiles managed by **chezmoi** (configs) + **ansible** (system deps). This file is the agent-facing contract: maintenance rules, hard invariants, and pointers to docs. User-facing intro is in [README.md](README.md).
 
-## Maintaining README.md
+> **Headroom rule**: keep this file under ~30k chars. Push handbook content into `docs/`; keep only edit rules and cross-file invariants here.
 
-**IMPORTANT**: When adding or modifying configurations, update `README.md` to reflect changes:
+## Cross-file maintenance rules
 
-- **New config files**: Add to "What You Get > Config Files" section
-- **New ansible roles/tools**: Add to "What You Get > Tools" section
-- **New platforms**: Add to "Supported Platforms" table
-- **Changed setup steps**: Update "Quick Setup" section
+When you change one of these surfaces, update the listed mirror file in the same commit. These are the rules most often forgotten.
 
-Keep README.md concise and user-focused. Technical details belong in CLAUDE.md or docs/.
+### README.md
 
-## Maintaining Custom Aliases & Shell Functions
+When adding/modifying configurations, update [README.md](README.md):
 
-**IMPORTANT**: When adding or modifying a custom alias or shell function in any `dot_config/zsh/` file, update `docs/zsh/aliases.md`:
+- **New config files** → "What You Get > Config Files" section
+- **New ansible roles/tools** → "What You Get > Tools" section
+- **New platforms** → "Supported Platforms" table
+- **Changed setup steps** → "Quick Setup" section
 
-- **New entry**: add a row with the command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description
-- **Modified entry**: update the existing row to reflect changes
-- **Removed entry**: delete the row
+Keep README.md concise and user-focused. Technical details belong here or in `docs/`.
 
-This keeps `docs/zsh/aliases.md` as the single quick-reference for all custom shell shortcuts.
+### Custom aliases & shell functions → `docs/zsh/aliases.md`
 
-## Maintaining Dockerfile
+When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
 
-**IMPORTANT**: When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, also update `Dockerfile`:
+### Dockerfile
 
-1. Add corresponding `ARG CHEZMOI_*` build argument
-2. Add `--promptBool` or `--promptString` flag to the `chezmoi init` command
+When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, also update `Dockerfile`:
 
-This ensures Docker testing works with all configuration options.
+1. Add corresponding `ARG CHEZMOI_*` build argument.
+2. Add `--promptBool` or `--promptString` flag to the `chezmoi init` command.
 
-## Chezmoi Templating Conventions
+This keeps Docker testing in sync with all configuration options.
 
-**IMPORTANT**: Before adding a `{{ if eq .profile ... }}` branch, ask: is the predicate auto-detectable? If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
+### Agent artifact redaction
+
+SpecStory transcripts and coding-agent plan files commonly paste shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+
+| Prefix | Source |
+|--------|--------|
+| `.specstory/history/` | SpecStory chat transcripts |
+| `.claude/plans/` | Claude Code plan files |
+| `.cursor/plans/` | Cursor plan files |
+| `.opencode/plans/` | OpenCode plan files |
+
+Tooling: `scripts/redact_secrets.py` (gitleaks + `PRIVATE KEY` pattern), `just check-secrets` / `just redact-secrets` / `just add-and-redact`. Pre-commit hook `redact-agent-secrets` runs `--fix` before `gitleaks-system`; if it rewrites a file, stage and retry.
+
+When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+
+### Keyboard shortcuts (cross-tool conflict check)
+
+When adding/modifying keybindings in any tool config, cross-check against other tools — multiple tools share the terminal's key namespace, especially `Ctrl+` and `Alt+`.
+
+| Tool | Config file | Conflict risk |
+|------|-------------|---------------|
+| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
+| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+
+Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta).
+
+**Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
+
+## Chezmoi templating conventions
+
+**Hard rule**: before adding a `{{ if eq .profile ... }}` branch, ask if the predicate is auto-detectable. If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
 
 | Predicate | Use |
 |---|---|
@@ -44,576 +75,68 @@ This ensures Docker testing works with all configuration options.
 | Intel Mac only | `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "amd64")` |
 | Desktop vs headless (user role) | `.profile` — `ubuntu_desktop` / `ubuntu_server`; macOS side covered by `eq .chezmoi.os "darwin"` |
 
-Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. Do **not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
+Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. **Do not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
 
-Full decision table, before/after examples, and the `macos_intel` migration snippet: see [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
+Full decision table, before/after examples, and the `macos_intel` migration snippet: [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
 
-## Maintaining Agent Artifact Redaction
+## Hard repo invariants
 
-**IMPORTANT**: SpecStory transcripts and coding-agent plan files commonly paste in shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+### Install vs upgrade is split on purpose
 
-| Prefix | Source |
-|--------|--------|
-| `.specstory/history/` | SpecStory chat transcripts |
-| `.claude/plans/` | Claude Code plan files |
-| `.cursor/plans/` | Cursor plan files |
-| `.opencode/plans/` | OpenCode plan files |
+`chezmoi apply` (+ ansible phase) is deliberately **install-only**: roles use `state: present` / `creates:` so re-applying never silently bumps every tool. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes.
 
-Tooling:
+- **Do not** rewrite ansible roles to `state: latest`.
+- **Do not** add `apt upgrade` / system package bumps to default scope.
+- `scripts/**` is in `.chezmoiignore.tmpl`, so `upgrade_tools.sh` is never deployed; it runs from the repo directly.
+- Adding a new upgrade category: see [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md) → "Adding a new category". For a tool already managed by an existing package manager (brew/uv/npm/cargo/dotnet/gem/mise) you do nothing — generic `upgrade` picks it up.
 
-- `scripts/redact_secrets.py` — runs `gitleaks` + a `PRIVATE KEY` pattern check, then redacts in place. Accepts `--paths PREFIX ...`; defaults to all four prefixes above. `scripts/redact_specstory.py` is a thin legacy shim scoped to `.specstory/history`.
-- `just check-secrets` / `just redact-secrets` / `just check-secrets-workdir` — staged + workdir entry points.
-- `just add-and-redact` — `git add -A` → redact → `git add -A`.
-- Pre-commit hook `redact-agent-secrets` (see `.pre-commit-config.yaml`) runs `--fix` before `gitleaks-system`. If it rewrites a file, pre-commit fails the commit with "files were modified by this hook"; stage the redacted file and retry.
+Full per-category matrix, sample output, and troubleshooting: [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md). The short version is also mirrored in `README.md`.
 
-When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+### Sudo session is shared across all run-scripts
 
-## Maintaining Keyboard Shortcuts
+All three `run_*` scripts share one sudo session via `scripts/lib/sudo_shared.sh`. The user is prompted **once** at the start of `chezmoi apply` and downstream scripts reuse the cached credential silently.
 
-**IMPORTANT**: When adding or modifying keybindings in any tool config, cross-check against other tools to avoid conflicts. Multiple tools share the terminal's key namespace — especially `Ctrl+` and `Alt+` modifiers.
+**Hard rules** when touching run-scripts:
 
-**Conflict surfaces to check:**
+- Do **not** re-implement `sudo -k` / `sudo -v` / TTY-read logic. Call the shared helper.
+- Do **not** run `sudo -k` (invalidates the shared cache for the whole flow).
+- Do **not** register a `trap … EXIT` that removes state (next run-script needs it).
+- Do **not** read the password into a shell variable. Always pipe via `sudo -S <file`.
 
-| Tool | Config file | Key conflict risk |
-|------|-------------|-------------------|
-| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
-| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
-| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` override global |
-| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
-| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
-
-**Known conflict zones:**
-
-- `Ctrl+H/J/K/L` — tmux vim-tmux-navigator pane navigation; removed/remapped in TV global config
-- `Ctrl+S/F/R` — TV built-in cycling/reload; avoid in channel actions
-- `Alt+*` — safe namespace for channel-specific actions (used by pueue channel); requires terminal to send Option as Meta
-
-**Resolution precedence:** tmux root-table bindings intercept keys before they reach the inner application. When running TV inside tmux, any `bind-key -n C-*` in tmux will shadow the same `ctrl-*` in TV. Prefer `Alt+` for custom actions to avoid this entirely.
-
-## Quick Start
-
-```bash
-# Install ansible (if not already installed)
-uv tool install ansible-core
-ansible-galaxy collection install community.general
-
-# Apply dotfiles
-chezmoi apply
-
-# Run ansible manually (from ~/.ansible directory)
-cd ~/.ansible && ansible-playbook playbooks/macos.yml
-```
-
-## Architecture
-
-```
-chezmoi repo/
-├── dot_* files               → ~/.* (config files)
-├── dot_ansible/              → ~/.ansible/ (ansible playbooks)
-├── run_once_before_*.tmpl    → bootstrap (runs once)
-└── run_onchange_after_*.tmpl → ansible (runs on changes)
-```
-
-Installation Order:
-
-```
-1. Bootstrap (run_once_before) - installs Homebrew (macOS/Linux), uv, ansible, mise
-2. chezmoi apply - deploys config files + ansible playbooks
-3. Ansible (run_onchange_after) - runs on fresh install + when roles change
-4. Brew bundle (run_onchange_after) - installs GUI apps if enabled
-```
-
-### Auto-run Scripts
-
-| Script | Behavior |
-|--------|----------|
-| `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS and Linux), uv, mise, ansible |
-| `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
-| `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled) |
-
-The onchange script includes SHA256 hashes of all role files. It runs:
-
-- **Fresh install**: no previous hash state → triggers run
-- **Updates**: any role's `tasks/main.yml` or `defaults/main.yml` changes → triggers run
-
-To force re-run all scripts:
-
-```bash
-chezmoi state delete-bucket --bucket=scriptState
-chezmoi apply
-```
-
-### Sudo Session Sharing
-
-**IMPORTANT**: All three run-scripts share a single sudo session via `scripts/lib/sudo_shared.sh` — the user is prompted **once** at the very start of `chezmoi apply` and every downstream script reuses the cached credential silently. Do NOT re-implement `sudo -k` / `sudo -v` / TTY-read logic in new run-scripts; call the shared helper instead.
-
-**How it's wired:**
-
-- Helper lives at `scripts/lib/sudo_shared.sh` (plain bash, ~270 lines). It is **never deployed** — `scripts/**` is in `.chezmoiignore.tmpl`.
-- Each `run_*.sh.tmpl` inlines the helper at render time via `{{ include "scripts/lib/sudo_shared.sh" }}` — no runtime sourcing, no path lookup back to the source tree.
-- A template-time `NEED_SUDO` flag (`1`/`0`) short-circuits the whole mechanism when no script in the flow will touch sudo (e.g. `noRoot=true` on Linux, or macOS without `installBrewApps`/`installInputMethod`).
-
-**Runtime state** lives under `$XDG_RUNTIME_DIR/chezmoi-sudo-$UID/` (0700; falls back to `${TMPDIR:-/tmp}/chezmoi-sudo-$UID/` when `$XDG_RUNTIME_DIR` is unset):
-
-| File | Mode | Contents |
-|------|------|----------|
-| `sudo.pass` | 0600 | raw password + `\n`, piped into `sudo -S` by `sudo_run` |
-| `ansible-become.yml` | 0600 | `ansible_become_password: "…"` YAML for `ansible-playbook -e @file` |
-| `keepalive.pid` | 0600 | detached watchdog PID |
-| `chezmoi.pid` | 0600 | ancestor chezmoi PID the watchdog watches |
-
-**Cleanup model** — hybrid, because per-script `trap … EXIT` would wipe state before the *next* script can reuse it:
-
-- Signal traps on `INT`/`TERM`/`HUP` → `sudo_session_abort` kills the watchdog + `rm -rf`s the state dir. User Ctrl+C never leaves the secret on disk.
-- End-of-flow cleanup → the watchdog (detached via `setsid`) watches the chezmoi ancestor PID. When chezmoi exits, the watchdog self-terminates and `rm -rf`s the state dir. Refreshes the TTY sudo timestamp every 50 s so cask pkg installers (`sudo /usr/sbin/installer`) find a live ticket.
-
-**Public API** (all three run-scripts use these):
-
-| Function | Purpose |
-|---|---|
-| `sudo_session_init [label]` | Idempotent: if state valid re-exports env vars; else prompts once on `/dev/tty`, validates, writes files, spawns watchdog. Returns non-zero when neither passwordless nor TTY-interactive. Call this BEFORE any sudo. |
-| `sudo_run <cmd ...>` | Thin wrapper: `sudo -S -p '' -- "$@" <sudo.pass` — pipes cached password, never puts it in argv. Falls back to plain `sudo` when passwordless. Use for bootstrap's `apt-get` calls. |
-| `sudo_session_skip_reason` | Branch helper. Prints `"cached"` / `"passwordless"` / `"non-interactive"` / `""`. Used by ansible + brew scripts to pick between `-e @file`, `""` flags, or manual-instruction fallback. |
-| `sudo_session_warm_cache` | Refreshes the current TTY's sudo timestamp with the cached password. Call before tools like `brew bundle` whose cask pkg installers invoke `sudo` internally and rely on timestamp caching rather than accepting a piped password. |
-
-**Exports on success**: `CHEZMOI_SUDO_STATE_DIR`, `CHEZMOI_SUDO_PASS_FILE`, `CHEZMOI_ANSIBLE_BECOME_FILE`, `CHEZMOI_SUDO_KEEPALIVE_PID`.
-
-**Adding a new sudo surface in a run-script:**
+Adding a new sudo surface in a run-script:
 
 1. `{{ include "scripts/lib/sudo_shared.sh" }}` near the top of the template.
-2. Decide the `NEED_SUDO` template flag for your script (mirror the conditions in existing run-scripts).
-3. Call `sudo_session_init "yourlabel"`; branch on the return code + `sudo_session_skip_reason`.
+2. Set the `NEED_SUDO` template flag (mirror existing run-scripts).
+3. Call `sudo_session_init "yourlabel"`; branch on return code + `sudo_session_skip_reason`.
 4. Run privileged commands via `sudo_run …` (simple cases) or pass `-e @$CHEZMOI_ANSIBLE_BECOME_FILE` to ansible.
 
-**Do NOT**:
+Full helper API, runtime state, cleanup model: [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md).
 
-- Run `sudo -k` (it invalidates the shared cache for the entire flow).
-- Register a `trap … EXIT` that removes state (next run-script needs it).
-- Read the password into a shell variable and leave it there — always via `sudo -S <file`, never as an env var or command argument.
+### `modify_` and `create_` prefix semantics
 
-## Chezmoi Commands
+Two chezmoi source prefixes tame files that would otherwise churn on every apply:
 
-```bash
-chezmoi diff              # Preview changes
-chezmoi apply             # Apply changes
-chezmoi apply --dry-run   # Test without applying
-chezmoi edit <file>       # Edit source file
-chezmoi cd                # Go to source directory
-```
+- **`modify_`** files are executable scripts: chezmoi pipes current target contents into stdin, expects new contents on stdout. Used for `~/.claude/settings.json` (jq overlay) and the editor `settings.json` files (VSCode/Cursor/Antigravity). Do **not** `chezmoi add` a `modify_` target — it would overwrite your script with the live file.
+- **`create_`** files seed once, then chezmoi never touches the contents. Used for `~/.config/nvim/lazy-lock.json` and editor `keybindings.json`. To refresh a `create_` baseline, copy the live file directly into the source path: `cp <target> "$(chezmoi source-path <target>)"`. Neither `chezmoi add` (strips the prefix) nor `chezmoi re-add` (silently skips) is correct.
 
-## Selective File Management (`modify_` and `create_`)
+Full case studies (`dot_claude/modify_settings.json`, `.chezmoitemplates/editor/*`, `dot_config/nvim/create_lazy-lock.json`), failure modes, presence-gating in `.chezmoiignore.tmpl`: [docs/tools/chezmoi-prefixes.md → Case studies in this repo](docs/tools/chezmoi-prefixes.md#case-studies-in-this-repo).
 
-Two chezmoi source prefixes are used to tame files that would otherwise churn on every apply. Reference: [Manage part but not all of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
+### Tmux ≥ 3.3 required for popup menu
 
-### `dot_claude/modify_settings.json` — partial JSON management via jq
+The `prefix + Space` popup uses `display-menu -x R -y P`; tmux 3.2a places the menu past the terminal edge and silently suppresses it, while 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically (Linuxbrew when present, otherwise user-level [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`). After the upgrade, run `tmux kill-server` once — running servers keep the old binary in memory.
 
-Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `skipAutoPermissionPrompt`, reorders keys). A static managed file would produce diff on every apply.
+### Key tmux settings for coding agents
 
-`modify_` files are executable scripts: chezmoi pipes the current target contents into stdin and expects the new contents on stdout. The script uses `jq '. * $overlay'` to deep-merge a managed overlay over the live file:
+These are non-obvious settings that other tools depend on; do not remove without checking:
 
-- Keys in the overlay are enforced by chezmoi: `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `statusLine`.
-- Any other keys Claude Code adds (model, permissions, skipAutoPermissionPrompt, etc.) are preserved verbatim.
-- Arrays in the overlay replace their counterparts wholesale, so `hooks.Notification` won't accumulate duplicates.
+- `extended-keys always` + `terminal-features 'xterm*:extkeys'` — forwards Shift+Enter, Ctrl+Enter through tmux to inner apps (Claude Code, Neovim, etc.)
+- `escape-time 0` — eliminates ESC delay for Neovim
+- `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) — OSC 52 over SSH without terminfo `Ms`. Paired with SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua`. See [docs/tools/tmux/README.md](docs/tools/tmux/README.md) → "OSC 52 Clipboard".
+- `allow-passthrough on` — OSC passthrough for terminal images
+- macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See [docs/tools/ghostty.md](docs/tools/ghostty.md).
 
-To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
+Full tmux config breakdown, theme switching, keybindings table, troubleshooting: [docs/tools/tmux/](docs/tools/tmux/).
 
-### `.chezmoitemplates/editor/*` — shared overlay for VSCode / Cursor / Antigravity
+### Zellij `default_mode "locked"`
 
-All three Electron editors read `settings.json` + `keybindings.json` from a per-editor `User/` directory (macOS `~/Library/Application Support/<Editor>/User/`, Linux `~/.config/<Editor>/User/`). Three concerns we want to manage cross-editor, cross-OS, without fighting each editor's own writes:
-
-1. A tiny **universal baseline** (Hack Nerd Font Mono, relative line numbers, format on save, smart accept-suggestion, terminal font) — this is canonical in [`.chezmoitemplates/editor/overlay.json`](.chezmoitemplates/editor/overlay.json). Add a key here and it deploys to all six targets (3 editors × 2 OSes).
-2. **Keybindings** that should seed on a fresh machine but never overwrite an editor's own additions (e.g. Cursor's `alt+cmd+s`) — canonical in [`.chezmoitemplates/editor/keybindings.json`](.chezmoitemplates/editor/keybindings.json).
-3. The `modify_` / `create_` plumbing itself — the bash+python+jq merge script lives once in [`.chezmoitemplates/editor/modify.sh`](.chezmoitemplates/editor/modify.sh); each of the 6 per-editor wrappers is a 1-line `{{ template … }}` shim.
-
-`modify_settings.json.tmpl` uses an inline Python JSONC normaliser (strip `//` and `/* */` comments + trailing commas) before piping into `jq '. * $overlay'`. This is the only place in the repo where live JSONC needs to be deep-merged in-place; **do not duplicate the script** — extend [`modify.sh`](.chezmoitemplates/editor/modify.sh) if you need a new overlay section (e.g. `[python]` block overrides).
-
-`create_keybindings.json.tmpl` is seed-once — same precedent as `create_lazy-lock.json` below. If you want to push an updated baseline to an existing live file, copy the live file back into the source path (`cp ~/Library/Application\ Support/Code/User/keybindings.json "$(chezmoi source-path ...)"`) to fold in editor-added entries, then edit the template.
-
-### Presence gating in `.chezmoiignore.tmpl`
-
-[`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) ignores both halves of the cross-OS tree on the wrong OS (`Library/**` on non-darwin, `.config/{Code,Cursor,Antigravity}/**` on non-linux), then per-editor `stat` gates ignore the whole subtree when the editor's config dir does not exist. Net effect: a fresh machine with only VSCode installed gets Code settings + skips Cursor/Antigravity entirely, no phantom directories. The `private_` prefix on `Library`, `Application Support`, and each editor dir preserves macOS's native `0700`/`0755` mode.
-
-When adding a fourth editor (e.g. Zed if it ever adopts the same layout), drop it into the `range (list "Code" "Cursor" "Antigravity" "NewEditor")` list in `.chezmoiignore.tmpl` and mirror the 4 source files (`{modify_settings,create_keybindings}.json.tmpl` × macOS/Linux).
-
-### `dot_config/nvim/create_lazy-lock.json` — seed-once, never overwrite
-
-LazyVim rewrites `~/.config/nvim/lazy-lock.json` on every `:Lazy update` and the tracked plugin list differs across OSes. `create_` only writes when the target file does not yet exist (new-machine seed), so subsequent edits produce zero chezmoi diff.
-
-**Refreshing the baseline after a deliberate plugin bump.** Neither `chezmoi re-add` nor `chezmoi add` is the right tool here:
-
-- `chezmoi re-add` silently **skips** `create_` files (by design — `create_` means contents are not managed).
-- `chezmoi add` would **strip** the `create_` prefix, promoting it to a plain managed file (defeating the whole point).
-
-Instead, copy the live file directly into the source path (this preserves the prefix):
-
-```bash
-cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock.json)"
-```
-
-This is an explicit, opt-in step instead of constant apply noise.
-
-### Failure modes of the `modify_` script
-
-If the live `~/.claude/settings.json` contains invalid JSON (e.g. Claude Code writes a stray trailing comma), `jq` aborts with a parse error and the script exits non-zero. chezmoi then logs `chezmoi: .claude/settings.json: exit status 5` and skips the file for that apply; the broken live file is left untouched for manual inspection. No partial / corrupt output is ever written. Fix or delete the live file and re-run `chezmoi apply`.
-
-## Upstream Clones via `.chezmoiexternal.toml.tmpl`
-
-Upstream git repos and single-file downloads that used to be cloned by Ansible are declared in `.chezmoiexternal.toml.tmpl` at the repo root. chezmoi fetches them during `chezmoi apply` and re-pulls weekly (`refreshPeriod = "168h"`). This is the source of truth for:
-
-- oh-my-zsh core + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
-- TPM (tmux plugin manager, `~/.tmux/plugins/tpm`)
-- fzf git source (Linux only, `~/.fzf`; apt version lacks `--zsh`)
-- toolkami.rb (`~/.local/toolkami.rb`)
-
-```bash
-chezmoi apply                          # normal: pull if older than 168h
-chezmoi apply --refresh-externals      # force: pull every external now
-```
-
-Ansible retains only the post-clone steps that externals can't do:
-
-- `zsh` role — install `zsh` package + change login shell.
-- `devtools` role — run `tpm/bin/install_plugins` once (sentinel: `~/.tmux/plugins/.ansible-installed`).
-- `lazyvim_deps` role — run `~/.fzf/install --bin` (idempotent via `creates:`).
-
-Add new entries to `.chezmoiexternal.toml.tmpl` when the content is a plain clone / single file and the only conditional is `.chezmoi.os`. Keep things in Ansible when they need arch / `noRoot` / `armv7l` logic, dynamic version paths, or `become: true`. Full rationale + schema notes live in [docs/tools/chezmoi-prefixes.md → Companion file: `.chezmoiexternal.<format>`](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat).
-
-## Upgrades
-
-> Full rationale, per-category details, sample output, troubleshooting, and an extension guide live in [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md). This section is the short version for agents touching this repo.
-
-**Install vs upgrade is split on purpose.** `chezmoi apply` (+ the ansible phase it triggers) is deliberately install-only: roles use `state: present` / `creates:` so re-applying never silently bumps every tool on the machine. That keeps `chezmoi apply` boring, reproducible, and safe to run on a running box. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes — it is the only thing that should move installed tools forward.
-
-**Entry points** (defined in [`justfile`](justfile)):
-
-| Recipe | Underlying action |
-|---|---|
-| `just upgrade-all` | Runs every category below in a canonical order. |
-| `just upgrade-dry-run` | Preview `all` without executing anything. |
-| `just upgrade-brew` | `brew update` + `brew upgrade` + `brew upgrade --cask --greedy` + `brew bundle` on `~/.config/homebrew/Brewfile*` **without** `--no-upgrade` + `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](scripts/lib/sudo_shared.sh) so cask pkg installers (`sudo /usr/sbin/installer`) find a live ticket. |
-| `just upgrade-mise` | `mise self-update --yes` + `mise upgrade` (runtimes pinned by `~/.config/mise/config.toml`). Self-update warns (not fails) when mise was installed via brew/apt. |
-| `just upgrade-uv` | `uv self update` + `uv tool upgrade --all` (covers every tool in [`python_uv_tools/defaults/main.yml`](dot_ansible/roles/python_uv_tools/defaults/main.yml) + [`llm_tools`](dot_ansible/roles/llm_tools/defaults/main.yml)). |
-| `just upgrade-npm` | `npm -g update`, falls back to `mise exec -- npm -g update` when npm is not on PATH (same detection as [`js_cli_tools`](dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](dot_ansible/roles/bitwarden/tasks/main.yml)). |
-| `just upgrade-cargo` | Bootstraps `cargo-update` crate if absent, then `cargo install-update -a`. Covers pueue (Linux) + any future entries in [`cargo_tools`](dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
-| `just upgrade-dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool under the mise dotnet shim. Falls back to `dotnet tool list --global` if parsing finds nothing. |
-| `just upgrade-gem` | `gem update --system` + `gem update` via the mise ruby shim. |
-| `just upgrade-agents` | Prefers each CLI's built-in self-update subcommand (`claude update`, `opencode upgrade`, `cursor-agent update`) for fast no-op when current; falls back to the official `curl \| bash` installer on failure. Re-runs the official installer for tools without a self-update subcommand: Ollama (Linux), llmfit (Linux), RTK. Also upgrades SpecStory (via `brew upgrade specstoryai/tap/specstory` when brew-managed on macOS, otherwise via [`scripts/install_specstory.sh`](scripts/install_specstory.sh) which always pulls the latest GitHub release). All blocks gated on the binary being present. List mirrors [`coding_agents`](dot_ansible/roles/coding_agents/tasks/main.yml). |
-| `just upgrade-plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → `pre-commit autoupdate` (in repo root) → `tldr --update` → `gh extension upgrade --all` (each guarded on the binary being present). |
-| `just upgrade-externals` | `chezmoi upgrade` (chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, toolkami.rb, fzf). |
-
-**Execution semantics.** The script is best-effort: a failure in one category does not abort later categories. At the end it prints one of:
-
-- `[SUCCESS] OK:      brew, uv, mise, ...`
-- `[WARN] SKIPPED: <name>` when the prerequisite tool is missing (exit code 77 from the category fn).
-- `[ERROR] FAILED:  <name>` when the category actually attempted something and got a non-zero rc. Overall exit is 1 iff any FAILED.
-
-Flags: `--dry-run`, `--only a,b`, `--skip a,b`. Categories run in the canonical `ALL_CATEGORIES` order (in the script) regardless of CLI arg order so dependencies between them (externals → brew → mise → uv → ...) are respected.
-
-**What's intentionally excluded.**
-
-- No `state: latest` rewrites of ansible roles. Keep `chezmoi apply` semantics unchanged; the upgrade path uses the underlying package-manager commands directly (`brew upgrade`, `uv tool upgrade --all`, ...).
-- No `apt upgrade` / system package bumps — not in the default scope to avoid requiring sudo and producing a lot of noise. Users can `sudo apt upgrade` manually.
-- No daemon restart for LiteLLM / Ollama / pueued — we only upgrade the binaries; restart is the user's call.
-- `scripts/**` is ignored by chezmoi (see [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) line 29), so `upgrade_tools.sh` is never deployed to `$HOME`. It runs from the dotfiles repo directly.
-
-**Adding a new category / tool to the upgrade flow.**
-
-1. If the tool is already managed by an existing package manager covered by a category (brew/uv/npm/cargo/dotnet/gem/mise), nothing to do — the generic `upgrade` command picks it up automatically.
-2. If it's a `curl | bash` installer, add a guarded block to `cat_agents()` in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh) — gate on the binary being present so we don't bootstrap on machines that don't have it.
-3. If it needs a completely new strategy (e.g. GitHub release binary with custom download logic), add a new `cat_<name>` function and register it in both `ALL_CATEGORIES` and the dispatch `case` in main, plus a matching `just upgrade-<name>` recipe.
-
-## Ansible Usage
-
-Ansible playbooks run automatically via `chezmoi apply` when playbook files change. For manual runs, use `~/.ansible/` directory:
-
-```bash
-cd ~/.ansible
-
-# Full setup (macOS)
-ansible-playbook playbooks/macos.yml
-
-# Full setup (Linux)
-ansible-playbook playbooks/linux.yml
-
-# Specific tags only
-ansible-playbook playbooks/macos.yml --tags "neovim,lazyvim_deps"
-
-# Skip tags requiring sudo
-ansible-playbook playbooks/linux.yml --skip-tags "sudo"
-
-# Dry run
-ansible-playbook playbooks/macos.yml --check
-```
-
-### Available Tags
-
-| Tag | Description |
-|-----|-------------|
-| `base` | git, git-lfs, curl, ripgrep, fd, build tools |
-| `homebrew` | macOS Homebrew update (installation done by bootstrap) |
-| `zsh` | zsh, oh-my-zsh, plugins (autosuggestions, syntax-highlighting, completions) |
-| `starship` | Starship cross-shell prompt (replaces oh-my-zsh theme) |
-| `neovim` | Neovim (>= 0.11.2) |
-| `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
-| `devtools` | bat, bats, eza, gh, glab, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television, pandoc |
-| `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
-| `nerdfonts` | Hack Nerd Font for terminal emulators |
-| `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory |
-| `bitwarden` | Bitwarden CLI (`bw`) via npm + Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion + SSH agent integration |
-| `security_tools` | `pre-commit` (via `uv tool install --python 3.13` on all OSes — single source of truth; run `just pre-commit-doctor` if hook envs break), gitleaks |
-| `python_uv_tools` | Python CLI tools via uv (apprise, mlflow, sqlit-tui, tmuxp, etc.) |
-| `js_cli_tools` | Standalone JS/npm CLI utilities (readability-cli for `readnode` terminal web reader) |
-| `llm_tools` | Local LLM tools: Ollama, LiteLLM, llmfit, models |
-| `rust_cargo_tools` | Rust CLI tools via cargo (pueue) |
-| `ruby_gem_tools` | Ruby CLI tools via gem (try-cli, tmuxinator, toolkami) |
-| `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
-| `networking_tools` | Networking CLI tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan |
-| `iac_tools` | Infrastructure-as-Code CLIs: Azure CLI (`az`), Terraform, OpenTofu (`tofu`) |
-| `gui_apps` | Linux-only desktop app installer: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode (Microsoft apt repo), Cursor (.deb), libfuse2. macOS equivalents are in `dot_config/homebrew/Brewfile.darwin.tmpl`. See [docs/tools/appimage.md](docs/tools/appimage.md). |
-
-## Profiles
-
-| Profile | OS | Tags Included |
-|---------|-----|---------------|
-| `macos` | macOS | homebrew, base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools (alacritty via Brewfile cask) |
-| `ubuntu_desktop` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, gui_apps |
-| `ubuntu_server` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
-
-**Tag categories:**
-
-- **Core** (all): base, zsh, starship, neovim, lazyvim_deps, security_tools
-- **Desktop** (macos, ubuntu_desktop): nerdfonts
-- **macOS only**: homebrew
-- **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, js_cli_tools, llm_tools, input_method (desktop only), networking_tools, iac_tools
-
-Note: `ubuntu_server` excludes `nerdfonts` (no GUI needed).
-
-## No Root Mode (Linux)
-
-For Linux servers where you don't have sudo/root access, enable `noRoot = true` during `chezmoi init`:
-
-```bash
-chezmoi init --force  # Answer "y" to "No sudo/root access" prompt
-```
-
-This skips all tasks tagged with `[sudo]` (apt packages, system-level installations). Tools with user-level fallbacks are automatically installed to `~/.local/bin` instead.
-
-**User-level tools** (installed automatically without sudo):
-
-- **GitHub binaries**: neovim, ripgrep, fd, jq, just, bat, bats, eza, delta, yazi, superfile, zellij, btop, gitleaks, lazygit, fzf, sesh, taplo, television
-- **tmux-appimage** (x86_64 only): extracted AppImage → `~/.local/share/tmux-appimage/squashfs-root`, shim at `~/.local/bin/tmux`. Runs only when the system `tmux` is older than 3.3 (see "tmux version requirement" below).
-- **mise**: Node.js, Rust runtime management
-- **Installers**: zoxide, starship, thefuck, tldr
-- **cargo tools**: pueue
-- **uv tools**: `pre-commit` (pinned to `--python 3.13`, see [docs/tools/pre-commit.md](docs/tools/pre-commit.md)), mlflow, sqlit-tui, tmuxp, etc.
-- **llm tools**: ollama, litellm, llmfit, models
-- **npm tools**: Claude Code, OpenCode, Gemini CLI, Bitwarden CLI, etc.
-
-What you **won't get** without root:
-
-- zsh (needs `/etc/shells` for login shell)
-- htop (requires system libraries)
-- direnv (apt only)
-- Docker (kernel features, daemon)
-- Ollama (system service install)
-- System fonts (nerdfonts)
-- Ruby and gem tools (ruby-build requires `libffi-dev` which needs sudo)
-- build-essential, git, curl, wget, tree (assumed pre-installed)
-
-**Tip**: Ask your sysadmin to run: `sudo apt install git curl wget zsh tmux htop direnv build-essential tree`
-
-## ARM / Raspberry Pi Support
-
-Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets full tool support. Raspberry Pi 4 may run 32-bit Raspberry Pi OS (armhf userland) with a 64-bit kernel (`arm_64bit=1` default), which causes `uname -m` to report `aarch64` while userland is 32-bit.
-
-**How it's handled:**
-
-- **Bootstrap**: Detects userland architecture via `dpkg --print-architecture`; skips Linuxbrew on armhf (Homebrew requires amd64 or arm64 userland)
-- **Ansible playbooks**: `linux.yml` has `pre_tasks` that override `ansible_architecture` to match the real userland (e.g. `armv7l` instead of `aarch64`), so roles download correct binaries
-- **Tool availability on armhf (32-bit ARM)**: apt packages work fine; GitHub release downloads are skipped for tools without armv7l builds
-
-**Tools with armv7l/armhf releases** (work on RPi 4 32-bit): ripgrep, fd, jq, glow, rclone, direnv, gitleaks, trippy, speedtest, bats (pure-bash, arch-agnostic)
-
-**Tools skipped on armv7l** (no 32-bit ARM release): neovim (GitHub tarball), lazygit, eza, git-delta, yazi, superfile, zellij, sesh, taplo, television, duckdb, doggo, gping, bandwhich, SpecStory, CodexBar, Claude Code (install.sh ships arm64/amd64 only)
-
-**Tools skipped on armv7l via mise** (no armv7l prebuilt): bun, ruby; node pinned to `node@20` (last LTS with armv7l tarball). npm-based tools (tldr, etc.) install via `mise exec -- npm` and work on armv7l. tree-sitter-cli is still skipped (cargo build needs libclang and takes 15+ min on RPi 4).
-
-**Recommendation**: Use 64-bit Raspberry Pi OS for full tool compatibility.
-
-## Tmux Configuration
-
-**Minimum version: tmux >= 3.3.** The popup menu on `prefix + Space` uses `display-menu -x R -y P`; tmux 3.2a places the menu past the terminal edge and silently suppresses it ("_If the menu is too large to fit on the terminal, it is not displayed._"), while 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically: Linuxbrew when present, otherwise a user-level install of [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`. After the upgrade, run `tmux kill-server` once so existing sessions switch over to the new binary (running servers keep the old binary in memory).
-
-The tmux config is modular under `dot_config/tmux/` (deployed to `~/.config/tmux/`), with `dot_tmux.conf` acting as a one-line shim at `~/.tmux.conf`. Structure: `tmux.conf` (entry point + theme selector), `common.conf` (plugins, general options, terminal compat), `keybindings.conf` (all binds + popup menu), `theme.catppuccin.conf` (default, top status bar), `theme.tmux2k.conf` (alternative, bottom bar).
-
-Theme selection priority: `$TMUX_THEME` env var → `@theme_variant` tmux option → default `catppuccin`. Switch at runtime with `prefix + M-c` (Catppuccin) or `prefix + M-t` (tmux2k). See `docs/tools/tmux/` (README, keybindings, themes, vim) for full details, including a troubleshooting note on the tmux2k bandwidth segment (`18446744073709551615K` = uint64 underflow).
-
-The Catppuccin status bar is **responsive**: `responsive.sh` + a `client-resized` hook dynamically adjust which modules are shown based on terminal width (>= 120 full, 80-119 medium, < 80 minimal). This makes the status bar usable on mobile terminals. See `docs/tools/tmux/themes.md` for details.
-
-### Key Settings for Coding Agents
-
-- `extended-keys always` + `terminal-features 'xterm*:extkeys'` -- forwards Shift+Enter, Ctrl+Enter, etc. through tmux to inner applications (Claude Code, Neovim, etc.)
-- `escape-time 0` -- eliminates ESC delay for Neovim
-- `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) -- OSC 52 clipboard works over SSH without relying on terminfo `Ms`. Paired with an SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua` so remote Neovim yanks reach the local clipboard. See `docs/tools/tmux/README.md` → "OSC 52 Clipboard" for verification steps.
-- `allow-passthrough on` -- OSC passthrough for terminal images
-- macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See `docs/tools/ghostty.md`.
-
-### Tmux Keybindings
-
-| Binding | Action |
-|---------|--------|
-| `Ctrl + 1..9` | Switch to window 1–9 (no prefix, requires CSI-u terminal) |
-| `Ctrl + 0` | Jump to git root session via sesh (no prefix, requires CSI-u) |
-| `prefix + Space` | Native popup menu (layouts, sessions, sesh, resize, etc.) |
-| `prefix + h/j/k/l` | Navigate panes (vim-style) |
-| `prefix + H/J/K/L` | Resize panes (5 cells) |
-| `prefix + M-h/j/k/l` | Fine resize panes (1 cell) |
-| `prefix + +` | Set current pane to 75% width |
-| `prefix + \|` | Split pane left/right |
-| `prefix + -` | Split pane top/bottom |
-| `prefix + F` | Toggle floating pane (tmux-floax) |
-| `prefix + P` | Floax popup menu |
-| `prefix + u` | Open fzf URL picker (tmux-fzf-url) |
-| `prefix + [` | Enter vim-style copy mode (v/V/y to select/yank) |
-| `prefix + y` | Copy visible pane to clipboard |
-| `prefix + Y` | Copy full scrollback to clipboard |
-| `prefix + C-y` | fzf line picker from scrollback |
-| `prefix + g` | Sesh session picker (fzf popup) |
-| `prefix + T` | Sesh session picker (television popup) |
-| `prefix + O` | Sesh built-in picker popup |
-| `prefix + W` | Sesh window picker (fzf popup) |
-| `prefix + S` | Switch to last session (sesh) |
-| `prefix + 9` | Jump to git root session (sesh) |
-| `prefix + N` | New session (prompts for name) |
-| `prefix + X` | Kill session (with confirmation) |
-| `prefix + M` | Move window to another session (tab tear-out) |
-| `prefix + B` | Break pane into new window in another session |
-| `prefix + A` | Link window into another session (shared, not copied) |
-| `prefix + R` | Reload tmux config |
-| `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
-| `prefix + M-t` | Switch theme to tmux2k (bottom status bar) |
-
-Note: `Ctrl+Space` is NOT bound (reserved for input method switching). `Ctrl+1..9` and `Ctrl+0` require CSI-u terminal support (Ghostty/cmux, Alacritty, Kitty); legacy terminals fall back to `prefix + number`. Popup menu accelerator keys match standalone `prefix + key` bindings (see `docs/tools/tmux/keybindings.md` for full mapping).
-
-## Zellij Configuration
-
-Zellij config (`dot_config/zellij/config.kdl`) uses `default_mode "locked"` so all keys pass through to inner applications by default. Press `Ctrl+G` to unlock Zellij commands. This prevents key conflicts with coding agents and vim-style applications.
-
-On first Zellij launch (without existing config), select the "Unlock-First (non-colliding)" keybinding preset for the best experience.
-
-## LazyVim Requirements
-
-- Neovim >= 0.11.2
-- ripgrep, fd
-- Node.js (via mise on Linux, Homebrew on macOS)
-- tree-sitter-cli
-- lazygit, fzf (via git on Linux, Homebrew on macOS)
-
-## Directory Structure
-
-After `chezmoi apply`:
-
-- Config files in `~/.*`
-- Ansible playbooks in `~/.ansible/`
-
-## Testing
-
-See [docs/this_repo/testing.md](docs/this_repo/testing.md) for the full guide (framework comparison — bats vs ZUnit vs ShellSpec — directory structure, patterns for testing zsh from bats, PATH stubbing, shellcheck/shfmt scope).
-
-Small, opt-in layers. This is a personal dotfiles repo — tests cover only painful-regression zones, not broad coverage.
-
-- **`just bats`** — unit tests (`tests/unit/*.bats`), no Docker, sub-second. Current coverage: proxy helpers (`dot_config/zsh/tools/50_networking.zsh`), `ghget` URL parsing (`dot_config/zsh/tools/41_github.zsh`), `lan-scan.sh` pure helpers (`dot_config/television/executable_lan-scan.sh` — `is_usable_ip`, `vendor_for_mac`).
-- **`just docker-test`** — smoke tests (`tests/smoke/docker_install.bats`) inside a clean Ubuntu container post-install: re-apply idempotency, `zsh -n` on `~/.zshrc`/`~/.zshenv` and every `~/.config/zsh/**/*.zsh`, `nvim --headless` works, core CLI tools on PATH, `oh-my-zsh` plugins present, unit tests pass under the container's zsh.
-- **`just check-all`** — `lint + bats + docker-test`.
-
-Shared helper: `tests/test_helper.bash` (sets `$REPO_ROOT`; `setup_path_stub` writes the stub dir to `$BATS_STUB_DIR` rather than stdout, so PATH export survives — don't wrap it in `$(...)`). No `bats-assert`/`bats-file`/`bats-support` vendored; plain bats built-ins (`run`, `$status`, `$output`, `[ ]`) are sufficient.
-
-**Out of scope by design**: ansible-role tests (use `just ansible-syntax-check`), bootstrap/`run_once` tests, chezmoi-template expansion tests, Python script tests, GitHub Actions CI. When a new high-risk pure-logic shell helper lands, extend `tests/unit/`; don't expand smoke tests.
-
-`shellcheck` + `shfmt` run via pre-commit on `scripts/*.sh` only. Zsh modules and `.sh.tmpl` files are out of shellcheck scope (zsh syntax + go-template tokens produce too many false positives).
-
-## Development
-
-After modifying ansible playbooks or roles, run syntax check:
-
-```bash
-ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/base.yml
-ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml
-ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
-```
-
-## Ansible vs Homebrew
-
-**Primary tool: Ansible** - manages CLI tools and system dependencies cross-platform.
-
-| Tool | Role | When to Use |
-|------|------|-------------|
-| **Ansible** | CLI tools, system packages | Always (apt/brew formulas) |
-| **Brewfile** | macOS GUI apps (casks), App Store | Optional (opt-in) |
-| **Linuxbrew** | Linux packages not in apt | Always installed on Linux |
-
-**How they work together:**
-
-- Bootstrap installs Homebrew on both macOS and Linux
-- Ansible roles use `community.general.homebrew` for macOS formulas
-- Brewfile manages casks (GUI apps) and mas (App Store) separately
-- On Linux, Ansible uses apt; Linuxbrew is available for newer packages
-
-For a deeper comparison of Linux package sources (apt / snap / Linuxbrew / GitHub binaries) and the policy the ansible roles follow when picking between them, see [docs/linux-package-sources.md](docs/linux-package-sources.md).
-
-## Brewfile (GUI Apps - Opt-in)
-
-GUI applications are managed via Homebrew Brewfile in XDG-compliant location `~/.config/homebrew/`.
-
-**Note**: Brewfile installation is **opt-in** (disabled by default). Enable general GUI apps via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps are a separate opt-in via `installAiDesktopApps = true`.
-
-### File Structure
-
-```
-~/.config/homebrew/
-├── Brewfile          # Shared: taps, CLI formulas, mas
-├── Brewfile.darwin   # macOS: casks (GUI apps), mas entries
-└── Brewfile.linux    # Linux: linuxbrew-specific (minimal)
-```
-
-### Usage
-
-```bash
-# Edit Brewfiles
-chezmoi edit ~/.config/homebrew/Brewfile.darwin
-
-# Apply changes manually
-brew bundle --file=~/.config/homebrew/Brewfile
-brew bundle --file=~/.config/homebrew/Brewfile.darwin
-
-# Or just run chezmoi apply (triggers run_onchange script)
-chezmoi apply
-
-# Check what would be installed
-brew bundle check --file=~/.config/homebrew/Brewfile.darwin
-```
-
-### Brewfile Categories (darwin)
-
-- **Terminals & Editors**: alacritty, iterm2, warp, cmux, cursor, visual-studio-code
-- **AI & Coding**: claude, chatgpt, opencode-desktop, antigravity, codex-app (Apple Silicon only), and `ollama-app` when `installAiDesktopApps` + `installLlmTools`
-- **System Utilities**: aerospace, alt-tab, raycast, jordanbaird-ice
-- **Communication**: discord, telegram, wechat, tencent-meeting
-- **Browsers**: arc, google-chrome, tor-browser
-- **Productivity**: obsidian, google-drive, grammarly-desktop
-- **Gaming**: steam, minecraft, battle-net (skipped if WORK_MACHINE env var set)
-- **Finance**: binance, tradingview
-- **Network**: tailscale, openvpn-connect, clash-verge-rev
-- **Mac App Store**: LINE, Keynote, Numbers, Pages
-
-### Customizing Brewfile
-
-The Brewfiles are chezmoi templates. Conditional sections:
-
-- Gaming apps: skipped if `WORK_MACHINE` environment variable is set
-- Chinese apps (baidunetdisk): only included if `useChineseMirror` is true
-- mas apps: requires signing in to App Store.app first
-
-## Customization
-
-See [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for detailed ansible customization guide.
+`dot_config/zellij/config.kdl` uses `default_mode "locked"` so all keys pass through to inner applications by default. Press `Ctrl+G` to unlock Zellij commands. This prevents key conflicts with coding agents and vim-style applications. On first Zellij launch (without existing config), select the "Unlock-First (non-colliding)" keybinding preset.

@@ -205,7 +205,7 @@ Open with `tv ansible`.
 | `Alt+V` | Open role directory in `yazi` (roles source only) |
 | `Ctrl+Y` / `Alt+Y` | Copy full `ansible-playbook ...` command to clipboard (OSC 52 over SSH) |
 
-All actions `cd ~/.ansible` and export `ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg`, matching the manual invocation pattern in `CLAUDE.md`. OS default: `macos.yml` on Darwin, `linux.yml` otherwise.
+All actions `cd ~/.ansible` and export `ANSIBLE_CONFIG=$HOME/.ansible/ansible.cfg`, matching the manual invocation pattern in [`docs/this_repo/architecture.md`](../this_repo/architecture.md#ansible-usage). OS default: `macos.yml` on Darwin, `linux.yml` otherwise.
 
 ---
 

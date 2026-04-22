@@ -64,14 +64,14 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
   cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock.json)"
   ```
 
-- **Typical use**: LazyVim `lazy-lock.json` (see the case study in [CLAUDE.md](../../CLAUDE.md#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite)), SSH `config` skeleton, first-run app baselines.
+- **Typical use**: LazyVim `lazy-lock.json` (see the [case study below](#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite)), SSH `config` skeleton, first-run app baselines.
 
 ### `modify_` — content is a script, not a file
 
 - **Effect**: The source file is an executable **script**. chezmoi pipes the current target contents into stdin; the script writes the new target contents to stdout. Lets you manage part of a file (e.g. via `jq`, `sed`, `awk`) while leaving the rest alone.
 - **`chezmoi add`**: do **not** `chezmoi add` a `modify_` target — it would overwrite your script with the live file contents.
 - **Alternative form**: put `chezmoi:modify-template` in the script body to switch it into template mode (the current contents arrive as `.chezmoi.stdin`). See [Manage part, but not all, of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
-- **Typical use**: Claude Code `settings.json` (see the case study in [CLAUDE.md](../../CLAUDE.md#dot_claudemodify_settingsjson--partial-json-management-via-jq)), Docker `config.json` proxies, INI files with a mix of managed and runtime-written keys.
+- **Typical use**: Claude Code `settings.json` (see the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq)), Docker `config.json` proxies, INI files with a mix of managed and runtime-written keys.
 
 ### `exact_` — directory is canonical (prune extras)
 
@@ -124,7 +124,7 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
   - `onchange_` — run when the script body changes (filename-keyed; unlike `once_`, editing the script re-runs it).
   - `before_` / `after_` — run before / after applying target files.
 - **`chezmoi add`**: does not apply — scripts have no file target.
-- **Already in this repo**: `run_once_before_00_bootstrap.sh.tmpl`, `run_onchange_after_20_ansible_roles.sh.tmpl`, `run_onchange_after_30_brew_bundle.sh.tmpl`. See [CLAUDE.md → Auto-run Scripts](../../CLAUDE.md#auto-run-scripts).
+- **Already in this repo**: `run_once_before_00_bootstrap.sh.tmpl`, `run_onchange_after_20_ansible_roles.sh.tmpl`, `run_onchange_after_30_brew_bundle.sh.tmpl`. See [docs/this_repo/architecture.md → Auto-run scripts](../this_repo/architecture.md#auto-run-scripts).
 
 ## Allowed prefix ordering
 
@@ -144,7 +144,7 @@ Worked examples:
 
 - `private_executable_dot_ssh/private_readonly_id_ed25519` — directory is private, file is private+readonly. (In practice: don't check in private keys; shown for ordering only.)
 - `create_private_dot_ssh/create_private_config` — create-once SSH config that is 0600 on creation.
-- `modify_private_dot_claude/modify_settings.json` — the actual pattern used in this repo (see case study in CLAUDE.md).
+- `modify_private_dot_claude/modify_settings.json` — the actual pattern used in this repo (see the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq)).
 
 If you ever lose the stacking order, `chezmoi chattr` will normalize it for you:
 
@@ -171,7 +171,7 @@ Track normally, `chezmoi add` freely, let `chezmoi re-add` pick up drift.
 
 Files that an app rewrites in-place after first launch, and where you only care about the initial state.
 
-- **`~/.config/nvim/lazy-lock.json`** → `create_lazy-lock.json`. See the case study in [CLAUDE.md](../../CLAUDE.md#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite). Refresh baseline with `cp … "$(chezmoi source-path …)"`.
+- **`~/.config/nvim/lazy-lock.json`** → `create_lazy-lock.json`. See the [case study below](#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite). Refresh baseline with `cp … "$(chezmoi source-path …)"`.
 - **`~/.ssh/config`** → create-only template that `Include ~/.ssh/config.d/*` and ships conservative defaults. See the SSH notes in [README.md](../../README.md).
 - First-run app JSONs where further changes are user-local (settings files that are a mix of state and preferences).
 
@@ -179,7 +179,7 @@ Files that an app rewrites in-place after first launch, and where you only care 
 
 Files an app actively rewrites at runtime (adding keys, reordering, …), where you only want to enforce a subset of keys.
 
-- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`, a `jq` script that deep-merges a managed overlay. See [CLAUDE.md → `dot_claude/modify_settings.json`](../../CLAUDE.md#dot_claudemodify_settingsjson--partial-json-management-via-jq).
+- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`, a `jq` script that deep-merges a managed overlay. See the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq).
 - **`~/.docker/config.json`** → a modify-script that rewrites `proxies.default` while preserving `auths` / `credsStore`. See [docs/tools/containers.md](containers.md).
 - Rule of thumb: if an app owns the file and you only care about N keys, `modify_` beats a full managed template.
 
@@ -296,9 +296,59 @@ Keep in ansible:
 3. `chezmoi apply --refresh-externals` — fetch and apply.
 4. If you removed an entry, chezmoi does **not** delete the destination directory (it's not managed anymore). Remove it manually if you want a clean state.
 
+## Case studies in this repo
+
+Three concrete walkthroughs of the `modify_` / `create_` patterns above, with the failure modes that bit us.
+
+### `dot_claude/modify_settings.json` — partial JSON management via jq
+
+Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `skipAutoPermissionPrompt`, reorders keys). A static managed file would produce diff on every apply.
+
+`modify_` files are executable scripts: chezmoi pipes the current target contents into stdin and expects the new contents on stdout. The script uses `jq '. * $overlay'` to deep-merge a managed overlay over the live file:
+
+- Keys in the overlay are enforced by chezmoi: `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `statusLine`.
+- Any other keys Claude Code adds (model, permissions, `skipAutoPermissionPrompt`, etc.) are preserved verbatim.
+- Arrays in the overlay replace their counterparts wholesale, so `hooks.Notification` won't accumulate duplicates.
+
+To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
+
+**Failure mode**: if the live `~/.claude/settings.json` contains invalid JSON (e.g. Claude Code writes a stray trailing comma), `jq` aborts with a parse error and the script exits non-zero. chezmoi then logs `chezmoi: .claude/settings.json: exit status 5` and skips the file for that apply; the broken live file is left untouched for manual inspection. No partial / corrupt output is ever written. Fix or delete the live file and re-run `chezmoi apply`.
+
+### `.chezmoitemplates/editor/*` — shared overlay for VSCode / Cursor / Antigravity
+
+All three Electron editors read `settings.json` + `keybindings.json` from a per-editor `User/` directory (macOS `~/Library/Application Support/<Editor>/User/`, Linux `~/.config/<Editor>/User/`). Three concerns we manage cross-editor, cross-OS, without fighting each editor's own writes:
+
+1. A tiny **universal baseline** (Hack Nerd Font Mono, relative line numbers, format on save, smart accept-suggestion, terminal font) — canonical in [`.chezmoitemplates/editor/overlay.json`](../../.chezmoitemplates/editor/overlay.json). Add a key here and it deploys to all six targets (3 editors × 2 OSes).
+2. **Keybindings** that should seed on a fresh machine but never overwrite an editor's own additions (e.g. Cursor's `alt+cmd+s`) — canonical in [`.chezmoitemplates/editor/keybindings.json`](../../.chezmoitemplates/editor/keybindings.json).
+3. The `modify_` / `create_` plumbing itself — the bash+python+jq merge script lives once in [`.chezmoitemplates/editor/modify.sh`](../../.chezmoitemplates/editor/modify.sh); each of the 6 per-editor wrappers is a 1-line `{{ template … }}` shim.
+
+`modify_settings.json.tmpl` uses an inline Python JSONC normaliser (strip `//` and `/* */` comments + trailing commas) before piping into `jq '. * $overlay'`. This is the only place in the repo where live JSONC needs to be deep-merged in-place; **do not duplicate the script** — extend [`modify.sh`](../../.chezmoitemplates/editor/modify.sh) if you need a new overlay section (e.g. `[python]` block overrides).
+
+`create_keybindings.json.tmpl` is seed-once. To push an updated baseline to an existing live file, copy the live file back into the source path (`cp ~/Library/Application\ Support/Code/User/keybindings.json "$(chezmoi source-path ...)"`) to fold in editor-added entries, then edit the template.
+
+**Presence gating in [`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl).** It ignores both halves of the cross-OS tree on the wrong OS (`Library/**` on non-darwin, `.config/{Code,Cursor,Antigravity}/**` on non-linux), then per-editor `stat` gates ignore the whole subtree when the editor's config dir does not exist. Net effect: a fresh machine with only VSCode installed gets Code settings + skips Cursor/Antigravity entirely, no phantom directories. The `private_` prefix on `Library`, `Application Support`, and each editor dir preserves macOS's native `0700`/`0755` mode.
+
+When adding a fourth editor (e.g. Zed if it ever adopts the same layout), drop it into the `range (list "Code" "Cursor" "Antigravity" "NewEditor")` list in `.chezmoiignore.tmpl` and mirror the 4 source files (`{modify_settings,create_keybindings}.json.tmpl` × macOS/Linux).
+
+### `dot_config/nvim/create_lazy-lock.json` — seed-once, never overwrite
+
+LazyVim rewrites `~/.config/nvim/lazy-lock.json` on every `:Lazy update` and the tracked plugin list differs across OSes. `create_` only writes when the target file does not yet exist (new-machine seed), so subsequent edits produce zero chezmoi diff.
+
+**Refreshing the baseline after a deliberate plugin bump.** Neither `chezmoi re-add` nor `chezmoi add` is the right tool here:
+
+- `chezmoi re-add` silently **skips** `create_` files (by design — `create_` means contents are not managed).
+- `chezmoi add` would **strip** the `create_` prefix, promoting it to a plain managed file (defeating the whole point).
+
+Instead, copy the live file directly into the source path (this preserves the prefix):
+
+```bash
+cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock.json)"
+```
+
+This is an explicit, opt-in step instead of constant apply noise.
+
 ## See also
 
-- [CLAUDE.md → Selective File Management (case studies)](../../CLAUDE.md#selective-file-management-case-studies) — repo-specific `modify_` / `create_` walkthroughs with failure modes.
 - [docs/this_repo/cheatsheet.md → chezmoi](../this_repo/cheatsheet.md#chezmoi) — command-level quick reference.
 - [chezmoi docs — Concepts](https://www.chezmoi.io/reference/concepts/) — source state vs destination state vs target state.
 - [chezmoi docs — Include files from elsewhere](https://www.chezmoi.io/user-guide/include-files-from-elsewhere/) — `.chezmoiexternal.<format>` user guide.
