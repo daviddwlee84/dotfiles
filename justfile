@@ -259,6 +259,63 @@ info:
     @echo -n "  git: "; git --version 2>/dev/null || echo "not installed"
 
 # ============================================================================
+# Upgrades (explicit, opt-in — `chezmoi apply` stays conservative)
+# ============================================================================
+# `chezmoi apply` is deliberately install-only: `state: present` / `creates:`
+# don't move tools forward once installed (avoids "apply accidentally bumps
+# every tool on the machine"). These recipes are the explicit upgrade path —
+# run them when you actually want tools to advance.
+# See `## Upgrades` section in AGENTS.md for rationale + category matrix.
+
+# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, agents, plugins
+upgrade-all:
+    ./scripts/upgrade_tools.sh all
+
+# Homebrew formulas + casks (--greedy) + Brewfile (no --no-upgrade) + cleanup
+upgrade-brew:
+    ./scripts/upgrade_tools.sh brew
+
+# mise self-update + `mise upgrade` (runtimes: node, rust, ruby, dotnet, bun)
+upgrade-mise:
+    ./scripts/upgrade_tools.sh mise
+
+# uv self update + `uv tool upgrade --all` (Python CLI tools)
+upgrade-uv:
+    ./scripts/upgrade_tools.sh uv
+
+# Global npm packages (falls back to `mise exec -- npm` when npm not on PATH)
+upgrade-npm:
+    ./scripts/upgrade_tools.sh npm
+
+# cargo install-update -a (bootstraps cargo-update crate if missing)
+upgrade-cargo:
+    ./scripts/upgrade_tools.sh cargo
+
+# `dotnet tool update --global <name>` per tool in dotnet_tools defaults
+upgrade-dotnet:
+    ./scripts/upgrade_tools.sh dotnet
+
+# rubygems + installed gems (via mise ruby shim)
+upgrade-gem:
+    ./scripts/upgrade_tools.sh gem
+
+# curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
+upgrade-agents:
+    ./scripts/upgrade_tools.sh agents
+
+# LazyVim (:Lazy sync) + TPM + pre-commit autoupdate + tldr + gh extensions
+upgrade-plugins:
+    ./scripts/upgrade_tools.sh plugins
+
+# chezmoi upgrade + chezmoi apply --refresh-externals (oh-my-zsh, TPM, etc.)
+upgrade-externals:
+    ./scripts/upgrade_tools.sh externals
+
+# Preview what `just upgrade-all` would do, without running anything
+upgrade-dry-run:
+    ./scripts/upgrade_tools.sh --dry-run all
+
+# ============================================================================
 # Ad-hoc Scripts
 # ============================================================================
 

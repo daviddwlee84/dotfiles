@@ -199,7 +199,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 ### Bootstrap (installed before ansible)
 - **Homebrew** (macOS): Package manager for macOS
 - **uv**: Python package manager for ansible
-- **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
+- **mise**: Runtime manager for Node.js and Rust (pins versions from `~/.config/mise/config.toml`; upgrade with `just upgrade-mise`, see [Keeping tools up-to-date](#keeping-tools-up-to-date))
 - **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television, pandoc
 - **Log viewers**: tailspin (`tspin`), lnav, grc, ccze (Linux only — no Homebrew formula) — plus `catl`/`lessl`/`logtail` zsh wrappers and a `tv logs` Television channel ([docs](docs/tools/log-tools.md))
 - **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
@@ -233,6 +233,33 @@ chezmoi cd            # Go to source directory
 # Re-run ansible manually
 cd ~/.ansible && ansible-playbook playbooks/macos.yml
 ```
+
+## Keeping tools up-to-date
+
+`chezmoi apply` is deliberately **install-only** — ansible roles mostly use
+`state: present` / `creates:` idempotency so re-applying never silently bumps
+every tool on your machine. For explicit upgrades, use the dedicated entry
+points (see `## Upgrades` in [AGENTS.md](AGENTS.md) for the full matrix):
+
+```bash
+just upgrade-all          # externals + brew + mise + uv + npm + cargo + dotnet + gem + agents + plugins
+just upgrade-dry-run      # preview without executing
+
+# Per category (compose as you like):
+just upgrade-brew         # formulas + casks (--greedy) + Brewfile (no --no-upgrade) + cleanup
+just upgrade-mise         # mise self-update + `mise upgrade`
+just upgrade-uv           # Python CLI tools (apprise, mlflow, sqlit-tui, ...)
+just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
+just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
+just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
+just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
+just upgrade-agents       # re-runs install.sh for Claude Code / OpenCode / Cursor CLI / Ollama / llmfit / RTK
+just upgrade-plugins      # LazyVim :Lazy sync + TPM + pre-commit autoupdate + tldr + gh extensions
+just upgrade-externals    # chezmoi upgrade + chezmoi apply --refresh-externals
+```
+
+Underlying script: [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh) —
+best-effort, prints a `SUCCESS / SKIPPED / FAILED` summary at the end.
 
 ## Testing
 

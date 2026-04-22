@@ -278,6 +278,48 @@ Ansible retains only the post-clone steps that externals can't do:
 
 Add new entries to `.chezmoiexternal.toml.tmpl` when the content is a plain clone / single file and the only conditional is `.chezmoi.os`. Keep things in Ansible when they need arch / `noRoot` / `armv7l` logic, dynamic version paths, or `become: true`. Full rationale + schema notes live in [docs/tools/chezmoi-prefixes.md → Companion file: `.chezmoiexternal.<format>`](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat).
 
+## Upgrades
+
+**Install vs upgrade is split on purpose.** `chezmoi apply` (+ the ansible phase it triggers) is deliberately install-only: roles use `state: present` / `creates:` so re-applying never silently bumps every tool on the machine. That keeps `chezmoi apply` boring, reproducible, and safe to run on a running box. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes — it is the only thing that should move installed tools forward.
+
+**Entry points** (defined in [`justfile`](justfile)):
+
+| Recipe | Underlying action |
+|---|---|
+| `just upgrade-all` | Runs every category below in a canonical order. |
+| `just upgrade-dry-run` | Preview `all` without executing anything. |
+| `just upgrade-brew` | `brew update` + `brew upgrade` + `brew upgrade --cask --greedy` + `brew bundle` on `~/.config/homebrew/Brewfile*` **without** `--no-upgrade` + `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](scripts/lib/sudo_shared.sh) so cask pkg installers (`sudo /usr/sbin/installer`) find a live ticket. |
+| `just upgrade-mise` | `mise self-update --yes` + `mise upgrade` (runtimes pinned by `~/.config/mise/config.toml`). Self-update warns (not fails) when mise was installed via brew/apt. |
+| `just upgrade-uv` | `uv self update` + `uv tool upgrade --all` (covers every tool in [`python_uv_tools/defaults/main.yml`](dot_ansible/roles/python_uv_tools/defaults/main.yml) + [`llm_tools`](dot_ansible/roles/llm_tools/defaults/main.yml)). |
+| `just upgrade-npm` | `npm -g update`, falls back to `mise exec -- npm -g update` when npm is not on PATH (same detection as [`js_cli_tools`](dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](dot_ansible/roles/bitwarden/tasks/main.yml)). |
+| `just upgrade-cargo` | Bootstraps `cargo-update` crate if absent, then `cargo install-update -a`. Covers pueue (Linux) + any future entries in [`cargo_tools`](dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
+| `just upgrade-dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool under the mise dotnet shim. Falls back to `dotnet tool list --global` if parsing finds nothing. |
+| `just upgrade-gem` | `gem update --system` + `gem update` via the mise ruby shim. |
+| `just upgrade-agents` | Re-runs the official `curl \| bash` installers for **only tools already present**: Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. List mirrors [`coding_agents`](dot_ansible/roles/coding_agents/tasks/main.yml). |
+| `just upgrade-plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → `pre-commit autoupdate` (in repo root) → `tldr --update` → `gh extension upgrade --all` (each guarded on the binary being present). |
+| `just upgrade-externals` | `chezmoi upgrade` (chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, toolkami.rb, fzf). |
+
+**Execution semantics.** The script is best-effort: a failure in one category does not abort later categories. At the end it prints one of:
+
+- `[SUCCESS] OK:      brew, uv, mise, ...`
+- `[WARN] SKIPPED: <name>` when the prerequisite tool is missing (exit code 77 from the category fn).
+- `[ERROR] FAILED:  <name>` when the category actually attempted something and got a non-zero rc. Overall exit is 1 iff any FAILED.
+
+Flags: `--dry-run`, `--only a,b`, `--skip a,b`. Categories run in the canonical `ALL_CATEGORIES` order (in the script) regardless of CLI arg order so dependencies between them (externals → brew → mise → uv → ...) are respected.
+
+**What's intentionally excluded.**
+
+- No `state: latest` rewrites of ansible roles. Keep `chezmoi apply` semantics unchanged; the upgrade path uses the underlying package-manager commands directly (`brew upgrade`, `uv tool upgrade --all`, ...).
+- No `apt upgrade` / system package bumps — not in the default scope to avoid requiring sudo and producing a lot of noise. Users can `sudo apt upgrade` manually.
+- No daemon restart for LiteLLM / Ollama / pueued — we only upgrade the binaries; restart is the user's call.
+- `scripts/**` is ignored by chezmoi (see [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) line 29), so `upgrade_tools.sh` is never deployed to `$HOME`. It runs from the dotfiles repo directly.
+
+**Adding a new category / tool to the upgrade flow.**
+
+1. If the tool is already managed by an existing package manager covered by a category (brew/uv/npm/cargo/dotnet/gem/mise), nothing to do — the generic `upgrade` command picks it up automatically.
+2. If it's a `curl | bash` installer, add a guarded block to `cat_agents()` in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh) — gate on the binary being present so we don't bootstrap on machines that don't have it.
+3. If it needs a completely new strategy (e.g. GitHub release binary with custom download logic), add a new `cat_<name>` function and register it in both `ALL_CATEGORIES` and the dispatch `case` in main, plus a matching `just upgrade-<name>` recipe.
+
 ## Ansible Usage
 
 Ansible playbooks run automatically via `chezmoi apply` when playbook files change. For manual runs, use `~/.ansible/` directory:
