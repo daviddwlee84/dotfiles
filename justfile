@@ -51,22 +51,29 @@ docker-clean:
 # ============================================================================
 # Chezmoi
 # ============================================================================
+#
+# All `chezmoi-*` recipes pass `--no-pager` so output streams straight to
+# stdout instead of spawning the configured pager (delta in this repo).
+# Critical for non-interactive callers (CI, coding agents, `just` itself
+# in scripted contexts) — without it, delta tries to alternate-screen
+# / line-buffer over a pipe and either panics, hangs, or eats output.
+# Use raw `chezmoi diff` directly when you want the interactive pager.
 
 # Show what would change
 chezmoi-diff:
-    chezmoi diff
+    chezmoi --no-pager diff
 
 # Apply dotfiles
 chezmoi-apply:
-    chezmoi apply
+    chezmoi --no-pager apply
 
 # Dry run (preview without applying)
 chezmoi-dry-run:
-    chezmoi apply --dry-run
+    chezmoi --no-pager apply --dry-run
 
 # Show chezmoi status
 chezmoi-status:
-    chezmoi status
+    chezmoi --no-pager status
 
 # Re-initialize chezmoi (for testing prompts)
 chezmoi-reinit:
@@ -79,7 +86,7 @@ chezmoi-clear-scripts:
 # Clear script state and re-apply (for testing run_once scripts)
 chezmoi-rerun-scripts:
     chezmoi state delete-bucket --bucket=scriptState
-    chezmoi apply -v
+    chezmoi --no-pager apply -v
 
 # ============================================================================
 # Ansible
