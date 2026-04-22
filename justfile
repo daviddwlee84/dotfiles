@@ -336,6 +336,10 @@ fleet-apply-dry-run *ARGS:
 fleet-apply-one HOST *ARGS:
     ./scripts/fleet_apply.py --hosts {{HOST}} --serial {{ARGS}}
 
+# Kill orphan chezmoi/ansible processes on every host (cleanup after Ctrl+C)
+fleet-apply-kill *ARGS:
+    ./scripts/fleet_apply.py --kill-orphans {{ARGS}}
+
 # ============================================================================
 # Ad-hoc Scripts
 # ============================================================================

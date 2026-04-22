@@ -237,41 +237,89 @@ def build_remote_command(
 ) -> str:
     """Build the single shell command sent over SSH.
 
-    Strategy:
-      * If a password is being injected: write it to ~/.cache/chezmoi-fleet/
-        sudo.pass (0600), export CHEZMOI_SUDO_PASSWORD_FILE, run chezmoi,
-        shred-then-rm the file. The remote sudo_shared.sh extension consumes
-        the env var, validates, and adopts the password into its shared state.
-      * If no password and no_root_machine=true: just run chezmoi.
-      * If no password and no_root_machine=false: still run, but expect the
-        sudo phase to fail (caller is warned in main()).
+    Three concerns are baked in:
+
+    1. Sudo password injection (when host.sudo_password is set): write password
+       to ~/.cache/chezmoi-fleet/sudo.pass (0600 via umask 077), export
+       CHEZMOI_SUDO_PASSWORD_FILE, run chezmoi, then `trap … EXIT` removes
+       the pass file even if chezmoi crashes.
+
+    2. Pager neutralisation: `PAGER=cat` and chezmoi-specific overrides force
+       non-paged output. ts_nas-style hosts where `bat` panics on a missing
+       theme would otherwise hang forever in a pager subprocess (no TTY → bat
+       still tries to spawn).
+
+    3. Process-group cleanup so a local Ctrl+C / SSH channel close kills the
+       remote chezmoi tree, not just the wrapper shell:
+         * `set -m` enables job control so each backgrounded child gets its
+           own process group (= -$pid kills the whole tree).
+         * `trap '… kill -TERM -$cz_pid …' INT TERM HUP` propagates the
+           controller's signal — asyncssh sends SIGHUP when the channel
+           closes (request_pty=True ensures the remote side delivers it).
+         * `wait $cz_pid` then proxies chezmoi's real exit status back.
+       Without this, an interrupted run leaves an orphan `chezmoi update`
+       on the remote that holds the git source dir lock and burns CPU until
+       it self-terminates.
     """
+    # `--no-pager` is a chezmoi global flag — it tells chezmoi to write
+    # paged subcommand output (diff, status) straight to stdout instead of
+    # spawning the configured pager. Critical for non-TTY runs because
+    # chezmoi's default pager is whatever the user configured (often bat /
+    # less), which can panic or block forever when its own stdin/stdout
+    # aren't a terminal. Setting `PAGER=cat` is NOT enough — chezmoi reads
+    # its own `pager` config key and ignores PAGER.
     cz = shlex.quote(host.chezmoi_path)
+    cz_global = f"{cz} --no-pager"
     if mode == "update":
-        sub = f"{cz} update"
+        sub = f"{cz_global} update"
         if init:
             sub += " --init"
     elif mode == "apply":
-        sub = f"{cz} apply"
+        sub = f"{cz_global} apply"
     else:  # diff
-        sub = f"{cz} diff"
+        sub = f"{cz_global} diff"
 
+    # Belt-and-braces: if any sub-tool chezmoi invokes (git, ansible) honours
+    # PAGER / GIT_PAGER, force them non-paged too. NB: chezmoi itself does
+    # NOT honour these — that's why --no-pager above is required.
+    pager_env = "PAGER=cat GIT_PAGER=cat "
     extra_env = " ".join(f"{k}={shlex.quote(v)}" for k, v in host.extra_env.items())
-    env_prefix = f"{extra_env} " if extra_env else ""
-
-    if host.sudo_password is None:
-        return f"set -e; {env_prefix}{sub}"
+    env_prefix = pager_env + (f"{extra_env} " if extra_env else "")
 
     pass_path = shlex.quote(REMOTE_SUDO_PASS_PATH)
-    # `umask 077` ensures the dir/file are 0700/0600 even on machines with a
-    # permissive default. `trap` guarantees cleanup even if chezmoi crashes.
+    if host.sudo_password is None:
+        pre = ""
+        cleanup_extra = ""
+    else:
+        pre = (
+            f"umask 077; "
+            f"mkdir -p \"$(dirname {pass_path})\"; "
+            f"cat > {pass_path}; chmod 600 {pass_path}; "
+            f"export CHEZMOI_SUDO_PASSWORD_FILE=\"$PWD/{REMOTE_SUDO_PASS_PATH}\"; "
+        )
+        cleanup_extra = f" rm -f {pass_path};"
+
+    # Process-tree cleanup: a `trap` on INT/TERM/HUP forwards the signal to
+    # chezmoi's PID, then to its whole subtree via `pkill -P`. Combined with
+    # request_pty=True on the asyncssh side (which causes SSH to deliver
+    # SIGHUP to the remote shell when the channel closes), this guarantees a
+    # local Ctrl+C / dropped connection actually stops chezmoi instead of
+    # leaving an orphan that holds the source-dir git lock and burns CPU.
+    # `wait $_cz_pid` proxies chezmoi's real exit status back to the SSH client.
     return (
-        f"set -e; umask 077; "
-        f"mkdir -p \"$(dirname {pass_path})\"; "
-        f"cat > {pass_path}; chmod 600 {pass_path}; "
-        f"trap 'rm -f {pass_path}' EXIT INT TERM; "
-        f"export CHEZMOI_SUDO_PASSWORD_FILE=\"$PWD/{REMOTE_SUDO_PASS_PATH}\"; "
-        f"{env_prefix}{sub}"
+        f"{pre}"
+        f"_cleanup() {{ "
+        f"  [ -n \"${{_cz_pid:-}}\" ] && {{ "
+        f"    pkill -TERM -P $_cz_pid 2>/dev/null; "
+        f"    kill -TERM $_cz_pid 2>/dev/null; "
+        f"  }};{cleanup_extra} "
+        f"}}; "
+        f"trap _cleanup INT TERM HUP; "
+        f"{env_prefix}{sub} </dev/null & "
+        f"_cz_pid=$!; "
+        f"wait $_cz_pid; _rc=$?; "
+        f"trap - INT TERM HUP;{cleanup_extra} "
+        f"exit $_rc"
     )
 
 
@@ -337,20 +385,36 @@ async def run_one(
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init}\n")
     log_fp.write(f"# remote-cmd: {cmd}\n\n")
 
+    proc = None
+    conn = None
     try:
         status.state = "connecting"
         async with asyncio.timeout(connect_timeout):
             conn = await asyncssh.connect(**_connect_kwargs(host))
-        async with conn:
+        try:
             status.state = "running"
             # Feed password (if any) via stdin: build_remote_command's `cat >`
-            # consumes exactly the bytes we send, then closes its half.
-            stdin_bytes = (
-                (host.sudo_password + "\n").encode() if host.sudo_password else b""
-            )
+            # reads exactly until EOF, so we send the password line then EOF.
+            # asyncssh streams default to text mode (encoding='utf-8'); we
+            # write str, not bytes — passing bytes triggers
+            # `TypeError: utf_8_encode() argument 1 must be str, not bytes`.
+            stdin_text = (host.sudo_password + "\n") if host.sudo_password else ""
+            # NB: we deliberately do NOT request a PTY here. Two reasons:
+            #   1. With a PTY, the wrapper's `cat > sudo.pass` reads from a
+            #      TTY where stdin EOF requires a literal Ctrl+D byte; our
+            #      `proc.stdin.write_eof()` becomes a no-op and `cat` hangs.
+            #   2. PTY-attached chezmoi may re-enable colored output / sniff
+            #      the terminal width. PAGER=cat already covers the pager
+            #      side; lack-of-TTY makes the rest behave like CI.
+            # Cleanup on local Ctrl+C / timeout is handled by:
+            #   * Wrapper's `trap … pkill -TERM -P $_cz_pid` (in build_remote_command).
+            #   * Explicit `proc.terminate()` + `conn.close()` in the
+            #     except/finally clauses below — closing the SSH channel
+            #     causes the remote shell to get SIGPIPE on its next write,
+            #     and the wrapper's trap fires.
             proc = await conn.create_process(cmd, stdin=asyncssh.PIPE)
-            if stdin_bytes:
-                proc.stdin.write(stdin_bytes)
+            if stdin_text:
+                proc.stdin.write(stdin_text)
             proc.stdin.write_eof()
 
             async def _drain(stream, label: str) -> None:
@@ -368,11 +432,44 @@ async def run_one(
                 result = await proc.wait()
             status.rc = result.exit_status if result.exit_status is not None else 1
             status.state = "done" if status.rc == 0 else "failed"
+        finally:
+            if conn is not None:
+                conn.close()
+                try:
+                    await conn.wait_closed()
+                except Exception:
+                    pass
+    except asyncio.CancelledError:
+        # User Ctrl+C or task-group cancellation: best-effort terminate the
+        # remote process before re-raising. proc.terminate() sends SIGTERM
+        # via the SSH channel; closing the connection then triggers SIGHUP
+        # on the remote shell as a belt-and-braces backstop.
+        status.state = "failed"
+        status.error = "cancelled by controller"
+        log_fp.write(f"\n[fleet-apply] CANCELLED: terminating remote process\n")
+        if proc is not None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        raise
     except (asyncssh.Error, OSError, TimeoutError) as e:
         status.state = "failed"
         status.rc = status.rc or 1
         status.error = f"{type(e).__name__}: {e}"
         log_fp.write(f"\n[fleet-apply] FAILED: {status.error}\n")
+        # If timeout fired while chezmoi was still running, terminate it so
+        # we don't leave an orphan on the remote.
+        if proc is not None and proc.exit_status is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
     finally:
         status.finished_at = loop.time()
         log_fp.close()
@@ -482,6 +579,33 @@ def cli(
     log_dir: Annotated[
         Path, tyro.conf.arg(help="Base log directory")
     ] = Path("logs/fleet-apply"),
+    connect_timeout: Annotated[
+        int, tyro.conf.arg(help="SSH connect timeout per host (seconds)")
+    ] = 30,
+    command_timeout: Annotated[
+        int,
+        tyro.conf.arg(
+            help=(
+                "Remote chezmoi command timeout (seconds). Default 7200 = 2 h "
+                "to accommodate first-run apply (Linuxbrew install + 22 ansible "
+                "roles + GUI cask downloads can easily exceed 30 min). "
+                "Steady-state re-apply on a warm machine usually finishes in "
+                "1–5 min — drop to e.g. 600 once your fleet is past first-run."
+            )
+        ),
+    ] = 7200,
+    kill_orphans: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Connect to each host and kill any leftover chezmoi / ansible "
+                "processes owned by the SSH user, then exit. Use this to clean "
+                "up after an interrupted run that left orphans (e.g. you "
+                "Ctrl+C'd before the cleanup trap could fire). Skips the "
+                "normal apply flow — no chezmoi command is sent."
+            )
+        ),
+    ] = False,
 ) -> int:
     """Apply chezmoi to a fleet of hosts in parallel. Exit code = failed-host count."""
     console = Console()
@@ -503,12 +627,73 @@ def cli(
         console.print("[yellow]no hosts selected[/]")
         return 0
 
+    if kill_orphans:
+        return _run_kill(console, selected, connect_timeout)
+
     mode: Literal["update", "apply", "diff"] = (
         "diff" if dry_run else ("apply" if no_init else "update")
     )
     init = mode == "update"
 
-    return _run(console, selected, mode, init, log_dir, serial, max_parallel)
+    return _run(
+        console, selected, mode, init, log_dir, serial, max_parallel,
+        connect_timeout, command_timeout,
+    )
+
+
+def _run_kill(
+    console: Console, selected: list[Host], connect_timeout: int
+) -> int:
+    """Connect to each host and SIGTERM stray chezmoi/ansible-playbook processes.
+
+    Use case: a previous fleet-apply was Ctrl+C'd, the local SSH client died
+    before the remote wrapper's trap could fire, and `chezmoi update` is now
+    an orphan holding the source-dir git lock. This sub-command does no
+    chezmoi work — it just runs `pkill -TERM` for the SSH user.
+
+    Output is direct stdout (no Live table — the operation is fast and
+    one-shot, table refresh would mostly show empty rows).
+    """
+    # `|| true` so pkill returning 1 (= no match) doesn't trip set -e.
+    # Two-pass: chezmoi first, then ansible-playbook (chezmoi spawns ansible).
+    kill_cmd = (
+        "for p in chezmoi ansible-playbook ansible; do "
+        "  pkill -TERM -u \"$(id -un)\" -x \"$p\" 2>/dev/null || true; "
+        "done; "
+        "sleep 1; "
+        "for p in chezmoi ansible-playbook ansible; do "
+        "  pkill -KILL -u \"$(id -un)\" -x \"$p\" 2>/dev/null || true; "
+        "done; "
+        "echo done"
+    )
+    failures = 0
+
+    async def _kill_one(h: Host) -> None:
+        nonlocal failures
+        target = h.ssh_alias or h.hostname
+        try:
+            async with asyncio.timeout(connect_timeout):
+                conn = await asyncssh.connect(**_connect_kwargs(h))
+            async with conn:
+                result = await conn.run(kill_cmd, check=False)
+            console.print(
+                f"[green]✓[/] {h.name} ({target}) "
+                f"rc={result.exit_status} "
+                f"{(result.stdout or '').strip()}"
+            )
+        except (asyncssh.Error, OSError, TimeoutError) as e:
+            failures += 1
+            console.print(f"[red]✗[/] {h.name} ({target}) {type(e).__name__}: {e}")
+
+    async def _orchestrate() -> None:
+        await asyncio.gather(*(_kill_one(h) for h in selected))
+
+    console.print(
+        f"[bold]fleet-apply --kill-orphans[/] on {len(selected)} host(s) "
+        f"(SIGTERM → 1s → SIGKILL on chezmoi/ansible-playbook/ansible)"
+    )
+    asyncio.run(_orchestrate())
+    return min(failures, 125)
 
 
 def _run(
@@ -519,6 +704,8 @@ def _run(
     log_dir_base: Path,
     serial: bool,
     max_parallel: int,
+    connect_timeout: int,
+    command_timeout: int,
 ) -> int:
     # Resolve passwords up-front (interactive prompts happen here).
     resolve_passwords(selected, console)
@@ -557,8 +744,8 @@ def _run(
                 log_dir=log_dir,
                 mode=mode,
                 init=init,
-                connect_timeout=15,
-                command_timeout=1800,
+                connect_timeout=connect_timeout,
+                command_timeout=command_timeout,
             )
 
     async def _orchestrate() -> None:

@@ -141,7 +141,47 @@ just fleet-apply --exclude throwaway-vm         # all except
 just fleet-apply --max-parallel 3               # throttle SSH fan-out
 just fleet-apply --no-init                      # `chezmoi apply` (skip update)
 just fleet-apply --serial                       # one at a time, no live table
+just fleet-apply --command-timeout 600          # tighter timeout for warm fleets
+just fleet-apply-kill                           # kill orphan chezmoi/ansible on every host
 ```
+
+## Timeouts
+
+| Flag | Default | Rationale |
+|---|---|---|
+| `--connect-timeout` | 30 s | SSH banner + auth handshake. Bump for high-latency or relay-heavy hosts. |
+| `--command-timeout` | 7200 s (2 h) | Generous to cover first-run apply: Linuxbrew install (10–20 min) + 22 ansible roles + Brewfile cask downloads (GUI apps; can be 20+ min on slow links) + python_uv_tools / npm / cargo bootstrap. After your fleet is past first-run, drop to e.g. `--command-timeout 600` (10 min) — steady-state re-apply on a warm machine usually finishes in 1–5 min. |
+
+If `--command-timeout` fires, the orchestrator sends SIGTERM via the SSH
+channel **and** closes the channel (which delivers SIGHUP to the remote
+shell, which the wrapper's trap propagates to chezmoi). The remote should
+fully exit within seconds.
+
+## Killing orphans
+
+Local Ctrl+C, network drop, or any other premature disconnect is handled
+two ways:
+
+1. **In-band cleanup**: `build_remote_command()` wraps chezmoi in a shell
+   wrapper with `trap '… pkill -TERM -P $_cz_pid …' INT TERM HUP`. asyncssh
+   uses `request_pty='force'`, so the SSH channel close delivers SIGHUP to
+   that wrapper shell on the remote — chezmoi (and any ansible-playbook
+   children) get SIGTERM-ed and the wrapper proxies the exit code back.
+
+2. **Out-of-band rescue**: if you killed `fleet_apply.py` so abruptly that
+   even the in-band trap didn't fire (e.g. `kill -9` on the Python process,
+   or your laptop slept), run:
+
+   ```bash
+   just fleet-apply-kill                       # all hosts
+   just fleet-apply-kill --hosts lab-box       # specific host
+   ```
+
+   This connects to each host and runs `pkill -TERM -u "$(id -un)" -x
+   chezmoi`, then `pkill -TERM -x ansible-playbook` and `ansible`, waits
+   1 s, then SIGKILLs anything still alive. Output is one line per host
+   showing exit status. No chezmoi command is sent, so this is safe to run
+   any time the fleet looks "stuck".
 
 ## Exit codes
 
@@ -167,6 +207,17 @@ your local `.gitignore` if you don't already have one for build artifacts.
 
 ## Troubleshooting
 
+- **`zsh:1: command not found: chezmoi` / rc=127** — non-interactive SSH
+  shells don't source `~/.zshrc`, so `~/.local/bin` (or wherever your
+  package manager put chezmoi) is not on PATH. Set the absolute path
+  per-host or in `[defaults]`:
+  ```toml
+  [defaults]
+  chezmoi_path = "/home/me/.local/bin/chezmoi"   # Linux user install
+  # or
+  chezmoi_path = "/opt/homebrew/bin/chezmoi"     # macOS Apple Silicon brew
+  ```
+  Run `ssh <host> command -v chezmoi` to find the right value.
 - **`bw get password` fails** — run `bw unlock`, then `export BW_SESSION=...`.
 - **`asyncssh.PermissionDenied`** — the alias resolves but auth failed.
   Test with `ssh <alias> echo ok` first; if you use the 1Password agent,
@@ -180,6 +231,19 @@ your local `.gitignore` if you don't already have one for build artifacts.
   password the orchestrator resolved was wrong. The remote
   `sudo_shared.sh` rejects it with an explicit message in stderr (caught in
   the per-host log).
+- **Host hangs forever during `chezmoi diff` / `update`** — usually chezmoi
+  spawned its configured pager (`bat`, `delta`, `less`) which blocked
+  waiting for terminal input. fleet_apply already passes `--no-pager` to
+  every chezmoi invocation, but if you've added a custom subcommand /
+  hookScript that bypasses chezmoi's pager handling, kill the orphan with
+  `just fleet-apply-kill --hosts <host>` and check that subcommand for
+  pager / `read` calls.
+- **Run looks dead after Ctrl+C** — when you Ctrl+C `fleet_apply.py`
+  asyncio cancels each task, which calls `proc.terminate()` and closes the
+  SSH connection. The remote wrapper's trap catches the resulting SIGHUP
+  and SIGTERMs the chezmoi tree. If anything still survives, run
+  `just fleet-apply-kill` to broadcast `pkill -TERM` (then SIGKILL) to
+  every host's `chezmoi` / `ansible-playbook` / `ansible` processes.
 
 ## Related docs
 
