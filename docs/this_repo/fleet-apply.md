@@ -331,7 +331,7 @@ disconnect is handled three ways:
    just fleet-apply-status --hosts ts_nas      # one host
    just fleet-apply-watch                      # poll every 10s until idle
    just fleet-apply-tail jingle207             # follow latest run on this host
-   just fleet-apply-tail jingle207 --tail jingle207:20260422T140446Z
+   just fleet-apply-tail jingle207:20260422T140446Z
                                                # pin a specific run id
    ```
 

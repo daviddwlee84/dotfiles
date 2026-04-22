@@ -63,6 +63,17 @@ Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV glo
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 
+### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
+
+Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:
+
+- `scripts/fleet_apply.py` — CLI flags, mode semantics, sudo helper integration, log/sentinel paths
+- `justfile` `fleet-*` recipes — name, args, doc-comment
+- `dot_config/fleet/create_private_machines.toml.tmpl` — schema (`local`, `chezmoi_path`, `no_root_machine`, `password.source`, etc.)
+- Any change to `scripts/lib/sudo_shared.sh` that affects how `CHEZMOI_SUDO_PASSWORD_FILE` is consumed (also see "Sudo session" invariant below)
+
+`README.md` only needs an update if the user-facing `## Multi-host apply` block changes (top-level recipe names, exit-code semantics).
+
 ## Chezmoi templating conventions
 
 **Hard rule**: before adding a `{{ if eq .profile ... }}` branch, ask if the predicate is auto-detectable. If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
@@ -121,6 +132,17 @@ run-scripts see the cached state and never re-prompt. Do **not** read
 through `sudo_session_init`. See [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md)
 → "Non-interactive password injection" and [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
 for the orchestrator side.
+
+### fleet-apply semantics (counter-intuitive defaults)
+
+A few `just fleet-apply*` behaviours WILL trip up agents who don't know them. Full docs in [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md); the load-bearing invariants:
+
+- **`drift` ≠ `failed`**. When chezmoi can't prompt to overwrite a hand-edited file (no PTY over SSH), the host is shown as yellow ⚠ `drift` in the live table and the per-file paths are listed, but it does **not** count toward the exit code. Don't "fix" drift hosts unless the user asks. Resolution: hand-fix the remote, or `--force` to let the template win.
+- **`fleet-apply-file PATH` skips `run_*` scripts**. Uses `chezmoi apply --exclude=scripts <PATH>` after an explicit `git pull`. Means ansible / Brewfile changes will NOT execute. If you edit `dot_ansible/...` and test with `fleet-apply-file`, the change won't apply — use full `fleet-apply` for ansible iterations. Same applies to Brewfile.
+- **`--branch BRANCH` is no-op on local hosts**. The local source dir IS the user's editor working tree; switching it would be hostile. Local hosts log a warning and run against the working tree as-is. The flag also forces mode to `apply` (since `chezmoi update` would re-pull main and undo the checkout).
+- **Install-only by design**. fleet-apply inherits the [Install vs upgrade is split](#install-vs-upgrade-is-split-on-purpose) invariant: it never silently bumps tools. The explicit upgrade path is `just upgrade-*` which must be run on each host (fleet-apply does NOT broadcast upgrades).
+- **Process substitution + sentinel are load-bearing**. `> >(tee -a $log) 2>&1 & _cz_pid=$!; wait $_cz_pid; _rc=$?; echo $_rc > $sentinel` is the contract that `--status` / `--tail` / `--watch` rely on. Don't change to a pipeline (`| tee`) — the wrapper's SIGHUP trap depends on `$_cz_pid` pointing to chezmoi, not tee. See [docs/this_repo/fleet-apply.md → Killing orphans, checking status, re-attaching](docs/this_repo/fleet-apply.md#killing-orphans-checking-status-re-attaching).
+- **Conservative drift classifier**. `_classify_drift()` only downgrades stderr lines matching the exact `chezmoi: <path>: could not open a new TTY: open /dev/tty:` fingerprint. Any unrecognised stderr line keeps `failed` state. Don't broaden the regex without explicit user request — silent downgrades hide real errors.
 
 ### `modify_` and `create_` prefix semantics
 
