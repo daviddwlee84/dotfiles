@@ -1,69 +1,40 @@
-# Clash / mihomo config channel for television (tv).
-# Fuzzy-search proxies, proxy-groups, rules and runtime controller info from a
-# local Clash or mihomo config YAML. `tv clash` is the YAML-backed picker: it
-# prefers the active Clash profile from ~/.config/clash/profiles/list.yml when
-# present, then falls back to legacy config.{yaml,yml} paths. Controller-backed
-# browsing lives in the separate `tv clash-api` channel.
+# Live Clash / mihomo controller channel for television (tv).
+# Fuzzy-search the external-controller API directly: proxies, proxy groups,
+# rules, and runtime summary rows from /version, /configs, and /connections.
 #
 # Usage:
-#   tv clash
+#   tv clash-api
+#   CLASH_CONTROLLER=192.168.222.207:9090 tv clash-api
+#   CLASH_CONTROLLER=192.168.222.207:9090 CLASH_SECRET=mytoken tv clash-api
 #
-# Config discovery (first match wins):
-#   $CLASH_CONFIG                                 (explicit override)
-#   ~/.config/clash/profiles/list.yml -> active profiles/<time>.yml
-#   ~/.config/clash/config.{yaml,yml}
-#   ~/.config/mihomo/config.{yaml,yml}
-#   ~/Library/Application Support/clash/config.{yaml,yml}
-#   ~/Library/Application Support/mihomo/config.{yaml,yml}
+# Controller discovery:
+#   $CLASH_CONTROLLER / $CLASH_SECRET           (explicit override)
+#   runtime external-controller from local Clash config
 #
-# Prereqs: `uv` (bootstrap) + `curl` (base ansible role). `bat` and `jq` are
-# used when present for nicer previews; PyYAML is auto-fetched by uv on first
-# run. External-controller API is optional — when absent, all browse and
-# latency-via-nc+ping flows still work, only the mutating Alt-key actions
-# gracefully no-op.
+# Prereqs: `curl`. `uv` is optional here: it is only used when no controller
+# env vars are set and the helper falls back to the local YAML config.
 #
 # Source cycling (Ctrl+S):
-#   1. Proxies              one row per proxies[] entry
-#   2. Proxy Groups         one row per proxy-groups[] entry
-#   3. Rules                one row per rules[] entry (indexed #NNNN)
-#   4. Summary              top-level scalars (port, mode, external-controller)
-#   5. API                  live controller health + traffic / connection stats
-#                         (still uses the runtime controller, not the profile's
-#                         stale external-controller field)
+#   1. Proxies              live /proxies leaf entries
+#   2. Proxy Groups         live /proxies selector/url-test/fallback entries
+#   3. Rules                live /rules entries
+#   4. Summary              /version + /configs + /connections
 #
 # Preview cycling (Ctrl+F):
-#   1. Main      selected entry's YAML block (bat -l yaml when available)
-#   2. Latency   Clash API /proxies/:name/delay; falls back to nc -z + ping
-#   3. Meta      groups referencing a proxy / full group YAML / sibling rules
-#
-# Keybindings (Alt+ namespace avoids tmux/TV conflicts):
-#   Enter      Show full YAML of selected entry (execute mode)
-#              On the synthetic `none` row: opens $EDITOR on a new config.
-#   Alt+T      Latency test (API /proxies/:name/delay OR direct TCP probe)
-#   Alt+S      Switch a proxy-group to this proxy (requires a group picked
-#              via fzf, uses PUT /proxies/:group) — proxy rows only
-#   Alt+C      Close all connections (DELETE /connections) with y/N confirm
-#   Alt+R      Reload config (PUT /configs?force=true, uses on-disk path)
-#   Alt+D      Open external-ui or a hosted dashboard in the browser
-#   Alt+E      Edit the resolved config file in $EDITOR
-#   Ctrl+Y     Copy the proxy's server:port (proxy rows) / name otherwise
-#   Alt+Y      Copy the row's name field to clipboard
-#
-# Row schema (TSV): kind \t name \t type_or_meta \t server_or_target \t extra
-#   kind ∈ {proxy, group, rule, config, api, none}
-# Actions switch on kind so wrong-kind keys become 1-second toasts.
+#   1. Main      selected entry's controller JSON
+#   2. Latency   Clash API /proxies/:name/delay
+#   3. Meta      proxy-group references, group members, nearby rules
 
 [metadata]
-name = "clash"
-description = "Clash/mihomo config: proxies, groups, rules, latency tests, controller API"
+name = "clash-api"
+description = "Live Clash/mihomo controller: proxies, groups, rules, runtime summary"
 requirements = ["curl", "uv"]
 
 [source]
 command = [
-  "$HOME/.config/television/clash-source.sh proxies",
-  "$HOME/.config/television/clash-source.sh groups",
-  "$HOME/.config/television/clash-source.sh rules",
-  "$HOME/.config/television/clash-source.sh summary",
+  "$HOME/.config/television/clash-source.sh api-proxies",
+  "$HOME/.config/television/clash-source.sh api-groups",
+  "$HOME/.config/television/clash-source.sh api-rules",
   "$HOME/.config/television/clash-source.sh api",
 ]
 display = "{split:\\t:0}  {split:\\t:1}  [{split:\\t:2}]  {split:\\t:3}  {split:\\t:4}"
@@ -72,14 +43,14 @@ no_sort = true
 
 [preview]
 command = [
-  "$HOME/.config/television/clash-preview.sh main    '{split:\\t:0}' '{split:\\t:1}'",
-  "$HOME/.config/television/clash-preview.sh latency '{split:\\t:0}' '{split:\\t:1}'",
-  "$HOME/.config/television/clash-preview.sh meta    '{split:\\t:0}' '{split:\\t:1}'",
+  "$HOME/.config/television/clash-preview.sh api-main '{split:\\t:0}' '{split:\\t:1}'",
+  "$HOME/.config/television/clash-preview.sh latency  '{split:\\t:0}' '{split:\\t:1}'",
+  "$HOME/.config/television/clash-preview.sh api-meta '{split:\\t:0}' '{split:\\t:1}'",
 ]
 header = "{split:\\t:0}: {split:\\t:1}"
 
 [ui]
-input_header = "Clash"
+input_header = "Clash API"
 
 [ui.preview_panel]
 size = 55
@@ -91,38 +62,21 @@ alt-s = ["actions:switch_proxy", "reload_source"]
 alt-c = ["actions:close_connections", "reload_source"]
 alt-r = ["actions:reload_config", "reload_source"]
 alt-d = "actions:open_dashboard"
-alt-e = "actions:edit_config"
-# Override TV global ctrl-y (copies full display line) to copy the server
-# address for proxies, or the name otherwise.
 ctrl-y = "actions:copy_server"
 alt-y = "actions:copy_name"
 
 [actions.show]
-description = "Show full YAML of the selected entry"
+description = "Show full controller JSON for the selected entry"
 command = """
-kind='{split:\\t:0}'
-name='{split:\\t:1}'
-case "$kind" in
-  none)
-    cfg="$HOME/.config/clash/config.yaml"
-    mkdir -p "$(dirname "$cfg")"
-    if [ ! -f "$cfg" ]; then
-      printf 'port: 7890\\nsocks-port: 7891\\nexternal-controller: 127.0.0.1:9090\\nmode: Rule\\nproxies: []\\nproxy-groups: []\\nrules:\\n  - MATCH,DIRECT\\n' > "$cfg"
-    fi
-    "${EDITOR:-vi}" "$cfg"
-    ;;
-  *)
-    "$HOME/.config/television/clash-preview.sh" main "$kind" "$name"
-    echo
-    echo '[Press Enter to exit]'
-    read -r _
-    ;;
-esac
+"$HOME/.config/television/clash-preview.sh" api-main '{split:\\t:0}' '{split:\\t:1}'
+echo
+echo '[Press Enter to exit]'
+read -r _
 """
 mode = "execute"
 
 [actions.test_latency]
-description = "Test proxy latency (Clash API /delay or direct TCP probe)"
+description = "Test proxy latency (Clash API /delay or direct TCP probe fallback)"
 command = """
 kind='{split:\\t:0}'
 if [ "$kind" != "proxy" ] && [ "$kind" != "group" ]; then
@@ -154,7 +108,7 @@ if ! command -v fzf >/dev/null 2>&1; then
 fi
 { read -r host; read -r secret; } < <("$HOME/.config/television/clash-source.sh" controller 2>/dev/null)
 if [ -z "${host:-}" ]; then
-  echo 'external-controller not set in Clash config'
+  echo 'external-controller not set'
   sleep 1
   exit 0
 fi
@@ -165,7 +119,7 @@ if ! curl -sS --max-time 2 "${auth[@]}" "http://$host/version" >/dev/null 2>&1; 
   sleep 1
   exit 0
 fi
-pick=$("$HOME/.config/television/clash-parse.py" groups-for-switch 2>/dev/null \\
+pick=$("$HOME/.config/television/clash-source.sh" api-groups-for-switch 2>/dev/null \\
   | awk -F'\\t' -v n="$name" '
       $1 == "group" {
         count = split($4, arr, / \\| /)
@@ -224,11 +178,22 @@ if [ -z "${host:-}" ]; then
   sleep 1
   exit 0
 fi
-cfg_path=$("$HOME/.config/television/clash-parse.py" path 2>/dev/null)
+cfg_path="${CLASH_CONFIG:-}"
+if [ -z "${cfg_path:-}" ]; then
+  cfg_path=$("$HOME/.config/television/clash-parse.py" path 2>/dev/null)
+fi
 if [ -z "${cfg_path:-}" ]; then
   echo 'no clash config resolved (set CLASH_CONFIG)'
   sleep 1
   exit 0
+fi
+if [ -n "${CLASH_CONTROLLER:-}" ] && [ -z "${CLASH_CONFIG:-}" ]; then
+  default_host=$("$HOME/.config/television/clash-parse.py" controller 2>/dev/null | sed -n '1p')
+  if [ -n "${default_host:-}" ] && [ "$default_host" != "$host" ]; then
+    echo 'Remote controller reload requires CLASH_CONFIG to point at a config path visible to that host'
+    sleep 1
+    exit 0
+  fi
 fi
 auth=()
 [ -n "${secret:-}" ] && auth=(-H "Authorization: Bearer $secret")
@@ -264,27 +229,24 @@ fi
 """
 mode = "fork"
 
-[actions.edit_config]
-description = "Edit Clash config in $EDITOR"
-command = """
-cfg=$("$HOME/.config/television/clash-parse.py" path 2>/dev/null)
-if [ -z "${cfg:-}" ]; then
-  cfg="$HOME/.config/clash/config.yaml"
-  mkdir -p "$(dirname "$cfg")"
-fi
-"${EDITOR:-vi}" "$cfg"
-"""
-mode = "execute"
-
 [actions.copy_server]
-description = "Copy server:port (proxy rows) or name to clipboard"
+description = "Copy server:port when YAML resolves it, or the row name otherwise"
 command = """
 _clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64 | tr -d '\\n')\\007" > /dev/tty; fi; }
 kind='{split:\\t:0}'
 name='{split:\\t:1}'
 case "$kind" in
-  proxy) "$HOME/.config/television/clash-parse.py" server --name "$name" 2>/dev/null | _clip ;;
-  *)     printf '%s' "$name" | _clip ;;
+  proxy)
+    data=$("$HOME/.config/television/clash-parse.py" server --name "$name" 2>/dev/null)
+    if [ -n "${data:-}" ]; then
+      printf '%s' "$data" | _clip
+    else
+      printf '%s' "$name" | _clip
+    fi
+    ;;
+  *)
+    printf '%s' "$name" | _clip
+    ;;
 esac
 """
 mode = "fork"

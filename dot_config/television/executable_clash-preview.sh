@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Preview script for the `clash` tv channel.
+# Preview script for the `clash` and `clash-api` tv channels.
 # Usage: clash-preview.sh <view> <kind> <name>
 #
-# view:
-#   main    → YAML block of the selected entry (bat -l yaml when available)
-#   latency → proxy latency via Clash API /proxies/:name/delay, falling back
-#             to a direct TCP nc probe + ping when the controller is absent
-#             or unreachable.
-#   meta    → kind-specific neighbours / links (e.g. group members + current
-#             selection via /proxies/:group, related rules, api counts).
-#
-# The TV channel's [preview].command calls main+latency+meta; Ctrl+F cycles.
+# Views:
+#   main      YAML-backed detail view for `tv clash`
+#   api-main  controller-backed detail view for `tv clash-api`
+#   latency   Clash API /proxies/:name/delay, falling back to TCP + ping
+#   meta      YAML-backed context view for `tv clash`
+#   api-meta  controller-backed context view for `tv clash-api`
 
 set -u
 
@@ -39,15 +36,20 @@ show_json() {
 
 show_text() {
   if command -v bat >/dev/null 2>&1; then
-    bat --color=always --paging=never -l yaml --style=plain
+    bat --color=always --paging=never -l markdown --style=plain
   else
     cat
   fi
 }
 
-# Resolve host + secret. CLASH_CONTROLLER / CLASH_SECRET env vars take
-# precedence over the config's external-controller / secret fields.
-# Outputs two lines; empty on both when no config/controller.
+pretty_json() {
+  if command -v jq >/dev/null 2>&1; then
+    jq . 2>/dev/null || cat
+  else
+    python3 -m json.tool 2>/dev/null || cat
+  fi
+}
+
 _controller() {
   if [ -n "${CLASH_CONTROLLER:-}" ]; then
     printf '%s\n%s\n' "$CLASH_CONTROLLER" "${CLASH_SECRET:-}"
@@ -65,35 +67,287 @@ _controller() {
 }
 
 _urlencode() {
-  # Minimal URL-encoder for proxy names (spaces, parens, slashes). Python is
-  # already available via uv/bootstrap; we avoid another runtime.
   python3 -c 'import sys, urllib.parse as u; print(u.quote(sys.argv[1], safe=""))' "$1" 2>/dev/null \
     || printf '%s' "$1"
 }
 
-case "$kind" in
-  none)
-    cat <<EOF
-No Clash config found.
+_api_request() {
+  local endpoint="$1"
+  local timeout="${2:-3}"
+  local ctrl_host ctrl_secret
+  local auth=()
 
-Expected locations (first match wins):
-  \$CLASH_CONFIG                               (explicit override)
-  \$HOME/.config/clash/config.yaml
-  \$HOME/.config/mihomo/config.yaml
-  \$HOME/Library/Application Support/clash/config.yaml
-  \$HOME/Library/Application Support/mihomo/config.yaml
+  {
+    read -r ctrl_host
+    read -r ctrl_secret
+  } < <(_controller)
 
-Actions:
-  Alt+E → open \$EDITOR on a fresh config
-  Ctrl+R → reload the picker once a config exists
+  [ -n "${ctrl_host:-}" ] || return 1
+  [ -n "${ctrl_secret:-}" ] && auth=(-H "Authorization: Bearer $ctrl_secret")
+  curl -sS --max-time "$timeout" "${auth[@]}" "http://$ctrl_host/$endpoint" 2>/dev/null || true
+}
+
+_show_api_main() {
+  local api_kind="$1"
+  local api_name="$2"
+  local resp encoded
+
+  case "$api_kind" in
+    proxy | group)
+      encoded="$(_urlencode "$api_name")"
+      resp="$(_api_request "proxies/$encoded" 4)"
+      if [ -n "$resp" ]; then
+        printf '%s' "$resp" | pretty_json | show_json
+      else
+        echo "(no response)"
+      fi
+      ;;
+
+    rule)
+      resp="$(_api_request "rules" 4)"
+      if [ -z "$resp" ]; then
+        echo "(no response)"
+        return 0
+      fi
+      printf '%s' "$resp" | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+try:
+    index = int(name.lstrip("#")) - 1
+except ValueError:
+    index = -1
+
+data = json.load(sys.stdin)
+rules = data.get("rules") or []
+if 0 <= index < len(rules):
+    print(json.dumps(rules[index], ensure_ascii=False, indent=2))
+else:
+    print(json.dumps({"error": f"rule {name} not found"}, ensure_ascii=False, indent=2))
+' "$api_name" | pretty_json | show_json
+      ;;
+
+    api)
+      case "$api_name" in
+        external-controller)
+          resp="$(_api_request "version" 2)"
+          ;;
+        connections | traffic)
+          resp="$(_api_request "connections" 3)"
+          ;;
+        config.*)
+          resp="$(_api_request "configs" 3)"
+          if [ -n "$resp" ]; then
+            printf '%s' "$resp" | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+key = name.split("config.", 1)[1] if name.startswith("config.") else name
+data = json.load(sys.stdin)
+print(json.dumps({key: data.get(key)}, ensure_ascii=False, indent=2))
+' "$api_name" | pretty_json | show_json
+            return 0
+          fi
+          ;;
+        *)
+          resp="$(_api_request "configs" 3)"
+          ;;
+      esac
+      if [ -n "$resp" ]; then
+        printf '%s' "$resp" | pretty_json | show_json
+      else
+        echo "(no response)"
+      fi
+      ;;
+
+    config)
+      "$PARSE" yaml --kind config --name "$api_name" 2>/dev/null | show_yaml
+      ;;
+
+    *)
+      printf '# No API main view for kind=%s\n' "$api_kind"
+      ;;
+  esac
+}
+
+_show_api_meta() {
+  local api_kind="$1"
+  local api_name="$2"
+  local resp encoded
+
+  case "$api_kind" in
+    proxy)
+      resp="$(_api_request "proxies" 4)"
+      if [ -z "$resp" ]; then
+        echo "(no response)"
+        return 0
+      fi
+      printf '%s' "$resp" | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+data = json.load(sys.stdin)
+proxies = data.get("proxies") or {}
+matches = []
+
+for group_name, item in proxies.items():
+    if not isinstance(item, dict):
+        continue
+    members = item.get("all")
+    if not isinstance(members, list):
+        continue
+    if name in members:
+        matches.append((group_name, item.get("type", "?"), item.get("now", "-")))
+
+print(f"# Groups that reference '{name}'")
+if not matches:
+    print("(no proxy-group references this proxy)")
+else:
+    print()
+    for group_name, proxy_type, current in matches:
+        print(f"- {group_name} ({proxy_type}, now={current})")
+' "$api_name" | show_text
+      ;;
+
+    group)
+      encoded="$(_urlencode "$api_name")"
+      resp="$(_api_request "proxies/$encoded" 4)"
+      if [ -z "$resp" ]; then
+        echo "(no response)"
+        return 0
+      fi
+      printf '%s' "$resp" | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+print(f"# current: {data.get(\"now\", \"-\")}")
+
+members = data.get("all") or []
+if members:
+    print("\n# members")
+    for member in members:
+        print(f"- {member}")
+
+history = data.get("history") or []
+if history:
+    print("\n# recent history")
+    for item in history[-10:]:
+        if not isinstance(item, dict):
+            continue
+        print(
+            f"- {item.get(\"time\", \"?\")}  delay={item.get(\"delay\", \"?\")}ms  "
+            f"mean={item.get(\"meanDelay\", \"?\")}ms"
+        )
+' | show_text
+      ;;
+
+    rule)
+      resp="$(_api_request "rules" 4)"
+      if [ -z "$resp" ]; then
+        echo "(no response)"
+        return 0
+      fi
+      printf '%s' "$resp" | python3 -c '
+import json
+import re
+import sys
+
+name = sys.argv[1]
+try:
+    index = int(name.lstrip("#")) - 1
+except ValueError:
+    index = -1
+
+data = json.load(sys.stdin)
+rules = data.get("rules") or []
+
+def rule_type(raw: object) -> str:
+    if not isinstance(raw, str) or not raw:
+        return "?"
+    rendered = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", raw).upper()
+    return (
+        rendered
+        .replace("IPCIDR", "IP-CIDR")
+        .replace("SRCIPCIDR", "SRC-IP-CIDR")
+        .replace("DSTPORT", "DST-PORT")
+        .replace("SRCPORT", "SRC-PORT")
+        .replace("GEOIP", "GEO-IP")
+        .replace("GEOSITE", "GEO-SITE")
+    )
+
+start = max(index - 2, 0)
+end = min(index + 3, len(rules))
+print(f"# rules around {name}")
+if not (0 <= index < len(rules)):
+    print("(rule not found)")
+else:
+    print()
+    for idx in range(start, end):
+        item = rules[idx]
+        if not isinstance(item, dict):
+            continue
+        marker = ">" if idx == index else " "
+        payload = item.get("payload") or "-"
+        target = item.get("proxy") or item.get("adapter") or item.get("outbound") or "-"
+        print(f"{marker} #{idx + 1:04d} {rule_type(item.get(\"type\")):16} {payload} -> {target}")
+' "$api_name" | show_text
+      ;;
+
+    api)
+      case "$api_name" in
+        external-controller)
+          resp="$(_api_request "configs" 3)"
+          ;;
+        connections | traffic)
+          resp="$(_api_request "connections" 3)"
+          ;;
+        *)
+          resp="$(_api_request "configs" 3)"
+          ;;
+      esac
+      if [ -n "$resp" ]; then
+        printf '%s' "$resp" | pretty_json | show_json
+      else
+        echo "(no response)"
+      fi
+      ;;
+
+    *)
+      printf '# No API meta view for kind=%s\n' "$api_kind"
+      ;;
+  esac
+}
+
+if [ "$kind" = "none" ]; then
+  cat <<EOF
+No Clash data available.
+
+YAML-backed browsing:
+  tv clash
+  CLASH_CONFIG=/path/to/profile.yml tv clash
+
+Live controller browsing:
+  tv clash-api
+  CLASH_CONTROLLER=192.168.222.207:9090 tv clash-api
 EOF
-    exit 0
-    ;;
-esac
+  exit 0
+fi
 
 case "$view" in
   main)
-    "$PARSE" yaml --kind "$kind" --name "$name" 2>/dev/null | show_yaml
+    if [ "$kind" = "api" ]; then
+      _show_api_main "$kind" "$name"
+    else
+      "$PARSE" yaml --kind "$kind" --name "$name" 2>/dev/null | show_yaml
+    fi
+    ;;
+
+  api-main)
+    _show_api_main "$kind" "$name"
     ;;
 
   latency)
@@ -119,10 +373,8 @@ case "$view" in
               2>/dev/null || true)
             if [ -z "$resp" ]; then
               echo "(empty response)"
-            elif command -v jq >/dev/null 2>&1; then
-              printf '%s' "$resp" | jq . 2>/dev/null || printf '%s\n' "$resp"
             else
-              printf '%s\n' "$resp"
+              printf '%s' "$resp" | pretty_json | show_json
             fi
             exit 0
           fi
@@ -132,7 +384,7 @@ case "$view" in
 
         server_port="$("$PARSE" server --name "$name" 2>/dev/null || true)"
         if [ -z "${server_port:-}" ]; then
-          echo "No server:port for proxy '$name' (is this proxy synthetic / provider-sourced?)"
+          echo "No server:port for proxy '$name' (set CLASH_CONFIG for YAML-backed resolution)"
           exit 0
         fi
         server="${server_port%:*}"
@@ -177,11 +429,7 @@ case "$view" in
           echo
           resp=$(curl -sS --max-time 3 "${auth[@]}" "$base/proxies/$encoded" 2>/dev/null || true)
           if [ -n "$resp" ]; then
-            if command -v jq >/dev/null 2>&1; then
-              printf '%s' "$resp" | jq . 2>/dev/null | show_json
-              exit 0
-            fi
-            printf '%s\n' "$resp" | show_json
+            printf '%s' "$resp" | pretty_json | show_json
             exit 0
           fi
           echo "(no response — controller unreachable or group not loaded)"
@@ -199,13 +447,13 @@ case "$view" in
     ;;
 
   meta)
+    if [ "$kind" = "api" ]; then
+      _show_api_meta "$kind" "$name"
+      exit 0
+    fi
     case "$kind" in
       proxy)
         echo "# Groups that reference '$name'"
-        # groups-for-switch emits 4 cols: group \t name \t type \t a | b | c
-        # (pipe-separated member list). Only print rows where `name` appears
-        # in the member list, so the preview is context-relevant instead of
-        # listing every group.
         matches=$("$PARSE" groups-for-switch 2>/dev/null | awk -F'\t' -v n="$name" '
           $1 == "group" {
             count = split($4, arr, / \| /)
@@ -227,7 +475,6 @@ case "$view" in
         ;;
 
       rule)
-        idx="${name#\#}"
         echo "# Rule $name"
         "$PARSE" rules 2>/dev/null | awk -F'\t' -v k="$name" '$2 == k'
         ;;
@@ -236,33 +483,14 @@ case "$view" in
         "$PARSE" yaml --kind config --name "$name" 2>/dev/null | show_yaml
         ;;
 
-      api)
-        {
-          read -r ctrl_host
-          read -r ctrl_secret
-        } < <(_controller)
-        if [ -z "${ctrl_host:-}" ]; then
-          echo "No external-controller configured."
-          exit 0
-        fi
-        base="http://$ctrl_host"
-        auth=()
-        [ -n "${ctrl_secret:-}" ] && auth=(-H "Authorization: Bearer $ctrl_secret")
-        echo "# $base/configs"
-        resp=$(curl -sS --max-time 2 "${auth[@]}" "$base/configs" 2>/dev/null || true)
-        if [ -n "$resp" ] && command -v jq >/dev/null 2>&1; then
-          printf '%s' "$resp" | jq . 2>/dev/null | show_json
-        elif [ -n "$resp" ]; then
-          printf '%s\n' "$resp"
-        else
-          echo "(no response)"
-        fi
-        ;;
-
       *)
         echo "# No meta view for kind=$kind"
         ;;
     esac
+    ;;
+
+  api-meta)
+    _show_api_meta "$kind" "$name"
     ;;
 
   *)

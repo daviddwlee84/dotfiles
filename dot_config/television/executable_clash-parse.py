@@ -14,6 +14,7 @@ kind ∈ {proxy, group, rule, config, none}
 
 Config discovery order (first existing file wins):
     $CLASH_CONFIG env var (explicit override)
+    ~/.config/clash/profiles/list.yml -> active profiles/<time>.yml
     ~/.config/clash/config.{yaml,yml}
     ~/.config/mihomo/config.{yaml,yml}
     ~/Library/Application Support/clash/config.{yaml,yml}   (macOS)
@@ -32,7 +33,7 @@ from pathlib import Path
 import yaml
 
 
-def _default_candidate_paths() -> list[Path]:
+def _runtime_candidate_paths() -> list[Path]:
     home = Path.home()
     paths: list[Path] = []
     for base in (
@@ -40,10 +41,81 @@ def _default_candidate_paths() -> list[Path]:
         home / ".config" / "mihomo",
         home / "Library" / "Application Support" / "clash",
         home / "Library" / "Application Support" / "mihomo",
-    ):
+        ):
         for ext in ("config.yaml", "config.yml"):
             paths.append(base / ext)
     return paths
+
+
+def _active_profile_path() -> Path | None:
+    list_path = Path.home() / ".config" / "clash" / "profiles" / "list.yml"
+    try:
+        if not list_path.is_file():
+            return None
+    except OSError:
+        return None
+
+    try:
+        with list_path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    files = data.get("files")
+    index = data.get("index")
+    if not isinstance(files, list) or not isinstance(index, int) or not (0 <= index < len(files)):
+        return None
+
+    entry = files[index]
+    if not isinstance(entry, dict):
+        return None
+
+    raw_name = entry.get("time") or entry.get("file") or entry.get("path")
+    if raw_name is None:
+        return None
+
+    raw_name = str(raw_name).strip()
+    if not raw_name:
+        return None
+
+    candidate = Path(raw_name).expanduser()
+    if candidate.is_absolute():
+        return candidate if candidate.is_file() else None
+
+    base = list_path.parent
+    variants = [base / raw_name]
+    if candidate.suffix not in {".yml", ".yaml"}:
+        variants.extend((base / f"{raw_name}.yml", base / f"{raw_name}.yaml"))
+
+    for variant in variants:
+        try:
+            if variant.is_file():
+                return variant
+        except OSError:
+            continue
+    return None
+
+
+def _default_candidate_paths() -> list[Path]:
+    paths: list[Path] = []
+    active_profile = _active_profile_path()
+    if active_profile is not None:
+        paths.append(active_profile)
+    paths.extend(_runtime_candidate_paths())
+    return paths
+
+
+def _controller_config_path() -> Path | None:
+    for p in _runtime_candidate_paths():
+        try:
+            if p.is_file():
+                return p
+        except OSError:
+            continue
+    return _active_profile_path()
 
 
 def find_config() -> tuple[Path | None, str | None]:
@@ -241,8 +313,23 @@ def cmd_server(cfg: dict, name: str) -> str:
 
 
 def cmd_controller(cfg: dict) -> tuple[str, str]:
-    host = os.environ.get("CLASH_CONTROLLER", "").strip() or (cfg.get("external-controller", "") or "")
-    secret = os.environ.get("CLASH_SECRET", "").strip() or (cfg.get("secret", "") or "")
+    env_host = os.environ.get("CLASH_CONTROLLER", "").strip()
+    env_secret = os.environ.get("CLASH_SECRET", "").strip()
+    if env_host:
+        return env_host, env_secret
+
+    host = str(cfg.get("external-controller", "") or "")
+    secret = env_secret or str(cfg.get("secret", "") or "")
+
+    controller_path = _controller_config_path()
+    if controller_path is not None:
+        try:
+            controller_cfg = load_config(controller_path)
+        except (OSError, yaml.YAMLError):
+            controller_cfg = {}
+        if isinstance(controller_cfg, dict):
+            host = str(controller_cfg.get("external-controller", "") or host)
+            secret = env_secret or str(controller_cfg.get("secret", "") or secret)
     return str(host), str(secret)
 
 
