@@ -1,0 +1,161 @@
+# logs channel for television (tv)
+# Fuzzy-browse log files on the machine and preview them with tailspin /
+# bat. Enter opens the file in `lnav` for real interactive exploration.
+#
+# Usage:
+#   tv logs
+#
+# Source cycling (Ctrl+S):
+#   1. *.log / *.ndjson / *.jsonl under $PWD (recursive via fd)
+#   2. User + system log dirs: ~/.cache/**/*.log, ~/Library/Logs (macOS),
+#      readable subset of /var/log
+#   3. journalctl (Linux w/ systemd) — recent 2000 lines; each line is a
+#      pseudo "path" so preview/actions can replay via journalctl itself
+#
+# Preview cycling (Ctrl+F):
+#   1. tailspin colorized tail (last ~500 lines)
+#   2. Plain bat view for comparison / when log is tiny
+#
+# Keybindings:
+#   Enter      Open in lnav (falls back to ccze|less -R)
+#   Alt+T      tail -f FILE | tspin  (live follow with colors)
+#   Alt+E      Open in $EDITOR
+#   Ctrl+Y     Copy file path to clipboard (OSC 52 over SSH)
+
+[metadata]
+name = "logs"
+description = "Browse log files with tailspin/lnav preview"
+requirements = ["fd"]
+
+[source]
+command = [
+  # 1. Project-local log-ish files.
+  """
+  fd -HI --type f \
+    --extension log \
+    --extension ndjson \
+    --extension jsonl \
+    . "$PWD" 2>/dev/null
+  """,
+  # 2. User + system log dirs. Skip unreadable entries silently.
+  """
+  {
+    fd -HI --type f --extension log . "$HOME/.cache" 2>/dev/null
+    if [ "$(uname -s)" = "Darwin" ] && [ -d "$HOME/Library/Logs" ]; then
+      fd -HI --type f . "$HOME/Library/Logs" 2>/dev/null
+    fi
+    if [ -d /var/log ]; then
+      find /var/log -maxdepth 3 -type f \\( -name '*.log' -o -name 'syslog*' -o -name 'messages*' \\) -readable 2>/dev/null
+    fi
+  } | awk '!seen[$0]++'
+  """,
+  # 3. systemd journal (Linux only). Each line is a "journal entry" we can
+  # preview by replaying the exact timestamp.
+  """
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl --no-pager --output=short-iso -n 2000 2>/dev/null
+  else
+    echo "journalctl: not available on this system"
+  fi
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Colorful tail via tailspin. Prefer --print (stdout mode) so tv can
+  # render the ANSI stream itself. If tspin is missing, fall back to a raw
+  # tail so the preview still works.
+  """
+  f='{}'
+  if [ -f "$f" ]; then
+    if command -v tspin >/dev/null 2>&1; then
+      tail -n 500 "$f" 2>/dev/null | tspin --print 2>/dev/null
+    else
+      tail -n 500 "$f" 2>/dev/null
+    fi
+  else
+    echo "$f"
+  fi
+  """,
+  # 2. Plain bat view (line numbers + syntax) for comparison.
+  """
+  f='{}'
+  if [ -f "$f" ]; then
+    if command -v bat >/dev/null 2>&1; then
+      bat --style=plain --color=always --paging=never --line-range=:500 "$f" 2>/dev/null
+    else
+      head -n 500 "$f" 2>/dev/null
+    fi
+  else
+    echo "$f"
+  fi
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Logs"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open_lnav"
+alt-t = "actions:follow"
+alt-e = "actions:edit"
+ctrl-y = "actions:copy_path"
+
+[actions.open_lnav]
+description = "Open in lnav (fallback: ccze | less -R)"
+command = """
+f='{}'
+[ -f "$f" ] || { echo "Not a regular file: $f"; read -r _; exit 0; }
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$f"
+elif command -v ccze >/dev/null 2>&1; then
+  ccze -A < "$f" | less -R
+else
+  less -R "$f"
+fi
+"""
+mode = "execute"
+
+[actions.follow]
+description = "tail -F with tailspin coloring"
+command = """
+f='{}'
+[ -f "$f" ] || { echo "Not a regular file: $f"; read -r _; exit 0; }
+if command -v tspin >/dev/null 2>&1; then
+  if tspin --help 2>/dev/null | grep -q -- '--follow'; then
+    tspin --follow "$f"
+  else
+    tail -F "$f" | tspin --print
+  fi
+else
+  tail -F "$f"
+fi
+"""
+mode = "execute"
+
+[actions.edit]
+description = "Open in $EDITOR"
+command = """
+f='{}'
+[ -f "$f" ] || { echo "Not a regular file: $f"; read -r _; exit 0; }
+"${EDITOR:-vi}" "$f"
+"""
+mode = "execute"
+
+[actions.copy_path]
+description = "Copy file path to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

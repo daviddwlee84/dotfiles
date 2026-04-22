@@ -51,6 +51,8 @@ gundo() {
   msg="$(git log -1 --pretty=%B)" || return 1
   git reset --soft HEAD~1 && echo "Undone commit:\n  $msg"
 }
+# Show commits on current branch not yet pushed to origin/master
+alias glop='git log --oneline origin/master..HEAD'
 
 # Zsh startup profiling
 alias zsh-profile='ZSH_PROF=1 zsh -i -c exit'

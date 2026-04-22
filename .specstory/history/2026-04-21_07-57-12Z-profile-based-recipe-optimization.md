@@ -1132,4 +1132,3034 @@ To-do's from the plan have already been created. Do not create them again. Mark 
 _**Agent (claude-opus-4-7)**_
 
 <think><details><summary>Thought Process</summary>
- Now</details></think>
+ Now I'm starting to work through the implementation plan step by step. First, I need to verify the exact API signature for `promptChoiceOnce` in chezmoi — the documentation shows it takes a dictionary with prior config, a prompt string, a list of choices, and a default value, though I'm realizing the choices are just simple strings rather than dictionaries.
+
+Looking at the actual chezmoi documentation more carefully, the signature is `promptChoiceOnce map path prompt choices [default]`, where the choices are a straightforward list of strings and the map is the current config context. So I need to adjust my approach — instead of the more complex syntax I was planning, I should use a simpler template that calls `promptChoiceOnce` with the context, a prompt message, and the list of profile options along with a default value.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+I'll now implement the plan. Let me start by verifying the exact `promptChoiceOnce` API since my plan sketch had complex dict syntax.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch">
+<details>
+<summary>Tool use: **web_fetch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptChoiceOnce/"
+}
+```
+Result:
+
+```json
+{
+  "markdown": "promptChoiceOnce - chezmoi\n\nSkip to content\n\n# promptChoiceOnce map path prompt choices [default]\n\n&#96;promptChoiceOnce&#96; returns the value of map at path if it exists and is a string, otherwise it prompts the user for one of choices with prompt and an optional default using [promptChoice](https://www.chezmoi.io/reference/templates/init-functions/promptChoice/).\n\nExample\n\n&#96;&#96;&#96;\n{{- $choices := list \"desktop\" \"laptop\" \"server\" \"termux\" -}}\n{{- $hosttype := promptChoiceOnce . \"hosttype\" \"What type of host are you on\" $choices -}}\n[data]\n    hosttype = {{- $hosttype | quote -}}\n\n&#96;&#96;&#96;",
+  "url": "https://www.chezmoi.io/reference/templates/init-functions/promptChoiceOnce/"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The API signature is straightforward—just a function that takes a profile key, prompt text, a list of string choices, and an optional default value. Now I'll start building this out.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Good — simpler API than my plan sketched. Now let's start implementing.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "in_progress"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "pending"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "pending"
+    },
+    {
+      "content": "Replace 'or (eq .profile macos) (eq .profile macos_intel)' with 'eq .chezmoi.os \"darwin\"' across the 5 bootstrap/onchange scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Collapse nested 'ne .profile' snap-path guard in dot_config/zsh/00_exports.zsh.tmpl to 'eq .chezmoi.os linux'; unify brew eval with dot_zshrc.tmpl",
+      "id": "zsh_exports",
+      "status": "pending"
+    },
+    {
+      "content": "In run_onchange_after_20_ansible_roles.sh.tmpl: keep ubuntu_desktop/ubuntu_server branch, collapse macos/macos_intel, switch Bitwarden desktop gate to '(eq .chezmoi.os darwin) OR (eq .profile ubuntu_desktop)'",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Brewfile.darwin.tmpl 'ne .profile macos_intel' (3 sites) to 'eq .chezmoi.arch arm64'; rewrite run_once_before_02_fix_intel_homebrew.sh.tmpl guard and dot_zshrc.tmpl:42 to combined os+arch check",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md with decision table, before/after examples, migration note for macos_intel users",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add 'Chezmoi Templating Conventions' section to AGENTS.md and CLAUDE.md; update Profiles tables (drop macos_intel row)",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify: 'rg macos_intel' excluding .specstory and *.md returns nothing; chezmoi apply --dry-run on all supported platforms; just docker-test passes",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 1. Refactor `.chezmoi.toml.tmpl`
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "in_progress"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "pending"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "in_progress"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "pending"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 2. OS rewrites across scripts and Brewfile.tmpl
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now `run_onchange_after_25_bat_theme.sh.tmpl`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_25_bat_theme.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now `run_onchange_after_30_brew_bundle.sh.tmpl`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_30_brew_bundle.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now `dot_config/homebrew/Brewfile.tmpl`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "in_progress"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "in_progress"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "pending"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 3. `dot_config/zsh/00_exports.zsh.tmpl`
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/00_exports.zsh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/00_exports.zsh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "in_progress"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "in_progress"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "pending"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 4. `run_onchange_after_20_ansible_roles.sh.tmpl`
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "in_progress"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "pending"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 5. Arch-based rewrites
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now `run_once_before_02_fix_intel_homebrew.sh.tmpl`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/run_once_before_02_fix_intel_homebrew.sh.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now `dot_zshrc.tmpl`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_zshrc.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Let me verify all `macos_intel` references are gone from the non-history files:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "glob": "!**/.specstory/**",
+  "outputMode": "content",
+  "pattern": "macos_intel"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "pattern": "macos_intel",
+  "topFiles": [
+    {
+      "matchCount": 22,
+      "uri": "./.cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/resilient_ansible_+_auto-assign_4ff9ce7c.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./docs/tutorials/bitwarden_ssh_agent.md"
+    }
+  ],
+  "totalFiles": 3,
+  "totalMatches": 24
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The template files look good overall — just need to update that one reference in the docs/tutorials/bitwarden_ssh_agent.md file since the other files I found are either the plan itself or an older plan that I should leave alone.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+All template files are clean. Let me fix the one doc reference and move on:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tutorials/bitwarden_ssh_agent.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "pending"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 6. Create `docs/tools/chezmoi-templating.md`
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/chezmoi-templating.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "in_progress"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "pending"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 7. Update AGENTS.md and CLAUDE.md
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/AGENTS.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now the Profiles table in AGENTS.md — it already has 3 rows (no macos_intel row), so that part is fine. Let me verify and also add/update CLAUDE.md:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now let me check README and the Profiles tables in AGENTS/CLAUDE. The existing Profiles tables already list 3 rows (no `macos_intel`) — good. Let me also check README:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "contextAfter": 4,
+  "contextBefore": 1,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "macos_intel|Profile.*\\|.*OS"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "macos_intel|Profile.*\\|.*OS",
+  "topFiles": [],
+  "totalFiles": 0,
+  "totalMatches": 0
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "profile|Profile"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "profile|Profile",
+  "topFiles": [
+    {
+      "matchCount": 5,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 5
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+README has no `macos_intel` / profile-choice table. Good. Let me check `docs/linux-package-sources.md` which was in the earlier grep hit:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs",
+  "pattern": "macos_intel|ubuntu_server|ubuntu_desktop"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs",
+  "pattern": "macos_intel|ubuntu_server|ubuntu_desktop",
+  "topFiles": [
+    {
+      "matchCount": 11,
+      "uri": "docs/tools/chezmoi-templating.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/cheatsheet.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/tutorials/bitwarden_ssh_agent.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": "docs/linux-package-sources.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/starship.md"
+    }
+  ],
+  "totalFiles": 5,
+  "totalMatches": 19
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All docs are clean now. Let me verify nothing needs fixing in ansible role defaults (the earlier grep showed `dot_ansible/roles/bitwarden/defaults/main.yml`):
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bitwarden/defaults/main.yml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+That's just a comment reference, fine. Now verify template expansion doesn't break:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "completed"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 8. Verification
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: command -v chezmoi && chezmoi --version</summary>
+
+```bash
+command -v chezmoi && chezmoi --version
+```
+
+```
+/opt/homebrew/bin/chezmoi
+chezmoi version v2.69.4, commit c4c669c9f2f329233a85802014d26fba3c58a4a4, built at 2026-02-11T08:59:37Z, built by Homebrew
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template '{{ .chezmoi.os }} {{ .chezmoi.arch }} profile={{ .profile }}'</summary>
+
+```bash
+chezmoi execute-template '{{ .chezmoi.os }} {{ .chezmoi.arch }} profile={{ .profile }}'
+```
+
+```
+darwin arm64 profile=macos
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Good — the current machine is darwin+arm64+macos. Now render the key templates to confirm no template errors:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: set -e
+for f in \
+    .chezmoi.toml.tmpl \
+    run_once_before_00_bootstrap.sh.tmpl \
+    run_once_before_02_fix_intel_homebrew.sh.tmpl \
+    run_onchange_after_20_ansible_roles.sh.tmpl \
+    run_onchange_after_25_bat_theme.sh.tmpl \
+    run_onchange_after_30_brew_bundle.sh.tmpl \
+    dot_config/homebrew/Brewfile.tmpl \
+    dot_config/homebrew/Brewfile.darwin.tmpl \
+    dot_config/zsh/00_exports.zsh.tmpl \
+    dot_zshrc.tmpl
+do
+    echo "=== $f ==="
+    chezmoi execute-template --init < "$f" >/dev/null && echo OK
+done</summary>
+
+```bash
+set -e
+for f in \
+    .chezmoi.toml.tmpl \
+    run_once_before_00_bootstrap.sh.tmpl \
+    run_once_before_02_fix_intel_homebrew.sh.tmpl \
+    run_onchange_after_20_ansible_roles.sh.tmpl \
+    run_onchange_after_25_bat_theme.sh.tmpl \
+    run_onchange_after_30_brew_bundle.sh.tmpl \
+    dot_config/homebrew/Brewfile.tmpl \
+    dot_config/homebrew/Brewfile.darwin.tmpl \
+    dot_config/zsh/00_exports.zsh.tmpl \
+    dot_zshrc.tmpl
+do
+    echo "=== $f ==="
+    chezmoi execute-template --init < "$f" >/dev/null && echo OK
+done
+```
+
+```
+=== .chezmoi.toml.tmpl ===
+OK
+=== run_once_before_00_bootstrap.sh.tmpl ===
+OK
+=== run_once_before_02_fix_intel_homebrew.sh.tmpl ===
+OK
+=== run_onchange_after_20_ansible_roles.sh.tmpl ===
+OK
+=== run_onchange_after_25_bat_theme.sh.tmpl ===
+OK
+=== run_onchange_after_30_brew_bundle.sh.tmpl ===
+OK
+=== dot_config/homebrew/Brewfile.tmpl ===
+OK
+=== dot_config/homebrew/Brewfile.darwin.tmpl ===
+OK
+=== dot_config/zsh/00_exports.zsh.tmpl ===
+OK
+=== dot_zshrc.tmpl ===
+OK
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All 10 templates render cleanly. Now let me confirm the rendered `.chezmoi.toml.tmpl` looks right and that `promptChoiceOnce` uses the right default on this darwin machine:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template --init < .chezmoi.toml.tmpl | head -25</summary>
+
+```bash
+chezmoi execute-template --init < .chezmoi.toml.tmpl | head -25
+```
+
+```
+# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+
+[data]
+# 只在 init 才需要問一次：你之後都讀這個值
+# TODO: not all the things we want to change all the time we chezmoi init
+#
+# Profile only encodes user-role choices that can't be auto-detected
+# (desktop vs server). OS/arch facts come from .chezmoi.os / .chezmoi.arch;
+# see docs/tools/chezmoi-templating.md for the full rule.
+profile = "macos"
+email   = "daviddwlee84@gmail.com"
+name    = "Da-Wei Lee"
+# 是否在中國大陸 GFW 內，需要使用鏡像源
+useChineseMirror = true
+# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+gitleaksAllRepos = false
+# 是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)
+installCodingAgents = true
+# 是否安裝 Bitwarden CLI 並啟用 SSH Agent 自動偵測 + Zsh completion
+installBitwarden = true
+# 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
+installPythonUvTools = true
+# 是否安裝 standalone JS/npm CLI utilities (readability-cli for &#96;readnode&#96;, etc.)
+installJsCliTools = true
+# 是否安裝本地 LLM tools (Ollama, LiteLLM, llmfit, models)
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm testing the linux+arm64 scenario to verify the default behavior works correctly in that environment.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Let me also verify simulated renders on other platforms:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi execute-template --init \
+    --promptString 'email=test@test.com' \
+    --promptString 'name=Tester' \
+    --promptBool 'useChineseMirror=false' \
+    --promptBool 'gitleaksAllRepos=false' \
+    --promptBool 'installCodingAgents=false' \
+    --promptBool 'installBitwarden=false' \
+    --promptBool 'installPythonUvTools=false' \
+    --promptBool 'installJsCliTools=false' \
+    --promptBool 'installLlmTools=false' \
+    --promptBool 'installAiDesktopApps=false' \
+    --promptBool 'installBrewApps=false' \
+    --promptBool 'installInputMethod=false' \
+    --promptBool 'installNetworkingTools=false' \
+    --promptBool 'installIacTools=false' \
+    --promptBool 'noRoot=false' \
+    --promptBool 'backupDotfiles=true' \
+    --promptBool 'allowPartialFailure=false' \
+    --promptChoice 'profile=ubuntu_server' \
+    < .chezmoi.toml.tmpl | head -15</summary>
+
+```bash
+chezmoi execute-template --init \
+    --promptString 'email=test@test.com' \
+    --promptString 'name=Tester' \
+    --promptBool 'useChineseMirror=false' \
+    --promptBool 'gitleaksAllRepos=false' \
+    --promptBool 'installCodingAgents=false' \
+    --promptBool 'installBitwarden=false' \
+    --promptBool 'installPythonUvTools=false' \
+    --promptBool 'installJsCliTools=false' \
+    --promptBool 'installLlmTools=false' \
+    --promptBool 'installAiDesktopApps=false' \
+    --promptBool 'installBrewApps=false' \
+    --promptBool 'installInputMethod=false' \
+    --promptBool 'installNetworkingTools=false' \
+    --promptBool 'installIacTools=false' \
+    --promptBool 'noRoot=false' \
+    --promptBool 'backupDotfiles=true' \
+    --promptBool 'allowPartialFailure=false' \
+    --promptChoice 'profile=ubuntu_server' \
+    < .chezmoi.toml.tmpl | head -15
+```
+
+```
+# https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
+
+[data]
+# 只在 init 才需要問一次：你之後都讀這個值
+# TODO: not all the things we want to change all the time we chezmoi init
+#
+# Profile only encodes user-role choices that can't be auto-detected
+# (desktop vs server). OS/arch facts come from .chezmoi.os / .chezmoi.arch;
+# see docs/tools/chezmoi-templating.md for the full rule.
+profile = "macos"
+email   = "daviddwlee84@gmail.com"
+name    = "Da-Wei Lee"
+# 是否在中國大陸 GFW 內，需要使用鏡像源
+useChineseMirror = true
+# 是否對所有 repo 啟用 gitleaks 掃描（包含沒有 .pre-commit-config.yaml 的 repo）
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ So the existing config values are preserved because `promptChoiceOnce` respects what's already there — existing installations won't get re-prompted, but they'll keep their `macos_intel` setting if they had one, which is why the migration note is important. Now I should run `chezmoi doctor` or `chezmoi apply --dry-run` to verify everything still works correctly.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi apply --dry-run 2>&1 | tail -30</summary>
+
+```bash
+chezmoi apply --dry-run 2>&1 | tail -30
+```
+
+```
+chezmoi: warning: config file template has changed, run chezmoi init to regenerate config file
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The warning about the config template changing is expected and harmless since the user will run `chezmoi init` themselves, and the exit code shows zero with no actual template errors. I should verify the `bats` test syntax is correct and run some light tests to make sure nothing else breaks.
+
+Actually, since this is just template refactoring work and everything renders fine, I'll do a quick ShellCheck pass on the generated bash to be thorough, but that's probably unnecessary given the user's clear instructions. Let me finalize the verification and move toward committing, then do a final grep to make sure there are no stray `macos_intel` references outside the protected areas.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Warning is expected — config template changed. Final grep to confirm scope:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: rg 'macos_intel' -g '!.specstory/**' -g '!.claude/plans/**' -g '!.cursor/plans/**' -g '!.opencode/plans/**' -l</summary>
+
+```bash
+rg 'macos_intel' -g '!.specstory/**' -g '!.claude/plans/**' -g '!.cursor/plans/**' -g '!.opencode/plans/**' -l
+```
+
+```
+]633;C]633;D;0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="await">
+<details>
+<summary>Tool use: **await**</summary>
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="await"><details>
+<summary>Tool use: **await**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/terminals/423213.txt</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The ripgrep search is taking too long because it's probably traversing into directories like .git or node_modules that I should be skipping. I'll switch to using grep with the right flags to avoid those directories.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: kill 91538 2>/dev/null; true</summary>
+
+```bash
+kill 91538 2>/dev/null; true
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "files_with_matches",
+  "pattern": "macos_intel"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "pattern": "macos_intel",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./CLAUDE.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./docs/tools/chezmoi-templating.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-21_07-57-12Z-profile-based-recipe-optimization.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-02-11_10-00-56Z-chezmoi-create-ssh-config.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-02-09_11-20-35Z-wrapper-terminal-copy-paste.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-02-10_07-55-02Z-coding-agents-https-github.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-02-09_07-22-32Z-at-dot-config-zsh.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-16_10-59-29Z-download-failure-handling-in-ansible.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-21_02-51-02Z.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-21_02-26-11Z-hash-local-proxy-config.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-21_01-03-47Z-clipboard-sync-osc52-settings.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-21_01-20-56Z-chezmoi-diff-delta-side.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-18_17-47-40Z-alacritty-ubuntu-desktop-profile.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-17_08-41-06Z.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-17_05-34-58Z.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-17_04-21-05Z-sh-c-curl-fsls.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-15_14-00-20Z-keithkslee-at-raspberrypi-sh.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.cursor/plans/resilient_ansible_+_auto-assign_4ff9ce7c.plan.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-04-16_02-30-35Z.md"
+    }
+  ],
+  "totalFiles": 69,
+  "totalMatches": 69
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All remaining `macos_intel` hits are expected:
+- `.cursor/plans/**` — plan files (including this plan's file)
+- `.specstory/history/**` — chat transcripts (immutable history)
+- `CLAUDE.md`, `docs/tools/chezmoi-templating.md` — deliberate references explaining the migration
+
+No active templates, configs, or scripts contain the string. 
+
+Let me also quickly run the existing tests to confirm nothing broke:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: just bats 2>&1 | tail -25</summary>
+
+```bash
+just bats 2>&1 | tail -25
+```
+
+```
+bats tests/unit
+1..20
+ok 1 ghget: missing arg prints usage and returns 1
+ok 2 ghget: non-GitHub URL is rejected
+ok 3 ghget: URL without /tree/ segment is rejected
+ok 4 ghget: URL with /blob/ (file, not tree) is rejected
+ok 5 ghget: valid URL feeds correct owner/repo/branch/path to curl and tar
+ok 6 ghget: strips query string and trailing slash from URL
+ok 7 ghget: refuses to overwrite an existing destination
+ok 8 is_usable_ip: accepts normal /24 host addresses
+ok 9 is_usable_ip: rejects link-local, multicast, broadcast, network
+ok 10 is_usable_ip: rejects empty input
+ok 11 vendor_for_mac: looks up vendor in nmap-style OUI DB
+ok 12 vendor_for_mac: returns nothing when prefix is too short
+ok 13 detect_proxy: $LOCAL_PROXY_URL is used verbatim, no probe
+ok 14 detect_proxy: probes default ports and picks first responder
+ok 15 detect_proxy: no responder sets cache=none and returns non-zero
+ok 16 all_proxy_url: prefers LOCAL_PROXY_SOCKS_URL, falls back to cache
+ok 17 proxy-on: exports all six proxy env vars
+ok 18 proxy-on: split HTTP/SOCKS wires http= and all= independently (fa4c063 guard)
+ok 19 proxy-off: clears all six proxy vars plus NO_PROXY / no_proxy
+ok 20 proxy-status: returns 1 when unavailable, 0 when available
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All 20 unit tests pass.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "completed"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "in_progress"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "completed"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+## 9. Git commit
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status</summary>
+
+```bash
+git status
+```
+
+```
+On branch main
+Your branch is ahead of 'origin/main' by 14 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .chezmoi.toml.tmpl
+	modified:   .specstory/statistics.json
+	modified:   CLAUDE.md
+	modified:   docs/tutorials/bitwarden_ssh_agent.md
+	modified:   dot_config/homebrew/Brewfile.darwin.tmpl
+	modified:   dot_config/homebrew/Brewfile.tmpl
+	modified:   dot_config/zsh/00_exports.zsh.tmpl
+	modified:   dot_zshrc.tmpl
+	modified:   run_once_before_00_bootstrap.sh.tmpl
+	modified:   run_once_before_02_fix_intel_homebrew.sh.tmpl
+	modified:   run_onchange_after_20_ansible_roles.sh.tmpl
+	modified:   run_onchange_after_25_bat_theme.sh.tmpl
+	modified:   run_onchange_after_30_brew_bundle.sh.tmpl
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	.cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md
+	.specstory/history/2026-04-21_07-57-12Z-profile-based-recipe-optimization.md
+	docs/tools/chezmoi-templating.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git log --oneline -10</summary>
+
+```bash
+git log --oneline -10
+```
+
+```
+a95dcbb Move upstream clones from Ansible to chezmoi externals
+71f1b14 Make docker default to rootless on Linux with config map notes
+99c5c43 Add chezmoi prefix guide
+54dc88c Also check agent plans for any leaking secrets
+8bc48ac Use modify_ + create_ chezmoi prefixes to stop recurring diffs
+f317aa0 Manage Docker proxy/mirrors via chezmoi; add container notes
+f0cb603 Add infrastructure as code related tools
+4af0473 Expand bats coverage: ghget + lan-scan; add TOML/JSON pre-commit checks
+a96aa84 Link pre-commit hook repos in docs/testing.md
+4e3f283 Add bats test suite, shellcheck/shfmt hooks, testing doc
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add -A && git status</summary>
+
+```bash
+git add -A && git status
+```
+
+```
+On branch main
+Your branch is ahead of 'origin/main' by 14 commits.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged &lt;file&gt;..." to unstage)
+	modified:   .chezmoi.toml.tmpl
+	new file:   .cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md
+	new file:   .specstory/history/2026-04-21_07-57-12Z-profile-based-recipe-optimization.md
+	modified:   .specstory/statistics.json
+	modified:   CLAUDE.md
+	new file:   docs/tools/chezmoi-templating.md
+	modified:   docs/tutorials/bitwarden_ssh_agent.md
+	modified:   dot_config/homebrew/Brewfile.darwin.tmpl
+	modified:   dot_config/homebrew/Brewfile.tmpl
+	modified:   dot_config/zsh/00_exports.zsh.tmpl
+	modified:   dot_zshrc.tmpl
+	modified:   run_once_before_00_bootstrap.sh.tmpl
+	modified:   run_once_before_02_fix_intel_homebrew.sh.tmpl
+	modified:   run_onchange_after_20_ansible_roles.sh.tmpl
+	modified:   run_onchange_after_25_bat_theme.sh.tmpl
+	modified:   run_onchange_after_30_brew_bundle.sh.tmpl
+
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I notice AGENTS.md should have been modified but it's not showing up in the diff at all — that's odd, let me investigate what happened there.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git diff --cached --stat AGENTS.md 2>&1; echo ---; ls -la AGENTS.md CLAUDE.md 2>&1</summary>
+
+```bash
+git diff --cached --stat AGENTS.md 2>&1; echo ---; ls -la AGENTS.md CLAUDE.md 2>&1
+```
+
+```
+---
+[34mM[1;90m-[0m [35m AGENTS.md[0m [1;90m-&gt;[0m CLAUDE.md
+[34mM[1;90m-[0m  CLAUDE.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Oh, so AGENTS.md is actually a symlink pointing to CLAUDE.md — they're the same file underneath. Let me double-check that.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: readlink AGENTS.md; readlink CLAUDE.md</summary>
+
+```bash
+readlink AGENTS.md; readlink CLAUDE.md
+```
+
+```
+CLAUDE.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Ah, I see the issue—AGENTS.md is actually a symlink pointing to CLAUDE.md, so when I edited both files, I was writing to the same location twice and the second edit overwrote the first. Let me verify what's currently in CLAUDE.md to make sure the conventions section is there.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+`AGENTS.md` → `CLAUDE.md` (symlink). My two edits wrote to the same file — the second edit would have overwritten the first. Let me verify CLAUDE.md has the intended content:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "contextAfter": 18,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Chezmoi Templating Conventions"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Chezmoi Templating Conventions",
+  "topFiles": [
+    {
+      "matchCount": 35,
+      "uri": "CLAUDE.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 2
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+The section was inserted twice because I used the same "Maintaining Dockerfile" anchor on a symlinked file. Let me remove the duplicate:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "count",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Chezmoi Templating Conventions"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "count",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "Chezmoi Templating Conventions",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "CLAUDE.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Exactly one section now. Stage and commit:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add -A && git status --short</summary>
+
+```bash
+git add -A && git status --short
+```
+
+```
+M  .chezmoi.toml.tmpl
+A  .cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md
+A  .specstory/history/2026-04-21_07-57-12Z-profile-based-recipe-optimization.md
+M  .specstory/statistics.json
+M  CLAUDE.md
+A  docs/tools/chezmoi-templating.md
+M  docs/tutorials/bitwarden_ssh_agent.md
+M  dot_config/homebrew/Brewfile.darwin.tmpl
+M  dot_config/homebrew/Brewfile.tmpl
+M  dot_config/zsh/00_exports.zsh.tmpl
+M  dot_zshrc.tmpl
+M  run_once_before_00_bootstrap.sh.tmpl
+M  run_once_before_02_fix_intel_homebrew.sh.tmpl
+M  run_onchange_after_20_ansible_roles.sh.tmpl
+M  run_onchange_after_25_bat_theme.sh.tmpl
+M  run_onchange_after_30_brew_bundle.sh.tmpl
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git commit --trailer "Made-with: Cursor" -m "$(cat <<'EOF'
+Prefer .chezmoi.os/.chezmoi.arch over .profile for OS/arch branching
+
+Collapse redundant `macos_intel` profile into `.chezmoi.arch`, rewrite
+all OS-based `.profile` conditionals to use `.chezmoi.os`, and keep
+`.profile` only where it encodes a genuine user role choice
+(ubuntu_desktop vs ubuntu_server). Profile prompt now uses
+promptChoiceOnce with auto-defaults based on `.chezmoi.os`.
+
+Intel-Mac installs with `profile = "macos_intel"` in chezmoi.toml need
+to either re-run `chezmoi init --force` or flip the value to `"macos"`;
+migration snippet documented in the new docs/tools/chezmoi-templating.md.
+EOF
+)"</summary>
+
+```bash
+git commit --trailer "Made-with: Cursor" -m "$(cat <<'EOF'
+Prefer .chezmoi.os/.chezmoi.arch over .profile for OS/arch branching
+
+Collapse redundant `macos_intel` profile into `.chezmoi.arch`, rewrite
+all OS-based `.profile` conditionals to use `.chezmoi.os`, and keep
+`.profile` only where it encodes a genuine user role choice
+(ubuntu_desktop vs ubuntu_server). Profile prompt now uses
+promptChoiceOnce with auto-defaults based on `.chezmoi.os`.
+
+Intel-Mac installs with `profile = "macos_intel"` in chezmoi.toml need
+to either re-run `chezmoi init --force` or flip the value to `"macos"`;
+migration snippet documented in the new docs/tools/chezmoi-templating.md.
+EOF
+)"
+```
+
+```
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...............................................................Passed
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 4a0d3c5] Prefer .chezmoi.os/.chezmoi.arch over .profile for OS/arch branching
+ 16 files changed, 1473 insertions(+), 34 deletions(-)
+ create mode 100644 .cursor/plans/chezmoi_profile_vs_os_arch_refactor_309f9476.plan.md
+ create mode 100644 .specstory/history/2026-04-21_07-57-12Z-profile-based-recipe-optimization.md
+ create mode 100644 docs/tools/chezmoi-templating.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status && git log --oneline -3</summary>
+
+```bash
+git status && git log --oneline -3
+```
+
+```
+On branch main
+Your branch is ahead of 'origin/main' by 15 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+4a0d3c5 Prefer .chezmoi.os/.chezmoi.arch over .profile for OS/arch branching
+a95dcbb Move upstream clones from Ansible to chezmoi externals
+71f1b14 Make docker default to rootless on Linux with config map notes
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "completed"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Rewrite .chezmoi.toml.tmpl profile prompt: promptChoiceOnce, drop macos_intel, auto-default via .chezmoi.os, switch installAiDesktopApps gate to .chezmoi.os",
+      "id": "prompt",
+      "status": "completed"
+    },
+    {
+      "content": "Replace OS profile checks with .chezmoi.os across scripts and Brewfile.tmpl",
+      "id": "os_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Collapse nested .profile guards in dot_config/zsh/00_exports.zsh.tmpl",
+      "id": "zsh_exports",
+      "status": "completed"
+    },
+    {
+      "content": "Refactor run_onchange_after_20_ansible_roles.sh.tmpl",
+      "id": "ansible_roles",
+      "status": "completed"
+    },
+    {
+      "content": "Switch Intel/AS profile checks to .chezmoi.arch",
+      "id": "arch_sites",
+      "status": "completed"
+    },
+    {
+      "content": "Create docs/tools/chezmoi-templating.md",
+      "id": "new_doc",
+      "status": "completed"
+    },
+    {
+      "content": "Add Chezmoi Templating Conventions to AGENTS.md/CLAUDE.md and update Profiles tables",
+      "id": "agent_docs",
+      "status": "completed"
+    },
+    {
+      "content": "Verify no macos_intel references remain and tests pass",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes (with specstory chat history)",
+      "id": "todo-1776758918832-yyz30d3ho",
+      "status": "in_progress"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All 9 todos done. Commit `4a0d3c5` is on `main`.
+
+## Summary
+
+**13 template/doc files updated, 1 new doc, 1 pre-existing docs fix.** 16 files committed in total (including the auto-captured plan + specstory transcript).
+
+### Semantic changes
+
+- [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl): profile prompt now uses `promptChoiceOnce` with 3 validated options (`macos`, `ubuntu_desktop`, `ubuntu_server`); default auto-picked from `.chezmoi.os`. `installAiDesktopApps` gate switched to `eq .chezmoi.os "darwin"`.
+- Every `or (eq .profile "macos") (eq .profile "macos_intel")` collapsed to `eq .chezmoi.os "darwin"` — 11 sites across bootstrap, onchange-ansible, onchange-bat, onchange-brew-bundle, Brewfile.tmpl, zsh exports.
+- Apple-Silicon-only casks (`chatgpt`, `codex-app`, `superset`) in [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl) use `eq .chezmoi.arch "arm64"`.
+- Intel-only logic in [`run_once_before_02_fix_intel_homebrew.sh.tmpl`](run_once_before_02_fix_intel_homebrew.sh.tmpl) and [`dot_zshrc.tmpl:42`](dot_zshrc.tmpl) uses `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "amd64")`.
+- Bitwarden-Desktop gate in [`run_onchange_after_20_ansible_roles.sh.tmpl:136`](run_onchange_after_20_ansible_roles.sh.tmpl) is now `or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")` — correctly expresses "is this a desktop?" where macOS is auto-detected and Linux needs the user's role choice.
+- [`dot_config/zsh/00_exports.zsh.tmpl`](dot_config/zsh/00_exports.zsh.tmpl): unflattened nested `ne .profile` guards into a single `eq .chezmoi.os "linux"`.
+
+### Agent guidance
+
+- New [`docs/tools/chezmoi-templating.md`](docs/tools/chezmoi-templating.md) (140+ lines) — decision table, cheat-sheet patterns, anti-pattern, and `macos_intel` migration snippet.
+- New "Chezmoi Templating Conventions" section in [`CLAUDE.md`](CLAUDE.md) (reached through the `AGENTS.md` → `CLAUDE.md` symlink, so both agent entrypoints see it).
+
+### Verification done
+
+- `chezmoi execute-template --init` renders all 10 modified templates successfully on darwin/arm64.
+- `chezmoi apply --dry-run` exits 0 with only the expected "config file template has changed" advisory.
+- `just bats` → 20/20 unit tests pass.
+- No `macos_intel` references remain in active files (only in agent history/plans and the deliberate migration note).
+
+### Breaking change (documented)
+
+Intel-Mac users with `profile = "macos_intel"` in `~/.config/chezmoi/chezmoi.toml` must run one of:
+
+```bash
+sed -i '' 's/"macos_intel"/"macos"/' ~/.config/chezmoi/chezmoi.toml && chezmoi apply
+# or
+chezmoi init --force
+```
+
+Migration snippet is front-and-center in [`docs/tools/chezmoi-templating.md`](docs/tools/chezmoi-templating.md).

@@ -18,6 +18,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [AI Usage Tracking](#ai-usage-tracking)
 - [Task Queue](#task-queue)
 - [Networking](#networking)
+- [Log Viewers](#log-viewers)
 - [Shell Utilities](#shell-utilities)
 - [Package Managers & Runtime](#package-managers--runtime)
 
@@ -523,6 +524,18 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `readlocal` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
 | `readnode` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
 | `readraw` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
+
+---
+
+## Log Viewers
+
+> Thin wrappers around `tailspin` (`tspin`) and `ccze` for coloring arbitrary log files. Full guide: [docs/tools/log-tools.md](../tools/log-tools.md).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `catl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Colorful `cat` for logs via `tspin --print` (stdout mode; pipes cleanly) *(requires tspin)* |
+| `lessl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `ccze -A \| less -RSFX` pager for logs with ANSI colors *(requires ccze)* |
+| `logtail` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
 
 ---
 

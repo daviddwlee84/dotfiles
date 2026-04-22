@@ -46,8 +46,11 @@ watch = 2.0
 no_sort = true
 
 [preview]
+# Preview cycle 1 pipes pueue log output through `tspin --print` when tailspin
+# is installed, for colorful highlighting of timestamps/levels/IPs/URLs in the
+# task log. Falls back to raw text on fresh installs (pre-devtools-role).
 command = [
-  "pueue log '{split:\\t:0}' --lines 200 2>/dev/null || pueue log '{split:\\t:0}' 2>/dev/null || echo 'No log available for: {split:\\t:0}'",
+  "if command -v tspin >/dev/null 2>&1; then pueue log '{split:\\t:0}' --lines 200 2>/dev/null | tspin --print 2>/dev/null; else pueue log '{split:\\t:0}' --lines 200 2>/dev/null; fi || pueue log '{split:\\t:0}' 2>/dev/null || echo 'No log available for: {split:\\t:0}'",
   "pueue status --json 2>/dev/null | jq '.tasks[\"{split:\\t:0}\"] | del(.envs)' 2>/dev/null || echo 'No details for: {split:\\t:0}'",
 ]
 header = "Task {split:\\t:0} ({split:\\t:1})"

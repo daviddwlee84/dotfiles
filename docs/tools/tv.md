@@ -103,6 +103,36 @@ Requires `nmap`; `rustscan` and `arp-scan` are used when present (all part of th
 
 ---
 
+### `logs` channel
+
+Fuzzy-browse log files on the machine with colorful previews. Open with `tv logs`.
+
+Source file: [`dot_config/television/cable/logs.toml`](../../dot_config/television/cable/logs.toml). Full toolbelt writeup: [log-tools.md](log-tools.md).
+
+**Source cycling** (`Ctrl+S`):
+
+1. Project-local logs under `$PWD` — `.log` / `.ndjson` / `.jsonl` via `fd -HI`
+2. User + system log dirs — `~/.cache/**/*.log`, `~/Library/Logs` on macOS, `/var/log/*.log` / `syslog*` / `messages*` (readable only)
+3. `journalctl --output=short-iso -n 2000` — Linux systemd journal recent lines (falls back to an empty source otherwise)
+
+**Preview cycling** (`Ctrl+F`):
+
+1. Colorful tail via [`tailspin`](https://github.com/bensadeh/tailspin) — `tail -n 500 FILE | tspin --print`; falls back to raw `tail` when `tspin` is missing
+2. Plain [`bat`](https://github.com/sharkdp/bat) view — `bat --style=plain --color=always --line-range=:500` for unbiased comparison
+
+**Keybindings:**
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Open in `lnav` (falls back to `ccze -A \| less -R`, then plain `less -R`) |
+| `Alt+T` | Follow with `tspin --follow` (or `tail -F \| tspin --print` on older tailspin) |
+| `Alt+E` | Open in `$EDITOR` |
+| `Ctrl+Y` | Copy file path to clipboard (OSC 52 over SSH) |
+
+Requires `fd` (part of the `base` ansible role). Tailspin, lnav, ccze are part of `devtools`.
+
+---
+
 ### `ansible` channel
 
 Browse the ansible playbooks / roles / tags shipped in `dot_ansible/` (deployed to `~/.ansible/`). Useful for quickly running a playbook, syntax-checking after edits, or copying the full `ansible-playbook` invocation to paste into a shell.
@@ -226,7 +256,7 @@ Open with `tv pueue`. Auto-refreshes every 2 seconds.
 
 **Preview** (`Ctrl+F` cycles):
 
-1. Task log output (`pueue log <id>`)
+1. Task log output (`pueue log <id> --lines 200`) — piped through `tspin --print` when [tailspin](log-tools.md) is installed, for colored timestamps/levels/IPs/URLs. Falls back to raw output on fresh installs.
 2. Full JSON task details (timing, dependencies, result — envs stripped for readability)
 
 **Implementation notes:**

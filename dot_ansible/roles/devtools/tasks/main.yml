@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -42,6 +42,10 @@
       - taplo
       - television
       - pandoc
+      - tailspin
+      - lnav
+      - grc
+      - ccze
     state: present
 
 # =============================================================================
@@ -2485,6 +2489,275 @@
   register: tv_update_channels
   changed_when: "'already exists' not in tv_update_channels.stderr"
   failed_when: false
+
+# =============================================================================
+# Log viewers (Linux)
+# =============================================================================
+# See docs/tools/log-tools.md for the toolbelt rationale. On macOS these are
+# installed via the Homebrew list at the top of this file. Here we handle the
+# Linux side: lnav/grc/ccze are in Debian/Ubuntu apt repos, tailspin (binary
+# `tspin`) is only on GitHub releases as a Rust musl binary.
+
+# --- lnav/grc/ccze (Debian/Ubuntu) ---
+- name: Install log viewers via apt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - lnav
+      - grc
+      - ccze
+    state: present
+  ignore_errors: true
+
+# --- lnav (user-level fallback) ---
+- name: Re-check if lnav is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v lnav
+  register: lnav_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install lnav from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - lnav_recheck.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (lnav)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest lnav release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/tstack/lnav/releases/latest
+        return_content: true
+      register: lnav_release
+
+    - name: Set lnav architecture mapping
+      ansible.builtin.set_fact:
+        lnav_arch: >-
+          {{
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Set lnav download URL
+      ansible.builtin.set_fact:
+        lnav_download_url: >-
+          {{
+            (
+              lnav_release.json.assets
+              | selectattr('name', 'match', '^lnav-.*-' ~ lnav_arch ~ '-.*-linux-musl\.zip$')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip lnav if download URL could not be determined
+      when: lnav_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "lnav skipped: could not find musl asset for architecture {{ lnav_arch }}"
+
+    - name: Download lnav zip (user)
+      when: lnav_download_url | trim != ''
+      ansible.builtin.get_url:
+        url: "{{ lnav_download_url }}"
+        dest: /tmp/lnav.zip
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create lnav temp directory
+      when: lnav_download_url | trim != ''
+      ansible.builtin.file:
+        path: /tmp/lnav-extract
+        state: directory
+        mode: '0755'
+
+    - name: Extract lnav zip
+      when: lnav_download_url | trim != ''
+      ansible.builtin.shell: |
+        set -euo pipefail
+        python3 -m zipfile -e /tmp/lnav.zip /tmp/lnav-extract
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Find lnav binary
+      when: lnav_download_url | trim != ''
+      ansible.builtin.find:
+        paths: /tmp/lnav-extract
+        patterns: lnav
+        file_type: file
+        recurse: true
+      register: lnav_find
+
+    - name: Install lnav to ~/.local/bin
+      when:
+        - lnav_download_url | trim != ''
+        - lnav_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ lnav_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/lnav"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up lnav temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/lnav.zip
+        - /tmp/lnav-extract
+
+  rescue:
+    - name: Warn lnav (user) installation failed
+      ansible.builtin.debug:
+        msg: "lnav (user) installation failed (likely network timeout) - skipping"
+
+    - name: Clean up lnav temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/lnav.zip
+        - /tmp/lnav-extract
+
+# --- tailspin (tspin) ---
+- name: Check if tailspin (tspin) is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: tspin --version
+  register: tspin_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Skip tailspin on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tspin_check.rc != 0
+    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: "tailspin skipped: no release for {{ target_architecture }}"
+
+- name: Install tailspin from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tspin_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (tailspin)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest tailspin release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/bensadeh/tailspin/releases/latest
+        return_content: true
+      register: tspin_release
+
+    - name: Set tailspin architecture mapping
+      ansible.builtin.set_fact:
+        tspin_arch: >-
+          {{
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Set tailspin download URL
+      ansible.builtin.set_fact:
+        tspin_download_url: >-
+          {{
+            (
+              tspin_release.json.assets
+              | selectattr('name', 'match', '^tailspin-.*' ~ tspin_arch ~ '-unknown-linux-musl\.tar\.gz$')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip tailspin if download URL could not be determined
+      when: tspin_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "tailspin skipped: could not determine download URL for architecture {{ tspin_arch }}"
+
+    - name: Download tailspin tarball
+      when: tspin_download_url | trim != ''
+      ansible.builtin.get_url:
+        url: "{{ tspin_download_url }}"
+        dest: /tmp/tailspin.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create tailspin temp directory
+      when: tspin_download_url | trim != ''
+      ansible.builtin.file:
+        path: /tmp/tailspin-extract
+        state: directory
+        mode: '0755'
+
+    - name: Extract tailspin
+      when: tspin_download_url | trim != ''
+      ansible.builtin.unarchive:
+        src: /tmp/tailspin.tar.gz
+        dest: /tmp/tailspin-extract
+        remote_src: true
+
+    - name: Find tspin binary
+      when: tspin_download_url | trim != ''
+      ansible.builtin.find:
+        paths: /tmp/tailspin-extract
+        patterns: tspin
+        file_type: file
+        recurse: true
+      register: tspin_find
+
+    - name: Install tspin to ~/.local/bin
+      when:
+        - tspin_download_url | trim != ''
+        - tspin_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ tspin_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/tspin"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up tailspin temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/tailspin.tar.gz
+        - /tmp/tailspin-extract
+
+  rescue:
+    - name: Warn tailspin installation failed
+      ansible.builtin.debug:
+        msg: "tailspin installation failed (likely network timeout) - skipping"
+
+    - name: Clean up tailspin temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/tailspin.tar.gz
+        - /tmp/tailspin-extract
 
 # =============================================================================
 # TPM (Tmux Plugin Manager) - All platforms
