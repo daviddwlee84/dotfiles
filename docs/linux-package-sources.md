@@ -70,10 +70,67 @@ Linux with sudo (ubuntu_desktop, ubuntu_server):
   d) Language tooling   → mise / uv / cargo / gem / npm
 
 Linux noRoot (ubuntu_server + noRoot=true):
-  GitHub release binaries → ~/.local/bin
+  GitHub release binaries → ~/.local/bin (prefer musl over gnu)
   AppImage (extracted)    → ~/.local/share/<tool>/
   mise + language tools   → ~/.local/bin, ~/.local/share
 ```
+
+### GitHub binary asset selection policy
+
+When a tool is installed from a GitHub release (either as the system-level
+source or as the user-level `noRoot` fallback), the ansible roles follow this
+selection order:
+
+1. **Prefer `unknown-linux-musl`** (or `musleabihf` for armhf) assets when
+   upstream publishes them. musl binaries are statically linked against libc
+   and therefore run on any glibc version the kernel can boot.
+2. **Use `unknown-linux-gnu` only when no musl asset exists** and the fallback
+   is explicitly justified in the role with a comment. gnu binaries inherit
+   whatever glibc version the upstream CI uses, which on modern
+   `ubuntu-latest` runners is already newer than Ubuntu 22.04 LTS ships.
+3. **If no safe musl asset exists for a given arch, prefer Linuxbrew** (when
+   available on the host). Homebrew bottles track an older glibc baseline than
+   random upstream CI images, so `brew install <tool>` is usually safer than
+   the latest gnu release binary.
+4. **If Linuxbrew is unavailable too, skip with an explicit `debug:` message**
+   instead of silently installing a binary that may fail to start on the user's
+   libc. The skip message should name the tool, the arch, and tell the user
+   either to install Linuxbrew or to wait for an upstream musl build.
+
+### Example: glibc compatibility on Ubuntu 22.04
+
+Ubuntu 22.04 LTS ships **glibc 2.35**. Several Rust/Go tools now produce
+`unknown-linux-gnu` release tarballs that link against glibc 2.38 or 2.39
+because their CI runs on `ubuntu-latest` (Ubuntu 24.04) or Debian 13. A
+concrete example surfaced in this repo:
+
+```
+❯ tv sesh
+tv: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by tv)
+```
+
+The `devtools` role used to blindly fetch `tv-<version>-<arch>-unknown-linux-gnu.tar.gz`
+which caused this failure on a fresh Jammy box. The fix — and the pattern
+replicated for all similar cases in the repo — was:
+
+- **television** — upstream ships no musl asset → brew-install when Linuxbrew
+  is present, otherwise skip with a debug message pointing to the `GLIBC_2.X`
+  error.
+- **yazi, fd** — upstream publishes musl assets → switch to
+  `unknown-linux-musl.{deb,zip,tar.gz}` for both sudo and noRoot paths.
+- **git-delta, eza** — upstream publishes musl for x86_64 only → use musl on
+  x86_64; on aarch64 fall through the "brew or skip" path.
+- **trippy** — musl targets already exist for every supported arch → the
+  system-level path is aligned with the user fallback on `*-unknown-linux-musl`.
+
+This matches the general "install vs upgrade is split on purpose" philosophy
+in [CLAUDE.md → Upgrades](../CLAUDE.md): `chezmoi apply` should never surprise
+a running box by installing a binary that won't run.
+
+If you hit a `GLIBC_2.X not found` failure **after** applying this repo
+(e.g. from a stale binary installed before the musl switch, or from a tool
+added later that slipped back to gnu), see the symptom-first recovery
+entry in [ansible_customization.md → `GLIBC_2.XX not found`](this_repo/ansible_customization.md#glibc_2xx-not-found-when-running-an-installed-cli-ubuntu-2204--older-distros).
 
 ### Example: tmux
 

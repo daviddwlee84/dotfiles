@@ -578,6 +578,12 @@
         msg: "eza apt install failed (likely broken third-party repo) — will try GitHub fallback"
 
 # --- eza (user-level fallback) ---
+# Upstream publishes a musl tarball for x86_64 only. aarch64 has just
+# `unknown-linux-gnu.tar.gz`, which can break on Jammy when upstream CI uses a
+# newer glibc. Split the user fallback by arch:
+#   - x86_64: switch to `eza_x86_64-unknown-linux-musl.tar.gz`.
+#   - aarch64: probe Linuxbrew; install via brew if present, otherwise skip
+#     with an explicit warning.
 - name: Re-check if eza is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.shell: command -v eza
@@ -585,11 +591,11 @@
   changed_when: false
   failed_when: false
 
-- name: Install eza from GitHub releases (user-level, no sudo)
+- name: Install eza musl from GitHub releases (user-level, x86_64)
   when:
     - ansible_facts["os_family"] == "Debian"
     - eza_recheck.rc != 0
-    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64']
   block:
     - name: Ensure ~/.local/bin exists (eza)
       ansible.builtin.file:
@@ -603,9 +609,9 @@
         return_content: true
       register: eza_release
 
-    - name: Download eza binary
+    - name: Download eza musl binary (x86_64)
       ansible.builtin.get_url:
-        url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_{{ target_architecture }}-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/eza-community/eza/releases/download/{{ eza_release.json.tag_name }}/eza_x86_64-unknown-linux-musl.tar.gz"
         dest: /tmp/eza.tar.gz
         mode: '0644'
         timeout: 120
@@ -635,7 +641,49 @@
       loop:
         - /tmp/eza.tar.gz
 
+# --- eza (aarch64 user fallback: brew or skip — no upstream musl asset) ---
+- name: Detect Linuxbrew for eza user fallback (Debian/Ubuntu, aarch64)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - eza_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: eza_brew_probe
+  changed_when: false
+
+- name: Install eza via Linuxbrew (user fallback, aarch64, brew available)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - eza_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - eza_brew_probe is defined
+    - eza_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: eza
+    state: present
+
+- name: Warn eza cannot be installed safely (aarch64, no brew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - eza_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - (eza_brew_probe is not defined) or (eza_brew_probe.stdout | default('') | trim == '')
+  ansible.builtin.debug:
+    msg: >-
+      eza skipped on aarch64: upstream publishes only `unknown-linux-gnu`
+      tarball for aarch64 which may require a newer glibc than Jammy (2.35).
+      Install Linuxbrew (`brew install eza`) or wait for an upstream musl
+      arm64 build.
+
 # --- git-delta ---
+# Upstream ships musl `.deb` + musl tarball for x86_64 only. On aarch64 only
+# `unknown-linux-gnu` assets exist, and delta 0.19.x briefly required glibc
+# 2.39 (unavailable on Jammy). We therefore:
+#   1) x86_64: use the musl `.deb` (sudo) / musl tarball (user).
+#   2) aarch64: probe Linuxbrew and install via `brew`; otherwise skip with a
+#      clear debug message rather than silently pulling a glibc-risky binary.
 - name: Check if delta is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: delta --version
@@ -651,11 +699,11 @@
   ansible.builtin.debug:
     msg: "git-delta skipped: no release for {{ target_architecture }}"
 
-- name: Install git-delta from GitHub releases (Debian/Ubuntu)
+- name: Install git-delta musl .deb (Debian/Ubuntu, x86_64)
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_check.rc != 0
-    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64']
   become: true
   tags: [sudo]
   block:
@@ -665,16 +713,16 @@
         return_content: true
       register: delta_release
 
-    - name: Download delta .deb package
+    - name: Download git-delta musl .deb package
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_{{ target_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}.deb"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta-musl_{{ delta_release.json.tag_name }}_amd64.deb"
         dest: /tmp/git-delta.deb
         mode: '0644'
         timeout: 120
       retries: 3
       delay: 5
 
-    - name: Install delta .deb package
+    - name: Install delta musl .deb package
       ansible.builtin.apt:
         deb: /tmp/git-delta.deb
 
@@ -690,10 +738,44 @@
 
     - name: Clean up git-delta temp files after failure
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: /tmp/git-delta.deb
         state: absent
-      loop:
-        - /tmp/git-delta.deb
+
+# --- git-delta (aarch64: brew or skip — no upstream musl asset) ---
+- name: Detect Linuxbrew for git-delta (Debian/Ubuntu, aarch64)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_check.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: delta_brew_probe
+  changed_when: false
+
+- name: Install git-delta via Linuxbrew (Debian/Ubuntu, aarch64, brew available)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_check.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - delta_brew_probe is defined
+    - delta_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: git-delta
+    state: present
+
+- name: Warn git-delta cannot be installed safely (aarch64, no brew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_check.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - (delta_brew_probe is not defined) or (delta_brew_probe.stdout | default('') | trim == '')
+  ansible.builtin.debug:
+    msg: >-
+      git-delta skipped on aarch64: upstream publishes only `unknown-linux-gnu`
+      assets, which historically require glibc >= 2.39 and may fail on Jammy
+      (glibc 2.35). Install Linuxbrew (`brew install git-delta`) or wait for
+      an upstream musl arm64 build.
 
 # --- git-delta (user-level fallback) ---
 - name: Re-check if delta is installed
@@ -703,11 +785,11 @@
   changed_when: false
   failed_when: false
 
-- name: Install git-delta from GitHub releases (user-level, no sudo)
+- name: Install git-delta musl tarball (user-level, no sudo, x86_64)
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_recheck.rc != 0
-    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - target_architecture in ['x86_64', 'amd64']
   block:
     - name: Ensure ~/.local/bin exists (delta)
       ansible.builtin.file:
@@ -721,9 +803,9 @@
         return_content: true
       register: delta_release_user
 
-    - name: Download delta tarball (user)
+    - name: Download delta musl tarball (user)
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
         timeout: 120
@@ -738,7 +820,7 @@
 
     - name: Install delta to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu/delta"
+        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl/delta"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/delta"
         mode: '0755'
         remote_src: true
@@ -749,7 +831,7 @@
         state: absent
       loop:
         - /tmp/delta.tar.gz
-        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-{{ target_architecture }}-unknown-linux-gnu"
+        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl"
 
   rescue:
     - name: Warn git-delta (user) installation failed
@@ -762,6 +844,41 @@
         state: absent
       loop:
         - /tmp/delta.tar.gz
+
+# --- git-delta (aarch64 user fallback: brew or skip) ---
+- name: Detect Linuxbrew for git-delta user fallback (Debian/Ubuntu, aarch64)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: delta_brew_probe_user
+  changed_when: false
+
+- name: Install git-delta via Linuxbrew (user fallback, aarch64, brew available)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - delta_brew_probe_user is defined
+    - delta_brew_probe_user.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: git-delta
+    state: present
+
+- name: Warn git-delta (user) cannot be installed safely (aarch64, no brew)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - delta_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+    - (delta_brew_probe_user is not defined) or (delta_brew_probe_user.stdout | default('') | trim == '')
+  ansible.builtin.debug:
+    msg: >-
+      git-delta (user) skipped on aarch64: no upstream musl asset. Install
+      Linuxbrew for a safe `brew install git-delta`, or wait for an upstream
+      musl arm64 build.
 
 # --- diffnav ---
 - name: Check if diffnav is installed
@@ -1488,6 +1605,9 @@
   failed_when: false
 
 - name: Install yazi from GitHub releases (Debian/Ubuntu)
+  # Upstream ships musl `.deb` assets for x86_64 and aarch64; use those over
+  # `unknown-linux-gnu.zip` so Jammy (glibc 2.35) stays compatible even when
+  # upstream CI bumps to a newer glibc. See docs/linux-package-sources.md.
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_check.rc != 0
@@ -1501,39 +1621,24 @@
         return_content: true
       register: yazi_release
 
-    - name: Download yazi binary
+    - name: Download yazi musl .deb package
       ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-gnu.zip"
-        dest: /tmp/yazi.zip
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-musl.deb"
+        dest: /tmp/yazi.deb
         mode: '0644'
         force: true
         timeout: 120
       retries: 3
       delay: 5
 
-    - name: Install unzip if not present
+    - name: Install yazi .deb package
       ansible.builtin.apt:
-        name: unzip
-        state: present
+        deb: /tmp/yazi.deb
 
-    - name: Extract and install yazi
-      ansible.builtin.shell: |
-        cd /tmp
-        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
-        unzip -o yazi.zip
-        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-*/yazi /usr/local/bin/yazi
-        chmod 755 /usr/local/bin/yazi
-      args:
-        executable: /bin/bash
-      changed_when: true
-
-    - name: Clean up yazi files
-      ansible.builtin.shell: |
-        rm -f /tmp/yazi.zip
-        rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
-      args:
-        executable: /bin/bash
-      changed_when: false
+    - name: Clean up yazi .deb
+      ansible.builtin.file:
+        path: /tmp/yazi.deb
+        state: absent
 
   rescue:
     - name: Warn yazi installation failed
@@ -1542,10 +1647,8 @@
 
     - name: Clean up yazi temp files after failure
       ansible.builtin.file:
-        path: "{{ item }}"
+        path: /tmp/yazi.deb
         state: absent
-      loop:
-        - /tmp/yazi.zip
 
 # --- yazi (user-level fallback) ---
 - name: Re-check if yazi is installed
@@ -1556,6 +1659,8 @@
   failed_when: false
 
 - name: Install yazi from GitHub releases (user-level, no sudo)
+  # Prefer the musl .zip asset over unknown-linux-gnu.zip. See sudo-path
+  # comment above for the glibc rationale.
   when:
     - ansible_facts["os_family"] == "Debian"
     - yazi_recheck.rc != 0
@@ -1573,9 +1678,9 @@
         return_content: true
       register: yazi_release_user
 
-    - name: Download yazi binary (user)
+    - name: Download yazi musl binary (user)
       ansible.builtin.get_url:
-        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-gnu.zip"
+        url: "https://github.com/sxyazi/yazi/releases/download/{{ yazi_release_user.json.tag_name }}/yazi-{{ target_architecture }}-unknown-linux-musl.zip"
         dest: /tmp/yazi.zip
         mode: '0644'
         force: true
@@ -1588,7 +1693,7 @@
         cd /tmp
         rm -rf /tmp/yazi-{{ target_architecture }}-unknown-linux-*
         python3 -m zipfile -e yazi.zip .
-        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-*/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
+        cp /tmp/yazi-{{ target_architecture }}-unknown-linux-musl/yazi {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
         chmod 755 {{ ansible_facts['env']['HOME'] }}/.local/bin/yazi
       args:
         executable: /bin/bash
@@ -2366,6 +2471,13 @@
         msg: "taplo installation failed (likely network timeout) - skipping"
 
 # --- television (tv) - fuzzy finder TUI ---
+# Upstream currently ships only `unknown-linux-gnu` assets (no musl on any
+# arch as of 0.15.6). Recent builds require glibc >= 2.39, which breaks on
+# Ubuntu 22.04 Jammy (glibc 2.35) with:
+#   tv: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found
+# Policy: prefer Linuxbrew (bottles track an older glibc baseline); if brew
+# is unavailable, skip with an explicit warning instead of silently installing
+# a potentially incompatible gnu binary. See docs/linux-package-sources.md.
 - name: Check if tv is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: tv --version
@@ -2373,124 +2485,66 @@
   changed_when: false
   failed_when: false
 
-- name: Install television from GitHub releases (Debian/Ubuntu, user-level)
+- name: Detect Linuxbrew for television install (Debian/Ubuntu)
   when:
     - ansible_facts["os_family"] == "Debian"
     - tv_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
-  block:
-    - name: Ensure ~/.local/bin exists (television)
-      ansible.builtin.file:
-        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-        state: directory
-        mode: '0755'
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: tv_brew_probe
+  changed_when: false
 
-    - name: Get latest television release
-      ansible.builtin.uri:
-        url: https://api.github.com/repos/alexpasmantier/television/releases/latest
-        return_content: true
-      register: tv_release
+- name: Install television via Linuxbrew (Debian/Ubuntu, brew available)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tv_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - tv_brew_probe is defined
+    - tv_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: television
+    state: present
 
-    - name: Set television architecture mapping
-      ansible.builtin.set_fact:
-        tv_arch: >-
-          {{
-            'x86_64' if target_architecture in ['x86_64', 'amd64']
-            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
-            else ''
-          }}
+- name: Warn television cannot be installed safely (no brew, gnu-only upstream)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tv_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - (tv_brew_probe is not defined) or (tv_brew_probe.stdout | default('') | trim == '')
+  ansible.builtin.debug:
+    msg: >-
+      television (tv) skipped: upstream publishes only `unknown-linux-gnu`
+      assets, which require glibc >= 2.39 and fail on Ubuntu 22.04 (glibc
+      2.35) with `GLIBC_2.39 not found`. Install Linuxbrew
+      (`brew install television`) for a bottle built against an older glibc,
+      or wait for upstream to ship musl builds.
 
-    - name: Skip television on unsupported architecture
-      when: tv_arch | trim == ''
-      ansible.builtin.debug:
-        msg: "television skipped: no release for {{ target_architecture }}"
+- name: Skip television on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - tv_check.rc != 0
+    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: "television skipped: no release for {{ target_architecture }}"
 
-    - name: Set television download URL
-      ansible.builtin.set_fact:
-        tv_download_url: >-
-          {{
-            (
-              tv_release.json.assets
-              | selectattr('name', 'match', 'tv-.*-' ~ tv_arch ~ '-unknown-linux-gnu\.tar\.gz$')
-              | rejectattr('name', 'match', '.*\.sha256$')
-              | map(attribute='browser_download_url')
-              | first
-            )
-            | default('', true)
-          }}
-
-    - name: Skip television if download URL could not be determined
-      when: tv_download_url | trim == ''
-      ansible.builtin.debug:
-        msg: "television skipped: could not determine download URL for architecture {{ tv_arch }}"
-
-    - name: Download television tarball
-      ansible.builtin.get_url:
-        url: "{{ tv_download_url }}"
-        dest: /tmp/tv.tar.gz
-        mode: '0644'
-        timeout: 120
-      retries: 3
-      delay: 5
-
-    - name: Create television temp directory
-      ansible.builtin.file:
-        path: /tmp/tv
-        state: directory
-        mode: '0755'
-
-    - name: Extract television
-      ansible.builtin.unarchive:
-        src: /tmp/tv.tar.gz
-        dest: /tmp/tv
-        remote_src: true
-
-    - name: Find television binary
-      ansible.builtin.find:
-        paths: /tmp/tv
-        patterns: tv
-        file_type: file
-        recurse: true
-      register: tv_find
-
-    - name: Fail if television binary was not found
-      when: tv_find.matched | default(0) | int == 0
-      ansible.builtin.fail:
-        msg: "tv binary was not found under /tmp/tv after extraction"
-
-    - name: Install television to ~/.local/bin
-      ansible.builtin.copy:
-        src: "{{ tv_find.files[0].path }}"
-        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/tv"
-        mode: '0755'
-        remote_src: true
-
-    - name: Clean up television temp files
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /tmp/tv.tar.gz
-        - /tmp/tv
-
-  rescue:
-    - name: Warn television installation failed
-      ansible.builtin.debug:
-        msg: "television installation failed (likely network timeout) - skipping"
-
-    - name: Clean up television temp files after failure
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /tmp/tv.tar.gz
-        - /tmp/tv
+- name: Check if tv binary ended up on PATH
+  ansible.builtin.shell: command -v tv
+  register: tv_final_probe
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Update television channel prototypes
+  when: tv_final_probe.rc == 0
   ansible.builtin.command: tv update-channels
   register: tv_update_channels
   changed_when: "'already exists' not in tv_update_channels.stderr"
   failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # =============================================================================
 # Log viewers (Linux)

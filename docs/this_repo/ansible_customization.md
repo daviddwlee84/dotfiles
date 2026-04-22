@@ -207,6 +207,71 @@ ansible-playbook ... --list-tasks
 ansible-playbook ... --list-tags
 ```
 
+### Common Failures
+
+#### `GLIBC_2.XX not found` when running an installed CLI (Ubuntu 22.04 / older distros)
+
+**Symptom** — a CLI installed by the ansible roles fails at startup:
+
+```
+tv: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by tv)
+```
+
+**Root cause** — the `.tar.gz` or `.deb` published under the tool's
+`unknown-linux-gnu` target was built on a CI image (Ubuntu 24.04 / Debian 13)
+whose glibc is newer than what the host distro ships. Ubuntu 22.04 LTS is
+stuck on **glibc 2.35**, so any binary needing glibc ≥ 2.36 will fail to
+start.
+
+**Fix (already applied in this repo as of the Jammy hardening patch):** the
+ansible roles now prefer musl assets over gnu assets, and fall back to
+Linuxbrew (or skip-with-warning) when no safe musl asset exists. See
+[docs/linux-package-sources.md → GitHub binary asset selection policy](../linux-package-sources.md#github-binary-asset-selection-policy)
+for the full policy.
+
+**If you still see the error on a box provisioned by this repo**, one of
+these applies:
+
+1. **A stale gnu binary is still on PATH from a previous apply.** The new
+   role only downloads musl / brew when the `command -v <tool>` check
+   fails — so an old broken binary short-circuits the install. Remove it and
+   re-run `chezmoi apply`:
+
+   ```bash
+   rm -f ~/.local/bin/tv /usr/local/bin/tv   # or whichever tool
+   chezmoi apply
+   ```
+
+2. **The tool has no upstream musl asset and Linuxbrew isn't installed.**
+   Affected tools as of this writing: `tv` (all arches), `git-delta` (arm64
+   only), `eza` (arm64 only). The role prints an explicit debug message
+   telling you to install Linuxbrew. On Debian/Ubuntu:
+
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+   chezmoi apply     # re-runs the role, brew-install branch taken this time
+   ```
+
+3. **A new tool was added to a role using `unknown-linux-gnu` again.** When
+   adding a role that downloads a Rust/Go binary, prefer the musl asset and
+   fall back to brew-or-skip per the policy linked above. Pattern examples:
+   `ripgrep` / `bat` / `fd` / `zellij` / `tailspin` / `lnav` / `trippy`.
+
+#### `eza` install fails on some hosts with broken third-party apt repo
+
+See the comment on the `Add eza repository` task in
+`dot_ansible/roles/devtools/tasks/main.yml` — the `deb.gierens.de` repo
+occasionally ships an expired GPG signature. The role tolerates this and
+falls through to the GitHub-release fallback, so no manual fix is usually
+needed. If the fallback also fails, remove the broken repo file:
+
+```bash
+sudo rm -f /etc/apt/sources.list.d/gierens.list /etc/apt/keyrings/gierens.gpg
+sudo apt update
+chezmoi apply     # re-runs the role; GitHub-release fallback picks it up
+```
+
 ## LazyVim Requirements
 
 LazyVim needs:

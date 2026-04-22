@@ -191,7 +191,7 @@ Sesh uses zoxide's frecency database to suggest directories. Any directory you `
 
 ### Television (tv)
 
-[Television](https://github.com/alexpasmantier/television) has a built-in [sesh channel](https://alexpasmantier.github.io/television/community/channels-unix/#sesh). Television is installed by the `devtools` ansible role (`brew install television` on macOS, GitHub release binary on Linux).
+[Television](https://github.com/alexpasmantier/television) has a built-in [sesh channel](https://alexpasmantier.github.io/television/community/channels-unix/#sesh). Television is installed by the `devtools` ansible role (`brew install television` on macOS; Linuxbrew on Linux when available, otherwise skipped with a warning because upstream currently ships only `unknown-linux-gnu` binaries that require glibc ≥ 2.39 — incompatible with Ubuntu 22.04 LTS. See [docs/linux-package-sources.md](../linux-package-sources.md)).
 
 **tmux keybinding:** `prefix + T` opens television's sesh channel in a tmux popup.
 

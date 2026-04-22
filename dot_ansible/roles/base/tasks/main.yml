@@ -148,12 +148,16 @@
         mode: '0755'
 
     - name: Set fd release target
+      # Prefer musl assets on Debian/Ubuntu: the `unknown-linux-gnu` tarballs
+      # are built on modern CI (Ubuntu 24.04, glibc 2.38+) and fail with
+      # `GLIBC_2.X not found` on Jammy (glibc 2.35). Upstream fd ships musl
+      # builds for x86_64, aarch64, and armhf.
       ansible.builtin.set_fact:
         fd_target: >-
           {{
-            target_architecture ~ '-unknown-linux-gnu'
+            target_architecture ~ '-unknown-linux-musl'
             if target_architecture in ['x86_64', 'aarch64']
-            else 'arm-unknown-linux-gnueabihf'
+            else 'arm-unknown-linux-musleabihf'
             if target_architecture in ['armv7l', 'armhf']
             else ''
           }}

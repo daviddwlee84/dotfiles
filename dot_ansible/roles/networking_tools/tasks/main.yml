@@ -272,6 +272,9 @@
     msg: "trippy skipped: no release for {{ target_architecture }}"
 
 - name: Install trippy from GitHub releases (Debian/Ubuntu, system-level)
+  # Use the musl target for parity with the user fallback below: gnu binaries
+  # compiled on modern CI can require a glibc newer than Jammy's 2.35 and fail
+  # to start. Upstream ships musl builds for x86_64, aarch64, and armv7.
   when:
     - ansible_facts["os_family"] == "Debian"
     - trippy_check.rc != 0
@@ -284,9 +287,9 @@
         return_content: true
       register: trippy_release
 
-    - name: Download trippy tarball
+    - name: Download trippy tarball (musl)
       ansible.builtin.get_url:
-        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ trippy_gnu_target }}.tar.gz"
+        url: "https://github.com/fujiapple852/trippy/releases/download/{{ trippy_release.json.tag_name }}/trippy-{{ trippy_release.json.tag_name }}-{{ trippy_musl_target }}.tar.gz"
         dest: /tmp/trippy.tar.gz
         mode: '0644'
         timeout: 120
