@@ -1,0 +1,424 @@
+---
+# =============================================================================
+# gui_apps_linux — Ubuntu/Debian desktop GUI app installer
+#
+# Handles the "desktop-only" category of apps that aren't in the apt default
+# repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), libfuse2
+# (AppImage runtime on Ubuntu 22.04+), and a placeholder hook for Antigravity
+# once an official Linux package ships.
+#
+# No-op on:
+#   - macOS  → Brewfile (`cask "alacritty"`, `cask "visual-studio-code"` when
+#              you add them) covers the desktop story. This role emits a
+#              debug note only on Darwin, no install logic runs.
+#   - armhf  → 32-bit ARM has no practical GUI story; cargo builds are slow
+#              and AppImages lack first-class armv7 support.
+#   - noRoot → `--skip-tags sudo` (set by run_onchange) skips every system
+#              apt/deb/PPA task. AppImageLauncher Lite (user-level AppImage)
+#              still runs when `gui_apps_linux_no_root=true` is passed via
+#              `--extra-vars`.
+#
+# Editor user-config overlays (settings.json / keybindings.json) are handled
+# by chezmoi itself, NOT ansible — see `.chezmoitemplates/editor/` and the
+# `modify_settings.json.tmpl` / `create_keybindings.json.tmpl` source files.
+# =============================================================================
+
+# --- Platform banner ---
+
+- name: Announce gui_apps_linux is Linux-only (macOS uses Brewfile)
+  when: ansible_facts['os_family'] == 'Darwin'
+  ansible.builtin.debug:
+    msg: >-
+      gui_apps_linux is Linux-only. macOS GUI apps are declared in
+      dot_config/homebrew/Brewfile.darwin.tmpl (alacritty cask, etc.).
+
+- name: Skip gui_apps_linux on armhf
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'armv7l'
+  ansible.builtin.debug:
+    msg: >-
+      Skipping gui_apps_linux on armhf — no practical GUI stack,
+      cargo builds of alacritty are very slow, and upstream AppImages
+      do not target armv7.
+
+# =============================================================================
+# Alacritty (moved verbatim from the former alacritty role)
+# =============================================================================
+
+- name: Install Alacritty build dependencies
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - cmake
+      - pkg-config
+      - libfontconfig1-dev
+      - libxcb-xfixes0-dev
+      - libxkbcommon-dev
+    state: present
+    update_cache: false
+
+- name: Check if Alacritty is already installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.command: alacritty --version
+  register: alacritty_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install Alacritty via cargo
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+    - alacritty_check.rc != 0
+  ansible.builtin.command: cargo install alacritty
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/alacritty"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+  timeout: 3600
+
+- name: Ensure user icon + application dirs exist
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.file:
+    path: "{{ ansible_facts['env']['HOME'] }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - .local/share/icons/hicolor/scalable/apps
+    - .local/share/applications
+
+- name: Download Alacritty SVG icon
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/alacritty/alacritty/master/extra/logo/alacritty-term.svg
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/icons/hicolor/scalable/apps/alacritty.svg"
+    mode: '0644'
+  retries: 3
+  delay: 5
+
+- name: Install Alacritty .desktop entry
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.copy:
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/applications/alacritty.desktop"
+    mode: '0644'
+    content: |
+      [Desktop Entry]
+      Type=Application
+      TryExec=alacritty
+      Exec=alacritty
+      Icon=alacritty
+      Terminal=false
+      Categories=System;TerminalEmulator;
+      Name=Alacritty
+      GenericName=Terminal
+      Comment=A fast, cross-platform, OpenGL terminal emulator
+      StartupWMClass=alacritty
+
+- name: Refresh desktop application database
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
+  changed_when: false
+  failed_when: false
+
+# =============================================================================
+# libfuse2 — AppImage runtime on Ubuntu 22.04+
+# Ubuntu dropped libfuse2 from the default install around 22.04; AppImages
+# compiled against it fail with a cryptic "dlopen(): error loading libfuse.so.2"
+# on boot. Installing the compat package fixes every AppImage we ship below.
+# =============================================================================
+
+- name: Install libfuse2 for AppImage compatibility
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: libfuse2
+    state: present
+    update_cache: false
+  ignore_errors: true
+
+# =============================================================================
+# AppImageLauncher — desktop integration for AppImages
+#
+# Strategy (in order):
+#   1. PPA `ppa:appimagelauncher-team/stable` — preferred on 20.04/22.04.
+#   2. GitHub `.deb` fallback — PPA is known-broken on Ubuntu 24.04 "noble"
+#      as of 2026 (upstream has not published a noble release); the latest
+#      GitHub `.deb` still installs cleanly.
+#   3. AppImageLauncher **Lite** — a user-level AppImage that integrates
+#      itself without root. Enabled when `gui_apps_linux_no_root=true`.
+#
+# Docs: see docs/tools/appimage.md for install paths, ail-cli usage, and
+# the libfuse2 / AppArmor gotchas on recent Ubuntu.
+# =============================================================================
+
+- name: Check if AppImageLauncher is installed (system-wide)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.command: dpkg -s appimagelauncher
+  register: ail_check
+  changed_when: false
+  failed_when: false
+
+- name: Install AppImageLauncher via PPA
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+    - not (gui_apps_linux_no_root | bool)
+    - ail_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Add AppImageLauncher PPA
+      ansible.builtin.apt_repository:
+        repo: ppa:appimagelauncher-team/stable
+        state: present
+        update_cache: true
+        filename: appimagelauncher-team-stable
+      ignore_errors: true
+      register: ail_ppa
+
+    - name: Install appimagelauncher from PPA
+      ansible.builtin.apt:
+        name: appimagelauncher
+        state: present
+      when: ail_ppa is succeeded
+      register: ail_apt_install
+      ignore_errors: true
+  rescue:
+    - name: Warn AppImageLauncher PPA install failed
+      ansible.builtin.debug:
+        msg: "AppImageLauncher PPA install failed — trying GitHub .deb fallback next."
+
+- name: Install AppImageLauncher from GitHub .deb (fallback)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - not (gui_apps_linux_no_root | bool)
+    - ail_check.rc != 0
+    - (ail_apt_install is not defined) or (ail_apt_install is not succeeded)
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest AppImageLauncher release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/TheAssassin/AppImageLauncher/releases/latest
+        return_content: true
+      register: ail_release
+
+    - name: Resolve AppImageLauncher .deb asset URL
+      ansible.builtin.set_fact:
+        ail_deb_url: >-
+          {{ (ail_release.json.assets
+              | selectattr('name', 'match', '^appimagelauncher_.*_' + ail_deb_arch + '\\.deb$')
+              | map(attribute='browser_download_url')
+              | list
+              | first) | default('') }}
+      vars:
+        ail_deb_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[target_architecture] }}"
+
+    - name: Download AppImageLauncher .deb
+      when: ail_deb_url | length > 0
+      ansible.builtin.get_url:
+        url: "{{ ail_deb_url }}"
+        dest: /tmp/appimagelauncher.deb
+        mode: '0644'
+        timeout: 180
+
+    - name: Install AppImageLauncher .deb
+      when: ail_deb_url | length > 0
+      ansible.builtin.apt:
+        deb: /tmp/appimagelauncher.deb
+        state: present
+  rescue:
+    - name: Warn AppImageLauncher .deb install failed
+      ansible.builtin.debug:
+        msg: "AppImageLauncher .deb install failed — the Lite user-level variant is still available via noRoot mode."
+
+- name: Install AppImageLauncher Lite (user-level, noRoot)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - gui_apps_linux_no_root | bool
+  block:
+    - name: Ensure ~/Applications exists
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/Applications"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest AppImageLauncher release (for Lite variant)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/TheAssassin/AppImageLauncher/releases/latest
+        return_content: true
+      register: ail_lite_release
+
+    - name: Resolve AppImageLauncher Lite AppImage URL
+      ansible.builtin.set_fact:
+        ail_lite_url: >-
+          {{ (ail_lite_release.json.assets
+              | selectattr('name', 'match', '^appimagelauncher-lite-.*-' + target_architecture + '\\.AppImage$')
+              | map(attribute='browser_download_url')
+              | list
+              | first) | default('') }}
+
+    - name: Download AppImageLauncher Lite
+      when: ail_lite_url | length > 0
+      ansible.builtin.get_url:
+        url: "{{ ail_lite_url }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/Applications/appimagelauncher-lite.AppImage"
+        mode: '0755'
+        timeout: 180
+      register: ail_lite_dl
+      ignore_errors: true
+
+    - name: Note how to finalise AppImageLauncher Lite integration
+      when: ail_lite_dl is defined and ail_lite_dl is succeeded
+      ansible.builtin.debug:
+        msg: >-
+          Downloaded AppImageLauncher Lite to ~/Applications/appimagelauncher-lite.AppImage.
+          Run `~/Applications/appimagelauncher-lite.AppImage install` once to register
+          the integration; see docs/tools/appimage.md for ail-cli usage.
+
+# =============================================================================
+# Visual Studio Code — official Microsoft apt repository
+# =============================================================================
+
+- name: Check if VSCode is installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.command: dpkg -s code
+  register: vscode_check
+  changed_when: false
+  failed_when: false
+
+- name: Install VSCode via Microsoft apt repo
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - not (gui_apps_linux_no_root | bool)
+    - vscode_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Ensure /etc/apt/keyrings exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Microsoft GPG key (dearmored)
+      ansible.builtin.shell: |
+        set -eu
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+          | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+      args:
+        creates: /etc/apt/keyrings/microsoft.gpg
+
+    - name: Add VSCode apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[target_architecture] }}
+          signed-by=/etc/apt/keyrings/microsoft.gpg]
+          https://packages.microsoft.com/repos/code stable main
+        state: present
+        filename: vscode
+        update_cache: true
+
+    - name: Install VSCode package
+      ansible.builtin.apt:
+        name: code
+        state: present
+  rescue:
+    - name: Warn VSCode install failed
+      ansible.builtin.debug:
+        msg: "VSCode install failed — rerun with --tags gui_apps after fixing network/GPG/apt issues."
+
+# =============================================================================
+# Cursor — .deb from cursor.com
+#
+# The download API returns a redirect to the latest build for the given
+# platform. The whole block is tolerant: a failed download is logged but
+# does not fail the playbook. Users can always fall back to the AppImage
+# path documented in docs/tools/appimage.md.
+# =============================================================================
+
+- name: Check if Cursor is installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  ansible.builtin.command: dpkg -s cursor
+  register: cursor_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Cursor via .deb
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - not (gui_apps_linux_no_root | bool)
+    - cursor_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Download latest Cursor .deb (redirect from cursor.com)
+      ansible.builtin.get_url:
+        url: >-
+          https://cursor.com/api/download?platform=linux-{{
+            {'x86_64': 'x64', 'aarch64': 'arm64'}[target_architecture]
+          }}&releaseTrack=stable
+        dest: /tmp/cursor.deb
+        mode: '0644'
+        timeout: 300
+        follow: true
+      register: cursor_dl
+      ignore_errors: true
+
+    - name: Install Cursor .deb
+      when: cursor_dl is defined and cursor_dl is succeeded
+      ansible.builtin.apt:
+        deb: /tmp/cursor.deb
+        state: present
+      ignore_errors: true
+  rescue:
+    - name: Warn Cursor .deb install failed
+      ansible.builtin.debug:
+        msg: >-
+          Cursor .deb install failed. You can fall back to the AppImage flow —
+          download from https://cursor.com/download and drop it under
+          ~/Applications/; AppImageLauncher will auto-integrate. See
+          docs/tools/appimage.md for the full recipe.
+
+# =============================================================================
+# Antigravity (placeholder)
+# No official Linux build at the time of writing; leave the hook disabled so
+# the structure is obvious when upstream starts shipping a .deb or AppImage.
+# =============================================================================
+
+- name: Antigravity Linux install (disabled — no official Linux build yet)
+  when: false
+  ansible.builtin.debug:
+    msg: >-
+      TODO: when an official Antigravity Linux .deb or AppImage ships,
+      add install tasks here mirroring the Cursor block above.

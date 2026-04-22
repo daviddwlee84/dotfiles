@@ -120,6 +120,7 @@ To change options later: `chezmoi init --force`
 - `~/.docker/config.json` - Docker client `proxies.default` block (auto-injected from `$LOCAL_PROXY_URL` / `$LOCAL_PROXY_SOCKS_URL`; preserves `auths` / `credsStore` via chezmoi modify-script) ([docs](docs/tools/containers.md))
 - `~/.config/docker/daemon.json` - Rootless Docker `registry-mirrors` (DaoCloud / USTC / NJU / ...; Linux + `useChineseMirror` only) ([docs](docs/tools/containers.md#strategy-a-registry-mirrors-in-daemonjson))
 - `~/.config/alacritty/` - Alacritty terminal config (CSI-u keybindings for `Ctrl+Number` tmux window switching, `option_as_alt` for Meta keys)
+- `~/Library/Application Support/{Code,Cursor,Antigravity}/User/` (macOS) + `~/.config/{Code,Cursor,Antigravity}/User/` (Linux) - Editor settings overlay: `modify_settings.json` deep-merges a 6-key baseline (Hack Nerd Font Mono, relative line numbers, format on save, smart-accept suggestion, terminal font) into each editor's live `settings.json` without overwriting other keys; `create_keybindings.json` seeds 5 universal keybindings on a fresh machine and never overwrites editor-added entries. Canonical templates live under [`.chezmoitemplates/editor/`](.chezmoitemplates/editor/); `.chezmoiignore.tmpl` gates each editor dir with a `stat` presence check so uninstalled editors never produce phantom directories.
 - `~/.config/ghostty/config` - Ghostty/cmux terminal config (`macos-option-as-alt` for tmux Meta keybindings, disabled ligatures, explicit `clipboard-write = allow` / `clipboard-read = ask` for OSC 52) ([docs](docs/tools/ghostty.md))
 - `~/.config/starship.toml` - Starship cross-shell prompt config
 - `~/.config/direnv/direnvrc` - direnv helper functions, including `.venv`-aware Python activation
@@ -200,8 +201,8 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (ensures latest versions)
 - **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television, pandoc
-- **Log viewers**: tailspin (`tspin`), lnav, grc, ccze — plus `catl`/`lessl`/`logtail` zsh wrappers and a `tv logs` Television channel ([docs](docs/tools/log-tools.md))
-- **Alacritty**: GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS; desktop only)
+- **Log viewers**: tailspin (`tspin`), lnav, grc, ccze (Linux only — no Homebrew formula) — plus `catl`/`lessl`/`logtail` zsh wrappers and a `tv logs` Television channel ([docs](docs/tools/log-tools.md))
+- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
 - **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp, trafilatura
 - **JS CLI tools (via npm)** (optional): readability-cli (`readable` — Mozilla Readability for `readnode` terminal web reader)

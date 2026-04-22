@@ -1,0 +1,9 @@
+---
+# gui_apps_linux defaults
+#
+# noRoot mode (no sudo available): system-wide installers are skipped via
+# `--skip-tags sudo`, and this flag switches user-level AppImage fallbacks on
+# for AppImageLauncher Lite. Override per-invocation via
+# `--extra-vars "gui_apps_linux_no_root=true"` (the run_onchange wrapper does
+# this automatically when profile=noRoot).
+gui_apps_linux_no_root: false

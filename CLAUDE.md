@@ -217,6 +217,24 @@ Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `
 
 To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
 
+### `.chezmoitemplates/editor/*` — shared overlay for VSCode / Cursor / Antigravity
+
+All three Electron editors read `settings.json` + `keybindings.json` from a per-editor `User/` directory (macOS `~/Library/Application Support/<Editor>/User/`, Linux `~/.config/<Editor>/User/`). Three concerns we want to manage cross-editor, cross-OS, without fighting each editor's own writes:
+
+1. A tiny **universal baseline** (Hack Nerd Font Mono, relative line numbers, format on save, smart accept-suggestion, terminal font) — this is canonical in [`.chezmoitemplates/editor/overlay.json`](.chezmoitemplates/editor/overlay.json). Add a key here and it deploys to all six targets (3 editors × 2 OSes).
+2. **Keybindings** that should seed on a fresh machine but never overwrite an editor's own additions (e.g. Cursor's `alt+cmd+s`) — canonical in [`.chezmoitemplates/editor/keybindings.json`](.chezmoitemplates/editor/keybindings.json).
+3. The `modify_` / `create_` plumbing itself — the bash+python+jq merge script lives once in [`.chezmoitemplates/editor/modify.sh`](.chezmoitemplates/editor/modify.sh); each of the 6 per-editor wrappers is a 1-line `{{ template … }}` shim.
+
+`modify_settings.json.tmpl` uses an inline Python JSONC normaliser (strip `//` and `/* */` comments + trailing commas) before piping into `jq '. * $overlay'`. This is the only place in the repo where live JSONC needs to be deep-merged in-place; **do not duplicate the script** — extend [`modify.sh`](.chezmoitemplates/editor/modify.sh) if you need a new overlay section (e.g. `[python]` block overrides).
+
+`create_keybindings.json.tmpl` is seed-once — same precedent as `create_lazy-lock.json` below. If you want to push an updated baseline to an existing live file, copy the live file back into the source path (`cp ~/Library/Application\ Support/Code/User/keybindings.json "$(chezmoi source-path ...)"`) to fold in editor-added entries, then edit the template.
+
+### Presence gating in `.chezmoiignore.tmpl`
+
+[`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) ignores both halves of the cross-OS tree on the wrong OS (`Library/**` on non-darwin, `.config/{Code,Cursor,Antigravity}/**` on non-linux), then per-editor `stat` gates ignore the whole subtree when the editor's config dir does not exist. Net effect: a fresh machine with only VSCode installed gets Code settings + skips Cursor/Antigravity entirely, no phantom directories. The `private_` prefix on `Library`, `Application Support`, and each editor dir preserves macOS's native `0700`/`0755` mode.
+
+When adding a fourth editor (e.g. Zed if it ever adopts the same layout), drop it into the `range (list "Code" "Cursor" "Antigravity" "NewEditor")` list in `.chezmoiignore.tmpl` and mirror the 4 source files (`{modify_settings,create_keybindings}.json.tmpl` × macOS/Linux).
+
 ### `dot_config/nvim/create_lazy-lock.json` — seed-once, never overwrite
 
 LazyVim rewrites `~/.config/nvim/lazy-lock.json` on every `:Lazy update` and the tracked plugin list differs across OSes. `create_` only writes when the target file does not yet exist (new-machine seed), so subsequent edits produce zero chezmoi diff.
@@ -293,7 +311,7 @@ ansible-playbook playbooks/macos.yml --check
 | `starship` | Starship cross-shell prompt (replaces oh-my-zsh theme) |
 | `neovim` | Neovim (>= 0.11.2) |
 | `lazyvim_deps` | fzf, lazygit, tree-sitter-cli, Node.js (via mise) |
-| `devtools` | bat, bats, eza, gh, glab, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television, pandoc, tailspin, lnav, grc, ccze |
+| `devtools` | bat, bats, eza, gh, glab, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, zellij, btop, htop, taplo, television, pandoc |
 | `docker` | Docker/container runtime (OrbStack on macOS, Docker Engine on Linux) |
 | `nerdfonts` | Hack Nerd Font for terminal emulators |
 | `coding_agents` | Claude Code, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory |
@@ -307,14 +325,14 @@ ansible-playbook playbooks/macos.yml --check
 | `input_method` | Traditional Chinese input methods: McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux) |
 | `networking_tools` | Networking CLI tools: nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan |
 | `iac_tools` | Infrastructure-as-Code CLIs: Azure CLI (`az`), Terraform, OpenTofu (`tofu`) |
-| `alacritty` | GPU-accelerated terminal emulator (cargo install on Linux, Homebrew cask on macOS) |
+| `gui_apps` | Linux-only desktop app installer: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode (Microsoft apt repo), Cursor (.deb), libfuse2. macOS equivalents are in `dot_config/homebrew/Brewfile.darwin.tmpl`. See [docs/tools/appimage.md](docs/tools/appimage.md). |
 
 ## Profiles
 
 | Profile | OS | Tags Included |
 |---------|-----|---------------|
-| `macos` | macOS | homebrew, base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, alacritty |
-| `ubuntu_desktop` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, alacritty |
+| `macos` | macOS | homebrew, base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools (alacritty via Brewfile cask) |
+| `ubuntu_desktop` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, gui_apps |
 | `ubuntu_server` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
 
 **Tag categories:**

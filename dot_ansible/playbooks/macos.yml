@@ -62,8 +62,9 @@
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
 
-    - role: alacritty
-      tags: [alacritty]
+    # Alacritty on macOS is declared in dot_config/homebrew/Brewfile.darwin.tmpl
+    # (`cask "alacritty"`). No ansible role needed. The Linux desktop install
+    # lives in dot_ansible/roles/gui_apps_linux/.
 
     - role: input_method
       tags: [input_method]

@@ -37,7 +37,8 @@
 # iac_tools defaults: {{ include "dot_ansible/roles/iac_tools/defaults/main.yml" | sha256sum }}
 # dotnet_tools tasks: {{ include "dot_ansible/roles/dotnet_tools/tasks/main.yml" | sha256sum }}
 # dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
-# alacritty: {{ include "dot_ansible/roles/alacritty/tasks/main.yml" | sha256sum }}
+# gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
+# gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -117,11 +118,14 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 {{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
-TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
+TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
 {{ else if eq .profile "ubuntu_desktop" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
-# Ubuntu Desktop: full desktop experience (no homebrew)
-TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,alacritty"
+# Ubuntu Desktop: full desktop experience (no homebrew).
+# gui_apps bundles alacritty + AppImageLauncher + VSCode + Cursor (see
+# dot_ansible/roles/gui_apps_linux/tasks/main.yml); libfuse2 comes with it
+# so AppImage-based editors work out of the box on Ubuntu 22.04+.
+TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
 {{ else if eq .profile "ubuntu_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)
@@ -245,6 +249,16 @@ info ""
 BECOME_FLAGS="--skip-tags sudo"
 # Ruby can't compile without libffi-dev (requires sudo on Ubuntu)
 TAGS="${TAGS//,ruby_gem_tools/}"
+# gui_apps_linux: --skip-tags sudo already skips system apt/deb installers;
+# this extra-var flips the user-level AppImageLauncher Lite path on so noRoot
+# users still get AppImage desktop integration.
+if [[ "$TAGS" == *gui_apps* ]]; then
+    if [[ -z "$EXTRA_VARS" ]]; then
+        EXTRA_VARS="gui_apps_linux_no_root=true"
+    else
+        EXTRA_VARS="$EXTRA_VARS gui_apps_linux_no_root=true"
+    fi
+fi
 {{ if $installLlmTools -}}
 if [[ -z "$EXTRA_VARS" ]]; then
     EXTRA_VARS="llm_tools_no_root=true"

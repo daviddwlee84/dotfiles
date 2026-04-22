@@ -82,8 +82,8 @@
     - role: ruby_gem_tools
       tags: [ruby_gem_tools]
 
-    - role: alacritty
-      tags: [alacritty]
+    - role: gui_apps_linux
+      tags: [gui_apps]
 
     - role: input_method
       tags: [input_method]

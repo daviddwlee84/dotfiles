@@ -16,16 +16,16 @@ todos:
     status: completed
   - id: gui-apps-role
     content: Create dot_ansible/roles/gui_apps_linux/ with tasks for alacritty (moved), AppImageLauncher (PPA + deb fallback + Lite), VSCode (MS apt repo), Cursor (.deb), libfuse2; delete old alacritty role
-    status: pending
+    status: completed
   - id: playbook-profile-rewire
     content: "Update dot_ansible/playbooks/linux.yml and .chezmoi.toml.tmpl profile tags: alacritty -> gui_apps; ensure macos playbook untouched"
-    status: pending
+    status: completed
   - id: docs-appimage
     content: Write docs/tools/appimage.md covering AppImageLauncher install paths (PPA/deb/Lite), ail-cli, recipes for Cursor/Obsidian, libfuse2 + AppArmor gotchas
-    status: pending
+    status: completed
   - id: agents-readme-updates
     content: Update AGENTS.md (Selective File Management section adds editor overlays subsection) and README.md (tags table gains gui_apps, drops alacritty standalone; new config files listed)
-    status: pending
+    status: completed
   - id: todo-1776826721439-w7rzu84ce
     content: git commit related changes (separate different part; with specstory chat history)
     status: pending
