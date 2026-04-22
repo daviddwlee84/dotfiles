@@ -45,16 +45,16 @@ case "$mode" in
     ;;
 
   api)
-    # Resolve controller + secret from the config. Two lines on stdout:
-    #   line 1: host:port (empty when external-controller is unset)
-    #   line 2: secret (empty when unset)
-    # `read -r` twice on the pipeline works on both bash + zsh.
-    ctrl_host=""
-    ctrl_secret=""
-    {
-      read -r ctrl_host || true
-      read -r ctrl_secret || true
-    } < <(run_parse controller)
+    # Resolve controller + secret. CLASH_CONTROLLER / CLASH_SECRET env vars
+    # take precedence; fall back to external-controller / secret in the config.
+    ctrl_host="${CLASH_CONTROLLER:-}"
+    ctrl_secret="${CLASH_SECRET:-}"
+    if [ -z "$ctrl_host" ]; then
+      {
+        read -r ctrl_host || true
+        read -r ctrl_secret || true
+      } < <(run_parse controller)
+    fi
 
     if [ -z "$ctrl_host" ]; then
       printf 'api\texternal-controller\tunset\t-\tSet external-controller in Clash config\t-\n'

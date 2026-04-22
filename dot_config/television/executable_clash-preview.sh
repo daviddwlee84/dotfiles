@@ -45,9 +45,14 @@ show_text() {
   fi
 }
 
-# Resolve host + secret from config ($CLASH_CONFIG respected).
+# Resolve host + secret. CLASH_CONTROLLER / CLASH_SECRET env vars take
+# precedence over the config's external-controller / secret fields.
 # Outputs two lines; empty on both when no config/controller.
 _controller() {
+  if [ -n "${CLASH_CONTROLLER:-}" ]; then
+    printf '%s\n%s\n' "$CLASH_CONTROLLER" "${CLASH_SECRET:-}"
+    return 0
+  fi
   if [ ! -x "$PARSE" ]; then
     printf '\n\n'
     return 0

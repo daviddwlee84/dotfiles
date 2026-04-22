@@ -241,8 +241,8 @@ def cmd_server(cfg: dict, name: str) -> str:
 
 
 def cmd_controller(cfg: dict) -> tuple[str, str]:
-    host = cfg.get("external-controller", "") or ""
-    secret = cfg.get("secret", "") or ""
+    host = os.environ.get("CLASH_CONTROLLER", "").strip() or (cfg.get("external-controller", "") or "")
+    secret = os.environ.get("CLASH_SECRET", "").strip() or (cfg.get("secret", "") or "")
     return str(host), str(secret)
 
 

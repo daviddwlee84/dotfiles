@@ -382,6 +382,15 @@ Open with `tv clash`. No auto-refresh — the parser reads the YAML fresh every 
 
 When no config is found the channel shows a single synthetic `none  no-clash-config` row; `Enter` on it seeds an empty `~/.config/clash/config.yaml` and opens `$EDITOR`.
 
+**Controller override** — if the local config has no `external-controller`, or you want to target a remote Clash instance, set `CLASH_CONTROLLER` (and optionally `CLASH_SECRET`) before launching:
+
+```bash
+CLASH_CONTROLLER=192.168.222.207:9090 tv clash
+CLASH_CONTROLLER=192.168.222.207:9090 CLASH_SECRET=mytoken tv clash
+```
+
+`CLASH_CONTROLLER` takes precedence over `external-controller` in the YAML config for all API operations: the `api` source rows, latency previews, and all Alt+ actions (Alt+T/S/C/R/D).
+
 **Source cycling** (`Ctrl+S`):
 
 | Source | Description |
