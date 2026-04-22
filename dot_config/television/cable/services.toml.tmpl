@@ -1,0 +1,484 @@
+# services channel for television (tv) — cross-platform
+# Fuzzy-browse systemd units on Linux / launchd jobs on macOS, with tailspin-
+# colored log preview and Alt-key lifecycle actions.
+#
+# Usage:
+#   tv services
+#
+# Source cycling (Ctrl+S):
+#   1. Running only      — currently active services (system + user merged)
+#   2. All loaded        — active + inactive + failed among *loaded* units
+#   3. Failed only       — crashed / non-zero exit
+#   4. User-scope only   — systemctl --user / macOS gui/$UID domain
+#   5. Installed on-disk — every unit file / .plist on disk, with enablement badge
+#      (catches "configured but not enabled" — land on a "○ Disabled" row and hit Alt+L)
+#
+# Preview cycling (Ctrl+F):
+#   1. Colorful log tail via tailspin (journalctl on Linux, StdoutPath / log show on macOS)
+#   2. Status / details                (systemctl status / launchctl print)
+#
+# Keybindings:
+#   Enter      Follow live log   (journalctl -fu / tail -F StdoutPath | tspin)
+#   Alt+R      Restart           (sudo-aware when scope=system)
+#   Alt+S      Stop
+#   Alt+T      Start             (macOS: kickstart for loaded, bootstrap-by-search otherwise)
+#   Alt+U      Reload            (systemctl reload-or-restart / launchctl kickstart)
+#   Alt+D      Show status       (full pager — systemctl status / launchctl print)
+#   Alt+E      Edit unit/plist   ($EDITOR on the unit file)
+#   Alt+L      Toggle enable-on-boot (enable <-> disable)
+#   Ctrl+Y     Copy name to clipboard (OSC 52 over SSH)
+#
+# Rendered from services.toml.tmpl by chezmoi — macOS and Linux get different
+# source/preview/action bodies. Template conditionals wrap per-OS branches.
+
+[metadata]
+name = "services"
+description = "Services: systemd (Linux) / launchd (macOS) — list, preview log, start/stop/restart/enable"
+requirements = []
+
+[source]
+command = [
+{{- if eq .chezmoi.os "linux" }}
+  # Cycle 1: Running only (system + user merged).
+  '''
+  for s in system user; do
+    [ "$s" = system ] && cmd='systemctl' || cmd='systemctl --user'
+    $cmd list-units --type=service --state=running --no-legend --plain --no-pager 2>/dev/null \
+      | awk -v scope="$s" '{u=$1;d="";for(i=5;i<=NF;i++)d=d (i>5?" ":"") $i;printf "▶ Running\t%s\t%s\t%s\n",u,scope,d}'
+  done
+  ''',
+  # Cycle 2: All loaded (active + inactive + failed).
+  '''
+  for s in system user; do
+    [ "$s" = system ] && cmd='systemctl' || cmd='systemctl --user'
+    $cmd list-units --type=service --all --no-legend --plain --no-pager 2>/dev/null \
+      | awk -v scope="$s" '{u=$1;a=$3;sb=$4;d="";for(i=5;i<=NF;i++)d=d (i>5?" ":"") $i; sym="? Unknown"; if(a=="active"&&sb=="running")sym="▶ Running"; else if(a=="active")sym="▶ Running"; else if(a=="failed")sym="✗ Failed"; else if(a=="inactive")sym="⏸ Stopped"; else if(a=="activating"||a=="deactivating")sym="… Transitioning"; printf "%s\t%s\t%s\t%s\n",sym,u,scope,d}'
+  done
+  ''',
+  # Cycle 3: Failed only.
+  '''
+  for s in system user; do
+    [ "$s" = system ] && cmd='systemctl' || cmd='systemctl --user'
+    $cmd list-units --type=service --state=failed --no-legend --plain --no-pager 2>/dev/null \
+      | awk -v scope="$s" '{u=$1;d="";for(i=5;i<=NF;i++)d=d (i>5?" ":"") $i;printf "✗ Failed\t%s\t%s\t%s\n",u,scope,d}'
+  done
+  ''',
+  # Cycle 4: User-scope only.
+  '''
+  systemctl --user list-units --type=service --all --no-legend --plain --no-pager 2>/dev/null \
+    | awk -v scope=user '{u=$1;a=$3;sb=$4;d="";for(i=5;i<=NF;i++)d=d (i>5?" ":"") $i; sym="? Unknown"; if(a=="active"&&sb=="running")sym="▶ Running"; else if(a=="active")sym="▶ Running"; else if(a=="failed")sym="✗ Failed"; else if(a=="inactive")sym="⏸ Stopped"; else if(a=="activating"||a=="deactivating")sym="… Transitioning"; printf "%s\t%s\t%s\t%s\n",sym,u,scope,d}'
+  ''',
+  # Cycle 5: Installed on-disk — list-unit-files with enablement state symbol.
+  # This is the "configured but not enabled" discovery view.
+  '''
+  for s in system user; do
+    [ "$s" = system ] && cmd='systemctl' || cmd='systemctl --user'
+    $cmd list-unit-files --type=service --no-legend --no-pager --plain 2>/dev/null \
+      | awk -v scope="$s" '{u=$1;st=$2; sym="? Unknown"; if(st=="enabled")sym="✓ Enabled"; else if(st=="enabled-runtime")sym="✓ Enabled(rt)"; else if(st=="disabled")sym="○ Disabled"; else if(st=="static")sym="— Static"; else if(st=="masked")sym="⊘ Masked"; else if(st=="masked-runtime")sym="⊘ Masked(rt)"; else if(st=="alias")sym="↪ Alias"; else if(st=="indirect")sym="● Indirect"; else if(st=="generated")sym="⚙ Generated"; else if(st=="transient")sym="◌ Transient"; printf "%s\t%s\t%s\t%s\n",sym,u,scope,st}'
+  done
+  ''',
+{{- else if eq .chezmoi.os "darwin" }}
+  # Cycle 1: Running only. `launchctl list` without sudo is gui/$UID domain;
+  # with passwordless sudo we also merge system daemons.
+  '''
+  launchctl list 2>/dev/null | awk -v scope=user 'NR>1 && $1!="-" && $1!="PID" {printf "▶ Running\t%s\t%s\tPID=%s\n",$3,scope,$1}'
+  if sudo -n true 2>/dev/null; then
+    sudo -n launchctl list 2>/dev/null | awk -v scope=system 'NR>1 && $1!="-" && $1!="PID" {printf "▶ Running\t%s\t%s\tPID=%s\n",$3,scope,$1}'
+  fi
+  ''',
+  # Cycle 2: All loaded (running + stopped + failed).
+  '''
+  launchctl list 2>/dev/null | awk -v scope=user 'NR>1 && $3!="" && $1!="PID" {sym="? Unknown"; if($1!="-")sym="▶ Running"; else if($2+0!=0)sym="✗ Failed"; else sym="⏸ Stopped"; info=($1!="-"?"PID="$1:"exit="$2); printf "%s\t%s\t%s\t%s\n",sym,$3,scope,info}'
+  if sudo -n true 2>/dev/null; then
+    sudo -n launchctl list 2>/dev/null | awk -v scope=system 'NR>1 && $3!="" && $1!="PID" {sym="? Unknown"; if($1!="-")sym="▶ Running"; else if($2+0!=0)sym="✗ Failed"; else sym="⏸ Stopped"; info=($1!="-"?"PID="$1:"exit="$2); printf "%s\t%s\t%s\t%s\n",sym,$3,scope,info}'
+  else
+    echo "ℹ Info	(run: sudo -v to include system daemons)	system	passwordless sudo required"
+  fi
+  ''',
+  # Cycle 3: Failed only.
+  '''
+  launchctl list 2>/dev/null | awk -v scope=user 'NR>1 && $1=="-" && $2+0!=0 && $3!="" {printf "✗ Failed\t%s\t%s\texit=%s\n",$3,scope,$2}'
+  if sudo -n true 2>/dev/null; then
+    sudo -n launchctl list 2>/dev/null | awk -v scope=system 'NR>1 && $1=="-" && $2+0!=0 && $3!="" {printf "✗ Failed\t%s\t%s\texit=%s\n",$3,scope,$2}'
+  fi
+  ''',
+  # Cycle 4: User-scope only.
+  '''
+  launchctl list 2>/dev/null | awk -v scope=user 'NR>1 && $3!="" && $1!="PID" {sym="? Unknown"; if($1!="-")sym="▶ Running"; else if($2+0!=0)sym="✗ Failed"; else sym="⏸ Stopped"; info=($1!="-"?"PID="$1:"exit="$2); printf "%s\t%s\t%s\t%s\n",sym,$3,scope,info}'
+  ''',
+  # Cycle 5: Installed on-disk — scan admin-installed + user plist dirs.
+  # Excludes /System/Library/Launch* to avoid ~600 Apple rows; edit this line
+  # to opt-in by adding those paths.
+  '''
+  loaded=$(launchctl list 2>/dev/null | awk 'NR>1 && $3!="" && $1!="PID" {print $3}' | sort -u)
+  for p in /Library/LaunchDaemons /Library/LaunchAgents "$HOME/Library/LaunchAgents"; do
+    [ -d "$p" ] || continue
+    find "$p" -maxdepth 2 -type f -name '*.plist' 2>/dev/null
+  done | while IFS= read -r plist; do
+    label=$(basename "$plist" .plist)
+    case "$plist" in
+      /Library/LaunchDaemons/*) scope=system ;;
+      /Library/LaunchAgents/*)  scope=system ;;
+      "$HOME"/Library/LaunchAgents/*) scope=user ;;
+      *) scope=unknown ;;
+    esac
+    if printf '%s\n' "$loaded" | grep -qFx "$label"; then
+      sym="● Loaded"
+    else
+      sym="○ On-disk"
+    fi
+    printf '%s\t%s\t%s\t%s\n' "$sym" "$label" "$scope" "$plist"
+  done
+  ''',
+{{- end }}
+]
+display = "{split:\t:0}  {split:\t:1}  [{split:\t:2}]  {split:\t:3}"
+output = "{split:\t:1}"
+watch = 5.0
+no_sort = true
+
+[preview]
+command = [
+{{- if eq .chezmoi.os "linux" }}
+  # Preview 1: Colorful log tail via tailspin.
+  '''
+  name='{split:\t:1}'; scope='{split:\t:2}'
+  if [ "$scope" = user ]; then
+    journalctl --user --no-pager -u "$name" -n 500 2>/dev/null
+  else
+    journalctl --no-pager -u "$name" -n 500 2>/dev/null
+  fi | { if command -v tspin >/dev/null 2>&1; then tspin --print 2>/dev/null; else cat; fi; }
+  ''',
+  # Preview 2: Status / details (no log, just the header block).
+  '''
+  name='{split:\t:1}'; scope='{split:\t:2}'
+  if [ "$scope" = user ]; then
+    systemctl --user status "$name" --no-pager -l -n 0 2>/dev/null \
+      || systemctl --user show "$name" --no-pager 2>/dev/null
+  else
+    systemctl status "$name" --no-pager -l -n 0 2>/dev/null \
+      || systemctl show "$name" --no-pager 2>/dev/null
+  fi
+  ''',
+{{- else if eq .chezmoi.os "darwin" }}
+  # Preview 1: Colorful log tail via StdoutPath from the plist. Regex
+  # deliberately anchors on "stdout path " / "standard out path " to avoid
+  # matching the plist's own "path = /Library/.../foo.plist" line.
+  #
+  # No `log show` fallback in preview — `log show --predicate process==…`
+  # is ~7s on a busy Mac (it scans the entire unified log DB), which blocks
+  # the preview. Hit Enter (actions.follow) to live-tail via `log stream`
+  # instead; that's near-instant.
+  '''
+  label='{split:\t:1}'; scope='{split:\t:2}'
+  [ "$scope" = user ] && dom="gui/$UID" || dom="system"
+  stdout_path=$(launchctl print "$dom/$label" 2>/dev/null \
+    | awk -F'= ' '/^[ \t]+stdout path / || /^[ \t]+standard out path /{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2; exit}')
+  if [ -n "$stdout_path" ] && [ -f "$stdout_path" ]; then
+    tail -n 500 "$stdout_path" 2>/dev/null \
+      | { if command -v tspin >/dev/null 2>&1; then tspin --print 2>/dev/null; else cat; fi; }
+  else
+    echo "No StdoutPath configured in $dom/$label.plist."
+    echo
+    echo "Press Enter (actions.follow) to live-tail this process via:"
+    echo "    log stream --predicate 'process == \"$label\"'"
+    echo
+    echo "Or switch to preview cycle 2 (Ctrl+F) for 'launchctl print' details."
+  fi
+  ''',
+  # Preview 2: launchctl print — full block with state, paths, spawn policy.
+  '''
+  label='{split:\t:1}'; scope='{split:\t:2}'
+  [ "$scope" = user ] && dom="gui/$UID" || dom="system"
+  launchctl print "$dom/$label" 2>/dev/null \
+    || { [ "$scope" = system ] && sudo -n launchctl print "system/$label" 2>/dev/null; } \
+    || echo "No launchctl print output for $dom/$label"
+  ''',
+{{- end }}
+]
+header = "{split:\t:1} [{split:\t:2}]"
+
+[ui]
+input_header = "Services"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:follow"
+alt-r = ["actions:restart", "reload_source"]
+alt-s = ["actions:stop", "reload_source"]
+alt-t = ["actions:start", "reload_source"]
+alt-u = ["actions:reload", "reload_source"]
+alt-d = "actions:status"
+alt-e = "actions:edit"
+alt-l = ["actions:toggle_enable", "reload_source"]
+ctrl-y = "actions:copy_name"
+
+{{ if eq .chezmoi.os "linux" }}
+[actions.follow]
+description = "Follow live log (journalctl -fu)"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+echo "[Following: $name ($scope) — Ctrl+C to return]"
+if [ "$scope" = user ]; then
+  journalctl --user -fu "$name" 2>/dev/null | { command -v tspin >/dev/null 2>&1 && tspin --print || cat; }
+else
+  sudo journalctl -fu "$name" 2>/dev/null | { command -v tspin >/dev/null 2>&1 && tspin --print || cat; } \
+    || journalctl -fu "$name" 2>/dev/null | { command -v tspin >/dev/null 2>&1 && tspin --print || cat; }
+fi
+echo
+echo "[Press Enter to return]"; read -r _
+'''
+mode = "execute"
+
+[actions.restart]
+description = "Restart service"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user restart "$name" || { echo; echo "[Restart failed — Press Enter]"; read -r _; }
+else
+  sudo systemctl restart "$name" || { echo; echo "[Restart failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.stop]
+description = "Stop service"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user stop "$name" || { echo; echo "[Stop failed — Press Enter]"; read -r _; }
+else
+  sudo systemctl stop "$name" || { echo; echo "[Stop failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.start]
+description = "Start service"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user start "$name" || { echo; echo "[Start failed — Press Enter]"; read -r _; }
+else
+  sudo systemctl start "$name" || { echo; echo "[Start failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.reload]
+description = "Reload service (reload-or-restart)"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user reload-or-restart "$name" || { echo; echo "[Reload failed — Press Enter]"; read -r _; }
+else
+  sudo systemctl reload-or-restart "$name" || { echo; echo "[Reload failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.status]
+description = "Show full status (systemctl status)"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user status "$name" --no-pager -l 2>&1 | less -R
+else
+  systemctl status "$name" --no-pager -l 2>&1 | less -R
+fi
+'''
+mode = "execute"
+
+[actions.edit]
+description = "Edit unit file (systemctl edit --full)"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  systemctl --user edit --full "$name"
+else
+  sudo systemctl edit --full "$name"
+fi
+'''
+mode = "execute"
+
+[actions.toggle_enable]
+description = "Toggle enable-on-boot (enable <-> disable)"
+command = '''
+name='{split:\t:1}'; scope='{split:\t:2}'
+if [ "$scope" = user ]; then
+  state=$(systemctl --user is-enabled "$name" 2>/dev/null || echo unknown)
+  if [ "$state" = enabled ] || [ "$state" = enabled-runtime ]; then
+    systemctl --user disable "$name" && echo "[Disabled $name]"
+  else
+    systemctl --user enable "$name" && echo "[Enabled $name (was $state)]"
+  fi
+else
+  state=$(systemctl is-enabled "$name" 2>/dev/null || echo unknown)
+  if [ "$state" = enabled ] || [ "$state" = enabled-runtime ]; then
+    sudo systemctl disable "$name" && echo "[Disabled $name]"
+  else
+    sudo systemctl enable "$name" && echo "[Enabled $name (was $state)]"
+  fi
+fi
+sleep 0.5
+'''
+mode = "execute"
+
+{{ else if eq .chezmoi.os "darwin" }}
+[actions.follow]
+description = "Follow live log (tail -F StdoutPath / log stream)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+stdout_path=$(launchctl print "$dom/$label" 2>/dev/null \
+  | awk -F'= ' '/^[ \t]+stdout path / || /^[ \t]+standard out path /{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2; exit}')
+echo "[Following: $label ($scope) — Ctrl+C to return]"
+if [ -n "$stdout_path" ] && [ -f "$stdout_path" ]; then
+  tail -F "$stdout_path" 2>/dev/null | { command -v tspin >/dev/null 2>&1 && tspin --print || cat; }
+else
+  log stream --predicate 'process == "'"$label"'"' --style syslog 2>/dev/null \
+    | { command -v tspin >/dev/null 2>&1 && tspin --print || cat; }
+fi
+echo
+echo "[Press Enter to return]"; read -r _
+'''
+mode = "execute"
+
+[actions.restart]
+description = "Restart (launchctl kickstart -k)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+if [ "$scope" = user ]; then
+  launchctl kickstart -k "$dom/$label" || { echo; echo "[Kickstart failed — Press Enter]"; read -r _; }
+else
+  sudo launchctl kickstart -k "$dom/$label" || { echo; echo "[Kickstart failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.stop]
+description = "Stop (launchctl bootout)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+if [ "$scope" = user ]; then
+  launchctl bootout "$dom/$label" || { echo; echo "[Bootout failed — Press Enter]"; read -r _; }
+else
+  sudo launchctl bootout "$dom/$label" || { echo; echo "[Bootout failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.start]
+description = "Start (kickstart for loaded, bootstrap-by-search otherwise)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+sudo_prefix=""
+[ "$scope" = system ] && sudo_prefix="sudo "
+# Try kickstart first (works if already loaded).
+if $sudo_prefix launchctl kickstart "$dom/$label" 2>/dev/null; then
+  :
+else
+  # Search for the plist and bootstrap it.
+  plist=""
+  for d in /Library/LaunchDaemons /Library/LaunchAgents "$HOME/Library/LaunchAgents"; do
+    [ -f "$d/$label.plist" ] && plist="$d/$label.plist" && break
+  done
+  if [ -n "$plist" ]; then
+    $sudo_prefix launchctl bootstrap "$dom" "$plist" \
+      && $sudo_prefix launchctl kickstart "$dom/$label"
+  else
+    echo "[No plist found for $label — Press Enter]"; read -r _
+  fi
+fi
+'''
+mode = "execute"
+
+[actions.reload]
+description = "Reload (launchctl kickstart, no -k)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+if [ "$scope" = user ]; then
+  launchctl kickstart "$dom/$label" || { echo; echo "[Kickstart failed — Press Enter]"; read -r _; }
+else
+  sudo launchctl kickstart "$dom/$label" || { echo; echo "[Kickstart failed — Press Enter]"; read -r _; }
+fi
+'''
+mode = "execute"
+
+[actions.status]
+description = "Show full launchctl print output"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+{
+  launchctl print "$dom/$label" 2>/dev/null \
+    || { [ "$scope" = system ] && sudo launchctl print "system/$label" 2>/dev/null; } \
+    || echo "No launchctl print output for $dom/$label"
+} | less -R
+'''
+mode = "execute"
+
+[actions.edit]
+description = "Edit plist in $EDITOR"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+info='{split:\t:3}'
+# In cycle 5 the INFO column IS the plist path.
+case "$info" in
+  /*|~/*) plist="$info" ;;
+  *) plist="" ;;
+esac
+# Otherwise, search the standard dirs.
+if [ -z "$plist" ]; then
+  for d in /Library/LaunchDaemons /Library/LaunchAgents "$HOME/Library/LaunchAgents"; do
+    [ -f "$d/$label.plist" ] && plist="$d/$label.plist" && break
+  done
+fi
+if [ -z "$plist" ]; then
+  echo "[No plist found for $label — Press Enter]"; read -r _; exit 0
+fi
+sudo_prefix=""
+case "$plist" in
+  /Library/*|/System/*) sudo_prefix="sudo " ;;
+esac
+$sudo_prefix "${EDITOR:-vi}" "$plist"
+'''
+mode = "execute"
+
+[actions.toggle_enable]
+description = "Toggle enable-on-boot (launchctl enable <-> disable)"
+command = '''
+label='{split:\t:1}'; scope='{split:\t:2}'
+[ "$scope" = user ] && dom="gui/$UID" || dom="system"
+sudo_prefix=""
+[ "$scope" = system ] && sudo_prefix="sudo "
+if $sudo_prefix launchctl print-disabled "$dom" 2>/dev/null | grep -q "\"$label\" => disabled"; then
+  $sudo_prefix launchctl enable "$dom/$label" && echo "[Enabled $label]"
+else
+  $sudo_prefix launchctl disable "$dom/$label" && echo "[Disabled $label]"
+fi
+sleep 0.5
+'''
+mode = "execute"
+
+{{ end }}
+
+[actions.copy_name]
+description = "Copy service name to clipboard"
+command = '''
+d='{split:\t:1}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"

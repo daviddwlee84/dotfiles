@@ -133,6 +133,47 @@ Requires `fd` (part of the `base` ansible role). Tailspin, lnav, ccze are part o
 
 ---
 
+### `services` channel
+
+Cross-platform fuzzy picker for systemd services (Linux) and launchd jobs (macOS), with tailspin-colored log previews and Alt-key lifecycle actions. Open with `tv services`.
+
+Source file: [`dot_config/television/cable/services.toml.tmpl`](../../dot_config/television/cable/services.toml.tmpl) (chezmoi template — Linux and macOS get different `systemctl` vs `launchctl` bodies). Full writeup including symbol legend and sudo caveats: [services.md](services.md).
+
+**Source cycling** (`Ctrl+S`):
+
+1. Running only — active services, system + user merged
+2. All loaded — active + inactive + failed among runtime-known units
+3. Failed only — crashed / non-zero exit
+4. User-scope only — `systemctl --user` / macOS `gui/$UID/` domain
+5. **Installed on-disk** — every unit file / `.plist` on disk, with enablement badges (`✓ Enabled` / `○ Disabled` / `— Static` / `⊘ Masked` on Linux; `● Loaded` / `○ On-disk` on macOS). This is the "configured but not enabled" discovery view — land on a `○ Disabled` row, hit `Alt+L`, done.
+
+**Preview cycling** (`Ctrl+F`):
+
+1. Colorful log tail via tailspin — `journalctl -u NAME -n 500` on Linux; tails `StdoutPath` from `launchctl print` on macOS (prints a helpful message when no stdout is configured, rather than blocking on `log show`).
+2. Status / details — `systemctl status` / `launchctl print`.
+
+**Keybindings:**
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Follow live log (`journalctl -fu` / `tail -F StdoutPath \| tspin` or `log stream`) |
+| `Alt+R` | Restart (auto-sudo when scope=system) |
+| `Alt+S` | Stop (`systemctl stop` / `launchctl bootout`) |
+| `Alt+T` | Start (`systemctl start` / `launchctl kickstart` with bootstrap-by-search fallback) |
+| `Alt+U` | Reload (`reload-or-restart` / `launchctl kickstart`) |
+| `Alt+D` | Show full status in pager |
+| `Alt+E` | Edit unit file / plist in `$EDITOR` |
+| `Alt+L` | Toggle enable-on-boot |
+| `Ctrl+Y` | Copy service name to clipboard |
+
+All mutating actions auto-prepend `sudo` when the row's scope column is `system`. Actions run in `execute` mode so the sudo password prompt is visible if needed.
+
+Deeper platform-specific channels (`tv systemd` with timers/sockets/targets + mask/daemon-reload; `tv launchd` with plist-on-disk sources + bootstrap/bootout) are planned follow-ups — see [`services.md`](services.md) for the full roadmap.
+
+No new dependencies — uses `systemctl`/`journalctl` (base systemd) on Linux, `launchctl`/`log` (macOS built-in) on Darwin, plus `tspin` from `devtools`.
+
+---
+
 ### `ansible` channel
 
 Browse the ansible playbooks / roles / tags shipped in `dot_ansible/` (deployed to `~/.ansible/`). Useful for quickly running a playbook, syntax-checking after edits, or copying the full `ansible-playbook` invocation to paste into a shell.
