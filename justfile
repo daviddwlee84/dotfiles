@@ -314,6 +314,29 @@ upgrade-dry-run:
     ./scripts/upgrade_tools.sh --dry-run all
 
 # ============================================================================
+# Fleet (multi-host chezmoi apply)
+# ============================================================================
+# Run `chezmoi update --init` (or apply / diff) across many remote hosts in
+# parallel. Inventory: ~/.config/fleet/machines.toml (seeded by chezmoi as a
+# `create_private_` template — your edits are preserved). Sudo password
+# sources: plain / interactive prompt / Bitwarden CLI / none.
+# Per-host log: logs/fleet-apply/<UTC-timestamp>/<host>.log
+# Exit code = number of failed hosts.
+# See docs/this_repo/fleet-apply.md for full schema and troubleshooting.
+
+# Apply chezmoi update to all configured hosts in parallel
+fleet-apply *ARGS:
+    ./scripts/fleet_apply.py {{ARGS}}
+
+# Preview only: runs `chezmoi diff` on every host (no changes applied)
+fleet-apply-dry-run *ARGS:
+    ./scripts/fleet_apply.py --dry-run {{ARGS}}
+
+# Apply to a single named host in --serial mode (debug-friendly output)
+fleet-apply-one HOST *ARGS:
+    ./scripts/fleet_apply.py --hosts {{HOST}} --serial {{ARGS}}
+
+# ============================================================================
 # Ad-hoc Scripts
 # ============================================================================
 

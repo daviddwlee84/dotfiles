@@ -112,6 +112,16 @@ Adding a new sudo surface in a run-script:
 
 Full helper API, runtime state, cleanup model: [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md).
 
+**Non-interactive password injection** (used by `scripts/fleet_apply.py` over
+SSH): `sudo_session_init` adopts `CHEZMOI_SUDO_PASSWORD_FILE` (a 0600 file
+path) instead of prompting on `/dev/tty`. The helper validates with `sudo -S
+-v -p ''` and writes into the same shared state dir, so downstream
+run-scripts see the cached state and never re-prompt. Do **not** read
+`CHEZMOI_SUDO_PASSWORD_FILE` from your run-script directly — always go
+through `sudo_session_init`. See [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md)
+→ "Non-interactive password injection" and [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
+for the orchestrator side.
+
 ### `modify_` and `create_` prefix semantics
 
 Two chezmoi source prefixes tame files that would otherwise churn on every apply:

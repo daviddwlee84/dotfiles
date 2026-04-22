@@ -41,6 +41,30 @@ All three run-scripts use these:
 
 **Exports on success**: `CHEZMOI_SUDO_STATE_DIR`, `CHEZMOI_SUDO_PASS_FILE`, `CHEZMOI_ANSIBLE_BECOME_FILE`, `CHEZMOI_SUDO_KEEPALIVE_PID`.
 
+## Non-interactive password injection (`CHEZMOI_SUDO_PASSWORD_FILE`)
+
+Used by remote orchestrators that have no TTY at the consuming end — currently
+[`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) over SSH.
+
+When `sudo_session_init` is called and:
+
+1. The shared state dir is **not** already populated, AND
+2. Sudo is **not** passwordless, AND
+3. `CHEZMOI_SUDO_PASSWORD_FILE` env var points to a readable file containing
+   the password (one line, optional trailing `\n`),
+
+then the file is read, validated with `sudo -S -v -p ''`, and adopted into the
+shared state dir exactly as if it had been entered interactively. The watchdog
+spawns the same way; subsequent run-scripts hit the cached-state branch and
+never see the env var (it's `unset` after adoption).
+
+If the password is rejected by sudo, init fails with a clear stderr message
+instead of silently falling through to the TTY branch.
+
+The orchestrator on the controller side is responsible for placing that 0600
+file on the remote and cleaning it up — see
+[`docs/this_repo/fleet-apply.md`](fleet-apply.md) for the contract.
+
 ## Adding a new sudo surface in a run-script
 
 1. `{{ include "scripts/lib/sudo_shared.sh" }}` near the top of the template.

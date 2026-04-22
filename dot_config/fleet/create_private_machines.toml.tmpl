@@ -1,0 +1,50 @@
+# ~/.config/fleet/machines.toml — fleet_apply.py host inventory
+#
+# Seeded ONCE by chezmoi (`create_` prefix) so your edits are never overwritten.
+# To reset to this template: `rm ~/.config/fleet/machines.toml && chezmoi apply`.
+# File mode is 0600 (chezmoi `private_` prefix) — safe for plaintext passwords,
+# but Bitwarden / interactive prompt sources are still preferred.
+#
+# Schema reference: docs/this_repo/fleet-apply.md
+# Run: `just fleet-apply` (parallel) | `just fleet-apply-dry-run` (chezmoi diff)
+
+[defaults]
+chezmoi_path    = "chezmoi"        # remote PATH binary; e.g. "~/.local/bin/chezmoi" if no-root install
+connect_timeout = 15
+command_timeout = 1800
+
+# ---------------------------------------------------------------------------
+# Examples — DELETE these and add your own [[hosts]] entries.
+# ---------------------------------------------------------------------------
+
+# 1) Preferred: ssh_config alias. Inherits ProxyJump, IdentityAgent (e.g.
+#    1Password SSH agent), Match blocks — everything you'd get from `ssh lab-box`.
+# [[hosts]]
+# name            = "lab-box"
+# ssh_alias       = "lab-box"
+# no_root_machine = false                                   # remote was init'd with noRoot=false
+# password_source = { type = "bitwarden", item = "ssh-lab-box-sudo" }
+
+# 2) Explicit connection (no ssh_config entry).
+# [[hosts]]
+# name            = "vps-tokyo"
+# hostname        = "203.0.113.42"
+# user            = "dwlee"
+# port            = 22
+# identity_file   = "~/.ssh/id_ed25519"
+# no_root_machine = true                                    # remote was init'd with noRoot=true
+# # password_source omitted → no sudo phase; chezmoi runs as the SSH user only.
+
+# 3) Interactive prompt (asked once at startup, never persisted).
+# [[hosts]]
+# name            = "office-mac"
+# ssh_alias       = "office-mac"
+# no_root_machine = false
+# password_source = { type = "prompt" }
+
+# 4) Plaintext password (last resort — relies on file mode 0600).
+# [[hosts]]
+# name            = "throwaway-vm"
+# ssh_alias       = "throwaway-vm"
+# no_root_machine = false
+# password_source = { type = "plain", value = "hunter2" }

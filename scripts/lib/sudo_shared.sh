@@ -36,6 +36,12 @@
 #                               passwordless, prompt once on /dev/tty, validate,
 #                               write files, spawn watchdog. Returns non-zero if
 #                               no TTY available and not passwordless.
+#                               Non-interactive override: when env var
+#                               CHEZMOI_SUDO_PASSWORD_FILE points to a 0600 file
+#                               containing the password, the file is adopted
+#                               instead of prompting (used by remote orchestrators
+#                               like scripts/fleet_apply.py — see docs/this_repo/
+#                               fleet-apply.md).
 #   sudo_session_skip_reason    Print a one-word label the caller uses to pick
 #                               a branch: "cached" | "passwordless" |
 #                               "non-interactive" | "" (empty = not probed yet).
@@ -158,6 +164,51 @@ sudo_session_init() {
     # Truly passwordless? No file, no watchdog, no prompt.
     if sudo -n true 2>/dev/null; then
         return 0
+    fi
+
+    # Non-interactive password injection (used by remote orchestrators like
+    # scripts/fleet_apply.py over SSH). When CHEZMOI_SUDO_PASSWORD_FILE points
+    # to a 0600 file containing the password (one line), adopt it instead of
+    # prompting on /dev/tty. The file is moved into the shared state dir and
+    # the env-supplied path is unset so subsequent run-scripts use the cached
+    # state-dir copy via the normal idempotent path.
+    if [[ -r "${CHEZMOI_SUDO_PASSWORD_FILE:-/nonexistent}" ]]; then
+        local injected_pw=""
+        injected_pw="$(cat "$CHEZMOI_SUDO_PASSWORD_FILE" 2>/dev/null || printf '')"
+        # Strip a single trailing newline if present.
+        injected_pw="${injected_pw%$'\n'}"
+        if [[ -n "$injected_pw" ]] && printf '%s\n' "$injected_pw" | sudo -S -v -p '' 2>/dev/null; then
+            [[ -d "$dir" ]] && rm -rf "$dir"
+            (umask 077 && mkdir -p "$dir") || { unset injected_pw; return 1; }
+            chmod 700 "$dir" 2>/dev/null || true
+            local pf="$dir/sudo.pass" bf="$dir/ansible-become.yml"
+            (umask 177 && : > "$pf" && : > "$bf") || { unset injected_pw; rm -rf "$dir"; return 1; }
+            chmod 600 "$pf" "$bf" 2>/dev/null || true
+            printf '%s\n' "$injected_pw" > "$pf"
+            local esc="${injected_pw//\\/\\\\}"
+            esc="${esc//\"/\\\"}"
+            printf 'ansible_become_password: "%s"\n' "$esc" > "$bf"
+            unset injected_pw esc
+            local wpid
+            wpid="$(_sudo_find_chezmoi_ancestor)"
+            [[ -z "$wpid" ]] && wpid="$PPID"
+            printf '%s\n' "$wpid" > "$dir/chezmoi.pid"
+            chmod 600 "$dir/chezmoi.pid" 2>/dev/null || true
+            local kpid
+            kpid="$(_sudo_spawn_watchdog "$dir" "$wpid")"
+            printf '%s\n' "$kpid" > "$dir/keepalive.pid"
+            chmod 600 "$dir/keepalive.pid" 2>/dev/null || true
+            export CHEZMOI_SUDO_STATE_DIR="$dir"
+            export CHEZMOI_SUDO_PASS_FILE="$pf"
+            export CHEZMOI_ANSIBLE_BECOME_FILE="$bf"
+            export CHEZMOI_SUDO_KEEPALIVE_PID="$kpid"
+            unset CHEZMOI_SUDO_PASSWORD_FILE
+            trap 'sudo_session_abort' INT TERM HUP
+            return 0
+        fi
+        unset injected_pw
+        printf '[%s] CHEZMOI_SUDO_PASSWORD_FILE rejected by sudo — aborting.\n' "$label" >&2
+        return 1
     fi
 
     # Not passwordless and no TTY: caller must fall through to its manual path.

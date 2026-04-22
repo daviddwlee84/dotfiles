@@ -272,6 +272,27 @@ latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
 Code's official stdin `rate_limits` only, so the old credential-derived `Max`
 plan badge may disappear after upgrade.
 
+## Multi-host apply (`just fleet-apply`)
+
+Push the same `chezmoi update --init` to every host in
+`~/.config/fleet/machines.toml`, in parallel, with sudo password sourced from
+plaintext / interactive prompt / Bitwarden CLI:
+
+```bash
+just fleet-apply                     # parallel, all hosts (chezmoi update --init)
+just fleet-apply-dry-run             # `chezmoi diff` on each host (no changes)
+just fleet-apply-one lab-box         # single host, --serial mode (debug)
+```
+
+Connection prefers `~/.ssh/config` aliases (`ProxyJump`, `IdentityAgent`,
+etc. all inherited) and falls back to explicit `hostname/user/port/identity_file`.
+Per-host log: `logs/fleet-apply/<UTC-timestamp>/<host>.log`. Exit code = number
+of failed hosts. Inventory file is seeded once by chezmoi as a
+`create_private_` template, so your edits are never overwritten.
+
+Full schema, password-source semantics, and troubleshooting:
+[docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md).
+
 ## Testing
 
 Two layers, both opt-in — this is a personal dotfiles repo, tests only cover painful-regression zones:
