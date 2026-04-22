@@ -266,20 +266,23 @@ channel **and** closes the channel (which delivers SIGHUP to the remote
 shell, which the wrapper's trap propagates to chezmoi). The remote should
 fully exit within seconds.
 
-## Killing orphans
+## Killing orphans, checking status, re-attaching
 
-Local Ctrl+C, network drop, or any other premature disconnect is handled
-two ways:
+Local Ctrl+C, network drop, laptop sleep, or any other premature
+disconnect is handled three ways:
 
 1. **In-band cleanup**: `build_remote_command()` wraps chezmoi in a shell
    wrapper with `trap '… pkill -TERM -P $_cz_pid …' INT TERM HUP`. asyncssh
    uses `request_pty='force'`, so the SSH channel close delivers SIGHUP to
    that wrapper shell on the remote — chezmoi (and any ansible-playbook
    children) get SIGTERM-ed and the wrapper proxies the exit code back.
+   In practice this fires whenever asyncssh actually closes the channel
+   (which is most cases, including normal SIGINT on the controller).
 
-2. **Out-of-band rescue**: if you killed `fleet_apply.py` so abruptly that
-   even the in-band trap didn't fire (e.g. `kill -9` on the Python process,
-   or your laptop slept), run:
+2. **Out-of-band rescue**: if even the in-band trap didn't fire (e.g.
+   `kill -9` on `fleet_apply.py`, or asyncssh closed the channel
+   "cleanly" without a HUP delivery), the remote chezmoi/ansible may
+   still be running:
 
    ```bash
    just fleet-apply-kill                       # all hosts
@@ -288,9 +291,34 @@ two ways:
 
    This connects to each host and runs `pkill -TERM -u "$(id -un)" -x
    chezmoi`, then `pkill -TERM -x ansible-playbook` and `ansible`, waits
-   1 s, then SIGKILLs anything still alive. Output is one line per host
-   showing exit status. No chezmoi command is sent, so this is safe to run
-   any time the fleet looks "stuck".
+   1 s, then SIGKILLs anything still alive. No chezmoi command is sent,
+   so this is safe to run any time the fleet looks "stuck".
+
+3. **Status probe + live tail re-attach** (added after observing that
+   asyncssh + a slow laptop-side kill sometimes leaves remote work
+   running for many minutes silently):
+
+   ```bash
+   just fleet-apply-status                     # which hosts are still busy?
+   just fleet-apply-status --hosts ts_nas      # one host
+   just fleet-apply-tail jingle207             # follow latest run on this host
+   just fleet-apply-tail jingle207 --tail jingle207:20260422T140446Z
+                                               # pin a specific run id
+   ```
+
+   Each remote run tees chezmoi's combined stdout/stderr to
+   `~/.cache/chezmoi-fleet/logs/<run_id>.log` and drops a sentinel
+   `<run_id>.exit` file containing the final exit code when the run
+   finishes. `--status` reads both: it shows `running` (live PIDs +
+   their numbers), `finished` (with the exit code), or `idle` per host,
+   plus the last 5 lines of the latest log inline for quick context.
+   `--tail` does a `tail -F` on the log over a fresh SSH session and
+   exits cleanly when the sentinel appears (or you Ctrl+C the viewer
+   — the remote run keeps going).
+
+   Both probes are read-only: they never send a chezmoi command and
+   never kill anything. Combine with `fleet-apply-kill` if you decide
+   the remote work should stop.
 
 ## Exit codes
 

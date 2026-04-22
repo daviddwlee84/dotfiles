@@ -347,6 +347,16 @@ fleet-apply-one HOST *ARGS:
 fleet-apply-kill *ARGS:
     ./scripts/fleet_apply.py --kill-orphans {{ARGS}}
 
+# Probe each host for running chezmoi/ansible (use after killing local SSH)
+fleet-apply-status *ARGS:
+    ./scripts/fleet_apply.py --status {{ARGS}}
+
+# Live-tail the remote fleet-apply log of HOST (defaults to most recent run);
+# pass `HOST:RUN_ID` (e.g. lab-box:20260422T133615Z) to pin a specific run.
+# Ctrl+C stops the viewer only — the remote run keeps going.
+fleet-apply-tail HOST *ARGS:
+    ./scripts/fleet_apply.py --tail {{HOST}} {{ARGS}}
+
 # ============================================================================
 # Ad-hoc Scripts
 # ============================================================================
