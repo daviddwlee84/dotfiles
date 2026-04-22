@@ -269,6 +269,63 @@ Open with `tv pueue`. Auto-refreshes every 2 seconds.
 
 ---
 
+### `azure` channel
+
+Fuzzy-search Azure resources via `az` CLI with per-resource actions: restart / start / power-off / deallocate / rotate-public-IP / SSH / open-in-portal / delete / copy-id / switch-subscription. Backed by three helper scripts under `~/.config/television/` (`azure-source.sh`, `azure-preview.sh`, `azure-rotate-ip.sh`). Requires `az` (ansible `iac_tools` tag) and `jq`; the channel is automatically skipped on hosts without either.
+
+Open with `tv azure`. No auto-refresh — `az` calls are too slow to watch; hit `Ctrl+R` to reload.
+
+**Login gate:** if `az account show` fails, the channel shows a single synthetic row (`login · not-logged-in`). Press `Enter` to run `az login`, then `Ctrl+R` to reload.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| Resource Groups | `az group list` (default) |
+| Virtual Machines | `az vm list -d` — name, RG, location, power state |
+| Public IPs | `az network public-ip list` — ipAddress + FQDN |
+| NICs + NSGs | Union of `az network nic list` and `az network nsg list` |
+| All resources | `az resource list` — generic fallback when you know a name but not its type |
+
+**Preview cycling** (`Ctrl+F`):
+
+1. `az <kind> show -o yaml` pretty-printed via `bat` when available
+2. `az <kind> show -o json` for copy-paste / `jq` piping
+
+**Keybindings** (`Alt+` namespace avoids tmux/TV conflicts):
+
+| Key | Action | Works on |
+|-----|--------|----------|
+| `Enter` | Show full resource (`az … show` in execute mode); on the login row runs `az login` | all |
+| `Alt+R` | Restart VM | vm |
+| `Alt+S` | Start VM | vm |
+| `Alt+P` | Power-off VM (still billed) | vm |
+| `Alt+D` | Deallocate VM (not billed) | vm |
+| `Alt+I` | **Rotate public IP** — keeps the FQDN, swaps the IP | vm |
+| `Alt+H` | SSH via `az ssh vm` (requires the `ssh` az extension) | vm |
+| `Alt+O` | Open resource in Azure Portal (`open` / `xdg-open` / `wslview`) | all |
+| `Alt+X` | Delete with y/N confirm | rg / vm / pip / nic / nsg / res |
+| `Alt+U` | Switch subscription (fzf picker of `az account list`) | all |
+| `Ctrl+Y` / `Alt+Y` | Copy resource id to clipboard (pbcopy / wl-copy / xclip / OSC 52 fallback) | all |
+
+Actions internally `case $kind` on the row's kind field, so wrong-kind keys (e.g. `Alt+R` on an RG row) print a 1-second "only applies to VMs" toast and no-op — same idiom as the `ansible` channel's role-only `Alt+V`.
+
+**Rotate Public IP** (`Alt+I`) calls `~/.config/television/azure-rotate-ip.sh <rg> <vm>`, a stateless port of [`DockerCompose-V2Ray/scripts/az_rotate_ip.sh`](https://github.com/daviddwlee84/DockerCompose-V2Ray/blob/main/scripts/az_rotate_ip.sh). It:
+
+- Resolves VM → NIC → PIP → DNS label live via `az` (no `.secrets/` state file).
+- Refuses to run when `SSH_CONNECTION` is set (detaching the PIP would sever the SSH session before reattach).
+- Requires Standard SKU (Basic retired 2025-09-30) with a `dnsSettings.domainNameLabel` — nothing to preserve otherwise.
+- 5-step: detach → delete → recreate with same `--dns-name` → reattach → `dig +short <fqdn>` verify.
+- `AZ_YES=1 azure-rotate-ip.sh <rg> <vm>` skips the confirm prompt (useful for scripting; the TV channel runs interactively so the prompt is fine).
+
+Use case: the GFW bans an Azure VM's public IP. Rotating keeps the `*.cloudapp.azure.com` FQDN, the TLS cert, the client configs, everything — the only change is the underlying IP.
+
+**Multi-subscription:** `Alt+U` pipes `az account list` through `fzf` so you can `az account set` without leaving the picker, then reloads the source. The `[ui].input_header` simply reads "Azure" — resolving the current subscription at channel-init time is cheap but not worth the UX complexity of refreshing it after `Alt+U`.
+
+**Non-goals (v1):** provisioning (`az vm create` stays in the V2Ray repo), teardown beyond `Alt+X`, and Windows-specific VM operations.
+
+---
+
 ### `sesh` channel (community)
 
 Provided by `tv update-channels`. Source cycling through session types and directory search, with connect/kill actions.

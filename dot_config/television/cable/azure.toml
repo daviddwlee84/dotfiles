@@ -1,0 +1,139 @@
+# Azure channel for television (tv)
+# Fuzzy-search Azure resources via `az` CLI, with per-resource actions
+# (restart, deallocate, rotate public IP, SSH, open in portal, copy id).
+#
+# Usage:
+#   tv azure
+#
+# Prereqs: `az` (iac_tools ansible tag) + `jq`. If you're not logged in,
+# the channel shows a single synthetic row and Enter runs `az login`.
+#
+# Source cycling (Ctrl+S):
+#   1. Resource Groups
+#   2. Virtual Machines (with power state)
+#   3. Public IPs (with ipAddress + FQDN)
+#   4. NICs + NSGs (union)
+#   5. All resources (generic `az resource list` fallback)
+#
+# Keybindings (Alt+key avoids conflicts with TV built-ins and tmux):
+#   Enter      Show full resource (`az … show`) in execute mode.
+#              On the "not-logged-in" row: run `az login`.
+#   Alt+R      Restart (vm)
+#   Alt+S      Start (vm)
+#   Alt+P      Power-off, still billed (vm)
+#   Alt+D      Deallocate, not billed (vm)
+#   Alt+I      Rotate public IP — keeps FQDN, swaps the IP (vm)
+#   Alt+H      SSH via `az ssh vm` (vm; requires the `ssh` az extension)
+#   Alt+O      Open resource in Azure Portal (all)
+#   Alt+X      Delete with confirm prompt (rg / vm / pip / nic / nsg / res)
+#   Alt+U      Switch subscription (fzf picker of `az account list`)
+#   Ctrl+Y     Copy resource id to clipboard (OSC 52 over SSH)
+#   Alt+Y      Copy resource id to clipboard (same)
+#   Ctrl+F     Cycle preview (YAML / JSON)
+#   Ctrl+O     Toggle preview panel
+#   Ctrl+R     Reload source (no auto-refresh — `az` calls are slow)
+#
+# Row schema (TSV): kind \t name \t resource_group \t location \t extra
+#   kind ∈ {rg, vm, pip, nic, nsg, res, login}
+# Actions switch on `kind` so wrong-kind keys become 1-second no-op toasts.
+
+[metadata]
+name = "azure"
+description = "Azure resources: browse, restart / deallocate / rotate-ip VMs, open in portal"
+requirements = ["az", "jq"]
+
+[source]
+command = [
+  "$HOME/.config/television/azure-source.sh rgs",
+  "$HOME/.config/television/azure-source.sh vms",
+  "$HOME/.config/television/azure-source.sh pips",
+  "$HOME/.config/television/azure-source.sh nics",
+  "$HOME/.config/television/azure-source.sh all",
+]
+display = "{split:\\t:0}  {split:\\t:1}  [{split:\\t:2}]  {split:\\t:3}  {split:\\t:4}"
+output = "{split:\\t:0}\t{split:\\t:1}\t{split:\\t:2}"
+no_sort = true
+
+[preview]
+command = [
+  "$HOME/.config/television/azure-preview.sh main '{split:\\t:0}' '{split:\\t:1}' '{split:\\t:2}'",
+  "$HOME/.config/television/azure-preview.sh alt '{split:\\t:0}' '{split:\\t:1}' '{split:\\t:2}'",
+]
+header = "{split:\\t:0}: {split:\\t:1} [{split:\\t:2}]"
+
+[ui]
+input_header = "Azure"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:show"
+alt-r = ["actions:restart", "reload_source"]
+alt-s = ["actions:start", "reload_source"]
+alt-p = ["actions:stop", "reload_source"]
+alt-d = ["actions:deallocate", "reload_source"]
+alt-i = ["actions:rotate_ip", "reload_source"]
+alt-h = "actions:ssh"
+alt-o = "actions:portal"
+alt-x = ["actions:delete", "reload_source"]
+alt-u = ["actions:switch_sub", "reload_source"]
+# Override TV global ctrl-y (which copies the full display line) to copy just
+# the resource id; alt-y is the muscle-memory twin used elsewhere in this repo.
+ctrl-y = "actions:copy_id"
+alt-y = "actions:copy_id"
+
+[actions.show]
+description = "Show full resource (az ... show) / run az login if not logged in"
+command = """kind='{split:\\t:0}'; name='{split:\\t:1}'; rg='{split:\\t:2}'; case "$kind" in login) az login; echo; echo '[Press Enter to exit]'; read -r _ ;; rg) az group show -n "$name" -o yamlc 2>/dev/null || az group show -n "$name" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; vm) az vm show -d -g "$rg" -n "$name" -o yamlc 2>/dev/null || az vm show -d -g "$rg" -n "$name" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; pip) az network public-ip show -g "$rg" -n "$name" -o yamlc 2>/dev/null || az network public-ip show -g "$rg" -n "$name" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; nic) az network nic show -g "$rg" -n "$name" -o yamlc 2>/dev/null || az network nic show -g "$rg" -n "$name" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; nsg) az network nsg show -g "$rg" -n "$name" -o yamlc 2>/dev/null || az network nsg show -g "$rg" -n "$name" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; res) az resource show --ids "$(az resource list -g "$rg" --name "$name" --query '[0].id' -o tsv)" -o yamlc 2>/dev/null || az resource show --ids "$(az resource list -g "$rg" --name "$name" --query '[0].id' -o tsv)" -o yaml; echo; echo '[Press Enter to exit]'; read -r _ ;; *) echo "no show for kind=$kind"; sleep 1 ;; esac"""
+mode = "execute"
+
+[actions.restart]
+description = "Restart VM"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+R only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; az vm restart -g '{split:\\t:2}' -n '{split:\\t:1}' --no-wait"""
+mode = "fork"
+
+[actions.start]
+description = "Start VM"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+S only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; az vm start -g '{split:\\t:2}' -n '{split:\\t:1}' --no-wait"""
+mode = "fork"
+
+[actions.stop]
+description = "Power off VM (still billed)"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+P only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; az vm stop -g '{split:\\t:2}' -n '{split:\\t:1}' --no-wait"""
+mode = "fork"
+
+[actions.deallocate]
+description = "Deallocate VM (not billed)"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+D only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; az vm deallocate -g '{split:\\t:2}' -n '{split:\\t:1}' --no-wait"""
+mode = "fork"
+
+[actions.rotate_ip]
+description = "Rotate VM public IP (keeps the FQDN; ~30-60s outage)"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+I only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; $HOME/.config/television/azure-rotate-ip.sh '{split:\\t:2}' '{split:\\t:1}'; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.ssh]
+description = "SSH to VM via `az ssh vm`"
+command = """kind='{split:\\t:0}'; if [ "$kind" != "vm" ]; then echo "Alt+H only applies to VMs (got kind=$kind)"; sleep 1; exit 0; fi; if ! az extension show --name ssh >/dev/null 2>&1; then echo "The 'ssh' az extension is not installed."; echo "Install: az extension add --name ssh"; echo; echo '[Press Enter to exit]'; read -r _; exit 0; fi; az ssh vm -g '{split:\\t:2}' -n '{split:\\t:1}'; echo; echo '[Press Enter to exit]'; read -r _"""
+mode = "execute"
+
+[actions.portal]
+description = "Open resource in Azure Portal"
+command = """kind='{split:\\t:0}'; name='{split:\\t:1}'; rg='{split:\\t:2}'; case "$kind" in login) id="" ;; rg) id=$(az group show -n "$name" --query id -o tsv 2>/dev/null) ;; vm) id=$(az vm show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null) ;; pip) id=$(az network public-ip show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null) ;; nic) id=$(az network nic show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null) ;; nsg) id=$(az network nsg show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null) ;; res) id=$(az resource list -g "$rg" --name "$name" --query '[0].id' -o tsv 2>/dev/null) ;; *) id="" ;; esac; if [ -z "$id" ]; then echo "could not resolve resource id for $kind:$name"; sleep 1; exit 0; fi; url="https://portal.azure.com/#@/resource${id}"; if command -v open >/dev/null 2>&1; then open "$url"; elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url" >/dev/null 2>&1 &; elif command -v wslview >/dev/null 2>&1; then wslview "$url"; else echo "$url"; sleep 1; fi"""
+mode = "fork"
+
+[actions.delete]
+description = "Delete selected resource (with y/N confirm)"
+command = """kind='{split:\\t:0}'; name='{split:\\t:1}'; rg='{split:\\t:2}'; case "$kind" in login) echo "nothing to delete"; sleep 1; exit 0 ;; esac; printf 'Delete %s "%s" in RG "%s"? [y/N]: ' "$kind" "$name" "$rg"; read -r confirm; case "$confirm" in y|Y|yes|YES) ;; *) echo "aborted"; sleep 1; exit 0 ;; esac; case "$kind" in rg) az group delete -n "$name" --yes --no-wait ;; vm) az vm delete -g "$rg" -n "$name" --yes --no-wait ;; pip) az network public-ip delete -g "$rg" -n "$name" ;; nic) az network nic delete -g "$rg" -n "$name" ;; nsg) az network nsg delete -g "$rg" -n "$name" ;; res) id=$(az resource list -g "$rg" --name "$name" --query '[0].id' -o tsv); [ -n "$id" ] && az resource delete --ids "$id" ;; *) echo "no delete for kind=$kind"; sleep 1 ;; esac; echo "Done (or submitted --no-wait)."; sleep 1"""
+mode = "execute"
+
+[actions.switch_sub]
+description = "Switch Azure subscription (fzf picker)"
+command = """if ! command -v fzf >/dev/null 2>&1; then echo "fzf not on PATH"; sleep 1; exit 0; fi; pick=$(az account list --query '[].{n:name,i:id,d:isDefault}' -o tsv 2>/dev/null | awk -F'\\t' '{star=($3=="True"?"*":" "); printf "%s %s\\t%s\\n", star, $1, $2}' | fzf --prompt='Subscription> ' --height=40% --reverse); if [ -z "$pick" ]; then echo "aborted"; sleep 1; exit 0; fi; sub_id=$(printf '%s' "$pick" | awk -F'\\t' '{print $2}'); az account set --subscription "$sub_id" && echo "Switched to: $pick"; sleep 1"""
+mode = "execute"
+
+[actions.copy_id]
+description = "Copy resource id to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; kind='{split:\\t:0}'; name='{split:\\t:1}'; rg='{split:\\t:2}'; case "$kind" in login) printf '%s' "not-logged-in" | _clip ;; rg) az group show -n "$name" --query id -o tsv 2>/dev/null | _clip ;; vm) az vm show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null | _clip ;; pip) az network public-ip show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null | _clip ;; nic) az network nic show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null | _clip ;; nsg) az network nsg show -g "$rg" -n "$name" --query id -o tsv 2>/dev/null | _clip ;; res) az resource list -g "$rg" --name "$name" --query '[0].id' -o tsv 2>/dev/null | _clip ;; *) printf '%s' "$name" | _clip ;; esac"""
+mode = "fork"

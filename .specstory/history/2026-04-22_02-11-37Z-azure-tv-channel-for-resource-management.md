@@ -158,3 +158,581 @@ ls /Users/daviddwlee84/Documents/Program/Personal/DockerCompose-V2Ray/scripts /U
 <summary>Tool use: **run_terminal_command_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm trying to figure out what the user means by "TV channel" — it could be a dashboard-style interface where you switch between different resource views, or possibly a reference to a specific tool. Let me examine the az scripts to understand what operations they support and see if that clarifies things.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/Documents/Program/Personal/DockerCompose-V2Ray/scripts/az_up.sh</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/Documents/Program/Personal/DockerCompose-V2Ray/scripts/az_rotate_ip.sh</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm exploring the chezmoi repository structure to see where a new tool would naturally fit, but first I need to clarify what the user actually means by "TV channel" — it could be an Azure Portal-style terminal dashboard where you navigate between different resource types, or something else entirely.
+
+Given the context about displaying different resource types with type-specific actions, I'm leaning toward this being a TUI tool similar to k9s or lazygit for Azure, where each "channel" represents a resource type you can switch between. Before diving deeper, I should ask the user whether they want a terminal UI or web dashboard, where it should live in the repo, and which resource types matter most.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/10_aliases.zsh</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls /Users/daviddwlee84/.local/share/chezmoi/bin /Users/daviddwlee84/.local/share/chezmoi/scripts</summary>
+
+```bash
+ls /Users/daviddwlee84/.local/share/chezmoi/bin /Users/daviddwlee84/.local/share/chezmoi/scripts
+```
+
+```
+/Users/daviddwlee84/.local/share/chezmoi/bin:
+[1;90m--[0m 󰡯 executable_sms
+[1;90m--[0m [31m󰡯 executable_x[0m
+
+/Users/daviddwlee84/.local/share/chezmoi/scripts:
+[1;90m--[0m [36m [1madhoc[0m
+[1;90m--[0m [31m import_ssh_to_bw.sh[0m
+[1;90m--[0m [31m install_specstory.sh[0m
+[1;90m--[0m [36m [1mlib[0m
+[1;90m--[0m [31m redact_secrets.py[0m
+[1;90m--[0m [31m redact_specstory.py[0m
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm spotting something significant here — the user has Television configured as a tool with both global settings and channel-specific overrides, which could be really useful for their workflow.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Ah — "TV channel" here means a **Television** (`tv`) cable channel. Let me look at the existing Television setup.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls /Users/daviddwlee84/.local/share/chezmoi/dot_config/television /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable 2>/dev/null</summary>
+
+```bash
+ls /Users/daviddwlee84/.local/share/chezmoi/dot_config/television /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable 2>/dev/null
+```
+
+```
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television:
+[1;90m--[0m [36m [1mcable[0m
+[1;90m--[0m  config.toml
+[1;90m--[0m  executable_ansible-preview.sh
+[1;90m--[0m  executable_lan-scan.sh
+
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable:
+[1;90m--[0m  aliases.toml
+[1;90m--[0m  ansible.toml
+[1;90m--[0m  channels.toml
+[1;90m--[0m  git-ops.toml
+[1;90m--[0m  kill-process.toml
+[1;90m--[0m  lan-devices.toml
+[1;90m--[0m  ports.toml
+[1;90m--[0m  pueue.toml
+[1;90m--[0m  sesh.toml.reference
+[1;90m--[0m  sms.toml
+[1;90m--[0m  ssh-config.toml
+[1;90m--[0m  tools.toml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "files_with_matches",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs",
+  "pattern": "television"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs",
+  "pattern": "television",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "docs/testing.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/zsh/aliases.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/tv.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/keyboard-shortcuts.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/cheatsheet.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/tmux/keybindings.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/linux-package-sources.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/sms.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/tv-vs-fzf.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/sesh.md"
+    }
+  ],
+  "totalFiles": 10,
+  "totalMatches": 10
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ansible.toml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm seeing the full picture now—this repo uses a sophisticated Television setup with multiple custom channels, and the user wants to add an `azure` channel that lists Azure resources, handles authentication by prompting `az login` when needed, and provides resource-specific actions like restarting VMs or rotating IPs. The existing channel configurations show the pattern I need to follow.
+
+Before I draft the implementation, I need to nail down a few key decisions: which Azure resources to prioritize (VMs are essential, but should I include Resource Groups, Storage, AKS, App Services, Networks, Disks?), how to handle multiple subscriptions (default to current or allow switching?), whether to show a graceful in-channel login prompt or refuse to start the channel, whether to keep everything in one `azure.toml` file or split out helper scripts, and what specific VM actions to support beyond restart and rotate IP.
+
+Looking at the V2Ray reference as a guide, I can infer most answers — scope it to Resource Groups, VMs, Public IPs, NICs, and NSGs to start, handle login with an `az account show` check that prompts for `az login` if needed, and build a preview/action helper script alongside the TOML (matching the repo's existing pattern). The critical questions I should ask are really just: what resource types matter most for v1, and whether to ship reusable scripts like `az_rotate_ip.sh` inside chezmoi or inline the commands directly in the TOML actions.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Now I fully understand: **"TV channel"** = a Television (`tv`) **cable channel** — the repo already has sophisticated custom channels at `dot_config/television/cable/*.toml` (`ansible`, `pueue`, `lan-devices`, `git-ops`, …) backed by helper scripts under `dot_config/television/`. You want a new `azure.toml` channel that:
+
+1. Runs on top of `az` CLI (already installed via the `iac_tools` ansible tag)
+2. Handles not-logged-in gracefully (similar to how `az_up.sh` does `az account show || die "run 'az login'"`)
+3. Lists Azure resources by type (sources you can cycle with `Ctrl+S`)
+4. Per-resource actions (e.g. VM: restart / rotate-IP / start / stop / ssh), adapting the patterns from `DockerCompose-V2Ray/scripts/az_rotate_ip.sh`, `az_up.sh`, `az_down.sh`
+
+Before I write a plan, two scope decisions will shape it significantly — everything else I can infer from the V2Ray repo + existing channel patterns.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ask_question">
+<details>
+<summary>Tool use: **ask_question**</summary>
+
+
+Parameters:
+
+```json
+{
+  "questions": [
+    {
+      "id": "scope",
+      "options": [
+        {
+          "id": "vm_centric",
+          "label": "VM-centric：Resource Groups, VMs, Public IPs, NICs/NSGs（貼近 V2Ray 用到的面；實作快、操作實用，可復用 az_rotate_ip.sh 邏輯）"
+        },
+        {
+          "id": "broad_catalog",
+          "label": "Broad catalog：加上 Storage Accounts, Disks, AKS, App Services, Key Vault 等（更像通用 Azure 瀏覽器，但每種 type 的 action 需各自設計、preview 也會慢）"
+        },
+        {
+          "id": "generic_all",
+          "label": "Generic：用 az resource list 列出所有 resource（不分 type，fuzzy 搜尋為主，action 只有 show / delete / tag / open-in-portal 這類通用的）"
+        },
+        {
+          "id": "let_me_choose",
+          "label": "VM-centric 為主，但同時支援一個 generic \"all resources\" source 作為 fallback（Ctrl+S 的第 N cycle）"
+        }
+      ],
+      "prompt": "資源類型的覆蓋範圍（Ctrl+S source cycling 要包含哪些？）v1 建議先聚焦在 DockerCompose-V2Ray 會碰到的那組（VM-centric），之後可以再擴充。"
+    },
+    {
+      "id": "rotate_ip_source",
+      "options": [
+        {
+          "id": "port_script",
+          "label": "移植並精簡到 chezmoi：在 dot_config/television/ 或 scripts/ 放一個 az-rotate-ip.sh，不依賴 V2Ray 的 state file，改從 az 當場查 NIC+PIP+DNS label。讓 azure 頻道呼叫它"
+        },
+        {
+          "id": "inline_toml",
+          "label": "全部 inline 寫在 azure.toml 的 [actions.rotate_ip] command 裡（保持跟 pueue/ansible 頻道一致的「單檔就是頻道」風格，但 shell 會很長、不好讀）"
+        },
+        {
+          "id": "skip_for_now",
+          "label": "v1 先不做 rotate-ip：只做簡單的 start/stop/restart/ssh/open-portal，rotate-ip 放後續 issue"
+        }
+      ],
+      "prompt": "Rotate Public IP 這類「多步驟、破壞性」動作，實作方式怎麼挑？V2Ray repo 已有一個可用的 scripts/az_rotate_ip.sh（260 行，含 state file、DNS 驗證、VPS-safety guard），它吃的是 .secrets/azure/vms/\u003crg\u003e.json。"
+    }
+  ]
+}
+```
+Additional data:
+
+```json
+{
+  "currentSelections": {
+    "rotate_ip_source": [
+      "port_script"
+    ],
+    "scope": [
+      "let_me_choose"
+    ]
+  },
+  "freeformTexts": {
+    "rotate_ip_source": "",
+    "scope": ""
+  },
+  "status": "submitted"
+}
+```
+Result:
+
+```json
+{
+  "answers": [
+    {
+      "freeformText": "",
+      "questionId": "scope",
+      "selectedOptionIds": [
+        "let_me_choose"
+      ]
+    },
+    {
+      "freeformText": "",
+      "questionId": "rotate_ip_source",
+      "selectedOptionIds": [
+        "port_script"
+      ]
+    }
+  ]
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ask_question"><details>
+<summary>Tool use: **ask_question**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm settling on a VM-centric approach where Ctrl+S cycles through different resource scopes—starting with Resource Groups, then VMs, Public IPs, NICs/NSGs, and falling back to a generic "all resources" option. I also need to port the standalone IP rotation script into the chezmoi repo and refactor it to work independently of V2Ray.
+
+Now I'm mapping out the full feature set: a login preflight that shows a friendly prompt if `az account show` fails, subscription display in the header with Alt+U to switch, preview modes cycling through YAML and JSON formats, Alt+O to open resources in the Azure portal, and Alt+Y/Ctrl+Y to copy resource IDs. For VMs specifically, I'm adding Enter for details view, Alt+R/S/P/D for restart/start/stop/deallocate, Alt+I to trigger IP rotation, and Alt+H for SSH access.
+
+The row format uses tab-separated values with kind, name, resource group, and location, and I'm using the same case-based action pattern from the ansible channel so keybindings work across different resource types. I'll need the `az` CLI and `jq`, with `bat` as optional for prettier preview output.
+
+I'm creating the azure.toml channel file, a preview dispatcher script following the ansible-preview pattern, and a rotate-IP helper script, plus updating the television docs.
+
+For the login flow, I'm building a helper script that checks if the user is authenticated—if not, it shows a synthetic "login" row prompting them to authenticate, and the enter action either triggers `az login` and reloads the source or shows the resource details depending on the row type. This keeps the UX clean and gates access to real data behind authentication.
+
+Now I need to structure the full implementation plan covering the new files, source cycling, keybindings, the rotate-IP script behavior, login and subscription handling, and documentation updates. One thing to note: the rotate-IP script will be ported into the chezmoi repo rather than linked from the V2Ray repo, so the tool stays self-contained while still referencing the original implementation.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Got it. Two decisions locked in:
+
+1. VM-centric resources + a generic "all resources" fallback source.
+2. Port the `az_rotate_ip.sh` logic into a standalone helper inside chezmoi (no dependence on V2Ray's `.secrets/azure/vms/<rg>.json` state file — query NIC/PIP/DNS live via `az`).
+
+Let me sketch the plan.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="create_plan">
+<details>
+<summary>Tool use: **create_plan**</summary>
+
+
+Parameters:
+
+```json
+{
+  "name": "Azure Television channel",
+  "overview": "Add an &#96;azure&#96; Television (&#96;tv&#96;) channel that fuzzy-searches Azure resources over &#96;az&#96; CLI, with source-cycling across resource types (Resource Groups / VMs / Public IPs / NICs+NSGs / all resources), per-resource actions (restart, deallocate, rotate public IP, SSH, open-in-portal, copy-id), and graceful prompting when the user isn't logged in.",
+  "plan": "## Files\n\n**New**\n- &#96;dot_config/television/cable/azure.toml&#96; — channel definition (follows &#96;pueue.toml&#96; / &#96;ansible.toml&#96; layout).\n- &#96;dot_config/television/executable_azure-source.sh&#96; — emits rows per source (one of: &#96;rgs&#96;, &#96;vms&#96;, &#96;pips&#96;, &#96;nics&#96;, &#96;all&#96;). Also handles the \"not-logged-in gate\": if &#96;az account show&#96; fails, emits a single synthetic row &#96;login\\tnot-logged-in\\t-\\t-\\tPress Enter to run 'az login'&#96;.\n- &#96;dot_config/television/executable_azure-preview.sh&#96; — preview dispatcher (&#96;main&#96; and &#96;alt&#96; cycles), routes on the row's &#96;kind&#96; field. Uses &#96;bat -l yaml&#96; if present, raw &#96;az ... show&#96; otherwise.\n- &#96;dot_config/television/executable_azure-rotate-ip.sh&#96; — ported from [&#96;DockerCompose-V2Ray/scripts/az_rotate_ip.sh&#96;](../../Documents/Program/Personal/DockerCompose-V2Ray/scripts/az_rotate_ip.sh), rewritten to resolve &#96;VM → NIC → PIP → DNS-label&#96; live via &#96;az&#96; (no &#96;.secrets/azure/vms/\u003crg\u003e.json&#96;). Keeps the 5-step detach→delete→recreate→reattach→verify flow, the VPS-safety &#96;SSH_CONNECTION&#96; guard, and the &#96;--dns-name&#96; preservation trick.\n\n**Updated**\n- &#96;docs/tools/tv.md&#96; — new &#96;### azure channel&#96; section after the &#96;pueue&#96; section (source cycling table, keybindings table, login UX, multi-sub switching, link to ported rotate-ip).\n\n## Row schema (TSV)\n\nEvery source emits rows with identical column layout so one set of actions can switch on &#96;kind&#96;:\n\n&#96;&#96;&#96;\nkind \\t name \\t resource_group \\t location \\t extra\n&#96;&#96;&#96;\n\n- &#96;kind ∈ {rg, vm, pip, nic, nsg, res, login}&#96;\n- &#96;extra&#96; varies: VM→power-state, PIP→ipAddress, NIC→ipConfig, NSG→ruleCount, res→type/kind string, rg→\"-\".\n\nDisplay template: &#96;{split:\\t:0}  {split:\\t:1}  [{split:\\t:2}]  {split:\\t:3}  {split:\\t:4}&#96;.\nOutput: &#96;{split:\\t:0}\\t{split:\\t:1}\\t{split:\\t:2}&#96; (enough for every action).\n\n## Source cycling (&#96;Ctrl+S&#96;)\n\nImplemented as 5 entries in &#96;[source].command&#96;, each calls &#96;azure-source.sh \u003ckind\u003e&#96;:\n\n1. **Resource Groups** — &#96;az group list -o tsv --query '[].{n:name,l:location}'&#96;\n2. **VMs** — &#96;az vm list -d -o tsv&#96; with power-state (&#96;-d&#96; adds it; one API call).\n3. **Public IPs** — &#96;az network public-ip list -o tsv&#96; with &#96;ipAddress&#96; + &#96;dnsSettings.fqdn&#96;.\n4. **NICs + NSGs** — union via two &#96;az&#96; calls, distinguished by &#96;kind&#96;.\n5. **All resources (generic fallback)** — &#96;az resource list -o tsv --query '[].{n:name,t:type,g:resourceGroup,l:location}'&#96;.\n\nAll sources short-circuit to the &#96;login&#96; synthetic row if &#96;az account show&#96; fails. &#96;watch&#96; is **not** set by default (az calls are slow); the user reloads manually with &#96;Ctrl+R&#96;.\n\n## Keybindings (&#96;Alt+*&#96; namespace to avoid tmux / TV built-ins)\n\n| Key | Action | Works on |\n|---|---|---|\n| &#96;Enter&#96; | &#96;az \u003ckind\u003e show&#96; in execute mode (press-Enter-to-exit). If &#96;kind=login&#96; → run &#96;az login&#96; + &#96;reload_source&#96;. | all |\n| &#96;Alt+R&#96; | Restart | vm |\n| &#96;Alt+S&#96; | Start | vm |\n| &#96;Alt+P&#96; | Power-off (billed) | vm |\n| &#96;Alt+D&#96; | Deallocate (not billed) | vm |\n| &#96;Alt+I&#96; | **Rotate public IP** — calls &#96;azure-rotate-ip.sh \u003crg\u003e \u003cvm\u003e&#96; | vm |\n| &#96;Alt+H&#96; | SSH via &#96;az ssh vm&#96; (if extension present) else hint | vm |\n| &#96;Alt+O&#96; | Open in Azure Portal (&#96;open&#96; / &#96;xdg-open&#96; on &#96;https://portal.azure.com/#@/resource\u003cid\u003e&#96;) | all |\n| &#96;Alt+X&#96; | Delete (confirm prompt) | rg, vm, pip, nic, nsg, res |\n| &#96;Alt+U&#96; | Switch subscription (&#96;az account list&#96; piped to &#96;fzf&#96; → &#96;az account set --subscription&#96;) + reload | all |\n| &#96;Alt+Y&#96; / &#96;Ctrl+Y&#96; | Copy resource id to clipboard (pbcopy / wl-copy / xclip / OSC-52 — same helper as in [pueue.toml](dot_config/television/cable/pueue.toml)) | all |\n\nEach action runs &#96;case \"$kind\" in ...&#96; inside its shell command, so wrong-kind keys become no-ops with a 1-second toast (same pattern as &#96;ansible.toml&#96;'s &#96;[actions.yazi]&#96; that only fires on &#96;role&#96;).\n\n## &#96;azure-rotate-ip.sh&#96; (ported, state-less)\n\nSignature: &#96;azure-rotate-ip.sh \u003cresource-group\u003e \u003cvm-name\u003e&#96; (or prompt for both if omitted). Keeps:\n\n- &#96;az account show&#96; preflight → hint to &#96;az login&#96;.\n- &#96;SSH_CONNECTION&#96; VPS-safety guard (refuses to run over SSH).\n- 5-step: &#96;nic ip-config update --remove publicIPAddress&#96; → &#96;public-ip delete&#96; → &#96;public-ip create --dns-name \u003cpreserved\u003e&#96; → &#96;nic ip-config update --public-ip-address&#96; → &#96;dig +short \u003cfqdn\u003e&#96; verification.\n- &#96;AZ_YES=1&#96; skip-prompt env.\n\nDropped vs the V2Ray version:\n\n- No &#96;.secrets/azure/vms/\u003crg\u003e.json&#96; read/write (live resolution only).\n- No legacy &#96;last-vm.json&#96; mirror.\n- No multi-host selection — &#96;\u003crg\u003e&#96; + &#96;\u003cvm\u003e&#96; come from the TV row.\n\n## Login / subscription UX\n\n- **Not logged in**: synthetic row drives the user to &#96;Enter → az login&#96;.\n- **Logged in**: &#96;[ui].input_header = \"Azure · $(az account show --query name -o tsv)\"&#96; so the subscription is always on-screen.\n- &#96;Alt+U&#96; opens a one-line fzf picker of &#96;az account list&#96; and &#96;az account set&#96;s + &#96;reload_source&#96;.\n\n## Preview cycling (&#96;Ctrl+F&#96;)\n\n1. &#96;az \u003ckind\u003e show -o yaml&#96; piped through &#96;bat -l yaml --style=plain --color=always&#96; (falls back to plain).\n2. &#96;az \u003ckind\u003e show -o json&#96; for copy-paste convenience.\n\n&#96;[ui.preview_panel].size = 55&#96;, matching &#96;pueue.toml&#96; / &#96;ansible.toml&#96;.\n\n## Requirements\n\n&#96;[metadata].requirements = [\"az\", \"jq\"]&#96; — same idiom as &#96;ansible.toml&#96;. TV will skip the channel on hosts without &#96;az&#96; (e.g. &#96;ubuntu_server&#96; profile that excludes the &#96;iac_tools&#96; ansible tag).\n\n## Non-goals (v1)\n\n- Provisioning (&#96;az vm create&#96;, &#96;az-up.sh&#96; equivalent) — stays in the V2Ray repo.\n- Teardown beyond the generic &#96;Alt+X&#96; delete-with-confirm.\n- Auto-refresh (&#96;watch = N&#96;) — the cost of &#96;az&#96; calls is too high; users hit &#96;Ctrl+R&#96;.\n- Windows resource types (focus is Linux VMs, parity with V2Ray use-case).",
+  "todos": [
+    {
+      "content": "Write dot_config/television/cable/azure.toml with 5-source cycling, Alt-key actions, preview cycling",
+      "id": "channel-toml",
+      "status": "pending"
+    },
+    {
+      "content": "Write executable_azure-source.sh emitting TSV rows per source, with az-account-show login gate",
+      "id": "source-script",
+      "status": "pending"
+    },
+    {
+      "content": "Write executable_azure-preview.sh (main + alt cycles) routed on kind",
+      "id": "preview-script",
+      "status": "pending"
+    },
+    {
+      "content": "Port executable_azure-rotate-ip.sh from V2Ray repo, stateless (live NIC+PIP resolve), keep VPS-safety guard + DNS verification",
+      "id": "rotate-ip-script",
+      "status": "pending"
+    },
+    {
+      "content": "Append azure channel section to docs/tools/tv.md (source cycling, keybinding table, login UX, rotate-ip note)",
+      "id": "docs-tv",
+      "status": "pending"
+    }
+  ]
+}
+```
+Additional data:
+
+```json
+{
+  "hasOpenedEditor": true,
+  "planId": "azure_television_channel_aa5a72d3",
+  "planUri": "file:///Users/daviddwlee84/.cursor/plans/azure_television_channel_aa5a72d3.plan.md",
+  "reviewData": {
+    "isShowingInput": false,
+    "selectedOption": "none",
+    "status": "Requested"
+  }
+}
+```
+Result:
+
+```json
+{
+  "rejected": {}
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="create_plan"><details>
+<summary>Tool use: **create_plan**</summary>
+
+</details></tool-use>
+
+---
+
+_**User**_
+
+Implement the plan as specified, it is attached for your reference. Do NOT edit the plan file itself.
+
+To-do's from the plan have already been created. Do not create them again. Mark them as in_progress as you work, starting with the first one. Don't stop until you have completed all the to-dos.
+
+---
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm going to start working through the plan systematically, beginning with marking the first task as in progress and taking a closer look at the existing TV channel patterns to understand them better before creating new ones.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Write dot_config/television/cable/azure.toml with 5-source cycling, Alt-key actions, preview cycling",
+      "id": "channel-toml",
+      "status": "in_progress"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Write dot_config/television/cable/azure.toml with 5-source cycling, Alt-key actions, preview cycling",
+      "id": "channel-toml",
+      "status": "pending"
+    },
+    {
+      "content": "Write executable_azure-source.sh emitting TSV rows per source, with az-account-show login gate",
+      "id": "source-script",
+      "status": "pending"
+    },
+    {
+      "content": "Write executable_azure-preview.sh (main + alt cycles) routed on kind",
+      "id": "preview-script",
+      "status": "pending"
+    },
+    {
+      "content": "Port executable_azure-rotate-ip.sh from V2Ray repo, stateless (live NIC+PIP resolve), keep VPS-safety guard + DNS verification",
+      "id": "rotate-ip-script",
+      "status": "pending"
+    },
+    {
+      "content": "Append azure channel section to docs/tools/tv.md (source cycling, keybinding table, login UX, rotate-ip note)",
+      "id": "docs-tv",
+      "status": "pending"
+    },
+    {
+      "content": "git commit ",
+      "id": "todo-1776824728209-krn15u7v8",
+      "status": "pending"
+    }
+  ],
+  "success": true
+}
+```
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
