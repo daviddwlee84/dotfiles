@@ -5,11 +5,14 @@
 # Usage:
 #   tv ssh-config
 #
-# Keybindings:
+# Keybindings (Alt+ namespace to avoid TV/tmux conflicts):
 #   Enter      SSH into selected host
+#   Alt+T      Online probe: BatchMode=yes test (does pubkey login actually work?)
+#   Alt+A      Offline batch scan: list every host + whether a local key file exists
 #   Ctrl+/     Toggle preview panel
 #
-# Preview shows resolved config via `ssh -G`.
+# Preview shows resolved config via `ssh -G` plus a local-key existence check
+# (no network — just stat the IdentityFile paths).
 
 [metadata]
 name = "ssh-config"
@@ -20,12 +23,100 @@ requirements = ["ssh", "cat", "grep", "awk", "sort"]
 command = "cat ~/.ssh/config ~/.ssh/config.d/* 2>/dev/null | grep -E '^Host[[:space:]]' | grep -v '[*?]' | awk '{for(i=2;i<=NF;i++) print $i}' | sort -u"
 
 [preview]
-command = "ssh -G '{}' 2>/dev/null | grep -E '^(host|hostname|user|port|identityfile|proxycommand|proxyjump|forwardagent|identityagent|localforward|remoteforward)[[:space:]]'"
+command = """
+host='{}'
+ssh -G "$host" 2>/dev/null | grep -E '^(host|hostname|user|port|identityfile|proxycommand|proxyjump|forwardagent|identityagent|localforward|remoteforward)[[:space:]]'
+echo
+echo '--- local key check (offline) ---'
+found=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$f" in '~/'*) f="$HOME/${f#'~/'}";; '~') f="$HOME";; esac
+  if [ -f "$f" ]; then
+    echo "  [OK]   $f"
+    found=1
+  else
+    echo "  [miss] $f"
+  fi
+done <<EOF
+$(ssh -G "$host" 2>/dev/null | awk '/^identityfile / {print $2}')
+EOF
+if [ "$found" -eq 0 ]; then
+  echo
+  echo '  => no IdentityFile present locally — password login likely required'
+  echo '     (or relies on ssh-agent / IdentityAgent — try Alt+T to probe)'
+fi
+"""
 
 [keybindings]
 enter = "actions:connect"
+alt-t = "actions:probe"
+alt-a = "actions:scan_all"
 
 [actions.connect]
 description = "SSH into the selected host"
 command = "ssh '{}'"
+mode = "execute"
+
+[actions.probe]
+description = "Probe selected host with BatchMode (no password prompt allowed)"
+command = """
+host='{}'
+echo "# Probing $host with BatchMode=yes (ConnectTimeout=3)"
+echo "# Exit 0 = passwordless login works; non-zero = needs password / unreachable / key not authorized"
+echo
+ssh -o BatchMode=yes \\
+    -o ConnectTimeout=3 \\
+    -o StrictHostKeyChecking=accept-new \\
+    -o PreferredAuthentications=publickey,hostbased,gssapi-with-mic \\
+    "$host" true
+rc=$?
+echo
+case $rc in
+  0)   echo "[OK] passwordless login works for '$host'" ;;
+  255) echo "[FAIL] connection / auth error (exit 255) — needs password, key not authorized, or host unreachable" ;;
+  *)   echo "[FAIL] remote command failed (exit $rc) — auth probably OK but 'true' failed" ;;
+esac
+echo
+echo '[Press Enter to exit]'
+read -r _
+"""
+mode = "execute"
+
+[actions.scan_all]
+description = "Offline scan: for every host, check if any IdentityFile exists locally"
+command = """
+echo "# Scanning all hosts (offline — no network) ..."
+echo "# Legend: [OK] = at least one IdentityFile present locally"
+echo "#         [--] = no key file on disk (password / agent / unconfigured)"
+echo
+cat ~/.ssh/config ~/.ssh/config.d/* 2>/dev/null \\
+  | grep -E '^Host[[:space:]]' \\
+  | grep -v '[*?]' \\
+  | awk '{for(i=2;i<=NF;i++) print $i}' \\
+  | sort -u \\
+  | while IFS= read -r host; do
+      keyline=""
+      found=0
+      while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        case "$f" in '~/'*) f="$HOME/${f#'~/'}";; '~') f="$HOME";; esac
+        if [ -f "$f" ]; then
+          keyline="$f"
+          found=1
+          break
+        fi
+      done <<EOF
+$(ssh -G "$host" 2>/dev/null | awk '/^identityfile / {print $2}')
+EOF
+      if [ "$found" -eq 1 ]; then
+        printf '  [OK] %-30s -> %s\\n' "$host" "$keyline"
+      else
+        printf '  [--] %-30s    (no local key)\\n' "$host"
+      fi
+    done
+echo
+echo '[Press Enter to exit]'
+read -r _
+"""
 mode = "execute"
