@@ -187,13 +187,35 @@ prompt dies with `chezmoi: <file>: could not open a new TTY: open
 | `--force` / `--no-force` | **off** | **Overwritten** with template render | Same |
 
 Default combination (`--keep-going`, no `--force`) = **non-destructive**:
-all clean files apply, drifted files are skipped. The host's exit code
-will still be non-zero so drift is visible in the summary table; SSH in
-and run `chezmoi diff <file>` to see what changed. After deciding, either:
+all clean files apply, drifted files are skipped. fleet_apply parses the
+chezmoi stderr; if the host's *only* failure is "could not open a new TTY"
+on one or more drifted targets, it classifies the host as **`drift`**
+(yellow `⚠`) instead of **`failed`** (red `✗`). The summary lists the
+drifted files per host so you know exactly what needs attention:
+
+```
+Summary: 5 hosts, 3 ok, 1 failed, 1 drift, 0 skipped
+  ✗ david_ubuntu  rc=1  log=…/david_ubuntu.log     # real failure
+  ⚠ hanru_mac     drift in: .config/foo.toml       # only a drift skip
+                  log=…/hanru_mac.log
+                  (resolve: --force, or sync edits back to source)
+```
+
+Drift hosts do **not** count toward the process exit code — only `failed`
+hosts do. This is intentional: drift is a "do something later" signal, not
+a CI failure. If a host has BOTH a drift skip AND an unrelated error
+(ansible task, network timeout, etc.) it will be classified as `failed`,
+not `drift`, so real errors are never silently downgraded.
+
+To resolve a drift, either:
 
 - Migrate the drift into a per-machine override file (e.g. `~/.gitconfig.local`,
   see below) and re-run.
-- Or run `just fleet-apply --force` once to let the canonical template win.
+- Or run `just fleet-apply --force` once to let the canonical template win
+  (also accepts `--hosts <name>` to scope it).
+- Or, for a single file you've already decided about, ssh in and run
+  `chezmoi apply --force <relpath>` directly — fastest fix when the
+  template is right but the target is stale.
 
 ## Per-machine git overrides (`~/.gitconfig.local`)
 
@@ -274,12 +296,14 @@ two ways:
 
 | Exit | Meaning |
 |---|---|
-| 0 | All selected hosts finished `chezmoi update` with rc 0 |
-| `N` (1–125) | `N` hosts failed (rc != 0, SSH error, timeout, or skipped due to missing sudo password) |
+| 0 | All selected hosts finished `chezmoi update` with rc 0, or only had recoverable drift skips (state = `drift`) |
+| `N` (1–125) | `N` hosts genuinely failed (rc != 0 with errors *other than* drift skips, SSH error, timeout, or skipped due to missing sudo password) |
 | 125 | More than 125 hosts failed (capped) |
 | 2 | Config error (missing TOML, malformed schema) |
 
-This makes the recipe usable from CI / cron loops without bespoke parsing.
+`drift` hosts intentionally do NOT count as failures — see "Conflict
+handling" above. They appear in the summary as `⚠` so a human notices, but
+CI / cron loops keep passing as long as no real errors occur.
 
 ## Logs
 

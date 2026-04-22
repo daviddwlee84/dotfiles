@@ -35,6 +35,7 @@ import asyncio
 import dataclasses
 import getpass
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -385,13 +386,55 @@ class HostStatus:
     """Live state shared between run_one() and the Rich table renderer."""
 
     host: Host
-    state: str = "pending"  # pending | connecting | running | done | failed | skipped
+    # pending | connecting | running | done | failed | skipped | drift
+    # `drift` = chezmoi exited non-zero but the only error was its inability
+    #           to prompt for an unexpected target change while running
+    #           non-interactively (i.e. a real drift on the remote machine
+    #           that --keep-going skipped). Treated as a warning, not a fail.
+    state: str = "pending"
     last_line: str = ""
     started_at: float | None = None
     finished_at: float | None = None
     rc: int | None = None
     log_path: Path | None = None
     error: str | None = None
+    drift_files: list[str] = dataclasses.field(default_factory=list)
+
+
+# Regex matching the chezmoi error emitted when --keep-going hits a target
+# whose contents changed since chezmoi last wrote it AND there is no TTY to
+# prompt the user with. Captured group 1 is the relative target path so we
+# can list it in the summary. Example line:
+#   chezmoi: .config/television/cable/ssh-config.toml: could not open a new
+#       TTY: open /dev/tty: device not configured
+_DRIFT_RE = re.compile(
+    r"^chezmoi: (\S+): could not open a new TTY: open /dev/tty: ",
+)
+
+
+def _classify_drift(stderr_lines: list[str]) -> tuple[bool, list[str]]:
+    """Return (is_pure_drift, [drift_paths]).
+
+    `is_pure_drift` is True iff every non-blank stderr line either matches
+    `_DRIFT_RE` or is a recognised drift-skip side-effect (e.g. the "has
+    changed since chezmoi last wrote it?" stdout/stderr probe). Used by
+    run_one()/run_one_local() to demote rc!=0 from `failed` to `drift`.
+
+    Conservative on purpose: any unrecognised stderr line means we keep the
+    `failed` classification so real errors are not silently swallowed.
+    """
+    drift_paths: list[str] = []
+    for raw in stderr_lines:
+        line = raw.strip()
+        if not line:
+            continue
+        m = _DRIFT_RE.match(line)
+        if m:
+            drift_paths.append(m.group(1))
+            continue
+        # Anything else in stderr → not a pure-drift case.
+        return False, []
+    return bool(drift_paths), drift_paths
 
 
 def _connect_kwargs(host: Host) -> dict:
@@ -463,6 +506,7 @@ async def run_one_local(
 
     env = {**os.environ, "PAGER": "cat", "GIT_PAGER": "cat", **host.extra_env}
     proc = None
+    stderr_lines: list[str] = []
     try:
         status.state = "running"
         proc = await asyncio.create_subprocess_exec(
@@ -480,6 +524,8 @@ async def run_one_local(
                 text = line.decode("utf-8", errors="replace").rstrip("\n")
                 log_fp.write(f"[{prefix}] {text}\n")
                 status.last_line = text
+                if prefix == "err":
+                    stderr_lines.append(text)
 
         async with asyncio.timeout(command_timeout):
             await asyncio.gather(
@@ -488,7 +534,15 @@ async def run_one_local(
                 proc.wait(),
             )
         status.rc = proc.returncode or 0
-        status.state = "done" if status.rc == 0 else "failed"
+        if status.rc == 0:
+            status.state = "done"
+        else:
+            is_drift, paths = _classify_drift(stderr_lines)
+            if is_drift:
+                status.state = "drift"
+                status.drift_files = paths
+            else:
+                status.state = "failed"
     except TimeoutError:
         status.state = "failed"
         status.rc = -1
@@ -571,12 +625,16 @@ async def run_one(
                 proc.stdin.write(stdin_text)
             proc.stdin.write_eof()
 
+            stderr_lines: list[str] = []
+
             async def _drain(stream, label: str) -> None:
                 async for line in stream:
                     text = line.rstrip("\n")
                     log_fp.write(f"[{label}] {text}\n")
                     if text.strip():
                         status.last_line = text[:120]
+                    if label == "err":
+                        stderr_lines.append(text)
 
             async with asyncio.timeout(command_timeout):
                 await asyncio.gather(
@@ -585,7 +643,15 @@ async def run_one(
                 )
                 result = await proc.wait()
             status.rc = result.exit_status if result.exit_status is not None else 1
-            status.state = "done" if status.rc == 0 else "failed"
+            if status.rc == 0:
+                status.state = "done"
+            else:
+                is_drift, paths = _classify_drift(stderr_lines)
+                if is_drift:
+                    status.state = "drift"
+                    status.drift_files = paths
+                else:
+                    status.state = "failed"
         finally:
             if conn is not None:
                 conn.close()
@@ -640,6 +706,7 @@ _STATE_STYLE = {
     "done": "green",
     "failed": "red bold",
     "skipped": "magenta",
+    "drift": "yellow bold",
 }
 
 
@@ -682,14 +749,23 @@ async def _live_render_loop(
 
 
 def _print_summary(console: Console, statuses: list[HostStatus]) -> int:
-    """Print summary; return number of failed hosts."""
+    """Print summary; return number of failed hosts.
+
+    `drift` hosts are reported as warnings but do NOT count toward the
+    return value — a drift means chezmoi successfully ran every other file
+    and only refused to overwrite a hand-edited target. The user is expected
+    to resolve them manually (re-run with --force, or merge changes back to
+    source). See docs/this_repo/fleet-apply.md → Conflict handling.
+    """
     fails = [s for s in statuses if s.state == "failed"]
     skips = [s for s in statuses if s.state == "skipped"]
+    drifts = [s for s in statuses if s.state == "drift"]
     console.print()
     console.print(
         f"[bold]Summary[/]: {len(statuses)} hosts, "
         f"[green]{sum(1 for s in statuses if s.state == 'done')} ok[/], "
         f"[red]{len(fails)} failed[/], "
+        f"[yellow]{len(drifts)} drift[/], "
         f"[magenta]{len(skips)} skipped[/]"
     )
     for s in fails:
@@ -697,6 +773,13 @@ def _print_summary(console: Console, statuses: list[HostStatus]) -> int:
             f"  [red]✗[/] {s.host.name}  rc={s.rc}  "
             f"log=[cyan]{s.log_path}[/]"
             + (f"  err={s.error}" if s.error else "")
+        )
+    for s in drifts:
+        files = ", ".join(s.drift_files) if s.drift_files else "?"
+        console.print(
+            f"  [yellow]⚠[/] {s.host.name}  drift in: {files}  "
+            f"log=[cyan]{s.log_path}[/]  "
+            f"[dim](resolve: --force, or sync edits back to source)[/]"
         )
     for s in skips:
         console.print(f"  [magenta]·[/] {s.host.name}  reason={s.error or 'skipped'}")
