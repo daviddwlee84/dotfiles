@@ -1,5 +1,15 @@
 # https://www.chezmoi.io/reference/special-files/chezmoi-format-tmpl/
 
+# Implied parent dirs of managed files / externals (e.g. ~/.local when only
+# ~/.local/share/toolkami/toolkami.rb is managed) inherit mode from
+# `0o777 & ~umask`. Default umask is the user's login umask, which on macOS
+# (002 → 0775) and various Linux distros (022 → 0755 / 0700 for ~) differs,
+# producing recurring "mode-only diff" noise on .local and friends across
+# the fleet. Pin umask to 022 so implied dirs are always 0755 regardless of
+# host login umask. Files that need stricter modes use the `private_` prefix
+# explicitly.
+umask = 0o022
+
 [data]
 # 只在 init 才需要問一次：你之後都讀這個值
 # TODO: not all the things we want to change all the time we chezmoi init
