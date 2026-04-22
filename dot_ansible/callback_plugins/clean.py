@@ -148,18 +148,56 @@ class CallbackModule(DefaultCallback):
             except Exception:
                 pass
         if tags and tags != "all":
-            # Truncate if too long
-            if len(tags) > 50:
-                tags = tags[:47] + "..."
             info_lines.append(("Tags", tags))
 
         if info_lines:
             self._display.display("┌─ System Info", color="bright cyan")
             for label, value in info_lines:
-                self._display.display(
-                    "│  %-8s %s" % (label + ":", value), color="bright cyan"
-                )
+                self._display_wrapped_info(label, value)
             self._display.display("└─", color="bright cyan")
+
+    def _display_wrapped_info(self, label, value, width=58):
+        """Display a label/value row, wrapping long values across lines.
+
+        For comma-separated values (like tags), wrap on commas so related
+        items stay grouped. Continuation lines are indented under the value.
+        """
+        label_str = "%-8s " % (label + ":")
+        prefix = "│  "
+        indent = " " * len(label_str)
+        max_value_width = max(width - len(prefix) - len(label_str), 20)
+
+        # Prefer wrapping on commas for lists (e.g., tags); fall back to spaces
+        if "," in value:
+            parts = [p + "," for p in value.split(",")]
+            parts[-1] = parts[-1].rstrip(",")
+            separator = " "
+        else:
+            parts = value.split(" ")
+            separator = " "
+
+        lines = []
+        current = ""
+        for part in parts:
+            candidate = part if not current else current + separator + part
+            if len(candidate) > max_value_width and current:
+                lines.append(current)
+                current = part
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+
+        if not lines:
+            lines = [value]
+
+        self._display.display(
+            "%s%s%s" % (prefix, label_str, lines[0]), color="bright cyan"
+        )
+        for cont in lines[1:]:
+            self._display.display(
+                "%s%s%s" % (prefix, indent, cont), color="bright cyan"
+            )
 
     def _record_task_timing(self, result, changed=False):
         """Record elapsed time for a task using the result's task name."""
