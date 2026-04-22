@@ -39,6 +39,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -243,8 +244,12 @@ REMOTE_SUDO_PASS_PATH = ".cache/chezmoi-fleet/sudo.pass"
 # Per-run log dir on the remote. fleet-apply tees chezmoi's combined output
 # here so a dropped SSH session doesn't lose progress visibility — `just
 # fleet-apply-tail HOST` reads the latest file. Survives across runs (one
-# file per timestamp) so you can compare; clean with `rm -rf` when stale.
+# file per timestamp); see _gc_local_logs / `--keep-logs` for retention.
 REMOTE_LOG_DIR = ".cache/chezmoi-fleet/logs"
+# Same layout for local hosts so --status / --tail can probe both kinds
+# uniformly. Absolute path; the SSH side uses the relative form because
+# the remote shell starts in $HOME.
+LOCAL_LOG_DIR = Path.home() / ".cache" / "chezmoi-fleet" / "logs"
 
 
 def build_remote_command(
@@ -254,6 +259,7 @@ def build_remote_command(
     force: bool = False,
     keep_going: bool = False,
     run_id: str = "adhoc",
+    keep_logs: int = 10,
 ) -> str:
     """Build the single shell command sent over SSH.
 
@@ -382,6 +388,21 @@ def build_remote_command(
         f"mkdir -p {shlex.quote(REMOTE_LOG_DIR)}; "
         f"rm -f {exit_q}; "
     )
+    # Log GC: keep only the N most recent .log files (and matching .exit
+    # sentinels) in REMOTE_LOG_DIR. Runs AFTER chezmoi finishes, BEFORE
+    # `exit $_rc`, so if it crashes the rc proxy still works. `tail -n
+    # +N+1` selects everything past the keep window. keep_logs=0 disables.
+    if keep_logs > 0:
+        gc = (
+            f"_d={shlex.quote(REMOTE_LOG_DIR)}; "
+            f"_keep={keep_logs}; "
+            f"ls -1t \"$_d\"/*.log 2>/dev/null | tail -n +$((_keep+1)) | "
+            f"  while read -r _f; do "
+            f"    rm -f \"$_f\" \"${{_f%.log}}.exit\"; "
+            f"  done; "
+        )
+    else:
+        gc = ""
     return (
         f"{pre}"
         f"{log_setup}"
@@ -396,6 +417,7 @@ def build_remote_command(
         f"_cz_pid=$!; "
         f"wait $_cz_pid; _rc=$?; "
         f"echo $_rc > {exit_q} 2>/dev/null || true; "
+        f"{gc}"
         f"trap - INT TERM HUP;{cleanup_extra} "
         f"exit $_rc"
     )
@@ -485,6 +507,30 @@ def _connect_kwargs(host: Host) -> dict:
     return kwargs
 
 
+def _gc_local_logs(keep: int) -> None:
+    """Trim LOCAL_LOG_DIR to the `keep` most recent .log files (+ .exit).
+
+    Mirrors the remote GC done by build_remote_command. keep<=0 disables.
+    Silent on errors (best-effort cleanup).
+    """
+    if keep <= 0:
+        return
+    try:
+        logs = sorted(
+            LOCAL_LOG_DIR.glob("*.log"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        return
+    for stale in logs[keep:]:
+        for ext in (".log", ".exit"):
+            try:
+                (LOCAL_LOG_DIR / f"{stale.stem}{ext}").unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 async def run_one_local(
     status: HostStatus,
     log_dir: Path,
@@ -493,6 +539,7 @@ async def run_one_local(
     command_timeout: int,
     force: bool = False,
     keep_going: bool = False,
+    keep_logs: int = 10,
 ) -> None:
     """Execute one local host: spawn `chezmoi` directly via subprocess.
 
@@ -529,6 +576,16 @@ async def run_one_local(
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init} (local)\n")
     log_fp.write(f"# argv: {argv}\n\n")
 
+    # Mirror the remote layout: write a second copy to LOCAL_LOG_DIR/<run_id>.log
+    # so `just fleet-apply-status` / `--tail self` (= local) can find this run
+    # using the same code path as SSH hosts. Also drop a .exit sentinel when
+    # done. log_dir.name is the timestamp like "20260422T140446Z".
+    LOCAL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    cache_log = LOCAL_LOG_DIR / f"{log_dir.name}.log"
+    cache_exit = LOCAL_LOG_DIR / f"{log_dir.name}.exit"
+    cache_exit.unlink(missing_ok=True)
+    cache_fp = cache_log.open("w", buffering=1)
+
     env = {**os.environ, "PAGER": "cat", "GIT_PAGER": "cat", **host.extra_env}
     proc = None
     stderr_lines: list[str] = []
@@ -548,6 +605,7 @@ async def run_one_local(
                     return
                 text = line.decode("utf-8", errors="replace").rstrip("\n")
                 log_fp.write(f"[{prefix}] {text}\n")
+                cache_fp.write(f"{text}\n")  # plain combined for tail -F
                 status.last_line = text
                 if prefix == "err":
                     stderr_lines.append(text)
@@ -586,6 +644,17 @@ async def run_one_local(
     finally:
         status.elapsed = loop.time() - (status.started_at or loop.time())
         log_fp.close()
+        cache_fp.close()
+        # Write the sentinel last so a `--status` poll sees the rc only
+        # after the cache log has been fully flushed (avoids the race
+        # where a probe sees "finished" but tail -F is still mid-line).
+        try:
+            cache_exit.write_text(f"{status.rc if status.rc is not None else -1}\n")
+        except OSError:
+            pass
+        # GC after writing sentinel so the just-finished run is itself
+        # in the keep window.
+        _gc_local_logs(keep_logs)
 
 
 async def run_one(
@@ -597,13 +666,14 @@ async def run_one(
     command_timeout: int,
     force: bool = False,
     keep_going: bool = False,
+    keep_logs: int = 10,
 ) -> None:
     """Execute one host: connect, stream output to log + status, set rc/state."""
     host = status.host
     if host.local:
         await run_one_local(
             status, log_dir, mode, init, command_timeout,
-            force=force, keep_going=keep_going,
+            force=force, keep_going=keep_going, keep_logs=keep_logs,
         )
         return
     log_path = log_dir / f"{host.name}.log"
@@ -613,7 +683,7 @@ async def run_one(
 
     cmd = build_remote_command(
         host, mode=mode, init=init, force=force, keep_going=keep_going,
-        run_id=log_dir.name,
+        run_id=log_dir.name, keep_logs=keep_logs,
     )
     log_fp = log_path.open("w", buffering=1)  # line-buffered
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init}\n")
@@ -925,6 +995,32 @@ def cli(
             )
         ),
     ] = True,
+    keep_logs: Annotated[
+        int,
+        tyro.conf.arg(
+            help=(
+                "Retain at most N most-recent fleet-apply logs in "
+                "~/.cache/chezmoi-fleet/logs/ on each host (and locally for "
+                "self). Older .log + .exit pairs are deleted at the end of "
+                "each run. Default 10. Pass 0 to disable GC and accumulate "
+                "logs forever (you'll want to `rm -rf ~/.cache/chezmoi-fleet/"
+                "logs` periodically)."
+            )
+        ),
+    ] = 10,
+    watch: Annotated[
+        int,
+        tyro.conf.arg(
+            help=(
+                "After --status, repeat every N seconds until every host "
+                "reports finished/idle (or you Ctrl+C). 0 = single shot "
+                "(default). Useful when you've Ctrl+C'd a long fleet-apply "
+                "and want to passively wait for the remotes to wrap up "
+                "without manually re-running --status. Honoured ONLY with "
+                "--status (no effect on apply / tail / kill)."
+            )
+        ),
+    ] = 0,
 ) -> int:
     """Apply chezmoi to a fleet of hosts in parallel. Exit code = failed-host count."""
     console = Console()
@@ -950,7 +1046,7 @@ def cli(
         return _run_kill(console, selected, connect_timeout)
 
     if status:
-        return _run_status(console, selected, connect_timeout)
+        return _run_status(console, selected, connect_timeout, watch=watch)
 
     if tail:
         # `tail` is a HOST or HOST:RUN_ID spec — resolve against `selected`
@@ -977,6 +1073,7 @@ def cli(
     rc = _run(
         console, selected, mode, init, log_dir, serial, max_parallel,
         connect_timeout, command_timeout, force=force, keep_going=keep_going,
+        keep_logs=keep_logs,
     )
     # If the run was Ctrl+C'd locally, the remote chezmoi/ansible may still
     # be running (the wrapper's SIGHUP trap covers most cases but not all,
@@ -1081,8 +1178,72 @@ _STATUS_PROBE_CMD = (
 )
 
 
+def _probe_local() -> tuple[dict, str]:
+    """Local-host equivalent of _STATUS_PROBE_CMD.
+
+    Reads LOCAL_LOG_DIR for the most recent run and looks for a
+    chezmoi/ansible-playbook process owned by the current user. Cannot
+    use the same shell snippet because we'd need to fork to a subprocess
+    just for pgrep; reading /proc / running pgrep directly is simpler.
+    """
+    fields: dict[str, str] = {}
+    # Find latest run via mtime, mirroring the remote `ls -t | head -1`.
+    try:
+        logs = sorted(
+            LOCAL_LOG_DIR.glob("*.log"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+    except OSError:
+        logs = []
+    latest = logs[0] if logs else None
+    run_id = latest.stem if latest else ""
+
+    # pgrep for live processes owned by us.
+    try:
+        result = subprocess.run(
+            ["pgrep", "-u", str(os.getuid()), "-x", "chezmoi|ansible-playbook|ansible"],
+            capture_output=True, text=True, check=False,
+        )
+        pids = ",".join(result.stdout.split())
+    except FileNotFoundError:
+        pids = ""
+
+    # Exclude our own PID and parents — the controller running this probe
+    # IS chezmoi-adjacent in some setups (e.g. invoked from `chezmoi
+    # execute-template`). Conservative filter: drop any PID in our own
+    # ancestor chain.
+    if pids:
+        own = {os.getpid(), os.getppid()}
+        pids = ",".join(p for p in pids.split(",") if int(p) not in own)
+
+    if pids:
+        fields["STATE"] = "running"
+        fields["PIDS"] = pids
+    elif latest and (LOCAL_LOG_DIR / f"{run_id}.exit").exists():
+        fields["STATE"] = "finished"
+        try:
+            fields["EXIT"] = (LOCAL_LOG_DIR / f"{run_id}.exit").read_text().strip()
+        except OSError:
+            fields["EXIT"] = "?"
+    else:
+        fields["STATE"] = "idle"
+    fields["RUN_ID"] = run_id
+
+    tail = ""
+    if latest:
+        try:
+            with latest.open() as fp:
+                lines = fp.readlines()[-5:]
+            tail = "".join(lines)
+        except OSError:
+            pass
+    return fields, tail
+
+
 def _run_status(
-    console: Console, selected: list[Host], connect_timeout: int
+    console: Console, selected: list[Host], connect_timeout: int,
+    watch: int = 0,
 ) -> int:
     """Show whether each host has a running chezmoi/ansible process.
 
@@ -1092,14 +1253,19 @@ def _run_status(
     skips HUP). This sub-command answers "what's still running where?"
     without disturbing anything. Read-only — no chezmoi command sent.
 
+    `watch > 0` re-probes every `watch` seconds and exits when no host is
+    in `running` state (or on Ctrl+C). Useful as a passive "wait until
+    everyone's done" cursor after killing the controller. Polls are kept
+    short to dominate latency, not host load — pgrep + a 1-line ls is
+    fast enough to run every 5–10s on a 100-host fleet without strain.
+
     Output per host: state (running/finished/idle), the latest run id,
     PIDs (if running), exit code (if finished), and the last 5 log lines.
     Always returns 0 — this is a probe, not a verdict.
     """
     async def _probe_one(h: Host) -> tuple[Host, dict, str]:
         if h.local:
-            # Local: skip — running THIS process is in the pgrep results.
-            return h, {"STATE": "skipped"}, "local host\n"
+            return h, *_probe_local()
         try:
             async with asyncio.timeout(connect_timeout):
                 conn = await asyncssh.connect(**_connect_kwargs(h))
@@ -1129,57 +1295,82 @@ def _run_status(
     async def _orchestrate() -> list[tuple[Host, dict, str]]:
         return await asyncio.gather(*(_probe_one(h) for h in selected))
 
-    console.print(
-        f"[bold]fleet-apply --status[/] on {len(selected)} host(s)"
-    )
-    results = asyncio.run(_orchestrate())
-
-    table = Table(title="remote chezmoi state", expand=True)
-    table.add_column("host", style="bold")
-    table.add_column("state")
-    table.add_column("run_id", overflow="fold")
-    table.add_column("detail", overflow="fold")
-    state_color = {
-        "running": "yellow",
-        "finished": "green",
-        "idle": "dim",
-        "skipped": "magenta",
-        "error": "red bold",
-    }
-    any_running = False
-    for h, fields, _tail in results:
-        st = fields.get("STATE", "?")
-        if st == "running":
-            any_running = True
-            detail = f"pids={fields.get('PIDS', '?')}"
-        elif st == "finished":
-            detail = f"exit={fields.get('EXIT', '?')}"
-        else:
-            detail = ""
-        color = state_color.get(st, "white")
-        table.add_row(
-            h.name,
-            f"[{color}]{st}[/]",
-            fields.get("RUN_ID", "") or "-",
-            detail,
-        )
-    console.print(table)
-
-    # Show log tails inline (under the table) so the user can see context
-    # without a second `--tail` round-trip. Only for non-idle hosts.
-    for h, fields, tail in results:
-        if fields.get("STATE") in {"idle", "skipped"} or not tail.strip():
-            continue
-        console.print(f"\n[bold cyan]── {h.name} (last 5 log lines) ──[/]")
-        console.print(tail.rstrip())
-
-    if any_running:
+    def _render(results: list[tuple[Host, dict, str]], iteration: int) -> bool:
+        """Render one probe pass; return True if any host still running."""
+        suffix = f" (poll #{iteration})" if iteration > 1 else ""
         console.print(
-            "\n[dim]Reattach a live tail with: "
-            "[bold]just fleet-apply-tail HOST[/] · "
-            "force-stop with: [bold]just fleet-apply-kill --hosts HOST[/][/]"
+            f"[bold]fleet-apply --status[/] on {len(selected)} host(s){suffix}"
         )
-    return 0
+        table = Table(title="remote chezmoi state", expand=True)
+        table.add_column("host", style="bold")
+        table.add_column("state")
+        table.add_column("run_id", overflow="fold")
+        table.add_column("detail", overflow="fold")
+        state_color = {
+            "running": "yellow",
+            "finished": "green",
+            "idle": "dim",
+            "skipped": "magenta",
+            "error": "red bold",
+        }
+        any_running = False
+        for h, fields, _tail in results:
+            st = fields.get("STATE", "?")
+            if st == "running":
+                any_running = True
+                detail = f"pids={fields.get('PIDS', '?')}"
+            elif st == "finished":
+                detail = f"exit={fields.get('EXIT', '?')}"
+            else:
+                detail = ""
+            color = state_color.get(st, "white")
+            table.add_row(
+                h.name,
+                f"[{color}]{st}[/]",
+                fields.get("RUN_ID", "") or "-",
+                detail,
+            )
+        console.print(table)
+
+        # Show log tails inline (under the table) so the user can see
+        # context without a second `--tail` round-trip. Only for
+        # non-idle hosts. Skip in watch mode after the first pass to
+        # keep the polling output compact.
+        if iteration <= 1:
+            for h, fields, tail in results:
+                if fields.get("STATE") in {"idle", "skipped"} or not tail.strip():
+                    continue
+                console.print(f"\n[bold cyan]── {h.name} (last 5 log lines) ──[/]")
+                console.print(tail.rstrip())
+
+        if any_running:
+            console.print(
+                "\n[dim]Reattach a live tail with: "
+                "[bold]just fleet-apply-tail HOST[/] · "
+                "force-stop with: [bold]just fleet-apply-kill --hosts HOST[/][/]"
+            )
+        return any_running
+
+    iteration = 0
+    try:
+        while True:
+            iteration += 1
+            results = asyncio.run(_orchestrate())
+            still_running = _render(results, iteration)
+            if watch <= 0 or not still_running:
+                if watch > 0 and iteration > 1:
+                    console.print(
+                        f"\n[green]✓[/] watch: all hosts settled after "
+                        f"{iteration} polls"
+                    )
+                return 0
+            console.print(
+                f"\n[dim]watch: re-polling in {watch}s (Ctrl+C to stop)[/]"
+            )
+            time.sleep(watch)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]watch: interrupted by user[/]")
+        return 130
 
 
 def _run_tail(
@@ -1198,11 +1389,83 @@ def _run_tail(
     server-side by `ls -t … | head -1`.
     """
     if host.local:
+        # Local: just `tail -F` the local cache file. Resolve `run_id` to
+        # newest if empty. No SSH needed, no sentinel polling needed
+        # (subprocess will exit when we Ctrl+C).
+        if not run_id:
+            try:
+                logs = sorted(
+                    LOCAL_LOG_DIR.glob("*.log"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+                if not logs:
+                    console.print(
+                        f"[red]✗[/] no local fleet-apply log in {LOCAL_LOG_DIR}"
+                    )
+                    return 3
+                run_id = logs[0].stem
+            except OSError as e:
+                console.print(f"[red]✗[/] read {LOCAL_LOG_DIR}: {e}")
+                return 3
+        log_file = LOCAL_LOG_DIR / f"{run_id}.log"
+        exit_file = LOCAL_LOG_DIR / f"{run_id}.exit"
+        if not log_file.exists():
+            console.print(f"[red]✗[/] not found: {log_file}")
+            return 3
         console.print(
-            f"[yellow]·[/] {host.name} is local; "
-            f"`tail -f logs/fleet-apply/<latest>/{host.name}.log` directly."
+            f"[dim]fleet-tail (local): following {log_file} "
+            f"(Ctrl+C stops viewer; local run continues if active)[/]"
         )
-        return 0
+        # Use plain `tail -F` and poll the sentinel from a sibling task.
+        try:
+
+            async def _local_follow() -> int:
+                proc = await asyncio.create_subprocess_exec(
+                    "tail", "-n", "+1", "-F", str(log_file),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+
+                async def _drain(stream, is_err):
+                    async for line in stream:
+                        text = line.decode("utf-8", errors="replace").rstrip("\n")
+                        if is_err:
+                            console.print(f"[dim]{text}[/]")
+                        else:
+                            console.print(text)
+
+                async def _watch_sentinel():
+                    while True:
+                        if exit_file.exists():
+                            await asyncio.sleep(1)  # let tail flush
+                            proc.terminate()
+                            try:
+                                rc = exit_file.read_text().strip()
+                            except OSError:
+                                rc = "?"
+                            console.print(
+                                f"\n[dim]fleet-tail: local run {run_id} "
+                                f"finished, rc={rc}[/]"
+                            )
+                            return
+                        await asyncio.sleep(2)
+
+                await asyncio.gather(
+                    _drain(proc.stdout, False),
+                    _drain(proc.stderr, True),
+                    _watch_sentinel(),
+                    return_exceptions=True,
+                )
+                return 0
+
+            return asyncio.run(_local_follow())
+        except KeyboardInterrupt:
+            console.print(
+                "\n[yellow]fleet-tail: viewer interrupted; "
+                "local run (if active) continues.[/]"
+            )
+            return 130
 
     # Resolve `run_id` on the remote so the user can pass `""` to mean
     # "newest". Then `tail -F` (follow + retry) on the picked log, and a
@@ -1291,6 +1554,7 @@ def _run(
     command_timeout: int,
     force: bool = False,
     keep_going: bool = False,
+    keep_logs: int = 10,
 ) -> int:
     # Resolve passwords up-front (interactive prompts happen here).
     resolve_passwords(selected, console)
@@ -1337,6 +1601,7 @@ def _run(
                 command_timeout=command_timeout,
                 force=force,
                 keep_going=keep_going,
+                keep_logs=keep_logs,
             )
 
     async def _orchestrate() -> None:

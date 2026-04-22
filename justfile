@@ -351,6 +351,11 @@ fleet-apply-kill *ARGS:
 fleet-apply-status *ARGS:
     ./scripts/fleet_apply.py --status {{ARGS}}
 
+# Like fleet-apply-status but re-poll every Ns until everyone is idle
+# (Ctrl+C to stop). Default interval 10s; override with --watch=N in ARGS.
+fleet-apply-watch *ARGS:
+    ./scripts/fleet_apply.py --status --watch 10 {{ARGS}}
+
 # Live-tail the remote fleet-apply log of HOST (defaults to most recent run);
 # pass `HOST:RUN_ID` (e.g. lab-box:20260422T133615Z) to pin a specific run.
 # Ctrl+C stops the viewer only — the remote run keeps going.

@@ -301,6 +301,7 @@ disconnect is handled three ways:
    ```bash
    just fleet-apply-status                     # which hosts are still busy?
    just fleet-apply-status --hosts ts_nas      # one host
+   just fleet-apply-watch                      # poll every 10s until idle
    just fleet-apply-tail jingle207             # follow latest run on this host
    just fleet-apply-tail jingle207 --tail jingle207:20260422T140446Z
                                                # pin a specific run id
@@ -316,9 +317,31 @@ disconnect is handled three ways:
    exits cleanly when the sentinel appears (or you Ctrl+C the viewer
    — the remote run keeps going).
 
+   `--watch N` (or `just fleet-apply-watch` which presets N=10) repeats
+   `--status` every N seconds until every host reports finished/idle,
+   then exits 0. Use this as a passive "wait for the fleet to settle"
+   cursor after killing the controller — no need to keep pressing
+   ↑↩ to re-poll. Subsequent polls suppress the per-host log tail to
+   keep output compact.
+
+   **Self / `local = true` hosts** are first-class here: their logs
+   land in `~/.cache/chezmoi-fleet/logs/` on the orchestrator (same
+   dir, no SSH round-trip). `--status` and `--tail self` work
+   identically to SSH hosts. The PID filter excludes the probe's own
+   process and parent so a `--status` invocation doesn't see itself.
+
    Both probes are read-only: they never send a chezmoi command and
    never kill anything. Combine with `fleet-apply-kill` if you decide
    the remote work should stop.
+
+### Log retention
+
+Each per-host log dir keeps the **10 most recent** runs (`.log` +
+`.exit` pair); older pairs are deleted at the end of the next run.
+Override with `--keep-logs N` (`N=0` disables GC entirely if you want
+to accumulate forever — you'll need to `rm -rf ~/.cache/chezmoi-fleet/
+logs` periodically yourself). GC happens AFTER the sentinel is
+written, so the just-finished run is always inside the keep window.
 
 ## Exit codes
 
