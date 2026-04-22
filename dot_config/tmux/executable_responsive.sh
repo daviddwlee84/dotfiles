@@ -4,9 +4,9 @@
 # Called on startup and via client-resized hook.
 #
 # Width tiers:
-#   >= 120  (wide)   : full modules
-#   80-119  (medium) : reduced right side
-#   < 80    (narrow) : minimal, for mobile terminals
+#   >= 120  (wide)   : full modules incl. clock
+#   80-119  (medium) : host only on right (clock dropped to save space)
+#   < 80    (narrow) : minimal, no right side, for mobile terminals
 
 set -euo pipefail
 
@@ -25,11 +25,12 @@ tmux set -g status-right ""
 if [ "$width" -ge 120 ]; then
   tmux set -agF status-right "#{E:@catppuccin_status_application}"
   tmux set -agF status-right "#{E:@catppuccin_status_user}"
-fi
-if [ "$width" -ge 80 ]; then
+  tmux set -agF status-right "#{E:@catppuccin_status_host}"
+  tmux set -agF status-right "#{E:@catppuccin_status_date_time}"
+elif [ "$width" -ge 80 ]; then
   tmux set -agF status-right "#{E:@catppuccin_status_host}"
 fi
-tmux set -agF status-right "#{E:@catppuccin_status_date_time}"
+# narrow (<80): no right-side modules -- leave full width for the window list
 
 # -- Adjust status length limits to match tier --
 if [ "$width" -ge 120 ]; then
@@ -40,5 +41,5 @@ elif [ "$width" -ge 80 ]; then
   tmux set -g status-right-length 80
 else
   tmux set -g status-left-length 25
-  tmux set -g status-right-length 40
+  tmux set -g status-right-length 0
 fi
