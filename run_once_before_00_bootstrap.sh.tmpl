@@ -39,6 +39,33 @@ fi
 # Ensure PATH includes local bin and Homebrew
 export PATH="$HOME/.local/bin:$PATH"
 
+# --- Shared sudo session (prompt once, reuse across bootstrap + ansible + brew)
+# Inlined from scripts/lib/sudo_shared.sh via chezmoi's `include` so the helper
+# travels with the rendered script (no runtime path lookup back to the source
+# tree). See that file for API, lifetime, and clean-up guarantees.
+{{ include "scripts/lib/sudo_shared.sh" }}
+# --- end sudo helper
+
+# Decide at render time whether *any* script in the apply flow will need sudo.
+# If not, we never prompt, never create the state dir, never spawn a watchdog.
+# Conditions mirror the sudo surfaces in every run-script:
+#   - Linux, non-noRoot: bootstrap apt-get + ansible become tasks.
+#   - macOS, installBrewApps: pkg-based cask installers (google-drive, etc.).
+#   - macOS, installInputMethod: Squirrel cask pkg installer (ansible).
+NEED_SUDO={{ if or (and (eq .chezmoi.os "linux") (not .noRoot)) (and (eq .chezmoi.os "darwin") (or .installBrewApps .installInputMethod)) }}1{{ else }}0{{ end }}
+
+# Set up the shared sudo session FIRST so bootstrap's own `apt-get` lines (and
+# every later run-script) reuse the same cached credential. Trap INT/TERM/HUP
+# only — no EXIT trap, because the next run-script needs the state to survive
+# this process exiting. End-of-flow cleanup is done by the detached watchdog
+# (see sudo_shared.sh).
+if [[ "$NEED_SUDO" == "1" ]]; then
+    if ! sudo_session_init "bootstrap"; then
+        warn "Could not establish a sudo session (no TTY and sudo needs a password);"
+        warn "bootstrap will attempt its sudo steps anyway and they may prompt or skip."
+    fi
+fi
+
 {{ if .useChineseMirror -}}
 # GFW mirrors (useChineseMirror=true). Must be set BEFORE the first
 # `brew install`, `rustup`, or `mise install` so every bootstrap fetch
@@ -112,10 +139,12 @@ case "$BREW_REAL_ARCH" in
     amd64|x86_64|arm64|aarch64)
         if ! command -v brew &> /dev/null; then
             info "Installing Linuxbrew..."
-            # Install Linuxbrew dependencies first
+            # Install Linuxbrew dependencies first. Uses sudo_run so the
+            # already-cached password is piped in on stdin (no mid-script
+            # prompt, no plaintext in argv).
             if command -v apt-get &> /dev/null; then
-                sudo apt-get update
-                sudo apt-get install -y build-essential procps curl file git
+                sudo_run apt-get update
+                sudo_run apt-get install -y build-essential procps curl file git
             fi
             # Install Linuxbrew
             NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -136,7 +165,7 @@ case "$BREW_REAL_ARCH" in
         if command -v brew &>/dev/null; then
             warn "Removing unusable Linuxbrew installation for '$BREW_REAL_ARCH'..."
             if [[ -d /home/linuxbrew/.linuxbrew ]]; then
-                sudo rm -rf /home/linuxbrew/.linuxbrew
+                sudo_run rm -rf /home/linuxbrew/.linuxbrew
             fi
         fi
         ;;
@@ -156,7 +185,9 @@ fi
 {{ $noRootDeps := false }}{{ if hasKey . "noRoot" }}{{ $noRootDeps = .noRoot }}{{ end -}}
 {{ if not $noRootDeps -}}
 if command -v apt-get &> /dev/null; then
-    sudo apt-get install -y libffi-dev libyaml-dev python3-dev 2>/dev/null || true
+    # sudo_run pipes the shared-session password on stdin; falls back to
+    # plain `sudo` when NOPASSWD is detected (CHEZMOI_SUDO_PASS_FILE unset).
+    sudo_run apt-get install -y libffi-dev libyaml-dev python3-dev 2>/dev/null || true
 fi
 {{ end -}}
 

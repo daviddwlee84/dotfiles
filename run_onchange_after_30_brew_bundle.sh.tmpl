@@ -73,16 +73,37 @@ if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
 fi
 
 {{ if eq .chezmoi.os "darwin" -}}
+# --- Shared sudo session (see scripts/lib/sudo_shared.sh)
+# Inlined at render time. By the time brew-bundle runs, bootstrap and ansible
+# will usually have already prompted + spawned the watchdog (which keeps the
+# TTY timestamp warm every 50 s). `sudo_session_init` is idempotent: if the
+# session already exists, it just re-exports env vars + re-registers traps.
+# If the user invoked brew-bundle standalone (without the other phases), the
+# prompt happens here instead.
+{{ include "scripts/lib/sudo_shared.sh" }}
+# --- end sudo helper
+
 # Pre-authenticate sudo so Homebrew cask pkg installers (e.g. google-drive,
 # squirrel, ollama-app) can invoke /usr/sbin/installer without prompting from
-# a non-TTY child. Credentials cache for ~5min, covering the bundle run.
-if sudo -n true 2>/dev/null; then
-    :
-elif [[ -t 0 ]]; then
-    info "Sudo password may be needed for pkg-based Homebrew casks (google-drive, squirrel, ollama-app)"
-    sudo -v || warn "sudo pre-auth declined; pkg-based casks may fail with 'Input/output error'"
+# a non-TTY child. The watchdog refreshes the timestamp every 50 s, which
+# is well inside sudo's default 5-minute tty_tickets window.
+if sudo_session_init "brew"; then
+    case "$(sudo_session_skip_reason)" in
+        cached)
+            # Warm the current TTY's timestamp right now so the FIRST cask
+            # that shells out to `sudo /usr/sbin/installer` finds a live
+            # ticket (cask installers read a TTY timestamp, not stdin).
+            sudo_session_warm_cache || warn "sudo_session_warm_cache failed; pkg casks may prompt or fail"
+            ;;
+        passwordless)
+            info "Passwordless sudo detected"
+            ;;
+        non-interactive | "")
+            warn "Non-interactive mode without passwordless sudo - pkg-based casks may fail"
+            ;;
+    esac
 else
-    warn "Non-interactive mode without passwordless sudo - pkg-based casks may fail"
+    warn "Sudo session could not be established - pkg-based casks may fail"
 fi
 
 {{ end -}}

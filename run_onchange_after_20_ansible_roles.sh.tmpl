@@ -47,6 +47,19 @@ export PATH="$HOME/.local/bin:$PATH"
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
+# --- Shared sudo session (see scripts/lib/sudo_shared.sh for full docs)
+# Inlined at template-render time so this script carries the helper body.
+# bootstrap has already prompted + spawned a watchdog in the normal flow;
+# the idempotent `sudo_session_init` below just re-exports the env vars
+# and (re)registers the INT/TERM/HUP abort trap. It will prompt here only
+# when the user ran ansible manually without the bootstrap phase.
+{{ include "scripts/lib/sudo_shared.sh" }}
+# --- end sudo helper
+
+# Whether ANY sudo surface is exercised in this run. Linux ansible always
+# needs sudo unless noRoot. On macOS only the input_method role needs sudo.
+NEED_SUDO={{ if or (and (eq .chezmoi.os "linux") (not .noRoot)) (and (eq .chezmoi.os "darwin") .installInputMethod) }}1{{ else }}0{{ end }}
+
 # Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
 {{ if eq .chezmoi.os "darwin" -}}
 if [[ -f /opt/homebrew/bin/brew ]]; then
@@ -170,7 +183,17 @@ fi
 
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
 
-# Handle sudo
+# === Handle sudo (delegated to scripts/lib/sudo_shared.sh) ==================
+# The helper (sudo_session_init) is idempotent: if bootstrap already prompted
+# the user and spawned the watchdog, this call just re-exports the env vars.
+# If ansible is run standalone (bypassing bootstrap), it prompts here instead.
+#
+# After init we classify via sudo_session_skip_reason:
+#   "cached"           -> pass $CHEZMOI_ANSIBLE_BECOME_FILE to ansible via -e @
+#   "passwordless"     -> no become password needed
+#   "non-interactive"  -> caller-specific fallback (below)
+# Importantly we DO NOT run `sudo -k` here anymore — doing so would throw away
+# the bootstrap-era cache and force a second prompt for the ansible phase.
 BECOME_FLAGS=""
 {{ if eq .chezmoi.os "darwin" -}}
 {{ $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
@@ -178,16 +201,28 @@ BECOME_FLAGS=""
 info "noRoot mode enabled on macOS - skipping input_method (requires sudo for pkg installers)"
 TAGS="${TAGS//,input_method/}"
 {{ else -}}
-# Pre-authenticate sudo so Homebrew cask pkg installers (e.g. Squirrel) can run
-# without prompting from a non-TTY child process. Credentials cache for ~5min,
-# which is enough for the short input_method tag. Touch ID works if configured.
-if sudo -n true 2>/dev/null; then
-    :
-elif [[ -t 0 ]]; then
-    info "Sudo password may be needed for pkg-based Homebrew casks (Squirrel, etc.)"
-    sudo -v || warn "sudo pre-auth declined; cask installs needing sudo will be skipped with a warning"
-else
-    warn "Non-interactive mode without passwordless sudo - pkg-based casks will be skipped"
+# input_method role uses Homebrew cask pkg installers (Squirrel) which invoke
+# `sudo /usr/sbin/installer` internally. Pre-warm the sudo timestamp via the
+# shared helper so the non-TTY child process finds a live ticket.
+if [[ "$NEED_SUDO" == "1" ]]; then
+    if sudo_session_init "ansible"; then
+        case "$(sudo_session_skip_reason)" in
+            cached)
+                # Refresh the current TTY's sudo timestamp so the cask child
+                # `sudo /usr/sbin/installer` finds a live ticket (it does not
+                # accept a piped password). The watchdog keeps it warm every 50s.
+                sudo_session_warm_cache || warn "sudo_session_warm_cache failed; pkg casks may still prompt"
+                ;;
+            passwordless)
+                info "Passwordless sudo detected"
+                ;;
+            non-interactive | "")
+                warn "Non-interactive mode without passwordless sudo - pkg-based casks may be skipped"
+                ;;
+        esac
+    else
+        warn "Sudo session could not be established - pkg-based casks may be skipped"
+    fi
 fi
 {{ end -}}
 {{ else -}}
@@ -218,34 +253,8 @@ else
 fi
 {{ end -}}
 {{ else -}}
-# Detect sudo capability reliably:
-#   1. Real NOPASSWD: invalidate cache first, then `sudo -n true` must still
-#      succeed (otherwise we got a false positive from a recent sudo timestamp
-#      that ansible's become subprocess won't be able to reuse due to tty_tickets).
-#   2. Otherwise try /dev/tty (works even when chezmoi takes over stdin) and
-#      read the password ONCE into a mode-0600 tmpfile, passed to ansible via
-#      `-e @file` so subsequent invocations (partial-failure loop) don't re-prompt.
-#   3. If neither works, print a clear manual command and exit 0 (don't break
-#      the rest of `chezmoi apply`).
-sudo -k 2>/dev/null || true
-if sudo -n true 2>/dev/null; then
-    info "Passwordless sudo detected"
-    BECOME_FLAGS=""
-elif [[ -r /dev/tty && -w /dev/tty ]]; then
-    info "Sudo password required - reading once from /dev/tty"
-    BECOME_PASS_FILE="$(mktemp)"
-    chmod 600 "$BECOME_PASS_FILE"
-    trap 'rm -f "$BECOME_PASS_FILE"' EXIT
-    printf "[sudo] password for %s: " "$USER" > /dev/tty
-    IFS= read -rs SUDO_PASS < /dev/tty
-    echo > /dev/tty
-    # Write as ansible vars file so password never appears in argv / ps / history.
-    # Use printf with %s (no shell interpretation) and escape embedded double quotes.
-    ESCAPED_PASS="${SUDO_PASS//\"/\\\"}"
-    printf 'ansible_become_password: "%s"\n' "$ESCAPED_PASS" > "$BECOME_PASS_FILE"
-    unset SUDO_PASS ESCAPED_PASS
-    BECOME_FLAGS="-e @$BECOME_PASS_FILE"
-else
+# Non-noRoot Linux: the shared helper gives us one of three outcomes.
+if ! sudo_session_init "ansible"; then
     warn "Non-interactive mode without passwordless sudo and no /dev/tty access"
     warn "Skipping ansible run. To complete setup, run manually:"
     warn ""
@@ -257,6 +266,25 @@ else
     warn "  echo '$USER ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/$USER"
     exit 0
 fi
+case "$(sudo_session_skip_reason)" in
+    cached)
+        info "Sudo session active (password cached; ansible becomes via -e @ans-become.yml)"
+        BECOME_FLAGS="-e @$CHEZMOI_ANSIBLE_BECOME_FILE"
+        ;;
+    passwordless)
+        info "Passwordless sudo detected"
+        BECOME_FLAGS=""
+        ;;
+    non-interactive | "")
+        # Shouldn't hit this after a successful sudo_session_init, but keep
+        # the manual-command fallback in case probes contradict each other.
+        warn "Sudo state inconsistent after session init; falling back to manual instructions"
+        warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \\"
+        warn "    $PLAYBOOK \\"
+        warn "    --tags '$TAGS' --ask-become-pass"
+        exit 0
+        ;;
+esac
 {{ end -}}
 {{ end -}}
 
