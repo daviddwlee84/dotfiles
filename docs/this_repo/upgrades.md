@@ -51,7 +51,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool (via the mise dotnet shim). Falls back to `dotnet tool list --global` if parsing finds nothing. |
 | `gem` | `gem update --system` + `gem update` via the mise ruby shim. |
 | `agents` | Re-runs the official `curl \| bash` installers for **tools already present** only — Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. Bootstrap list mirrors [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml). |
-| `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
+| `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → refresh installed `claude-hud` via [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
 
 ### Run order
 
@@ -70,6 +70,8 @@ flowchart LR
 ```
 
 Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
+
+`claude-hud` stays out of [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl): it uses a versioned cache path and rewrites `~/.claude/plugins/installed_plugins.json`, so it fits the explicit `plugins` upgrade path better than chezmoi externals. Upstream `v0.0.12+` also switched usage rendering to Claude Code's official stdin `rate_limits`, which means the old credential-derived `Max` badge may disappear after upgrade.
 
 ## Semantics: best-effort, not all-or-nothing
 

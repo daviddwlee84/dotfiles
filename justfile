@@ -301,7 +301,7 @@ upgrade-gem:
 upgrade-agents:
     ./scripts/upgrade_tools.sh agents
 
-# LazyVim (:Lazy sync) + TPM + pre-commit autoupdate + tldr + gh extensions
+# LazyVim (:Lazy sync) + TPM + claude-hud + pre-commit autoupdate + tldr + gh extensions
 upgrade-plugins:
     ./scripts/upgrade_tools.sh plugins
 

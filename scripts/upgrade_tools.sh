@@ -21,7 +21,7 @@
 #   --skip a,b         Run everything except listed categories.
 #   -h, --help         Show help.
 #
-# See docs/tools/upgrades.md and `## Upgrades` in AGENTS.md for rationale.
+# See docs/this_repo/upgrades.md and `## Upgrades` in AGENTS.md for rationale.
 
 set -u
 # NOTE: we deliberately do not `set -e`. Each command is guarded by _run /
@@ -665,6 +665,8 @@ cat_agents() {
 cat_plugins() {
   local any_fail=0
   local ran_any=0
+  local claude_hud_helper="$_REPO_ROOT/dot_ansible/roles/coding_agents/files/claude_hud_sync.py"
+  local claude_hud_installed=0
 
   # LazyVim (Neovim plugins)
   if command -v nvim >/dev/null 2>&1; then
@@ -678,6 +680,21 @@ cat_plugins() {
   if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
     info "Updating tmux plugins via TPM"
     _run "$HOME/.tmux/plugins/tpm/bin/update_plugins" all || any_fail=1
+    ran_any=1
+  fi
+
+  # claude-hud plugin cache / installed_plugins.json
+  if [[ -d "$HOME/.claude/plugins/cache/claude-hud" ]]; then
+    claude_hud_installed=1
+  elif [[ -f "$HOME/.claude/plugins/installed_plugins.json" ]] \
+    && grep -q '"claude-hud@claude-hud"' "$HOME/.claude/plugins/installed_plugins.json"; then
+    claude_hud_installed=1
+  fi
+  if [[ "$claude_hud_installed" -eq 1 ]] \
+    && command -v python3 >/dev/null 2>&1 \
+    && [[ -f "$claude_hud_helper" ]]; then
+    info "Refreshing claude-hud plugin"
+    _run python3 "$claude_hud_helper" --only-if-installed || any_fail=1
     ran_any=1
   fi
 
