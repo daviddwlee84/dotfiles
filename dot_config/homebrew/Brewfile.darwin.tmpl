@@ -28,6 +28,13 @@ cask "antigravity"
 cask "codex-app"
 {{ end -}}
 # cask "chatgpt-atlas"  # Uncomment if needed
+# CodeIsland — macOS notch HUD that surfaces coding-agent activity (Claude/Codex/
+# Cursor/Copilot/Gemini/AntiGravity/OpenCode). macOS 14+ only; Swift app uses a
+# Unix socket at /tmp/codeisland-<uid>.sock. The app auto-installs hook payloads
+# into each detected CLI's config; our chezmoi overlays are deliberately
+# hook-aware to coexist (see docs/tools/agent-overlays.md).
+tap "wxtsky/tap"
+cask "codeisland"
 # Local LLM GUI runtime (also provides the `ollama` CLI)
 {{ if .installLlmTools -}}
 cask "ollama-app"

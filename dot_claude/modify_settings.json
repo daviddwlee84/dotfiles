@@ -1,18 +1,27 @@
 #!/bin/sh
-# chezmoi modify_ script: deep-merge a managed overlay into ~/.claude/settings.json.
+# chezmoi modify_ script: hook-aware deep-merge of a managed overlay into
+# ~/.claude/settings.json.
 #
-# Why: Claude Code rewrites ~/.claude/settings.json at runtime (adds fields like
-# "permissions", "skipAutoPermissionPrompt", reorders keys). Treating it as a
-# static managed file produces diff noise on every `chezmoi apply`.
+# Why hook-aware? Claude Code rewrites this file at runtime AND CodeIsland
+# (https://github.com/wxtsky/CodeIsland, macOS notch HUD) auto-installs its
+# own entries into hooks.Notification / hooks.PermissionRequest / hooks.Stop
+# / hooks.PreToolUse / etc. A naive `jq '. * $overlay'` deep-merge replaces
+# arrays wholesale, so declaring our notify.sh hook in the overlay would
+# silently delete every CodeIsland entry on each `chezmoi apply` (and
+# CodeIsland would re-install on next launch — endless ping-pong).
 #
-# How: chezmoi pipes the current target file into stdin; this script prints the
-# new contents on stdout. `jq '. * $overlay'` does recursive object merge, so
-# only the keys declared in $overlay are enforced by chezmoi; any other keys
-# that Claude Code adds at runtime are preserved verbatim. Arrays inside the
-# overlay replace their counterparts wholesale (no duplicate accumulation).
+# How: For all keys EXCEPT .hooks, do the normal recursive object merge.
+# For .hooks.<event> arrays, additively merge — append overlay entries that
+# aren't already present (matched by .hooks[0].command), preserving every
+# entry the live file already contains. This lets our overlay enforce
+# notify.sh while CodeIsland (or any other tool) freely manages its own
+# parallel entries in the same event arrays.
 #
-# To manage an additional key: add it to the $overlay JSON below.
+# To manage an additional hook event: add it to $overlay.hooks below.
+# To manage an additional non-hook key: add it to $overlay.
 # Requires: jq (installed by the `base` ansible role).
+#
+# See: docs/tools/agent-overlays.md → "CodeIsland integration".
 set -eu
 
 overlay=$(cat <<'JSON'
@@ -64,4 +73,34 @@ JSON
 base=$(cat)
 [ -z "$base" ] && base='{}'
 
-printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'
+# Hook-aware merge:
+#   1. Compute non-hook portion of overlay (everything except .hooks).
+#   2. Deep-merge that into base normally: base * overlay_no_hooks.
+#   3. For each event in overlay.hooks, append entries whose .hooks[0].command
+#      isn't already represented in the live event array (by exact-string
+#      command match on .hooks[0].command). Live entries are preserved
+#      verbatim, and new overlay entries are added at the end.
+printf '%s' "$base" | jq --argjson overlay "$overlay" '
+  . as $base
+  | ($overlay | del(.hooks)) as $non_hook_overlay
+  | ($overlay.hooks // {}) as $overlay_hooks
+  | ($base * $non_hook_overlay) as $merged
+  | $merged
+  | .hooks = (
+      ($merged.hooks // {}) as $live_hooks
+      | reduce ($overlay_hooks | to_entries[]) as $ev (
+          $live_hooks;
+          .[$ev.key] = (
+            (.[$ev.key] // []) as $live_arr
+            | ($live_arr | map(.hooks[0].command? // "")) as $live_cmds
+            | $live_arr + (
+                $ev.value
+                | map(select(
+                    (.hooks[0].command? // "") as $cmd
+                    | ($cmd == "") or (($live_cmds | index($cmd)) == null)
+                  ))
+              )
+          )
+        )
+    )
+'

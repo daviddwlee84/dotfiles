@@ -125,3 +125,25 @@ Library/Application Support/{{ . }}/**
 .config/opencode
 .config/opencode/**
 {{- end }}
+
+# -----------------------------------------------------------------------------
+# CodeIsland-owned hook sidecars (macOS-only HUD app, see
+# docs/tools/agent-overlays.md → "CodeIsland integration").
+#
+# These files are written and auto-repaired by the CodeIsland.app on every
+# launch. They MUST NOT be checked into the source tree — if accidentally
+# `chezmoi add`-ed they would clobber CodeIsland's runtime updates and
+# create a ping-pong with the app's auto-installer. The Claude
+# settings.json overlay uses a hook-aware merger to coexist with
+# CodeIsland's parallel entries; for these dedicated sidecars we leave
+# the file fully unmanaged.
+#
+# Always-ignore (regardless of OS / dir presence) because the only sane
+# state on machines without CodeIsland is "doesn't exist".
+# -----------------------------------------------------------------------------
+.codex/hooks.json
+.cursor/hooks.json
+.copilot/hooks/codeisland.json
+.copilot/hooks/**
+.gemini/settings.json
+.antigravity/settings.json

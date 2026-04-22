@@ -198,7 +198,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager)
-- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
 
 ### Bootstrap (installed before ansible)
 - **Homebrew** (macOS): Package manager for macOS

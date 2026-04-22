@@ -211,3 +211,121 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   [ -f "$fake_home/.config/opencode/opencode.json" ]
   grep -q '"x": 1' "$fake_home/.config/opencode/opencode.json"
 }
+
+# -----------------------------------------------------------------------------
+# Claude settings.json hook-aware merger
+#
+# The Claude overlay must coexist with CodeIsland (https://github.com/wxtsky/
+# CodeIsland), which auto-installs entries into hooks.<event> arrays. A naive
+# `jq '. * $overlay'` would replace those arrays wholesale and silently
+# delete CodeIsland's entries on every apply. The new merger:
+#   - deep-merges everything except .hooks normally,
+#   - additively merges .hooks.<event> arrays by .hooks[0].command substring
+#     match (overlay entries appended only if not already present).
+# -----------------------------------------------------------------------------
+
+@test "claude modify_settings: notify.sh added to empty hooks, codeisland entries preserved" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  # Live file mimics a fresh install where CodeIsland has already injected
+  # its entries but our notify.sh hook is missing.
+  local live='{
+    "model": "sonnet",
+    "permissions": {"defaultMode": "auto"},
+    "hooks": {
+      "Notification": [
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 86400}]}
+      ],
+      "Stop": [
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 5}]}
+      ],
+      "PreToolUse": [
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 5}]}
+      ]
+    }
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | sh '$SOURCE_DIR/dot_claude/modify_settings.json'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # Notification: CodeIsland entry preserved + notify.sh appended.
+  echo "$output" | jq -e '.hooks.Notification | length == 2' >/dev/null
+  echo "$output" | jq -e '.hooks.Notification | map(.hooks[0].command) | index("~/.codeisland/codeisland-hook.sh") != null' >/dev/null
+  echo "$output" | jq -e '.hooks.Notification | map(.hooks[0].command) | index("~/.claude/hooks/notify.sh") != null' >/dev/null
+  # Stop: same.
+  echo "$output" | jq -e '.hooks.Stop | length == 2' >/dev/null
+  echo "$output" | jq -e '.hooks.Stop | map(.hooks[0].command) | index("~/.claude/hooks/notify.sh") != null' >/dev/null
+  # PreToolUse: only CodeIsland entry (not in our overlay), must survive untouched.
+  echo "$output" | jq -e '.hooks.PreToolUse | length == 1' >/dev/null
+  echo "$output" | jq -e '.hooks.PreToolUse[0].hooks[0].command == "~/.codeisland/codeisland-hook.sh"' >/dev/null
+  # Non-hook keys: live values preserved + overlay keys enforced.
+  echo "$output" | jq -e '.model == "sonnet"' >/dev/null
+  echo "$output" | jq -e '.permissions.defaultMode == "auto"' >/dev/null
+  echo "$output" | jq -e '.skipDangerousModePermissionPrompt == true' >/dev/null
+  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
+}
+
+@test "claude modify_settings: idempotent when notify.sh already present" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local live='{
+    "hooks": {
+      "Notification": [
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 86400}]},
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.claude/hooks/notify.sh"}]}
+      ],
+      "Stop": [
+        {"hooks": [{"type": "command", "command": "~/.claude/hooks/notify.sh"}]},
+        {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 5}]}
+      ]
+    }
+  }'
+
+  # First pass.
+  pass1=$(printf '%s' "$live" | sh "$SOURCE_DIR/dot_claude/modify_settings.json")
+  # Second pass on the result of the first.
+  pass2=$(printf '%s' "$pass1" | sh "$SOURCE_DIR/dot_claude/modify_settings.json")
+
+  # No duplicate notify.sh entry on first pass.
+  printf '%s' "$pass1" | jq -e '[.hooks.Notification[] | select(.hooks[0].command == "~/.claude/hooks/notify.sh")] | length == 1' >/dev/null
+  printf '%s' "$pass1" | jq -e '[.hooks.Stop[] | select(.hooks[0].command == "~/.claude/hooks/notify.sh")] | length == 1' >/dev/null
+
+  # Stable across re-application.
+  diff <(printf '%s' "$pass1" | jq -S .) <(printf '%s' "$pass2" | jq -S .)
+}
+
+@test "claude modify_settings: empty live file produces overlay-only output" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  run bash -c "printf '' | sh '$SOURCE_DIR/dot_claude/modify_settings.json'"
+  [ "$status" -eq 0 ]
+
+  echo "$output" | jq -e '.hooks.Notification[0].hooks[0].command == "~/.claude/hooks/notify.sh"' >/dev/null
+  echo "$output" | jq -e '.hooks.Stop[0].hooks[0].command == "~/.claude/hooks/notify.sh"' >/dev/null
+  echo "$output" | jq -e '.skipDangerousModePermissionPrompt == true' >/dev/null
+}
+
+@test "claude modify_settings: non-hook deep-merge preserves siblings" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  # User has manually added an extra plugin in enabledPlugins; our overlay
+  # only declares two specific plugins. Deep merge means user's extra survives.
+  local live='{
+    "enabledPlugins": {
+      "user-custom@some-marketplace": true
+    },
+    "extraKnownMarketplaces": {
+      "user-marketplace": {"source": {"source": "github", "repo": "user/m"}}
+    }
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | sh '$SOURCE_DIR/dot_claude/modify_settings.json'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # Overlay keys enforced.
+  echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
+  echo "$output" | jq -e '.extraKnownMarketplaces["claude-hud"].source.repo == "jarrodwatts/claude-hud"' >/dev/null
+  # User's extras preserved (deep merge into objects).
+  echo "$output" | jq -e '.enabledPlugins["user-custom@some-marketplace"] == true' >/dev/null
+  echo "$output" | jq -e '.extraKnownMarketplaces["user-marketplace"].source.repo == "user/m"' >/dev/null
+}
