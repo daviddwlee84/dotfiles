@@ -224,7 +224,7 @@ Then bats asserts on the `$output`:
 
 ## shellcheck + shfmt
 
-[shellcheck](https://www.shellcheck.net/) is a static analyser for shell scripts. [shfmt](https://github.com/mvdan/sh) is a formatter / format-check. Both run via pre-commit in this repo.
+[shellcheck](https://www.shellcheck.net/) is a static analyser for shell scripts. [shfmt](https://github.com/mvdan/sh) is a formatter / format-check. Both run via pre-commit in this repo. For generic pre-commit mechanics (cache location, `uv`-managed bootstrap Python, debugging broken hook envs), see [`docs/tools/pre-commit.md`](../tools/pre-commit.md).
 
 Pre-commit hook sources (see `.pre-commit-config.yaml`):
 

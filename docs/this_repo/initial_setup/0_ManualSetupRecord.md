@@ -57,7 +57,7 @@ And will update the `~/.config/chezmoi/chezmoi.toml` file accordingly.
 
 ---
 
-(After setup CLAUDE.md I mostly ask it to update, so please checkout [`.specstory/history/`](../../.specstory/history/) instead)
+(After setup CLAUDE.md I mostly ask it to update, so please checkout [`.specstory/history/`](../../../.specstory/history/) instead)
 
 ---
 

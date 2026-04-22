@@ -802,13 +802,13 @@
       "last_updated": "2026-04-19T06:42:39Z"
     },
     "7ac536f6-f8ff-46b0-9ac1-65efe4cbaab3": {
-      "user_message_count": 2,
-      "agent_message_count": 48,
+      "user_message_count": 3,
+      "agent_message_count": 144,
       "start_timestamp": "2026-04-22T11:09:56+08:00",
       "end_timestamp": "2026-04-22T11:09:56+08:00",
-      "markdown_size_bytes": 61238,
+      "markdown_size_bytes": 218538,
       "provider": "cursoride",
-      "last_updated": "2026-04-22T04:27:31Z"
+      "last_updated": "2026-04-22T05:08:26Z"
     },
     "7be12ddc-c0b8-4edc-b7da-1d3463c3c2f5": {
       "user_message_count": 2,

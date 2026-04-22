@@ -280,6 +280,8 @@ Add new entries to `.chezmoiexternal.toml.tmpl` when the content is a plain clon
 
 ## Upgrades
 
+> Full rationale, per-category details, sample output, troubleshooting, and an extension guide live in [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md). This section is the short version for agents touching this repo.
+
 **Install vs upgrade is split on purpose.** `chezmoi apply` (+ the ansible phase it triggers) is deliberately install-only: roles use `state: present` / `creates:` so re-applying never silently bumps every tool on the machine. That keeps `chezmoi apply` boring, reproducible, and safe to run on a running box. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes — it is the only thing that should move installed tools forward.
 
 **Entry points** (defined in [`justfile`](justfile)):
@@ -516,7 +518,7 @@ After `chezmoi apply`:
 
 ## Testing
 
-See [docs/testing.md](docs/testing.md) for the full guide (framework comparison — bats vs ZUnit vs ShellSpec — directory structure, patterns for testing zsh from bats, PATH stubbing, shellcheck/shfmt scope).
+See [docs/this_repo/testing.md](docs/this_repo/testing.md) for the full guide (framework comparison — bats vs ZUnit vs ShellSpec — directory structure, patterns for testing zsh from bats, PATH stubbing, shellcheck/shfmt scope).
 
 Small, opt-in layers. This is a personal dotfiles repo — tests cover only painful-regression zones, not broad coverage.
 
@@ -614,4 +616,4 @@ The Brewfiles are chezmoi templates. Conditional sections:
 
 ## Customization
 
-See [docs/ansible.md](docs/ansible.md) for detailed ansible customization guide.
+See [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for detailed ansible customization guide.

@@ -299,6 +299,6 @@ Keep in ansible:
 ## See also
 
 - [CLAUDE.md → Selective File Management (case studies)](../../CLAUDE.md#selective-file-management-case-studies) — repo-specific `modify_` / `create_` walkthroughs with failure modes.
-- [docs/cheatsheet.md → chezmoi](../cheatsheet.md#chezmoi) — command-level quick reference.
+- [docs/this_repo/cheatsheet.md → chezmoi](../this_repo/cheatsheet.md#chezmoi) — command-level quick reference.
 - [chezmoi docs — Concepts](https://www.chezmoi.io/reference/concepts/) — source state vs destination state vs target state.
 - [chezmoi docs — Include files from elsewhere](https://www.chezmoi.io/user-guide/include-files-from-elsewhere/) — `.chezmoiexternal.<format>` user guide.

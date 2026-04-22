@@ -148,6 +148,8 @@ Used for testing the full setup on a bare Ubuntu image.
 
 ## Pre-commit & Gitleaks
 
+> See [`docs/tools/pre-commit.md`](../tools/pre-commit.md) for the generic pre-commit reference (how its virtualenv-per-hook model works, `uv`-managed bootstrap Python, and troubleshooting broken hook envs).
+
 ```bash
 # Setup
 just pre-commit-install-tool   # Install pre-commit binary

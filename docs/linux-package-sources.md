@@ -105,6 +105,6 @@ This is the pattern to replicate whenever an apt-shipped tool is too old for wha
 
 ## Related docs
 
-- [ansible.md](ansible.md) — how to run and customise the ansible roles
+- [this_repo/ansible_customization.md](this_repo/ansible_customization.md) — how to run and customise the ansible roles
 - [tools/tmux/README.md](tools/tmux/README.md) — the tmux ≥ 3.3 requirement and fallback install
 - Root [CLAUDE.md](../CLAUDE.md) — "Ansible vs Homebrew" section and per-tag tool breakdown

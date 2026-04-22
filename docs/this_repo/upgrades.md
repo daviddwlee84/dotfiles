@@ -1,0 +1,164 @@
+# Upgrades — Explicit, Opt-in Tool Refresh
+
+> How to actually move installed tools forward on a machine managed by this repo, and why `chezmoi apply` deliberately will *not* do that for you.
+
+## Why install and upgrade are split
+
+`chezmoi apply` (and the ansible phase it triggers) is **install-only by design**. Ansible roles use `state: present` + `creates:` so that running `chezmoi apply` on a running box is idempotent and never silently bumps every tool to whatever happens to be latest that day. This matters because:
+
+- **Predictability** — rerunning apply after editing one role file shouldn't ripple-upgrade unrelated tools.
+- **Offline / flaky network** — install-only can be satisfied by what's already on disk; `--upgrade` workflows always hit the network.
+- **Review friction** — you *want* to see "chezmoi says 10 casks would move; proceed?" as a separate decision from "apply my dotfile changes".
+
+The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes in [`justfile`](../../justfile). It is the **only** thing that intentionally moves tools forward on this repo's flow.
+
+Two side-effects worth knowing about:
+
+- `.chezmoiexternal.toml.tmpl` entries have `refreshPeriod = "168h"` — chezmoi itself will re-fetch those weekly on apply. That's a bounded "nudge", not an upgrade mechanism for installed binaries.
+- Homebrew casks that carry a `homebrew_cask` entry with `state: present` freeze to that version until a Brewfile hash change forces a re-bundle with `--no-upgrade`. Still install-only; `upgrade-brew` is what actually bumps them.
+
+## Entry points
+
+```bash
+just upgrade-all          # externals → brew → mise → uv → npm → cargo → dotnet → gem → agents → plugins
+just upgrade-dry-run      # same, but commands are printed, not executed
+just upgrade-<category>   # run one category in isolation
+```
+
+Or use the script directly when you want the flags:
+
+```bash
+./scripts/upgrade_tools.sh                           # same as 'all'
+./scripts/upgrade_tools.sh brew uv                   # two categories
+./scripts/upgrade_tools.sh --only brew,mise          # same, via --only
+./scripts/upgrade_tools.sh --skip agents,plugins     # all, minus those
+./scripts/upgrade_tools.sh --dry-run all             # preview
+./scripts/upgrade_tools.sh --help
+```
+
+The script runs categories in the canonical `ALL_CATEGORIES` order regardless of CLI arg order — dependencies between categories are real (see [§ Run order](#run-order)).
+
+## Category matrix
+
+| Category | What actually happens |
+| --- | --- |
+| `externals` | `chezmoi upgrade` (the chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, toolkami.rb, fzf). First because a chezmoi version bump may change how later steps behave. |
+| `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile` *without* `--no-upgrade` → `Brewfile.{darwin,linux}` → `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) so cask pkg installers that shell out to `sudo /usr/sbin/installer` find a live ticket. |
+| `mise` | `mise self-update --yes` + `mise upgrade` (honours the version constraints in `~/.config/mise/config.toml`). `self-update` warns, rather than fails, when mise was installed via brew/apt. |
+| `uv` | `uv self update` + `uv tool upgrade --all`. Covers every tool listed in [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) and [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml). |
+| `npm` | `npm -g update`, falling back to `mise exec -- npm -g update` when `npm` is not directly on PATH (same detection as [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml)). |
+| `cargo` | If absent, bootstraps the `cargo-update` crate, then `cargo install-update -a`. Covers pueue (Linux) plus any future entries in [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
+| `dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool (via the mise dotnet shim). Falls back to `dotnet tool list --global` if parsing finds nothing. |
+| `gem` | `gem update --system` + `gem update` via the mise ruby shim. |
+| `agents` | Re-runs the official `curl \| bash` installers for **tools already present** only — Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. Bootstrap list mirrors [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml). |
+| `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
+
+### Run order
+
+```mermaid
+flowchart LR
+    externals["externals<br/>(chezmoi + externals)"] --> brew
+    brew["brew<br/>(formulas + casks greedy + Brewfile)"] --> mise
+    mise["mise<br/>(self-update + runtimes)"] --> uv
+    uv["uv<br/>(self update + tools)"] --> npm
+    npm["npm<br/>(-g update)"] --> cargo
+    cargo["cargo<br/>(install-update -a)"] --> dotnet
+    dotnet["dotnet<br/>(tool update --global)"] --> gem
+    gem["gem<br/>(gem update)"] --> agents
+    agents["agents<br/>(curl \| bash installers)"] --> plugins
+    plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
+```
+
+Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
+
+## Semantics: best-effort, not all-or-nothing
+
+Each category is wrapped in a `run_category` helper:
+
+- Individual command failures inside a category do **not** abort the rest of the category. Everything is best-effort.
+- A category failure does **not** abort the next category. The script keeps going.
+- Categories return `77` when the prerequisite is missing (e.g. no `dotnet` binary) — that is reported as **SKIPPED**, not FAILED.
+- The final summary groups into three buckets:
+
+```text
+[INFO] Upgrade Summary
+[SUCCESS] OK:      externals brew mise uv npm cargo agents plugins
+[WARN] SKIPPED: gem (prerequisite missing)
+[ERROR] FAILED:  dotnet
+[ERROR]    - dotnet: rc=1
+```
+
+Overall process exit code is `1` iff at least one category is in FAILED. `--dry-run` always exits `0` because no real command runs.
+
+## Sample: `just upgrade-dry-run`
+
+```text
+────────────────────────────────────────────
+[INFO] upgrade_tools.sh — categories: externals brew mise uv npm cargo dotnet gem agents plugins (dry-run)
+[WARN] DRY-RUN MODE — commands are printed, not executed
+────────────────────────────────────────────
+[INFO] ── category: externals ──
+[INFO] Upgrading chezmoi binary itself
++ chezmoi upgrade
+[INFO] Force-refreshing chezmoi externals (.chezmoiexternal.toml.tmpl)
++ chezmoi apply --refresh-externals
+[SUCCESS] category 'externals' completed
+────────────────────────────────────────────
+[INFO] ── category: brew ──
++ brew update
++ brew upgrade
++ brew upgrade --cask --greedy
++ brew bundle --file=/Users/me/.config/homebrew/Brewfile
++ brew bundle --file=/Users/me/.config/homebrew/Brewfile.darwin
++ brew cleanup
+[SUCCESS] category 'brew' completed
+...
+```
+
+## Things intentionally excluded
+
+- **No `state: latest` rewrites of ansible roles.** `chezmoi apply` semantics stay conservative; the upgrade path uses package-manager commands directly.
+- **No `apt upgrade` / system package bumps.** Keeps the default scope sudo-light and noise-free. Run `sudo apt upgrade && sudo apt autoremove` manually if you want that.
+- **No daemon restart** for LiteLLM / Ollama / pueued / anything `systemd`-managed. We only refresh the binaries; restarting is your call.
+- **No automatic scheduling.** There is no cron, launchd, or systemd timer wired up. Running `just upgrade-all` is an intentional action you take when you have time to review diffs / deal with breakage.
+- **`scripts/**` is ignored by chezmoi** ([`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) line 29) — the script is *not* deployed to `$HOME`. It runs from the dotfiles repo checkout directly (where `chezmoi cd` takes you). That is a deliberate choice: upgrade logic is repo-local, not per-user.
+
+## Troubleshooting
+
+- **`chezmoi upgrade` fails.** `chezmoi upgrade` only works when chezmoi was installed via the official install script or `go install`. Homebrew/apt installs will surface an error — upgrade via *that* channel instead. The script treats this as a warning, not a failure.
+- **`mise self-update` / `uv self update` fails.** Same pattern — both refuse when installed via a system package manager. Treated as a warning.
+- **macOS cask pkg installer hangs on sudo.** The script calls `sudo_session_init "upgrade-brew"` on macOS, which prompts once and warms the ticket. If you ran the script over SSH with no TTY, that step becomes `non-interactive` and cask pkg bumps may stall. Fix: run locally, or `ssh -t`, or pre-warm with `sudo -v` yourself before `just upgrade-brew`.
+- **`cargo install-update -a` fails halfway through.** One crate break does not abort the rest (best-effort). Re-run `just upgrade-cargo` — cargo-update is itself rebuilt if missing.
+- **`pre-commit autoupdate` bumped a hook that now errors.** That is a repo-file change, not an environment change. Review `.pre-commit-config.yaml` diff; `git checkout -p .pre-commit-config.yaml` to partially revert if needed.
+
+## Extending
+
+Three ways to add a new tool to the upgrade flow:
+
+1. **Tool already managed by an existing category (brew / uv / npm / cargo / dotnet / gem / mise).** Nothing to do — the generic `upgrade-<category>` picks it up because it uses the package manager's own bulk command.
+2. **New `curl | bash` installer.** Add a guarded block inside `cat_agents()` in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh). Gate on the binary being present so the upgrade path never bootstraps on machines that don't have the tool.
+
+   ```bash
+   if command -v newtool >/dev/null 2>&1; then
+     info "Upgrading newtool"
+     _run_sh "curl -fsSL https://newtool.dev/install.sh | bash" || any_fail=1
+     ran_any=1
+   fi
+   ```
+
+3. **Brand-new strategy (e.g. GitHub release binary with custom download logic).** Add a `cat_<name>` function, register it in:
+   - `ALL_CATEGORIES` array
+   - The dispatch `case` in the main loop
+   - A matching `just upgrade-<name>` recipe in [`justfile`](../../justfile)
+   - This doc's [category matrix](#category-matrix)
+
+Keep the return-value contract: `0` = success, `77` = skipped (prerequisite missing), any other non-zero = failure.
+
+## Cross-references
+
+- [`AGENTS.md` § Upgrades](../../AGENTS.md) — short version written for AI agents touching this repo.
+- [`README.md` § Keeping tools up-to-date](../../README.md) — short version written for humans arriving from the front page.
+- [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh) — the implementation.
+- [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) — the sudo-session helper reused for macOS cask installers.
+- [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl) — the `refreshPeriod` entries that `upgrade-externals` force-refreshes.
+- Ansible role defaults consumed for enumeration: [`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml), [`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml), [`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml), [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml).

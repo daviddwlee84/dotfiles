@@ -60,7 +60,7 @@ The desktop app prompts you to authorize each key usage (configurable under Sett
 
 ### Via the CLI script
 
-This repo includes an import script (see [import_ssh_to_bw.sh docs](../scripts/import_ssh_to_bw.sh.md)):
+This repo includes an import script (see [import_ssh_to_bw.sh docs](../this_repo/scripts/import_ssh_to_bw.sh.md)):
 
 ```bash
 # Interactive -- pick which keys to import
@@ -249,6 +249,6 @@ The remote host can then use your Bitwarden-managed keys to authenticate onward
 
 - [SSH Agent Fallback](../tools/ssh-agent.md) -- Fallback chain: Bitwarden → existing agent → ssh-agent
 - [Bitwarden SSH Agent official docs](https://bitwarden.com/help/ssh-agent/)
-- [import_ssh_to_bw.sh](../scripts/import_ssh_to_bw.sh.md) -- Bulk import SSH keys to Bitwarden
+- [import_ssh_to_bw.sh](../this_repo/scripts/import_ssh_to_bw.sh.md) -- Bulk import SSH keys to Bitwarden
 - `~/.config/zsh/tools/94_ssh_agent.zsh` -- SSH agent auto-detection and fallback
 - `~/.config/zsh/tools/95_bitwarden.zsh` -- Bitwarden CLI zsh completion
