@@ -151,7 +151,7 @@ Keep logging libraries boring. Put the color at the viewer.
 
 Two touch points:
 
-1. **New `logs` channel** — [`dot_config/television/cable/logs.toml`](../../dot_config/television/cable/logs.toml). `tv logs` fuzzy-browses `.log`/`.ndjson`/`.jsonl` files in `$PWD`, user/system log directories, and (on Linux) recent `journalctl` output. Preview cycles: tailspin-colored tail vs plain `bat`. Keybindings:
+1. **New `logs` channel** — [`dot_config/television/cable/logs.toml.tmpl`](../../dot_config/television/cable/logs.toml.tmpl) (chezmoi template; the journalctl cycle is only rendered on Linux). `tv logs` fuzzy-browses `.log`/`.ndjson`/`.jsonl` files in `$PWD`, user/system log directories, and (Linux only) recent `journalctl` output. Preview cycles: tailspin-colored tail vs plain `bat`. Keybindings:
    - `Enter` → open in `lnav` (falls back to `ccze -A | less -R`, then plain `less`)
    - `Alt+T` → `tspin --follow` live tail
    - `Alt+E` → open in `$EDITOR`

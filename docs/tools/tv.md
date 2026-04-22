@@ -107,13 +107,13 @@ Requires `nmap`; `rustscan` and `arp-scan` are used when present (all part of th
 
 Fuzzy-browse log files on the machine with colorful previews. Open with `tv logs`.
 
-Source file: [`dot_config/television/cable/logs.toml`](../../dot_config/television/cable/logs.toml). Full toolbelt writeup: [log-tools.md](log-tools.md).
+Source file: [`dot_config/television/cable/logs.toml.tmpl`](../../dot_config/television/cable/logs.toml.tmpl) (chezmoi template — the journalctl cycle below is only rendered on Linux). Full toolbelt writeup: [log-tools.md](log-tools.md).
 
 **Source cycling** (`Ctrl+S`):
 
 1. Project-local logs under `$PWD` — `.log` / `.ndjson` / `.jsonl` via `fd -HI`
 2. User + system log dirs — `~/.cache/**/*.log`, `~/Library/Logs` on macOS, `/var/log/*.log` / `syslog*` / `messages*` (readable only)
-3. `journalctl --output=short-iso -n 2000` — Linux systemd journal recent lines (falls back to an empty source otherwise)
+3. **Linux only** — `journalctl --output=short-iso -n 2000` for systemd journal recent lines. Templated out on macOS because journalctl output lines are not file paths and the preview/Enter/Alt+T actions can't act on them (a dedicated `tv journalctl` channel would be the follow-up).
 
 **Preview cycling** (`Ctrl+F`):
 

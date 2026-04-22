@@ -8999,4 +8999,94 @@ _**Agent (claude-opus-4-7)**_
 
 老實說 — **ccze 基本上是 deprecated 了**，只是還沒被所有 distro 正式標記為 obsolete。
 
-## 時間線（
+## 時間線（ccze 的現況）
+
+| 時間 | 事件 |
+|---|---|
+| 2015 | ccze 0.2.1 released — **這是最後一個 upstream release** |
+| ~2016-2022 | 原作者（[Gergely Nagy / algernon](https://github.com/madhouse-project/ccze)）基本不再維護 |
+| 2022-07 | Homebrew disabled |
+| 2023-08 | Homebrew 徹底移除 |
+| 至今 | Debian/Ubuntu 還留著（200KB 的 C 二進制，沒人動它所以也沒人移除）|
+
+GitHub 上真正的上游 repo（[madhouse-project/ccze](https://github.com/madhouse-project/ccze)）最後一次 commit 是 2014 年。有人 fork 去修 bug（[cornet/ccze](https://github.com/cornet/ccze)），也已經 5+ 年沒動。
+
+## 還有人用嗎？
+
+- **Legacy sysadmin scripts** — 2010 年代寫的 `tail -f /var/log/syslog | ccze -A | less -R` 這種 shell 函式，沿用至今。
+- **Debian/Ubuntu server 老環境** — 因為還在 apt 裡，手快打了 `apt install ccze` 就繼續用。
+- **極小體積需求** — ccze 二進制只有幾百 KB，裝在非常 constrained 的環境（embedded Linux、舊 ARM 板）。
+
+**現代 Linux desktop / macOS 實質上沒人主動選 ccze 了。** Reddit / HN / log-analysis 的討論，過去 2-3 年幾乎只剩「我從 ccze 換到 X」這種 migration post。
+
+## 為什麼被新工具超車
+
+ccze 的設計限制（2002 年定案的）：
+
+1. **硬編碼的 parser** — 只認 syslog / Apache / su / httpd 這些格式，遇到 JSON / structured logs 直接放棄。
+2. **不支援彩色 passthrough** — `-A` ANSI 模式是後來 bolted on，很多 edge case 爛。
+3. **沒有 config file** — 想加自訂 color rule？去改 C source 重編。
+4. **沒有 follow mode** — 只能當 pipe filter；要跟檔案要自己 `tail -f | ccze`。
+5. **沒有 OSC/true color / 24-bit** — 只能用 terminal 16 色 palette。
+
+## 比 ccze 好的選擇（你已經都裝了）
+
+按照使用場景排：
+
+| 你想做的事 | 舊：ccze | 新：建議 |
+|---|---|---|
+| 看一個 log file 加顏色 | `ccze -A < f \| less -R` | **`tspin f`** — zero-config，一鍵 pager + 色彩 |
+| Pipe 中做 colorization | `cmd \| ccze -A` | **`cmd \| tspin --print`** — 更多格式認得出來 |
+| Follow with colors | `tail -f f \| ccze` | **`tspin --follow f`** 或 `logtail f`（我們的 wrapper）|
+| 自訂 per-command 規則 | 改 C source | **`grc -es CMD`** + `~/.grc/conf.CMD` |
+| 多檔 timeline + 搜尋 + SQL | ccze 做不到 | **`lnav f1 f2 ...`** |
+| 單純 regex 高亮 | ccze 做不到 | `rg --color=always --passthru PATTERN f \| less -R` |
+
+**tailspin（`tspin`）是 ccze 的直接精神繼承者** — 用 Rust 寫的、active maintained（[bensadeh/tailspin](https://github.com/bensadeh/tailspin)，7.8k stars，2026 年還在發 release），功能是 ccze 的 superset，並且加了 JSON / IP / URL / UUID / HTTP status 這些現代 log 才會出現的東西。`tspin --print` 就是 `ccze -A` 的等價物。
+
+## 我的建議
+
+你現在 `devtools` role 的配置是：
+
+- macOS: `tailspin` + `lnav` + `grc`（沒 ccze，因為 brew 拿不到）
+- Linux: `tailspin` + `lnav` + `grc` + `ccze`（apt 裝 ccze 是因為順手 + 零成本）
+
+**要不要把 ccze 從 Linux 也砍掉，徹底只用 tailspin/grc/lnav？**
+
+支持砍的理由：
+- 你的 `lessl` zsh wrapper 可以改成「優先用 `tspin --print`，找不到才 fallback 到 `ccze`」，反而兩邊（macOS + Linux）行為一致。
+- 你新機器 setup 時少一個 apt 套件、少一次 sudo。
+- 維護心智負擔小 — 未來看到 log viewer 出問題只需要 debug tailspin。
+
+保留的理由：
+- 有些 legacy script / tutorial 還在用 `ccze`，裝著以防萬一。
+- apt install 是 `become: true` + 無依賴，成本幾乎是零。
+- 跑 `tail -f /var/log/syslog | ccze` 這種 Debian server 經典動作時不用改肌肉記憶。
+
+我個人會投「**砍 Linux 端的 ccze，然後把 `lessl` 改用 `tspin --print` 做 backend**」—— 這樣整個 repo 只需要 care tailspin，ccze 這個 15 年沒更新的 C 程式退出歷史舞台。
+
+你想走哪條路？我可以直接動手：
+
+1. **完全砍 ccze**（推薦）：從 devtools role apt 列表移除、把 `lessl` rewrite 用 `tspin --print | less -RSFX`、更新 docs 把 ccze 降格為「historical note」。
+2. **維持現狀**：Linux 留 ccze 當備胎，macOS 的 `lessl` 因為沒 ccze 所以 no-op（就是現在的樣子）。
+3. **折衷**：Linux 保留 ccze 安裝，但 `lessl` 兩邊都改用 `tspin --print`，ccze 純當 legacy tooling 的 "it works if you want it"。
+
+---
+
+_**User**_
+
+@dot_config/television/cable/logs.toml 
+`Not a regular file: journalctl: not available on this system`
+好像缺少些dependencies?
+還是說這個弄成 .tmpl 然後只在linux下才安裝？
+
+---
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I see the problem now—when journalctl isn't available on macOS, the error message gets inserted as a literal row in the channel instead of being handled gracefully, so when the user tries to interact with it, the system treats that error string as a file path and fails.
+
+The real issue is deeper: journalctl output isn't file paths at all, so it fundamentally doesn't belong in a channel designed around file browsing and preview actions. The cleanest solution is to drop the journalctl cycle entirely and keep the channel focused on what it does well—browsing actual log files from the filesystem.
+
+For the implementation, I'll convert logs.toml to a template file so I can conditionally include only the two file-based source cycles on macOS, while keeping all three on Linux. I need to check chezmoi's template syntax to make sure the OS conditionals work properly in television's cable channel files.</details></think>

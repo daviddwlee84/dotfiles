@@ -9,8 +9,9 @@
 #   1. *.log / *.ndjson / *.jsonl under $PWD (recursive via fd)
 #   2. User + system log dirs: ~/.cache/**/*.log, ~/Library/Logs (macOS),
 #      readable subset of /var/log
-#   3. journalctl (Linux w/ systemd) — recent 2000 lines; each line is a
-#      pseudo "path" so preview/actions can replay via journalctl itself
+{{- if eq .chezmoi.os "linux" }}
+#   3. systemd journal (Linux w/ systemd) — recent 2000 lines via journalctl
+{{- end }}
 #
 # Preview cycling (Ctrl+F):
 #   1. tailspin colorized tail (last ~500 lines)
@@ -18,9 +19,16 @@
 #
 # Keybindings:
 #   Enter      Open in lnav (falls back to ccze|less -R)
-#   Alt+T      tail -f FILE | tspin  (live follow with colors)
+#   Alt+T      tail -F FILE | tspin  (live follow with colors)
 #   Alt+E      Open in $EDITOR
 #   Ctrl+Y     Copy file path to clipboard (OSC 52 over SSH)
+#
+# This file is rendered from logs.toml.tmpl by chezmoi.
+# macOS gets 2 source cycles (local + user/system log dirs); Linux gets a
+# 3rd cycle that enumerates systemd journal entries. The journal cycle is
+# templated out on non-Linux because journalctl's output lines are not
+# file paths, so the preview/Enter/Alt+T actions cannot meaningfully act
+# on them — a dedicated `tv journalctl` channel would be the follow-up.
 
 [metadata]
 name = "logs"
@@ -49,15 +57,16 @@ command = [
     fi
   } | awk '!seen[$0]++'
   """,
-  # 3. systemd journal (Linux only). Each line is a "journal entry" we can
-  # preview by replaying the exact timestamp.
+{{- if eq .chezmoi.os "linux" }}
+  # 3. systemd journal (Linux only). If journalctl is missing or fails
+  # (e.g. on non-systemd Linux like Alpine / busybox), produce no rows
+  # instead of a fake "not available" row.
   """
   if command -v journalctl >/dev/null 2>&1; then
     journalctl --no-pager --output=short-iso -n 2000 2>/dev/null
-  else
-    echo "journalctl: not available on this system"
   fi
   """,
+{{- end }}
 ]
 output = "{}"
 
