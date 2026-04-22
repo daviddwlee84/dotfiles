@@ -75,6 +75,9 @@ All tools installed by this dotfiles project. The **Invocation** column is what 
 | Command | Invocation | Description | Notes |
 |---------|------------|-------------|-------|
 | `jq` | `jq ` | JSON processor | `.` pretty-print, `.key` extract, `keys` list |
+| `yq` | `yq ` | YAML/JSON/XML processor (Mike Farah Go build) | `yq .key file.yaml`, `-i` in-place edit, `-o=json` convert |
+| `dasel` | `dasel ` | Unified YAML/TOML/XML/JSON/CSV query & modify | `dasel -f file.yaml '.key'`, `-r toml -w json` for cross-format conversion |
+| `jnv` | `jnv ` | Interactive `jq` filter TUI on JSON | `cat data.json \| jnv` — live preview while typing |
 | `just` | `just` | Command runner (Makefile alt) | bare `just` lists all recipes |
 | `taplo` | `taplo ` | TOML formatter & linter | `taplo fmt`, `taplo check` |
 | `tldr` | `tldr ` | Community man pages | `tldrf` for fzf interactive |
