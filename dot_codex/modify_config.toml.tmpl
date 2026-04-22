@@ -1,0 +1,145 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.codex/config.toml.
+#
+# Why: Codex CLI rewrites this file at runtime, adding per-project trust
+# (`[projects."<absolute-path>"]`) and marketplace paths
+# (`[marketplaces.<id>]`) that are machine-specific. Tracking the whole file
+# would create constant diff and bake one machine's paths into another's apply.
+# We enforce only stable preferences (model, personality, [features],
+# [plugins.*]) and round-trip the live machine state untouched.
+#
+# How: chezmoi pipes the current target file into stdin; this script prints
+# the new contents on stdout. The merge runs in a small Python program because:
+#   - jq doesn't speak TOML.
+#   - mikefarah/yq's TOML emitter collapses nested tables into inline
+#     `{ ... }` syntax and fails to quote keys with special characters
+#     (e.g. `github@openai-curated`), producing invalid TOML on round-trip.
+#   - Python 3.11+ ships `tomllib` built-in for reads; the inline writer below
+#     handles the small schema this file uses (scalars, nested string-key
+#     tables, no arrays-of-tables) and quotes every table key for safety.
+#
+# Merge precedence (later wins):
+#   1. Stripped live (everything except [projects] and [marketplaces.*]).
+#   2. Managed overlay (this script's $overlay heredoc).
+#   3. Machine-local state ([projects.*], [marketplaces.*]) re-attached
+#      verbatim so per-project trust survives an overlay churn.
+#
+# To manage an additional key: edit .chezmoitemplates/agents/codex.config.overlay.toml
+# Requires: Python 3.11+ with built-in tomllib (macOS via mise/uv, Debian
+# via base ansible role). Falls back to passing the live file through
+# untouched if Python is too old or missing.
+set -eu
+
+overlay=$(cat <<'TOML'
+{{ template "agents/codex.config.overlay.toml" . }}
+TOML
+)
+
+base=$(cat)
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "modify_config.toml: python3 not found; skipping merge" >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+# Pass live file + overlay via env vars; emit merged TOML on stdout. If
+# anything goes wrong (tomllib missing on Python <3.11, malformed live file),
+# Python prints to stderr and exits non-zero -> chezmoi skips the file.
+CODEX_LIVE="$base" CODEX_OVERLAY="$overlay" python3 - <<'PYEOF'
+import os
+import sys
+
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib  # backport for Python 3.10 and below
+    except ModuleNotFoundError:
+        print(
+            "modify_config.toml: tomllib unavailable (need Python 3.11+ or "
+            "`pip install tomli`); skipping merge",
+            file=sys.stderr,
+        )
+        sys.stdout.write(os.environ.get("CODEX_LIVE", ""))
+        sys.exit(0)
+
+
+def parse(text: str) -> dict:
+    text = text.strip()
+    if not text:
+        return {}
+    return tomllib.loads(text)
+
+
+def deep_merge(base: dict, overlay: dict) -> dict:
+    """Recursive dict merge; overlay wins on conflict. Non-dict overlay
+    values replace base wholesale (lists are not concatenated)."""
+    out = dict(base)
+    for k, v in overlay.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def fmt_scalar(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, str):
+        # Use basic-string with escaping. tomllib accepts both basic and
+        # literal; basic is universal.
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+    if isinstance(v, list):
+        return "[" + ", ".join(fmt_scalar(x) for x in v) + "]"
+    raise TypeError(f"unsupported scalar type for TOML emit: {type(v).__name__}")
+
+
+def emit_table(prefix: str, table: dict, out: list[str]) -> None:
+    """Emit a TOML table. `prefix` is the dotted header path (already quoted
+    where needed); empty for root. Scalars come first, then nested tables."""
+    scalars = {k: v for k, v in table.items() if not isinstance(v, dict)}
+    sub = {k: v for k, v in table.items() if isinstance(v, dict)}
+
+    if prefix and (scalars or not sub):
+        out.append(f"[{prefix}]")
+    for k, v in scalars.items():
+        out.append(f"{quote_key(k)} = {fmt_scalar(v)}")
+    if scalars and sub:
+        out.append("")
+
+    for k, v in sub.items():
+        sub_prefix = f"{prefix}.{quote_key(k)}" if prefix else quote_key(k)
+        emit_table(sub_prefix, v, out)
+        out.append("")
+
+
+def quote_key(k: str) -> str:
+    """Quote any key that isn't a bare TOML key (alnum / `_` / `-` only).
+    We over-quote rather than risk emitting invalid TOML for keys like
+    `github@openai-curated` or absolute-path project keys."""
+    if k and all(c.isalnum() or c in "_-" for c in k):
+        return k
+    return '"' + k.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+live = parse(os.environ.get("CODEX_LIVE", ""))
+overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
+
+# Pull machine-local subtrees out before merge; re-attach last so they win.
+state = {}
+for key in ("projects", "marketplaces"):
+    if key in live:
+        state[key] = live.pop(key)
+
+merged = deep_merge(live, overlay)
+merged = deep_merge(merged, state)
+
+lines: list[str] = []
+emit_table("", merged, lines)
+text = "\n".join(line for line in lines if line is not None).rstrip() + "\n"
+sys.stdout.write(text)
+PYEOF

@@ -98,3 +98,30 @@ Library/Application Support/{{ . }}/**
 {{- end }}
 {{- end }}
 {{- end }}
+
+# -----------------------------------------------------------------------------
+# Coding-agent CLI overlays (Cursor / OpenCode / Codex)
+#
+# Each tree ships a `modify_*` overlay that enforces a small set of stable
+# preferences over the live config file. Everything else (auth tokens,
+# per-project trust, plugin caches, sessions, telemetry) stays as machine-
+# local state and is intentionally NOT tracked.
+#
+# Presence gates below skip the entire tree when the CLI isn't installed,
+# so we don't create phantom ~/.cursor/ etc. dirs on fresh machines.
+# -----------------------------------------------------------------------------
+
+{{- if not (stat (joinPath .chezmoi.homeDir ".cursor")) }}
+.cursor
+.cursor/**
+{{- end }}
+
+{{- if not (stat (joinPath .chezmoi.homeDir ".codex")) }}
+.codex
+.codex/**
+{{- end }}
+
+{{- if not (stat (joinPath .chezmoi.homeDir ".config" "opencode")) }}
+.config/opencode
+.config/opencode/**
+{{- end }}

@@ -43,7 +43,12 @@ repos:
       - id: check-toml
         # chezmoi .tmpl files contain `{{ ... }}` go-template tokens that
         # aren't valid TOML — their rendered output is what ends up on disk.
-        exclude: ^.*\.tmpl$
+        # `modify_*.toml` source files are shell scripts that emit TOML on
+        # stdout (see dot_codex/modify_config.toml.tmpl), not static TOML.
+        exclude: |
+          (?x)
+          ^.*\.tmpl$
+          | (^|/)modify_[^/]+\.toml$
       - id: check-json
         # chezmoi `modify_*.json` source files are shell scripts that emit
         # JSON on stdout, not static JSON themselves; skip JSON syntax check.

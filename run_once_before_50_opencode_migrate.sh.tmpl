@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Migrate legacy ~/.config/opencode/config.json -> opencode.json (one-shot).
+#
+# Why: OpenCode docs now recommend `opencode.json` (and `tui.json`) as the
+# canonical global config filename. This repo manages the modern filename via
+# dot_config/opencode/modify_opencode.json.tmpl. On machines that still have
+# the legacy `config.json`, OpenCode would read both and merge unpredictably.
+#
+# What this does:
+#   1. If legacy `config.json` exists and `opencode.json` does NOT:
+#        rename legacy -> opencode.json (preserve user keys before modify_
+#        overlay runs).
+#   2. If BOTH exist: deep-merge legacy into opencode.json (legacy loses on
+#        conflict since opencode.json is presumed newer), then delete legacy.
+#   3. If only opencode.json exists or neither exists: no-op.
+#
+# Idempotent because once the legacy file is gone, all branches are no-ops.
+# This is a `run_once_before_*` script (single-shot per source-state hash);
+# safe to leave in repo indefinitely.
+#
+# Requires: jq (installed by base ansible role; macOS usually has it
+# pre-installed via prior brew). Skips with a warning if jq is missing.
+set -euo pipefail
+
+opencode_dir="${HOME}/.config/opencode"
+legacy="${opencode_dir}/config.json"
+modern="${opencode_dir}/opencode.json"
+
+[ -d "${opencode_dir}" ] || exit 0
+[ -f "${legacy}" ] || exit 0
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "opencode-migrate: jq not found; deferring legacy config.json migration" >&2
+  exit 0
+fi
+
+if [ ! -f "${modern}" ]; then
+  echo "opencode-migrate: renaming legacy config.json -> opencode.json" >&2
+  mv "${legacy}" "${modern}"
+  exit 0
+fi
+
+echo "opencode-migrate: merging legacy config.json into opencode.json" >&2
+merged=$(jq -s '.[0] * .[1]' "${legacy}" "${modern}")
+printf '%s\n' "${merged}" > "${modern}"
+rm -f "${legacy}"

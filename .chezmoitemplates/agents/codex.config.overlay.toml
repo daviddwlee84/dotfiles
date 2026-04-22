@@ -1,0 +1,19 @@
+personality = "pragmatic"
+model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+
+[features]
+codex_hooks = true
+unified_exec = true
+shell_snapshot = true
+steer = true
+multi_agent = true
+
+[plugins."github@openai-curated"]
+enabled = true
+
+[plugins."google-drive@openai-curated"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
+enabled = true

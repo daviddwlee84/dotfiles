@@ -1,0 +1,30 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.config/opencode/opencode.json.
+#
+# Why: OpenCode's official docs recommend `opencode.json` (not the legacy
+# `config.json`); we use the modern filename. The CLI may add fields at
+# runtime (telemetry IDs, last-used provider hints), and may bake in plugin
+# paths with absolute machine-local prefixes. We enforce only stable user
+# preferences and let everything else through verbatim.
+#
+# How: chezmoi pipes the current target file into stdin; this script prints
+# the new contents on stdout. `jq '. * $overlay'` does recursive object merge.
+#
+# Migration from legacy ~/.config/opencode/config.json:
+#   - run_once_before_50_opencode_migrate.sh.tmpl merges legacy keys into
+#     opencode.json before this script runs (one-shot, idempotent).
+#   - dot_config/opencode/remove_config.json then deletes the legacy file.
+#
+# To manage an additional key: edit .chezmoitemplates/agents/opencode.overlay.json
+# Requires: jq (installed by the `base` ansible role).
+set -eu
+
+overlay=$(cat <<'JSON'
+{{ template "agents/opencode.overlay.json" . }}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

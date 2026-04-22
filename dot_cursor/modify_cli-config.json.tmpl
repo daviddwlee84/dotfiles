@@ -1,0 +1,26 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.cursor/cli-config.json.
+#
+# Why: Cursor CLI rewrites this file at runtime (auth tokens, privacyCache,
+# statsigBootstrap, hasChangedDefaultModel, etc). Tracking the whole file would
+# leak secrets and produce constant diff. We only enforce the small set of
+# stable preferences declared in the overlay.
+#
+# How: chezmoi pipes the current target file into stdin; this script prints
+# the new contents on stdout. `jq '. * $overlay'` does recursive object merge,
+# so only overlay keys are enforced; runtime keys (authInfo, privacyCache,
+# statsigBootstrap, version, hasChangedDefaultModel, ...) are preserved.
+#
+# To manage an additional key: edit .chezmoitemplates/agents/cursor.cli-config.overlay.json
+# Requires: jq (installed by the `base` ansible role).
+set -eu
+
+overlay=$(cat <<'JSON'
+{{ template "agents/cursor.cli-config.overlay.json" . }}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

@@ -1,0 +1,207 @@
+#!/usr/bin/env bats
+# Unit tests for the coding-agent CLI overlay scripts:
+#   dot_cursor/modify_cli-config.json.tmpl
+#   dot_config/opencode/modify_opencode.json.tmpl
+#   dot_codex/modify_config.toml.tmpl
+#
+# Each script is a chezmoi `modify_` template: chezmoi pipes the live target
+# file into stdin and expects the new contents on stdout. The contract we
+# care about (silent-regression risk):
+#   1. Overlay keys are enforced.
+#   2. Live runtime keys outside the overlay are preserved verbatim.
+#   3. For Codex specifically: [projects."<path>"] and [marketplaces.*]
+#      round-trip unchanged (machine-local trust state).
+#
+# Tests render each .tmpl via `chezmoi execute-template` first (so the
+# `{{ template ... }}` includes are resolved), then exec the rendered script
+# with crafted stdin.
+
+load "../test_helper.bash"
+
+SOURCE_DIR="$REPO_ROOT"
+
+setup() {
+  RENDER_DIR="$(mktemp -d "${TMPDIR:-/tmp}/agent-overlay.XXXXXX")"
+  export RENDER_DIR
+}
+
+teardown() {
+  [ -n "${RENDER_DIR:-}" ] && [ -d "$RENDER_DIR" ] && rm -rf "$RENDER_DIR"
+}
+
+# Render a chezmoi modify_ template into a runnable script.
+_render() {
+  local src="$1" out="$2"
+  chezmoi execute-template --source "$SOURCE_DIR" < "$src" > "$out"
+  chmod +x "$out"
+}
+
+_have_chezmoi() {
+  command -v chezmoi >/dev/null 2>&1
+}
+
+@test "cursor modify_cli-config: overlay keys enforced, runtime keys preserved" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local script="$RENDER_DIR/cursor.sh"
+  _render "$SOURCE_DIR/dot_cursor/modify_cli-config.json.tmpl" "$script"
+
+  # Live file with runtime/secret keys we must NOT touch.
+  local live='{
+    "version": 1,
+    "authInfo": {"token": "SECRET-DO-NOT-LEAK"},
+    "privacyCache": {"hash": "abc"},
+    "statsigBootstrap": {"x": "y"},
+    "editor": {"vimMode": false, "fontSize": 14}
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # Overlay enforces editor.vimMode=true.
+  echo "$output" | jq -e '.editor.vimMode == true' >/dev/null
+  # Runtime keys preserved verbatim.
+  echo "$output" | jq -e '.authInfo.token == "SECRET-DO-NOT-LEAK"' >/dev/null
+  echo "$output" | jq -e '.privacyCache.hash == "abc"' >/dev/null
+  echo "$output" | jq -e '.statsigBootstrap.x == "y"' >/dev/null
+  echo "$output" | jq -e '.version == 1' >/dev/null
+  # Sibling key under editor must survive (deep merge).
+  echo "$output" | jq -e '.editor.fontSize == 14' >/dev/null
+}
+
+@test "cursor modify_cli-config: empty live file produces overlay-only output" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local script="$RENDER_DIR/cursor.sh"
+  _render "$SOURCE_DIR/dot_cursor/modify_cli-config.json.tmpl" "$script"
+
+  run bash -c "printf '' | '$script'"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.editor.vimMode == true' >/dev/null
+}
+
+@test "opencode modify_opencode: overlay enforced, plugin paths preserved" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local script="$RENDER_DIR/opencode.sh"
+  _render "$SOURCE_DIR/dot_config/opencode/modify_opencode.json.tmpl" "$script"
+
+  local live='{
+    "$schema": "https://opencode.ai/config.json",
+    "plugin": ["file:///Users/me/.config/opencode/plugins/local.js"],
+    "agent": {"title": {"reasoningEffort": "high"}, "build": {"model": "x"}}
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  echo "$output" | jq -e '.autoupdate == true' >/dev/null
+  # Overlay sets agent.title.reasoningEffort=low.
+  echo "$output" | jq -e '.["agent"].title.reasoningEffort == "low"' >/dev/null
+  # Sibling agent.build untouched.
+  echo "$output" | jq -e '.["agent"].build.model == "x"' >/dev/null
+  # Local plugin path preserved verbatim (machine-local).
+  echo "$output" | jq -e '.plugin[0] == "file:///Users/me/.config/opencode/plugins/local.js"' >/dev/null
+}
+
+@test "codex modify_config.toml: overlay enforced, [projects] and [marketplaces.*] preserved" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant (need mikefarah/yq)"
+
+  local script="$RENDER_DIR/codex.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+
+  local live='personality = "old"
+model = "old-model"
+model_reasoning_effort = "low"
+
+[features]
+codex_hooks = false
+some_user_flag = true
+
+[projects."/Users/me/secret-repo"]
+trust_level = "trusted"
+
+[projects."/tmp/scratch"]
+trust_level = "trusted"
+
+[marketplaces.openai-bundled]
+last_updated = "2026-04-22T05:56:50Z"
+source_type = "local"
+source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
+'
+
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # Overlay wins on managed keys.
+  echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
+  echo "$output" | yq -p toml -e '.model == "gpt-5.4"' >/dev/null
+  echo "$output" | yq -p toml -e '.features.codex_hooks == true' >/dev/null
+  echo "$output" | yq -p toml -e '.features.unified_exec == true' >/dev/null
+  # User-added [features] keys outside overlay survive.
+  echo "$output" | yq -p toml -e '.features.some_user_flag == true' >/dev/null
+  # Per-project trust round-trips verbatim.
+  echo "$output" | yq -p toml -e '.projects["/Users/me/secret-repo"].trust_level == "trusted"' >/dev/null
+  echo "$output" | yq -p toml -e '.projects["/tmp/scratch"].trust_level == "trusted"' >/dev/null
+  # Marketplace block round-trips verbatim.
+  echo "$output" | yq -p toml -e '.marketplaces["openai-bundled"].source == "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"' >/dev/null
+}
+
+@test "codex modify_config.toml: empty live file produces overlay-only output" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
+
+  local script="$RENDER_DIR/codex.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+
+  run bash -c "printf '' | '$script'"
+  [ "$status" -eq 0 ]
+  echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
+  echo "$output" | yq -p toml -e '.features.steer == true' >/dev/null
+}
+
+@test "opencode migrate: legacy config.json renamed when modern absent" {
+  local fake_home="$RENDER_DIR/home"
+  mkdir -p "$fake_home/.config/opencode"
+  printf '{"foo": "bar"}' > "$fake_home/.config/opencode/config.json"
+
+  HOME="$fake_home" run bash "$SOURCE_DIR/run_once_before_50_opencode_migrate.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [ ! -f "$fake_home/.config/opencode/config.json" ]
+  [ -f "$fake_home/.config/opencode/opencode.json" ]
+  grep -q '"foo": "bar"' "$fake_home/.config/opencode/opencode.json"
+}
+
+@test "opencode migrate: legacy + modern both present -> merge then delete legacy" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+
+  local fake_home="$RENDER_DIR/home"
+  mkdir -p "$fake_home/.config/opencode"
+  printf '{"a": 1, "b": "from-legacy"}' > "$fake_home/.config/opencode/config.json"
+  printf '{"b": "from-modern", "c": 3}' > "$fake_home/.config/opencode/opencode.json"
+
+  HOME="$fake_home" run bash "$SOURCE_DIR/run_once_before_50_opencode_migrate.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [ ! -f "$fake_home/.config/opencode/config.json" ]
+  # Modern wins on conflict (b="from-modern"); a + c merged in.
+  jq -e '.a == 1' "$fake_home/.config/opencode/opencode.json" >/dev/null
+  jq -e '.b == "from-modern"' "$fake_home/.config/opencode/opencode.json" >/dev/null
+  jq -e '.c == 3' "$fake_home/.config/opencode/opencode.json" >/dev/null
+}
+
+@test "opencode migrate: no-op when legacy absent" {
+  local fake_home="$RENDER_DIR/home"
+  mkdir -p "$fake_home/.config/opencode"
+  printf '{"x": 1}' > "$fake_home/.config/opencode/opencode.json"
+
+  HOME="$fake_home" run bash "$SOURCE_DIR/run_once_before_50_opencode_migrate.sh.tmpl"
+  [ "$status" -eq 0 ]
+  [ -f "$fake_home/.config/opencode/opencode.json" ]
+  grep -q '"x": 1' "$fake_home/.config/opencode/opencode.json"
+}
