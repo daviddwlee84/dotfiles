@@ -339,6 +339,36 @@ fleet-apply *ARGS:
 fleet-apply-dry-run *ARGS:
     ./scripts/fleet_apply.py --dry-run {{ARGS}}
 
+# Quick `chezmoi diff` against ONE host (serial, debug-friendly output).
+# Use this in vibe loops to see exactly what your latest commit will do
+# on a specific machine before pushing/applying for real.
+fleet-diff HOST *ARGS:
+    ./scripts/fleet_apply.py --dry-run --hosts {{HOST}} --serial {{ARGS}}
+
+# Apply ONLY a single chezmoi target on each host (skips ansible / Brewfile).
+# PATH is the chezmoi target path, e.g. `.config/zsh/aliases.zsh` or
+# `.zshrc`. Fast feedback for editing one dotfile across the fleet without
+# waiting for full Linuxbrew/ansible cycles. Pass extra `--hosts HOST` to
+# scope. Internally sets CHEZMOI_FLEET_APPLY_PATH so the wrapper runs
+# `chezmoi apply <relpath>` instead of `chezmoi update --init`.
+fleet-apply-file PATH *ARGS:
+    ./scripts/fleet_apply.py --apply-only-path {{PATH}} {{ARGS}}
+
+# Apply a feature BRANCH instead of pulling main. Each remote does
+# `git fetch origin BRANCH && git checkout -B BRANCH origin/BRANCH &&
+# git merge --ff-only origin/BRANCH` before chezmoi apply. Fails loud
+# on divergence — use `just fleet-apply-branch-force` to nuke local
+# state with `git reset --hard`. Local hosts skip this entirely (source
+# is your editor's working tree).
+fleet-apply-branch BRANCH *ARGS:
+    ./scripts/fleet_apply.py --branch {{BRANCH}} {{ARGS}}
+
+# Like fleet-apply-branch but uses `git reset --hard origin/BRANCH` on
+# remotes, destroying any local divergence. Use after force-pushing a
+# rebased topic branch so every host follows.
+fleet-apply-branch-force BRANCH *ARGS:
+    ./scripts/fleet_apply.py --branch {{BRANCH}} --force-checkout {{ARGS}}
+
 # Apply to a single named host in --serial mode (debug-friendly output)
 fleet-apply-one HOST *ARGS:
     ./scripts/fleet_apply.py --hosts {{HOST}} --serial {{ARGS}}

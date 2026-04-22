@@ -260,6 +260,9 @@ def build_remote_command(
     keep_going: bool = False,
     run_id: str = "adhoc",
     keep_logs: int = 10,
+    apply_path: str = "",
+    branch: str = "",
+    force_checkout: bool = False,
 ) -> str:
     """Build the single shell command sent over SSH.
 
@@ -339,10 +342,70 @@ def build_remote_command(
             sub += " --init"
     elif mode == "apply":
         sub = f"{cz_global} apply{sub_flags}"
+        # apply_path mode: scope to one target + skip run_* scripts so an
+        # ansible / Brewfile change doesn't trigger the slow re-run when
+        # all you wanted was to push a dotfile edit. `--exclude=scripts`
+        # is the chezmoi knob; the path is appended last so any per-mode
+        # flags (--force, --keep-going) come first.
+        #
+        # IMPORTANT: this branch deliberately bypasses `chezmoi update`,
+        # which means the remote source dir is NOT auto-pulled. Prepend an
+        # explicit `git pull` of the source-path so the remote checkout
+        # has the latest commit before we re-render the target. We use
+        # `chezmoi source-path` (no args) to discover the source dir on
+        # the remote — works regardless of where the user installed it.
+        # NB: when --branch is set the git prelude below replaces this
+        # plain pull with a checkout-of-branch sequence, so we skip it
+        # to avoid double-pulling.
+        if apply_path and not branch:
+            sub = (
+                f'_src=$({cz_global} source-path) && '
+                f'git -C "$_src" pull --ff-only --quiet && '
+                f"{sub} --exclude=scripts {shlex.quote(apply_path)}"
+            )
+        elif apply_path:
+            sub = f"{sub} --exclude=scripts {shlex.quote(apply_path)}"
     else:  # diff
         # `chezmoi diff` doesn't take --force / --keep-going — it's
         # read-only and never prompts.
         sub = f"{cz_global} diff"
+        if apply_path:
+            sub += f" {shlex.quote(apply_path)}"
+
+    # --branch BRANCH: pin the remote source dir to a feature branch
+    # before the chezmoi invocation, so you can iterate on a topic branch
+    # without polluting main. Default merge strategy is --ff-only (fail
+    # loud on divergence so you notice). --force-checkout swaps in
+    # `reset --hard origin/BRANCH` to nuke any local divergence — useful
+    # when you're rebasing the topic branch and want hosts to follow.
+    #
+    # Implementation: fetch only that ref, checkout (creating local
+    # tracking branch on first run via -B), then sync. We use chezmoi's
+    # configured source dir (not assumed path) for portability across
+    # hosts that installed chezmoi to different prefixes.
+    if branch:
+        br = shlex.quote(branch)
+        if force_checkout:
+            sync = f'git -C "$_src" reset --hard origin/{branch} --quiet'
+        else:
+            sync = f'git -C "$_src" merge --ff-only origin/{branch} --quiet'
+        prelude = (
+            f'_src=$({cz_global} source-path) && '
+            f'git -C "$_src" fetch origin {br} --quiet && '
+            f'git -C "$_src" checkout -B {br} origin/{branch} --quiet && '
+            f"{sync}"
+        )
+        # If sub already starts with a `_src=…` prefix (apply_path branch
+        # above), strip it — the prelude defines _src already.
+        if sub.startswith("_src="):
+            # Find the first ' && ' after _src=... and take everything after
+            # the next chezmoi/source-path stanza. Easier: just rebuild.
+            # The apply_path branch sets sub to "_src=… && git pull && CHEZMOI…"
+            # — we want only the CHEZMOI part. Split on ' && ' and keep the
+            # last segment(s).
+            parts = sub.split(" && ", 2)
+            sub = parts[-1] if len(parts) >= 3 else sub
+        sub = f"{prelude} && {sub}"
 
     # Belt-and-braces: if any sub-tool chezmoi invokes (git, ansible) honours
     # PAGER / GIT_PAGER, force them non-paged too. NB: chezmoi itself does
@@ -540,6 +603,8 @@ async def run_one_local(
     force: bool = False,
     keep_going: bool = False,
     keep_logs: int = 10,
+    apply_path: str = "",
+    branch_warning: str = "",
 ) -> None:
     """Execute one local host: spawn `chezmoi` directly via subprocess.
 
@@ -571,9 +636,23 @@ async def run_one_local(
             argv.append("--force")
         if keep_going:
             argv.append("--keep-going")
+    # apply_path mode: skip run_* scripts and scope to the single target.
+    # Mirrors build_remote_command's apply_path branch above.
+    if apply_path and mode == "apply":
+        argv.extend(["--exclude=scripts", apply_path])
+    elif apply_path and mode == "diff":
+        argv.append(apply_path)
 
     log_fp = log_path.open("w", buffering=1)
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init} (local)\n")
+    if branch_warning:
+        # Surface the skip explicitly in the log so users grepping for
+        # "branch" don't think the flag was honoured silently.
+        log_fp.write(
+            f"# warning: --branch={branch_warning} ignored for local host "
+            f"(local source is your editor's working tree; switch branches "
+            f"manually with git if you really mean to)\n"
+        )
     log_fp.write(f"# argv: {argv}\n\n")
 
     # Mirror the remote layout: write a second copy to LOCAL_LOG_DIR/<run_id>.log
@@ -667,13 +746,21 @@ async def run_one(
     force: bool = False,
     keep_going: bool = False,
     keep_logs: int = 10,
+    apply_path: str = "",
+    branch: str = "",
+    force_checkout: bool = False,
 ) -> None:
     """Execute one host: connect, stream output to log + status, set rc/state."""
     host = status.host
     if host.local:
+        # --branch is intentionally NOT honoured for local hosts: the local
+        # source dir IS your editor's working tree, switching it under your
+        # feet would be hostile. Warn (via the log) but continue with the
+        # local working tree as-is.
         await run_one_local(
             status, log_dir, mode, init, command_timeout,
             force=force, keep_going=keep_going, keep_logs=keep_logs,
+            apply_path=apply_path, branch_warning=branch,
         )
         return
     log_path = log_dir / f"{host.name}.log"
@@ -683,7 +770,8 @@ async def run_one(
 
     cmd = build_remote_command(
         host, mode=mode, init=init, force=force, keep_going=keep_going,
-        run_id=log_dir.name, keep_logs=keep_logs,
+        run_id=log_dir.name, keep_logs=keep_logs, apply_path=apply_path,
+        branch=branch, force_checkout=force_checkout,
     )
     log_fp = log_path.open("w", buffering=1)  # line-buffered
     log_fp.write(f"# fleet-apply host={host.name} mode={mode} init={init}\n")
@@ -1021,6 +1109,55 @@ def cli(
             )
         ),
     ] = 0,
+    apply_only_path: Annotated[
+        str,
+        tyro.conf.arg(
+            help=(
+                "Run `chezmoi apply --exclude=scripts <PATH>` instead of "
+                "the default `chezmoi update --init`. PATH is a chezmoi "
+                "TARGET path (i.e. relative to $HOME, like "
+                "`.config/zsh/aliases.zsh` — NOT a source path). On remote "
+                "hosts an explicit `git -C <source> pull --ff-only` is run "
+                "first so the host's checkout has your latest commit; "
+                "run_* scripts (ansible / Brewfile) are skipped via "
+                "--exclude=scripts. Local hosts skip the git pull (the "
+                "source IS the working tree). Intended for vibe loops "
+                "where you've edited one dotfile and want fast feedback "
+                "across the fleet without 5–30 min full apply. You still "
+                "need to `git push` first for remotes to see the edit. "
+                "Empty = normal full-apply mode."
+            )
+        ),
+    ] = "",
+    branch: Annotated[
+        str,
+        tyro.conf.arg(
+            help=(
+                "Pin remote source dir to this branch instead of pulling "
+                "main. Implementation: `git fetch origin BRANCH && git "
+                "checkout -B BRANCH origin/BRANCH && git merge --ff-only "
+                "origin/BRANCH` runs before chezmoi. Switches mode to "
+                "`apply` (since `chezmoi update` would re-pull main). "
+                "Default merge is --ff-only — fails loud on divergence so "
+                "you notice. Use --force-checkout to nuke local divergence "
+                "with `reset --hard` (needed when you rebase the topic "
+                "branch). LOCAL hosts ignore this flag (their source dir "
+                "IS your working tree; switching it would be hostile)."
+            )
+        ),
+    ] = "",
+    force_checkout: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "With --branch, replace `git merge --ff-only` with `git "
+                "reset --hard origin/BRANCH`. Destroys uncommitted changes "
+                "and any local divergence on the remote source dir. Useful "
+                "when you've force-pushed a rebased topic branch and want "
+                "every host to follow. No effect without --branch."
+            )
+        ),
+    ] = False,
 ) -> int:
     """Apply chezmoi to a fleet of hosts in parallel. Exit code = failed-host count."""
     console = Console()
@@ -1066,14 +1203,15 @@ def cli(
         return _run_tail(console, match, run_id, connect_timeout)
 
     mode: Literal["update", "apply", "diff"] = (
-        "diff" if dry_run else ("apply" if no_init else "update")
+        "diff" if dry_run else ("apply" if (no_init or apply_only_path or branch) else "update")
     )
     init = mode == "update"
 
     rc = _run(
         console, selected, mode, init, log_dir, serial, max_parallel,
         connect_timeout, command_timeout, force=force, keep_going=keep_going,
-        keep_logs=keep_logs,
+        keep_logs=keep_logs, apply_path=apply_only_path,
+        branch=branch, force_checkout=force_checkout,
     )
     # If the run was Ctrl+C'd locally, the remote chezmoi/ansible may still
     # be running (the wrapper's SIGHUP trap covers most cases but not all,
@@ -1555,6 +1693,9 @@ def _run(
     force: bool = False,
     keep_going: bool = False,
     keep_logs: int = 10,
+    apply_path: str = "",
+    branch: str = "",
+    force_checkout: bool = False,
 ) -> int:
     # Resolve passwords up-front (interactive prompts happen here).
     resolve_passwords(selected, console)
@@ -1602,6 +1743,9 @@ def _run(
                 force=force,
                 keep_going=keep_going,
                 keep_logs=keep_logs,
+                apply_path=apply_path,
+                branch=branch,
+                force_checkout=force_checkout,
             )
 
     async def _orchestrate() -> None:

@@ -173,6 +173,34 @@ just fleet-apply --command-timeout 600          # tighter timeout for warm fleet
 just fleet-apply-kill                           # kill orphan chezmoi/ansible on every host
 ```
 
+### Vibe-loop recipes (fast iteration)
+
+```bash
+just fleet-diff lab-box                         # `chezmoi diff` on ONE host, serial output
+just fleet-apply-file .zshrc                    # apply ONE file across the fleet, skip ansible
+just fleet-apply-file .config/zsh/aliases.zsh --hosts lab-box
+just fleet-apply-branch feature/new-tmux        # pin remotes to a branch (ff-only)
+just fleet-apply-branch-force feature/new-tmux  # … allow `git reset --hard` (after rebase)
+```
+
+`fleet-apply-file PATH` is the headline vibe-loop command:
+
+- Skips `chezmoi update` (and thus the slow `run_*` scripts: ansible, Brewfile, Linuxbrew refresh).
+- Prepends `git -C $(chezmoi source-path) pull --ff-only` so the remote checkout has your latest commit before `chezmoi apply --exclude=scripts <PATH>` re-renders just that one target.
+- PATH is a chezmoi *target* path (relative to `$HOME`), e.g. `.zshrc`, `.config/tmux/tmux.conf`, `.gitconfig`. NOT a source path like `dot_zshrc`.
+- Round-trip on a warm fleet is typically ~5-15 seconds per host vs 5-30 minutes for a full `fleet-apply`.
+- You still need to `git push` first — the remote runs `git pull` on its checkout. Local hosts (`local = true`) skip the pull because the source IS your editor's working tree.
+- Drift / `--force` semantics are unchanged: pass `--force` if you've also edited the file by hand on the remote and want to overwrite.
+
+`fleet-apply-branch BRANCH` lets you iterate on a feature branch without polluting `main`:
+
+- Each remote runs `git fetch origin BRANCH && git checkout -B BRANCH origin/BRANCH && git merge --ff-only origin/BRANCH` before `chezmoi apply`.
+- Mode is forced to `apply` (since `chezmoi update` would re-pull `main` and undo the checkout).
+- Default merge is `--ff-only`: fails loud if the remote checkout has divergence. Use `fleet-apply-branch-force` (which adds `--force-checkout`) to swap in `git reset --hard origin/BRANCH` — necessary after you've force-pushed a rebased topic branch.
+- Local hosts ignore `--branch` entirely: their source dir is your working tree, switching it under your editor would be hostile. The skip is logged.
+- Compose with `--apply-only-path` for the fastest possible loop: `just fleet-apply --branch tmp/test --apply-only-path .config/foo/bar.toml --hosts lab-box`.
+
+
 ## Conflict handling: `--force` vs `--keep-going`
 
 When a remote file has drifted from what chezmoi last wrote (someone
