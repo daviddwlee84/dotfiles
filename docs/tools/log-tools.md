@@ -2,7 +2,7 @@
 
 Reading server/app logs in the terminal should be as pleasant as `bat` made reading source files. This repo ships four complementary tools — each solving a different part of the "read, follow, search, colorize" problem — plus zsh wrappers and a Television channel to tie them together.
 
-All four are installed by the `devtools` Ansible role (see [`dot_ansible/roles/devtools/tasks/main.yml`](../../dot_ansible/roles/devtools/tasks/main.yml)). On macOS via Homebrew; on Debian/Ubuntu via apt, with a user-level GitHub-release fallback for `tailspin` and `lnav` (both ship as musl static binaries).
+All four are installed by the `devtools` Ansible role (see [`dot_ansible/roles/devtools/tasks/main.yml`](../../dot_ansible/roles/devtools/tasks/main.yml)). `tailspin`/`lnav`/`grc` install via Homebrew on macOS and apt on Debian/Ubuntu; `lnav` and `tailspin` also have user-level GitHub-release musl-binary fallbacks for Linux (including no-sudo shells). `ccze` is **Linux-only** — it has been removed from Homebrew core, so on macOS the `lessl` wrapper gracefully no-ops and you should reach for `tspin` instead.
 
 ## TL;DR
 
@@ -11,7 +11,7 @@ All four are installed by the `devtools` Ansible role (see [`dot_ansible/roles/d
 | [`tailspin`](https://github.com/bensadeh/tailspin) (bin: `tspin`) | **One-shot colorizer** / `bat`-for-logs | `tspin file.log` (pager) · `… \| tspin --print` (pipe) | Zero config. Highlights dates, levels, IPs, URLs, numbers. Works on arbitrary text. |
 | [`lnav`](https://lnav.org/) | **Interactive TUI** | `lnav file.log [file2.log …]` | Merges multi-file timelines, SQL queries on log data, built-in filters. The serious option. |
 | [`grc`](https://github.com/garabik/grc) | **Custom regex rules** | `grc -es tail -f app.log` | Per-command coloring profiles in `~/.grc/conf.*`. Best when you control the log format. |
-| [`ccze`](https://github.com/cornet/ccze) | **Lightweight pipe colorizer** | `ccze -A \| less -R` | Ancient but fast; the classic `tail -f \| ccze` pager idiom. |
+| [`ccze`](https://github.com/cornet/ccze) | **Lightweight pipe colorizer** | `ccze -A \| less -R` | Ancient but fast; the classic `tail -f \| ccze` pager idiom. **Linux-only** (removed from brew). |
 
 Rule of thumb:
 
@@ -127,7 +127,7 @@ If you want your profile tracked in dotfiles, drop it under `dot_grc/conf.<name>
 
 ## `ccze` — Old-school Pipe Colorizer
 
-Fast, minimal, written in C. Project upstream has been quiet for years, but the binary still works on any Linux distro and Homebrew macOS. Main idiom:
+Fast, minimal, written in C. Project upstream has been quiet for years; the package remains in Debian/Ubuntu apt repos but has been **removed from Homebrew core**, so on macOS it's effectively retired — prefer `tspin --print` there. On Linux it still works fine. Main idiom:
 
 ```bash
 tail -f /var/log/syslog | ccze -A | less -R

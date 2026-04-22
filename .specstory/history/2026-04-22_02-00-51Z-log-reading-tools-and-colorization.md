@@ -1148,3 +1148,6464 @@ _**Agent (claude-opus-4-7)**_
 _**Agent (claude-opus-4-7)**_
 
 I'll insert the log-viewer tasks between `tv update-channels` and the TPM section:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Let me verify the ansible file is syntactically valid and then move on:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml 2>&1 | tail -20</summary>
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml 2>&1 | tail -20
+```
+
+```
+
+playbook: dot_ansible/playbooks/linux.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml 2>&1 | tail -5</summary>
+
+```bash
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml 2>&1 | tail -5
+```
+
+```
+
+playbook: dot_ansible/playbooks/macos.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Ansible passes syntax check. Moving to aliases:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "in_progress"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "pending"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "pending"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "pending"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "pending"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "pending"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/28_tldr.zsh</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_log_tools.zsh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ls docs/zsh/</summary>
+
+```bash
+ls docs/zsh/
+```
+
+```
+[1;90m--[0m  aliases.md
+[1;90m--[0m  zsh-completions.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm adding a new "Log Viewers" section to the interface, placing it after the Shell Utilities section.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "pending"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "in_progress"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "pending"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "pending"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now the pueue preview retrofit:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I should audit which channels are actually displaying log-like content rather than assuming based on the plan mentioning SMS and Ansible channels.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Audit other TV channels for log-like previews:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "files_with_matches",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable",
+  "pattern": "\\.log|journalctl|tail -f|tail -n"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable",
+  "pattern": "\\.log|journalctl|tail -f|tail -n",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "dot_config/television/cable/lan-devices.toml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_config/television/cable/kill-process.toml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_config/television/cable/ports.toml"
+    }
+  ],
+  "totalFiles": 3,
+  "totalMatches": 3
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I see that the pueue entry is actually a log, so I'm moving past those and focusing on the new logs channel instead.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+No other channels show log content. Moving on to the new `logs` channel:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "in_progress"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "pending"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/lan-devices.toml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/logs.toml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: python3 -c "import tomllib; tomllib.load(open('dot_config/television/cable/logs.toml','rb')); print('ok')"</summary>
+
+```bash
+python3 -c "import tomllib; tomllib.load(open('dot_config/television/cable/logs.toml','rb')); print('ok')"
+```
+
+```
+ok
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: python3 -c "import tomllib; tomllib.load(open('dot_config/television/cable/pueue.toml','rb')); print('ok')"</summary>
+
+```bash
+python3 -c "import tomllib; tomllib.load(open('dot_config/television/cable/pueue.toml','rb')); print('ok')"
+```
+
+```
+ok
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "completed"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "in_progress"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "pending"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/log-tools.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "completed"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "completed"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "completed"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "in_progress"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "pending"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now the repo-level docs updates. Let me read the existing docs:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "devtools"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+  "pattern": "devtools",
+  "topFiles": [
+    {
+      "matchCount": 6,
+      "uri": "CLAUDE.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 6
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update `README.md`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "Tools \\(via ansible\\)|television|bat, eza|Config Files"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+  "pattern": "Tools \\(via ansible\\)|television|bat, eza|Config Files",
+  "topFiles": [
+    {
+      "matchCount": 7,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 7
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now add the config-file entries near the other television/zsh entries:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now update `docs/tools/tv.md`:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md",
+  "pattern": "^### |channel|lan-devices"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md",
+  "pattern": "^### |channel|lan-devices",
+  "topFiles": [
+    {
+      "matchCount": 30,
+      "uri": "docs/tools/tv.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 31
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I should add a note about the tspin preview retrofit to the pueue channel section and verify the details.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md",
+  "pattern": "Preview|preview"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md",
+  "pattern": "Preview|preview",
+  "topFiles": [
+    {
+      "matchCount": 11,
+      "uri": "docs/tools/tv.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 11
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+Now let me look through the existing TOC / list at the top of tv.md to make sure the `logs` entry is discoverable:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm verifying that the devtools role comment has been updated with the four tools—looks like I already handled that. Let me confirm the checklist: the module comment in the main tasks file got the tool list appended, and I need to check on the CLAUDE.md file status.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+All documentation updates are done. Let me check for lint issues on modified files:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml",
+    "/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_log_tools.zsh",
+    "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/logs.toml",
+    "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml",
+    "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/log-tools.md",
+    "/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md",
+    "/Users/daviddwlee84/.local/share/chezmoi/README.md",
+    "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md",
+    "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml"
+    },
+    {
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_log_tools.zsh"
+    },
+    {
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/logs.toml"
+    },
+    {
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 14,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 13,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 14,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 13,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 18,
+              "line": 10
+            },
+            "startPosition": {
+              "column": 17,
+              "line": 10
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 14,
+              "line": 28
+            },
+            "startPosition": {
+              "column": 13,
+              "line": 28
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 73
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 73
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 73
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 73
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 73
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 73
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 73
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 73
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/log-tools.md"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 31
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 31
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 16,
+              "line": 31
+            },
+            "startPosition": {
+              "column": 15,
+              "line": 31
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 50,
+              "line": 31
+            },
+            "startPosition": {
+              "column": 49,
+              "line": 31
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 73,
+              "line": 31
+            },
+            "startPosition": {
+              "column": 72,
+              "line": 31
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 55
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 55
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 55
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 55
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 56,
+              "line": 55
+            },
+            "startPosition": {
+              "column": 55,
+              "line": 55
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 115,
+              "line": 55
+            },
+            "startPosition": {
+              "column": 114,
+              "line": 55
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 64
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 64
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 77
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 77
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 77
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 77
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 77
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 77
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 26,
+              "line": 77
+            },
+            "startPosition": {
+              "column": 25,
+              "line": 77
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 101
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 101
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 101
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 101
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 101
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 101
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 101
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 101
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 116
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 116
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 116
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 116
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 116
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 116
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 116
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 116
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 131
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 131
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 131
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 131
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 131
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 131
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 131
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 131
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 150
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 150
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 150
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 150
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 150
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 150
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 150
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 150
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 168
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 168
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 168
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 168
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 168
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 168
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 168
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 168
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 194
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 194
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 194
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 194
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 194
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 194
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 194
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 194
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 209
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 209
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 209
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 209
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 209
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 209
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 209
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 209
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 230
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 230
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 230
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 230
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 230
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 230
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 230
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 230
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 249
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 249
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 249
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 249
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 249
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 249
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 249
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 249
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 267
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 267
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 267
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 267
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 267
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 267
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 267
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 267
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 286
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 286
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 286
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 286
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 286
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 286
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 286
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 286
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 308
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 308
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 308
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 308
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 308
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 308
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 308
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 308
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 325
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 325
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 325
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 325
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 325
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 325
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 325
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 325
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 340
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 340
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 340
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 340
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 340
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 340
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 340
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 340
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 355
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 355
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 355
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 355
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 355
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 355
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 355
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 355
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 372
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 372
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 372
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 372
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 372
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 372
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 372
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 372
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 427
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 427
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 446
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 446
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 457
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 457
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 469
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 469
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 483
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 483
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 61,
+              "line": 483
+            },
+            "startPosition": {
+              "column": 60,
+              "line": 483
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 136,
+              "line": 483
+            },
+            "startPosition": {
+              "column": 135,
+              "line": 483
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 492
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 492
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 509
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 509
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 522
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 522
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD056/table-column-count: Table column count [Expected: 4; Actual: 6; Too many cells, extra data will be missing]",
+          "range": {
+            "endPosition": {
+              "column": 174,
+              "line": 526
+            },
+            "startPosition": {
+              "column": 93,
+              "line": 526
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 535
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 535
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 19,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 18,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 33,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 32,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 47,
+              "line": 545
+            },
+            "startPosition": {
+              "column": 46,
+              "line": 545
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 15,
+              "line": 556
+            },
+            "startPosition": {
+              "column": 14,
+              "line": 556
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 556
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 556
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 57,
+              "line": 556
+            },
+            "startPosition": {
+              "column": 56,
+              "line": 556
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 124,
+              "line": 556
+            },
+            "startPosition": {
+              "column": 123,
+              "line": 556
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 27,
+              "line": 557
+            },
+            "startPosition": {
+              "column": 26,
+              "line": 557
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 35,
+              "line": 557
+            },
+            "startPosition": {
+              "column": 34,
+              "line": 557
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 69,
+              "line": 557
+            },
+            "startPosition": {
+              "column": 68,
+              "line": 557
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 119,
+              "line": 557
+            },
+            "startPosition": {
+              "column": 118,
+              "line": 557
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 35,
+              "line": 87
+            },
+            "startPosition": {
+              "column": 34,
+              "line": 87
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD022/blanks-around-headings: Headings should be surrounded by blank lines [Expected: 1; Actual: 0; Below]",
+          "range": {
+            "endPosition": {
+              "column": 41,
+              "line": 197
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 197
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD032/blanks-around-lists: Lists should be surrounded by blank lines",
+          "range": {
+            "endPosition": {
+              "column": 50,
+              "line": 198
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 198
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 31,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 30,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 31,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 30,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 39,
+              "line": 216
+            },
+            "startPosition": {
+              "column": 38,
+              "line": 216
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/README.md"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 40
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 40
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 56
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 56
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 56
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 56
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 56
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 56
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 20,
+              "line": 56
+            },
+            "startPosition": {
+              "column": 19,
+              "line": 56
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 23,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 22,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 43,
+              "line": 78
+            },
+            "startPosition": {
+              "column": 42,
+              "line": 78
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD040/fenced-code-language: Fenced code blocks should have a language specified",
+          "range": {
+            "endPosition": {
+              "column": 4,
+              "line": 109
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 109
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD040/fenced-code-language: Fenced code blocks should have a language specified",
+          "range": {
+            "endPosition": {
+              "column": 4,
+              "line": 119
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 119
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 129
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 129
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 129
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 129
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 129
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 129
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 22,
+              "line": 129
+            },
+            "startPosition": {
+              "column": 21,
+              "line": 129
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 16,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 15,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 16,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 15,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 27,
+              "line": 159
+            },
+            "startPosition": {
+              "column": 26,
+              "line": 159
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 173
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 173
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 173
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 173
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 6,
+              "line": 173
+            },
+            "startPosition": {
+              "column": 5,
+              "line": 173
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 10,
+              "line": 173
+            },
+            "startPosition": {
+              "column": 9,
+              "line": 173
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 289
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 289
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 289
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 289
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 289
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 289
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 22,
+              "line": 289
+            },
+            "startPosition": {
+              "column": 21,
+              "line": 289
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 18,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 17,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 18,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 17,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 34,
+              "line": 315
+            },
+            "startPosition": {
+              "column": 33,
+              "line": 315
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD049/emphasis-style: Emphasis style [Expected: asterisk; Actual: underscore]",
+          "range": {
+            "endPosition": {
+              "column": 180,
+              "line": 383
+            },
+            "startPosition": {
+              "column": 179,
+              "line": 383
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD049/emphasis-style: Emphasis style [Expected: asterisk; Actual: underscore]",
+          "range": {
+            "endPosition": {
+              "column": 250,
+              "line": 383
+            },
+            "startPosition": {
+              "column": 249,
+              "line": 383
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 402
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 402
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 402
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 402
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 402
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 402
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 402
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 402
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 9,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 8,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 16,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 15,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 16,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 15,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 30,
+              "line": 488
+            },
+            "startPosition": {
+              "column": 29,
+              "line": 488
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD040/fenced-code-language: Fenced code blocks should have a language specified",
+          "range": {
+            "endPosition": {
+              "column": 4,
+              "line": 510
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 510
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md"
+    },
+    {
+      "errors": [
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 50
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 50
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 48,
+              "line": 50
+            },
+            "startPosition": {
+              "column": 47,
+              "line": 50
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 51
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 51
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 55,
+              "line": 51
+            },
+            "startPosition": {
+              "column": 54,
+              "line": 51
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 68
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 68
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 68
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 68
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 68
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 68
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 68
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 68
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 82
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 82
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 82
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 82
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 82
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 82
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 82
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 82
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD040/fenced-code-language: Fenced code blocks should have a language specified",
+          "range": {
+            "endPosition": {
+              "column": 4,
+              "line": 94
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 94
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 126
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 126
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 126
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 126
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 126
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 126
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 126
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 126
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 145
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 145
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 145
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 145
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 145
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 145
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 145
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 145
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 158
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 158
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 158
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 158
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 158
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 158
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 158
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 158
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 180
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 180
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 180
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 180
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 180
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 180
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 180
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 180
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 220
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 220
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 220
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 220
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 220
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 220
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 220
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 220
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 229
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 229
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 229
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 229
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 8,
+              "line": 229
+            },
+            "startPosition": {
+              "column": 7,
+              "line": 229
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 229
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 229
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 243
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 243
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 44,
+              "line": 243
+            },
+            "startPosition": {
+              "column": 43,
+              "line": 243
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 244
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 244
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 82,
+              "line": 244
+            },
+            "startPosition": {
+              "column": 81,
+              "line": 244
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 252
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 252
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 74,
+              "line": 252
+            },
+            "startPosition": {
+              "column": 73,
+              "line": 252
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 253
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 253
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 74,
+              "line": 253
+            },
+            "startPosition": {
+              "column": 73,
+              "line": 253
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 279
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 279
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 279
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 279
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 11,
+              "line": 279
+            },
+            "startPosition": {
+              "column": 10,
+              "line": 279
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 25,
+              "line": 279
+            },
+            "startPosition": {
+              "column": 24,
+              "line": 279
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 290
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 290
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 42,
+              "line": 290
+            },
+            "startPosition": {
+              "column": 41,
+              "line": 290
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 13,
+              "line": 291
+            },
+            "startPosition": {
+              "column": 12,
+              "line": 291
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 57,
+              "line": 291
+            },
+            "startPosition": {
+              "column": 56,
+              "line": 291
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 301
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 301
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 59,
+              "line": 301
+            },
+            "startPosition": {
+              "column": 58,
+              "line": 301
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 17,
+              "line": 302
+            },
+            "startPosition": {
+              "column": 16,
+              "line": 302
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe does not align with header for style \"aligned\"]",
+          "range": {
+            "endPosition": {
+              "column": 66,
+              "line": 302
+            },
+            "startPosition": {
+              "column": 65,
+              "line": 302
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 2,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 1,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 12,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 11,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 21,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 20,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 35,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 34,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the right for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 35,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 34,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        },
+        {
+          "message": "MD060/table-column-style: Table column style [Table pipe is missing space to the left for style \"compact\"]",
+          "range": {
+            "endPosition": {
+              "column": 43,
+              "line": 313
+            },
+            "startPosition": {
+              "column": 42,
+              "line": 313
+            }
+          },
+          "severity": "DIAGNOSTIC_SEVERITY_WARNING",
+          "source": "markdownlint"
+        }
+      ],
+      "relativeWorkspacePath": "/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ Looking at the lint warnings, they're all pre-existing style issues in the markdown file that aren't related to my changes. Let me verify which lines I actually modified—I added content around the log viewers section, the logs.toml config, and the zsh config file, but I need to double-check the exact line numbers to make sure none of my additions are triggering these warnings.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/daviddwlee84/.local/share/chezmoi/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The linting warnings I'm seeing are all pre-existing issues in the repo—the MD022/MD032 warnings about missing blank lines before lists and the MD060 table formatting warnings appear throughout the file and aren't from my changes. I can move forward without addressing these.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+All the reported lints are pre-existing markdown style warnings (MD060 table-column-style) that exist throughout this codebase — my edits didn't introduce any new ones. Finalizing todos:
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "completed"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "completed"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "completed"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Extend devtools role: add tailspin/lnav/grc/ccze to macOS brew list; add Linux apt install for lnav/grc/ccze; add tailspin GitHub-release binary fallback (pattern after sesh block); add lnav noRoot fallback",
+      "id": "ansible",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/zsh/tools/29_log_tools.zsh with catl/lessl/logtail and update docs/zsh/aliases.md",
+      "id": "aliases",
+      "status": "completed"
+    },
+    {
+      "content": "Retrofit pueue.toml preview to pipe pueue log through tspin --print when available (fallback to raw)",
+      "id": "tv_pueue",
+      "status": "completed"
+    },
+    {
+      "content": "Create dot_config/television/cable/logs.toml new channel (fd-based source cycles, tspin+bat preview cycles, Enter-\u003elnav, Alt+T-\u003etail|tspin, Alt+E-\u003eeditor, Ctrl+Y-\u003ecopy path)",
+      "id": "tv_logs",
+      "status": "completed"
+    },
+    {
+      "content": "Write docs/tools/log-tools.md covering all four tools + Loguru note + TV integration",
+      "id": "docs_new",
+      "status": "completed"
+    },
+    {
+      "content": "Update README.md tools section, docs/tools/tv.md logs channel section, CLAUDE.md devtools tag table, devtools role header comment",
+      "id": "docs_update",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit related changes with specstory chat history",
+      "id": "todo-1776824088046-eelk59vg8",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+All plan todos are complete. Summary of what landed:
+
+**Ansible — [`dot_ansible/roles/devtools/tasks/main.yml`](dot_ansible/roles/devtools/tasks/main.yml)**
+- macOS Homebrew list: added `tailspin`, `lnav`, `grc`, `ccze`.
+- Linux Debian: apt install of `lnav`/`grc`/`ccze` (with `become: true` + `tags: [sudo]`).
+- Linux user-level fallbacks for `lnav` (GitHub musl zip) and `tailspin` (GitHub musl tar), modeled on the existing `sesh` block. Both have `block/rescue` cleanup and skip gracefully on `armv7l`. `ansible-playbook --syntax-check` passes for both macOS and Linux playbooks.
+
+**Zsh wrappers — new [`dot_config/zsh/tools/29_log_tools.zsh`](dot_config/zsh/tools/29_log_tools.zsh)**
+- `catl` → `tspin --print` (bat-for-logs feel, stdout mode).
+- `lessl` → `ccze -A | less -RSFX` (file or stdin).
+- `logtail` → `tspin --follow` with `tail -F | tspin --print` fallback.
+- All guarded on binary presence.
+- Added to [`docs/zsh/aliases.md`](docs/zsh/aliases.md) under a new "Log Viewers" section + TOC entry.
+
+**TV — [`pueue.toml`](dot_config/television/cable/pueue.toml) retrofit**
+- Preview cycle 1 now pipes `pueue log` through `tspin --print` when available, with a safe fallback chain so the channel still works pre-tools-install.
+
+**TV — new [`logs.toml`](dot_config/television/cable/logs.toml) channel**
+- `tv logs`. Three source cycles: `$PWD` log files (via `fd`), user/system log dirs (`~/.cache`, `~/Library/Logs`, `/var/log`), and `journalctl` on Linux.
+- Two preview cycles: `tspin --print` colored tail vs `bat --style=plain` plain comparison.
+- `Enter` → `lnav` (falls back to `ccze | less -R`, then `less -R`); `Alt+T` → `tspin --follow`; `Alt+E` → `$EDITOR`; `Ctrl+Y` → clipboard (OSC-52). TOML validated.
+
+**Docs**
+- New [`docs/tools/log-tools.md`](docs/tools/log-tools.md) — TL;DR decision table, per-tool sections (`tailspin`, `lnav`, `grc`, `ccze`) with a Python/FastAPI `grc` profile sample, the "why no Loguru wrapper" paragraph, and the full TV integration writeup.
+- [`docs/tools/tv.md`](docs/tools/tv.md) — new `### logs channel` subsection, plus a note on the pueue preview being piped through tailspin.
+- [`README.md`](README.md) — new "Log viewers" dev-tools bullet + config-file entries for `logs.toml` and `29_log_tools.zsh`.
+- [`CLAUDE.md`](CLAUDE.md) — `devtools` tag-table description extended with the four tools.
+- Devtools role header comment also updated.
+
+Plan file [`/Users/daviddwlee84/.cursor/plans/log_viewer_tools_934c6093.plan.md`](/Users/daviddwlee84/.cursor/plans/log_viewer_tools_934c6093.plan.md) was not modified, as instructed. The final remaining item (git commit with specstory chat history) was listed in the plan but flagged as a separate step for you to trigger — let me know if you want me to stage and commit now.
+
+---
+
+_**User**_
+
+@/Users/daviddwlee84/.cursor/projects/Users-daviddwlee84-local-share-chezmoi/terminals/1.txt:85-200 
+
+似乎掛了 仔細檢查一下安裝方式是否都正確且available 然後fix and commit related change
+
+---
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
