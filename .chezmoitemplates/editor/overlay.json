@@ -1,0 +1,8 @@
+{
+  "editor.fontFamily": "Hack Nerd Font Mono, Menlo, Monaco, 'Courier New', monospace",
+  "editor.fontSize": 13,
+  "editor.lineNumbers": "relative",
+  "editor.formatOnSave": true,
+  "editor.acceptSuggestionOnEnter": "smart",
+  "terminal.integrated.fontFamily": "Hack Nerd Font Mono"
+}

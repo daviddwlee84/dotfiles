@@ -54,3 +54,47 @@ scripts/**
 .condarc
 .gemrc
 {{- end }}
+
+# -----------------------------------------------------------------------------
+# Editor overlays (VSCode / Cursor / Antigravity)
+#
+# Source files live in two parallel trees to keep a single overlay template
+# usable on both platforms:
+#
+#   macOS:  Library/Application Support/<Editor>/User/{modify_settings.json,keybindings.json}.tmpl
+#   Linux:  .config/<Editor>/User/{modify_settings.json,keybindings.json}.tmpl
+#
+# Gates below:
+#   1. OS-mismatch  -> ignore the tree that doesn't apply to this OS
+#   2. Editor-absent -> ignore per-editor paths when the editor isn't installed
+#                       (avoids creating phantom ~/Library/.../Antigravity dirs
+#                        on machines without that editor)
+# -----------------------------------------------------------------------------
+
+{{- if ne .chezmoi.os "darwin" }}
+Library
+Library/**
+{{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+.config/Code
+.config/Code/**
+.config/Cursor
+.config/Cursor/**
+.config/Antigravity
+.config/Antigravity/**
+{{- end }}
+
+{{- range (list "Code" "Cursor" "Antigravity") }}
+{{- if eq $.chezmoi.os "darwin" }}
+{{- if not (stat (joinPath $.chezmoi.homeDir "Library/Application Support" .)) }}
+Library/Application Support/{{ . }}
+Library/Application Support/{{ . }}/**
+{{- end }}
+{{- else if eq $.chezmoi.os "linux" }}
+{{- if not (stat (joinPath $.chezmoi.homeDir ".config" .)) }}
+.config/{{ . }}
+.config/{{ . }}/**
+{{- end }}
+{{- end }}
+{{- end }}

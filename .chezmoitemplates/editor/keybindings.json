@@ -1,0 +1,27 @@
+// Managed by chezmoi via .chezmoitemplates/editor/keybindings.json
+// Source: edit the template, NOT the live file under ~/Library/Application Support/<Editor>/User/
+// or ~/.config/<Editor>/User/ (it will be overwritten on next `chezmoi apply`).
+[
+    {
+        "key": "f5",
+        "command": "python.execInTerminal"
+    },
+    {
+        "key": "f",
+        "command": "explorer.newFile",
+        "when": "explorerViewletFocus && !inputFocus"
+    },
+    {
+        "key": "d",
+        "command": "explorer.newFolder",
+        "when": "explorerViewletFocus && !inputFocus"
+    },
+    {
+        "key": "alt+n",
+        "command": "explorer.newFile"
+    },
+    {
+        "key": "shift+alt+n",
+        "command": "explorer.newFolder"
+    }
+]

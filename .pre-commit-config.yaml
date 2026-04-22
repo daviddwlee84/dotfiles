@@ -47,8 +47,19 @@ repos:
       - id: check-json
         # chezmoi `modify_*.json` source files are shell scripts that emit
         # JSON on stdout, not static JSON themselves; skip JSON syntax check.
-        exclude: (^|/)modify_[^/]+\.json$
+        # Shared chezmoi templates under .chezmoitemplates/ may contain JSONC
+        # (leading `//` comments documenting intent) since they are rendered
+        # through Go templates before reaching disk.
+        exclude: |
+          (?x)
+          (^|/)modify_[^/]+\.json$
+          | ^\.chezmoitemplates/.*\.json$
       - id: check-executables-have-shebangs
+        # chezmoi `modify_*.json.tmpl` wrappers are 1-line Go templates that
+        # `{{ template ... }}` the shared editor/modify.sh whose rendered
+        # output already carries `#!/usr/bin/env bash`. The source wrapper
+        # itself has no shebang by design, so skip the shebang check for it.
+        exclude: (^|/)modify_[^/]+\.tmpl$
 
   # shellcheck - static analysis for bash scripts in scripts/
   # Scoped narrowly: top-level scripts only. `.tmpl` files and zsh modules
