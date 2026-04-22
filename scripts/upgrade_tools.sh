@@ -543,31 +543,71 @@ cat_agents() {
   local any_fail=0
   local ran_any=0
 
-  # Claude Code — official installer
+  # Strategy: prefer the binary's built-in self-update subcommand (fast no-op
+  # when already current; doesn't re-download the full binary). Fallback to
+  # the official curl installer if the subcommand fails, hangs, or doesn't
+  # exist. Inspection of upstream installers (2026-04) confirmed none of them
+  # delegate to the self-update subcommand internally:
+  #   - claude.sh   : always re-downloads, no version check
+  #   - opencode.sh : has a same-version fast-path, but no `opencode upgrade`
+  #   - cursor.sh   : always re-downloads, no version check
+  #
+  # We wrap the self-update call with a timeout (some `claude update` runs
+  # have been observed hanging indefinitely on network checks) so a stuck
+  # subcommand cannot block the whole upgrade flow.
+  local _timeout_bin=""
+  if command -v timeout >/dev/null 2>&1; then
+    _timeout_bin="timeout"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    _timeout_bin="gtimeout"
+  fi
+  _try_self_update_then_curl() {
+    local label="$1" self_cmd="$2" curl_url="$3"
+    info "Upgrading $label (trying self-update first)"
+    local wrapped="$self_cmd"
+    if [[ -n "$_timeout_bin" ]]; then
+      wrapped="$_timeout_bin 90 $self_cmd"
+    fi
+    if _run_sh "$wrapped"; then
+      return 0
+    fi
+    warn "$label self-update failed/timed out — falling back to official installer"
+    local fallback="curl -fsSL $curl_url | bash"
+    if [[ -n "$_timeout_bin" ]]; then
+      fallback="$_timeout_bin 300 bash -c 'curl -fsSL $curl_url | bash'"
+    fi
+    _run_sh "$fallback"
+  }
+
+  # Claude Code — `claude update` (alias: `claude upgrade`)
   if command -v claude >/dev/null 2>&1 \
     || [[ -x "$HOME/.claude/local/bin/claude" ]]; then
-    info "Upgrading Claude Code"
-    _run_sh "curl -fsSL https://claude.ai/install.sh | bash" || any_fail=1
+    _try_self_update_then_curl "Claude Code" \
+      "claude update" \
+      "https://claude.ai/install.sh" || any_fail=1
     ran_any=1
   fi
 
-  # OpenCode — official installer
+  # OpenCode — `opencode upgrade`
   if command -v opencode >/dev/null 2>&1; then
-    info "Upgrading OpenCode"
-    _run_sh "curl -fsSL https://opencode.ai/install | bash" || any_fail=1
+    _try_self_update_then_curl "OpenCode" \
+      "opencode upgrade" \
+      "https://opencode.ai/install" || any_fail=1
     ran_any=1
   fi
 
-  # Cursor CLI — official installer
+  # Cursor CLI — `cursor-agent update`
   if command -v cursor-agent >/dev/null 2>&1 \
     || command -v cursor-cli >/dev/null 2>&1 \
     || [[ -x "$HOME/.local/bin/cursor-agent" ]]; then
-    info "Upgrading Cursor CLI"
-    _run_sh "curl -fsSL https://cursor.com/install | bash" || any_fail=1
+    _try_self_update_then_curl "Cursor CLI" \
+      "cursor-agent update" \
+      "https://cursor.com/install" || any_fail=1
     ran_any=1
   fi
 
-  # Ollama — Linux official installer (macOS is Homebrew-managed elsewhere)
+  # Ollama — Linux official installer (macOS is Homebrew-managed elsewhere).
+  # No self-update subcommand exists.
   if [[ "$(uname -s)" == "Linux" ]] && command -v ollama >/dev/null 2>&1; then
     info "Upgrading Ollama (Linux installer)"
     _run_sh "curl -fsSL https://ollama.com/install.sh | sh" || any_fail=1
@@ -581,10 +621,33 @@ cat_agents() {
     ran_any=1
   fi
 
-  # RTK — official installer
+  # RTK — official installer (no self-update subcommand)
   if command -v rtk >/dev/null 2>&1; then
     info "Upgrading RTK"
     _run_sh "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh" || any_fail=1
+    ran_any=1
+  fi
+
+  # SpecStory — brew tap when available (macOS), else GitHub release script.
+  # The installer script is idempotent and pulls latest by default, so re-running
+  # it is the upgrade path on Linux (and on macOS when not brew-managed).
+  if command -v specstory >/dev/null 2>&1 \
+    || [[ -x "$HOME/.local/bin/specstory" ]]; then
+    local specstory_handled=0
+    if [[ "$(uname -s)" == "Darwin" ]] && setup_brew_path \
+      && brew list --formula specstoryai/tap/specstory >/dev/null 2>&1; then
+      info "Upgrading SpecStory via Homebrew tap"
+      _run brew upgrade specstoryai/tap/specstory || any_fail=1
+      specstory_handled=1
+    fi
+    if [[ "$specstory_handled" -eq 0 ]]; then
+      if [[ -x "$_REPO_ROOT/scripts/install_specstory.sh" ]]; then
+        info "Upgrading SpecStory via install_specstory.sh (latest GitHub release)"
+        _run "$_REPO_ROOT/scripts/install_specstory.sh" || any_fail=1
+      else
+        warn "specstory present but install_specstory.sh not found — skipping"
+      fi
+    fi
     ran_any=1
   fi
 
