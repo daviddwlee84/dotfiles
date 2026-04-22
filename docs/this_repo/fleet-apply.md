@@ -209,15 +209,18 @@ your local `.gitignore` if you don't already have one for build artifacts.
 
 - **`zsh:1: command not found: chezmoi` / rc=127** — non-interactive SSH
   shells don't source `~/.zshrc`, so `~/.local/bin` (or wherever your
-  package manager put chezmoi) is not on PATH. Set the absolute path
-  per-host or in `[defaults]`:
+  package manager put chezmoi) is not on PATH. The default
+  `chezmoi_path = "auto"` already augments PATH with `~/.local/bin`,
+  `~/bin`, `/opt/homebrew/bin`, `/home/linuxbrew/.linuxbrew/bin`,
+  `/usr/local/bin`, `/snap/bin` before invoking chezmoi — covers ~all
+  installs. If your binary lives elsewhere, pin it explicitly:
   ```toml
-  [defaults]
-  chezmoi_path = "/home/me/.local/bin/chezmoi"   # Linux user install
-  # or
-  chezmoi_path = "/opt/homebrew/bin/chezmoi"     # macOS Apple Silicon brew
+  [[hosts]]
+  name         = "weird-box"
+  chezmoi_path = "/opt/custom/bin/chezmoi"
   ```
-  Run `ssh <host> command -v chezmoi` to find the right value.
+  Run `ssh <host> command -v chezmoi` (interactive) vs
+  `ssh <host> 'command -v chezmoi'` (non-interactive) to see the gap.
 - **`bw get password` fails** — run `bw unlock`, then `export BW_SESSION=...`.
 - **`asyncssh.PermissionDenied`** — the alias resolves but auth failed.
   Test with `ssh <alias> echo ok` first; if you use the 1Password agent,

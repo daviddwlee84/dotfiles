@@ -68,7 +68,7 @@ class Host:
     port: int | None = None
     identity_file: str | None = None
     no_root_machine: bool = False
-    chezmoi_path: str = "chezmoi"
+    chezmoi_path: str = "auto"
     extra_env: dict[str, str] = dataclasses.field(default_factory=dict)
     # Resolved later (not from TOML directly)
     password_source_type: PasswordSourceType = "none"
@@ -268,7 +268,28 @@ def build_remote_command(
     # less), which can panic or block forever when its own stdin/stdout
     # aren't a terminal. Setting `PAGER=cat` is NOT enough — chezmoi reads
     # its own `pager` config key and ignores PAGER.
-    cz = shlex.quote(host.chezmoi_path)
+    #
+    # `chezmoi_path == "auto"` (the default) defers binary lookup to the
+    # remote: PATH is augmented with every plausible install location
+    # (Linuxbrew, Homebrew x86/arm64, snap, ~/.local/bin, ~/bin) so a
+    # non-interactive shell — which doesn't source ~/.zshrc and therefore
+    # often lacks ~/.local/bin — still finds chezmoi. To pin a specific
+    # binary, set `chezmoi_path = "/abs/path/to/chezmoi"` per-host.
+    # Bare "chezmoi" (no slash, no path) is treated the same as "auto" —
+    # users who hand-wrote that value still benefit from PATH augmentation,
+    # because rc=127 "command not found" is the most common first-run
+    # failure on hosts where ~/.local/bin isn't in non-interactive PATH.
+    chezmoi_path = host.chezmoi_path or "auto"
+    if chezmoi_path == "auto" or "/" not in chezmoi_path:
+        cz = shlex.quote(chezmoi_path if chezmoi_path != "auto" else "chezmoi")
+        path_prefix = (
+            'export PATH="$HOME/.local/bin:$HOME/bin:'
+            '/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:'
+            '/usr/local/bin:/snap/bin:$PATH"; '
+        )
+    else:
+        cz = shlex.quote(chezmoi_path)
+        path_prefix = ""
     cz_global = f"{cz} --no-pager"
     if mode == "update":
         sub = f"{cz_global} update"
@@ -284,7 +305,7 @@ def build_remote_command(
     # NOT honour these — that's why --no-pager above is required.
     pager_env = "PAGER=cat GIT_PAGER=cat "
     extra_env = " ".join(f"{k}={shlex.quote(v)}" for k, v in host.extra_env.items())
-    env_prefix = pager_env + (f"{extra_env} " if extra_env else "")
+    env_prefix = path_prefix + pager_env + (f"{extra_env} " if extra_env else "")
 
     pass_path = shlex.quote(REMOTE_SUDO_PASS_PATH)
     if host.sudo_password is None:

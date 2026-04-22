@@ -9,7 +9,11 @@
 # Run: `just fleet-apply` (parallel) | `just fleet-apply-dry-run` (chezmoi diff)
 
 [defaults]
-chezmoi_path    = "chezmoi"        # remote PATH binary; e.g. "~/.local/bin/chezmoi" if no-root install
+chezmoi_path    = "auto"           # "auto" → augment remote PATH with common install dirs
+                                   # (~/.local/bin, /opt/homebrew/bin, /home/linuxbrew/.linuxbrew/bin,
+                                   #  /usr/local/bin, /snap/bin) before invoking `chezmoi`.
+                                   # Override per-host with an absolute path (e.g.
+                                   # "/snap/bin/chezmoi") to pin a specific binary.
 connect_timeout = 15
 command_timeout = 1800
 
