@@ -367,6 +367,67 @@ Use case: the GFW bans an Azure VM's public IP. Rotating keeps the `*.cloudapp.a
 
 ---
 
+### `clash` channel
+
+Fuzzy-search a local Clash / mihomo config YAML — proxies, proxy-groups, rules, top-level summary — with latency tests and Alt-key actions that talk to the live `external-controller` HTTP API. Backed by three helpers under `~/.config/television/` (`clash-parse.py` — PyYAML parser with `uv run --script` shebang; `clash-source.sh` — TSV source emitter incl. an `api` health mode; `clash-preview.sh` — three-view preview dispatcher). Requires `curl` (base role) and `uv` (bootstrap); PyYAML is auto-fetched by uv on first run. `bat` and `jq` are used when present for nicer previews but are optional.
+
+Open with `tv clash`. No auto-refresh — the parser reads the YAML fresh every Ctrl+S cycle; hit `Ctrl+R` to reload the current source.
+
+**Config discovery** (first match wins):
+
+1. `$CLASH_CONFIG` — explicit override, hard-fails if the path doesn't exist (so a bad override surfaces instead of silently falling through to a different config and leaking its credentials in preview).
+2. `~/.config/clash/config.{yaml,yml}`
+3. `~/.config/mihomo/config.{yaml,yml}`
+4. `~/Library/Application Support/{clash,mihomo}/config.{yaml,yml}` (macOS)
+
+When no config is found the channel shows a single synthetic `none  no-clash-config` row; `Enter` on it seeds an empty `~/.config/clash/config.yaml` and opens `$EDITOR`.
+
+**Source cycling** (`Ctrl+S`):
+
+| Source | Description |
+|--------|-------------|
+| Proxies | One row per `proxies[]` entry — `name`, `type` (vmess/vless/trojan/ss/…), `server:port`, and a compact `tls,udp,ws,<cipher>` flag field |
+| Proxy Groups | One row per `proxy-groups[]` entry — `name`, `type` (select/url-test/fallback/load-balance), first member, `N members` |
+| Rules | One row per `rules[]` entry, indexed `#NNNN` — `match-type`, pattern, `target modifier` (e.g. `PROXY no-resolve`). `MATCH` rules have a `-` pattern |
+| Summary | Top-level scalars (`port`, `mixed-port`, `external-controller`, `mode`, `log-level`, `ipv6`, `tun` / `dns` compact flow-mapped…) + `proxies.count` / `proxy-groups.count` / `rules.count` |
+| API | `external-controller` health check via `GET /version`; runtime configs via `GET /configs`; active `/connections` count + cumulative up/down bytes. When the controller is unreachable the source emits a single `unreachable` row — no masking of a dead API |
+
+**Preview cycling** (`Ctrl+F`):
+
+1. Main — the selected entry's YAML block via `bat -l yaml` (proxies / groups / rules / summary use the same emitter)
+2. Latency — for proxy rows, prefers `GET /proxies/:name/delay?timeout=5000&url=http://www.gstatic.com/generate_204` from the Clash API when the controller is reachable; falls back to `nc -z -w3 server port` + `ping -c 3` when the API is absent, so the test works even without Clash running. For group rows, fetches `GET /proxies/:group` so you can see `now` (current selection) + full `all` + live `history[]` delays per member
+3. Meta — kind-dependent: proxy rows list the proxy-groups that reference this proxy (pulled via `groups-for-switch` mode); group rows show the full group YAML; rule rows show sibling rules of the same match-type; the API row pretty-prints `GET /configs`
+
+**Keybindings** (`Alt+` namespace avoids tmux/TV conflicts):
+
+| Key | Action | Works on |
+|-----|--------|----------|
+| `Enter` | Show full YAML in execute mode (falls back to opening `$EDITOR` on a seeded config for the `none` row) | all |
+| `Alt+T` | Latency test (API `/proxies/:name/delay` or TCP probe fallback) | proxy, group |
+| `Alt+S` | Switch a proxy-group's selection to the highlighted proxy (fzf picks which group; uses `PUT /proxies/:group`) | proxy |
+| `Alt+C` | Close all connections (`DELETE /connections`, y/N confirm) | all |
+| `Alt+R` | Reload Clash config from disk (`PUT /configs?force=true`, y/N confirm) | all |
+| `Alt+D` | Open the controller's `external-ui` (`http://<host>/ui`) or fall back to `yacd.haishan.me` | all |
+| `Alt+E` | Edit the resolved config file in `$EDITOR` | all |
+| `Ctrl+Y` | Copy `server:port` for proxies, row name otherwise (pbcopy / wl-copy / xclip / OSC 52 fallback) | all |
+| `Alt+Y` | Copy the row name to clipboard | all |
+
+All mutating actions (`Alt+S/C/R`) check `/version` first; if the controller is unreachable they print a 1-second toast and no-op rather than leaving the user wondering why nothing happened. `secret:` in the config is read by `clash-parse.py controller` and sent as `Authorization: Bearer <secret>` on every API call.
+
+**Redaction hardening**
+
+The sample configs users typically paste into `.specstory/history/` / `.cursor/plans/` / `.claude/plans/` / `.opencode/plans/` contain vmess UUIDs (authentication tokens) and Azure proxy-VM hostnames. Three rules in [`.gitleaks.toml`](../../.gitleaks.toml) catch them with `secretGroup = 1`, so `scripts/redact_secrets.py` rewrites only the sensitive capture:
+
+- `clash-vmess-uuid` — `uuid: 41871a7c-…` → `uuid: 418...c56`
+- `clash-vmess-share-link` — `vmess://<base64>` → `vme...XYZ`
+- `azure-cloudapp-hostname` — `<vm>.<region>.cloudapp.azure.com` (e.g. an Azure VM hosting a v2ray / trojan endpoint) → `pro...com` style truncation
+
+Raw IPv4 proxy servers (`122.116.74.12`, `34.84.165.46`, …) are not detected by default — they produce too many false positives against legit dotfile mentions of public DNS resolvers and CDN edges. Add a repo-local rule if you need it.
+
+**Non-goals (v1):** provisioning (`proxy create` / template generation), profile-file configs (Clash Verge Rev splits across `profiles/*.yaml` — we only follow `config.yaml`), live traffic streaming (the API `/traffic` SSE endpoint would need a long-lived connection that doesn't fit TV's preview model), and mutating rules at runtime.
+
+---
+
 ### `sesh` channel (community)
 
 Provided by `tv update-channels`. Source cycling through session types and directory search, with connect/kill actions.

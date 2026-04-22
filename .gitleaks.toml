@@ -79,3 +79,35 @@ useDefault = true
   description = "Notion internal integration token (ntn_...)"
   regex       = '''\bntn_[A-Za-z0-9]{40,}\b'''
   tags        = ["key", "notion", "auto"]
+
+# ---------------------------------------------------------------------------
+# Clash / V2Ray / mihomo proxy config leaks. Example sources:
+#   - Pasted Clash YAML in SpecStory transcripts / coding-agent plan files
+#   - vmess:// share links (base64-encoded server+uuid blob)
+#   - Azure VM hostnames under *.cloudapp.azure.com used as proxy server hosts
+#
+# All three rules use `secretGroup = 1` so `scripts/redact_secrets.py`
+# rewrites only the sensitive capture (e.g. `uuid: 418...c56`) instead of
+# the whole YAML line, keeping surrounding keys human-readable.
+# ---------------------------------------------------------------------------
+
+[[rules]]
+  id          = "clash-vmess-uuid"
+  description = "Clash / V2Ray vmess / vless UUID in YAML (auth token)"
+  regex       = '''(?i)\buuid\s*:\s*['"]?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})['"]?'''
+  secretGroup = 1
+  tags        = ["key", "clash", "vmess", "auto"]
+
+[[rules]]
+  id          = "clash-vmess-share-link"
+  description = "vmess:// base64 share link (embeds host + port + uuid)"
+  regex       = '''\b(vmess://[A-Za-z0-9+/=_-]{40,})\b'''
+  secretGroup = 1
+  tags        = ["key", "clash", "vmess", "share-link", "auto"]
+
+[[rules]]
+  id          = "azure-cloudapp-hostname"
+  description = "Azure VM hostname under *.cloudapp.azure.com (often proxy server)"
+  regex       = '''\b([a-z0-9][a-z0-9-]{0,62}\.(?:[a-z]+\d?\.)?cloudapp\.azure\.com)\b'''
+  secretGroup = 1
+  tags        = ["hostname", "azure", "clash", "auto"]

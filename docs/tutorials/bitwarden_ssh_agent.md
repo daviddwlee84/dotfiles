@@ -147,7 +147,7 @@ Host github.com
                                      # Bitwarden agent is fallback
 
 Host azure
-    HostName davidlee.japaneast.cloudapp.azure.com
+    HostName <vm>.<region>.cloudapp.azure.com
     User daviddwlee84
     Port 22
     IdentityFile ~/.ssh/YetAnotherStupidVM
@@ -165,7 +165,7 @@ Host github.com
     # No IdentityFile -- agent provides the right key automatically
 
 Host azure
-    HostName davidlee.japaneast.cloudapp.azure.com
+    HostName <vm>.<region>.cloudapp.azure.com
     User daviddwlee84
     Port 22
     # No IdentityFile -- agent provides the right key automatically
