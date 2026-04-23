@@ -270,6 +270,70 @@ project-root detection when you have buffers from multiple projects open.
 Use `:cd` (`<leader>fZ`) when you genuinely want the whole nvim session
 to follow.
 
+### Three project pickers compared
+
+LazyVim ends up with **three overlapping but distinct** project-jump
+entry points. Pick the one that matches your intent:
+
+| Where | Trigger | Source | What it does |
+|-------|---------|--------|--------------|
+| Inside nvim | `<leader>fp` (or dashboard `p`) | `snacks.picker.projects` — oldfiles git roots + `fd` over `dev` dirs | `:tcd` + `persistence.nvim` restore (last buffers/windows for that cwd) |
+| Inside nvim | `<leader>fz` / `<leader>fZ` | Full zoxide DB (frecency, 100+ entries) | Pure `:tcd` / `:cd`, no session restore |
+| Inside tmux | `prefix + g` (sesh fzf) | tmux + sesh.toml + zoxide | Switch/create tmux session, spawn nvim + lazygit fresh |
+
+Rough heuristic:
+
+- **Already in nvim, want to peek at another repo's file** → `<leader>fz`
+  (cheap, no session ceremony)
+- **Already in nvim, want to fully resume work on another repo** →
+  `<leader>fp` (restores buffers/windows you had last time)
+- **Outside nvim, want a clean per-repo workspace** → `prefix+g` from tmux
+  (gets you the layout from `~/.config/tmuxp/project.yaml`)
+
+### Configuring the snacks projects picker
+
+The defaults look at `~/dev` and `~/projects` (which probably don't exist
+on your machine), plus oldfiles-derived git roots. To make `<leader>fp`
+surface every repo under your project home, add it to `dev` —
+[`projects.lua`](../../dot_config/nvim/exact_plugins/projects.lua) does this
+for `/Volumes/Data/Program`:
+
+```lua
+{
+  "folke/snacks.nvim",
+  opts = {
+    picker = {
+      sources = {
+        projects = {
+          dev = { "/Volumes/Data/Program" },  -- canonical path, not the symlink
+          max_depth = 2,                       -- catches <group>/<repo>
+        },
+      },
+    },
+  },
+}
+```
+
+To **manually pin** a project that doesn't have a `.git` (or you want it
+permanently surfaced regardless of `fd` discovery), set `projects` to
+a list of paths:
+
+```lua
+projects = {
+  vim.fn.expand("~/.local/share/chezmoi"),
+  vim.fn.expand("~/.config/nvim"),
+  "/Volumes/Data/Program/Personal/some-repo",
+},
+```
+
+Both `dev` (auto-discovered via `fd`) and `projects` (manual list) are
+merged with oldfiles entries before fzf renders. Snacks dedupes by path.
+
+The `confirm = "load_session"` default delegates to `persistence.nvim`
+(also wired in `projects.lua`); it restores the last buffer/window
+layout for that cwd. If `persistence.nvim` isn't installed, `load_session`
+silently falls back to opening the file picker after `:tcd`.
+
 ### Television (tv)
 
 [Television](https://github.com/alexpasmantier/television) has a built-in [sesh channel](https://alexpasmantier.github.io/television/community/channels-unix/#sesh). Television is installed by the `devtools` ansible role (`brew install television` on macOS; Linuxbrew on Linux when available, otherwise skipped with a warning because upstream currently ships only `unknown-linux-gnu` binaries that require glibc ≥ 2.39 — incompatible with Ubuntu 22.04 LTS. See [docs/linux-package-sources.md](../linux-package-sources.md)).
