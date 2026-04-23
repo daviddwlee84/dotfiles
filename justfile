@@ -320,6 +320,11 @@ upgrade-externals:
 upgrade-dry-run:
     ./scripts/upgrade_tools.sh --dry-run all
 
+# Restore project-scope agent skills (chezmoi repo only — global is auto-handled). See docs/tools/agent-skills.md
+bootstrap-skills:
+    @if [ ! -f skills-lock.json ]; then echo "[INFO] no skills-lock.json in repo root; nothing to restore"; exit 0; fi
+    npx -y skills@latest experimental_install
+
 # ============================================================================
 # Fleet (multi-host chezmoi apply)
 # ============================================================================

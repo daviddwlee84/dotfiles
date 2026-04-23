@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "project-knowledge-harness": {
+      "source": "daviddwlee84/agent-skills",
+      "sourceType": "github",
+      "computedHash": "08ee2411333cd72344d10b152f9e2efd96ff2f599926e90e8d986a6204b3a2f9"
+    }
+  }
+}

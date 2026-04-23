@@ -1,0 +1,82 @@
+#!/bin/sh
+# chezmoi modify_ script: maintain ~/.agents/.skill-lock.json (the *global*
+# skills-cli lock file at https://github.com/vercel-labs/skills).
+#
+# Why managed?  The skills CLI does not yet support `npx skills install -g`
+# from a lock file (see vercel-labs/skills #283 / #549). So to keep "must-have"
+# global agent skills consistent across machines we treat the lock file as the
+# single source of truth: this script merges the *managed set* below into
+# whatever the live lock contains, then `run_onchange_after_install_global_skills.sh.tmpl`
+# reinstalls any entries whose `~/.agents/skills/<name>/SKILL.md` is missing.
+#
+# Why merge instead of overwrite?  Locally added skills (`npx skills add … -g`
+# without `-y` followed by chezmoi re-add) should NOT be wiped on every
+# `chezmoi apply`.  We only enforce *presence* of the managed entries; any
+# extra `skills.<name>` entries in the live file are preserved verbatim,
+# along with `dismissed` flags and `lastSelectedAgents` per-machine state.
+#
+# To add a new must-have global skill: append an object to $managed.skills below,
+# matching the schema chezmoi found when first running `npx skills add … -g`
+# (run `cat ~/.agents/.skill-lock.json` after a fresh install for reference).
+#
+# Requires: jq (installed by the `base` ansible role).
+# See: docs/tools/agent-skills.md
+set -eu
+
+managed=$(cat <<'JSON'
+{
+  "version": 3,
+  "skills": {
+    "project-knowledge-harness": {
+      "source": "daviddwlee84/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/daviddwlee84/agent-skills.git",
+      "skillPath": "skills/local/project-knowledge-harness/SKILL.md"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md"
+    }
+  }
+}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{"version":3,"skills":{}}'
+
+# Merge strategy:
+#   - .version: take the higher of the two (forward-compatible with skills CLI bumps)
+#   - .skills: for every name in $managed.skills, ensure presence; if the live file
+#     already has it, keep its installedAt/updatedAt/skillFolderHash (they encode
+#     real install state) but overwrite source/sourceUrl/skillPath from $managed
+#     (those are the contract we enforce).
+#   - .skills.<name> entries NOT in $managed.skills are preserved as-is.
+#   - .dismissed and .lastSelectedAgents: preserve from live (per-machine state).
+printf '%s' "$base" | jq --argjson managed "$managed" '
+  . as $base
+  | ($base.skills // {}) as $live_skills
+  | ($managed.skills // {}) as $managed_skills
+  | {
+      version: ([($base.version // 0), ($managed.version // 0)] | max),
+      skills: (
+        $live_skills
+        + (
+            $managed_skills
+            | to_entries
+            | map({
+                key: .key,
+                value: (
+                  ($live_skills[.key] // {})
+                  + (.value | with_entries(select(.key | IN("source","sourceType","sourceUrl","skillPath"))))
+                )
+              })
+            | from_entries
+          )
+      )
+    }
+    + (if ($base.dismissed // null) != null         then {dismissed:         $base.dismissed}         else {} end)
+    + (if ($base.lastSelectedAgents // null) != null then {lastSelectedAgents: $base.lastSelectedAgents} else {} end)
+'

@@ -63,62 +63,32 @@ Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV glo
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 
-### Long-term backlog → `TODO.md` + `backlog/`
+### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
 
-When the user surfaces an idea explicitly **not** being implemented this session
-(signals: "maybe later", "nice to have", "if I'm interested", "工程量太大需要再評估",
-"先記下來"), add an entry to [`TODO.md`](TODO.md) with priority + effort tags
-(`P1`/`P2`/`P3`/`P?` × `S`/`M`/`L`/`XL`). Do **not** create new
-`ROADMAP.md` / `IDEAS.md` / `BACKLOG.md` files — `TODO.md` is the single index.
+This repo uses the `project-knowledge-harness` agent skill (managed via
+`~/.agents/.skill-lock.json` → restored by
+`run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
+see [docs/tools/agent-skills.md](docs/tools/agent-skills.md)). **Load the skill**
+for the full template, disambiguation table, and upgrade path.
 
-Add a `backlog/<slug>.md` companion doc when the item meets any of:
+**Fallback (if the skill cannot be loaded)** — minimum viable rules so this
+section still constrains agents who can't see the skill:
 
-- carries a `P?` tag (record what was tried so it doesn't need re-investigation)
-- captures a paused troubleshooting session (preserve the error trace + root
-  cause analysis before context evaporates)
-- weighs multiple options (record trade-offs, not only the winner)
-- is `[L]` or `[XL]` (architectural; needs design before code)
-
-`[S]` items rarely need a backlog doc — a file path in the `TODO.md` line is
-usually enough. See [`backlog/README.md`](backlog/README.md) for the full
-template and "when to add a doc" rules.
-
-When implementing a `TODO.md` item, in the same commit:
-
-1. Move the entry to the `## Done` section with a one-line summary.
-2. Mark the corresponding `backlog/<slug>.md` (if any) `Status: shipped` and
-   keep it as a historical record (don't delete — future-you may revisit
-   adjacent decisions).
-
-`backlog/` is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `backlog/**`); it
-is repo metadata for maintainers, not user-facing config to deploy. It is also
-**not** auto-redacted (unlike `.claude/plans/` etc.) — review for secrets
-before committing, like any other doc.
-
-### Past pitfalls → `pitfalls/`
-
-When you spend more than ~15 minutes debugging something that wasn't googleable
-and the fix is non-obvious, write a `pitfalls/<slug>.md` capturing:
-
-1. **Verbatim symptom** — copy-paste error messages exactly, do not paraphrase
-   (preserves grep-ability for future-you / future agent)
-2. **Root cause** — why this happens (with source / docs / upstream issue link)
-3. **Workaround** — copy-pasteable commands or config diff
-4. **Prevention** — how to avoid stepping on this again
-
-Title the doc by the **symptom**, not the root cause (you'll search by what
-you're seeing, not by what you eventually learned). See
-[`pitfalls/README.md`](pitfalls/README.md) for the full template, when-to-add
-rules, and the cross-reference table for traps already documented elsewhere.
-
-**Pitfall vs Hard invariant**: a pitfall *graduates* to a Hard invariant in
-this file when it (a) recurs across machines, (b) silently corrupts state, or
-(c) the workaround is non-obvious enough that "remember to do X" isn't safe.
-When graduating, leave the `pitfalls/<slug>.md` as historical record and link
-to it from the new invariant.
-
-`pitfalls/` is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `pitfalls/**`)
-and **not** auto-redacted; review for secrets before committing.
+- Three repo-root surfaces, all `chezmoi`-ignored, all NOT auto-redacted:
+  [`TODO.md`](TODO.md) (priority/effort tags `P1`/`P2`/`P3`/`P?` × `S`/`M`/`L`/`XL`),
+  [`backlog/`](backlog/README.md) (research/design notes; needed for `P?` /
+  `[L]` / `[XL]` / multi-option entries), [`pitfalls/`](pitfalls/README.md)
+  (debugged traps, **titled by symptom not root cause**, verbatim error
+  messages — never paraphrase).
+- Triggers to capture future work: "maybe later", "nice to have", "if I'm
+  interested", "工程量太大需要再評估", "先記下來".
+- Triggers to capture pitfalls: >~15 min debugging, not googleable,
+  non-obvious fix, silent failure mode.
+- Do **not** spawn `ROADMAP.md` / `IDEAS.md` / `LESSONS.md` /
+  `TROUBLESHOOTING.md` — three surfaces, always.
+- A pitfall *graduates* to a Hard invariant in this file when it (a) recurs
+  across machines, (b) silently corrupts state, or (c) has a non-obvious
+  workaround. Link from the new invariant back to `pitfalls/<slug>.md`.
 
 ### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
 
