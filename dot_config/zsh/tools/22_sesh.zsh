@@ -129,18 +129,27 @@ function _sesh_wrap_agent() {
 # evaluating the inner command — we don't double-eval.
 function _sesh_on_exit_wrap() {
     local inner="$1" mode="$2" label="${3:-agent}"
+    # Ctrl+C sends SIGINT to the entire foreground process group, so the
+    # wrapper shell itself dies before it can print the hint or exec the
+    # login shell — the pane just vanishes. `trap '' INT` makes the wrapper
+    # ignore SIGINT; the inner command still receives it and exits normally,
+    # then control returns to the wrapper which prints the hint as intended.
+    # (Tools that install their own SIGINT handler — btop, htop, less — were
+    # the visible failure case; agent CLIs happened to handle Ctrl+C as
+    # clean exit so this was masked for them.)
+    local guard="trap '' INT;"
     case "$mode" in
         kill)
             print -r -- "$inner"
             ;;
         restart)
             # `|| true` so a crash exit doesn't abort the loop on `set -e` shells
-            print -r -- "while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
+            print -r -- "$guard while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
             ;;
         shell|*)
             # Default. Hint message uses tmux color codes — works in all
             # terminals tmux supports.
-            print -r -- "$inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
+            print -r -- "$guard $inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
             ;;
     esac
 }
