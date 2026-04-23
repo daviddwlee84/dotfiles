@@ -17,6 +17,9 @@ Managed tmux config lives under `~/.config/tmux/`, with a shim at `~/.tmux.conf`
 This setup is tuned for coding-agent and Neovim workflows:
 
 - native popup menu on `prefix + Space`
+- fuzzy keybinding search on `prefix + ?` (tmux-fzf, replaces the built-in list-keys dump)
+- markdown cheatsheet via `prefix + Space` → `?` (rendered with `glow`)
+- floating scratchpad on `prefix + F` (tmux-floax, persistent), one-shot popup shell on `prefix + \``, lazygit popup on `prefix + G`
 - Catppuccin (default, top status bar) or tmux2k (bottom) — switchable at runtime
 - Catppuccin status bar is responsive — modules adapt to terminal width (mobile-friendly)
 - vim-style pane navigation and copy mode
@@ -145,6 +148,7 @@ Default: `Ctrl + b`. Examples in the sibling docs assume `prefix = Ctrl + b`.
 | `tmux-resurrect` | Save/restore sessions across tmux restarts |
 | `tmux-continuum` | Automatic session saving |
 | `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
+| `tmux-fzf` | Fuzzy picker for keybindings/sessions/windows/panes (`prefix+?` rebound from list-keys) |
 | `tmux-fzf-url` | `prefix+u` opens fzf popup with all URLs in pane |
 | `tmux-open` | In copy-mode: `o` opens selection, `C-o` in editor, `S` search |
 | `catppuccin/tmux` | Status bar theme (mocha, top bar) — default |

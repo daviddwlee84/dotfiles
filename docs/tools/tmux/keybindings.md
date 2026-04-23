@@ -68,10 +68,53 @@ Swap-pane swaps the **content** while keeping the **sizes**. So if you have a 75
 
 | Keybinding | Action |
 |------------|--------|
-| `prefix + F` | Toggle floating pane (80% width/height) |
+| `prefix + F` | Toggle floating pane (80% width/height, **persistent** `float` session) |
 | `prefix + P` | Open floax popup menu |
+| `prefix + \`` | One-shot **popup shell** at current pane path (each invocation = fresh shell, exits on `exit`/Ctrl-D) |
 
-The floating pane uses a dedicated tmux session named `float` (hidden from sesh picker via blacklist). It inherits the current pane path. Useful for quick terminal tasks without disrupting your layout.
+Two flavours of popup shell, pick by use case:
+
+- **`prefix + \``** — quick-and-forget. Run a `curl`, check `df -h`, eyeball a file, exit. Each open is a clean shell. No history across opens. Good for "I just need to type one command without leaving my pane layout".
+- **`prefix + F` (floax)** — scratchpad. The `float` session persists, so when you re-toggle the popup, your previous shell history, environment, and even running processes are still there. Good for "I'm iterating on something and don't want to lose the context".
+
+## One-shot Popups
+
+These open `display-popup -E` at `#{pane_current_path}`; the popup closes when the inner command exits. Unlike floax, no session persists.
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + G` | [`lazygit`](https://github.com/jesseduffield/lazygit) popup |
+| `prefix + T` | sesh picker (television) |
+| `prefix + O` | sesh built-in picker |
+| `prefix + W` | sesh window picker (fzf) |
+| `prefix + U` | CLI tools picker (`tv tools`) |
+| `prefix + u` | URL picker (tmux-fzf-url) |
+
+When to use which:
+
+- **floax (`prefix + F`)** — repeated quick-access shell, want history preserved (notes, scratch math, long-running curl).
+- **`prefix + \`` popup shell** — quick command in a fresh shell, exit and forget.
+- **One-shot tool popup (`G`/...)** — start a TUI tool, do work, exit cleanly.
+
+## Help / Discovery (no more memorizing)
+
+The built-in `prefix + ?` (a wall-of-text `list-keys -N` dump) is replaced with [tmux-fzf](https://github.com/sainnhe/tmux-fzf): an fzf popup over **every** binding (including user-defined), fully fuzzy-searchable.
+
+| Keybinding | Action |
+|------------|--------|
+| `prefix + ?` | tmux-fzf: top-level fuzzy picker (keybindings / sessions / windows / panes / commands / processes / clipboard) |
+| `prefix + C-?` | Plain `list-keys -N` (fallback if tmux-fzf is missing) |
+| `prefix + /` | Built-in: prompt for a key, show what it's bound to (single-key lookup) |
+| `prefix + Space` then `?` | Curated cheatsheet rendered with [`glow`](https://github.com/charmbracelet/glow) (source: `dot_config/tmux/cheatsheet.md`) |
+| `prefix + Space` then `/` | tmux-fzf **keybinding** picker directly (skips the category menu) |
+
+Three layers of "I forgot the key" recovery:
+
+1. **Curated** (`prefix + Space`): grouped popup menu with the high-traffic 30-ish actions and accelerator keys.
+2. **Searchable** (`prefix + ?` → tmux-fzf): fuzzy-search across the full binding list.
+3. **Reference** (`prefix + Space` → `?`): glow-rendered markdown cheatsheet (this file's `cheatsheet.md` sibling), good for browsing while learning.
+
+Why three? The popup menu is fastest once you know roughly what you want; tmux-fzf is for "I know it exists somewhere"; the cheatsheet is for "what's even possible?". Pick whichever matches your current uncertainty.
 
 ## Copy Mode (Vim-Style)
 
@@ -155,7 +198,8 @@ Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for picki
 | `prefix + q` | Show pane numbers |
 | `prefix + ,` | Rename window |
 | `prefix + $` | Rename session |
-| `prefix + ?` | List named keybindings |
+| `prefix + ?` | tmux-fzf: fuzzy-search all keybindings (rebound from list-keys) |
+| `prefix + C-?` | Built-in `list-keys -N` (fallback) |
 | `prefix + /` | Prompt for a key and show what it is bound to |
 
 ## Popup Menu (`prefix + Space`)
@@ -196,6 +240,10 @@ Menu accelerator keys match the standalone `prefix + key` bindings wherever poss
 | `R` | Reload config | yes |
 | `I` | Install plugins (TPM) | yes (TPM built-in) |
 | `U` | Update plugins (TPM) | yes (TPM built-in) |
+| `G` | Lazygit popup | yes |
+| `p` | Popup shell | yes (`prefix + \``) |
+| `f` | Floax scratchpad | yes (`prefix + F`) |
+| `?` | Glow cheatsheet popup | menu-only |
+| `/` | tmux-fzf keybinding picker | yes (`prefix + ?`) |
 | `d` | Detach | yes (built-in) |
 | `t` | Clock | yes (built-in) |
-| `?` | List keys | yes (built-in) |
