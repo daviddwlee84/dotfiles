@@ -13,6 +13,7 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + O` | Open sesh built-in picker |
 | `prefix + S` | Jump to the last sesh session (status-bar message if none) |
 | `prefix + 9` | Open `scode` for current dir (repo-aware coding-agent layout — nvim 75% \| agent 25% + btop monitor; idempotent, switches to existing session if already created) |
+| `prefix + 0` | Lightweight sesh session at git root of current dir (no nvim/agent layout — symmetric counterpart to `prefix + 9`) |
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
 | `prefix + W` | Kill window (with confirmation) |
@@ -30,7 +31,7 @@ All bindings use the default prefix `Ctrl + b`.
 | Keybinding | Action |
 |------------|--------|
 | `Ctrl + 1..9` | Switch to window 1–9 (requires CSI-u terminal: Ghostty, Alacritty, Kitty) |
-| `Ctrl + 0` | Jump to git root session via `sesh connect --root` (kept for back-compat; `prefix + 9` now goes to `scode` instead) |
+| `Ctrl + 0` | Lightweight sesh session at repo root for current pane (mirrors `prefix + 0`) |
 | `Ctrl + h/j/k/l` | Move between panes — crosses into Neovim splits (vim-tmux-navigator) |
 | `Ctrl + \` | Focus previous pane/split (vim-tmux-navigator) |
 | `prefix + h/j/k/l` | Move between panes (fallback, tmux-only) |
