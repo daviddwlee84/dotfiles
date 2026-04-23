@@ -47,7 +47,7 @@ with a one-line summary of what shipped.
 
 ## P? — Needs evaluation before committing
 
-- [ ] **[?/M] tmux window status indicators (running / idle / error)** — show per-window state on the tab list (e.g. `1 opencode ⚙` busy vs `2 opencode 💤` idle vs `❌` errored). Three options evaluated; lean toward hook-based per-pane state file driven by opencode `session.*` + Claude `Stop`/`UserPromptSubmit` hooks. Blocked on (a) verifying opencode hook event names, (b) confirming the `dot_claude/modify_settings.json` merger handles multiple entries per event so we don't ping-pong with CodeIsland. → [research](backlog/tmux-window-status-indicators.md)
+- [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
 - [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
 - [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
 - [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
@@ -58,6 +58,7 @@ with a one-line summary of what shipped.
 
 ## Done (recent, kept for context — older items pruned)
 
+- ✅ **tmux built-in window activity/bell flags** — `monitor-activity`/`monitor-bell` enabled in `dot_config/tmux/common.conf` so Catppuccin's `#{window_flags}` shows `#`/`!` glyphs for non-current windows that produced output or rang the bell. `monitor-silence` left disabled (agent panes have a perpetual spinner, would never fire). Option A of `backlog/tmux-window-status-indicators.md`; option C (hook-based semantic state) scoped + deferred.
 - ✅ **conda/mamba lazy init** — `dot_config/zsh/tools/04_conda_mamba.zsh` finds miniforge3/miniconda3/anaconda3 and lazy-loads on first `conda`/`mamba` call.
 - ✅ **NVM lazy setup** — `02_legacy_tools.zsh` wires `NVM_DIR`; opt-in via `LOAD_NVM=1` env or `load-nvm` alias to keep startup fast.
 - ✅ **yazi `y()` function + ansible install** — `35_yazi.zsh` provides cwd-tracking wrapper; `devtools` role installs yazi (apt fallback to GitHub release musl binary).
