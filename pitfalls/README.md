@@ -99,11 +99,13 @@ Pitfalls owned by this folder. Keep alphabetical.
 | Slug | Symptom keywords | Status |
 |---|---|---|
 | [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
+| [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
 | [`tmux-display-menu-silent-fail`](tmux-display-menu-silent-fail.md) | `prefix + Space` / `prefix + e` doesn't open the popup menu, no error | workaround documented (script + height tiers) |
 | [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | tmux-resurrect doesn't restore coding-agent / TUI sessions after `kill-server` | known limitation |
 | [`tmux2k-bandwidth-uint64-underflow`](tmux2k-bandwidth-uint64-underflow.md) | `18446744073709551615K` in tmux status bar | workaround documented |
 | [`tv-channel-bare-braces-break-substitution`](tv-channel-bare-braces-break-substitution.md) | TV channel preview shows literal `{split:\t:N}` instead of substituted values, no error | workaround documented (avoid bare `{...}` in heredocs; prefer external `executable_*.sh/py` helpers) |
 | [`yazi-tmux-popup-crash`](yazi-tmux-popup-crash.md) | Yazi inside `display-popup` crashes tmux server, "Terminal response timeout" | workaround documented |
+| [`zsh-tied-array-path-shadowing`](zsh-tied-array-path-shadowing.md) | `command not found` only inside one zsh function, works at prompt; `hash -r` / `rehash` doesn't help | fixed in `dot_config/zsh/tools/22_sesh.zsh` (rename local `path` → `target`) |
 | [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | reattach restores layout but agent/TUI panes come back as bare shell | workaround documented (`@resurrect-processes` whitelist) |
 | [`yazi-tmux-popup-crash`](yazi-tmux-popup-crash.md) | `Terminal response timeout` from yazi → tmux server dies | workaround documented (use `new-window`, not `display-popup`) |
 
