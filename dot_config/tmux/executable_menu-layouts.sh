@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
-# Layout submenu (invoked from menu.sh)
+# Layout submenu.
+#
+# Invoked from two places with different position semantics:
+#   1. Top popup menu (`prefix + Enter` → Layouts...) — keyboard, no mouse
+#      event in flight, parent uses `-x R -y P`.
+#   2. Right-click window-tab menu (`Layouts...` row) — mouse-driven; the
+#      pending mouse-release/move events from the right-click would dismiss
+#      a non-`-O` menu instantly ("flash and gone"), and `-x R -y P` from
+#      the status bar lands the popup in the bottom-right corner.
+#
+# Fix: `-O` keeps the menu Open until an item is chosen / Escape pressed,
+# and `-x M -y M` anchors at the mouse position so it appears next to the
+# clicked tab. Both anchors fall back gracefully when there's no mouse
+# event (keyboard invocation places it at last-known mouse / pane center).
 set -euo pipefail
-exec tmux display-menu -T " Layouts " -x R -y P \
+exec tmux display-menu -O -T " Layouts " -x M -y M \
   "Even horizontal" 1 "select-layout even-horizontal" \
   "Even vertical"   2 "select-layout even-vertical" \
   "Main horizontal" 3 "select-layout main-horizontal" \

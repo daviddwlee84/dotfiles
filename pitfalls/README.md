@@ -101,6 +101,7 @@ Pitfalls owned by this folder. Keep alphabetical.
 | [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
 | [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
 | [`tmux-display-menu-silent-fail`](tmux-display-menu-silent-fail.md) | `prefix + Space` / `prefix + e` doesn't open the popup menu, no error | workaround documented (script + height tiers) |
+| [`tmux-submenu-flash-and-bottom-right`](tmux-submenu-flash-and-bottom-right.md) | submenu flashes away or pops up glued to bottom-right when invoked from a right-click status-bar menu | workaround documented (`-O` + `-x M -y M`) |
 | [`tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper`](tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper.md) | tmux pane built with `cmd; exec $SHELL` wrapper closes on Ctrl+C inside btop/htop/less even though clean quit (`q`/`:q`) lands in shell as designed | fixed in `dot_config/zsh/tools/22_sesh.zsh` (`trap '' INT;` prefix in `_sesh_on_exit_wrap`) |
 | [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | tmux-resurrect doesn't restore coding-agent / TUI sessions after `kill-server` | known limitation |
 | [`tmux2k-bandwidth-uint64-underflow`](tmux2k-bandwidth-uint64-underflow.md) | `18446744073709551615K` in tmux status bar | workaround documented |
