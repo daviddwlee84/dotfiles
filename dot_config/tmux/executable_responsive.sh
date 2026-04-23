@@ -35,6 +35,10 @@ set -euo pipefail
 # We replicate the catppuccin look (colour pill + text) using the same
 # `@thm_*` palette variables, but with a literal `#S` so tmux re-renders it
 # every status refresh.
+# session pill changes colour green->red on prefix (built-in client_prefix
+# tracking). That colour shift is enough indication; we tried adding a
+# separate `⌨ PFX` flag but it duplicated information already conveyed by
+# the pill colour change.
 _session_block='#[fg=#{?client_prefix,#{E:@thm_red},#{E:@thm_green}}]#{E:@catppuccin_status_left_separator}#[fg=#{E:@thm_crust},bg=#{?client_prefix,#{E:@thm_red},#{E:@thm_green}}] #[fg=#{E:@thm_fg},bg=#{E:@thm_surface_0}] #S#[fg=#{E:@thm_surface_0},bg=default]#{E:@catppuccin_status_right_separator}'
 
 tmux set -gq '@_status_right_wide' \
