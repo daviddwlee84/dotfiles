@@ -271,10 +271,11 @@ Agent wrapping (auto, opt out with --no-specstory):
   claude / codex / cursor / droid / gemini  → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
---on-exit MODE controls what happens when the agent exits/Ctrl+C:
-  shell    (default) — drop to shell with a hint, agent re-runnable
-  kill                — let the pane close (tmux default)
-  restart             — auto-respawn the agent in a loop
+--on-exit MODE controls what happens when ANY pane command exits/Ctrl+C
+(applies to the agent pane, the nvim pane, and the btop monitor window):
+  shell    (default) — drop to shell with a hint, command re-runnable
+  kill                — let the pane/window close (tmux default)
+  restart             — auto-respawn the command in a loop
 
 Examples:
   scode                            # current repo, default agent (specstory → claude)
@@ -337,18 +338,24 @@ EOF
     agent_inner=$(_sesh_wrap_agent "$agent" "$specstory_mode")
     agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "${agent:-agent}")
 
-    tmux new-session -d -s "$session" -c "$repo_root" -n editor nvim
+    # nvim and monitor get the same on-exit treatment as the agent so that
+    # quitting them drops to a shell with a re-launch hint instead of the
+    # pane/window vanishing.
+    local nvim_cmd monitor_inner monitor_cmd
+    nvim_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+
+    tmux new-session -d -s "$session" -c "$repo_root" -n editor "$nvim_cmd"
     tmux split-window -h -t "${session}:editor" -c "$repo_root" "$agent_cmd"
     # main-vertical layout, then size the LEFT pane to 75% of window width
     tmux select-layout -t "${session}:editor" main-vertical >/dev/null
     tmux resize-pane -t "${session}:editor.1" -x 75% 2>/dev/null
 
     # Monitor window
-    local monitor_cmd
-    if   command -v btop >/dev/null 2>&1; then monitor_cmd=btop
-    elif command -v htop >/dev/null 2>&1; then monitor_cmd=htop
-    else                                       monitor_cmd=top
+    if   command -v btop >/dev/null 2>&1; then monitor_inner=btop
+    elif command -v htop >/dev/null 2>&1; then monitor_inner=htop
+    else                                       monitor_inner=top
     fi
+    monitor_cmd=$(_sesh_on_exit_wrap "$monitor_inner" "$on_exit" "$monitor_inner")
     tmux new-window -t "$session" -n monitor -c "$repo_root" "$monitor_cmd"
 
     # Focus editor window, left (nvim) pane
@@ -432,10 +439,11 @@ Agent wrapping (auto, opt out with --no-specstory):
   claude / codex / cursor / droid / gemini  → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
---on-exit MODE controls per-pane behavior on agent exit/Ctrl+C:
-  shell    (default) — drop to shell with a hint, agent re-runnable
-  kill                — let the pane close (tmux default)
-  restart             — auto-respawn the agent in a loop
+--on-exit MODE controls per-pane behavior on Ctrl+C / clean exit
+(applies to all agent panes, the lazygit window, and the nvim window):
+  shell    (default) — drop to shell with a hint, command re-runnable
+  kill                — let the pane/window close (tmux default)
+  restart             — auto-respawn the command in a loop
 
 Examples:
   svibe                                            # 4× claude
@@ -570,14 +578,20 @@ EOF
     unset -f _vibe_agent_cmd
 
     # Window 2: git (lazygit if present)
+    # lazygit and nvim get the same on-exit handling as agents — quitting
+    # them drops to shell with a re-launch hint rather than killing the window.
+    local git_cmd edit_cmd
     if command -v lazygit >/dev/null 2>&1; then
-        tmux new-window -t "$session" -n git -c "$repo_root" lazygit
+        git_cmd=$(_sesh_on_exit_wrap "lazygit" "$on_exit" "lazygit")
+        tmux new-window -t "$session" -n git -c "$repo_root" "$git_cmd"
     else
+        # `git status; exec $SHELL` already lands in shell — no wrap needed.
         tmux new-window -t "$session" -n git -c "$repo_root" "git status; exec \$SHELL"
     fi
 
     # Window 3: edit (nvim)
-    tmux new-window -t "$session" -n edit -c "$repo_root" nvim
+    edit_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+    tmux new-window -t "$session" -n edit -c "$repo_root" "$edit_cmd"
 
     # Focus agents window, first pane
     tmux select-window -t "${session}:agents"

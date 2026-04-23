@@ -123,18 +123,24 @@ because vibe layouts make even less sense without git context).
 
 ##### `--on-exit` modes
 
-What happens when the agent exits (clean quit, Ctrl+C, crash):
+What happens when **any** pane command exits (agent, nvim, btop in `scode`;
+agent, lazygit, nvim in `svibe`) — clean quit, Ctrl+C, or crash:
 
 | Mode | Behavior |
 |------|----------|
-| `shell` (default) | Pane prints a yellow hint and drops into `$SHELL`. You can re-launch the agent (the hint shows the exact command), switch to lazygit, or close the pane manually. Costs one background `$SHELL` process per pane. |
-| `kill` | Pane closes when the agent exits. The historical / tmux-default behavior. |
-| `restart` | Wraps the agent in `while true; do AGENT \|\| true; sleep 1; done`. Use Ctrl+C twice quickly to break the loop and land in shell. Useful for crash-prone development of an agent itself. |
+| `shell` (default) | Pane prints a yellow hint and drops into `$SHELL`. You can re-launch the command (the hint shows the exact invocation), switch windows, or close the pane manually. Costs one background `$SHELL` process per pane while the command isn't running. |
+| `kill` | Pane/window closes when the command exits. The historical / tmux-default behavior. |
+| `restart` | Wraps the command in `while true; do CMD \|\| true; sleep 1; done`. Use Ctrl+C twice quickly to break the loop and land in shell. Useful when iterating on a crash-prone tool. |
 
 > The `shell` default trades one background process per pane for far better
 > recoverability — the most common reported pain point with the old
-> `coding-agent` workflow was "I hit Ctrl+C and lost the pane plus the
-> 75/25 layout".
+> `coding-agent` workflow was "I hit Ctrl+C in the agent and lost the pane
+> plus the 75/25 layout"; the same applies to accidentally `:q`-ing nvim or
+> quitting btop/lazygit.
+
+> The flag applies uniformly to every command-running pane in the layout —
+> there is no per-surface override. If you want e.g. lazygit to die on quit
+> but agents to drop to shell, file a feature request.
 
 ##### Single-agent only
 
