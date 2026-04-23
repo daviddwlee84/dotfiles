@@ -63,6 +63,38 @@ Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV glo
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 
+### Long-term backlog → `TODO.md` + `backlog/`
+
+When the user surfaces an idea explicitly **not** being implemented this session
+(signals: "maybe later", "nice to have", "if I'm interested", "工程量太大需要再評估",
+"先記下來"), add an entry to [`TODO.md`](TODO.md) with priority + effort tags
+(`P1`/`P2`/`P3`/`P?` × `S`/`M`/`L`/`XL`). Do **not** create new
+`ROADMAP.md` / `IDEAS.md` / `BACKLOG.md` files — `TODO.md` is the single index.
+
+Add a `backlog/<slug>.md` companion doc when the item meets any of:
+
+- carries a `P?` tag (record what was tried so it doesn't need re-investigation)
+- captures a paused troubleshooting session (preserve the error trace + root
+  cause analysis before context evaporates)
+- weighs multiple options (record trade-offs, not only the winner)
+- is `[L]` or `[XL]` (architectural; needs design before code)
+
+`[S]` items rarely need a backlog doc — a file path in the `TODO.md` line is
+usually enough. See [`backlog/README.md`](backlog/README.md) for the full
+template and "when to add a doc" rules.
+
+When implementing a `TODO.md` item, in the same commit:
+
+1. Move the entry to the `## Done` section with a one-line summary.
+2. Mark the corresponding `backlog/<slug>.md` (if any) `Status: shipped` and
+   keep it as a historical record (don't delete — future-you may revisit
+   adjacent decisions).
+
+`backlog/` is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `backlog/**`); it
+is repo metadata for maintainers, not user-facing config to deploy. It is also
+**not** auto-redacted (unlike `.claude/plans/` etc.) — review for secrets
+before committing, like any other doc.
+
 ### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
 
 Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:

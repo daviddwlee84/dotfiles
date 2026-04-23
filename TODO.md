@@ -1,48 +1,65 @@
 # TODO
 
-Future enhancements for the dotfiles repository.
+Long-term backlog for the dotfiles repository. See [`AGENTS.md`](AGENTS.md) for
+maintenance contract and [`README.md`](README.md) for current architecture.
 
-## Zsh Configuration
+> **For agents**: when the user surfaces an idea explicitly **not** being implemented
+> this session (signals: "maybe later", "nice to have", "if I'm interested",
+> "工程量太大需要再評估", "先記下來"), add it here with priority + effort tags.
+> Do not create new `ROADMAP.md` / `IDEAS.md` / `BACKLOG.md` files — `TODO.md` is
+> the single backlog index. Long-form research goes in [`backlog/<slug>.md`](backlog/).
 
-| Item | Notes |
-|------|-------|
-| conda/mamba init | Needs ansible role for miniforge/conda |
-| NVM setup | Needs ansible role for nvm |
-| Yazi y() function | Needs ansible role for yazi |
-| BUN, pnpm, cargo PATH | Needs ansible roles for these tools |
-| Go PATH | Needs ansible role for Go |
-| TA-Lib paths | Machine-specific, keep in secrets.zsh |
-| Try/Toolkami | Custom tools, keep in secrets.zsh |
-| alias cc, readelf, ccusage | These depend on specstory/binutils |
-| secrets.zsh encryption | Future: encrypt with age |
+## How to read this
 
-## Ansible Roles to Add
+Each item carries two tags:
 
-- [ ] miniforge/conda
-- [ ] nvm (Node Version Manager)
-- [ ] yazi (terminal file manager)
-- [ ] bun (JavaScript runtime)
-- [ ] pnpm (package manager)
-- [ ] rust/cargo
-- [ ] go
+- **Priority**: `P1` (next likely batch) · `P2` (worth doing) · `P3` (someday) · `P?` (needs evaluation first — spike before committing)
+- **Effort**: `S` (< 1h) · `M` (half day) · `L` (multi-day) · `XL` (architectural, design doc first)
 
-## Pueue
+A trailing `→ [research](backlog/<slug>.md)` link means the item has accompanying
+investigation, design notes, or paused troubleshooting — read that first before
+re-investigating. Items without a link are simple enough to act on directly.
 
-- [ ] Manage pueue config via chezmoi (`~/.config/pueue/pueue.yml`) and define macOS compatibility strategy for `~/Library/Application Support/pueue/pueue.yml` (`PUEUE_CONFIG_PATH` or path sync).
+When implementing an item, move it to the `## Done` section in the same commit
+with a one-line summary of what shipped.
 
 ---
 
-Fix Claude Code hook on Ubuntu `Stop hook error: Failed with non-blocking status code: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Notifications was not provided by any .service files`
+## P1 — Likely next batch
 
-Use mise to manage most of the runtime version?!
+- [ ] **[S] Starship status-aware modules** — enable `status` / `cmd_duration` / `shlvl` / `container` in `dot_config/starship.toml`. Pure additive, no risk. → [research](backlog/starship-context-modules.md)
+- [ ] **[S] tmux2k bandwidth bug** — drop `bandwidth` from `@tmux2k-right-plugins` in `dot_config/tmux/theme.tmux2k.conf` (uint64 underflow already documented in the file's own comment). → [research](backlog/tmux2k-tuning.md)
+- [ ] **[S] tmux2k theme alignment** — switch `@tmux2k-theme` from `onedark` to `catppuccin` so the tmux2k layout matches Ghostty/Neovim's colour story. → [research](backlog/tmux2k-tuning.md)
+- [ ] **[M] Fix Claude Code hook on Ubuntu (headless)** — `Stop hook error: ... org.freedesktop.Notifications was not provided by any .service files`. Headless servers have no notification daemon; need either fallback in the hook or `libnotify` + lightweight daemon.
 
-Optimize zsh & tmux startup time
+## P2 — Worth doing, no rush
 
-~Do we want to use Brewfile to manage macOS packages installation instead of writing one by one through Ansible?~ **Done**: XDG-compliant Brewfiles at `~/.config/homebrew/` with chezmoi run_onchange script (opt-in via `installBrewApps`).
+- [ ] **[M] miniforge/conda ansible role** — `dot_config/zsh/tools/04_conda_mamba.zsh` already lazy-loads if conda is present, but no role installs it. Decide: ansible role vs delegate to `mise`/`brew install --cask miniforge`.
+- [ ] **[M] nvm ansible role** — `02_legacy_tools.zsh` wires PATH + provides `load-nvm` alias, but no role installs nvm itself. May be obviated by mise consolidation (see P? below).
+- [ ] **[S] bun / pnpm / go install via ansible** — PATH wiring already in `02_legacy_tools.zsh`; just need install steps (likely additions to `js_cli_tools` and a new `go_tools` role, or fold into `devtools`).
+- [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`).
+- [ ] **[L] secrets.zsh encryption with age** — currently plaintext + chezmoi-ignored. Age-encrypted version could live in the source tree. Needs key distribution plan across machines.
+
+## P3 — Someday / nice to have
+
+- [ ] **[S] TA-Lib path management** — currently in `secrets.zsh` as machine-specific. Could move to a `99_local_*.zsh` create-only stub like the proxy pattern in `dot_config/zsh/99_local_proxy.zsh`.
+- [ ] **[S] Try / Toolkami custom tool aliases** — currently in `secrets.zsh`. Same `99_local_*.zsh` pattern as TA-Lib above; group together.
+
+## P? — Needs evaluation before committing
+
+- [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
+- [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
+- [ ] **[?/XL] CUDA / ML toolchain ansible role** — driver/cudnn/nccl version matrix is large; only relevant on Linux ML hosts. Defer until there's a concrete host that needs it. Likely belongs behind a new `ml_linux` profile.
+- [ ] **[?/XL] SLURM client config** — same shape as CUDA above: host-specific, likely a `dot_slurm/` template gated by profile. No machine currently needs it.
 
 ---
 
-ML
+## Done (recent, kept for context — older items pruned)
 
-- cuda
-- SLURM?
+- ✅ **conda/mamba lazy init** — `dot_config/zsh/tools/04_conda_mamba.zsh` finds miniforge3/miniconda3/anaconda3 and lazy-loads on first `conda`/`mamba` call.
+- ✅ **NVM lazy setup** — `02_legacy_tools.zsh` wires `NVM_DIR`; opt-in via `LOAD_NVM=1` env or `load-nvm` alias to keep startup fast.
+- ✅ **yazi `y()` function + ansible install** — `35_yazi.zsh` provides cwd-tracking wrapper; `devtools` role installs yazi (apt fallback to GitHub release musl binary).
+- ✅ **bun / pnpm / cargo / go PATH** — wired in `02_legacy_tools.zsh` + `06_cargo.zsh`. Install side still pending (P2 above).
+- ✅ **ccusage alias** — `07_bunx_cli.zsh` runs via `bunx`.
+- ✅ **rust/cargo ansible role** — `rust_cargo_tools` role with `cargo-update` for upgrade flow.
+- ✅ **Brewfile-based macOS package management** — XDG Brewfiles at `~/.config/homebrew/` with chezmoi `run_onchange` script (opt-in via `installBrewApps` prompt).
