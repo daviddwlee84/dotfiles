@@ -1883,7 +1883,7 @@
 # --- tmux ---
 # The dotfiles tmux config uses features (display-menu positioning clamping,
 # popup-style options, etc.) that require tmux >= 3.3. Ubuntu 22.04 apt ships
-# 3.2a, which silently suppresses the prefix + Space popup menu. We therefore:
+# 3.2a, which silently suppresses the prefix + Enter popup menu. We therefore:
 #   1. install the apt package as a baseline (when sudo is available),
 #   2. check the resulting version, and
 #   3. upgrade via Linuxbrew (preferred) or tmux-appimage (user-level) if too old.

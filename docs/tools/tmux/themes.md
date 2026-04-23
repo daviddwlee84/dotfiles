@@ -40,7 +40,7 @@ alias tmuxt='TMUX_THEME=tmux2k tmux'
 | `prefix + M-c` | Switch to Catppuccin |
 | `prefix + M-t` | Switch to tmux2k |
 
-Both entries also live in the `prefix + Space` popup menu.
+Both entries also live in the `prefix + Enter` popup menu.
 
 ### First-time caveat
 

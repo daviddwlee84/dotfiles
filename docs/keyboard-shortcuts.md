@@ -131,7 +131,7 @@ Prefix key: `Ctrl+B`
 | `prefix + M-t` | Switch to tmux2k theme (bottom status bar) |
 | `prefix + R` | Reload tmux config |
 
-### Popup Menu  *(`prefix + Space`)*
+### Popup Menu  *(`prefix + Enter`)*
 
 One-key access to all major operations. Accelerator letters match the standalone bindings above.
 

@@ -16,9 +16,9 @@ Managed tmux config lives under `~/.config/tmux/`, with a shim at `~/.tmux.conf`
 
 This setup is tuned for coding-agent and Neovim workflows:
 
-- native popup menu on `prefix + Space`
+- native popup menu on `prefix + Enter` (was `prefix + Space` — moved due to a tmux 3.6a + csi-u flake; see [keybindings.md](./keybindings.md#popup-menu-prefix--enter))
 - fuzzy keybinding search on `prefix + ?` (tmux-fzf, replaces the built-in list-keys dump)
-- markdown cheatsheet via `prefix + Space` → `?` (rendered with `glow`)
+- markdown cheatsheet via `prefix + Enter` → `?` (rendered with `glow`)
 - floating scratchpad on `prefix + F` (tmux-floax, persistent), one-shot popup shell on `prefix + \``, lazygit popup on `prefix + G`
 - Catppuccin (default, top status bar) or tmux2k (bottom) — switchable at runtime
 - Catppuccin status bar is responsive — modules adapt to terminal width (mobile-friendly)
@@ -42,7 +42,7 @@ After `chezmoi apply`, start tmux and run `prefix + I` once to let TPM install t
 
 ## Version requirement: tmux >= 3.3
 
-The popup menu at `prefix + Space` uses `display-menu -x R -y P`. On tmux 3.2a (shipped by Ubuntu 22.04 apt) the menu is positioned past the terminal's right edge and silently suppressed — the man page explicitly states _"If the menu is too large to fit on the terminal, it is not displayed."_ tmux 3.3 introduced position clamping and arithmetic in `-x`/`-y`, so the menu renders correctly.
+The popup menu (now bound to `prefix + Enter`, historically `prefix + Space`) uses `display-menu -x R -y P`. On tmux 3.2a (shipped by Ubuntu 22.04 apt) the menu is positioned past the terminal's right edge and silently suppressed — the man page explicitly states _"If the menu is too large to fit on the terminal, it is not displayed."_ tmux 3.3 introduced position clamping and arithmetic in `-x`/`-y`, so the menu renders correctly.
 
 The ansible `devtools` role now checks the tmux version and, when it is below 3.3, upgrades automatically:
 

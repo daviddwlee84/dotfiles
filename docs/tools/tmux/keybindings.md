@@ -7,7 +7,7 @@ All bindings use the default prefix `Ctrl + b`.
 | Keybinding | Action |
 |------------|--------|
 | `prefix + R` | Reload `~/.tmux.conf` |
-| `prefix + Space` | Open the tmux popup menu |
+| `prefix + Enter` | Open the tmux popup menu |
 | `prefix + g` | Open sesh picker |
 | `prefix + T` | Open sesh picker via television (tv) |
 | `prefix + O` | Open sesh built-in picker |
@@ -105,14 +105,14 @@ The built-in `prefix + ?` (a wall-of-text `list-keys -N` dump) is replaced with 
 | `prefix + ?` | tmux-fzf: top-level fuzzy picker (keybindings / sessions / windows / panes / commands / processes / clipboard) |
 | `prefix + C-?` | Plain `list-keys -N` (fallback if tmux-fzf is missing) |
 | `prefix + /` | Built-in: prompt for a key, show what it's bound to (single-key lookup) |
-| `prefix + Space` then `?` | Curated cheatsheet rendered with [`glow`](https://github.com/charmbracelet/glow) (source: `dot_config/tmux/cheatsheet.md`) |
-| `prefix + Space` then `/` | tmux-fzf **keybinding** picker directly (skips the category menu) |
+| `prefix + Enter` then `?` | Curated cheatsheet rendered with [`glow`](https://github.com/charmbracelet/glow) (source: `dot_config/tmux/cheatsheet.md`) |
+| `prefix + Enter` then `/` | tmux-fzf **keybinding** picker directly (skips the category menu) |
 
 Three layers of "I forgot the key" recovery:
 
-1. **Curated** (`prefix + Space`): grouped popup menu with the high-traffic 30-ish actions and accelerator keys.
+1. **Curated** (`prefix + Enter`): grouped popup menu with the high-traffic 30-ish actions and accelerator keys.
 2. **Searchable** (`prefix + ?` → tmux-fzf): fuzzy-search across the full binding list.
-3. **Reference** (`prefix + Space` → `?`): glow-rendered markdown cheatsheet (this file's `cheatsheet.md` sibling), good for browsing while learning.
+3. **Reference** (`prefix + Enter` → `?`): glow-rendered markdown cheatsheet (this file's `cheatsheet.md` sibling), good for browsing while learning.
 
 Why three? The popup menu is fastest once you know roughly what you want; tmux-fzf is for "I know it exists somewhere"; the cheatsheet is for "what's even possible?". Pick whichever matches your current uncertainty.
 
@@ -202,7 +202,9 @@ Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for picki
 | `prefix + C-?` | Built-in `list-keys -N` (fallback) |
 | `prefix + /` | Prompt for a key and show what it is bound to |
 
-## Popup Menu (`prefix + Space`)
+## Popup Menu (`prefix + Enter`)
+
+> Historical note: the menu used to be on `prefix + Space`, but tmux 3.6a + `extended-keys=always` + `csi-u` makes bare Space unreliable as a prefix-table key (upstream tmux/tmux#4959, #4984). `Space` is now intentionally **unbound** — `Enter` is the canonical menu key. If you forget it, `prefix + ?` (tmux-fzf) is the always-on fallback.
 
 Menu accelerator keys match the standalone `prefix + key` bindings wherever possible — pressing `R` inside the menu does the same thing as `prefix + R` outside it. Items marked "menu-only" have no standalone binding.
 

@@ -1,12 +1,12 @@
 # tmux Cheatsheet
 
-> **Prefix** = `Ctrl + b` · Press inside tmux: `prefix + Space` for menu, `prefix + ?` for fuzzy key search.
+> **Prefix** = `Ctrl + b` · Press inside tmux: `prefix + Enter` for menu, `prefix + ?` for fuzzy key search.
 
 ## Most-Used (memorize these first)
 
 | Key | Action |
 |-----|--------|
-| `prefix + Space` | Popup menu (everything below, navigable) |
+| `prefix + Enter` | Popup menu (everything below, navigable) |
 | `prefix + ?` | **fzf** picker over ALL keybindings (tmux-fzf) |
 | `prefix + /` | Prompt for a key, show what it's bound to |
 | `prefix + d` | Detach |
@@ -117,8 +117,8 @@
 | `prefix + ?` | tmux-fzf: search all keybindings |
 | `prefix + C-?` | Plain `list-keys -N` (fallback) |
 | `prefix + /` | Prompt for a key, show its binding |
-| `prefix + Space` then `?` | Open this cheatsheet (glow) |
-| `prefix + Space` then `/` | Same as `prefix + ?` (tmux-fzf) |
+| `prefix + Enter` then `?` | Open this cheatsheet (glow) |
+| `prefix + Enter` then `/` | Same as `prefix + ?` (tmux-fzf) |
 
 ## Right-click menus
 

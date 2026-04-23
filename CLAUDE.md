@@ -212,7 +212,7 @@ Full case studies (`dot_claude/modify_settings.json`, `.chezmoitemplates/editor/
 
 ### Tmux ≥ 3.3 required for popup menu
 
-The `prefix + Space` popup uses `display-menu -x R -y P`; tmux 3.2a places the menu past the terminal edge and silently suppresses it, while 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically (Linuxbrew when present, otherwise user-level [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`). After the upgrade, run `tmux kill-server` once — running servers keep the old binary in memory.
+The `prefix + Enter` popup uses `display-menu -x R -y P`; tmux 3.2a places the menu past the terminal edge and silently suppresses it, while 3.3+ clamps the position. (`prefix + Space` was the historical key, moved to `Enter` due to a tmux 3.6a + `extended-keys=always` + `csi-u` flake — see [docs/tools/tmux/keybindings.md → Popup Menu](docs/tools/tmux/keybindings.md#popup-menu-prefix--enter); upstream tmux/tmux#4959, #4984.) The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically (Linuxbrew when present, otherwise user-level [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`). After the upgrade, run `tmux kill-server` once — running servers keep the old binary in memory.
 
 ### Key tmux settings for coding agents
 
