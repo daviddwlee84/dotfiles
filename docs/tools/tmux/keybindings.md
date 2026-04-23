@@ -11,11 +11,12 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + g` | Open sesh picker |
 | `prefix + T` | Open sesh picker via television (tv) |
 | `prefix + O` | Open sesh built-in picker |
-| `prefix + W` | Open sesh window picker (fzf) |
-| `prefix + S` | Jump to the last sesh session |
+| `prefix + S` | Jump to the last sesh session (status-bar message if none) |
 | `prefix + 9` | Jump to the git root session for the current repo |
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
+| `prefix + W` | Kill window (with confirmation) |
+| `prefix + r` | Renumber windows (close gaps left by killed windows) |
 | `prefix + M` | Move current window to another session (prompts for `session[:index]`) |
 | `prefix + B` | Break current pane into a new window and move it to a session (tab tear-out) |
 | `prefix + A` | Link current window into another session (window appears in both) |
@@ -39,10 +40,14 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + \|` | Split left/right (vertical divider) |
 | `prefix + -` | Split top/bottom (horizontal divider) |
 | `prefix + c` | New window in current path |
-| `prefix + x` | Kill pane |
+| `prefix + x` | Kill pane (with confirmation) |
+| `prefix + W` | Kill window (with confirmation) |
+| `prefix + r` | Manually renumber windows (close index gaps) |
 | `prefix + z` | Toggle pane zoom |
 | `prefix + {` | Swap pane with previous (left/up) |
 | `prefix + }` | Swap pane with next (right/down) |
+| `prefix + m` | **Mark** current pane (built-in; one mark globally; needed by Join in menus) |
+| `prefix + !` | Break current pane into a new window in same session (built-in) |
 | `prefix + [` | Enter copy mode |
 
 `Ctrl+1..9` and `Ctrl+0` require CSI-u terminal support. Ghostty/cmux sends these natively. Alacritty needs explicit `keyboard.bindings` (managed by this repo in `dot_config/alacritty/alacritty.toml`). Legacy terminals (Terminal.app, plain SSH) cannot send these — use `prefix + number` instead.
@@ -86,7 +91,6 @@ These open `display-popup -E` at `#{pane_current_path}`; the popup closes when t
 | `prefix + G` | [`lazygit`](https://github.com/jesseduffield/lazygit) popup |
 | `prefix + T` | sesh picker (television) |
 | `prefix + O` | sesh built-in picker |
-| `prefix + W` | sesh window picker (fzf) |
 | `prefix + U` | CLI tools picker (`tv tools`) |
 | `prefix + u` | URL picker (tmux-fzf-url) |
 
@@ -139,13 +143,15 @@ Mouse drag in copy mode also copies to clipboard. Double-click selects a word.
 
 Right-click opens a context menu depending on where you click:
 
-| Target | Menu |
-|--------|------|
-| Pane body (`MouseDown3Pane`) | Split / swap / zoom / kill / respawn |
-| Window list (`MouseDown3Status`) | Swap / rename / kill / new window |
-| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/rename session, new session/window |
+| Target | Menu items |
+|--------|------------|
+| Pane body (`MouseDown3Pane`) | Split h/v, swap up/down/left/right, zoom, resize 75% / even, mark, swap marked, **join marked here (h/v)**, **send pane to window…**, **break to new window**, copy mode, respawn, kill |
+| Window list (`MouseDown3Status`) | Swap left/right, move/link to session, **merge into other window as pane (h/v)**, kill window, **renumber windows**, rename, new window |
+| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/rename session, move current window, new session/window |
 
 Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
+
+After break / send / merge / join, a status-bar message reports what happened (e.g. `Broke pane out to window 4 (zsh)`, `Merged into 1`).
 
 ## URL Opening
 
@@ -173,19 +179,50 @@ Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select 
 
 Cross-platform: `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 also works for the vim-style `y` yank (even over SSH).
 
-## Moving Windows Across Sessions
+## Moving Windows / Panes Across Sessions
 
-Like dragging a browser tab into a new window. The target prompt accepts:
+Like dragging a browser tab into a new window — but tmux can do it at three different granularities (whole window, pane → new window, pane → existing window as split). The target prompt accepts:
 
 - `session:` — append to next free index in `session`
 - `session:N` — specific index in `session` (fails if taken; tmux's `-k` flag would overwrite, but our binds omit it for safety — rename or use a free index)
 - `session:` where `session` doesn't yet exist — fails; create first with `prefix + N` or `tmux new -ds session`
 
+### Window-level (whole tab)
+
 | Key | Underlying command | Effect |
 |-----|-------------------|--------|
 | `prefix + M` | `move-window -t '%%'` | **Cut** current window out of this session and **paste** into target |
-| `prefix + B` | `break-pane -t '%%'` | Pull current **pane** out as a new window in target session |
 | `prefix + A` | `link-window -t '%%'` | **Link** (not copy): same window appears in both sessions; edits stay in sync. `unlink-window` removes one side without killing |
+| `prefix + W` | `kill-window` | Kill current window (with confirmation) |
+| `prefix + r` | `move-window -r` | Renumber windows in current session — closes index gaps. `renumber-windows on` (set in `common.conf`) auto-renumbers when a whole window is destroyed, but kill-pane on multi-pane windows or shell-driven exits can still leave gaps; this binding is the manual top-up. |
+
+### Pane → new window
+
+| Key | Underlying command | Effect |
+|-----|-------------------|--------|
+| `prefix + !` | `break-pane` (built-in) | Break current pane into a new window in the **same** session |
+| `prefix + B` | `break-pane -t '%%'` | Break + move to chosen session in one step (tab tear-out) |
+| Right-click pane → "Break to new window" | `break-pane` | Same as `prefix + !`, but reports the new window index in the status bar |
+
+### Pane → existing window (as a split)
+
+These all use tmux's `join-pane`, which moves a pane between windows. `join-pane` always operates on individual **panes**, not whole windows — there is no "merge two windows wholesale" command. The two-step "mark + join" idiom is the canonical workflow:
+
+1. Go to the **source** pane (the one you want to move).
+2. Press `prefix + m` to **mark** it. tmux remembers exactly one marked pane globally; the marked pane gets a coloured border.
+3. Switch to the **destination** window.
+4. Right-click any pane → "Join marked pane here (h-split)" or "(v-split)". The marked pane jumps over and becomes a split.
+
+Alternative entry points to the same `join-pane` command:
+
+| From | Action | Effect |
+|------|--------|--------|
+| Right-click pane → "Join marked pane here (h/v-split)" | `join-pane -h` / `-v` | Pull the marked pane into this window as a split |
+| Right-click pane → "Send pane to window…" | `choose-tree -Zw … join-pane -h -s '#{pane_id}' -t '%%'` | Push **this** pane out to another window as a split (no mark needed; pick target from window tree picker) |
+| Right-click window tab → "Merge into other window (as pane, h/v-split)" | `choose-tree -Zw … join-pane -h -s '#{window_id}' -t '%%'` | Move this window's **active pane** into another window as a split. If the source window has only one pane, it disappears (effectively merging the whole window). With multiple panes, only the active one moves. |
+| popup menu → Session → "Join marked here (h/v)" / "Send pane to…" | same as right-click | Same actions, keyboard-driven |
+
+> **Why no top-level `prefix +` key for join-pane / send-pane?** All single-letter capital slots are taken (`H/J/K/L` = resize, `S` = sesh-last, `W` = kill-window, `M/N/B/A` = window ops). Rather than rebind something else, these live in the right-click menus and the popup menu's Session submenu. The mark-and-join workflow is mostly mouse-friendly anyway.
 
 Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for picking the destination session name before invoking `M`/`B`/`A`.
 
@@ -252,8 +289,8 @@ Accelerator keys match the standalone `prefix + key` bindings wherever possible 
 Source of truth: `dot_config/tmux/executable_menu-*.sh`.
 
 - **Layouts** (`L`): Even h/v (`1`/`2`), Main h/v (`3`/`4`), Tiled (`5`), Resize 75% (`+`), Pane h/j/k/l, Swap `{`/`}`.
-- **Session** (`S`): Rename session/window (`$`/`,`), New session (`N`), Move window (`m`), Break pane (`r`), Link window (`K`), Kill pane/session/server (`x`/`X`/`Q`).
-- **Sesh+** (`E`): TV picker (`V`), Built-in (`O`), Windows (`W`), Last sesh (`U`), Repo root (`9`), CLI Tools tv (`B`).
+- **Session** (`S`): Rename session/window (`$`/`,`), New session (`N`), Move window (`m`), Break pane (`r`), Link window (`K`), Renumber (`R`), Join marked here h/v (`j`/`J`), Send pane to (`s`), Kill pane/window/session/server (`x`/`W`/`X`/`Q`).
+- **Sesh+** (`E`): TV picker (`V`), Built-in (`O`), Last sesh (`U`), Repo root (`9`), CLI Tools tv (`B`).
 - **Popups** (`o`): Lazygit (`g`), Shell (`s`), Floax scratchpad (`f`).
 - **Theme** (`T`): Catppuccin (`c`), tmux2k (`t`).
 - **System** (`Y`): Reload config (`R`), Install plugins (`I`), Update plugins (`U`), Detach (`d`), Clock (`k`).

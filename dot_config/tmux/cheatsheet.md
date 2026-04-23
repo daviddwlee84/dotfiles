@@ -25,7 +25,6 @@
 | `prefix + G` | Lazygit popup @ pane path |
 | `prefix + T` | Sesh picker via television |
 | `prefix + O` | Sesh built-in picker |
-| `prefix + W` | Sesh window picker |
 | `prefix + U` | CLI tools picker (tv tools) |
 | `prefix + u` | URL picker (tmux-fzf-url) |
 
@@ -56,6 +55,10 @@
 | `prefix + ,` | Rename window |
 | `prefix + w` | Choose window tree |
 | `prefix + n` `prefix + p` | Next · previous window |
+| `prefix + W` | Kill window (confirm) |
+| `prefix + r` | Renumber windows (close gaps) |
+| `prefix + !` | Break pane to new window (same session) |
+| `prefix + m` | **Mark** current pane (for join via menu) |
 
 ## Sessions
 
@@ -65,9 +68,24 @@
 | `prefix + N` | New session (prompts for name) |
 | `prefix + $` | Rename session |
 | `prefix + X` | Kill session (confirm) |
+| `prefix + S` | Last sesh session |
 | `prefix + M` | **Move** window to another session |
 | `prefix + B` | **Break** pane into a window in another session |
 | `prefix + A` | **Link** window into another session (lives in both) |
+
+## Pane ↔ Window (mark + join, via menu)
+
+No top-level `prefix +` key — use right-click pane menu or popup menu → Session.
+Workflow to merge two windows into one:
+
+1. Go to source pane → `prefix + m` (mark)
+2. Go to destination window → right-click pane → "Join marked pane here (h/v-split)"
+
+Other directions:
+
+- Right-click pane → "Send pane to window…" — push current pane to another window
+- Right-click pane → "Break to new window" — same as `prefix + !`, with status message
+- Right-click window tab → "Merge into other window (as pane)" — sends this window's active pane elsewhere
 
 ## Layouts
 
