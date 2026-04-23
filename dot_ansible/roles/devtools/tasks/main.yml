@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -33,6 +33,7 @@
       - superfile
       - tmux
       - sesh
+      - worktrunk
       - zellij
       - btop
       - htop
@@ -2400,6 +2401,138 @@
         - /tmp/sesh
         - /tmp/README.md
         - /tmp/LICENSE
+
+# --- worktrunk (git worktree manager for parallel AI agents) ---
+- name: Check if worktrunk is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: wt --version
+  register: worktrunk_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Ensure xz is available for worktrunk extraction (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - worktrunk_check.rc != 0
+  ansible.builtin.apt:
+    name: xz-utils
+    state: present
+  become: true
+  failed_when: false
+
+- name: Install worktrunk from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - worktrunk_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (worktrunk)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest worktrunk release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/max-sixty/worktrunk/releases/latest
+        return_content: true
+      register: worktrunk_release
+
+    - name: Set worktrunk architecture mapping
+      ansible.builtin.set_fact:
+        worktrunk_arch: >-
+          {{
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Skip worktrunk on unsupported architecture
+      when: worktrunk_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "worktrunk skipped: no release for {{ target_architecture }}"
+
+    - name: Set worktrunk download URL fact
+      ansible.builtin.set_fact:
+        worktrunk_download_url: >-
+          {{
+            (
+              worktrunk_release.json.assets
+              | selectattr('name', 'equalto', 'worktrunk-' ~ worktrunk_arch ~ '-unknown-linux-musl.tar.xz')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip worktrunk if download URL could not be determined
+      when: worktrunk_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "worktrunk skipped: could not determine download URL for architecture {{ worktrunk_arch }}"
+
+    - name: Download worktrunk tarball
+      ansible.builtin.get_url:
+        url: "{{ worktrunk_download_url }}"
+        dest: /tmp/worktrunk.tar.xz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create worktrunk temp directory
+      ansible.builtin.file:
+        path: /tmp/worktrunk
+        state: directory
+        mode: '0755'
+
+    - name: Extract worktrunk
+      ansible.builtin.unarchive:
+        src: /tmp/worktrunk.tar.xz
+        dest: /tmp/worktrunk
+        remote_src: true
+
+    - name: Find worktrunk binary
+      ansible.builtin.find:
+        paths: /tmp/worktrunk
+        patterns: wt
+        file_type: file
+        recurse: true
+      register: worktrunk_find
+
+    - name: Fail if worktrunk binary was not found in extracted archive
+      when: worktrunk_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "worktrunk binary 'wt' was not found under /tmp/worktrunk after extraction"
+
+    - name: Install worktrunk to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ worktrunk_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/wt"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up worktrunk temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/worktrunk.tar.xz
+        - /tmp/worktrunk
+
+  rescue:
+    - name: Warn worktrunk installation failed
+      ansible.builtin.debug:
+        msg: "worktrunk installation failed (likely network timeout) - skipping"
+
+    - name: Clean up worktrunk temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/worktrunk.tar.xz
+        - /tmp/worktrunk
 
 # --- taplo (TOML language server / formatter) ---
 - name: Check if taplo is installed

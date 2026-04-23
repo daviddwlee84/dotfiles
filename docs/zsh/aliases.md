@@ -14,6 +14,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Git](#git)
 - [Tools Picker](#tools-picker)
 - [Session Management](#session-management)
+- [Worktree Management](#worktree-management)
 - [GitHub / GitLab](#github--gitlab)
 - [AI Usage Tracking](#ai-usage-tracking)
 - [Task Queue](#task-queue)
@@ -450,6 +451,19 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `sesh-code` / `scode` | function / alias | `dot_config/zsh/tools/22_sesh.zsh` | Repo-scoped coding-agent layout: nvim 75% \| `specstory run [agent]` 25%, plus btop window. Session named `coding-agent/<repo>` (collision-safe). Refuses outside git repos. Flags: `--on-exit shell\|kill\|restart`, `--no-specstory` |
 | `sesh-vibe` / `svibe` | function / alias | `dot_config/zsh/tools/22_sesh.zsh` | Parametric multi-agent layout: `svibe [N] [CLI]` (homogeneous) or `svibe --agents claude,codex,opencode,…` (heterogeneous). N tiled agent panes + lazygit window + nvim window. Session named `vibe/<repo>`. Same `--on-exit` / `--no-specstory` flags as scode |
 | `try-sesh` / `tsesh` | function / alias | `dot_config/zsh/tools/32_try.zsh` | Open a `try` ephemeral workspace and immediately connect via sesh |
+
+---
+
+## Worktree Management
+
+> Requires `worktrunk` (`wt`). `wtcd` also requires `jq` + `fzf`.
+>
+> Worktrunk's own aliases (`wt sw`, `wt ls`, `wt rm`, `wt cc`, `wt oc`) are defined in `dot_config/worktrunk/config.toml`, not in zsh — they work from any shell and from the interactive picker.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `wt` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
+| `wtcd` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
 
 ---
 

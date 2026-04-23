@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Worktrunk — global user config (managed by chezmoi).
+# Source:  dot_config/worktrunk/config.toml
+# Target:  ~/.config/worktrunk/config.toml
+# Docs:    https://worktrunk.dev
+#
+# Status: try-out config. Aliases active; hooks & LLM commits intentionally
+# left commented until I've used wt enough to know what I want. Uncomment
+# blocks one at a time as needs surface; delete the whole file (and the
+# Brewfile/ansible entries in dot_ansible/roles/devtools/) if I drop wt.
+# ---------------------------------------------------------------------------
+
+# Where new worktrees live. Default `{{ repo_path }}/../{{ repo }}.{{ branch | sanitize }}`
+# is fine for most repos. Override here only if you want a different layout
+# (e.g. flat sibling dirs, or bare-repo style under {repo}/{branch}/).
+# worktree-path = "{{ repo_path }}/../{{ repo }}.{{ branch | sanitize }}"
+
+# --- Aliases (your own shorthands; `wt sw foo` == `wt switch foo`) ---------
+[aliases]
+sw  = "wt switch"
+ls  = "wt list"
+rm  = "wt remove"
+# Open a new worktree AND launch Claude Code in it, in one keystroke:
+#   wt cc fix-login -- 'Login times out after 5min. Extend to 24h.'
+cc  = "wt switch --create --execute=claude"
+# Same, but with OpenCode:
+oc  = "wt switch --create --execute='opencode run'"
+
+# --- Hooks: keep MINIMAL while testing. Uncomment what you want. -----------
+
+# Copy gitignored files (node_modules/, .env, target/ etc) from the source
+# worktree so new worktrees don't cold-start. Safe default for most repos
+# but slow if the project ignores huge build artefacts — opt in per-need.
+# [post-start]
+# copy = "wt step copy-ignored"
+
+# Per-worktree dev server on a deterministic port derived from branch name.
+# [post-start]
+# server = "npm run dev -- --port {{ branch | hash_port }}"
+# [list]
+# url = "http://localhost:{{ branch | hash_port }}"
+# [pre-remove]
+# server = "lsof -ti :{{ branch | hash_port }} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+
+# --- LLM commit messages (used by `wt merge`) -----------------------------
+# Pick ONE. Defaults to whatever the binary ships with; explicit is safer.
+# Option 1: editor-driven (no LLM, fully manual):
+# [commit.generation]
+# command = '''f=$(mktemp); printf '\n\n' > "$f"; sed 's/^/# /' >> "$f"; ${EDITOR:-vi} "$f" < /dev/tty > /dev/tty; grep -v '^#' "$f"'''
+
+# Option 2: pipe diff/prompt to Claude Code in non-interactive mode:
+# [commit.generation]
+# command = "claude -p"
+
+# Option 3: pipe to OpenCode:
+# [commit.generation]
+# command = "opencode run"
+
+# --- LLM branch summaries in `wt list --full` -----------------------------
+# Requires commit.generation above to be set.
+# [list]
+# summary = true
