@@ -21,6 +21,7 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + M` | Move current window to another session (prompts for `session[:index]`) |
 | `prefix + B` | Break current pane into a new window and move it to a session (tab tear-out) |
 | `prefix + A` | Link current window into another session (window appears in both) |
+| `prefix + E` | Explode — break every pane in current window into its own window (same session). For switching from wide-screen multi-pane to mobile/SSH single-pane |
 | `prefix + d` | Detach |
 | `prefix + t` | Show tmux clock mode |
 | `prefix + M-c` | Switch theme to Catppuccin (top status bar) |
@@ -199,6 +200,7 @@ Like dragging a browser tab into a new window — but tmux can do it at three di
 |-----|-------------------|--------|
 | `prefix + !` | `break-pane` (built-in) | Break current pane into a new window in the **same** session |
 | `prefix + B` | `choose-tree -Zs … break-pane -s '#{pane_id}' -t '%%'` | Break + move to chosen session in one step (tab tear-out, session picker) |
+| `prefix + E` | `~/.config/tmux/break-all-panes.sh` | **Explode** — break every pane in current window into its own window (same session). Source window keeps the first pane; others become sibling windows inserted right after, named after each pane's current command. Use case: continuing a wide-screen multi-pane layout on mobile/SSH where one pane per window is easier than zooming with `prefix + z`. Also available via right-click window menu → "Break all panes → windows". |
 | Right-click pane → "Break to new window" | `break-pane` | Same as `prefix + !`, but reports the new window index in the status bar |
 
 ### Pane → existing window (as a split)
