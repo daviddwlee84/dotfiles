@@ -173,6 +173,16 @@ Workarounds (pick one):
 
 See upstream [2kabhishek/tmux2k](https://github.com/2kabhishek/tmux2k) issues for progress.
 
+### Status-left session name doesn't update after `sesh connect`
+
+Symptom: switching session via `sesh connect` (or any `switch-client -t`) leaves the old session name in catppuccin's status-left until you `tmux detach` + `tmux attach`, run `tmux refresh-client -S` manually, or hit `prefix + R` to source the config.
+
+Cause: catppuccin's `@catppuccin_status_session` module stores its text segment via `set -ag` (without `-F`), embedding `#{E:@catppuccin_session_text}` (which expands to `#S`) as a *string reference* inside the variable. When `responsive.sh` then wraps that variable in another `#{E:...}`, the result is triple-nested expansion that tmux's per-client format cache does not invalidate on `client-session-changed`. Reported upstream as [catppuccin/tmux#337](https://github.com/catppuccin/tmux/issues/337) (closed but the staleness path remains).
+
+Fix (already applied in `dot_config/tmux/executable_responsive.sh`): hand-roll the session block using a literal `#S` plus the catppuccin `@thm_*` palette variables, bypassing `@catppuccin_status_session` entirely. The directory and right-side modules still go through catppuccin because they don't reference live per-client state. tmux re-evaluates `#S` on every status redraw, so switching sessions updates immediately without any hooks or `refresh-client` calls.
+
+The variant of this fix that does NOT work: adding `set-hook -g client-session-changed 'refresh-client -S'` or appending `&& tmux refresh-client -S` to sesh bindings. Both fire too early — `run-shell` completes asynchronously after the popup frame redraws over the refresh, so the cached status-left wins. The hand-rolled approach is the only fix that survives the popup race.
+
 ### Switching themes leaves residual styling
 
 Some tmux options (colors, pane-border-style, etc.) persist on the server after a plugin sets them. Our theme files reset `status-left/right` and `window-status-*` before composing, which covers the visible status bar, but deeper style overrides may linger. Cleanest workaround:

@@ -19,16 +19,34 @@
 set -euo pipefail
 
 # -- Module bundles (stored as user options so the format can reference them)
-tmux set -gqF '@_status_right_wide' \
-  '#{E:@catppuccin_status_application}#{E:@catppuccin_status_user}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}'
-tmux set -gqF '@_status_right_medium' \
-  '#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}'
-tmux set -gq  '@_status_right_narrow' ''
+#
+# IMPORTANT: use `set -gq` (NOT `-gqF`) to store the module references as
+# *unexpanded* strings. The status-left/status-right format below then wraps
+# the lookup in a single `#{E:...}` expansion.
+#
+# session is hand-rolled instead of using `#{E:@catppuccin_status_session}`
+# because catppuccin's session module stores `#{E:@catppuccin_session_text}`
+# (which expands to `#S`) inside its own variable via `set -ag` (not `-agF`).
+# This creates triple-nested `#{E:}` expansion that tmux's format cache does
+# not invalidate on `client-session-changed`, leaving the old session name
+# in status-left after `tmux switch-client` / `sesh connect` until manual
+# `prefix + R` reload. See catppuccin/tmux#337.
+#
+# We replicate the catppuccin look (colour pill + text) using the same
+# `@thm_*` palette variables, but with a literal `#S` so tmux re-renders it
+# every status refresh.
+_session_block='#[fg=#{?client_prefix,#{E:@thm_red},#{E:@thm_green}}]#{E:@catppuccin_status_left_separator}#[fg=#{E:@thm_crust},bg=#{?client_prefix,#{E:@thm_red},#{E:@thm_green}}] #[fg=#{E:@thm_fg},bg=#{E:@thm_surface_0}] #S#[fg=#{E:@thm_surface_0},bg=default]#{E:@catppuccin_status_right_separator}'
 
-tmux set -gqF '@_status_left_wide' \
-  '#{E:@catppuccin_status_session}#{E:@catppuccin_status_directory}'
-tmux set -gqF '@_status_left_narrow' \
-  '#{E:@catppuccin_status_session}'
+tmux set -gq '@_status_right_wide' \
+  '#{E:@catppuccin_status_application}#{E:@catppuccin_status_user}#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}'
+tmux set -gq '@_status_right_medium' \
+  '#{E:@catppuccin_status_host}#{E:@catppuccin_status_date_time}'
+tmux set -gq '@_status_right_narrow' ''
+
+tmux set -gq '@_status_left_wide' \
+  "${_session_block}#{E:@catppuccin_status_directory}"
+tmux set -gq '@_status_left_narrow' \
+  "${_session_block}"
 
 # -- Per-client status-right: pick bundle by client_width.
 #    e|>=: numeric comparison; nested #{?:,:} is fine here because each
