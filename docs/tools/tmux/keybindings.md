@@ -181,18 +181,14 @@ Cross-platform: `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 also works fo
 
 ## Moving Windows / Panes Across Sessions
 
-Like dragging a browser tab into a new window — but tmux can do it at three different granularities (whole window, pane → new window, pane → existing window as split). The target prompt accepts:
-
-- `session:` — append to next free index in `session`
-- `session:N` — specific index in `session` (fails if taken; tmux's `-k` flag would overwrite, but our binds omit it for safety — rename or use a free index)
-- `session:` where `session` doesn't yet exist — fails; create first with `prefix + N` or `tmux new -ds session`
+Like dragging a browser tab into a new window — but tmux can do it at three different granularities (whole window, pane → new window, pane → existing window as split). All cross-session/cross-window targets are picked from a `choose-tree` picker (live preview, fuzzy-search), not typed into a prompt. See the [picker-over-prompt design rule](#design-note-pickers-over-prompts) below for why.
 
 ### Window-level (whole tab)
 
 | Key | Underlying command | Effect |
 |-----|-------------------|--------|
-| `prefix + M` | `move-window -t '%%'` | **Cut** current window out of this session and **paste** into target |
-| `prefix + A` | `link-window -t '%%'` | **Link** (not copy): same window appears in both sessions; edits stay in sync. `unlink-window` removes one side without killing |
+| `prefix + M` | `choose-tree -Zs … move-window -s '#{window_id}' -t '%%'` | **Cut** current window out of this session and **paste** into target (session picker) |
+| `prefix + A` | `choose-tree -Zs … link-window -s '#{window_id}' -t '%%:'` | **Link** (not copy): same window appears in both sessions; edits stay in sync. `unlink-window` removes one side without killing |
 | `prefix + W` | `kill-window` | Kill current window (with confirmation) |
 | `prefix + r` | `move-window -r` | Renumber windows in current session — closes index gaps. `renumber-windows on` (set in `common.conf`) auto-renumbers when a whole window is destroyed, but kill-pane on multi-pane windows or shell-driven exits can still leave gaps; this binding is the manual top-up. |
 
@@ -201,7 +197,7 @@ Like dragging a browser tab into a new window — but tmux can do it at three di
 | Key | Underlying command | Effect |
 |-----|-------------------|--------|
 | `prefix + !` | `break-pane` (built-in) | Break current pane into a new window in the **same** session |
-| `prefix + B` | `break-pane -t '%%'` | Break + move to chosen session in one step (tab tear-out) |
+| `prefix + B` | `choose-tree -Zs … break-pane -s '#{pane_id}' -t '%%'` | Break + move to chosen session in one step (tab tear-out, session picker) |
 | Right-click pane → "Break to new window" | `break-pane` | Same as `prefix + !`, but reports the new window index in the status bar |
 
 ### Pane → existing window (as a split)
@@ -224,7 +220,18 @@ Alternative entry points to the same `join-pane` command:
 
 > **Why no top-level `prefix +` key for join-pane / send-pane?** All single-letter capital slots are taken (`H/J/K/L` = resize, `S` = sesh-last, `W` = kill-window, `M/N/B/A` = window ops). Rather than rebind something else, these live in the right-click menus and the popup menu's Session submenu. The mark-and-join workflow is mostly mouse-friendly anyway.
 
-Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for picking the destination session name before invoking `M`/`B`/`A`.
+Tip: `prefix + s` (built-in choose-tree) shows live previews — handy for previewing sessions before invoking `M`/`B`/`A`, though those bindings now open their own pickers so the standalone preview is mostly for casual browsing.
+
+### Design note: pickers over prompts
+
+All cross-window/cross-session bindings in this repo use `choose-tree -Zw` (window picker) or `-Zs` (session picker), not `command-prompt`. Two reasons:
+
+1. **Correctness for `target-pane` commands**. tmux's `join-pane`, `swap-pane`, `move-pane` parse `-t TARGET` as a *pane* — a bare integer `N` means "pane index N in the *current* window", not "window N". Users typing `1` thinking "window 1" silently target the wrong pane (often the source pane itself, producing `Source and target panes must be different`). `choose-tree -Zw` returns `session:window`, which the parser unambiguously resolves to that window's active pane. Full debugging trail in [`pitfalls/tmux-join-pane-numeric-target-pane-not-window.md`](../../../pitfalls/tmux-join-pane-numeric-target-pane-not-window.md).
+2. **UX**. Live preview, fuzzy-search, and zero memorisation of session names beat a free-form prompt even when both are technically safe (e.g. `move-window -t` accepts session-level targets without ambiguity).
+
+Source pane/window is always pinned with `-s '#{pane_id}'` or `-s '#{window_id}'` rather than relying on "current pane / current window" — `#{pane_id}` resolves at click time against the client's active pane, which may not be the right-clicked tab on status-bar menus.
+
+When adding a new keybinding/menu row that targets a window or session: reach for `choose-tree -Zw` / `-Zs` first; only fall back to `command-prompt` if no picker fits (free-form rename, brand-new session name, etc.).
 
 ## Built-in tmux Keys Still Available
 

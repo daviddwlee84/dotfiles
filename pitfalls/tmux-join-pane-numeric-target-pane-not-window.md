@@ -77,3 +77,31 @@ case.
 - `pitfalls/tmux-display-menu-silent-fail.md` — the other tmux menu pitfall
   (height-fit suppression, also misdiagnosed at first)
 - `man tmux` → "COMMANDS" → target-pane vs target-window grammar
+
+## General rule: prefer pickers over `command-prompt` for window/session targets
+
+Beyond the specific `join-pane -t N` trap, this debugging round upgraded a
+broader heuristic for **all** tmux bindings whose target is "another
+window/session/pane the user has to identify":
+
+| Approach | When OK | When NOT OK |
+|---|---|---|
+| `command-prompt -p "Target:" "cmd -t '%%'"` | Target unambiguously parses to the right scope (e.g. `move-window -t`, `link-window -t`, `break-pane -t` all accept session-level targets — bare `N` works) | Target type is `target-pane` (e.g. `join-pane`, `swap-pane`, `move-pane`) — bare integer falls back to "pane index in current window" and silently picks the wrong (often source) pane |
+| `choose-tree -Zs … "cmd -t '%%'"` (session picker) | Cross-session ops where session is the natural target | Single-session use that needs a specific window/pane within |
+| `choose-tree -Zw … "cmd -t '%%'"` (window picker) | Cross-window pane ops — returns `session:window`, unambiguous | — |
+
+Even when `command-prompt` is technically safe (M/B/A in this repo), the
+picker form is preferred for UX reasons: live preview, no need to remember
+session names, no fat-finger typos. We migrated `prefix + M / B / A` to
+`choose-tree -Zs` in the same change as the join-pane fix for consistency.
+
+Always also pin the **source** with an explicit `-s '#{pane_id}'` or `-s
+'#{window_id}'` rather than relying on "current pane / current window".
+`#{pane_id}` / `#{window_id}` resolve at menu-row click time against the
+client's current pane, which is **not** necessarily the right-clicked tab on
+status-bar menus — pinning the ID at definition time avoids that footgun too.
+
+When introducing a new keybinding/menu row that takes a window or session as
+target: reach for `choose-tree -Zw` / `-Zs` first; only fall back to
+`command-prompt` if no picker fits (e.g. free-form rename, where the user
+has to type a brand-new name).
