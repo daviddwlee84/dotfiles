@@ -95,6 +95,31 @@ is repo metadata for maintainers, not user-facing config to deploy. It is also
 **not** auto-redacted (unlike `.claude/plans/` etc.) — review for secrets
 before committing, like any other doc.
 
+### Past pitfalls → `pitfalls/`
+
+When you spend more than ~15 minutes debugging something that wasn't googleable
+and the fix is non-obvious, write a `pitfalls/<slug>.md` capturing:
+
+1. **Verbatim symptom** — copy-paste error messages exactly, do not paraphrase
+   (preserves grep-ability for future-you / future agent)
+2. **Root cause** — why this happens (with source / docs / upstream issue link)
+3. **Workaround** — copy-pasteable commands or config diff
+4. **Prevention** — how to avoid stepping on this again
+
+Title the doc by the **symptom**, not the root cause (you'll search by what
+you're seeing, not by what you eventually learned). See
+[`pitfalls/README.md`](pitfalls/README.md) for the full template, when-to-add
+rules, and the cross-reference table for traps already documented elsewhere.
+
+**Pitfall vs Hard invariant**: a pitfall *graduates* to a Hard invariant in
+this file when it (a) recurs across machines, (b) silently corrupts state, or
+(c) the workaround is non-obvious enough that "remember to do X" isn't safe.
+When graduating, leave the `pitfalls/<slug>.md` as historical record and link
+to it from the new invariant.
+
+`pitfalls/` is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `pitfalls/**`)
+and **not** auto-redacted; review for secrets before committing.
+
 ### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
 
 Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:
