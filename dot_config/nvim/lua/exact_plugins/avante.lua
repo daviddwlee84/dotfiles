@@ -43,15 +43,28 @@ return {
       "nvim-tree/nvim-web-devicons", -- or echasnovski/mini.icons
       "zbirenbaum/copilot.lua", -- for providers='copilot'
       {
-        -- support for image pasting
+        -- support for image pasting.
+        --
+        -- `drag_and_drop.insert_mode = true` would make img-clip override
+        -- vim.paste() in insert mode, so EVERY paste (URLs, code, plain
+        -- text) shells out to pngpaste/xclip to check whether the clipboard
+        -- holds an image -- adding ~50-200ms per paste plus a "Content is
+        -- not an image." notification each time. We keep drag-and-drop
+        -- enabled in normal mode (drop a file/URL onto nvim -> markdown
+        -- link) and rely on `:PasteImage` for explicit image paste; Avante
+        -- buffers handle their own image flow independently.
+        --
+        -- `verbose = false` silences the "Content is not an image." toast
+        -- that fires from any unrelated cmdline / lua paste.
         "HakonHarnes/img-clip.nvim",
         event = "VeryLazy",
         opts = {
           default = {
             embed_image_as_base64 = false,
             prompt_for_file_name = false,
+            verbose = false,
             drag_and_drop = {
-              insert_mode = true,
+              insert_mode = false,
             },
           },
         },
