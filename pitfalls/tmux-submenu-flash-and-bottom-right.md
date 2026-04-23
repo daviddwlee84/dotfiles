@@ -1,9 +1,9 @@
-# tmux: submenu opens in bottom-right corner and flashes away when invoked from a right-click menu
+# tmux: nested display-menu via `run-shell` from a right-click parent menu is unreliable
 
-**Symptoms** (grep this section): submenu flashes and disappears, popup in bottom-right corner, `display-menu` flickers, right-click submenu won't stay open, tmux menu position wrong from status bar
+**Symptoms** (grep this section): submenu flashes and disappears, popup in bottom-right corner, `display-menu` flickers, right-click submenu won't stay open, tmux menu position wrong from status bar, submenu opens but selecting an item does nothing on second invocation
 **First seen**: 2026-04
-**Affects**: tmux 3.3+ (likely older too); any `display-menu` submenu invoked from `MouseDown3Status` / `MouseDown3Pane` / `MouseDown3StatusLeft`
-**Status**: workaround documented (apply `-O` + `-x M -y M` to dual-purpose submenus)
+**Affects**: tmux 3.3+ (likely older too); any `display-menu` invoked indirectly via `run-shell "$HOME/.config/tmux/menu-foo.sh"` from a `MouseDown3*` parent
+**Status**: workaround — inline the submenu items into the parent instead of nesting via shell script
 
 ## Symptom
 
@@ -50,47 +50,61 @@ same `-x R -y P` puts the menu in a sensible place near the parent.
 
 ## Fix
 
-For any submenu that may be opened from a **mouse-driven** parent menu,
-combine both:
+**Don't nest.** Inline the submenu items directly into the parent menu, even
+if it pushes the parent above the ~14-row soft cap (see
+`AGENTS.md` → "tmux ≥ 3.3 required for popup menu"). The cap exists for a
+real reason (small terminals silently suppress oversized menus), so when
+inlining grows the parent past 14 rows, drop the lowest-frequency rows and
+move them to the keyboard popup (`prefix + Enter` → submenu) where the
+nesting works fine.
 
-```sh
-exec tmux display-menu -O -T " Layouts " -x M -y M \
-  "Even horizontal" 1 "select-layout even-horizontal" \
+```tmux
+# Bad: nested via run-shell (selection silently no-ops on 2nd invocation)
+bind-key -n MouseDown3Status display-menu -O ... \
+  "Layouts..." L { run-shell "~/.config/tmux/menu-layouts.sh" } \
+  ...
+
+# Good: inline the layout commands directly
+bind-key -n MouseDown3Status display-menu -O ... \
+  "Even horizontal" 1 { select-layout even-horizontal } \
+  "Even vertical"   2 { select-layout even-vertical } \
+  "Tiled (grid)"    5 { select-layout tiled } \
   ...
 ```
 
-- `-O` keeps the menu Open until an item is chosen or Escape is pressed —
-  immune to the queued mouse-release event from the parent.
-- `-x M -y M` anchors at the **mouse position** (last mouse event), so the
-  popup appears next to the clicked tab. Falls back gracefully on keyboard
-  invocation (last-known mouse position; in practice still readable).
+The keyboard popup path (`prefix + Enter` → "Layouts..." → `run-shell
+~/.config/tmux/menu-layouts.sh`) keeps working — the bug is specific to
+mouse-driven parents whose mouse-event lifecycle interferes with the child
+menu's input handling.
 
-Top-level keyboard-only popups (`menu.sh` triggered by `prefix + Enter`)
-can keep `-x R -y P` without `-O` — there's no mouse event to dismiss them
-and the cursor-pane anchor is fine for keyboard.
+## Things that look like fixes but aren't
 
-## Why it took a while to spot
+Spent time trying these — none worked reliably across "first invocation"
+vs "after cancelling once":
 
-- Both quirks are "silent": no error, no log, just wrong position or instant
-  dismiss.
-- The same submenu script was already used (and working) from
-  `prefix + Enter`. Easy to assume "it works, must be the parent menu's
-  fault" when right-click triggered it badly.
-- Adding `-O` alone fixes the flash but leaves the popup in the bottom-right
-  — which then looks like a *new* bug, not the same one.
-- Removing `-O` alone after fixing position would re-introduce the flash —
-  the two fixes are independent and both required.
+- `-O` on the submenu: stops the immediate flash-and-gone, but on second
+  invocation after cancelling the parent, selecting an item silently
+  no-ops.
+- `-x M -y M` on the submenu: fixes the bottom-right placement, but mouse
+  position state is stale after cancel-and-retry, so it pops up in
+  unpredictable places.
+- `run-shell -d 0.1 "~/.config/tmux/menu-foo.sh"`: deferring the shell
+  exec lets the parent's mouse-release drain, fixes the flash, but the
+  selection-no-ops bug remains.
+- `display-popup` wrapping the submenu: changes mouse semantics entirely
+  but you lose `display-menu`'s key shortcuts.
 
-## Repository touchpoints
+The man page (tmux 3.3+) explains why `-O` alone isn't enough:
 
-- `dot_config/tmux/executable_menu-layouts.sh` — fixed instance (has docstring
-  explaining the dual-invocation contract).
-- `dot_config/tmux/keybindings.conf` — `MouseDown3Status` window menu invokes
-  it with `run-shell "~/.config/tmux/menu-layouts.sh"`.
-- Other submenus (`menu-session.sh`, `menu-system.sh`, `menu-theme.sh`,
-  `menu-popups.sh`, `menu-sesh.sh`) are currently only invoked from the
-  keyboard popup, so they intentionally still use `-x R -y P` without `-O`.
-  If any of these is later wired into a right-click menu, apply the same fix.
+> If the mouse is enabled and the menu is opened from a mouse key binding,
+> releasing the mouse button … closes the menu. `-M` tells tmux the menu
+> should handle mouse events; by default only menus opened from mouse key
+> bindings do so.
+
+A submenu launched via `run-shell` is NOT considered "opened from a mouse
+key binding" — so `-M` doesn't help either, and the trailing mouse events
+from the now-defunct parent leak into an undefined input state for the
+child.
 
 ## Related
 
