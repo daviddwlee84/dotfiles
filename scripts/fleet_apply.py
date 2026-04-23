@@ -721,7 +721,12 @@ async def run_one_local(
         status.error = str(e)
         log_fp.write(f"\n# exception: {type(e).__name__}: {e}\n")
     finally:
-        status.elapsed = loop.time() - (status.started_at or loop.time())
+        # Freeze elapsed by stamping finished_at — the live renderer keys
+        # off this field to stop the clock (see _render_table). Setting a
+        # bare `status.elapsed` attr (the previous bug) was a no-op because
+        # HostStatus doesn't declare it AND the renderer never reads it,
+        # so the `self` row kept ticking even after state=done.
+        status.finished_at = loop.time()
         log_fp.close()
         cache_fp.close()
         # Write the sentinel last so a `--status` poll sees the rc only
