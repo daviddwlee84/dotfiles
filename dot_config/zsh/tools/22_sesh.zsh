@@ -78,6 +78,62 @@ function _sesh_ensure_session() {
     return 1       # newly created
 }
 
+# Wrap a known specstory provider in `specstory run X` so the agent picks up
+# auto-save markdown logging. Bare CLI names that aren't specstory providers
+# (currently: opencode — see backlog/specstory-opencode-support.md) pass
+# through unchanged.
+#
+# Update the case list when specstory adds providers (track upstream:
+# specstoryai/getspecstory#146 for opencode, similar issues for others).
+function _sesh_wrap_agent() {
+    local agent="$1"
+    case "$agent" in
+        ""|"specstory")
+            # No agent specified → bare `specstory run` (default = claude).
+            print -r -- "specstory run"
+            ;;
+        claude|codex|cursor|droid|gemini)
+            print -r -- "specstory run $agent"
+            ;;
+        *)
+            # Pass-through for non-specstory providers (opencode today, more
+            # later as specstory adds support).
+            print -r -- "$agent"
+            ;;
+    esac
+}
+
+# Build a wrapper command that controls what happens when the inner command
+# exits (Ctrl+C, agent quit, crash). `--on-exit shell|kill|restart`:
+#   shell   — print a hint, then drop into $SHELL so user can restart agent,
+#             switch to lazygit, kill the pane manually, etc. (default)
+#   kill    — let the pane close on exit (tmux default `remain-on-exit off`)
+#   restart — wrap in `while true; do CMD; sleep 1; done` so the agent
+#             auto-respawns. Use Ctrl+C twice quickly to break the loop and
+#             land in shell.
+#
+# Args: $1=inner_cmd, $2=mode, $3=label_for_hint
+# Stdout: the wrapped shell command (single string suitable for `tmux
+# new-window … "<cmd>"`). Quoting is structured so user $SHELL is the one
+# evaluating the inner command — we don't double-eval.
+function _sesh_on_exit_wrap() {
+    local inner="$1" mode="$2" label="${3:-agent}"
+    case "$mode" in
+        kill)
+            print -r -- "$inner"
+            ;;
+        restart)
+            # `|| true` so a crash exit doesn't abort the loop on `set -e` shells
+            print -r -- "while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
+            ;;
+        shell|*)
+            # Default. Hint message uses tmux color codes — works in all
+            # terminals tmux supports.
+            print -r -- "$inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
+            ;;
+    esac
+}
+
 # Connect to a sesh session for the current directory (creates it if missing).
 # Lightweight: drops you into a plain shell at $PWD with NO startup command.
 # For an editor-first session use `scode` (repo-aware, full layout) or just
@@ -146,9 +202,9 @@ alias svibe='sesh-vibe'
 
 # ── scode: repo-aware coding-agent layout ───────────────────────────────────
 #
-# Open the coding-agent layout (nvim 75% | specstory 25% + btop window) in a
-# session NAMED FOR THE CURRENT REPO, so different repos don't collide on
-# the single `coding-agent` session name.
+# Open the coding-agent layout (nvim 75% | specstory-wrapped agent 25%, btop
+# window) in a session NAMED FOR THE CURRENT REPO, so different repos don't
+# collide on the single `coding-agent` session name.
 #
 # Session naming:
 #   In repo /Volumes/Data/Program/Personal/foo  → session `coding-agent/foo`
@@ -158,39 +214,67 @@ alias svibe='sesh-vibe'
 # Outside a git repo the function refuses with a hint to use `shere` or `svibe`
 # (the heavy layout doesn't make sense for ad-hoc directories).
 #
+# Agent wrapping: known specstory providers (claude/codex/cursor/droid/gemini)
+# are auto-wrapped in `specstory run X` for markdown auto-save. Others
+# (opencode today) pass through raw — see _sesh_wrap_agent + backlog entry
+# `specstory-opencode-support` for the upstream tracking.
+#
+# Exit behavior: `--on-exit shell` (default) drops to a shell with a hint when
+# the agent exits, so Ctrl+C doesn't kill the pane. Use `--on-exit kill` for
+# the old behavior, or `--on-exit restart` for an auto-respawn loop.
+#
 # Usage:
-#   scode                              # current repo, default agent (claude)
-#   scode codex                        # current repo, override agent CLI
-#   scode opencode                     # current repo, opencode
+#   scode                              # current repo, default agent (specstory → claude)
+#   scode codex                        # specstory run codex
+#   scode opencode                     # opencode raw (not yet a specstory provider)
+#   scode --on-exit kill claude        # Ctrl+C kills the right pane
+#   scode --on-exit restart codex      # codex auto-respawns on crash
 #   scode -p ~/some/other/repo         # explicit repo path
 #   scode --no-attach                  # create session in background, don't switch
 function sesh-code() {
-    local target="" agent="" no_attach=0
+    local target="" agent="" no_attach=0 on_exit="shell"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
             -a|--agent)     agent="$2"; shift 2 ;;
+            --on-exit)      on_exit="$2"; shift 2 ;;
             --no-attach)    no_attach=1; shift ;;
             -h|--help)
                 cat <<'EOF'
 scode — open repo-scoped coding-agent layout
 
-Usage: scode [--path DIR] [--agent CLI] [--no-attach] [AGENT]
+Usage: scode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-attach] [AGENT]
 
-Layout: window `editor` (nvim 75% | specstory 25%) + window `monitor` (btop).
+Layout: window `editor` (nvim 75% | agent 25%) + window `monitor` (btop).
 Session name: `coding-agent/<repo-basename>` (one session per repo).
 Requires:     git repo (errors otherwise — use `shere` or `svibe`).
 
+Agent wrapping (auto):
+  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  opencode (and other unknown CLIs)         → raw passthrough
+
+--on-exit MODE controls what happens when the agent exits/Ctrl+C:
+  shell    (default) — drop to shell with a hint, agent re-runnable
+  kill                — let the pane close (tmux default)
+  restart             — auto-respawn the agent in a loop
+
 Examples:
-  scode                  # current repo, default agent (specstory passthrough)
-  scode claude           # override: launch claude in the right pane
-  scode -p ~/work/foo    # explicit repo path
+  scode                            # current repo, default agent
+  scode codex                      # right pane: specstory run codex
+  scode opencode                   # right pane: opencode (raw)
+  scode --on-exit kill claude      # right pane closes when claude exits
+  scode -p ~/work/foo              # explicit repo path
 EOF
                 return 0 ;;
             -*)             echo "scode: unknown flag $1" >&2; return 1 ;;
             *)              [[ -z "$agent" ]] && agent="$1" || true; shift ;;
         esac
     done
+
+    case "$on_exit" in
+        shell|kill|restart) ;;
+        *) echo "scode: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+    esac
 
     # Resolve repo root
     local repo_root
@@ -216,33 +300,17 @@ EOF
         return 0
     fi
 
-    # Create session + build layout directly with tmux commands. We deliberately
-    # avoid tmuxp -a here because (a) tmuxp --append needs a live tmux client
-    # ($TMUX set), which isn't guaranteed when scode is invoked from outside
-    # tmux, and (b) the layout is simple enough that direct tmux scripting is
-    # clearer than the YAML-template-then-cleanup-empty-window dance the
-    # sesh.toml `coding-agent` named session uses.
+    # Create session + build layout directly with tmux commands (see svibe
+    # comment block for why not tmuxp).
     #
-    # Window 1 "editor": nvim (left, will be 75%) | $right_pane_cmd (right, 25%)
+    # Window 1 "editor": nvim (left, will be 75%) | wrapped agent (right, 25%)
     # Window 2 "monitor": btop (or htop / top fallback)
-    #
-    # Right-pane command resolution:
-    #   - No agent override        → `specstory run` (defaults to claude with auto-save md)
-    #   - Override with bare name  → `specstory run <name>` if name is a known
-    #                                specstory provider (claude/codex/cursor/droid/gemini),
-    #                                otherwise `<name>` raw (e.g. opencode)
-    local right_pane_cmd
-    if [[ -z "$agent" ]]; then
-        right_pane_cmd="specstory run"
-    else
-        case "$agent" in
-            claude|codex|cursor|droid|gemini) right_pane_cmd="specstory run $agent" ;;
-            *)                                right_pane_cmd="$agent" ;;
-        esac
-    fi
+    local agent_inner agent_cmd
+    agent_inner=$(_sesh_wrap_agent "$agent")
+    agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "${agent:-agent}")
 
     tmux new-session -d -s "$session" -c "$repo_root" -n editor nvim
-    tmux split-window -h -t "${session}:editor" -c "$repo_root" "$right_pane_cmd"
+    tmux split-window -h -t "${session}:editor" -c "$repo_root" "$agent_cmd"
     # main-vertical layout, then size the LEFT pane to 75% of window width
     tmux select-layout -t "${session}:editor" main-vertical >/dev/null
     tmux resize-pane -t "${session}:editor.1" -x 75% 2>/dev/null
@@ -271,26 +339,34 @@ EOF
 # Session naming: `vibe/<dir-basename>` — collision-safe across directories.
 # Refuses outside a git repo (use `shere` for plain shells in arbitrary dirs).
 #
+# Each agent pane is wrapped in `specstory run X` (for known providers) and
+# additionally wrapped in an exit handler controlled by `--on-exit MODE` —
+# same semantics as `scode`. Default `shell` keeps the pane open with a hint
+# after the agent exits, so Ctrl+C is recoverable.
+#
 # Usage:
-#   svibe                              # 4 panes × claude, + lazygit + nvim
+#   svibe                              # 4 panes × claude (specstory-wrapped) + lazygit + nvim
 #   svibe 2                            # 2 panes × claude
-#   svibe 4 codex                      # 4 panes × codex
-#   svibe 3 opencode                   # 3 panes × opencode
+#   svibe 4 codex                      # 4 panes × specstory run codex
+#   svibe 3 opencode                   # 3 panes × opencode (raw, not yet a specstory provider)
+#   svibe --on-exit kill 4 claude      # Ctrl+C kills the pane (old behavior)
+#   svibe --on-exit restart 4 codex    # codex auto-respawns on crash
 #   svibe -p ~/repo 4 claude           # explicit path
 #   svibe --no-attach 4 claude         # create in background
 function sesh-vibe() {
-    local target="" no_attach=0
+    local target="" no_attach=0 on_exit="shell"
     local n_agents=4
     local agent_cli="claude"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
+            --on-exit)      on_exit="$2"; shift 2 ;;
             --no-attach)    no_attach=1; shift ;;
             -h|--help)
                 cat <<'EOF'
 svibe — parametric multi-agent vibe layout
 
-Usage: svibe [--path DIR] [--no-attach] [N_AGENTS] [AGENT_CLI]
+Usage: svibe [--path DIR] [--on-exit MODE] [--no-attach] [N_AGENTS] [AGENT_CLI]
 
 Default: svibe 4 claude
   window 1 "agents" — N_AGENTS panes (tiled), each running AGENT_CLI
@@ -300,11 +376,21 @@ Default: svibe 4 claude
 Session name: `vibe/<repo-basename>` (collision-safe per directory).
 Requires:     git repo (use `shere` for plain shells elsewhere).
 
+Agent wrapping (auto):
+  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+  opencode (and other unknown CLIs)         → raw passthrough
+
+--on-exit MODE controls per-pane behavior on agent exit/Ctrl+C:
+  shell    (default) — drop to shell with a hint, agent re-runnable
+  kill                — let the pane close (tmux default)
+  restart             — auto-respawn the agent in a loop
+
 Examples:
-  svibe                  # 4× claude
-  svibe 2                # 2× claude
-  svibe 4 codex          # 4× codex
-  svibe 6 opencode       # 6× opencode (heavy — large monitor recommended)
+  svibe                            # 4× claude (default exit=shell)
+  svibe 2                          # 2× claude
+  svibe 4 codex                    # 4× codex
+  svibe 6 opencode                 # 6× opencode (heavy — large monitor recommended)
+  svibe --on-exit kill 4 claude    # Ctrl+C closes the pane
 EOF
                 return 0 ;;
             -*)             echo "svibe: unknown flag $1" >&2; return 1 ;;
@@ -318,6 +404,11 @@ EOF
         fi
     fi
     [[ $# -gt 0 ]] && agent_cli="$1"
+
+    case "$on_exit" in
+        shell|kill|restart) ;;
+        *) echo "svibe: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+    esac
 
     if (( n_agents < 1 || n_agents > 12 )); then
         echo "svibe: n_agents=$n_agents out of range [1, 12]" >&2
@@ -337,10 +428,11 @@ EOF
         return 1
     fi
 
-    # Validate agent CLI exists
+    # Validate agent CLI exists (check the bare CLI, not the wrapped form —
+    # `specstory run X` validity is `specstory`'s problem, not ours).
     if ! command -v "$agent_cli" >/dev/null 2>&1; then
         echo "svibe: agent CLI '$agent_cli' not found in PATH." >&2
-        echo "       Available: $(for c in claude codex opencode; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
+        echo "       Available: $(for c in claude codex opencode cursor droid gemini; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
         return 1
     fi
 
@@ -354,14 +446,19 @@ EOF
         return 0
     fi
 
+    # Build the wrapped command once; reused for every pane.
+    local agent_inner agent_cmd
+    agent_inner=$(_sesh_wrap_agent "$agent_cli")
+    agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "$agent_cli")
+
     # ── Build the session ───────────────────────────────────────────────
     # Window 1: agents (start with first pane running the agent)
-    tmux new-session -d -s "$session" -c "$repo_root" -n agents "$agent_cli"
+    tmux new-session -d -s "$session" -c "$repo_root" -n agents "$agent_cmd"
 
     # Add remaining N-1 panes; -t targets window 1
     local i
     for (( i = 2; i <= n_agents; i++ )); do
-        tmux split-window -t "${session}:agents" -c "$repo_root" "$agent_cli"
+        tmux split-window -t "${session}:agents" -c "$repo_root" "$agent_cmd"
         # Re-tile after each split so layout stays balanced (avoids 1-pane-too-small fail)
         tmux select-layout -t "${session}:agents" tiled >/dev/null
     done
