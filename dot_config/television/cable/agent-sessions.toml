@@ -1,0 +1,422 @@
+# Coding-agent sessions cable channel for television (tv)
+#
+# Unified browser for OpenCode + Claude Code + Codex + Cursor sessions.
+# Backed by `dot_config/television/executable_agent-sessions.py` (Python helper
+# that walks SQLite + JSONL + store.db and emits a single TSV stream).
+#
+# Usage:
+#   tv agent-sessions
+#
+# Source cycling (Ctrl+S):
+#   1. All agents merged       (default — sorted DESC within each agent)
+#   2. OpenCode only           (~/.local/share/opencode/opencode.db)
+#   3. Claude Code only        (~/.claude/projects/**/<sid>.jsonl)
+#   4. Codex only              (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl)
+#   5. Cursor Agent CLI only   (~/.cursor/chats/<wsHash>/<chatId>/store.db)
+#   6. Cursor IDE composers    (~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage})
+#
+# Agent tags: [oc] OpenCode, [cc] Claude Code, [cx] Codex,
+#             [cu] Cursor Agent CLI, [ci] Cursor IDE composer chats
+#
+# Title/snippet column is the first non-system user message (truncated 140ch),
+# so TV's fuzzy search matches by content as well as date / project / id.
+#
+# Preview cycling (Ctrl+F):
+#   1. Session metadata + recent messages
+#   2. Raw record dump (head 200 lines / SQL dump)
+#
+# Keybindings:
+#   Enter      Print resume one-liner to stdout (cd <dir> && <agent-cmd> <id>)
+#   Alt+T      Resume in same shell (cd + exec; T for "take over")
+#   Ctrl+Y     Copy session ID to clipboard
+#   Alt+P      Copy directory path to clipboard
+#   Alt+R      Copy resume one-liner to clipboard
+#   Alt+E      Open raw session file in $EDITOR (claude/codex only)
+#
+# Ctrl+E is left as TV's global `go_to_input_end`.
+
+[metadata]
+name = "agent-sessions"
+description = "Coding-agent sessions: OpenCode + Claude Code + Codex + Cursor (CLI & IDE) — content-searchable"
+requirements = ["python3", "bat"]
+
+[source]
+# Each cycle calls the helper with a different mode. Mode "all" is the default.
+# TSV columns produced by the helper:
+#   0. agent  ([oc]/[cc]/[cx]/[cu])
+#   1. when   (YYYY-MM-DD HH:MM)
+#   2. id     (session id)
+#   3. dir    (cwd)
+#   4. title/snippet
+command = [
+  "~/.config/television/agent-sessions.py all",
+  "~/.config/television/agent-sessions.py opencode",
+  "~/.config/television/agent-sessions.py claude",
+  "~/.config/television/agent-sessions.py codex",
+  "~/.config/television/agent-sessions.py cursor",
+  "~/.config/television/agent-sessions.py cursor-ide",
+]
+display = "{split:\t:0} {split:\t:1}  │  {split:\t:4}  │  {split:\t:3|split:/:-1}"
+output = "{split:\t:2}"
+
+[preview]
+command = [
+  # Preview 1: per-agent metadata + recent messages.
+  '''
+  agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'
+  printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
+  printf '\033[2mcwd:\033[0m %s\n\n' "$dir"
+  case "$agent" in
+    "[oc]")
+      sqlite3 "$HOME/.local/share/opencode/opencode.db" \
+        "SELECT 'title=' || title || char(10) || 'version=' || version || char(10) || 'project_id=' || project_id || char(10) || coalesce('share=' || share_url, '') FROM session WHERE id = '$sid';" 2>/dev/null
+      printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+      sqlite3 "$HOME/.local/share/opencode/opencode.db" "
+        SELECT '  ' || substr(replace(replace(json_extract(p.data, '\$.text'), char(10), ' '), '  ', ' '), 1, 280)
+        FROM part p JOIN message m ON p.message_id = m.id
+        WHERE p.session_id = '$sid'
+          AND m.data LIKE '%\"role\":\"user\"%'
+          AND p.data LIKE '%\"type\":\"text\"%'
+          AND p.data NOT LIKE '%\"synthetic\":true%'
+        ORDER BY p.time_created ASC
+        LIMIT 5;" 2>/dev/null
+      ;;
+    "[cc]")
+      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+      if [ -n "$f" ]; then
+        printf 'file: %s\n\n' "$f"
+        printf '\033[1mFirst 5 user messages:\033[0m\n'
+        head -200 "$f" | python3 -c "
+import sys, json, re
+n=0
+for line in sys.stdin:
+  try: d=json.loads(line)
+  except: continue
+  if d.get('type') != 'user': continue
+  m=d.get('message') or dict()
+  c=m.get('content')
+  txt=''
+  if isinstance(c,str): txt=c
+  elif isinstance(c,list):
+    for p in c:
+      if isinstance(p,dict) and p.get('type')=='text': txt=p.get('text',''); break
+  if not txt or txt.lstrip().startswith(('<','#')): continue
+  txt=re.sub(r'\s+',' ',txt).strip()[:300]
+  print('  ' + txt)
+  n+=1
+  if n>=5: break
+" 2>/dev/null
+      else
+        echo "(jsonl not found for $sid)"
+      fi
+      ;;
+    "[cx]")
+      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1)
+      if [ -n "$f" ]; then
+        printf 'file: %s\n\n' "$f"
+        printf '\033[1mFirst 5 user messages:\033[0m\n'
+        head -200 "$f" | python3 -c "
+import sys, json, re
+n=0
+for line in sys.stdin:
+  try: d=json.loads(line)
+  except: continue
+  if d.get('type')!='response_item': continue
+  p=d.get('payload') or dict()
+  if p.get('type')!='message' or p.get('role')!='user': continue
+  for c in p.get('content',[]):
+    if isinstance(c,dict) and c.get('type') in ('input_text','text'):
+      txt=c.get('text','')
+      if not txt or txt.lstrip().startswith('<'): continue
+      txt=re.sub(r'\s+',' ',txt).strip()[:300]
+      print('  ' + txt)
+      n+=1
+      break
+  if n>=5: break
+" 2>/dev/null
+      else
+        echo "(rollout not found for $sid)"
+      fi
+      ;;
+    "[cu]")
+      db=$(find "$HOME/.cursor/chats" -path "*/${sid}/store.db" 2>/dev/null | head -1)
+      if [ -n "$db" ]; then
+        printf 'db: %s\n\n' "$db"
+        # meta value is hex-encoded JSON; decode and pretty-print
+        sqlite3 "$db" "SELECT value FROM meta LIMIT 1;" 2>/dev/null \
+          | python3 -c "
+import sys, json
+raw = sys.stdin.read().strip()
+try: text = bytes.fromhex(raw).decode('utf-8','replace')
+except ValueError: text = raw
+try:
+    d = json.loads(text)
+    for k in ('name','mode','lastUsedModel','agentId','createdAt','latestRootBlobId'):
+        if k in d:
+            v = d[k]
+            print('  ' + k + ': ' + str(v))
+except Exception:
+    print(text[:500])
+" 2>/dev/null
+        printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+        # Read blobs directly via python sqlite3 (avoids CLI binary/newline issues)
+        python3 -c "
+import sqlite3, json, re, sys
+con = sqlite3.connect('file:$db?mode=ro', uri=True)
+n = 0
+for (data,) in con.execute('SELECT data FROM blobs'):
+  if isinstance(data, (bytes, bytearray)):
+    try: text = bytes(data).decode('utf-8','replace')
+    except Exception: continue
+  else:
+    text = str(data)
+  try: d = json.loads(text)
+  except Exception: continue
+  if not isinstance(d, dict): continue
+  if d.get('role') != 'user': continue
+  c = d.get('content')
+  txt = ''
+  if isinstance(c, str): txt = c
+  elif isinstance(c, list):
+    for p in c:
+      if isinstance(p, dict) and p.get('type') == 'text':
+        txt = p.get('text',''); break
+  if not txt: continue
+  s = txt.lstrip()
+  if s.startswith(('<user_info>','<system_reminder>','<attached_files>','<environment_context>','<local-command-','<system-reminder>','# AGENTS','Caveat:')):
+    continue
+  txt = re.sub(r'\s+',' ', txt).strip()[:280]
+  print('  ' + txt)
+  n += 1
+  if n >= 5: break
+con.close()
+if n == 0:
+  print('  (no user-role blobs found; chat may use a different schema)')
+" 2>/dev/null
+        printf '\n'
+        sqlite3 "$db" "SELECT count(*) || ' blob(s)' FROM blobs;" 2>/dev/null
+      else
+        echo "(store.db not found for $sid)"
+      fi
+      ;;
+    "[ci]")
+      gdb="$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+      [ -f "$gdb" ] || gdb="$HOME/.config/Cursor/User/globalStorage/state.vscdb"
+      if [ ! -f "$gdb" ]; then
+        echo "(Cursor IDE state.vscdb not found)"
+      else
+        printf 'db: %s\n\n' "$gdb"
+        # Composer metadata
+        sqlite3 "$gdb" "SELECT value FROM cursorDiskKV WHERE key='composerData:$sid';" 2>/dev/null \
+          | python3 -c "
+import sys, json
+raw = sys.stdin.read().strip()
+if not raw:
+  print('  (composer not found)')
+else:
+  try:
+    d = json.loads(raw)
+    for k in ('name','subtitle','unifiedMode','forceMode','status','contextUsagePercent'):
+      if k in d and d[k] not in (None, ''):
+        print('  ' + k + ': ' + str(d[k])[:200])
+    heads = d.get('fullConversationHeadersOnly') or list()
+    print('  bubbles: ' + str(len(heads)) + ' (user: ' + str(sum(1 for h in heads if h.get('type')==1)) + ', assistant: ' + str(sum(1 for h in heads if h.get('type')==2)) + ')')
+  except Exception as e:
+    print('  (parse error: ' + str(e) + ')')
+" 2>/dev/null
+        printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+        python3 -c "
+import sqlite3, json, re
+con = sqlite3.connect('file:$gdb?mode=ro', uri=True)
+row = con.execute(\"SELECT value FROM cursorDiskKV WHERE key='composerData:$sid'\").fetchone()
+if not row or not row[0]:
+  print('  (composer not found)')
+else:
+  d = json.loads(row[0])
+  heads = d.get('fullConversationHeadersOnly') or list()
+  n = 0
+  for h in heads:
+    if h.get('type') != 1: continue
+    bid = h.get('bubbleId')
+    if not bid: continue
+    brow = con.execute('SELECT value FROM cursorDiskKV WHERE key = ?', ('bubbleId:$sid:' + bid,)).fetchone()
+    if not brow or not brow[0]: continue
+    try: bd = json.loads(brow[0])
+    except Exception: continue
+    txt = bd.get('text') or ''
+    if not txt: continue
+    s = txt.lstrip()
+    if s.startswith(('<user_info>','<system_reminder>','<attached_files>','<environment_context>','<local-command-','<system-reminder>','# AGENTS','Caveat:')):
+      continue
+    txt = re.sub(r'\s+',' ', txt).strip()[:280]
+    print('  ' + txt)
+    n += 1
+    if n >= 5: break
+  if n == 0:
+    print('  (no user-role bubbles found)')
+con.close()
+" 2>/dev/null
+      fi
+      ;;
+  esac
+  ''',
+  # Preview 2: raw record dump.
+  '''
+  agent='{split:\t:0}'; sid='{split:\t:2}'
+  case "$agent" in
+    "[oc]")
+      sqlite3 -header -column "$HOME/.local/share/opencode/opencode.db" \
+        "SELECT id, title, directory, version, datetime(time_created/1000,'unixepoch','localtime') AS created FROM session WHERE id='$sid';" 2>/dev/null
+      ;;
+    "[cc]")
+      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+      [ -n "$f" ] && head -200 "$f" | bat --color=always -l json --plain --paging=never 2>/dev/null \
+        || [ -n "$f" ] && head -200 "$f" \
+        || echo "(jsonl not found)"
+      ;;
+    "[cx]")
+      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1)
+      [ -n "$f" ] && head -200 "$f" | bat --color=always -l json --plain --paging=never 2>/dev/null \
+        || [ -n "$f" ] && head -200 "$f" \
+        || echo "(rollout not found)"
+      ;;
+    "[cu]")
+      db=$(find "$HOME/.cursor/chats" -path "*/${sid}/store.db" 2>/dev/null | head -1)
+      [ -n "$db" ] && sqlite3 "$db" ".schema" 2>/dev/null
+      ;;
+    "[ci]")
+      gdb="$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+      [ -f "$gdb" ] || gdb="$HOME/.config/Cursor/User/globalStorage/state.vscdb"
+      [ -f "$gdb" ] && sqlite3 "$gdb" "SELECT value FROM cursorDiskKV WHERE key='composerData:$sid';" 2>/dev/null \
+        | python3 -m json.tool 2>/dev/null | bat --color=always -l json --plain --paging=never 2>/dev/null \
+        || echo "(composer not found)"
+      ;;
+  esac
+  ''',
+]
+header = "{split:\t:0}  {split:\t:2}  ({split:\t:3})"
+
+[ui]
+input_header = "Agent Sessions"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:print_resume"
+alt-t = "actions:resume"
+ctrl-y = "actions:copy_id"
+alt-p = "actions:copy_dir"
+alt-r = "actions:copy_resume"
+alt-e = "actions:edit_jsonl"
+
+# ---------------------------------------------------------------------------
+# Helper: assemble the agent-specific resume invocation.
+# Each action sources `_resume_cmd` to keep the per-agent mapping in one place.
+# ---------------------------------------------------------------------------
+[actions.print_resume]
+description = "Print 'cd <dir> && <agent> --resume <id>' to stdout"
+command = '''
+agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+case "$agent" in
+  "[oc]") cmd="opencode --session $sid" ;;
+  "[cc]") cmd="claude --resume $sid" ;;
+  "[cx]") cmd="codex resume $sid" ;;
+  "[cu]") cmd="cursor-agent --resume $sid" ;;
+  "[ci]") cmd="cursor   # IDE composer $sid (open from sidebar)" ;;
+esac
+case "$dir" in
+  /*) printf 'cd %q && %s\n' "$dir" "$cmd" ;;
+  vscode-remote://*) printf '%s   # remote: %s\n' "$cmd" "$dir" ;;
+  *)  printf '%s   # cwd: %s\n' "$cmd" "$dir" ;;
+esac
+'''
+mode = "execute"
+
+[actions.resume]
+description = "cd to session dir and resume agent (in current terminal)"
+command = '''
+agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+case "$dir" in /*) cd "$dir" 2>/dev/null || { echo "cd failed: $dir"; echo "[Press Enter]"; read -r _; exit 1; } ;; esac
+case "$agent" in
+  "[oc]") exec opencode --session "$sid" ;;
+  "[cc]") exec claude --resume "$sid" ;;
+  "[cx]") exec codex resume "$sid" ;;
+  "[cu]") exec cursor-agent --resume "$sid" ;;
+  "[ci]")
+    case "$dir" in
+      /*) exec cursor "$dir" ;;
+      vscode-remote://*) echo "Remote workspace: $dir"; echo "Composer ID: $sid"; echo "Open Cursor and pick this chat from the sidebar."; echo "[Press Enter]"; read -r _; exit 0 ;;
+      *) echo "Unknown workspace: $dir"; echo "Composer ID: $sid"; echo "[Press Enter]"; read -r _; exit 0 ;;
+    esac
+    ;;
+esac
+'''
+mode = "execute"
+
+[actions.copy_id]
+description = "Copy session ID to clipboard"
+command = '''
+d='{split:\t:2}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy directory path to clipboard"
+command = '''
+d='{split:\t:3}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_resume]
+description = "Copy 'cd <dir> && <agent> --resume <id>' to clipboard"
+command = '''
+agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+case "$agent" in
+  "[oc]") cmd="opencode --session $sid" ;;
+  "[cc]") cmd="claude --resume $sid" ;;
+  "[cx]") cmd="codex resume $sid" ;;
+  "[cu]") cmd="cursor-agent --resume $sid" ;;
+  "[ci]") cmd="cursor $dir" ;;
+esac
+case "$dir" in
+  /*) [ "$agent" = "[ci]" ] && line="$cmd" || line=$(printf 'cd %q && %s' "$dir" "$cmd") ;;
+  *)  line="$cmd" ;;
+esac
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$line" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$line" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$line" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$line" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.edit_jsonl]
+description = "Open raw session file in $EDITOR (claude/codex only)"
+command = '''
+agent='{split:\t:0}'; sid='{split:\t:2}'
+case "$agent" in
+  "[cc]") f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1) ;;
+  "[cx]") f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1) ;;
+  "[oc]") echo "OpenCode sessions live in SQLite — use 'opencode export $sid' instead."; echo "[Press Enter]"; read -r _; exit 0 ;;
+  "[cu]") echo "Cursor sessions live in opaque BLOBs — no plaintext to edit."; echo "[Press Enter]"; read -r _; exit 0 ;;
+  "[ci]") echo "Cursor IDE chats live in state.vscdb (cursorDiskKV table) — no plaintext to edit."; echo "Composer ID: $sid"; echo "[Press Enter]"; read -r _; exit 0 ;;
+esac
+if [ -z "$f" ] || [ ! -f "$f" ]; then
+  echo "Session file not found for $sid"; echo "[Press Enter]"; read -r _; exit 0
+fi
+"${EDITOR:-vi}" "$f"
+'''
+mode = "execute"

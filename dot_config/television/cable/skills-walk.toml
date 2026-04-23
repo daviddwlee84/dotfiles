@@ -1,0 +1,198 @@
+# Agent skills (filesystem walker) cable channel for television (tv)
+#
+# Walks well-known agent skill directories WITHOUT invoking npx — fast,
+# zero-deps, works offline. Pairs with `skills` (npx-backed; richer metadata).
+#
+# Walked roots (any subdir containing SKILL.md is treated as a skill):
+#   ~/.agents/skills/                  (cross-agent global, npm `skills` pkg)
+#   ~/.claude/skills/                  (Claude Code)
+#   ~/.codex/skills/                   (Codex)
+#   ~/.cursor/skills-cursor/           (Cursor; note non-`skills/` name)
+#   $PWD/.agents/skills/               (current project; only if cwd resolves)
+#
+# Usage:
+#   tv skills-walk
+#
+# Source cycling (Ctrl+S):
+#   1. All roots merged                   (default)
+#   2. Global only                        (~/.agents/skills/)
+#   3. Per-agent dirs                     (claude / codex / cursor)
+#   4. Current project (.agents/skills/)  — empty unless run from a project root
+#
+# Preview cycling (Ctrl+F):
+#   1. SKILL.md rendered (bat)
+#   2. Directory tree (eza --tree / find)
+#
+# Keybindings:
+#   Enter      Show SKILL.md in pager
+#   Alt+E      Open SKILL.md in $EDITOR
+#   Ctrl+Y     Copy skill name to clipboard
+#   Alt+P      Copy absolute path to clipboard
+#   Alt+R      Reveal directory in $SHELL (cd & spawn subshell)
+
+[metadata]
+name = "skills-walk"
+description = "Agent skills (filesystem walk) — no npx; scans ~/.agents, ~/.claude, ~/.codex, ~/.cursor"
+requirements = ["find", "bat"]
+
+[source]
+# TSV columns:
+#   0. source tag    ([global]/[claude]/[codex]/[cursor]/[project])
+#   1. skill name    (basename of dir containing SKILL.md)
+#   2. absolute path (dir containing SKILL.md)
+command = [
+  # Cycle 1: all roots merged.
+  '''
+  _walk() {
+    tag="$1"; root="$2"
+    [ -d "$root" ] || return 0
+    find "$root" -maxdepth 4 -type f \( -name SKILL.md -o -name skill.md \) 2>/dev/null \
+      | while IFS= read -r md; do
+          dir=$(dirname "$md")
+          name=$(basename "$dir")
+          printf '%s\t%s\t%s\n' "$tag" "$name" "$dir"
+        done
+  }
+  _walk "[global] " "$HOME/.agents/skills"
+  _walk "[claude] " "$HOME/.claude/skills"
+  _walk "[codex]  " "$HOME/.codex/skills"
+  _walk "[cursor] " "$HOME/.cursor/skills-cursor"
+  if [ -d "$PWD/.agents/skills" ]; then
+    _walk "[project]" "$PWD/.agents/skills"
+  fi
+  ''',
+  # Cycle 2: global only.
+  '''
+  root="$HOME/.agents/skills"
+  [ -d "$root" ] && find "$root" -maxdepth 4 -type f \( -name SKILL.md -o -name skill.md \) 2>/dev/null \
+    | while IFS= read -r md; do dir=$(dirname "$md"); printf '[global] \t%s\t%s\n' "$(basename "$dir")" "$dir"; done
+  ''',
+  # Cycle 3: per-agent dirs.
+  '''
+  for entry in "claude:$HOME/.claude/skills" "codex:$HOME/.codex/skills" "cursor:$HOME/.cursor/skills-cursor"; do
+    tag=${entry%%:*}; root=${entry#*:}
+    [ -d "$root" ] || continue
+    find "$root" -maxdepth 4 -type f \( -name SKILL.md -o -name skill.md \) 2>/dev/null \
+      | while IFS= read -r md; do dir=$(dirname "$md"); printf '[%s]\t%s\t%s\n' "$tag" "$(basename "$dir")" "$dir"; done
+  done
+  ''',
+  # Cycle 4: current project.
+  '''
+  root="$PWD/.agents/skills"
+  if [ -d "$root" ]; then
+    find "$root" -maxdepth 4 -type f \( -name SKILL.md -o -name skill.md \) 2>/dev/null \
+      | while IFS= read -r md; do dir=$(dirname "$md"); printf '[project]\t%s\t%s\n' "$(basename "$dir")" "$dir"; done
+  else
+    echo "[project]	(no .agents/skills/ in $PWD)	$PWD"
+  fi
+  ''',
+]
+display = "{split:\t:0}  {split:\t:1}  │  {split:\t:2}"
+output = "{split:\t:1}"
+
+[preview]
+command = [
+  # Preview 1: SKILL.md rendered.
+  '''
+  p='{split:\t:2}'
+  md=""
+  [ -f "$p/SKILL.md" ] && md="$p/SKILL.md"
+  [ -z "$md" ] && [ -f "$p/skill.md" ] && md="$p/skill.md"
+  if [ -n "$md" ]; then
+    bat --color=always --style=plain --paging=never "$md" 2>/dev/null || cat "$md"
+  else
+    echo "No SKILL.md found in: $p"
+  fi
+  ''',
+  # Preview 2: directory tree.
+  '''
+  p='{split:\t:2}'
+  if command -v eza >/dev/null 2>&1; then
+    eza --tree --level=3 --git-ignore "$p" 2>/dev/null
+  else
+    find "$p" -maxdepth 3 2>/dev/null
+  fi
+  ''',
+]
+header = "{split:\t:0} {split:\t:1}  ({split:\t:2})"
+
+[ui]
+input_header = "Skills (walk)"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:show"
+alt-e = "actions:edit"
+ctrl-y = "actions:copy_name"
+alt-p = "actions:copy_path"
+alt-r = "actions:reveal"
+
+[actions.show]
+description = "Show SKILL.md in pager"
+command = '''
+p='{split:\t:2}'
+md="$p/SKILL.md"
+[ ! -f "$md" ] && [ -f "$p/skill.md" ] && md="$p/skill.md"
+if [ ! -f "$md" ]; then
+  echo "No SKILL.md in $p"; echo "[Press Enter]"; read -r _; exit 0
+fi
+if command -v glow >/dev/null 2>&1; then
+  glow -p "$md"
+elif command -v bat >/dev/null 2>&1; then
+  bat --paging=always --style=plain "$md"
+else
+  ${PAGER:-less} "$md"
+fi
+'''
+mode = "execute"
+
+[actions.edit]
+description = "Open SKILL.md in $EDITOR"
+command = '''
+p='{split:\t:2}'
+md="$p/SKILL.md"
+[ ! -f "$md" ] && [ -f "$p/skill.md" ] && md="$p/skill.md"
+if [ ! -f "$md" ]; then
+  echo "No SKILL.md in $p"; echo "[Press Enter]"; read -r _; exit 0
+fi
+"${EDITOR:-vi}" "$md"
+'''
+mode = "execute"
+
+[actions.copy_name]
+description = "Copy skill name to clipboard"
+command = '''
+d='{split:\t:1}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_path]
+description = "Copy skill path to clipboard"
+command = '''
+d='{split:\t:2}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.reveal]
+description = "Spawn subshell in skill directory"
+command = '''
+p='{split:\t:2}'
+[ -d "$p" ] || { echo "Not a directory: $p"; echo "[Press Enter]"; read -r _; exit 0; }
+echo "[Spawning subshell in $p — exit to return]"
+cd "$p" && "${SHELL:-zsh}"
+'''
+mode = "execute"

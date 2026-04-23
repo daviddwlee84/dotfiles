@@ -1,0 +1,222 @@
+# Agent skills (npx skills) cable channel for television (tv)
+#
+# Lists project-local + global agent skills via the `skills` npm package.
+# Pairs with `skills-walk` (filesystem-only enumeration; no npx).
+#
+# Usage:
+#   tv skills
+#
+# Source cycling (Ctrl+S):
+#   1. Project + Global merged (default)  — combined view, [P]/[G] tag column
+#   2. Project only                        — `npx skills list`
+#   3. Global only                         — `npx skills list -g`
+#
+# Preview cycling (Ctrl+F):
+#   1. SKILL.md rendered with bat
+#   2. Skill directory listing (eza/ls -la)
+#
+# Keybindings:
+#   Enter      Show SKILL.md in $PAGER (less)
+#   Alt+E      Open SKILL.md in $EDITOR
+#   Ctrl+Y     Copy skill name to clipboard
+#   Alt+P      Copy absolute path to clipboard
+#   Alt+I      Print "skill: <name>" hint to stdout (for agent prompt paste)
+#
+# Ctrl+E is left as TV's global `go_to_input_end` — Alt+E for edit follows
+# the same convention as the git-ops channel.
+
+[metadata]
+name = "skills"
+description = "Agent skills (npx skills) — project + global, preview SKILL.md, edit / copy"
+requirements = ["npx", "bat"]
+
+[source]
+# All three sources emit the same TSV columns:
+#   0. scope tag    ([P] / [G])
+#   1. skill name
+#   2. absolute path (tilde-expanded)
+#   3. agents string (e.g. "Claude Code, Codex, Cursor +3 more")
+#
+# `npx skills list` output format (after stripping ANSI):
+#   <name> <path>            ← name + path on one line, separated by spaces
+#     Agents: <comma-list>   ← indented continuation
+#
+# We strip ANSI with sed, then a state-machine awk pairs each name+path row
+# with the next "Agents:" row.
+command = [
+  # Cycle 1: project + global merged.
+  '''
+  _parse() {
+    tag="$1"; cmd="$2"
+    eval "$cmd" 2>/dev/null \
+      | sed 's/\x1b\[[0-9;]*[mK]//g' \
+      | awk -v tag="$tag" '
+          /^[[:space:]]*Agents:/ {
+            sub(/^[[:space:]]*Agents:[[:space:]]*/, "")
+            agents = $0
+            if (name != "") {
+              printf "%s\t%s\t%s\t%s\n", tag, name, path, agents
+              name = ""; path = ""; agents = ""
+            }
+            next
+          }
+          /^[[:space:]]*$/ || /^[[:space:]]*Project Skills/ || /^[[:space:]]*Global Skills/ { next }
+          /^[^[:space:]]/ {
+            # Flush previous (no Agents line)
+            if (name != "") {
+              printf "%s\t%s\t%s\t%s\n", tag, name, path, "—"
+            }
+            # name is field 1, path is field 2 (rest)
+            name = $1
+            path = $2
+            for (i = 3; i <= NF; i++) path = path " " $i
+            # Expand leading ~ to $HOME for downstream tools
+            sub(/^~/, ENVIRON["HOME"], path)
+          }
+          END {
+            if (name != "") printf "%s\t%s\t%s\t%s\n", tag, name, path, (agents == "" ? "—" : agents)
+          }
+        '
+  }
+  _parse "[P]" "npx --no-install skills list 2>/dev/null || npx skills list"
+  _parse "[G]" "npx --no-install skills list -g 2>/dev/null || npx skills list -g"
+  ''',
+  # Cycle 2: project only.
+  '''
+  { npx --no-install skills list 2>/dev/null || npx skills list 2>/dev/null; } \
+    | sed 's/\x1b\[[0-9;]*[mK]//g' \
+    | awk '
+        /^[[:space:]]*Agents:/ { sub(/^[[:space:]]*Agents:[[:space:]]*/, ""); agents=$0; if(name!="") {printf "[P]\t%s\t%s\t%s\n", name, path, agents; name=""; path=""; agents=""} next }
+        /^[[:space:]]*$/ || /^[[:space:]]*Project Skills/ { next }
+        /^[^[:space:]]/ {
+          if (name != "") printf "[P]\t%s\t%s\t%s\n", name, path, "—"
+          name=$1; path=$2; for(i=3;i<=NF;i++) path=path" "$i; sub(/^~/, ENVIRON["HOME"], path)
+        }
+        END { if(name!="") printf "[P]\t%s\t%s\t%s\n", name, path, (agents==""?"—":agents) }
+      '
+  ''',
+  # Cycle 3: global only.
+  '''
+  { npx --no-install skills list -g 2>/dev/null || npx skills list -g 2>/dev/null; } \
+    | sed 's/\x1b\[[0-9;]*[mK]//g' \
+    | awk '
+        /^[[:space:]]*Agents:/ { sub(/^[[:space:]]*Agents:[[:space:]]*/, ""); agents=$0; if(name!="") {printf "[G]\t%s\t%s\t%s\n", name, path, agents; name=""; path=""; agents=""} next }
+        /^[[:space:]]*$/ || /^[[:space:]]*Global Skills/ { next }
+        /^[^[:space:]]/ {
+          if (name != "") printf "[G]\t%s\t%s\t%s\n", name, path, "—"
+          name=$1; path=$2; for(i=3;i<=NF;i++) path=path" "$i; sub(/^~/, ENVIRON["HOME"], path)
+        }
+        END { if(name!="") printf "[G]\t%s\t%s\t%s\n", name, path, (agents==""?"—":agents) }
+      '
+  ''',
+]
+display = "{split:\t:0} {split:\t:1}  │  {split:\t:3}"
+output = "{split:\t:1}"
+
+[preview]
+command = [
+  # Preview 1: SKILL.md rendered.
+  '''
+  p='{split:\t:2}'
+  if [ -f "$p/SKILL.md" ]; then
+    bat --color=always --style=plain --paging=never "$p/SKILL.md" 2>/dev/null || cat "$p/SKILL.md"
+  elif [ -f "$p/skill.md" ]; then
+    bat --color=always --style=plain --paging=never "$p/skill.md" 2>/dev/null || cat "$p/skill.md"
+  else
+    echo "No SKILL.md found in: $p"
+    echo
+    echo "Directory contents:"
+    ls -la "$p" 2>/dev/null || echo "(unreadable)"
+  fi
+  ''',
+  # Preview 2: directory listing.
+  '''
+  p='{split:\t:2}'
+  if command -v eza >/dev/null 2>&1; then
+    eza -la --git --no-user --time-style=long-iso "$p" 2>/dev/null
+  else
+    ls -la "$p" 2>/dev/null
+  fi
+  ''',
+]
+header = "{split:\t:0} {split:\t:1}  ({split:\t:2})"
+
+[ui]
+input_header = "Skills"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:show"
+alt-e = "actions:edit"
+ctrl-y = "actions:copy_name"
+alt-p = "actions:copy_path"
+alt-i = "actions:print_hint"
+
+[actions.show]
+description = "Show SKILL.md in pager"
+command = '''
+p='{split:\t:2}'
+md=""
+[ -f "$p/SKILL.md" ] && md="$p/SKILL.md"
+[ -z "$md" ] && [ -f "$p/skill.md" ] && md="$p/skill.md"
+if [ -z "$md" ]; then
+  echo "No SKILL.md in $p"; echo "[Press Enter]"; read -r _; exit 0
+fi
+if command -v glow >/dev/null 2>&1; then
+  glow -p "$md"
+elif command -v bat >/dev/null 2>&1; then
+  bat --paging=always --style=plain "$md"
+else
+  ${PAGER:-less} "$md"
+fi
+'''
+mode = "execute"
+
+[actions.edit]
+description = "Open SKILL.md in $EDITOR"
+command = '''
+p='{split:\t:2}'
+md="$p/SKILL.md"
+[ ! -f "$md" ] && [ -f "$p/skill.md" ] && md="$p/skill.md"
+[ ! -f "$md" ] && md="$p/SKILL.md"  # create if missing? no — abort
+if [ ! -f "$md" ]; then
+  echo "No SKILL.md in $p"; echo "[Press Enter]"; read -r _; exit 0
+fi
+"${EDITOR:-vi}" "$md"
+'''
+mode = "execute"
+
+[actions.copy_name]
+description = "Copy skill name to clipboard"
+command = '''
+d='{split:\t:1}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_path]
+description = "Copy skill path to clipboard"
+command = '''
+d='{split:\t:2}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.print_hint]
+description = "Print 'skill: <name>' hint (for agent prompt paste)"
+command = '''
+printf 'Load this skill: %s\n' '{split:\t:1}'
+'''
+mode = "execute"

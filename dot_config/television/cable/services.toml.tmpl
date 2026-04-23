@@ -92,7 +92,7 @@ command = [
   if sudo -n true 2>/dev/null; then
     sudo -n launchctl list 2>/dev/null | awk -v scope=system 'NR>1 && $3!="" && $1!="PID" {sym="? Unknown"; if($1!="-")sym="▶ Running"; else if($2+0!=0)sym="✗ Failed"; else sym="⏸ Stopped"; info=($1!="-"?"PID="$1:"exit="$2); printf "%s\t%s\t%s\t%s\n",sym,$3,scope,info}'
   else
-    echo "ℹ Info	(run: sudo -v to include system daemons)	system	passwordless sudo required"
+    echo "ℹ Info\t(run: sudo -v to include system daemons)\tsystem\tpasswordless sudo required"
   fi
   ''',
   # Cycle 3: Failed only.
