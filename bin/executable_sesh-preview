@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# sesh-preview — multi-section preview for sesh fzf picker
+#
+# Sesh passes one argument that is either:
+#   - an absolute path (zoxide / find sources)
+#   - a session name like "icon  name  /path" (sesh's --icons output)
+#
+# We extract the path (last token), then render in this priority:
+#   1. Header: dir name + git branch (if any) + last-modified
+#   2. README.md (first 25 lines, syntax-highlighted via bat if available)
+#   3. Recent git log (5 commits, oneline) — only if a git repo
+#   4. Directory listing (eza tree if available, else ls)
+#
+# Designed to be safely called from sesh's preview_command. Stays under
+# ~50 lines of output so fzf preview pane doesn't scroll on first paint.
+
+set -u
+
+raw="${1:-}"
+[[ -z "$raw" ]] && exit 0
+
+# Extract the path: last whitespace-separated token. Works for both
+# bare paths and sesh's "icon  name  /path" format.
+path="${raw##* }"
+# Strip trailing slash for consistency
+path="${path%/}"
+
+# Sesh sometimes hands us the session name only (no path). Resolve via sesh.
+if [[ ! -d "$path" ]]; then
+    # Try interpreting whole arg as session name → ask sesh for its path
+    resolved="$(sesh list -t -j 2>/dev/null | jq -r --arg n "$raw" \
+        '.[] | select(.Name==$n) | .Path' 2>/dev/null | head -1)"
+    [[ -n "$resolved" && -d "$resolved" ]] && path="$resolved"
+fi
+
+[[ ! -d "$path" ]] && { echo "(not a directory: $path)"; exit 0; }
+
+# Color helpers — use tput if terminal supports it
+if [[ -t 1 ]]; then
+    bold=$(tput bold 2>/dev/null || true)
+    dim=$(tput dim 2>/dev/null || true)
+    reset=$(tput sgr0 2>/dev/null || true)
+    cyan=$(tput setaf 6 2>/dev/null || true)
+    yellow=$(tput setaf 3 2>/dev/null || true)
+else
+    bold="" dim="" reset="" cyan="" yellow=""
+fi
+
+# ── 1. Header ────────────────────────────────────────────────────────────────
+name="$(basename "$path")"
+parent_short="$(dirname "$path" | sed "s|^$HOME|~|")"
+echo "${bold}${cyan}${name}${reset} ${dim}— ${parent_short}/${reset}"
+
+if git_branch=$(git -C "$path" symbolic-ref --short HEAD 2>/dev/null); then
+    git_status_count=$(git -C "$path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    git_ahead_behind=$(git -C "$path" rev-list --left-right --count "@{upstream}...HEAD" 2>/dev/null \
+        | awk '{ if ($1>0||$2>0) printf "↓%s ↑%s", $1, $2 }')
+    echo "${dim}git:${reset} ${yellow}${git_branch}${reset} ${dim}(${git_status_count} dirty${git_ahead_behind:+, $git_ahead_behind})${reset}"
+fi
+
+# Last modified (mtime of dir)
+if mtime=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$path" 2>/dev/null); then
+    echo "${dim}mtime: ${mtime}${reset}"
+fi
+
+echo
+
+# ── 2. README ────────────────────────────────────────────────────────────────
+readme=""
+for f in README.md README.rst README.txt readme.md README; do
+    if [[ -f "$path/$f" ]]; then readme="$path/$f"; break; fi
+done
+
+if [[ -n "$readme" ]]; then
+    echo "${bold}── README ──${reset}"
+    if command -v bat >/dev/null 2>&1; then
+        bat --color=always --style=plain --line-range=:25 --paging=never "$readme"
+    else
+        head -25 "$readme"
+    fi
+    echo
+fi
+
+# ── 3. Recent commits ───────────────────────────────────────────────────────
+if [[ -n "${git_branch:-}" ]]; then
+    echo "${bold}── Recent commits ──${reset}"
+    git -C "$path" log --oneline --color=always -5 2>/dev/null
+    echo
+fi
+
+# ── 4. Directory tree ───────────────────────────────────────────────────────
+echo "${bold}── Files ──${reset}"
+if command -v eza >/dev/null 2>&1; then
+    eza --tree --level=2 --git-ignore --color=always --icons \
+        --ignore-glob='node_modules|.git|__pycache__|.venv|target|dist|build' \
+        "$path" 2>/dev/null | head -30
+else
+    ls -la "$path" | head -25
+fi

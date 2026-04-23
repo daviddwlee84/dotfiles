@@ -11,7 +11,10 @@ blacklist = ["^scratch$", "^_", "^float$"]
 
 [default_session]
 startup_command = "nvim"
-preview_command = "eza --all --git --icons --color=always {}"
+# Multi-section preview: header (name + git branch) + README + recent commits +
+# tree. Falls back to ls/head if bat/eza missing. See bin/executable_sesh-preview
+# in the chezmoi source for the script. Deployed to ~/bin/sesh-preview.
+preview_command = "~/bin/sesh-preview {}"
 
 # ── Named sessions ──────────────────────────────────────────────────────────
 
@@ -78,6 +81,25 @@ path = "~"
 tmuxinator = "coding-agent-mux"
 
 # ── Wildcards ────────────────────────────────────────────────────────────────
+#
+# `startup_command` runs after sesh creates the bare session. We use a tmuxp
+# `--append` invocation that adds the project layout (editor / shell / git
+# windows) to the session sesh just made, then kills the empty initial window
+# sesh always creates. Same trick as the `coding-agent` named session above —
+# see ~/.config/tmuxp/project.yaml for the layout.
+#
+# The wildcard `{}` placeholder is the matched path; we set it as
+# start_directory env var so tmuxp's `start_directory: ${start_directory:-.}`
+# picks it up.
+
+# All repos under /Volumes/Data/Program/<group>/<repo>
+# (e.g. JingleAI/AShare_T0_RL, Personal/career-ops, Tadronaut/tarlin)
+# Symlinked surface paths under ~/Documents/Program/* are canonicalized to
+# /Volumes/Data/Program/* by _ZO_RESOLVE_SYMLINKS=1 (zsh/tools/20_zoxide.zsh)
+# so a single wildcard pattern catches both entry points.
+[[wildcard]]
+pattern = "/Volumes/Data/Program/*/*"
+startup_command = "start_directory={} tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
 
 [[wildcard]]
 pattern = "~/repos/*"
@@ -85,8 +107,14 @@ startup_command = "nvim"
 
 # try-cli ephemeral workspaces: `try some-project` → `shere` or `try-sesh`
 # Session name will be "tries/2026-04-14-some-project" (dir_length=2)
+# These are short-lived so we use plain nvim, not the full project layout.
 [[wildcard]]
 pattern = "~/src/tries/*"
+startup_command = "nvim"
+
+# Same for canonical /Volumes/Data/Program/tries/* (after symlink resolution)
+[[wildcard]]
+pattern = "/Volumes/Data/Program/tries/*"
 startup_command = "nvim"
 
 # ── Windows ──────────────────────────────────────────────────────────────────

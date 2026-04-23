@@ -1,0 +1,40 @@
+# Per-project workspace layout
+#
+# Generic layout for any code repo. Use via sesh wildcard
+# (~/.config/sesh/sesh.toml: pattern = "/Volumes/Data/Program/*/*"), or
+# directly:
+#
+#   start_directory=~/some/repo tmuxp load -a -y ~/.config/tmuxp/project.yaml
+#
+# Windows:
+#   1. editor   — nvim (full pane)
+#   2. shell    — interactive shell at project root
+#   3. git      — lazygit (only if `lazygit` binary exists; otherwise plain git status)
+#
+# Why no horizontal splits in `editor`:
+#   nvim's :terminal + tmux navigator already covers in-editor terminal needs.
+#   Keeping `editor` single-pane lets nvim use full width for tree+code+sidebar.
+#   For coding-agent layouts (nvim | specstory) use the dedicated
+#   ~/.config/tmuxp/coding-agent.yaml — that's the persistent agent workspace,
+#   this template is the per-repo workhorse.
+
+session_name: project
+start_directory: ${start_directory:-.}
+
+windows:
+  - window_name: editor
+    panes:
+      - shell_command: nvim
+
+  - window_name: shell
+    panes:
+      - shell_command: ""
+
+  - window_name: git
+    panes:
+      - shell_command: |
+          if command -v lazygit >/dev/null 2>&1; then
+            lazygit
+          else
+            git status
+          fi

@@ -155,6 +155,55 @@ startup_command = "nvim"
 - `*` matches one level, `**` matches recursively
 - Explicit `[[session]]` entries take priority over wildcards
 
+#### Per-project layout via tmuxp `--append`
+
+For repos that benefit from a structured layout (editor / shell / lazygit
+windows), wildcards can chain a `tmuxp load --append` on top of the bare
+session sesh creates. Same trick as the `coding-agent` named session — see
+[Approach B below](#approach-b-tmuxp-via-startup_command-active) for the
+underlying mechanic.
+
+```toml
+# All repos under /Volumes/Data/Program/<group>/<repo>
+[[wildcard]]
+pattern = "/Volumes/Data/Program/*/*"
+startup_command = "start_directory={} tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
+```
+
+The `{}` placeholder is the matched path. We pass it as a `start_directory`
+env var so [`~/.config/tmuxp/project.yaml`](../../dot_config/tmuxp/project.yaml)'s
+`start_directory: ${start_directory:-.}` picks it up. After the append, the
+empty initial window sesh always creates is killed (`-t :1`), and focus
+moves to the `editor` window so nvim is foregrounded immediately.
+
+The pattern targets `/Volumes/Data/Program/*/*` (canonical paths) rather
+than `~/Documents/Program/*/*` because zoxide records canonical paths
+(see [zoxide.md](zoxide.md) → `_ZO_RESOLVE_SYMLINKS`). One pattern catches
+both surface and canonical entries.
+
+### Custom multi-section preview
+
+The default `eza` preview only shows a file listing. The
+[`~/bin/sesh-preview`](../../bin/executable_sesh-preview) script renders a
+richer view in the fzf preview pane:
+
+1. **Header**: dir name, parent path, git branch + dirty count + ahead/behind, mtime
+2. **README**: first 25 lines, syntax-highlighted via `bat` if available
+3. **Recent commits**: last 5 oneline commits (git repos only)
+4. **File tree**: `eza --tree --level=2` with build dirs ignored
+
+Wired in `sesh.toml`:
+
+```toml
+[default_session]
+preview_command = "~/bin/sesh-preview {}"
+```
+
+Falls back to plain `head`/`ls` if `bat`/`eza` are missing, and gracefully
+handles non-directory args (sesh sometimes hands the picker raw session
+strings rather than paths). Output is capped under ~50 lines to avoid
+fzf preview pane scroll on first paint.
+
 ### Windows
 
 Define reusable window layouts:
@@ -188,6 +237,38 @@ Sesh's primary picker integration. The `fzf-tmux` wrapper renders fzf inside a t
 ### zoxide
 
 Sesh uses zoxide's frecency database to suggest directories. Any directory you `cd` into is automatically tracked and appears in `sesh list -z`.
+
+`_ZO_RESOLVE_SYMLINKS=1` (set in
+[`zsh/tools/20_zoxide.zsh`](../../dot_config/zsh/tools/20_zoxide.zsh)) makes
+zoxide canonicalise paths before storing them, so symlink-heavy setups
+(e.g. `~/Documents/Program -> /Volumes/Data/Program`) don't fragment a
+single physical directory's frecency across two phantom entries. Sesh
+wildcards should target the canonical pattern (`/Volumes/Data/Program/*/*`)
+rather than the surface symlink.
+
+To bootstrap a fresh DB with the directories you'd like sesh to surface
+immediately (without waiting for organic `cd` traffic), the simplest path
+is a one-shot Python script that reads the binary `db.zo` (version 3
+format: `u32 ver, u64 count, then per-entry: u64 path_len, path bytes,
+f64 rank, u64 ts`), inserts new entries with `rank=1.0`, and writes back.
+Existing entries with higher scores are preserved. Sample workflow lives
+in [pitfalls/zoxide-symlink-fragmentation.md](../../pitfalls/zoxide-symlink-fragmentation.md)
+if/when that pitfall doc is created.
+
+### Neovim (in-editor zoxide picker)
+
+For jumping between repos without leaving Neovim, [`nvim/lua/plugins/zoxide-picker.lua`](../../dot_config/nvim/exact_plugins/zoxide-picker.lua)
+adds a snacks.picker over `zoxide query --list --score`:
+
+| Keymap | Action |
+|--------|--------|
+| `<leader>fz` | Pick repo, change tab-local cwd via `:tcd` |
+| `<leader>fZ` | Pick repo, change global cwd via `:cd` |
+
+`:tcd` (tab-local) is the default to avoid confusing LazyVim's
+project-root detection when you have buffers from multiple projects open.
+Use `:cd` (`<leader>fZ`) when you genuinely want the whole nvim session
+to follow.
 
 ### Television (tv)
 
