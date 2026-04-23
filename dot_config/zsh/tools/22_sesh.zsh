@@ -38,31 +38,81 @@ function sesh-sessions() {
     }
 }
 
+# ── Internal helpers ────────────────────────────────────────────────────────
+#
+# All helpers below take care to avoid the lowercase `path` / `cdpath` /
+# `manpath` / `fpath` zsh-tied-array trap (see
+# pitfalls/zsh-tied-array-path-shadowing.md).
+
+# Resolve the git repo root, or return non-zero if not in a repo.
+function _sesh_git_root() {
+    git rev-parse --show-toplevel 2>/dev/null
+}
+
+# Sanitize a string for use as a tmux session name.
+# tmux forbids `.` and `:` in session names; we also strip whitespace.
+function _sesh_sanitize() {
+    print -r -- "${1//[.:[:space:]]/-}"
+}
+
+# Switch to or attach to a tmux session named $1 (creating it at $2 if needed).
+# Inside tmux: `switch-client`. Outside tmux: `attach-session`.
+function _sesh_attach_or_switch() {
+    local session="$1"
+    if [[ -n "$TMUX" ]]; then
+        tmux switch-client -t "$session"
+    else
+        tmux attach-session -t "$session"
+    fi
+}
+
+# Create (or no-op if exists) a detached tmux session at the given path.
+# Returns 0 if the session already existed, 1 if newly created. (Caller uses
+# this to decide whether to apply layout setup or just attach.)
+function _sesh_ensure_session() {
+    local session="$1" target="$2"
+    if tmux has-session -t "=$session" 2>/dev/null; then
+        return 0   # already exists
+    fi
+    tmux new-session -d -s "$session" -c "$target"
+    return 1       # newly created
+}
+
 # Connect to a sesh session for the current directory (creates it if missing).
+# Lightweight: drops you into a plain shell at $PWD with NO startup command.
+# For an editor-first session use `scode` (repo-aware, full layout) or just
+# launch nvim manually inside the new session.
+#
 # Smart argument handling:
-#   shere                              # default startup_command (nvim)
+#   shere                              # plain shell at $PWD, no command
 #   shere specstory run codex          # bare args → treated as command
 #   shere -c "specstory run codex"     # explicit --command flag
-#   shere -p ~/my-proj                 # explicit path
+#   shere -p ~/my-proj                 # explicit path, plain shell
 #   shere -p ~/my-proj npm run dev     # explicit path + command
 function sesh-here() {
-    local cmd="" path=""
-    # Parse flags first
+    local cmd="" target=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -c|--command) cmd="$2"; shift 2 ;;
-            -p|--path)    path="$2"; shift 2 ;;
+            -p|--path)    target="$2"; shift 2 ;;
             -*)           echo "sesh-here: unknown flag $1" >&2; return 1 ;;
             *)            break ;;  # remaining args are the command
         esac
     done
-    # Remaining positional args become the command
     [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
-    path="${path:-$PWD}"
+    target="${target:-$PWD}"
     if [[ -n "$cmd" ]]; then
-        sesh connect --command "$cmd" "$path"
+        sesh connect --command "$cmd" "$target"
     else
-        sesh connect "$path"
+        # Bypass sesh's default_session.startup_command (nvim) for a plain
+        # shell. We create the session via tmux directly, then attach. This
+        # also means the wildcard startup_command (project layout) is
+        # bypassed — `shere` is intentionally lightweight; use `scode`,
+        # `svibe`, or `sesh connect <path>` for layouts.
+        local session
+        session=$(_sesh_sanitize "$(basename "$target")")
+        _sesh_ensure_session "$session" "$target"
+        _sesh_attach_or_switch "$session"
     fi
 }
 
@@ -91,6 +141,247 @@ function sesh-root() {
 
 alias shere='sesh-here'
 alias sroot='sesh-root'
+alias scode='sesh-code'
+alias svibe='sesh-vibe'
+
+# ── scode: repo-aware coding-agent layout ───────────────────────────────────
+#
+# Open the coding-agent layout (nvim 75% | specstory 25% + btop window) in a
+# session NAMED FOR THE CURRENT REPO, so different repos don't collide on
+# the single `coding-agent` session name.
+#
+# Session naming:
+#   In repo /Volumes/Data/Program/Personal/foo  → session `coding-agent/foo`
+#   Same repo re-invocation                     → attach (no duplicate)
+#   Different repo                              → new session `coding-agent/<other>`
+#
+# Outside a git repo the function refuses with a hint to use `shere` or `svibe`
+# (the heavy layout doesn't make sense for ad-hoc directories).
+#
+# Usage:
+#   scode                              # current repo, default agent (claude)
+#   scode codex                        # current repo, override agent CLI
+#   scode opencode                     # current repo, opencode
+#   scode -p ~/some/other/repo         # explicit repo path
+#   scode --no-attach                  # create session in background, don't switch
+function sesh-code() {
+    local target="" agent="" no_attach=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--path)      target="$2"; shift 2 ;;
+            -a|--agent)     agent="$2"; shift 2 ;;
+            --no-attach)    no_attach=1; shift ;;
+            -h|--help)
+                cat <<'EOF'
+scode — open repo-scoped coding-agent layout
+
+Usage: scode [--path DIR] [--agent CLI] [--no-attach] [AGENT]
+
+Layout: window `editor` (nvim 75% | specstory 25%) + window `monitor` (btop).
+Session name: `coding-agent/<repo-basename>` (one session per repo).
+Requires:     git repo (errors otherwise — use `shere` or `svibe`).
+
+Examples:
+  scode                  # current repo, default agent (specstory passthrough)
+  scode claude           # override: launch claude in the right pane
+  scode -p ~/work/foo    # explicit repo path
+EOF
+                return 0 ;;
+            -*)             echo "scode: unknown flag $1" >&2; return 1 ;;
+            *)              [[ -z "$agent" ]] && agent="$1" || true; shift ;;
+        esac
+    done
+
+    # Resolve repo root
+    local repo_root
+    if [[ -n "$target" ]]; then
+        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+    else
+        repo_root=$(_sesh_git_root)
+    fi
+    if [[ -z "$repo_root" ]]; then
+        echo "scode: not inside a git repo." >&2
+        echo "       Use \`shere\` for a plain shell, or \`svibe\` for a vibe layout in any dir." >&2
+        return 1
+    fi
+
+    local repo_name session
+    repo_name=$(basename "$repo_root")
+    session=$(_sesh_sanitize "coding-agent/${repo_name}")
+
+    # If session already exists, just attach (idempotent — solves the
+    # cross-repo collision problem the old single `coding-agent` session had).
+    if tmux has-session -t "=$session" 2>/dev/null; then
+        (( no_attach )) || _sesh_attach_or_switch "$session"
+        return 0
+    fi
+
+    # Create session + build layout directly with tmux commands. We deliberately
+    # avoid tmuxp -a here because (a) tmuxp --append needs a live tmux client
+    # ($TMUX set), which isn't guaranteed when scode is invoked from outside
+    # tmux, and (b) the layout is simple enough that direct tmux scripting is
+    # clearer than the YAML-template-then-cleanup-empty-window dance the
+    # sesh.toml `coding-agent` named session uses.
+    #
+    # Window 1 "editor": nvim (left, will be 75%) | $right_pane_cmd (right, 25%)
+    # Window 2 "monitor": btop (or htop / top fallback)
+    #
+    # Right-pane command resolution:
+    #   - No agent override        → `specstory run` (defaults to claude with auto-save md)
+    #   - Override with bare name  → `specstory run <name>` if name is a known
+    #                                specstory provider (claude/codex/cursor/droid/gemini),
+    #                                otherwise `<name>` raw (e.g. opencode)
+    local right_pane_cmd
+    if [[ -z "$agent" ]]; then
+        right_pane_cmd="specstory run"
+    else
+        case "$agent" in
+            claude|codex|cursor|droid|gemini) right_pane_cmd="specstory run $agent" ;;
+            *)                                right_pane_cmd="$agent" ;;
+        esac
+    fi
+
+    tmux new-session -d -s "$session" -c "$repo_root" -n editor nvim
+    tmux split-window -h -t "${session}:editor" -c "$repo_root" "$right_pane_cmd"
+    # main-vertical layout, then size the LEFT pane to 75% of window width
+    tmux select-layout -t "${session}:editor" main-vertical >/dev/null
+    tmux resize-pane -t "${session}:editor.1" -x 75% 2>/dev/null
+
+    # Monitor window
+    local monitor_cmd
+    if   command -v btop >/dev/null 2>&1; then monitor_cmd=btop
+    elif command -v htop >/dev/null 2>&1; then monitor_cmd=htop
+    else                                       monitor_cmd=top
+    fi
+    tmux new-window -t "$session" -n monitor -c "$repo_root" "$monitor_cmd"
+
+    # Focus editor window, left (nvim) pane
+    tmux select-window -t "${session}:editor"
+    tmux select-pane -t "${session}:editor.1"
+
+    (( no_attach )) || _sesh_attach_or_switch "$session"
+}
+
+# ── svibe: parametric multi-agent vibe layout ───────────────────────────────
+#
+# A "vibe coding" session: window 1 has N agent panes (default 4), window 2
+# is lazygit, window 3 is nvim. Built directly with tmux split/new-window
+# commands so it stays parametric (tmuxp YAML can't express dynamic pane counts).
+#
+# Session naming: `vibe/<dir-basename>` — collision-safe across directories.
+# Refuses outside a git repo (use `shere` for plain shells in arbitrary dirs).
+#
+# Usage:
+#   svibe                              # 4 panes × claude, + lazygit + nvim
+#   svibe 2                            # 2 panes × claude
+#   svibe 4 codex                      # 4 panes × codex
+#   svibe 3 opencode                   # 3 panes × opencode
+#   svibe -p ~/repo 4 claude           # explicit path
+#   svibe --no-attach 4 claude         # create in background
+function sesh-vibe() {
+    local target="" no_attach=0
+    local n_agents=4
+    local agent_cli="claude"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--path)      target="$2"; shift 2 ;;
+            --no-attach)    no_attach=1; shift ;;
+            -h|--help)
+                cat <<'EOF'
+svibe — parametric multi-agent vibe layout
+
+Usage: svibe [--path DIR] [--no-attach] [N_AGENTS] [AGENT_CLI]
+
+Default: svibe 4 claude
+  window 1 "agents" — N_AGENTS panes (tiled), each running AGENT_CLI
+  window 2 "git"    — lazygit
+  window 3 "edit"   — nvim
+
+Session name: `vibe/<repo-basename>` (collision-safe per directory).
+Requires:     git repo (use `shere` for plain shells elsewhere).
+
+Examples:
+  svibe                  # 4× claude
+  svibe 2                # 2× claude
+  svibe 4 codex          # 4× codex
+  svibe 6 opencode       # 6× opencode (heavy — large monitor recommended)
+EOF
+                return 0 ;;
+            -*)             echo "svibe: unknown flag $1" >&2; return 1 ;;
+            *)              break ;;
+        esac
+    done
+    # Positional: [n_agents] [agent_cli]
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" =~ ^[0-9]+$ ]]; then
+            n_agents="$1"; shift
+        fi
+    fi
+    [[ $# -gt 0 ]] && agent_cli="$1"
+
+    if (( n_agents < 1 || n_agents > 12 )); then
+        echo "svibe: n_agents=$n_agents out of range [1, 12]" >&2
+        return 1
+    fi
+
+    # Resolve repo root
+    local repo_root
+    if [[ -n "$target" ]]; then
+        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+    else
+        repo_root=$(_sesh_git_root)
+    fi
+    if [[ -z "$repo_root" ]]; then
+        echo "svibe: not inside a git repo." >&2
+        echo "       Use \`shere\` for a plain shell in arbitrary directories." >&2
+        return 1
+    fi
+
+    # Validate agent CLI exists
+    if ! command -v "$agent_cli" >/dev/null 2>&1; then
+        echo "svibe: agent CLI '$agent_cli' not found in PATH." >&2
+        echo "       Available: $(for c in claude codex opencode; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
+        return 1
+    fi
+
+    local repo_name session
+    repo_name=$(basename "$repo_root")
+    session=$(_sesh_sanitize "vibe/${repo_name}")
+
+    # Idempotent: existing session = just attach
+    if tmux has-session -t "=$session" 2>/dev/null; then
+        (( no_attach )) || _sesh_attach_or_switch "$session"
+        return 0
+    fi
+
+    # ── Build the session ───────────────────────────────────────────────
+    # Window 1: agents (start with first pane running the agent)
+    tmux new-session -d -s "$session" -c "$repo_root" -n agents "$agent_cli"
+
+    # Add remaining N-1 panes; -t targets window 1
+    local i
+    for (( i = 2; i <= n_agents; i++ )); do
+        tmux split-window -t "${session}:agents" -c "$repo_root" "$agent_cli"
+        # Re-tile after each split so layout stays balanced (avoids 1-pane-too-small fail)
+        tmux select-layout -t "${session}:agents" tiled >/dev/null
+    done
+
+    # Window 2: git (lazygit if present)
+    if command -v lazygit >/dev/null 2>&1; then
+        tmux new-window -t "$session" -n git -c "$repo_root" lazygit
+    else
+        tmux new-window -t "$session" -n git -c "$repo_root" "git status; exec \$SHELL"
+    fi
+
+    # Window 3: edit (nvim)
+    tmux new-window -t "$session" -n edit -c "$repo_root" nvim
+
+    # Focus agents window, first pane
+    tmux select-window -t "${session}:agents"
+    tmux select-pane -t "${session}:agents.1"
+
+    (( no_attach )) || _sesh_attach_or_switch "$session"
+}
 
 # Register as zsh widget
 zle -N sesh-sessions

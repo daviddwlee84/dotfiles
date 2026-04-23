@@ -21,34 +21,144 @@ Source: `~/.config/zsh/tools/22_sesh.zsh`
 
 ### ZSH Helpers
 
-The managed zsh config also provides two shell helpers:
+The managed zsh config provides four shell helpers, each with a distinct
+weight class so you can pick the right tool for the moment:
 
-| Command | Action |
-|---------|--------|
-| `shere` | Connect to a sesh session for the current directory |
-| `sroot` | Connect to the current git root if present, otherwise `$PWD` |
+| Command | Weight | When to use | Session name |
+|---------|--------|-------------|--------------|
+| `shere` | Bare shell | Ad-hoc cd: just need a tmux session at `$PWD`, no editor, no layout | `<basename>` |
+| `sroot` | Sesh defaults | Want sesh's wildcard / `default_session` behavior at the git root | sesh-determined (`dir_length=2`) |
+| `scode` | Heavy | "Open the coding-agent layout for *this* repo" — nvim 75% \| `specstory run` 25% + btop window | `coding-agent/<repo>` |
+| `svibe` | Heaviest | "Vibe coding" — N tiled agent panes + lazygit + nvim | `vibe/<repo>` |
 
-The underlying functions are `sesh-here` and `sesh-root`, so you can call them directly if you prefer function names over aliases.
+The underlying functions are `sesh-here` / `sesh-root` / `sesh-code` /
+`sesh-vibe`; you can call them directly if you prefer function names over
+aliases.
 
-Both helpers accept a **command** as bare arguments (no quotes needed), which overrides the default `startup_command` from `sesh.toml`:
+#### `shere` — bare shell at `$PWD`
+
+Intentionally lightweight: creates a tmux session named after the basename of
+the directory, drops you into a shell, **does not** trigger sesh's
+`default_session.startup_command` (nvim) or any wildcard layout. Use it when
+you've cd'd somewhere ephemeral and just want session persistence.
 
 ```bash
-# No args → default startup_command (nvim)
-shere
-sroot
-
-# Bare args → treated as the command to run in the new session
-shere specstory run codex
-shere npm run dev
-sroot specstory run codex
-
-# Explicit flags (also supported)
-shere -c "specstory run codex"       # --command flag
-shere -p ~/repos/my-project          # --path flag (overrides $PWD)
-shere -p ~/repos/my-project npm dev  # path + command
+shere                          # bare shell session at $PWD
+shere npm run dev              # session that runs `npm run dev` instead of a shell
+shere -c "specstory run"       # explicit --command flag
+shere -p ~/some/dir            # explicit path; -p + bare args also works
 ```
 
-**Note:** `--command` only takes effect when creating a new session. If the session already exists, sesh switches to it and ignores the command.
+> **Behavior change (2026-04)**: `shere` used to inherit sesh's default
+> startup_command, which opened nvim. It was renamed to "lightweight session"
+> because the heavy editor-first workflow is now `scode`. If you want the old
+> behavior, use `sroot` (which honors the sesh wildcards/defaults) or
+> `sesh connect "$PWD"` directly.
+
+#### `sroot` — git root with sesh defaults
+
+Connects to the current git repo's top-level (or `$PWD` if not in a repo) and
+honors all of sesh.toml: wildcard layouts (e.g. `/Volumes/Data/Program/*/*`
+auto-applies `project.yaml`), `default_session.startup_command`, etc. This is
+the right choice if you've been customizing sesh.toml and want those
+customizations to apply.
+
+```bash
+sroot                          # connect to git root, sesh.toml decides layout
+sroot specstory run codex      # explicit command override
+```
+
+#### `scode` — repo-scoped coding-agent layout
+
+`scode` creates a session **named after the current repo**, so different
+repos no longer collide on the single `coding-agent` session name. This was
+the headline pain point of the old `sesh connect coding-agent` workflow:
+the second invocation from a different repo would silently reuse the
+existing session pointing at the *wrong* repo.
+
+```bash
+scode                          # current repo, default agent (specstory → claude)
+scode codex                    # right pane runs `specstory run codex`
+scode opencode                 # right pane runs `opencode` raw (not a specstory provider)
+scode -p ~/work/foo            # explicit repo path
+scode --no-attach              # build the session in the background, don't switch
+scode -h                       # help
+```
+
+Layout (window 1 "editor"):
+
+```
+┌─────────────────────────────┬──────────────┐
+│ nvim                        │ specstory    │
+│ (75% width)                 │ run [agent]  │
+│                             │ (25% width)  │
+└─────────────────────────────┴──────────────┘
+```
+
+Window 2 "monitor": `btop` (falls back to `htop` / `top`).
+
+**Refuses outside a git repo** — if you're not in a repo, you don't want the
+heavy layout. Use `shere` for bare shells or `svibe` if you really want a
+vibe layout in a non-repo directory (svibe also requires a repo, but that's
+because vibe layouts make even less sense without git context).
+
+The agent override resolves to:
+
+| Argument | Right-pane command |
+|----------|--------------------|
+| (none) | `specstory run` (defaults to claude with auto-save md) |
+| `claude` / `codex` / `cursor` / `droid` / `gemini` | `specstory run <name>` (known specstory providers) |
+| anything else, e.g. `opencode` | runs the binary directly |
+
+> The legacy `coding-agent` named session in `sesh.toml` is **kept for
+> back-compat** (still appears in the sesh picker, still works as
+> `sesh connect coding-agent`) but `scode` is the preferred entry point.
+> See the "DEPRECATED" comment block in sesh.toml.
+
+#### `svibe` — parametric multi-agent vibe layout
+
+Built directly with tmux scripting (not tmuxp) because pane counts are
+parametric and tmuxp YAML can't express that.
+
+```bash
+svibe                          # 4× claude (default) + lazygit + nvim
+svibe 2                        # 2× claude
+svibe 4 codex                  # 4× codex
+svibe 6 opencode               # 6× opencode (heavy — large monitor recommended)
+svibe -p ~/repo 4 claude       # explicit path
+svibe -h                       # help
+```
+
+Layout (3 windows):
+
+```
+window 1 "agents"    — N tiled panes, each running AGENT_CLI
+window 2 "git"       — lazygit (or `git status` fallback)
+window 3 "edit"      — nvim
+```
+
+`N_AGENTS` is bounded `[1, 12]`. Above ~6 the tiled layout becomes too
+cramped on most displays — the cap is conservative, not technical.
+
+Like `scode`, `svibe` refuses outside a git repo. The agent CLI is checked
+against PATH up-front; missing → error with the list of available agents
+detected on this machine.
+
+### Picking between the four
+
+Decision tree:
+
+```
+Are you in a git repo?
+├── No  → shere (bare shell) or sroot (if you want sesh defaults)
+└── Yes → Do you want a layout?
+          ├── No                       → shere or sroot
+          ├── Single editor + side    → scode
+          └── Multiple parallel agents → svibe
+```
+
+All four are idempotent: re-invoking with the same target attaches to the
+existing session instead of creating a duplicate.
 
 ### tmux
 

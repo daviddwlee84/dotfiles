@@ -43,6 +43,17 @@ disable_startup_command = true
 
 # ── Coding agent session (layout: nvim 75% | specstory 25%, btop tab) ────────
 #
+# DEPRECATED: prefer the `scode` zsh function (dot_config/zsh/tools/22_sesh.zsh)
+# which creates a per-repo session named `coding-agent/<repo>`. The named
+# session below is the legacy "always reuse the same `coding-agent` session
+# regardless of which repo you cd'd from" behavior — it's kept for back-compat
+# (sesh picker entry, `sesh connect coding-agent`) but should NOT be your
+# muscle-memory default.
+#
+# Why scode is better: cd to repo A → `scode` → session `coding-agent/A`;
+# cd to repo B → `scode` → NEW session `coding-agent/B`. Same workflow, no
+# accidental reuse of an existing session pointing at the wrong repo.
+#
 # Approach B (active): tmuxp --append via startup_command
 #   sesh creates the session, then tmuxp appends windows into it.
 #   After appending, kills the initial empty window sesh created.
