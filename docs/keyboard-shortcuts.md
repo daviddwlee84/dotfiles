@@ -131,24 +131,24 @@ Prefix key: `Ctrl+B`
 | `prefix + M-t` | Switch to tmux2k theme (bottom status bar) |
 | `prefix + R` | Reload tmux config |
 
-### Popup Menu  *(`prefix + Enter`)*
+### Popup Menu  *(`prefix + Space` or `prefix + e`)*
 
-One-key access to all major operations. Accelerator letters match the standalone bindings above.
+Script-driven (`~/.config/tmux/menu.sh`), height-aware, with submenus. Top menu accelerator letters match the standalone bindings above.
 
 | Key | Action |
 |-----|--------|
-| `\|` / `-` | Split pane |
-| `h/j/k/l` | Navigate panes |
-| `z` | Zoom toggle |
-| `c` | New window |
-| `N` / `X` | New / kill session |
-| `E/e/v/b/T` | Layout presets (even-h/v, main-v/h, tiled) |
-| `g` / `V` / `O` | Sesh pickers (fzf / tv / built-in) |
-| `W` / `S` / `9` | Sesh window / last / root |
-| `B` | CLI tools picker (tv tools) |
-| `C` / `M` | Theme: Catppuccin / tmux2k |
-| `R` / `I` / `U` | Reload config / TPM install / TPM update |
-| `?` | List all tmux keys |
+| `Tab` / `P` | Last window / last pane |
+| `w` / `s` | Choose window / session tree |
+| `q` | Show pane numbers |
+| `g` / `G` | Sesh picker / Lazygit popup |
+| `c` / `\|` / `-` / `z` | New window / split / split / zoom (height ≥ 22) |
+| `→ Layouts (L)` | Submenu: even/main/tiled, pane nav, swap |
+| `→ Session (S)` | Submenu: rename / new / move / break / link / kill |
+| `→ Sesh+ (E)` | Submenu: TV / built-in / windows / last / root / CLI tools |
+| `→ Popups (o)` | Submenu: Lazygit / Shell / Floax |
+| `→ Theme (T)` | Submenu: Catppuccin / tmux2k |
+| `→ System (Y)` | Submenu: reload / TPM install/update / detach / clock |
+| `?` / `/` | Cheatsheet (glow) / tmux-fzf keybinding picker |
 
 > `Ctrl+Space` is intentionally unbound — reserved for input method switching.
 
