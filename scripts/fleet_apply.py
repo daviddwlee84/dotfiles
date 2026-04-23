@@ -1061,6 +1061,33 @@ def cli(
             )
         ),
     ] = "",
+    compact: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Compact post-mortem view of a finished (or hung) run across "
+                "all selected hosts. By default each host picks its newest "
+                "log independently; pin to a specific run with "
+                "--compact-run-id RUN_ID to compare the same run across the "
+                "fleet. For each host shows: final TASK number reached, "
+                "total ansible runtime, top 5 slow tasks, which run_* "
+                "script failed (if any), and final exit code. Read-only — "
+                "pulls log + sentinel via SSH and parses locally. Use after "
+                "a broadcast finishes when --tail per host is too noisy and "
+                "--status doesn't give enough detail."
+            )
+        ),
+    ] = False,
+    compact_run_id: Annotated[
+        str,
+        tyro.conf.arg(
+            help=(
+                "Pin --compact to a specific RUN_ID (e.g. "
+                "`20260422T151551Z`). Default empty = each host picks its "
+                "own latest log."
+            )
+        ),
+    ] = "",
     force: Annotated[
         bool,
         tyro.conf.arg(
@@ -1190,6 +1217,9 @@ def cli(
 
     if status:
         return _run_status(console, selected, connect_timeout, watch=watch)
+
+    if compact:
+        return _run_compact(console, selected, compact_run_id, connect_timeout)
 
     if tail:
         # `tail` is a HOST or HOST:RUN_ID spec — resolve against `selected`
@@ -1594,6 +1624,215 @@ def _run_status(
     except KeyboardInterrupt:
         console.print("\n[yellow]watch: interrupted by user[/]")
         return 130
+
+
+def _parse_compact_log(log_text: str) -> dict:
+    """Extract a one-row summary from a fleet-apply log.
+
+    Greps for the patterns the chezmoi run_* scripts + ansible
+    `pretty_compact` callback emit. Pure parsing — no I/O. Returns
+    a dict suitable for rendering as a Rich table row.
+
+    Patterns matched:
+      - `[N] TASK · [role : task name]` → final task number reached
+      - `PLAY RECAP  (Xm Ys)` → total ansible runtime (last occurrence wins)
+      - `Slow tasks (>5s):` block followed by `  ⏱ ... (Xs)` lines
+      - `chezmoi: <script>: exit status N` → which run_* failed
+    """
+    last_task_num = 0
+    last_task_name = ""
+    play_recap_runtime = ""
+    slow_tasks: list[str] = []
+    failed_script = ""
+
+    in_slow = False
+    for line in log_text.splitlines():
+        # Task counter — `[N] TASK · [role : description]`
+        m = re.match(r"^\[(\d+)\] TASK · (.+)$", line)
+        if m:
+            last_task_num = int(m.group(1))
+            last_task_name = m.group(2).strip().lstrip("[").rstrip("]")
+            in_slow = False
+            continue
+
+        # PLAY RECAP timing — `PLAY RECAP  (1m7s)` or `(45s)` etc.
+        m = re.match(r"^PLAY RECAP\s+\(([^)]+)\)", line)
+        if m:
+            play_recap_runtime = m.group(1)
+            in_slow = False
+            continue
+
+        # Slow tasks block opens
+        if line.startswith("Slow tasks"):
+            in_slow = True
+            continue
+        # Slow task entry — `  ⏱ task name (1m6s)`
+        if in_slow:
+            m = re.match(r"^\s*⏱\s+(.+?)\s+\(([^)]+)\)\s*$", line)
+            if m:
+                slow_tasks.append(f"{m.group(2)} {m.group(1)}")
+                continue
+            # Blank or non-matching line ends the slow-task block
+            if line.strip() == "" or not line.startswith(" "):
+                in_slow = False
+
+        # `chezmoi: 20_ansible_roles.sh: exit status 2`
+        m = re.match(r"^chezmoi: (\S+):\s*exit status\s+(\d+)", line)
+        if m:
+            failed_script = f"{m.group(1)} (rc={m.group(2)})"
+
+    return {
+        "last_task_num": last_task_num,
+        "last_task_name": last_task_name,
+        "play_recap_runtime": play_recap_runtime,
+        "slow_tasks": slow_tasks[:5],
+        "failed_script": failed_script,
+    }
+
+
+def _run_compact(
+    console: Console, selected: list[Host], run_id: str, connect_timeout: int
+) -> int:
+    """Post-mortem compact summary: pull log+sentinel from each host, parse, render.
+
+    Per-host workflow:
+      1. SSH-fetch the requested run's `.log` and `.exit` from
+         `~/.cache/chezmoi-fleet/logs/`. Empty `run_id` = `ls -t | head -1`
+         on the remote so each host picks its own latest independently.
+      2. Parse with `_parse_compact_log`.
+      3. Render row in a Rich table.
+
+    Local hosts read from `LOCAL_LOG_DIR` directly without SSH.
+    Returns 0 always (read-only diagnostic).
+    """
+    if run_id:
+        # Same run on every host — single-line summary header
+        console.print(
+            f"[bold]fleet-apply --compact[/] for run [cyan]{run_id}[/] "
+            f"on {len(selected)} host(s)"
+        )
+    else:
+        console.print(
+            f"[bold]fleet-apply --compact[/] (latest run per host) "
+            f"on {len(selected)} host(s)"
+        )
+
+    # Bash snippet: pick run, dump LOG/EXIT/RUN_ID via printf delimiters so
+    # we can parse a single SSH stream per host. Empty run_id → latest.
+    def _fetch_cmd(rid: str) -> str:
+        if rid:
+            picker = f'_run_id="{rid}"; _log="$_dir/$_run_id.log"'
+        else:
+            picker = (
+                "_log=$(ls -t \"$_dir\"/*.log 2>/dev/null | head -1); "
+                "_run_id=$(basename \"${_log:-}\" .log)"
+            )
+        return (
+            "_dir=\"$HOME/.cache/chezmoi-fleet/logs\"; "
+            f"{picker}; "
+            "if [ -z \"$_run_id\" ] || [ ! -f \"$_log\" ]; then "
+            "  printf 'RUN_ID=\\nMISSING=1\\n'; exit 0; fi; "
+            "_exit=\"$_dir/$_run_id.exit\"; "
+            "printf 'RUN_ID=%s\\n' \"$_run_id\"; "
+            "printf 'EXIT=%s\\n' \"$([ -f \"$_exit\" ] && cat \"$_exit\" || echo '?')\"; "
+            "printf '---LOG---\\n'; "
+            "cat \"$_log\""
+        )
+
+    rows: list[dict] = []
+
+    async def _fetch_one(h: Host) -> dict:
+        row = {"host": h.name, "run_id": "", "exit": "?", "missing": False, "parsed": {}}
+        if h.local:
+            # Read locally
+            if run_id:
+                log_path = LOCAL_LOG_DIR / f"{run_id}.log"
+                resolved_rid = run_id
+            else:
+                logs = sorted(LOCAL_LOG_DIR.glob("*.log"),
+                              key=lambda p: p.stat().st_mtime, reverse=True)
+                log_path = logs[0] if logs else None
+                resolved_rid = log_path.stem if log_path else ""
+            if not log_path or not log_path.exists():
+                row["missing"] = True
+                return row
+            row["run_id"] = resolved_rid
+            exit_path = LOCAL_LOG_DIR / f"{resolved_rid}.exit"
+            row["exit"] = exit_path.read_text().strip() if exit_path.exists() else "?"
+            row["parsed"] = _parse_compact_log(log_path.read_text(errors="replace"))
+            return row
+
+        try:
+            async with asyncio.timeout(connect_timeout):
+                conn = await asyncssh.connect(**_connect_kwargs(h))
+            async with conn:
+                result = await conn.run(_fetch_cmd(run_id), check=False)
+            stdout = result.stdout or ""
+            if "MISSING=1" in stdout.split("---LOG---", 1)[0]:
+                row["missing"] = True
+                # Still try to capture RUN_ID for reporting
+                m = re.search(r"^RUN_ID=(.*)$", stdout, re.MULTILINE)
+                if m:
+                    row["run_id"] = m.group(1)
+                return row
+            head, _, log_text = stdout.partition("---LOG---\n")
+            for ln in head.splitlines():
+                if ln.startswith("RUN_ID="):
+                    row["run_id"] = ln[7:]
+                elif ln.startswith("EXIT="):
+                    row["exit"] = ln[5:]
+            row["parsed"] = _parse_compact_log(log_text)
+            return row
+        except (asyncssh.Error, OSError, TimeoutError) as e:
+            row["missing"] = True
+            row["error"] = str(e)
+            return row
+
+    async def _gather() -> None:
+        results = await asyncio.gather(
+            *(_fetch_one(h) for h in selected), return_exceptions=False
+        )
+        rows.extend(results)
+
+    asyncio.run(_gather())
+
+    # Render
+    table = Table(title="fleet compact summary", show_lines=True)
+    table.add_column("host", style="bold")
+    table.add_column("run_id", style="dim")
+    table.add_column("exit")
+    table.add_column("last task")
+    table.add_column("ansible runtime")
+    table.add_column("slow tasks")
+    table.add_column("failed script")
+
+    for row in rows:
+        if row["missing"]:
+            err = row.get("error", "no log on remote")
+            table.add_row(row["host"], row.get("run_id", "—") or "—",
+                          "[dim]—[/]", f"[dim]{err}[/]", "—", "—", "—")
+            continue
+        p = row["parsed"]
+        exit_color = "green" if row["exit"] == "0" else "red"
+        last_task = (
+            f"#{p['last_task_num']} {p['last_task_name'][:50]}"
+            if p["last_task_num"] else "[dim](no ansible)[/]"
+        )
+        slow = "\n".join(p["slow_tasks"]) if p["slow_tasks"] else "[dim]none[/]"
+        failed = (
+            f"[red]{p['failed_script']}[/]" if p["failed_script"]
+            else "[dim]—[/]"
+        )
+        table.add_row(
+            row["host"], row["run_id"],
+            f"[{exit_color}]{row['exit']}[/]",
+            last_task,
+            p["play_recap_runtime"] or "[dim]—[/]",
+            slow, failed,
+        )
+
+    console.print(table)
+    return 0
 
 
 def _run_tail(

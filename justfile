@@ -392,6 +392,12 @@ fleet-apply-watch *ARGS:
 fleet-apply-tail HOST *ARGS:
     ./scripts/fleet_apply.py --tail {{HOST}} {{ARGS}}
 
+# Compact post-mortem summary across the fleet: final task reached, ansible
+# runtime, top slow tasks, failed run_* script, exit code. Defaults to each
+# host's latest run; pin to one run with --compact-run-id RUN_ID in ARGS.
+fleet-apply-compact *ARGS:
+    ./scripts/fleet_apply.py --compact {{ARGS}}
+
 # ============================================================================
 # Ad-hoc Scripts
 # ============================================================================

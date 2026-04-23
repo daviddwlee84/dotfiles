@@ -227,8 +227,15 @@
 
 # tree-sitter-cli
 - name: Check if tree-sitter is installed
+  # Search standard PATH dirs INCLUDING ~/.cargo/bin (cargo install target)
+  # so re-applies don't reinstall on hosts that fell through to the cargo
+  # fallback path. ansible.builtin.command doesn't honour ~ expansion in
+  # PATH; use shell with explicit ${HOME}.
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: tree-sitter --version
+  ansible.builtin.shell: |
+    PATH="${HOME}/.cargo/bin:${PATH}" tree-sitter --version
+  args:
+    executable: /bin/bash
   register: treesitter_check
   changed_when: false
   failed_when: false
@@ -242,26 +249,41 @@
     msg: "tree-sitter-cli skipped on {{ target_architecture }}: no armv7l node prebuilt; cargo build needs libclang and takes 15+ min"
 
 - name: Install tree-sitter-cli via mise npm (Debian/Ubuntu)
+  # The npm tarball comes from npmmirror (when useChineseMirror=true), but the
+  # postinstall script `node install.js` ALWAYS downloads a prebuilt binary
+  # from `https://github.com/tree-sitter/tree-sitter/releases/download/...`
+  # which redirects to release-assets.githubusercontent.com (Azure blob CDN).
+  # That CDN is frequently unreachable / extremely slow from China, and
+  # tree-sitter's install.js has no env-var override for the download URL.
+  # Without an outer timeout the whole `chezmoi apply` hangs indefinitely.
+  #
+  # `timeout 180` exits 124 on timeout → treesitter_npm.rc != 0 → cargo
+  # fallback fires (cargo crates.io is mirrored via TUNA when
+  # useChineseMirror=true, so cargo path is reliable behind GFW). 180s is
+  # enough for a working network (full install ~30s) but bounded enough not
+  # to burn the fleet-apply outer budget.
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
   ansible.builtin.shell: |
-    {{ mise_bin }} exec -- npm install -g tree-sitter-cli
+    timeout 180 {{ mise_bin }} exec -- npm install -g tree-sitter-cli
   args:
     executable: /bin/bash
   register: treesitter_npm
   changed_when: "'added' in treesitter_npm.stdout or 'added' in treesitter_npm.stderr"
-  ignore_errors: true
+  failed_when: false  # Don't fail the play; downstream cargo task handles it.
 
 # cargo build of tree-sitter-cli requires libclang (via bindgen). Install on
 # Debian/Ubuntu when we might fall through to the cargo path.
 - name: Install libclang-dev for tree-sitter-cli cargo build (Debian/Ubuntu)
+  # rc != 0 covers both: regular npm failure AND `timeout` exit 124.
+  # `is failed` alone wouldn't catch rc=124 because failed_when: false above.
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
-    - treesitter_npm is failed
+    - treesitter_npm.rc | default(1) != 0
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -270,11 +292,14 @@
   ignore_errors: true
 
 - name: Install tree-sitter-cli via cargo (fallback)
+  # Triggered when npm install times out or fails. Cargo pulls from
+  # crates.io which is TUNA-mirrored when useChineseMirror=true (via
+  # ~/.cargo/config.toml sparse index), so this path works behind GFW.
   when:
     - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
-    - treesitter_npm is failed
+    - treesitter_npm.rc | default(1) != 0
   ansible.builtin.shell: |
     if command -v cargo >/dev/null 2>&1; then
       cargo install tree-sitter-cli

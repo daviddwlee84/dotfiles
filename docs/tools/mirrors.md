@@ -67,6 +67,36 @@ places so every code path gets the mirror:
 - **System `pip`** — `uv.toml` already covers the primary path; system pip
   only fires as a fallback in `security_tools` role.
 
+## npm postinstall scripts that download from GitHub Releases
+
+The npm registry is mirrored (`registry.npmmirror.com`), but **a small set
+of npm packages run a `postinstall` script that downloads a prebuilt
+binary directly from GitHub Releases** — bypassing the npm tarball
+mirror entirely. From China, `release-assets.githubusercontent.com`
+(Azure blob CDN) is frequently slow or unreachable, and these scripts
+typically have **no env-var override** for the download URL.
+
+Symptom: `npm install -g <pkg>` hangs after printing
+`Downloading https://github.com/.../releases/download/...` with no
+further output. The npm tarball download itself succeeds (fast, from
+npmmirror) — only the postinstall step hangs.
+
+| Package | Postinstall downloads | Workaround in this repo |
+|---|---|---|
+| `tree-sitter-cli` | `tree-sitter-{platform}-{arch}.gz` | `dot_ansible/roles/lazyvim_deps/tasks/main.yml` wraps with `timeout 180` → cargo fallback (crates.io is TUNA-mirrored) |
+| `node-gyp` (transitive, when building native modules) | platform headers / pre-builts | No managed install — only triggers if a downstream package needs native build |
+
+When adding a new ansible task that runs `npm install -g <pkg>`:
+
+1. **Check if the package has a postinstall binary download** —
+   `npm view <pkg> scripts.postinstall` or read its `install.js`.
+2. If yes, **wrap with `timeout 180`** and a sensible fallback (cargo,
+   apt, manual binary download from a mirrored host).
+3. **Don't `set ignore_errors: true`** alone — it doesn't catch hangs,
+   only failures. Use `failed_when: false` + an explicit
+   `treesitter_npm.rc | default(1) != 0` gate on the fallback task so
+   `timeout` exit 124 properly fires the next step.
+
 ## Adding a new mirror
 
 1. Identify the ecosystem (env var or config file driven?).
