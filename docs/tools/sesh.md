@@ -698,6 +698,16 @@ Sesh's `tmuxp` config field is documented in the schema and README, but **not im
 - [#198 - Built-in Window and Pane management](https://github.com/joshmedeski/sesh/issues/198) -- Request for native pane/window layout support (avoiding tmuxp/tmuxinator dependency). Status: Closed. Sesh v2.25 added basic window support but still no pane splits.
 - [#188 - startup_command sent too early](https://github.com/joshmedeski/sesh/issues/188) -- Bug where startup_command is sent before the shell is ready. Status: Open. This can affect Approach B (`tmuxp load -a`) if there's a timing issue.
 
+## See also
+
+- [`docs/tools/worktrunk.md`](worktrunk.md) — git-worktree manager (`wt`)
+  for the **branch** layer below sesh's project layer. The recommended
+  three-tier mental model is **sesh = repo, wt = worktree within repo,
+  tmux = pane within worktree**. See the
+  [three-layer navigation](worktrunk.md#the-three-layer-navigation-sesh--wt--wtcd)
+  and [tmux session per worktree](worktrunk.md#tmux-session-per-worktree-and-how-it-interacts-with-scodesvibe)
+  sections for how `scode`/`svibe` and `wt` compose.
+
 ## References
 
 - [sesh GitHub](https://github.com/joshmedeski/sesh)
