@@ -115,6 +115,82 @@ on the chezmoi repo immediately, which the global install covers but
 project-scope makes the lock-file dependency explicit for anyone reading
 `skills-lock.json` here.
 
+## How `npx skills` actually wires agents (mechanism reference)
+
+Verified by reading [`vercel-labs/skills/src/agents.ts`](https://github.com/vercel-labs/skills/blob/main/src/agents.ts)
+and [`installer.ts`](https://github.com/vercel-labs/skills/blob/main/src/installer.ts).
+Important because the CLI's "I installed your skill for agent X" message does
+**not** mean agent X actually reads from `~/.agents/skills/` at runtime — that
+is a per-agent convention, not a guarantee.
+
+### Two install strategies
+
+| Strategy | What the CLI writes | Agents that use it |
+|---|---|---|
+| **Universal** (`skillsDir: '.agents/skills'`) | Nothing in agent-specific dir; agent reads `~/.agents/skills/` (global) or `./.agents/skills/` (project) directly | `cursor`, `opencode`, `codex`, `gemini-cli`, `copilot`, `antigravity`, `warp`, `replit`, `cline`, `kimi-cli`, `firebender`, `deep-agents` |
+| **Per-agent symlink** | Symlink `~/.<agent>/skills/<name>` → `~/.agents/skills/<name>` (copy on Windows) | `claude-code`, `augment`, `bob`, `cortex`, `crush`, `goose`, `junie`, `kilo`, `kiro`, `kode`, `roo`, `trae`, `windsurf`, etc. |
+
+The skip happens at `installer.ts`:
+
+```ts
+if (isGlobal && isUniversalAgent(agentType)) {
+  return { /* skipped: no symlink, no copy */ };
+}
+```
+
+So `npx skills add foo -g -a cursor -a opencode` produces **zero** files in
+`~/.cursor/skills/` or `~/.opencode/skills/`. Whether Cursor and OpenCode
+actually pick up `~/.agents/skills/foo/SKILL.md` at runtime is up to those
+agents (Anthropic's Skills spec is Claude Code's; others adopt by convention,
+not contract).
+
+### Lock filename collision (easy to confuse)
+
+| Path | Scope | Owner |
+|---|---|---|
+| `~/.agents/.skill-lock.json` | Global, **singular** `skill-` | Skills CLI |
+| `./skills-lock.json` | Project, **plural** `skills-` | Skills CLI |
+
+Schema differs (global is v3 with `dismissed`/`lastSelectedAgents`; project is
+flatter). Don't symlink one to the other.
+
+### Restore commands and their quirks
+
+| Command | What it does |
+|---|---|
+| `npx skills experimental_install` | Restores **project** lock (`./skills-lock.json`) only |
+| `npx skills experimental_install -g` | `-g` is **silently ignored**, still project-only ([#283](https://github.com/vercel-labs/skills/issues/283), [#549](https://github.com/vercel-labs/skills/issues/549)) |
+| `npx skills update -g` | Updates already-installed global skills; does **not** backfill missing entries from the lock |
+| `npx skills add <source> -s <name> -g -y` | The only working "restore one missing global skill" idiom — what `run_onchange_after_40_install_global_skills.sh.tmpl` loops over |
+
+### CLI flag gotchas
+
+- **Repo shorthand requires `/skills` suffix when skills live under `skills/`**.
+  `npx skills add owner/repo` looks at `.agents/skills/` in that repo;
+  `npx skills add owner/repo/skills` looks at `skills/`. Most third-party skill
+  repos use the latter layout.
+- **`-a` does NOT take comma-separated values**. Repeat the flag:
+  `-a claude-code -a opencode -a cursor`.
+- **Agent names are normalised** (`claude-code` not `claude`,
+  `gemini-cli` not `gemini`, `copilot` not `github-copilot`). Run
+  `npx skills add --list` (or trigger the validation error) to see the
+  canonical list.
+
+### Per-agent env var overrides
+
+Agents that respect a custom config dir change where the symlink/skill is
+read from:
+
+| Env var | Default | Effect |
+|---|---|---|
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | Skills CLI writes symlinks here instead |
+| `CODEX_HOME` | `~/.codex` | Codex picks up skills from here (Codex is universal, so the global install relies on `~/.agents/skills/` regardless) |
+| `XDG_CONFIG_HOME` | `~/.config` | Affects Cursor/OpenCode/Gemini-CLI lookup paths |
+
+If you set any of these and re-run `npx skills add -g`, the CLI writes to the
+new location; chezmoi's lock-file management still uses
+`~/.agents/.skill-lock.json` (the lock is location-independent).
+
 ## Anti-patterns
 
 - **Don't put skill source files (`.agents/skills/<name>/SKILL.md`,
