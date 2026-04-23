@@ -131,7 +131,7 @@ Prefix key: `Ctrl+B`
 | `prefix + M-t` | Switch to tmux2k theme (bottom status bar) |
 | `prefix + R` | Reload tmux config |
 
-### Popup Menu  *(`prefix + Space` or `prefix + e`)*
+### Popup Menu  *(`prefix + Space`)*
 
 Script-driven (`~/.config/tmux/menu.sh`), height-aware, with submenus. Top menu accelerator letters match the standalone bindings above.
 

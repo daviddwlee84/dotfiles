@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Top-level tmux popup menu — invoked by `prefix + Space` / `prefix + e`.
+# Top-level tmux popup menu — invoked by `prefix + Space`.
 #
 # Why a script (not inline `display-menu` in keybindings.conf):
 #   1. tmux's command parser stops at literal `;`, `{`, `}` even inside

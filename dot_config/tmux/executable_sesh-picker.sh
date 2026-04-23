@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sesh picker — invoked from tmux popup menu (`prefix + e` → "Sesh picker").
+# Sesh picker — invoked from tmux popup menu (`prefix + Space` → "Sesh picker").
 #
 # Extracted from dot_config/tmux/keybindings.conf because the inline
 # `display-menu` row tripped tmux's command parser: the fzf `{2..}` range
