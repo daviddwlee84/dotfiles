@@ -96,5 +96,7 @@ Add new entries here as you create them. Keep alphabetical.
 
 | Slug | Status | TODO entry |
 |---|---|---|
+| [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
+| [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |

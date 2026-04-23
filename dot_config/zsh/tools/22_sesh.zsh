@@ -85,8 +85,19 @@ function _sesh_ensure_session() {
 #
 # Update the case list when specstory adds providers (track upstream:
 # specstoryai/getspecstory#146 for opencode, similar issues for others).
+#
+# Args: $1=agent, $2=specstory_mode (auto|never; default auto)
+#   auto  — wrap if known provider, raw otherwise (the historical default)
+#   never — pass through raw regardless (CLI flag --no-specstory sets this)
 function _sesh_wrap_agent() {
-    local agent="$1"
+    local agent="$1" specstory_mode="${2:-auto}"
+    if [[ "$specstory_mode" == "never" ]]; then
+        # Even an empty agent goes raw → caller's responsibility to pick a
+        # sensible default (we choose `claude` upstream when --no-specstory
+        # is set, since `specstory run` with no arg defaults to claude too).
+        print -r -- "${agent:-claude}"
+        return
+    fi
     case "$agent" in
         ""|"specstory")
             # No agent specified → bare `specstory run` (default = claude).
@@ -232,24 +243,31 @@ alias svibe='sesh-vibe'
 #   scode -p ~/some/other/repo         # explicit repo path
 #   scode --no-attach                  # create session in background, don't switch
 function sesh-code() {
-    local target="" agent="" no_attach=0 on_exit="shell"
+    local target="" agent="" no_attach=0 on_exit="shell" specstory_mode="auto"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
             -a|--agent)     agent="$2"; shift 2 ;;
             --on-exit)      on_exit="$2"; shift 2 ;;
+            --no-specstory) specstory_mode="never"; shift ;;
+            --specstory)    specstory_mode="auto"; shift ;;
             --no-attach)    no_attach=1; shift ;;
+            --agents)
+                echo "scode: --agents is svibe-only (scode is single-agent)." >&2
+                echo "       For multi-agent layouts: svibe --agents '$2'" >&2
+                return 1 ;;
             -h|--help)
                 cat <<'EOF'
 scode — open repo-scoped coding-agent layout
 
-Usage: scode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-attach] [AGENT]
+Usage: scode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-specstory]
+             [--no-attach] [AGENT]
 
 Layout: window `editor` (nvim 75% | agent 25%) + window `monitor` (btop).
 Session name: `coding-agent/<repo-basename>` (one session per repo).
 Requires:     git repo (errors otherwise — use `shere` or `svibe`).
 
-Agent wrapping (auto):
+Agent wrapping (auto, opt out with --no-specstory):
   claude / codex / cursor / droid / gemini  → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
@@ -259,9 +277,10 @@ Agent wrapping (auto):
   restart             — auto-respawn the agent in a loop
 
 Examples:
-  scode                            # current repo, default agent
+  scode                            # current repo, default agent (specstory → claude)
   scode codex                      # right pane: specstory run codex
   scode opencode                   # right pane: opencode (raw)
+  scode --no-specstory claude      # right pane: claude (raw, no markdown auto-save)
   scode --on-exit kill claude      # right pane closes when claude exits
   scode -p ~/work/foo              # explicit repo path
 EOF
@@ -289,6 +308,15 @@ EOF
         return 1
     fi
 
+    # Validate agent CLI exists in PATH (fail-fast). Specstory itself isn't
+    # checked here — if the user passed a known provider but specstory is
+    # missing, the pane will exit with specstory's error message and
+    # --on-exit=shell will leave a shell to read it.
+    if [[ -n "$agent" ]] && ! command -v "$agent" >/dev/null 2>&1; then
+        echo "scode: agent CLI '$agent' not found in PATH." >&2
+        return 1
+    fi
+
     local repo_name session
     repo_name=$(basename "$repo_root")
     session=$(_sesh_sanitize "coding-agent/${repo_name}")
@@ -306,7 +334,7 @@ EOF
     # Window 1 "editor": nvim (left, will be 75%) | wrapped agent (right, 25%)
     # Window 2 "monitor": btop (or htop / top fallback)
     local agent_inner agent_cmd
-    agent_inner=$(_sesh_wrap_agent "$agent")
+    agent_inner=$(_sesh_wrap_agent "$agent" "$specstory_mode")
     agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "${agent:-agent}")
 
     tmux new-session -d -s "$session" -c "$repo_root" -n editor nvim
@@ -339,44 +367,68 @@ EOF
 # Session naming: `vibe/<dir-basename>` — collision-safe across directories.
 # Refuses outside a git repo (use `shere` for plain shells in arbitrary dirs).
 #
-# Each agent pane is wrapped in `specstory run X` (for known providers) and
-# additionally wrapped in an exit handler controlled by `--on-exit MODE` —
-# same semantics as `scode`. Default `shell` keeps the pane open with a hint
-# after the agent exits, so Ctrl+C is recoverable.
+# Each agent pane is wrapped in `specstory run X` (for known providers, opt
+# out with --no-specstory) and additionally wrapped in an exit handler
+# controlled by `--on-exit MODE` — same semantics as `scode`. Default `shell`
+# keeps the pane open with a hint after the agent exits, so Ctrl+C is
+# recoverable.
+#
+# Two modes for choosing which agents run:
+#   1. Homogeneous (positional): `svibe 4 codex` → 4 panes all running codex
+#   2. Heterogeneous (--agents):  `svibe --agents claude,codex,codex,opencode`
+#                                 → 4 panes running those specific agents
+#                                 (list LENGTH determines pane count;
+#                                 positional N_AGENTS is rejected to avoid
+#                                 ambiguity)
 #
 # Usage:
-#   svibe                              # 4 panes × claude (specstory-wrapped) + lazygit + nvim
-#   svibe 2                            # 2 panes × claude
-#   svibe 4 codex                      # 4 panes × specstory run codex
-#   svibe 3 opencode                   # 3 panes × opencode (raw, not yet a specstory provider)
-#   svibe --on-exit kill 4 claude      # Ctrl+C kills the pane (old behavior)
-#   svibe --on-exit restart 4 codex    # codex auto-respawns on crash
-#   svibe -p ~/repo 4 claude           # explicit path
-#   svibe --no-attach 4 claude         # create in background
+#   svibe                                          # 4× claude (specstory)
+#   svibe 2                                        # 2× claude
+#   svibe 4 codex                                  # 4× specstory run codex
+#   svibe 3 opencode                               # 3× opencode (raw)
+#   svibe --agents claude,codex,codex,opencode     # 4 panes, mixed
+#   svibe --agents claude,opencode --on-exit kill  # 2 panes, mixed, hard exit
+#   svibe --no-specstory 4 claude                  # 4× claude (raw, no md auto-save)
+#   svibe --on-exit restart 4 codex                # auto-respawn loop
+#   svibe -p ~/repo 4 claude                       # explicit path
+#   svibe --no-attach 4 claude                     # create in background
 function sesh-vibe() {
-    local target="" no_attach=0 on_exit="shell"
+    local target="" no_attach=0 on_exit="shell" specstory_mode="auto"
     local n_agents=4
     local agent_cli="claude"
+    local agents_csv=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
             --on-exit)      on_exit="$2"; shift 2 ;;
+            --agents)       agents_csv="$2"; shift 2 ;;
+            --no-specstory) specstory_mode="never"; shift ;;
+            --specstory)    specstory_mode="auto"; shift ;;
             --no-attach)    no_attach=1; shift ;;
             -h|--help)
                 cat <<'EOF'
 svibe — parametric multi-agent vibe layout
 
-Usage: svibe [--path DIR] [--on-exit MODE] [--no-attach] [N_AGENTS] [AGENT_CLI]
+Usage:
+  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+        [N_AGENTS] [AGENT_CLI]
+  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+        --agents A1,A2,A3[,...]
 
 Default: svibe 4 claude
-  window 1 "agents" — N_AGENTS panes (tiled), each running AGENT_CLI
+  window 1 "agents" — N panes (tiled), each running an agent
   window 2 "git"    — lazygit
   window 3 "edit"   — nvim
+
+Two modes for choosing agents:
+  Homogeneous:    `svibe 4 codex` → 4 panes all codex
+  Heterogeneous:  `svibe --agents claude,codex,codex,opencode`
+                  → 4 panes (one each, in order); list length = pane count
 
 Session name: `vibe/<repo-basename>` (collision-safe per directory).
 Requires:     git repo (use `shere` for plain shells elsewhere).
 
-Agent wrapping (auto):
+Agent wrapping (auto, opt out with --no-specstory):
   claude / codex / cursor / droid / gemini  → `specstory run <agent>`
   opencode (and other unknown CLIs)         → raw passthrough
 
@@ -386,32 +438,66 @@ Agent wrapping (auto):
   restart             — auto-respawn the agent in a loop
 
 Examples:
-  svibe                            # 4× claude (default exit=shell)
-  svibe 2                          # 2× claude
-  svibe 4 codex                    # 4× codex
-  svibe 6 opencode                 # 6× opencode (heavy — large monitor recommended)
-  svibe --on-exit kill 4 claude    # Ctrl+C closes the pane
+  svibe                                            # 4× claude
+  svibe 2                                          # 2× claude
+  svibe 4 codex                                    # 4× codex
+  svibe 6 opencode                                 # 6× opencode (heavy)
+  svibe --agents claude,codex,codex,opencode       # 4 panes, mixed
+  svibe --agents claude,opencode --on-exit kill    # 2 panes, mixed
+  svibe --no-specstory 4 claude                    # raw claude, no auto-save
 EOF
                 return 0 ;;
             -*)             echo "svibe: unknown flag $1" >&2; return 1 ;;
             *)              break ;;
         esac
     done
-    # Positional: [n_agents] [agent_cli]
-    if [[ $# -gt 0 ]]; then
-        if [[ "$1" =~ ^[0-9]+$ ]]; then
-            n_agents="$1"; shift
+
+    # Build the agents array. Two paths:
+    #   --agents claude,codex,…  → split csv, list length = pane count
+    #   positional [N] [CLI]     → repeat CLI N times
+    # Mixing both is rejected to keep semantics unambiguous.
+    local -a agents
+    if [[ -n "$agents_csv" ]]; then
+        if [[ $# -gt 0 ]]; then
+            echo "svibe: cannot combine --agents with positional N_AGENTS/AGENT_CLI." >&2
+            echo "       Pick one. (e.g. drop the trailing args)" >&2
+            return 1
         fi
+        # Split CSV. Trim whitespace per element so 'claude, codex' works.
+        local IFS=','
+        agents=( ${=agents_csv} )
+        # Trim leading/trailing whitespace on each element
+        local j
+        for (( j = 1; j <= ${#agents}; j++ )); do
+            agents[$j]="${agents[$j]## }"
+            agents[$j]="${agents[$j]%% }"
+        done
+        if (( ${#agents} == 0 )); then
+            echo "svibe: --agents list is empty." >&2
+            return 1
+        fi
+    else
+        # Positional: [n_agents] [agent_cli]
+        if [[ $# -gt 0 ]]; then
+            if [[ "$1" =~ ^[0-9]+$ ]]; then
+                n_agents="$1"; shift
+            fi
+        fi
+        [[ $# -gt 0 ]] && agent_cli="$1"
+        # Build a homogeneous array of length n_agents
+        local k
+        for (( k = 1; k <= n_agents; k++ )); do
+            agents+=( "$agent_cli" )
+        done
     fi
-    [[ $# -gt 0 ]] && agent_cli="$1"
 
     case "$on_exit" in
         shell|kill|restart) ;;
         *) echo "svibe: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
     esac
 
-    if (( n_agents < 1 || n_agents > 12 )); then
-        echo "svibe: n_agents=$n_agents out of range [1, 12]" >&2
+    if (( ${#agents} < 1 || ${#agents} > 12 )); then
+        echo "svibe: agent count = ${#agents} out of range [1, 12]" >&2
         return 1
     fi
 
@@ -428,10 +514,21 @@ EOF
         return 1
     fi
 
-    # Validate agent CLI exists (check the bare CLI, not the wrapped form —
-    # `specstory run X` validity is `specstory`'s problem, not ours).
-    if ! command -v "$agent_cli" >/dev/null 2>&1; then
-        echo "svibe: agent CLI '$agent_cli' not found in PATH." >&2
+    # Validate ALL agent CLIs exist in PATH (fail-fast — we don't want to
+    # build a 4-pane layout where one pane is dead). De-dup the list to keep
+    # the error message readable.
+    local -a missing
+    local -A seen
+    local a
+    for a in "${agents[@]}"; do
+        [[ -n "${seen[$a]:-}" ]] && continue
+        seen[$a]=1
+        if ! command -v "$a" >/dev/null 2>&1; then
+            missing+=( "$a" )
+        fi
+    done
+    if (( ${#missing} > 0 )); then
+        echo "svibe: agent CLI(s) not found in PATH: ${missing[*]}" >&2
         echo "       Available: $(for c in claude codex opencode cursor droid gemini; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
         return 1
     fi
@@ -446,22 +543,31 @@ EOF
         return 0
     fi
 
-    # Build the wrapped command once; reused for every pane.
-    local agent_inner agent_cmd
-    agent_inner=$(_sesh_wrap_agent "$agent_cli")
-    agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "$agent_cli")
+    # Build wrapped command for each agent (the wrapping is pane-specific so
+    # we can mix providers in one window).
+    #
+    # Helper: turn agent name → fully-wrapped tmux command string.
+    _vibe_agent_cmd() {
+        local inner
+        inner=$(_sesh_wrap_agent "$1" "$specstory_mode")
+        _sesh_on_exit_wrap "$inner" "$on_exit" "$1"
+    }
 
     # ── Build the session ───────────────────────────────────────────────
-    # Window 1: agents (start with first pane running the agent)
-    tmux new-session -d -s "$session" -c "$repo_root" -n agents "$agent_cmd"
+    # Window 1: agents (start with first pane running agents[1])
+    tmux new-session -d -s "$session" -c "$repo_root" -n agents \
+        "$(_vibe_agent_cmd "${agents[1]}")"
 
-    # Add remaining N-1 panes; -t targets window 1
+    # Add remaining panes
     local i
-    for (( i = 2; i <= n_agents; i++ )); do
-        tmux split-window -t "${session}:agents" -c "$repo_root" "$agent_cmd"
-        # Re-tile after each split so layout stays balanced (avoids 1-pane-too-small fail)
+    for (( i = 2; i <= ${#agents}; i++ )); do
+        tmux split-window -t "${session}:agents" -c "$repo_root" \
+            "$(_vibe_agent_cmd "${agents[$i]}")"
+        # Re-tile after each split so layout stays balanced
         tmux select-layout -t "${session}:agents" tiled >/dev/null
     done
+
+    unset -f _vibe_agent_cmd
 
     # Window 2: git (lazygit if present)
     if command -v lazygit >/dev/null 2>&1; then

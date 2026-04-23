@@ -79,7 +79,10 @@ existing session pointing at the *wrong* repo.
 ```bash
 scode                          # current repo, default agent (specstory → claude)
 scode codex                    # right pane runs `specstory run codex`
-scode opencode                 # right pane runs `opencode` raw (not a specstory provider)
+scode opencode                 # right pane runs `opencode` raw (not yet a specstory provider)
+scode --no-specstory claude    # right pane runs `claude` raw (no markdown auto-save)
+scode --on-exit kill claude    # Ctrl+C closes the right pane (vs default: drops to shell)
+scode --on-exit restart codex  # codex auto-respawns on crash
 scode -p ~/work/foo            # explicit repo path
 scode --no-attach              # build the session in the background, don't switch
 scode -h                       # help
@@ -102,13 +105,42 @@ heavy layout. Use `shere` for bare shells or `svibe` if you really want a
 vibe layout in a non-repo directory (svibe also requires a repo, but that's
 because vibe layouts make even less sense without git context).
 
-The agent override resolves to:
+##### Agent wrapping (auto, opt out with `--no-specstory`)
 
 | Argument | Right-pane command |
 |----------|--------------------|
 | (none) | `specstory run` (defaults to claude with auto-save md) |
 | `claude` / `codex` / `cursor` / `droid` / `gemini` | `specstory run <name>` (known specstory providers) |
-| anything else, e.g. `opencode` | runs the binary directly |
+| `opencode` and other unknown CLIs | runs the binary directly |
+| any agent + `--no-specstory` | runs the binary directly (raw) |
+
+> `opencode` is currently raw because specstory upstream doesn't support it
+> as a provider yet. Tracked in
+> [`backlog/specstory-opencode-support.md`](../../backlog/specstory-opencode-support.md)
+> — when `specstoryai/getspecstory#156` lands, the case statement in
+> `_sesh_wrap_agent` gets a one-line update and opencode joins the auto-wrap
+> list.
+
+##### `--on-exit` modes
+
+What happens when the agent exits (clean quit, Ctrl+C, crash):
+
+| Mode | Behavior |
+|------|----------|
+| `shell` (default) | Pane prints a yellow hint and drops into `$SHELL`. You can re-launch the agent (the hint shows the exact command), switch to lazygit, or close the pane manually. Costs one background `$SHELL` process per pane. |
+| `kill` | Pane closes when the agent exits. The historical / tmux-default behavior. |
+| `restart` | Wraps the agent in `while true; do AGENT \|\| true; sleep 1; done`. Use Ctrl+C twice quickly to break the loop and land in shell. Useful for crash-prone development of an agent itself. |
+
+> The `shell` default trades one background process per pane for far better
+> recoverability — the most common reported pain point with the old
+> `coding-agent` workflow was "I hit Ctrl+C and lost the pane plus the
+> 75/25 layout".
+
+##### Single-agent only
+
+`scode` is single-agent by design. If you want multiple agents in parallel,
+use `svibe --agents …`. Passing `--agents` to `scode` errors with a hint to
+switch to `svibe`.
 
 > The legacy `coding-agent` named session in `sesh.toml` is **kept for
 > back-compat** (still appears in the sesh picker, still works as
@@ -120,29 +152,67 @@ The agent override resolves to:
 Built directly with tmux scripting (not tmuxp) because pane counts are
 parametric and tmuxp YAML can't express that.
 
+Two ways to specify which agents run:
+
 ```bash
-svibe                          # 4× claude (default) + lazygit + nvim
-svibe 2                        # 2× claude
-svibe 4 codex                  # 4× codex
-svibe 6 opencode               # 6× opencode (heavy — large monitor recommended)
-svibe -p ~/repo 4 claude       # explicit path
-svibe -h                       # help
+# Homogeneous (positional): all panes run the same agent
+svibe                                            # 4× claude (default)
+svibe 2                                          # 2× claude
+svibe 4 codex                                    # 4× codex
+svibe 6 opencode                                 # 6× opencode (heavy — large monitor recommended)
+
+# Heterogeneous (--agents): one entry per pane, list length = pane count
+svibe --agents claude,codex,codex,opencode       # 4 panes, mixed
+svibe --agents claude,opencode                   # 2 panes, mixed
+svibe --agents 'claude, codex, opencode'         # whitespace around commas tolerated
+
+# Other flags (work with both modes)
+svibe --on-exit kill 4 claude                    # Ctrl+C closes panes
+svibe --on-exit restart --agents codex,opencode  # auto-respawn loop
+svibe --no-specstory 4 claude                    # 4× raw claude (no markdown auto-save)
+svibe -p ~/repo --agents claude,codex            # explicit path
+svibe -h                                         # help
 ```
+
+Mixing positional `[N] [CLI]` with `--agents` is **rejected** to keep
+semantics unambiguous — pick one mode.
 
 Layout (3 windows):
 
 ```
-window 1 "agents"    — N tiled panes, each running AGENT_CLI
+window 1 "agents"    — N tiled panes, each running its agent (mixed allowed)
 window 2 "git"       — lazygit (or `git status` fallback)
 window 3 "edit"      — nvim
 ```
 
-`N_AGENTS` is bounded `[1, 12]`. Above ~6 the tiled layout becomes too
+Pane count is bounded `[1, 12]`. Above ~6 the tiled layout becomes too
 cramped on most displays — the cap is conservative, not technical.
 
-Like `scode`, `svibe` refuses outside a git repo. The agent CLI is checked
-against PATH up-front; missing → error with the list of available agents
-detected on this machine.
+##### Validation (fail-fast)
+
+`svibe` validates before building anything:
+
+1. `--agents` and positional `[N] [CLI]` cannot both be set
+2. `--on-exit` must be `shell` / `kill` / `restart`
+3. Pane count in `[1, 12]`
+4. Must be inside a git repo
+5. **Every** agent CLI in the list must exist in `$PATH`
+
+This avoids the "4-pane window where one pane is silently dead" failure mode
+you'd get if validation were per-pane.
+
+##### `--no-specstory` and `--on-exit`
+
+Same semantics as `scode`. The wrapping is **per-pane**, so you can mix
+opencode (raw) with claude (specstory-wrapped) freely:
+
+```bash
+# 3 panes — opencode raw, claude wrapped, codex wrapped, all share --on-exit shell
+svibe --agents opencode,claude,codex
+```
+
+Like `scode`, `svibe` refuses outside a git repo. Use `shere` for plain
+shells in arbitrary directories.
 
 ### Picking between the four
 
