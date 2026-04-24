@@ -2677,7 +2677,7 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 printf 'not-a-real-key\n' > "$TMPDIR/id_ed25519"
 printf 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQABAAACAQ test@example\n' > "$TMPDIR/id_ed25519.pub"
-printf '[REDACTED PRIV***KEY BLOCK]\n' > "$TMPDIR/some.txt"
+printf '[REDACTED PEM PRIVKEY BLOCK]\n' > "$TMPDIR/some.txt"
 printf 'hello world\n' > "$TMPDIR/file with spaces.txt"
 
 # Sensitive filename blocked
@@ -4183,7 +4183,7 @@ TMPBIN=$(mktemp -d)
 trap 'rm -rf "$TMPDIR" "$TMPBIN"' EXIT
 printf 'not-a-real-key\n' > "$TMPDIR/id_ed25519"
 printf 'ssh-ed25519 AAAAB3NzaC1yc2EAAAADAQABAAACAQ test@example\n' > "$TMPDIR/id_ed25519.pub"
-printf '[REDACTED PRIV***KEY BLOCK]\n' > "$TMPDIR/some.txt"
+printf '[REDACTED PEM PRIVKEY BLOCK]\n' > "$TMPDIR/some.txt"
 printf 'hello world\n' > "$TMPDIR/file with spaces.txt"
 
 set +e

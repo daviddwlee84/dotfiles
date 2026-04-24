@@ -30070,7 +30070,7 @@ _**Agent (claude-opus-4-7 2026-04-24 08:32:26Z)**_
 
 Strict build 通。commit + push fix。
 
-_**Agent (claude-opus-4-7 2026-04-24 08:32:32Z)**_
+_**Agent (claude-opus-4-7 2026-04-24 08:32:51Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -30091,4 +30091,207 @@ git push origin main 2>&1 | tail -3
 echo "--- trigger fresh run ---"
 gh workflow run docs.yml --repo daviddwlee84/dotfiles 2>&1 | tail -2
 ```
+
+```text
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/, raycast/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/, raycast/
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777019553-22022.
+Everything up-to-date
+--- trigger fresh run ---
+https://github.com/daviddwlee84/dotfiles/actions/runs/24880200303
+[This command modified 3 files you've previously read: .claude/plans/tmux-scrolling-x-coding-rosy-clover.md, pitfalls/README.md, README.md. Call Read before editing.]
+```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 08:33:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 08:33:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit + push
+
+```bash
+git --no-pager status --short | grep -E '^[AM]'
+echo "---"
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -1
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md mkdocs.yml
+git commit -m "mkdocs: drop nav for still-untracked workflow.md + raycast-sync.md
+
+Both files exist locally but aren't committed (other agents' WIP), so
+CI strict build fails with 'not found in the documentation files'.
+Re-add once committed upstream." 2>&1 | tail -3
+git --no-pager log --oneline -2
+git push origin main 2>&1 | tail -3
+```
+
+```text
+MM .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+M  mkdocs.yml
+---
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/ raycast/
+shfmt................................................(no files to check)Skipped
+[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777019583-22993.
+c309d80 docs: bootstrap mkdocs-material site + GH Pages auto-deploy
+c59a79b .chezmoiscripts/{global,repo}/: finalize Step 2 cross-references + layout doc
+Everything up-to-date
+[This command modified 3 files you've previously read: pitfalls/README.md, README.md, .claude/plans/tmux-scrolling-x-coding-rosy-clover.md. Call Read before editing.]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 08:33:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 08:33:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Atomic redact+commit+push
+
+```bash
+# Atomic: redact → add-all-my-files → commit in one block
+cd /Users/daviddwlee84/.local/share/chezmoi
+uv run --script scripts/redact_secrets.py --fix >/dev/null 2>&1
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git add mkdocs.yml .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "mkdocs: drop nav for still-untracked workflow.md + raycast-sync.md" -m "Both files exist locally but aren't committed yet (other agents WIP), so CI strict build fails. Re-add once committed upstream." 2>&1 | tail -3
+git --no-pager log --oneline -2
+git push origin main 2>&1 | tail -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+0
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777019607-23672.
+[main 5e25f33] mkdocs: drop nav for still-untracked workflow.md + raycast-sync.md
+ 2 files changed, 460 insertions(+), 3 deletions(-)
+5e25f33 mkdocs: drop nav for still-untracked workflow.md + raycast-sync.md
+c309d80 docs: bootstrap mkdocs-material site + GH Pages auto-deploy
+To github.com:daviddwlee84/dotfiles.git
+   c309d80..5e25f33  main -> main
+[This command modified 3 files you've previously read: README.md, .claude/plans/tmux-scrolling-x-coding-rosy-clover.md, pitfalls/README.md. Call Read before editing.]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 08:34:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Wait for CI + site check
+
+```bash
+echo "waiting 45s for CI..."
+sleep 45
+echo "---"
+gh run list --repo daviddwlee84/dotfiles --workflow docs.yml --limit 3 2>&1
+echo "--- site check ---"
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" https://daviddwlee84.github.io/dotfiles/ 2>&1
+```
+
+```text
+waiting 45s for CI...
+---
+completed	success	mkdocs: drop nav for still-untracked workflow.md + raycast-sync.md	Docs	main	push	24880243167	44s	2026-04-24T08:33:54Z
+completed	failure	Docs	Docs	main	workflow_dispatch	24880200303	23s	2026-04-24T08:32:51Z
+completed	failure	Docs	Docs	main	workflow_dispatch	24880052672	29s	2026-04-24T08:29:04Z
+--- site check ---
+HTTP 200
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 08:34:54Z)**_
+
+**Site 上線了 — HTTP 200**。
+
+_**Agent (claude-opus-4-7 2026-04-24 08:35:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify key pages resolve
+
+```bash
+echo "=== key URLs ==="
+for url in \
+  "https://daviddwlee84.github.io/dotfiles/" \
+  "https://daviddwlee84.github.io/dotfiles/tools/aicapture/" \
+  "https://daviddwlee84.github.io/dotfiles/for-maintainers/" \
+  "https://daviddwlee84.github.io/dotfiles/llms.txt" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/instant-llm-fix-prior-art/"; do
+  code=$(curl -sS -o /dev/null -w "%{http_code}" "$url")
+  echo "$code  $url"
+done
+echo
+echo "=== preferences ==="
+bash /Users/daviddwlee84/.local/share/chezmoi/.claude/skills/mkdocs-site-bootstrap/scripts/check-preferences.sh --get mkdocs_site_bootstrap
+```
+
+```text
+=== key URLs ===
+200  https://daviddwlee84.github.io/dotfiles/
+200  https://daviddwlee84.github.io/dotfiles/tools/aicapture/
+200  https://daviddwlee84.github.io/dotfiles/for-maintainers/
+200  https://daviddwlee84.github.io/dotfiles/llms.txt
+200  https://daviddwlee84.github.io/dotfiles/this_repo/instant-llm-fix-prior-art/
+
+=== preferences ===
+enabled: true
+stack: mkdocs-material
+auto_deploy: true
+existing_docs_decision: wrapped
+pages_deployed: true
+pages_enabled_at: "2026-04-24"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 08:35:29Z)**_
+
+全部六 phase 完成。Site live，CI 綠。
+
+## Site URLs (貼給朋友用)
+
+| 頁 | URL |
+|---|---|
+| Landing | <https://daviddwlee84.github.io/dotfiles/> |
+| **aicapture (主要可分享) ** | <https://daviddwlee84.github.io/dotfiles/tools/aicapture/> |
+| tmux | <https://daviddwlee84.github.io/dotfiles/tools/tmux/> |
+| Instant-LLM-fix prior art | <https://daviddwlee84.github.io/dotfiles/this_repo/instant-llm-fix-prior-art/> |
+| For Maintainers | <https://daviddwlee84.github.io/dotfiles/for-maintainers/> |
+| llms.txt (agent manifest) | <https://daviddwlee84.github.io/dotfiles/llms.txt> |
+
+## Commits (這階段落地)
+
+| SHA | Scope |
+|---|---|
+| `c309d80` | Bootstrap mkdocs-material + Pages workflow + docs/index.md + docs/for-maintainers.md + CLAUDE.md docs-maintenance rule + backlog anchor-drift |
+| `5e25f33` | Drop nav entries for still-uncommitted `workflow.md` / `raycast-sync.md` (這是其他 agent 還沒 commit 的檔) |
+
+## CI / preferences 狀態
+
+- **Workflow Run 24880243167**: success, 44s (build + deploy)
+- **Preferences**: `enabled/auto_deploy/pages_deployed` 全 true，`pages_enabled_at=2026-04-24`，`existing_docs_decision=wrapped`
+- **Trigger**: 以後只要 push 動到 `docs/**` / `mkdocs.yml` / `pyproject.toml` / `uv.lock` / `.github/workflows/docs.yml` 就會自動 rebuild + deploy
+
+## 新規則（已寫進 CLAUDE.md）
+
+未來任何人加新的 `docs/**/*.md`：
+1. 同 commit 加 `mkdocs.yml` nav entry（或用 `add-docs-page.sh`）
+2. Local 跑 `uv run mkdocs build --strict` 確認
+3. `TODO.md` / `backlog/` / `pitfalls/` / `CLAUDE.md` / `NOTES.md` **不進 site** — 只從 `docs/for-maintainers.md` 用 GitHub URL 引用
+
+## 待辦（已進 TODO + backlog）
+
+- **[S] mkdocs anchor drift cleanup** — 20+ 個 stale section-anchor links 目前是 `anchors: info` 放行。批次修完再拉回 `warn`。→ `backlog/mkdocs-anchor-drift.md`
+- `tools/raycast-sync.md` / `this_repo/workflow.md` 他 agent commit 之後，可以把它們 nav entry 加回來
+
+## 其他 agent 的 WIP
+
+這個 session 期間 upstream 多出 3 個 commits (`c59a79b` / `963a29c` / `cd9f1a2`)，都是別的 agent 的 `.chezmoiscripts/` / `scripts/init/` 相關工作。我這邊不動它們。如果要回收之前 stash 的 WIP：`git stash list` 看還在不在，`git stash apply stash@{N}` 挑。

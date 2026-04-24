@@ -1,307 +1,286 @@
-# tmux Capture Helpers Extension: indexed blocks + agent pipe + TUI
+# aicapture docs + non-tmux Tier 1 wrappers + backlog for Tier 2/3
 
 ## Context
 
-Previous task (committed in `b5e8da0`) shipped `cpout` / `cpcmd` / `cpblock`
-plus OSC 133 shell integration and tmux scrollback tuning. This extension
-builds on that baseline:
+Previous phases (committed in `5c2959d` / `697eafd` / `3993b7b` / `c457a78` /
+`430326d`) shipped the aicapture layer: cpout/cpcmd/cpblock with N-back
+lookback, aifix/aiexplain wrappers with model defaults + glow/bat prettify
++ stderr metadata + spinner, an aiblock Python TUI with multi-select, and
+an instant-llm-fix prior-art survey doc.
 
-1. **Indexed lookback** — currently the three helpers only grab the LAST
-   block. Real debugging often wants "the one 3 commands back" (the error
-   is usually not the last thing on screen). Add a positional `N` arg.
-2. **One-shot pipe to coding-agent** — chaining `cpblock N` into `claude
-   -p "fix this"` is a common-enough idiom to deserve its own command.
-   User confirmed: **advisory only** by default (agent prints suggestion,
-   doesn't touch files); **name `aifix` + `aiexplain`** (not `askai`).
-3. **Interactive TUI** — a Python `uv run --script` tool that lets the
-   user scroll previous commands, edit the prompt, and pick where the
-   agent's reply goes (stdout / clipboard / interactive-agent-with-context).
+This phase addresses three remaining gaps surfaced in the latest chat:
 
-Underlying mechanics are unchanged: OSC 133 markers in tmux's grid
-line-attrs, navigated via `previous-prompt` / `previous-prompt -o`; the
-agent is invoked in non-interactive mode (`claude -p`, `opencode run`,
-`codex exec`, `cursor-agent -p`) with the block as context.
+1. **No user-facing "how do I use this" doc**. `docs/tools/tmux/README.md`
+   has an AI section but it's embedded in a tmux-centric page; a friend
+   asked to try these tools would need to read prose + reverse-engineer
+   the source. Needs a dedicated `docs/tools/aicapture.md` walkthrough.
+2. **Non-tmux environments** (VSCode integrated terminal, bare Ghostty
+   without tmux, quick SSH sessions). cpcmd works; everything else that
+   depends on tmux scrollback doesn't. Need `aifix-stdin` / `aifix-run` /
+   `aifix-rerun` for the common cases.
+3. **Backlog** the more invasive non-tmux options (Tier 2: transparent tee;
+   Tier 3: script(1) / PTY proxy) with explicit "why not" so future-us
+   doesn't spend a weekend re-deriving that they're bad trades.
 
-## Design decisions (confirmed with user)
+User asked to sequence as: **docs first** → commit + push → then Tier 1 →
+then backlog → commit + push.
 
-- **Naming**: `aifix` (diagnose + suggest fix) and `aiexplain` (explain what
-  happened). Two small fixed-purpose commands beat one `askai -m MODE`.
-- **Agent mode**: **advisory only** — the default is print-only, no file
-  edits. `--execute` / `--allow-edits` not offered in v1; escalation path
-  is "spawn an interactive agent pane with this context" via the TUI.
-- **Agent auto-detection**: `claude` → `opencode` → `codex` → `cursor-agent`,
-  whichever is on `$PATH` first. Override via `-a AGENT`.
-- **TUI library**: `questionary` + `rich` — matches
-  [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py)
-  and [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py). No new deps.
-- **Script location**: `scripts/aiblock.py` (source of truth, agent-visible,
-  matches `fleet_apply.py` convention); shell alias `aiblock` in
-  `dot_config/zsh/tools/04_ai_capture.zsh` resolves the path via
-  `chezmoi source-path` (cached once).
+## Phase A — User guide at `docs/tools/aicapture.md` (NEW)
 
-## Indexed lookback (shell-level)
+Single-page walkthrough that stands alone. A friend can read this and
+either (a) use the tools via chezmoi or (b) copy-paste the 4 source files
+and use them standalone.
 
-### UX
+Sections:
+
+- **Quick start** — one-command demo (`aifix` after a failing cargo build)
+- **Commands table** — cpcmd/cpout/cpblock [N], aifix/aiexplain [N] with
+  flags, aiblock TUI
+- **Configuration** — the six `AICAP_*` env vars with defaults and
+  meaning (the same list that `aifix --help` prints)
+- **Requirements** — zsh, tmux 3.3+ (for output capture), OSC 133 hook,
+  one agent CLI, optional glow/bat/jq/uv
+- **Standalone setup (no chezmoi)** — curl the 4 files + sourceable
+  snippet for `~/.zshrc`. Include GitHub blob URLs directly so a
+  recipient can click and read without clone:
+  - `dot_config/zsh/tools/02_shell_integration.zsh`
+  - `dot_config/zsh/tools/03_tmux_capture.zsh`
+  - `dot_config/zsh/tools/04_ai_capture.zsh`
+  - `scripts/aiblock.py`
+- **Troubleshooting** — `exec zsh` after install, the "shell history
+  empty" bug (fixed in `3993b7b`), metadata `(?)` fallback, spinner
+  visibility. Link to the two relevant pitfalls.
+- **Related** — cross-refs to `tmux/README.md` OSC 133 section and
+  `this_repo/instant-llm-fix-prior-art.md`.
+
+No deployment step needed — repo is public (`github.com/daviddwlee84/dotfiles`),
+no GitHub Pages set up (confirmed via Phase 1 exploration), so the share
+link is the plain blob URL. Future: if we want a prettier docs site it's a
+separate deferred task; `docs/` is already well-formed enough that a
+future `mkdocs` config would be trivial.
+
+**Also update**:
+- `docs/tools/tmux/README.md` AI section — replace the inline usage
+  paragraphs with a one-line pointer to the new aicapture.md.
+- `README.md` root — if there's an existing "What You Get" or tools list,
+  add a row linking to aicapture.md. (If not, skip.)
+
+**Commit + push after Phase A so the doc is live on github.com BEFORE
+implementing Tier 1.** User explicitly asked for this ordering.
+
+## Phase B — Tier 1: three non-tmux wrappers
+
+Three new shell functions in `dot_config/zsh/tools/04_ai_capture.zsh`,
+alongside existing aifix/aiexplain:
+
+### `aifix-stdin [-a AGENT] [-p PROMPT] [--raw] [--no-meta]`
+
+Reads stdin as the "block". Zero magic, composes with anything.
 
 ```sh
-cpblock          # last block (unchanged default)
-cpblock 3        # block 3 back (third-to-last command + its output)
-cpout 2          # output of the 2nd-to-last command
-cpcmd 4          # input line of the 4th-to-last command
+tail -200 /var/log/nginx/error.log | aifix-stdin
+curl -sS https://weird.api/thing | aifix-stdin -p "explain this JSON"
+aifix-stdin < build.log
 ```
 
-`N` is always "how many commands back, counting from the current prompt"
-(1 = last, 2 = one before that, ...). No range/combine syntax in v1 —
-that's the TUI's job.
+Default prompt same as `aifix` ("diagnose + fix"). Implementation: refactor
+the dispatch to share arg parsing + agent invocation between aifix (cpblock
+source) and aifix-stdin (stdin source). Introduce an internal
+`_ai_dispatch_core <block> ...` that both call.
 
-### Implementation
+### `aifix-run [-a AGENT] [-p PROMPT] [--] CMD [ARG...]`
 
-**`dot_config/zsh/tools/03_tmux_capture.zsh`**: thread `N` through the
-existing helper, ripple into the three public commands.
-
-- `_cpx_tmux_select <name> <count> <start-cmd> [args]` — generalise the
-  helper: `count` is how many `previous-*` repetitions before
-  `begin-selection`, followed by a single `next-prompt` to close.
-- `cpout [N]`: call helper with `count=N`, start=`previous-prompt -o`.
-  (Because preexec skips C for cpout/cpcmd/cpblock, N=1 finds the PREVIOUS
-  command's C, N=2 finds the one before that, etc.)
-- `cpblock [N]`: call helper with `count=N+1`, start=`previous-prompt`.
-  (The +1 skips cpblock's own A; the remaining N lands on the Nth block
-  back's A.)
-- `cpcmd [N]`: replace `fc -ln -1` with `fc -ln -N -N` (range from Nth
-  back to Nth back — a single entry).
-
-Validate `N` is a positive integer; default to `1`; reject `0` or negative
-with stderr diagnostic.
-
-## One-shot agent wrapper (shell-level)
-
-### UX
+Runs `CMD ARG...` with stdout+stderr teed to a temp file, then feeds
+`$ CMD ARG...` + captured output + exit code to the agent.
 
 ```sh
-aifix              # last block, default "diagnose + fix" prompt, auto-detected agent
-aifix 3            # 3rd block back
-aifix -a opencode  # force agent
-aifix -p "why does this segfault?"  # override prompt
-aiexplain          # same args, different default prompt
+aifix-run -- cargo build --release
+aifix-run -p "is this safe?" -- ansible-playbook deploy.yml
 ```
 
-Defaults:
+Implementation: `CMD "$@" 2>&1 | tee "$log"`. Capture CMD's exit code
+via `${pipestatus[1]}` (zsh array). Write a small header to the log:
+```
+$ CMD ARG ARG
+<output>
+(exit code: N)
+```
+Then call `_ai_dispatch_core` with the log contents.
 
-- **aifix prompt**: "Here is a command I ran in my terminal and its output.
-  Diagnose any errors and suggest a concrete fix. Be brief and specific."
-- **aiexplain prompt**: "Here is a command I ran in my terminal and its
-  output. Explain what happened in plain language. Be concise."
+**isatty caveat** (documented, not worked around): teeing makes CMD's
+stdout a pipe, so TUI apps (vim, less, htop) will render in degraded mode.
+User shouldn't be aifix-run'ing interactive TUIs anyway; we leave this as
+documented surprise, not a trap (no auto-whitelist — that's Tier 2
+territory).
 
-### Implementation
+### `aifix-rerun [-a AGENT] [-p PROMPT] [-y]`
 
-**`dot_config/zsh/tools/04_ai_capture.zsh`** (new):
+thefuck-style: fetches `fc -ln -2 -2` (skip aifix-rerun itself), confirms
+`re-execute "$CMD"? [y/N]` unless `-y`, then delegates to `aifix-run --
+$=CMD` with `$=` word-splitting.
 
-```zsh
-_aiagent_invoke() {
-  # Args: <agent> <prompt>
-  # Invokes agent in non-interactive mode. prompt is sent via the agent's
-  # one-shot flag; no file edits are requested.
-  local agent=$1 prompt=$2
-  case "$agent" in
-    claude)       claude -p "$prompt" ;;
-    opencode)     opencode run "$prompt" ;;
-    codex)        codex exec "$prompt" ;;
-    cursor-agent) cursor-agent -p "$prompt" ;;
-    *) print -u2 "aifix: unknown agent: $agent"; return 1 ;;
-  esac
-}
+**Warnings**: prints `⚠ re-executing has side effects if CMD is not
+idempotent` on stderr. Safe commands (ls, cat, echo, grep, etc.) could
+be added to a no-warn allowlist later; v1 just warns unconditionally
+and requires explicit y.
 
-_aiagent_autodetect() {
-  for cand in claude opencode codex cursor-agent; do
-    command -v "$cand" &>/dev/null && { print -r -- "$cand"; return 0; }
-  done
-  return 1
-}
+### Docs hook-up in aicapture.md
 
-# aifix [N] [-a AGENT] [-p PROMPT]
-aifix() { _ai_capture_dispatch aifix 'Diagnose any errors ...' "$@"; }
-aiexplain() { _ai_capture_dispatch aiexplain 'Explain what happened ...' "$@"; }
+Add a fourth section before "Configuration":
 
-_ai_capture_dispatch() {
-  # parses N, -a, -p; calls cpblock $N; prepends prompt; invokes agent.
-  # advisory only — no flag to enable edits in v1.
-  ...
-}
+```markdown
+### Non-tmux alternatives
+
+When you don't have tmux (VSCode terminal, bare shell, short SSH):
+
+| Command | Source of context |
+|---|---|
+| `aifix-stdin` | whatever you pipe in |
+| `aifix-run -- CMD` | runs CMD, tees output, reviews |
+| `aifix-rerun` | re-executes last command (confirm prompt) |
 ```
 
-Output goes to stdout (pipe-friendly for `aifix | tee /tmp/advice.md`).
-Diagnostic line to stderr ("aifix: claude invoked with 3rd block back").
+## Phase C — Backlog: `backlog/ai-capture-non-tmux-output.md` (NEW)
 
-### Call graph
+Follow the template at `backlog/README.md:42-91`. Single entry covers both
+Tier 2 and the Tier 3 rejection, since they share a problem domain.
 
-```
-aifix / aiexplain           <-- user types this
-  → cpblock N               <-- reuses committed helper
-  → _aiagent_invoke         <-- claude / opencode / codex / cursor-agent
-```
+Shape:
 
-## Python TUI
+```markdown
+# Non-tmux output capture for aifix / aiexplain
 
-### UX sketch
+**Status**: P2 deferred (Tier 2); P3 rejected (Tier 3)
+**Effort**: M (Tier 2) / XL-won't-do (Tier 3)
+**Related**: `TODO.md`, `dot_config/zsh/tools/04_ai_capture.zsh`,
+  `docs/tools/aicapture.md`, `docs/this_repo/instant-llm-fix-prior-art.md`
 
-```
-$ aiblock
-┌─ Recent commands (pick one) ──────────────────────────────────────┐
-│ > 1  (45s ago)  cargo build --release                              │
-│   2  (2m ago)   git rebase -i HEAD~5                               │
-│   3  (4m ago)   pytest tests/integration/test_auth.py             │
-│   4  (7m ago)   just fleet-apply                                   │
-│   ...                                                              │
-└───────────────────────────────────────────────────────────────────┘
+## Context
+[2026-04: committed aifix-stdin/-run/-rerun as Tier 1. What Tier 2/3 would add.]
 
-[after selection, rich panel shows the captured block]
+## Investigation
+[Summary of thefuck's re-run strategy, butterfish PTY proxy,
+tee+isatty breakage, script(1) job-control quirks. Copy key findings
+from instant-llm-fix-prior-art.md.]
 
-? Edit prompt (default: Diagnose any errors ...):
-  [editable text box]
+## Options considered
 
-? Action:
-  ▸ Print reply here (default)
-    Copy reply to clipboard
-    Spawn interactive agent pane with this context
-    Cancel
+| Option | Pros | Cons |
+|---|---|---|
+| **Tier 1 (shipped)** — aifix-stdin/-run/-rerun | zero magic, composes with pipe | user must remember to pipe / prefix |
+| **Tier 2 — preexec/precmd tee redirect** | transparent, no per-command prefix | breaks isatty for TUIs; ZLE timing fragile; /tmp fills |
+| **Tier 3a — wrap every shell in script(1)** | PTY emulation keeps isatty truthy; most robust | script(1) has bugs + zsh job-control conflicts; layer-count pain; tools detect "inside script" |
+| **Tier 3b — PTY proxy (butterfish / Warp)** | richest context | effectively rewriting our own terminal |
 
-[agent invoked, rich panel renders reply]
-```
+## Decision (2026-04)
 
-### Implementation
+- **Tier 1 shipped** (see `5c2959d`-era commits).
+- **Tier 2 deferred** — benefit limited to non-tmux-daily users; effort
+  is M but testing cost is high (TUI-app matrix, ZLE interaction, disk
+  usage cap). Revisit if ≥3 users report needing it OR if we find a way
+  to keep `isatty(1)` truthy (PTY-pair approach).
+- **Tier 3 rejected** — matches the "What we intentionally don't do"
+  section of instant-llm-fix-prior-art.md. Both script(1) wrapping and
+  PTY proxy require re-architecting this repo around a shell-subsuming
+  wrapper, giving up portability and adding a permanent extra layer.
+  The "just use tmux" answer is this repo's house style.
 
-**`scripts/aiblock.py`** (new, PEP 723 shebang):
-
-```python
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.11"
-# dependencies = ["questionary>=2.0", "rich>=13.9"]
-# ///
-"""aiblock — TUI for reviewing a past command + asking an AI agent about it."""
-
-import subprocess, os, sys, shlex
-from rich.console import Console
-from rich.panel import Panel
-import questionary
-
-def list_recent_commands(n=20):
-    # zsh: `fc -ln -<n>` — last n commands; parse into (index, text)
-    out = subprocess.run(["zsh", "-ic", f"fc -ln -{n}"],
-                         capture_output=True, text=True).stdout
-    lines = [l.strip() for l in out.splitlines() if l.strip()]
-    return list(enumerate(reversed(lines), start=1))  # (N=1 is most recent)
-
-def capture_block(n):
-    # Delegate to our committed cpblock function
-    return subprocess.run(["zsh", "-ic", f"cpblock {n}"],
-                          capture_output=True, text=True).stdout
-
-def invoke_agent(agent, prompt):
-    # Mirror _aiagent_invoke logic from the shell wrapper
-    flagmap = {"claude": ["-p"], "opencode": ["run"],
-               "codex": ["exec"], "cursor-agent": ["-p"]}
-    return subprocess.run([agent, *flagmap[agent], prompt],
-                          capture_output=True, text=True).stdout
-
-def main():
-    # 1. pick command
-    # 2. capture block, show preview in rich Panel
-    # 3. questionary.text(default=DEFAULT_FIX_PROMPT) — editable
-    # 4. questionary.select(actions) — Print / Copy / Spawn / Cancel
-    # 5. invoke + route per action
-    ...
+## References
+- thefuck's eval-alias approach: [nvbn/thefuck/shells/zsh.py](https://github.com/nvbn/thefuck/blob/master/thefuck/shells/zsh.py)
+- butterfish PTY proxy design: [bakks/butterfish blog post](https://pbbakkum.com/blog/20230927/)
+- atuin's choice NOT to capture output: blog.atuin.sh
+- pitfall: [`pitfalls/zsh-osc133-precmd-printf-a-not-stored.md`](../pitfalls/zsh-osc133-precmd-printf-a-not-stored.md)
 ```
 
-Action routing:
-
-- **Print reply**: write to stdout in a `rich.Panel`. User sees it in the
-  same pane; scroll up to review. No clipboard.
-- **Copy reply**: pipe reply through `tmux load-buffer -w -` when `$TMUX`
-  set, else `pbcopy` / `xclip` / `xsel` / `wl-copy` (reuse the detection
-  logic from `03_tmux_capture.zsh` `_cpx_to_clipboard`).
-- **Spawn interactive agent pane**: build a command like `claude` (no
-  `-p`) with the block pre-injected via a heredoc or temp-file, launch in
-  a new tmux window with `tmux new-window -n ai 'claude <temp-file>'`.
-  Concrete syntax TBD per agent; may need per-agent tweaks.
-- **Cancel**: exit 0, no-op.
-
-### Shell alias
-
-**`dot_config/zsh/tools/04_ai_capture.zsh`** (same file as `aifix`):
-
-```zsh
-_AIBLOCK_SCRIPT=""
-aiblock() {
-  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
-    local base
-    base=$(chezmoi source-path 2>/dev/null) || {
-      print -u2 "aiblock: chezmoi source-path failed"; return 1
-    }
-    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
-  fi
-  uv run --script "$_AIBLOCK_SCRIPT" "$@"
-}
-```
-
-Resolves once per shell (cached in `_AIBLOCK_SCRIPT`). `uv run --script`
-handles dep install/cache.
+**TODO.md entry**: add a P? row with `→ [research](backlog/ai-capture-non-tmux-output.md)`
+pointer.
 
 ## Files to modify
 
-| Path | Change |
-|---|---|
-| `dot_config/zsh/tools/03_tmux_capture.zsh` | Thread `N` through `_cpx_tmux_select`; extend cpout/cpcmd/cpblock |
-| `dot_config/zsh/tools/04_ai_capture.zsh` | **NEW** — aifix / aiexplain / aiblock (shell shim) + `_aiagent_*` helpers |
-| `scripts/aiblock.py` | **NEW** — Python TUI |
-| `docs/zsh/aliases.md` | Add rows under "Tmux Integration" + new "AI Capture" section |
-| `docs/tools/tmux/README.md` | New section: "Reviewing past commands with AI agents" |
+| Path | Action | Phase |
+|---|---|---|
+| `docs/tools/aicapture.md` | **NEW** — user-facing walkthrough | A |
+| `docs/tools/tmux/README.md` | thin-out AI section, link to aicapture.md | A |
+| `README.md` (root) | add link row if "tools" / "docs" table exists | A |
+| `dot_config/zsh/tools/04_ai_capture.zsh` | refactor dispatcher; add 3 new commands | B |
+| `docs/tools/aicapture.md` | add "Non-tmux alternatives" section | B |
+| `docs/zsh/aliases.md` | add rows for the 3 new commands | B |
+| `backlog/ai-capture-non-tmux-output.md` | **NEW** — backlog entry | C |
+| `backlog/README.md` index | add row | C |
+| `TODO.md` | add P? row linking to backlog entry | C |
+
+## Existing code to reuse
+
+- `_ai_capture_dispatch` in `04_ai_capture.zsh:109-174` — refactor into
+  `_ai_dispatch_core <block-text> <name> <default-prompt> ...` so stdin /
+  run / rerun paths share the existing arg parsing, spinner, prettify,
+  metadata pipeline. Don't duplicate that logic.
+- `_aicap_spinner_start` / `_aicap_spinner_stop` in `04_ai_capture.zsh` —
+  already handles non-tty skip; new wrappers just need to call
+  `_aiagent_invoke` (which spawns the spinner internally).
+- `_cpx_to_clipboard` in `03_tmux_capture.zsh:24-39` — reuse for any
+  "copy result to clipboard" need. Not strictly required for Tier 1.
+
+## Commit + push plan
+
+Two pushes, per the user's sequencing request:
+
+**Push 1** (after Phase A):
+- `docs/tools/aicapture.md` (new)
+- `docs/tools/tmux/README.md` (thin-out)
+- `README.md` (if applicable)
+- Specstory + redact
+- Message: `docs: aicapture user guide (for sharing w/o whole dotfiles)`
+- **Push to origin/main so the blob URL is live**
+
+**Push 2** (after Phases B + C):
+- `dot_config/zsh/tools/04_ai_capture.zsh`
+- `docs/tools/aicapture.md` (append non-tmux section)
+- `docs/zsh/aliases.md`
+- `backlog/ai-capture-non-tmux-output.md` (new)
+- `backlog/README.md` (index)
+- `TODO.md`
+- Specstory + redact
+- Message: `aicapture: Tier 1 non-tmux wrappers + backlog Tier 2/3 trade-offs`
 
 ## Verification
 
-End-to-end checks after apply:
+**Phase A**: open the pushed `docs/tools/aicapture.md` on github.com in a
+browser, walk through Quick Start, Commands, Configuration,
+Troubleshooting. Share the URL with a friend and ask them if they can
+follow it standalone without any clone.
 
-1. **Indexed cpblock**: in a fresh tmux pane, run `echo A; echo B; echo C`
-   as three separate commands. Then:
-   ```sh
-   cpblock     # should print "❯ echo C\nC"
-   cpblock 2   # should print "❯ echo B\nB"
-   cpblock 3   # should print "❯ echo A\nA"
-   cpblock 99  # should print stderr "empty — …", exit 1
-   ```
-2. **cpout / cpcmd indexed**: same pattern, verify the right command's
-   OUTPUT and INPUT come back.
-3. **Agent auto-detect**: `aifix 1` in a pane where a command failed.
-   Verify stderr logs which agent was picked; stdout has the agent's reply.
-   Re-run with `-a opencode` / `-a codex` and verify override.
-4. **Agent override**: `aifix -p "custom prompt" 2` verifies both overrides
-   compose.
-5. **aiblock TUI**: run `aiblock` in a tmux pane after 5+ commands. Confirm:
-   (a) recent commands list shows correct N (from `fc`);
-   (b) selecting one shows the block in a rich Panel;
-   (c) prompt editor has the aifix default;
-   (d) each action (Print / Copy / Spawn / Cancel) routes correctly.
-6. **Graceful degradation**: `aifix` in a non-tmux shell → stderr error
-   from cpblock (inherits existing behaviour); exit 1.
-7. **No-agent-installed**: `aifix` with no CLI on PATH → stderr "no
-   coding-agent CLI found (tried: claude, opencode, codex, cursor-agent)";
-   exit 1.
+**Phase B**:
+```sh
+# aifix-stdin
+echo "error: No such file or directory" | aifix-stdin -p "what file?"
+printf 'failed\nreason: bad' | aifix-stdin --raw
 
-## Critical files found during exploration
+# aifix-run
+aifix-run -- ls /nonexistent
+aifix-run -p "explain" -- curl -sSf https://httpbin.org/status/500
 
-- [`dot_config/zsh/tools/42_gitlab.zsh:100-103`](../../dot_config/zsh/tools/42_gitlab.zsh) —
-  canonical non-interactive agent invocation map; reuse the exact
-  flag syntax (`claude -p`, `opencode run`, `codex exec`,
-  `cursor-agent -p`).
-- [`dot_config/zsh/tools/03_tmux_capture.zsh`](../../dot_config/zsh/tools/03_tmux_capture.zsh) —
-  committed baseline; `_cpx_tmux_select` and `_cpx_to_clipboard` helpers
-  to extend / reuse.
-- [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py) —
-  questionary + rich + tyro pattern to mirror in `aiblock.py`.
-- [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) — same stack;
-  good reference for subprocess + rich.live patterns if we want progress
-  UI while the agent is thinking.
-- [`dot_config/zsh/tools/22_sesh.zsh:92-115`](../../dot_config/zsh/tools/22_sesh.zsh) —
-  `_sesh_wrap_agent` pattern for spawning an interactive agent pane; copy
-  the shape for "Spawn agent with this context" action in the TUI.
+# aifix-rerun
+false                    # last command fails
+aifix-rerun              # prompts "re-execute false?" — answer n to abort
+aifix-rerun -y           # prompts suppressed; reruns; feeds to agent
+```
+
+Each should print the agent reply through glow/bat with the metadata
+stderr line. No tmux required; test in a plain zsh session with TMUX
+unset.
+
+**Phase C**: read the new backlog entry and the backlog/README.md index.
+Confirm TODO.md has the new row. A future agent hitting "why don't we do
+Tier 3" should find the answer in the "Decision" section.
+
+## Friend-sharing quick answer (for the chat)
+
+- **No GitHub Pages site** — confirmed by Phase 1 exploration. Repo is
+  public at `github.com/daviddwlee84/dotfiles`, so all docs and source
+  files are readable on github.com directly.
+- **Best single URL to share post-push**:
+  `https://github.com/daviddwlee84/dotfiles/blob/main/docs/tools/aicapture.md`
+- **For standalone adoption** (friend doesn't want chezmoi), the
+  aicapture.md page has a "Standalone setup" section with 4 raw-URL
+  `curl`s + a one-line source snippet for `~/.zshrc`.
