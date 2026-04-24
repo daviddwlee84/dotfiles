@@ -1,224 +1,131 @@
-# svibe: prefer column layout below a pane-count threshold
+# svibe: width-aware layout + auto-default N (round 2)
 
 ## Context
 
-`svibe` (alias for the `sesh-vibe` zsh function) always lays out its agent
-window with `tmux select-layout … tiled`, regardless of pane count. This means
-2 panes already produce a top/bottom split and 3 panes produce an awkward
-1.5×2 grid, when what the user actually wants for small counts is **N
-side-by-side vertical columns** — each pane keeps a usable width and
-agent transcripts stay readable.
+**Round 1 (already shipped, commit `3b2c63e`)**: svibe's agent window no
+longer always uses `tiled`. Hardcoded threshold: `N ≤ 3 → even-horizontal`,
+`N ≥ 4 → tiled`. That matched the user's initial ask ("3 panes = 3 columns,
+4 = grid") but is insensitive to terminal width — on a narrow terminal,
+3 columns may already be unreadable; on a very wide terminal, 5 columns
+would still be fine.
 
-The user asked: for small N prefer column layout ("水平切分" → side-by-side
-columns via tmux `even-horizontal`), only fall back to a grid once the grid
-is genuinely necessary. Their example cutover: 3 panes = 3 columns, 4 panes
-= start using the grid.
+**Round 2 (code changes in place, this plan covers the commit step)**:
+two enhancements asked for in the follow-up:
 
-Outcome: change the layout selection in svibe from unconditional `tiled` to
-`even-horizontal` when `N ≤ 3` and `tiled` when `N ≥ 4`. Everything else
-about svibe (agent wrapping, windows, bounds, validation, help output,
-heterogeneous `--agents` mode) is unchanged.
+1. **Width-aware cutover**: replace the `N ≤ 3` constant with
+   `N ≤ term_width / min_width`. A new `--min-width COLS` flag (env
+   `SVIBE_MIN_WIDTH`, default 80) gates the behavior.
+2. **Auto-default N**: when the user doesn't pass a pane count (neither
+   positional `N` nor `--agents`), derive it from the current terminal:
+   `N = clamp(term_width / min_width, 1, 12)`. Users who pass `svibe 4`
+   or `svibe --agents a,b,c` keep explicit control.
 
-## Scope & non-goals
+A separate `L`-sized follow-up — **multi-window spillover** when agents
+would fall below `min_width` even after falling back to tiled — was
+captured in `backlog/svibe-multi-window-spillover.md` plus a TODO entry,
+rather than built now.
 
-- **In scope**: the single layout-selection call that runs after each split
-  inside `sesh-vibe`, plus the short doc/help strings that describe the
-  layout.
-- **Not in scope**: adding a `--layout` CLI flag, adding an `SVIBE_LAYOUT`
-  env override, revisiting the `[1, 12]` bound, changing pane ordering.
-  A flag override is a plausible future addition but the user asked for a
-  default change, not new configuration surface.
+## State of the working tree
 
-## The change
+Another agent's commits landed in parallel while this was in progress:
 
-### 1. `dot_config/zsh/tools/22_sesh.zsh` — `sesh-vibe()` layout selection
+- `3e2fcbb` (tv/agent-sessions) incidentally picked up my TODO.md entry
+  for the svibe-spillover backlog, so the TODO index is already up-to-date
+  on main.
+- `5b5e89e` (tmux prefix + M-x) is unrelated; no overlap.
 
-Currently (lines 578–585):
+Remaining uncommitted work for this round:
 
-```zsh
-# Add remaining panes
-local i
-for (( i = 2; i <= ${#agents}; i++ )); do
-    tmux split-window -t "${session}:agents" -c "$repo_root" \
-        "$(_vibe_agent_cmd "${agents[$i]}")"
-    # Re-tile after each split so layout stays balanced
-    tmux select-layout -t "${session}:agents" tiled >/dev/null
-done
-```
+| File | Status | Change |
+|------|--------|--------|
+| `dot_config/zsh/tools/22_sesh.zsh` | modified, unstaged | adds `min_width` local, `--min-width` flag parsing + validation, `term_width` computation, auto-N in the positional branch, width-based layout cutover in the split loop, new --help paragraph + example |
+| `docs/tools/sesh.md` | modified, unstaged | "Width-aware defaults" subsection with the knob table, updated layout description, updated examples (incl. `svibe --min-width 120`) |
+| `backlog/svibe-multi-window-spillover.md` | untracked | long-form design notes for the deferred L-sized feature |
+| `.specstory/history/2026-04-24_10-12-53Z-svibe-split-pane-grid.md` | modified, unstaged | this session's transcript (per `agent-history-hygiene` skill, commit alongside feature) |
 
-Replace with:
+Unrelated unstaged files (do **not** include in this commit): the older
+`.specstory/history/2026-04-24_02-36-54Z-*.md` and
+`.specstory/history/2026-04-24_09-41-49Z-*.md` transcripts,
+`.specstory/statistics.json`, `docs/assets/copy-to-llm/copy-to-llm-custom.css`.
 
-```zsh
-# Pick window layout based on final pane count:
-#   N ≤ 3 → even-horizontal (N side-by-side columns, readable width)
-#   N ≥ 4 → tiled (grid — columns would be too narrow)
-local svibe_layout
-if (( ${#agents} <= 3 )); then
-    svibe_layout="even-horizontal"
-else
-    svibe_layout="tiled"
-fi
+The index currently has unrelated staged content (tv-agent-sessions WIP
+ancillaries that 3e2fcbb did not consume). The commit must use a
+`-- <pathspec>` filter so only the four svibe files land in this commit.
 
-# Add remaining panes
-local i
-for (( i = 2; i <= ${#agents}; i++ )); do
-    tmux split-window -t "${session}:agents" -c "$repo_root" \
-        "$(_vibe_agent_cmd "${agents[$i]}")"
-    # Re-balance after each split so layout stays uniform
-    tmux select-layout -t "${session}:agents" "$svibe_layout" >/dev/null
-done
-```
+## Commit step
 
-Notes:
-- Threshold is computed **once** from `${#agents}` before the loop, so every
-  iteration applies the same target layout. That also keeps the N=1 case
-  correct: the loop body doesn't run, so no `select-layout` is called and
-  the single pane fills the window as before.
-- `even-horizontal` vs a chain of `split-window -h`: using `select-layout`
-  is the right hammer because it re-balances widths at every step, matching
-  how the existing tiled path works. This also means the user can press
-  `prefix + Space` / the built-in tmux layout cycler to switch between
-  layouts interactively if they want a different view for a given session.
+1. **Drop the obsolete stash**: `git stash drop stash@{0}`. Its content
+   (TODO.md deltas) was absorbed by 3e2fcbb; keeping it would mislead
+   future stash-list scans.
+2. **Stage the new backlog file**:
+   `git add backlog/svibe-multi-window-spillover.md`.
+3. **Commit with a pathspec filter** so the user's other staged WIP stays
+   out. Message follows the existing `svibe: …` prefix style:
 
-### 2. Help text (same file, inside the `-h|--help` heredoc, lines ~434–437)
+   ```
+   svibe: width-aware layout + auto-default N (--min-width, SVIBE_MIN_WIDTH)
 
-Current:
+   Replace the N≤3 columns cutover that shipped last round with a
+   width-aware rule: columns when all N panes fit at ≥min_width cols
+   side-by-side, tiled grid otherwise. Min-width defaults to 80, tunable
+   via `SVIBE_MIN_WIDTH` env or `--min-width COLS` flag.
 
-```
-Default: svibe 4 claude
-  window 1 "agents" — N panes (tiled), each running an agent
-  window 2 "git"    — lazygit
-  window 3 "edit"   — nvim
-```
+   When neither positional N nor --agents is given, also auto-pick the
+   count from the current terminal: N = clamp(term_width / min_width,
+   1, 12). So `svibe` on a 240-col terminal with min-width 80 builds
+   3 agent panes; at min-width 120, 2 panes.
 
-Replace with:
+   Multi-window spillover (>max_columns agents into agents-2/agents-3
+   windows) is scoped but deferred — see
+   backlog/svibe-multi-window-spillover.md + P?/L TODO entry.
+   ```
 
-```
-Default: svibe 4 claude
-  window 1 "agents" — N agent panes (≤3 = columns, ≥4 = tiled grid)
-  window 2 "git"    — lazygit
-  window 3 "edit"   — nvim
-```
+   Pathspec: `dot_config/zsh/tools/22_sesh.zsh`, `docs/tools/sesh.md`,
+   `backlog/svibe-multi-window-spillover.md`,
+   `.specstory/history/2026-04-24_10-12-53Z-svibe-split-pane-grid.md`.
 
-### 3. `docs/tools/sesh.md` — svibe layout description (lines 186–195)
-
-Current:
-
-```
-Layout (3 windows):
-
-\`\`\`
-window 1 "agents"    — N tiled panes, each running its agent (mixed allowed)
-window 2 "git"       — lazygit (or \`git status\` fallback)
-window 3 "edit"      — nvim
-\`\`\`
-
-Pane count is bounded \`[1, 12]\`. Above ~6 the tiled layout becomes too
-cramped on most displays — the cap is conservative, not technical.
-```
-
-Replace with:
-
-```
-Layout (3 windows):
-
-\`\`\`
-window 1 "agents"    — N agent panes: ≤3 = even-horizontal columns,
-                       ≥4 = tiled grid (mixed agents allowed)
-window 2 "git"       — lazygit (or \`git status\` fallback)
-window 3 "edit"      — nvim
-\`\`\`
-
-The agents window prefers **side-by-side vertical columns** up to 3 panes
-so each transcript keeps a readable width, and falls back to a tiled grid
-at 4+ panes where columns would be too narrow. Press \`prefix + Space\`
-to cycle through tmux's built-in layouts if you want a different view.
-
-Pane count is bounded \`[1, 12]\`. Above ~6 the tiled grid becomes too
-cramped on most displays — the cap is conservative, not technical.
-```
-
-## Files to modify
-
-| File | Change |
-|------|--------|
-| `dot_config/zsh/tools/22_sesh.zsh` | layout-selection logic (lines 578–585); `--help` text (lines 434–437) |
-| `docs/tools/sesh.md` | layout description (lines 186–195) |
-
-No other CLAUDE.md invariants apply (this doesn't touch chezmoi templates,
-the sudo session, fleet-apply, upgrade paths, or the tmux popup menu size).
-`mkdocs.yml` nav is unchanged (no new doc pages).
+4. **Post-commit sanity**: `git status` to confirm the svibe files are
+   gone from the unstaged set and the user's other WIP is untouched.
 
 ## Verification
 
-Run from the repo root. Assumes `claude` is installed; substitute any
-agent you have locally if not.
+Already run before re-entering plan mode (to re-confirm, rerun after
+commit lands):
 
-1. **Source the updated function** in a fresh shell so the change takes
-   effect:
+- `zsh -n dot_config/zsh/tools/22_sesh.zsh` → syntax OK
+- `uv run mkdocs build --strict` → built in ~2s, only the tolerated
+  anchor-drift INFO lines (tracked in
+  `backlog/mkdocs-anchor-drift.md`), no new warnings
 
-   ```bash
-   source ~/.config/zsh/tools/22_sesh.zsh
-   ```
+Behavior checks — to be run manually in a zsh shell after sourcing the
+updated file (not part of the commit):
 
-2. **N = 2** — expect two side-by-side columns:
+1. `source ~/.config/zsh/tools/22_sesh.zsh` to reload `sesh-vibe`.
+2. `svibe --no-attach` on a 240-col terminal → expect 3 even-horizontal
+   panes; `tmux list-panes -t 'vibe/chezmoi:agents' -F '#{pane_width}'`
+   should show roughly 80-wide panes.
+3. `svibe --no-attach --min-width 120` → expect 2 panes at ~120 each.
+4. `svibe --no-attach 5` on the same 240-col terminal → explicit count >
+   `max_columns=3` forces tiled grid (2+2+1 or similar).
+5. `svibe --no-attach 1` → single pane, no `select-layout` call (loop
+   body doesn't run).
+6. `svibe -h | grep -E 'min-width|auto'` → help text mentions the flag +
+   auto-N behavior.
+7. `SVIBE_MIN_WIDTH=1 svibe --no-attach` → every terminal width produces
+   `max_columns = term_width`, so auto-N hits the [1,12] clamp and layout
+   stays even-horizontal.
+8. `SVIBE_MIN_WIDTH=abc svibe --no-attach` → validation rejects with the
+   expected error message.
 
-   ```bash
-   svibe --no-attach 2 claude
-   tmux display-message -t 'vibe/chezmoi:agents' -p '#{window_layout}'
-   # → layout string should start with "even-horizontal" or show two
-   #   panes at roughly (cols/2, full-height) each.
-   tmux list-panes -t 'vibe/chezmoi:agents' -F '#{pane_index} #{pane_width}x#{pane_height}'
-   # → two panes, equal widths, equal (full) heights.
-   tmux kill-session -t 'vibe/chezmoi'
-   ```
+Tear down after each test: `tmux kill-session -t 'vibe/chezmoi'`.
 
-3. **N = 3** — expect three side-by-side columns (the user's motivating
-   example):
+## Out of scope (for later rounds)
 
-   ```bash
-   svibe --no-attach 3 claude
-   tmux list-panes -t 'vibe/chezmoi:agents' -F '#{pane_index} #{pane_width}x#{pane_height}'
-   # → three panes, equal widths, equal full heights. NOT a 2-over-1 grid.
-   tmux kill-session -t 'vibe/chezmoi'
-   ```
-
-4. **N = 4** — expect tiled grid (regression check — behavior unchanged):
-
-   ```bash
-   svibe --no-attach 4 claude
-   tmux list-panes -t 'vibe/chezmoi:agents' -F '#{pane_index} #{pane_width}x#{pane_height}'
-   # → 2×2 grid (two rows of two panes).
-   tmux kill-session -t 'vibe/chezmoi'
-   ```
-
-5. **N = 1** — expect a single full-window pane (no `select-layout`
-   called):
-
-   ```bash
-   svibe --no-attach 1 claude
-   tmux list-panes -t 'vibe/chezmoi:agents' | wc -l
-   # → 1
-   tmux kill-session -t 'vibe/chezmoi'
-   ```
-
-6. **`--help` text** mentions the new layout rule:
-
-   ```bash
-   svibe -h | grep -E 'columns|tiled'
-   ```
-
-7. **Docs strict build** still passes:
-
-   ```bash
-   uv run mkdocs build --strict
-   ```
-
-## Risks
-
-- Minor: users with muscle memory for the previous tiled layout at N=2 or
-  N=3 will see a change. This is the requested behavior. They can cycle
-  layouts with `prefix + Space` in-session, and the help text + docs now
-  call out the new rule.
-- None of the changes touch `modify_` / `create_` chezmoi files, ansible,
-  or the sudo session, so no cross-file invariants are at risk.
+- Multi-window spillover (the L-sized follow-up captured in the backlog
+  doc and P? TODO entry).
+- A `--layout auto|columns|tiled` override flag. Interactive tmux layout
+  cycling via `prefix + Space` covers the one-off "I want a different
+  view" case; a CLI override is noise until someone actually asks for it.
+- Dynamic re-layout on terminal resize. tmux handles proportional resize
+  of existing panes; a full layout recompute on SIGWINCH is a different
+  shape of feature.
