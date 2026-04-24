@@ -62,6 +62,9 @@ overlay=$(cat <<'JSON'
     }
   },
   "skipDangerousModePermissionPrompt": true,
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
   "statusLine": {
     "type": "command",
     "command": "bash -c 'plugin_dir=$(ls -d \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | sort -V | tail -1); runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null); [ -z \"$runtime\" ] && exit 0; rt=\"${runtime##*/}\"; if [ \"$rt\" = \"bun\" ]; then exec \"$runtime\" --env-file /dev/null \"${plugin_dir}src/index.ts\"; else exec \"$runtime\" \"${plugin_dir}dist/index.js\"; fi'"

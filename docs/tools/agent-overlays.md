@@ -31,7 +31,7 @@ The `modify_` overlay model deep-merges only the keys we explicitly enforce; eve
 ```
 
 - `editor.vimMode = true` — universal preference; sibling `editor.fontSize` etc. survive the deep merge.
-- **`permissions` is intentionally NOT in the overlay.** `jq '. * $overlay'` replaces arrays wholesale, so listing any `permissions.allow` / `permissions.deny` entries here would clobber the user's live machine-specific allow-list on every `chezmoi apply`. Manage those per machine via the live file directly, or move to a `--argjson allow $merged` array-union approach if you ever need a shared baseline.
+- **`permissions.allow` / `permissions.deny` arrays are intentionally NOT in the overlay.** `jq '. * $overlay'` replaces arrays wholesale at the same key path, so listing any entries here would clobber the user's live machine-specific allow-list on every `chezmoi apply`. Manage those per machine via the live file directly, or move to a `--argjson allow $merged` array-union approach if you ever need a shared baseline.
 
 ### OpenCode — [`agents/opencode.overlay.json`](../../.chezmoitemplates/agents/opencode.overlay.json)
 
@@ -206,7 +206,7 @@ Files where stable user prefs and CodeIsland hooks coexist need a smarter overla
 
 [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) solves this with a hook-aware merger:
 
-1. **Non-hook keys** (`enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `statusLine`, …) deep-merge normally via `base * overlay_no_hooks`.
+1. **Non-hook keys** (`enabledPlugins`, `extraKnownMarketplaces`, `skipDangerousModePermissionPrompt`, `permissions.defaultMode`, `statusLine`, …) deep-merge normally via `base * overlay_no_hooks`. Note: `permissions.defaultMode = "bypassPermissions"` is set deliberately to work around Claude Code resetting the active permission mode after every interactive prompt (`AskUserQuestion`, CodeIsland popup, remote-control inject); see [`pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md`](../../pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md). The deep-merge writes the `defaultMode` scalar without touching sibling `permissions.allow` / `permissions.deny` arrays — those remain machine-local.
 2. **`hooks.<event>` arrays** are merged additively: for each event the overlay declares, append entries whose `.hooks[0].command` isn't already represented in the live array (string-equality match). Live entries are preserved verbatim, no entry is ever removed.
 
 The full filter (jq):
