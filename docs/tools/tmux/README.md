@@ -119,6 +119,41 @@ Terminal support:
 
 Paste from the system clipboard over OSC 52 is therefore best-effort; yank is the reliable direction. If remote paste matters more than remote yank, use SSH's `LocalForward`/`ForwardAgent` workflows or a dedicated clipboard bridge (e.g. `lemonade`).
 
+## Scrollback & Coding Agents
+
+Streaming TUIs (Claude Code, OpenCode, Codex) repaint the same screen region via ANSI sequences. On the **alternate screen** (vim, htop, Claude Code's interactive session) tmux's scrollback is unaffected — alt-screen has its own buffer. On the **main screen** (some agents, live progress bars, `cargo build` with ascii status), every frame can be pushed into history by default, producing ghost/duplicated lines that make scrolling back look broken compared to a native terminal.
+
+Two settings and one workflow keep this clean:
+
+- `set -g scroll-on-clear off` (in [`common.conf`](../../../dot_config/tmux/common.conf)) — discards pre-clear contents instead of pushing them into history on full-screen clear (ED). Defaults to `on` since tmux 3.3.
+- `history-limit 50000` — already set; plenty even for a full day of agent sessions.
+- **Freeze before scrolling**: `prefix + [` enters copy-mode, which snapshots the current frame. Scroll the wheel or use `C-u` / `C-d` without the UI continuing to repaint under you. `q` exits.
+
+For a pitfall-level description of why this can't be "fixed" further (ANSI redraw + linear scrollback is fundamentally lossy), see [`pitfalls/tmux-scrollback-tui-repaint-ghosting.md`](../../../pitfalls/tmux-scrollback-tui-repaint-ghosting.md).
+
+## OSC 133 Command-Boundary Navigation (Warp-style)
+
+[`dot_config/zsh/tools/02_shell_integration.zsh`](../../../dot_config/zsh/tools/02_shell_integration.zsh) emits [OSC 133 prompt markers](https://gitlab.freedesktop.org/Per_Bothner/specifications/blob/master/proposals/semantic-prompts.md) (A = prompt start, C = command output start, D = output end + exit code) via `add-zsh-hook precmd` / `preexec`. Chains cleanly with starship / zsh-vi-mode / oh-my-zsh — no precmd clobbering. tmux 3.4+ parses them and exposes navigation in copy-mode plus a one-press "copy last output":
+
+| Key | Context | Action |
+|---|---|---|
+| `{` / `}` | copy-mode | Jump to previous / next **prompt** line |
+| `Alt+[` / `Alt+]` | copy-mode | Jump to previous / next **command output** start (line after prompt) |
+| `prefix + M-y` | top-level | Copy the **last command's output** to clipboard (Warp-style one-press) |
+| `prefix + M-i` | top-level | Copy the **last command's input line** (prompt + typed command) to clipboard |
+
+`prefix + M-i` copies the whole prompt line because we intentionally don't emit the B marker (see the note at the bottom of [`02_shell_integration.zsh`](../../../dot_config/zsh/tools/02_shell_integration.zsh)) — so the clipboard looks like `❯ echo hi` rather than just `echo hi`. Trim in your paste target if needed.
+
+Shell-level equivalents live in [`03_tmux_capture.zsh`](../../../dot_config/zsh/tools/03_tmux_capture.zsh) — runnable from the prompt, pipe-friendly (`cpout | grep ERROR`), and copy to clipboard as a side effect:
+
+| Command | Equivalent to | What it copies |
+|---|---|---|
+| `cpout` | `prefix + M-y` | Last command's output only |
+| `cpcmd` | `prefix + M-i` | Last command's input line (prompt + typed command) |
+| `cpblock` | — | Last command's full block (prompt + input + output) — Warp-style |
+
+Opt out per shell: `export DISABLE_OSC133=1` before starting zsh. The tmux bindings become no-ops automatically when markers are absent — **including in shells that pre-date the `chezmoi apply` that added the hook** (reloading tmux config doesn't re-source zsh; run `exec zsh` in the affected pane or open a new one). Symptom of a pre-hook shell: `prefix + M-y` / `M-i` flash their success message but paste is empty. Verify with `echo $precmd_functions | tr ' ' '\n' | grep osc133`.
+
 ## Reload Config
 
 Most changes do not need a server restart.

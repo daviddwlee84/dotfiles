@@ -137,9 +137,13 @@ Enter with `prefix + [`. Navigate with vim keys, then:
 | `n`/`N` | Next/previous search match |
 | `g`/`G` | Jump to top/bottom |
 | `C-u`/`C-d` | Half-page up/down |
+| `{` / `}` | Jump to previous / next prompt (needs OSC 133 — see [OSC 133](./README.md#osc-133-command-boundary-navigation-warp-style)) |
+| `M-[` / `M-]` | Jump to previous / next command **output** start (needs OSC 133) |
 | `q` or `Escape` | Exit copy mode |
 
 Mouse drag in copy mode also copies to clipboard. Double-click selects a word.
+
+Command-boundary keys (`{` `}` `M-[` `M-]`) rely on OSC 133 markers emitted by `dot_config/zsh/tools/02_shell_integration.zsh`. In a pane running a non-zsh shell or one that opted out via `DISABLE_OSC133=1`, they are silent no-ops.
 
 ## Right-click menus
 
@@ -178,6 +182,8 @@ Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select 
 | `prefix + y` | Copy visible pane content to system clipboard |
 | `prefix + Y` | Copy full scrollback to system clipboard |
 | `prefix + C-y` | Open scrollback in fzf, select lines to copy (Tab=multi) |
+| `prefix + M-y` | Copy **last command's output** to clipboard (Warp-style, needs OSC 133 — see [OSC 133](./README.md#osc-133-command-boundary-navigation-warp-style)) |
+| `prefix + M-i` | Copy **last command's input line** (prompt + typed command) to clipboard (needs OSC 133) |
 
 Cross-platform: `pbcopy` on macOS, `xclip`/`xsel` on Linux. OSC 52 also works for the vim-style `y` yank (even over SSH).
 

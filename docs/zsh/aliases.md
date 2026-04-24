@@ -21,6 +21,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
 - [Shell Utilities](#shell-utilities)
+- [Tmux Integration](#tmux-integration)
 - [Package Managers & Runtime](#package-managers--runtime)
 
 ---
@@ -564,6 +565,18 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | Profile zsh startup time (`ZSH_PROF=1 zsh -i -c exit`) |
 | `ghostty-ssh-terminfo` | function | `dot_config/zsh/10_aliases.zsh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
 | `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
+
+---
+
+## Tmux Integration
+
+> Requires tmux + OSC 133 markers in the pane's scrollback (emitted by [`02_shell_integration.zsh`](../../dot_config/zsh/tools/02_shell_integration.zsh) — if missing, run `exec zsh` to reload). All three functions print to stdout (pipe-friendly: `cpout | grep ERROR`) AND copy to the system clipboard via tmux's OSC 52 bridge. Shell-level counterparts of the `prefix + M-y` / `M-i` tmux bindings — see [docs/tools/tmux/README.md → OSC 133](../tools/tmux/README.md#osc-133-command-boundary-navigation-warp-style).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `cpout` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's output** (Warp-style "copy output") |
+| `cpcmd` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's input line** (prompt + typed command) |
+| `cpblock` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's full block** (prompt + input + output) |
 
 ---
 
