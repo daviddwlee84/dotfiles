@@ -1,0 +1,9 @@
+# .skills/preferences.yaml
+# Per-repo preferences recorded by skills. Each top-level key is a skill
+# namespace. See:
+#   skills/local/mkdocs-site-bootstrap/references/preferences-schema.md
+mkdocs_site_bootstrap:
+  enabled: true
+  stack: mkdocs-material
+  auto_deploy: true
+  existing_docs_decision: wrapped

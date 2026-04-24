@@ -37,3 +37,7 @@ __pycache__/
 # `just bootstrap-skills`. See docs/tools/agent-skills.md.
 .agents/
 .claude/skills/
+
+# mkdocs build output
+/site/
+.venv/

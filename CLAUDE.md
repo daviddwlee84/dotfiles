@@ -19,6 +19,29 @@ When adding/modifying configurations, update [README.md](README.md):
 
 Keep README.md concise and user-focused. Technical details belong here or in `docs/`.
 
+### `docs/` + MkDocs site → `mkdocs.yml` nav
+
+`docs/` is published to **<https://daviddwlee84.github.io/dotfiles/>** via a MkDocs Material site (auto-deployed by [`.github/workflows/docs.yml`](.github/workflows/docs.yml) on push-to-main when `docs/**`, `mkdocs.yml`, `pyproject.toml`, or `uv.lock` changes). Source of truth remains the `.md` files in the repo; the site is a renderer.
+
+Any time you **add a new `docs/**/*.md` file**:
+
+1. Add a nav entry in [`mkdocs.yml`](mkdocs.yml) under the matching top-level section (Tools / Zsh / Neovim / This Repo / Infrastructure / Tutorials / Input methods / Misc). Alphabetical within a section unless there's a narrative order.
+2. Cross-link from related pages if applicable (e.g., a new `docs/tools/foo.md` probably wants a mention in `docs/tools/tmux/README.md` or `docs/tools/sesh.md` if relevant).
+3. Run `uv run mkdocs build --strict` locally to catch broken links / stale anchors. If you're adding *external*-relative links (to `dot_config/…`, `pitfalls/…`, `backlog/…`), the `validation.links.not_found: info` config tolerates them — that's intentional, don't tighten it without cleaning up the ~20 known anchor-drift cases tracked in [`backlog/mkdocs-anchor-drift.md`](backlog/mkdocs-anchor-drift.md) first.
+
+The `.claude/skills/mkdocs-site-bootstrap/scripts/add-docs-page.sh` helper can create a new page + insert the nav entry in one shot, but hand-editing `mkdocs.yml` is also fine as long as strict build passes.
+
+**What does NOT belong in `docs/`** (stays at repo root, NOT in MkDocs nav):
+
+| Surface | Why |
+|---|---|
+| `README.md` | Canonical GitHub landing page; `docs/index.md` links to it (no duplication, no snippet copy) |
+| `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` | Agent-operational contract; `docs/for-maintainers.md` references it |
+| `TODO.md`, `backlog/`, `pitfalls/` | Dynamic maintainer surfaces; `docs/for-maintainers.md` references them via absolute GitHub URLs (reference, not copy) |
+| `NOTES.md` | User's personal WIP notes |
+
+All four categories are **referenced** from [`docs/for-maintainers.md`](docs/for-maintainers.md) via absolute GitHub URLs — do not add them to `mkdocs.yml` nav or include them via `pymdownx.snippets`. The "reference yes, copy no" rule avoids drift between the site and the live repo root.
+
 ### Custom aliases & shell functions → `docs/zsh/aliases.md`
 
 When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.

@@ -40,6 +40,7 @@ with a one-line summary of what shipped.
 - [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`).
 - [ ] **[L] secrets.zsh encryption with age** — currently plaintext + chezmoi-ignored. Age-encrypted version could live in the source tree. Needs key distribution plan across machines.
 - [ ] **[M] aicapture: non-tmux output capture (Tier 2)** — Tier 1 (`aifix-stdin` / `aifix-run` / `aifix-rerun`) shipped; transparent preexec/precmd tee redirect would remove the "remember to prefix" friction for non-tmux daily users. Tier 3 (script(1) or PTY proxy) explicitly rejected. → [research](backlog/ai-capture-non-tmux-output.md)
+- [ ] **[S] mkdocs anchor drift cleanup** — first deploy uses `validation.links.anchors: info` so ~20 stale section-anchor links in existing docs don't fail CI strict. Batch-fix them, then raise back to `warn` in `mkdocs.yml`. → [research](backlog/mkdocs-anchor-drift.md)
 
 ## P3 — Someday / nice to have
 
