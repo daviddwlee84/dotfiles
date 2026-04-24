@@ -31,6 +31,7 @@
 : "${AICAP_CURSOR_MODEL:=}"
 : "${AICAP_SHOW_METADATA:=1}"
 : "${AICAP_PRETTIFY:=1}"
+: "${AICAP_SPINNER:=1}"
 
 _aiagent_autodetect() {
   local cand
@@ -41,6 +42,37 @@ _aiagent_autodetect() {
     fi
   done
   return 1
+}
+
+# Background spinner on stderr while the agent is thinking. Skipped when
+# AICAP_SPINNER=0 or stderr isn't a tty (so pipes / file redirects stay
+# clean). The spinner subprocess is disowned via `&!` so it survives the
+# command substitution that invokes the agent.
+_AICAP_SPIN_PID=
+_aicap_spinner_start() {
+  [[ "$AICAP_SPINNER" != "1" ]] && return 0
+  [[ ! -t 2 ]] && return 0
+  local label=${1:-thinking}
+  (
+    trap 'exit 0' TERM INT HUP
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+    while true; do
+      printf '\r\e[K%s %s' "${frames[$(( (i % 10) + 1 ))]}" "$label" >&2
+      (( i++ ))
+      sleep 0.1
+    done
+  ) &!
+  _AICAP_SPIN_PID=$!
+}
+
+_aicap_spinner_stop() {
+  [[ -z "$_AICAP_SPIN_PID" ]] && return 0
+  kill "$_AICAP_SPIN_PID" 2>/dev/null
+  # Drain; zsh waits on PIDs even if disowned as long as we know the PID.
+  wait "$_AICAP_SPIN_PID" 2>/dev/null
+  _AICAP_SPIN_PID=
+  [[ -t 2 ]] && printf '\r\e[K' >&2
 }
 
 # Pretty-print stdin as Markdown: glow > bat > raw. Skips prettify if stdout
@@ -65,14 +97,20 @@ _aicap_prettify() {
 # "<agent> (<model>)" line on stderr.
 _aiagent_invoke() {
   local agent=$1 prompt=$2
-  local json reply model_used tokens_in tokens_out cost
+  local json reply model_used tokens_in tokens_out cache_read cache_create cost duration rc
+
+  # Ensure spinner cleans up if the caller returns or we hit a trap.
+  trap '_aicap_spinner_stop' EXIT INT TERM
 
   case "$agent" in
     claude)
       if [[ "$AICAP_SHOW_METADATA" == "1" ]] && command -v jq &>/dev/null; then
-        json=$(claude -p --model "$AICAP_CLAUDE_MODEL" --output-format json "$prompt") || return $?
+        _aicap_spinner_start "claude $AICAP_CLAUDE_MODEL (json)…"
+        json=$(claude -p --model "$AICAP_CLAUDE_MODEL" --output-format json "$prompt")
+        rc=$?
+        _aicap_spinner_stop
+        (( rc != 0 )) && return $rc
         reply=$(print -r -- "$json" | jq -r '.result // empty')
-        # Model lives under `.modelUsage` as the object's only key (no top-level `.model`).
         model_used=$(print -r -- "$json" | jq -r '.modelUsage | keys | first // "?"')
         tokens_in=$(print -r -- "$json" | jq -r '.usage.input_tokens // "?"')
         tokens_out=$(print -r -- "$json" | jq -r '.usage.output_tokens // "?"')
@@ -84,25 +122,42 @@ _aiagent_invoke() {
         print -r -- "$reply"
       else
         print -u2 "claude ($AICAP_CLAUDE_MODEL)"
+        _aicap_spinner_start "claude $AICAP_CLAUDE_MODEL…"
         claude -p --model "$AICAP_CLAUDE_MODEL" "$prompt"
+        rc=$?
+        _aicap_spinner_stop
+        return $rc
       fi
       ;;
     opencode)
       print -u2 "opencode ($AICAP_OPENCODE_MODEL)"
+      _aicap_spinner_start "opencode $AICAP_OPENCODE_MODEL…"
       opencode run -m "$AICAP_OPENCODE_MODEL" "$prompt"
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
       ;;
     codex)
       print -u2 "codex ($AICAP_CODEX_MODEL)"
+      _aicap_spinner_start "codex $AICAP_CODEX_MODEL…"
       codex exec -m "$AICAP_CODEX_MODEL" "$prompt"
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
       ;;
     cursor-agent)
       if [[ -n "$AICAP_CURSOR_MODEL" ]]; then
         print -u2 "cursor-agent ($AICAP_CURSOR_MODEL)"
+        _aicap_spinner_start "cursor-agent $AICAP_CURSOR_MODEL…"
         cursor-agent -p --model "$AICAP_CURSOR_MODEL" "$prompt"
       else
         print -u2 "cursor-agent"
+        _aicap_spinner_start "cursor-agent…"
         cursor-agent -p "$prompt"
       fi
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
       ;;
     *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
   esac
@@ -137,6 +192,7 @@ _ai_capture_dispatch() {
         print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
         print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
         print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+        print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
         return 0 ;;
       --) shift; break ;;
       -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
