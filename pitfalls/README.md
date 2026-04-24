@@ -98,6 +98,7 @@ Pitfalls owned by this folder. Keep alphabetical.
 
 | Slug | Symptom keywords | Status |
 |---|---|---|
+| [`ansible-js-cli-tools-old-system-node`](ansible-js-cli-tools-old-system-node.md) | `Tag 'js_cli_tools' had failures` / `Tag 'coding_agents' had failures`; `npm WARN EBADENGINE` + `EACCES /usr/local/lib/node_modules`; system node v12.22.9 on Ubuntu jammy | fix paths documented (no in-repo fix yet) |
 | [`brew-cask-slow-github-release-assets`](brew-cask-slow-github-release-assets.md) | `brew upgrade --cask <x>` download creeps at ~25 KB/s from `release-assets.githubusercontent.com`; TUNA/ghproxy/Clash don't help | no workaround (network-path issue) |
 | [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
 | [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
@@ -105,6 +106,7 @@ Pitfalls owned by this folder. Keep alphabetical.
 | [`tmux-submenu-flash-and-bottom-right`](tmux-submenu-flash-and-bottom-right.md) | nested `display-menu` via `run-shell` from right-click parent: flash, bottom-right placement, or selection silently does nothing on 2nd open | workaround documented (inline submenu items into parent) |
 | [`tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper`](tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper.md) | tmux pane built with `cmd; exec $SHELL` wrapper closes on Ctrl+C inside btop/htop/less even though clean quit (`q`/`:q`) lands in shell as designed | fixed in `dot_config/zsh/tools/22_sesh.zsh` (`trap '' INT;` prefix in `_sesh_on_exit_wrap`) |
 | [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | tmux-resurrect doesn't restore coding-agent / TUI sessions after `kill-server` | known limitation |
+| [`tmux-scrollback-tui-repaint-ghosting`](tmux-scrollback-tui-repaint-ghosting.md) | ghost / duplicated lines in tmux scrollback while Claude Code / OpenCode / live progress streams; flipbook frames visible in copy-mode | mitigated (`scroll-on-clear off` + `prefix + [` freeze workflow); fundamental limit |
 | [`tmux2k-bandwidth-uint64-underflow`](tmux2k-bandwidth-uint64-underflow.md) | `18446744073709551615K` in tmux status bar | workaround documented |
 | [`tv-channel-bare-braces-break-substitution`](tv-channel-bare-braces-break-substitution.md) | TV channel preview shows literal `{split:\t:N}` instead of substituted values, no error | workaround documented (avoid bare `{...}` in heredocs; prefer external `executable_*.sh/py` helpers) |
 | [`yazi-tmux-popup-crash`](yazi-tmux-popup-crash.md) | Yazi inside `display-popup` crashes tmux server, "Terminal response timeout" | workaround documented |
