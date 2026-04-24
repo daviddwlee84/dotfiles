@@ -226,7 +226,7 @@
         state: absent
 
 # tree-sitter-cli
-- name: Check if tree-sitter is installed
+- name: Check if tree-sitter --version works (any install path)
   # Search standard PATH dirs INCLUDING ~/.cargo/bin (cargo install target)
   # so re-applies don't reinstall on hosts that fell through to the cargo
   # fallback path. ansible.builtin.command doesn't honour ~ expansion in
@@ -236,9 +236,51 @@
     PATH="${HOME}/.cargo/bin:${PATH}" tree-sitter --version
   args:
     executable: /bin/bash
-  register: treesitter_check
+  register: treesitter_version_check
   changed_when: false
   failed_when: false
+
+- name: Purge broken tree-sitter-cli native binary in mise node installs (if any)
+  # tree-sitter-cli's npm postinstall (install.js) downloads a prebuilt
+  # binary from GitHub release-assets (Azure blob CDN). On flaky networks
+  # the gunzip stream can fail silently, leaving a 0-byte file with mode
+  # 0600 next to cli.js while postinstall exits 0. `tree-sitter --version`
+  # still reports OK because cli.js reads package.json — it never spawns
+  # the native binary. Every :TSInstall / parser build then explodes with
+  # EACCES. Scan all mise node installs directly and purge empty/
+  # non-executable native binaries so the install block below re-runs
+  # npm install and heals them. Does NOT touch cargo's monolithic binary
+  # (different install shape, can't exhibit this failure mode).
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: |
+    set +e
+    any_broken=0
+    for d in "${HOME}/.local/share/mise/installs/node/"*/lib/node_modules/tree-sitter-cli; do
+      [[ -d "$d" ]] || continue
+      native="$d/tree-sitter"
+      [[ -e "$native" ]] || continue
+      if [[ ! -s "$native" ]] || [[ ! -x "$native" ]]; then
+        echo "BROKEN: $native"
+        rm -f "$native"
+        any_broken=1
+      fi
+    done
+    exit 0
+  args:
+    executable: /bin/bash
+  register: treesitter_mise_cleanup
+  changed_when: "'BROKEN' in (treesitter_mise_cleanup.stdout | default(''))"
+
+- name: Compute treesitter_check aggregate
+  # Re-install needed if --version failed (no tree-sitter anywhere) OR
+  # we just purged a broken mise binary (force npm path to re-download
+  # the prebuilt native binary so nvim-treesitter can spawn it).
+  ansible.builtin.set_fact:
+    treesitter_check:
+      rc: >-
+        {{ 0 if (treesitter_version_check.rc | default(1) == 0
+                 and not treesitter_mise_cleanup.changed)
+           else 1 }}
 
 - name: Skip tree-sitter-cli on armv7l (no working node and cargo build too slow)
   when:

@@ -2416,17 +2416,33 @@
   when:
     - ansible_facts["os_family"] == "Debian"
     - worktrunk_check.rc != 0
+  become: true
+  tags: [sudo]
   ansible.builtin.apt:
     name: xz-utils
     state: present
-  become: true
   failed_when: false
+
+- name: Probe for xz binary (worktrunk extraction dependency)
+  # worktrunk releases only ship .tar.xz (no .tar.gz alternative), and the
+  # apt install above is skipped in noRoot mode. If xz isn't already on
+  # PATH (linuxbrew, prior install), the unarchive step below cannot
+  # succeed — skip the ~4MB download + retries outright.
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - worktrunk_check.rc != 0
+  ansible.builtin.shell: command -v xz || true
+  args:
+    executable: /bin/bash
+  register: worktrunk_xz_probe
+  changed_when: false
 
 - name: Install worktrunk from GitHub releases (Debian/Ubuntu, user-level)
   when:
     - ansible_facts["os_family"] == "Debian"
     - worktrunk_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - worktrunk_xz_probe.stdout | default('') | trim != ''
   block:
     - name: Ensure ~/.local/bin exists (worktrunk)
       ansible.builtin.file:
