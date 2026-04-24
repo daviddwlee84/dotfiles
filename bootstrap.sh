@@ -17,30 +17,60 @@
 #   - This script is kept in .chezmoiignore.tmpl so `chezmoi apply` does NOT
 #     deploy it to $HOME/bootstrap.sh.
 #   - Behind GFW: github.com / raw.githubusercontent.com may be blocked.
-#     Set DOTFILES_RAW_URL / DOTFILES_REF to a mirror (e.g. gitee.com raw).
+#     Set DOTFILES_RAW_URL / DOTFILES_REF to a mirror (e.g. ghproxy.com).
+#     See docs/this_repo/bootstrap.md → "Behind GFW / proxy".
 #   - Pass extra args through to dotfiles_init (e.g. `| bash -s -- doctor`).
+#
+# Verbose mode (recommended for slow networks / first-time runs):
+#   curl -fsSL .../bootstrap.sh | DOTFILES_BOOTSTRAP_VERBOSE=1 bash
+#   Sets `set -x`, makes uv print download/resolve progress (`--verbose`),
+#   and timestamps every stage so you can see where it's stuck.
 
 set -euo pipefail
 
 DOTFILES_RAW_URL="${DOTFILES_RAW_URL:-https://raw.githubusercontent.com/daviddwlee84/dotfiles}"
 DOTFILES_REF="${DOTFILES_REF:-main}"
 SCRIPT_URL="${DOTFILES_RAW_URL}/${DOTFILES_REF}/scripts/init/dotfiles_init.py"
+VERBOSE="${DOTFILES_BOOTSTRAP_VERBOSE:-0}"
+
+log() {
+    # Timestamped log line so you can spot which stage is slow.
+    printf '[bootstrap %s] %s\n' "$(date +%H:%M:%S)" "$*" >&2
+}
+
+if [ "$VERBOSE" = "1" ]; then
+    set -x
+    UV_RUN_FLAGS=(--verbose)
+else
+    UV_RUN_FLAGS=()
+fi
+
+log "starting (ref=${DOTFILES_REF}, raw=${DOTFILES_RAW_URL})"
+log "PATH=${PATH}"
+log "TTY: stdin=$([ -t 0 ] && echo yes || echo no), /dev/tty=$([ -r /dev/tty ] && echo readable || echo no)"
 
 # --- 1. ensure uv ------------------------------------------------------------
 if ! command -v uv >/dev/null 2>&1; then
-    echo "[bootstrap] Installing uv..."
+    log "uv not found — installing from https://astral.sh/uv/install.sh"
+    log "(if this hangs >30s, you're likely behind GFW; see docs/this_repo/bootstrap.md)"
     curl -fsSL https://astral.sh/uv/install.sh | sh
     # uv's installer writes to ~/.local/bin by default; add to PATH for this shell.
     export PATH="${HOME}/.local/bin:${PATH}"
+    log "uv installed: $(command -v uv || echo MISSING)"
+else
+    log "uv already present: $(command -v uv) ($(uv --version 2>/dev/null || echo unknown))"
 fi
 
 # --- 2. re-exec under /dev/tty if we were piped (curl | bash) ----------------
 # `[ -t 0 ]` is false when stdin is the pipe; re-exec so questionary can read
 # keystrokes. Skip when there's no controlling TTY at all (headless CI).
 if [ ! -t 0 ] && [ -r /dev/tty ]; then
+    log "stdin is a pipe — reattaching to /dev/tty for interactive prompts"
     exec < /dev/tty
 fi
 
 # --- 3. run ------------------------------------------------------------------
-echo "[bootstrap] Running ${SCRIPT_URL}..."
-exec uv run --script "$SCRIPT_URL" "$@"
+log "fetching + running ${SCRIPT_URL}"
+log "(first run resolves PEP 723 deps: questionary, rich, tyro — may take 30s-3min on slow networks)"
+log "(set DOTFILES_BOOTSTRAP_VERBOSE=1 to see uv resolver progress)"
+exec uv run "${UV_RUN_FLAGS[@]}" --script "$SCRIPT_URL" "$@"

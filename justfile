@@ -79,6 +79,24 @@ chezmoi-status:
 chezmoi-reinit:
     chezmoi init
 
+# Run the interactive bootstrap wrapper from the LOCAL chezmoi source.
+# Use this instead of `curl|bash` when you're on a slow / GFW-throttled network
+# and have already cloned the repo. Skips the bootstrap.sh stage entirely:
+# uv resolves PEP 723 deps locally; chezmoi init clones from the same remote
+# you're cloned from. Pass extra args after `--`:
+#     just bootstrap-local                  # interactive
+#     just bootstrap-local -- doctor        # schema parity check
+#     just bootstrap-local -- list-bundles  # show bundles
+#     just bootstrap-local -- --yes --bundle minimal  # non-interactive
+bootstrap-local *ARGS:
+    @echo "[bootstrap-local] running scripts/init/dotfiles_init.py from local source"
+    uv run --script scripts/init/dotfiles_init.py {{ARGS}}
+
+# Verbose bootstrap-local: shows uv resolver output (download/build steps).
+bootstrap-local-verbose *ARGS:
+    @echo "[bootstrap-local-verbose] uv --verbose; expect lots of resolver output"
+    uv run --verbose --script scripts/init/dotfiles_init.py {{ARGS}}
+
 # Clear run_once script state (allows re-running run_once scripts)
 chezmoi-clear-scripts:
     chezmoi state delete-bucket --bucket=scriptState

@@ -30844,4 +30844,262 @@ cd /Users/daviddwlee84/.local/share/chezmoi
 git add docs/playbooks/workflow.md docs/index.md backlog/mkdocs-anchor-drift.md mkdocs.yml .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
 git --no-pager diff --cached --stat
 ```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 572 +++++++++++++++++++--
+ backlog/mkdocs-anchor-drift.md                     |   2 +-
+ docs/index.md                                      |   2 +-
+ docs/{this_repo => playbooks}/workflow.md          |   0
+ mkdocs.yml                                         |   8 +-
+ 5 files changed, 550 insertions(+), 34 deletions(-)
+```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:25:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit + push rename
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+uv run --script scripts/redact_secrets.py --fix >/dev/null 2>&1
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "docs: move workflow.md → playbooks/ + rename 'This Repo' nav to 'Repo Internals'
+
+workflow.md is a user-facing end-to-end playbook (sesh + worktrunk +
+tmux navigation recipes), not content 'about the repo itself' —
+placing it under the 'This Repo' nav section made it hard to find.
+Promote it to a top-level 'Playbooks' section right after Home, and
+rename the remaining architecture/ops page group to 'Repo Internals'
+so the distinction is obvious:
+
+- Playbooks  → user-facing flows + how-tos (just workflow.md for now,
+  future additions land here)
+- Repo Internals → architecture, fleet-apply, testing, upgrades,
+  sudo-session, chezmoiscripts-layout, prior-art docs — i.e. 'how
+  this repo is built + maintained'
+
+File move preserves directory depth (docs/this_repo/ → docs/playbooks/),
+so all relative links inside workflow.md (../tools/, ../zsh/,
+../../dot_config/, ../../TODO.md, ../../backlog/) continue to resolve
+correctly — no in-file edits needed.
+
+Cross-ref updates:
+- docs/index.md: 'For users' table row now points to playbooks/workflow.md
+- backlog/mkdocs-anchor-drift.md: tracked-files list updated
+- mkdocs.yml: nav top-level Playbooks section added, 'This Repo' label
+  renamed to 'Repo Internals', llmstxt sections mirror same split
+
+Strict build passes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -4
+git --no-pager log --oneline -3
+git push origin main 2>&1 | tail -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777022728-33340.
+456801d scripts/init: --no-apply flag + working Docker smoke test
+6f9d846 chore: backup agent-session artifacts (SpecStory transcripts + plans)
+74883cc tmux: add smart-picker.sh — unified sesh / worktree / zoxide picker
+To github.com:daviddwlee84/dotfiles.git
+   5e25f33..456801d  main -> main
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:26:02Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:26:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+git --no-pager status --short | head
+echo "---"
+uv run --script scripts/redact_secrets.py --fix >/dev/null 2>&1
+git add docs/playbooks/workflow.md docs/index.md backlog/mkdocs-anchor-drift.md mkdocs.yml .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "docs: move workflow.md → playbooks/ + rename 'This Repo' nav to 'Repo Internals'" -m "workflow.md is a user-facing end-to-end playbook (sesh + worktrunk + tmux navigation), not content 'about the repo itself'. Promote to top-level Playbooks section right after Home; rename the remaining architecture/ops group to Repo Internals. File move preserves dir depth so relative links inside workflow.md still resolve." -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -3
+git --no-pager log --oneline -2
+git push origin main 2>&1 | tail -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+M  .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/statistics.json
+M  backlog/mkdocs-anchor-drift.md
+ M docs/assets/copy-to-llm/copy-to-llm-custom.css
+M  docs/index.md
+R  docs/this_repo/workflow.md -> docs/playbooks/workflow.md
+M  mkdocs.yml
+?? .specstory/history/2026-04-24_09-09-09Z-commit-commit-backup-e.md
+---
+[main e8ebec3] docs: move workflow.md → playbooks/ + rename 'This Repo' nav to 'Repo Internals'
+ 5 files changed, 558 insertions(+), 4 deletions(-)
+ rename docs/{this_repo => playbooks}/workflow.md (100%)
+e8ebec3 docs: move workflow.md → playbooks/ + rename 'This Repo' nav to 'Repo Internals'
+456801d scripts/init: --no-apply flag + working Docker smoke test
+To github.com:daviddwlee84/dotfiles.git
+   456801d..e8ebec3  main -> main
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:26:36Z)**_
+
+Commit `e8ebec3` 成功，push 了。等 CI build，驗 site：
+
+_**Agent (claude-opus-4-7 2026-04-24 09:26:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+CI + site verify
+
+```bash
+sleep 50
+gh run list --repo daviddwlee84/dotfiles --workflow docs.yml --limit 2 2>&1
+echo "---"
+for u in \
+  "https://daviddwlee84.github.io/dotfiles/" \
+  "https://daviddwlee84.github.io/dotfiles/playbooks/workflow/" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/workflow/" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/architecture/"; do
+  code=$(curl -sS -o /dev/null -w "%{http_code}" "$u")
+  echo "$code  $u"
+done
+```
+
+```text
+<tool_use_error>Blocked: sleep 50 followed by: gh run list --repo daviddwlee84/dotfiles --workflow docs.yml --limit 2 echo "---" for u in \
+  "https://daviddwlee84.github.io/dotfiles/" \
+  "https://daviddwlee84.github.io/dotfiles/playbooks/workflow/" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/workflow/" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/architecture/"; do
+  code=$(curl -sS -o /dev/null -w "%{http_code}" "$u")
+  echo "$code  $u"
+done. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:26:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+CI status (no sleep)
+
+`gh run list --repo daviddwlee84/dotfiles --workflow docs.yml --limit 2 2>&1`
+
+```text
+in_progress		docs: move workflow.md → playbooks/ + rename 'This Repo' nav to 'Repo…	Docs	main	push	24882380532	11s	2026-04-24T09:26:33Z
+completed	success	scripts/init: --no-apply flag + working Docker smoke test	Docs	main	push	24882355979	37s	2026-04-24T09:25:57Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:27:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Wait for run to complete
+
+`gh run watch 24882380532 --repo daviddwlee84/dotfiles --exit-status 2>&1 | tail -8`
+
+```text
+  ✓ Set up job
+  ✓ Run actions/deploy-pages@v5
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-python@v5, actions/upload-artifact@v4, astral-sh/setup-uv@v5. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+build: .github#2
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:27:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Site verify
+
+```bash
+for u in \
+  "https://daviddwlee84.github.io/dotfiles/" \
+  "https://daviddwlee84.github.io/dotfiles/playbooks/workflow/" \
+  "https://daviddwlee84.github.io/dotfiles/this_repo/architecture/" \
+  "https://daviddwlee84.github.io/dotfiles/tools/aicapture/"; do
+  code=$(curl -sS -o /dev/null -w "%{http_code}" "$u")
+  echo "$code  $u"
+done
+```
+
+```text
+200  https://daviddwlee84.github.io/dotfiles/
+200  https://daviddwlee84.github.io/dotfiles/playbooks/workflow/
+200  https://daviddwlee84.github.io/dotfiles/this_repo/architecture/
+200  https://daviddwlee84.github.io/dotfiles/tools/aicapture/
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:27:47Z)**_
+
+全綠 HTTP 200。
+
+## 本輪完成
+
+**Commit `e8ebec3`** (已 push，CI 過):
+- `docs/this_repo/workflow.md` → `docs/playbooks/workflow.md`（git mv，保留歷史）
+- mkdocs.yml nav：頂層加 **Playbooks** 節（Home 之下、Tools 之上），原 "This Repo" 改名 **"Repo Internals"**
+- llmstxt plugin sections 同步分拆
+- docs/index.md + backlog/mkdocs-anchor-drift.md cross-refs 更新
+
+**Stash 處理**:
+- `stash@{0}: others-wip-phase-A` — 因為其他 agent 已經各自 commit 了那些檔（HEAD 移動很多），stash 是過時快照，drop 掉沒損失
+- `stash@{0}: autostash` + `stash@{1}: WIP on main: 14e5329` — 不是我產生的，留著沒動
+
+## Live URLs
+
+| 頁 | URL |
+|---|---|
+| Workflow playbook (**新位置**) | <https://daviddwlee84.github.io/dotfiles/playbooks/workflow/> |
+| Repo Internals index (架構) | <https://daviddwlee84.github.io/dotfiles/this_repo/architecture/> |
+| Landing | <https://daviddwlee84.github.io/dotfiles/> |
+
+**注意**: 舊 URL `…/this_repo/workflow/` 現在 404（GH Pages 不做自動 redirect）。如果你有之前分享過那條舊連結，任何點到的人會 404 — 可以手寫一個一次性的 301-redirect HTML 放在 `docs/this_repo/workflow.md` 殼檔（`<meta http-equiv="refresh" content="0; url=../playbooks/workflow/">`），但多數情況下搬家後短期 404 是可接受的代價。要加重定向 shim 跟我說。
+
+**CI 方面**：Actions 噴了 `Node.js 20 deprecated` 的 annotation — 是 actions/checkout@v4 等用的 Node 版本，GitHub 2026-09 才強制淘汰。不影響功能，看要不要 bump 到 `@v5`（等 upstream action 出新 major 版本；現在用 checkout v4 仍是最新）。目前不急。
+
+## 未來待辦（backlog 已記）
+
+- **mkdocs anchor drift** 批次修（~20 個 stale anchor）→ backlog/mkdocs-anchor-drift.md
+- **aicapture Tier 2** 非 tmux 自動 tee → backlog/ai-capture-non-tmux-output.md
+- 若需要把其他 `this_repo/*.md` 挪到 `playbooks/`：`cheatsheet.md` 感覺也偏 playbook（快速查詢），但屬於「repo 自己的 cheatsheet」比較像 internals。要不要挪你決定。
+
+要處理其他事情再跟我說。

@@ -167,6 +167,7 @@ nav:
   - Repo Internals:
     - Architecture: this_repo/architecture.md
     - Cheatsheet: this_repo/cheatsheet.md
+    - Bootstrap (curl|sh): this_repo/bootstrap.md
     - Ansible customization: this_repo/ansible_customization.md
     - Upgrades: this_repo/upgrades.md
     - Testing: this_repo/testing.md
