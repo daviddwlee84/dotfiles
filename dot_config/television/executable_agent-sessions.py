@@ -9,18 +9,33 @@ a single TSV stream with stable columns:
   2. session id       (full id; passed to <agent> --resume / --session)
   3. directory        (absolute cwd; "?" when unknown)
   4. title/snippet    (first non-system user message, truncated)
+  5. specstory_path   (matching .specstory/history/*.md file, or empty)
+
+In `all` mode rows from every agent are collected into one buffer, sorted
+globally by raw mtime DESC, and then printed — otherwise TV sees each
+agent's block sorted internally but concatenated, which looks random.
 
 Usage (called from cable/agent-sessions.toml):
 
-  agent-sessions.py all       # all four agents merged
+  agent-sessions.py all       # all five agents merged, globally sorted
   agent-sessions.py opencode  # opencode-only
   agent-sessions.py claude    # claude-only
   agent-sessions.py codex     # codex-only
   agent-sessions.py cursor    # cursor Agent CLI only
-  agent-sessions.py cursor-ide  # Cursor IDE composer chats only
+  agent-sessions.py cursor-ide                # Cursor IDE composer chats only
+  agent-sessions.py transcript <cc|cx|oc> <sid>  # render full back-and-forth
+                                                 # as markdown on stdout.
+
+Column 5 (specstory_path) is produced by grep'ing each file under
+$SPECSTORY_HISTORY_DIRS (default: ~/.local/share/chezmoi/.specstory/history)
+for `<!-- <Provider> Session <uuid> ... -->` on the first ~10 lines — the
+comment SpecStory embeds in every transcript it writes. See
+docs/tools/specstory-internals.md for why that line is the reverse-lookup
+key.
 
 Performance notes:
 - Title extraction reads only the first ~80 lines of each JSONL.
+- SpecStory map reads the first ~10 lines per .md file, once per invocation.
 - Skips obvious system prepends (AGENTS.md, <local-command-caveat>,
   <system-reminder>, etc.) heuristically — see _is_system_prepend().
 - All errors are swallowed silently; missing dirs produce no output.
@@ -107,10 +122,94 @@ def _compress_home(p: str) -> str:
     return p
 
 
-def _emit(agent: str, when: str, sid: str, cwd: str, title: str) -> None:
+# ---------------------------------------------------------------------------
+# SpecStory reverse-lookup: session id -> .specstory/history/*.md path.
+#
+# Every file written by SpecStory embeds a line of the form
+#   <!-- <Provider-display-name> Session <uuid> (YYYY-MM-DD HH:MM:SSZ) -->
+# on line 5. The UUID matches the agent's own session id, so we can grep
+# the first handful of lines of every .md and build a {sid -> path} cache.
+# Details: docs/tools/specstory-internals.md.
+# ---------------------------------------------------------------------------
+_SS_COMMENT_RE = re.compile(
+    r"Session ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    re.IGNORECASE,
+)
+_SPECSTORY_DEFAULT = HOME / ".local/share/chezmoi/.specstory/history"
+_SPECSTORY_MAP: Optional[dict[str, str]] = None
+
+
+def _specstory_history_dirs() -> list[Path]:
+    """Directories to scan for `.specstory/history/*.md` files.
+
+    Override via `SPECSTORY_HISTORY_DIRS` (colon-separated). Default is
+    just this repo's checkout, which is where the user's SpecStory is
+    currently configured to write.
+    """
+    raw = os.environ.get("SPECSTORY_HISTORY_DIRS", "")
+    if raw:
+        out: list[Path] = []
+        for p in raw.split(":"):
+            p = p.strip()
+            if not p:
+                continue
+            out.append(Path(os.path.expanduser(p)))
+        return out
+    if _SPECSTORY_DEFAULT.is_dir():
+        return [_SPECSTORY_DEFAULT]
+    return []
+
+
+def _load_specstory_map() -> dict[str, str]:
+    global _SPECSTORY_MAP
+    if _SPECSTORY_MAP is not None:
+        return _SPECSTORY_MAP
+    m: dict[str, str] = dict()
+    for d in _specstory_history_dirs():
+        try:
+            md_files = list(d.glob("*.md"))
+        except OSError:
+            continue
+        for md in md_files:
+            try:
+                with md.open("r", encoding="utf-8", errors="replace") as f:
+                    for i, line in enumerate(f):
+                        if i >= 10:
+                            break
+                        match = _SS_COMMENT_RE.search(line)
+                        if match:
+                            # First win is fine — duplicates (same sid, two
+                            # .md files) are undocumented edge cases.
+                            m.setdefault(match.group(1).lower(), str(md))
+                            break
+            except OSError:
+                continue
+    _SPECSTORY_MAP = m
+    return m
+
+
+def _specstory_path(sid: str) -> str:
+    if not sid:
+        return ""
+    return _load_specstory_map().get(sid.lower(), "")
+
+
+# ---------------------------------------------------------------------------
+# Emission buffer. `all` mode collects into _COLLECT so we can sort globally
+# by mtime DESC across agents — each handler still sorts locally but the
+# block ordering between agents was previously source-order (random-feel).
+# ---------------------------------------------------------------------------
+_COLLECT: Optional[list] = None
+
+
+def _emit(agent: str, when: str, sid: str, cwd: str, title: str, ts: float = 0.0) -> None:
     title = _truncate(title or "(no title)")
     cwd = _compress_home(cwd or "?")
-    print(f"{agent}\t{when}\t{sid}\t{cwd}\t{title}")
+    ss = _specstory_path(sid)
+    if _COLLECT is not None:
+        _COLLECT.append((ts, agent, when, sid, cwd, title, ss))
+        return
+    print(f"{agent}\t{when}\t{sid}\t{cwd}\t{title}\t{ss}")
 
 
 # ---------------------------------------------------------------------------
@@ -132,12 +231,15 @@ def _opencode() -> Iterator[None]:
             """
         )
         for row in cur:
+            tu = row["time_updated"] or 0
+            ts_s = (tu / 1000.0) if tu > 1e12 else float(tu)
             _emit(
                 "[oc]",
-                _fmt_when(row["time_updated"]),
+                _fmt_when(tu),
                 row["id"],
                 row["directory"] or "?",
                 row["title"] or "",
+                ts=ts_s,
             )
         con.close()
     except sqlite3.Error:
@@ -203,8 +305,8 @@ def _claude() -> None:
         cwd, title = _claude_first_user_msg(jsonl)
         rows.append((mtime, sid, cwd, title, _fmt_when(mtime)))
     rows.sort(key=lambda r: r[0], reverse=True)
-    for _mtime, sid, cwd, title, when in rows:
-        _emit("[cc]", when, sid, cwd, title)
+    for mtime, sid, cwd, title, when in rows:
+        _emit("[cc]", when, sid, cwd, title, ts=mtime)
 
 
 # ---------------------------------------------------------------------------
@@ -282,8 +384,8 @@ def _codex() -> None:
             title = index_titles[sid]
         rows.append((mtime, sid, cwd, title, _fmt_when(mtime)))
     rows.sort(key=lambda r: r[0], reverse=True)
-    for _mtime, sid, cwd, title, when in rows:
-        _emit("[cx]", when, sid, cwd, title)
+    for mtime, sid, cwd, title, when in rows:
+        _emit("[cx]", when, sid, cwd, title, ts=mtime)
 
 
 # ---------------------------------------------------------------------------
@@ -370,8 +472,8 @@ def _cursor() -> None:
             title = "(cursor chat)"
         rows.append((mtime, chat_id, cwd, title, _fmt_when(mtime)))
     rows.sort(key=lambda r: r[0], reverse=True)
-    for _mtime, sid, cwd, title, when in rows:
-        _emit("[cu]", when, sid, cwd, title)
+    for mtime, sid, cwd, title, when in rows:
+        _emit("[cu]", when, sid, cwd, title, ts=mtime)
 
 
 # ---------------------------------------------------------------------------
@@ -511,8 +613,225 @@ def _cursor_ide() -> None:
         rows.append((float(ts) / 1000.0 if ts > 1e12 else float(ts), cid, cwd, title, when))
     gdb.close()
     rows.sort(key=lambda r: r[0], reverse=True)
-    for _ts, sid, cwd, title, when in rows:
-        _emit("[ci]", when, sid, cwd, title)
+    for ts, sid, cwd, title, when in rows:
+        _emit("[ci]", when, sid, cwd, title, ts=ts)
+
+
+# ---------------------------------------------------------------------------
+# Transcript rendering — full back-and-forth as markdown on stdout.
+#
+# Prefer SpecStory's pre-rendered `.specstory/history/*.md` when the session
+# has been synced (matches what the user sees on disk, zero-parsing). Fall
+# back to a raw-source walk for live / un-synced sessions.
+# ---------------------------------------------------------------------------
+def _render_turn(role: str, text: str, ts: str = "", model: str = "") -> None:
+    header = f"## {role}"
+    if model:
+        header += f" — `{model}`"
+    if ts:
+        header += f"  *({ts})*"
+    print(header)
+    print()
+    print(text.rstrip())
+    print()
+    print("---")
+    print()
+
+
+def _transcript_claude(sid: str) -> None:
+    root = HOME / ".claude/projects"
+    if not root.is_dir():
+        print("(~/.claude/projects not found)")
+        return
+    path: Optional[Path] = None
+    for p in root.rglob(f"{sid}.jsonl"):
+        if "/subagents/" in str(p):
+            continue
+        path = p
+        break
+    if path is None:
+        print(f"(Claude session `{sid}` not found)")
+        return
+    print(f"# Claude Code session  `{sid}`")
+    print()
+    print(f"*file*: `{path}`")
+    print()
+    print("---")
+    print()
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                t = d.get("type")
+                if t not in ("user", "assistant"):
+                    continue
+                msg = d.get("message") or dict()
+                content = msg.get("content")
+                parts: list[str] = []
+                if isinstance(content, str):
+                    parts.append(content)
+                elif isinstance(content, list):
+                    for part in content:
+                        if not isinstance(part, dict):
+                            continue
+                        pt = part.get("type")
+                        if pt == "text":
+                            parts.append(part.get("text", "") or "")
+                        elif pt == "tool_use":
+                            name = part.get("name", "?")
+                            parts.append(f"\n> *tool_use: `{name}`*")
+                        elif pt == "tool_result":
+                            tr = part.get("content", "")
+                            if isinstance(tr, list):
+                                tr = " ".join(
+                                    (c.get("text", "") or "")
+                                    for c in tr
+                                    if isinstance(c, dict) and c.get("type") == "text"
+                                )
+                            tr = str(tr or "")
+                            tr = re.sub(r"\s+", " ", tr)[:500]
+                            parts.append(f"\n> *tool_result*: {tr}")
+                text = "\n".join(p for p in parts if p).strip()
+                if not text:
+                    continue
+                if t == "user" and _is_system_prepend(text):
+                    continue
+                role = "User" if t == "user" else "Agent"
+                model = msg.get("model", "") if t == "assistant" else ""
+                _render_turn(role, text, ts=d.get("timestamp", "") or "", model=model)
+    except OSError as e:
+        print(f"(error reading session file: {e})")
+
+
+def _transcript_codex(sid: str) -> None:
+    root = HOME / ".codex/sessions"
+    if not root.is_dir():
+        print("(~/.codex/sessions not found)")
+        return
+    path: Optional[Path] = None
+    for p in root.rglob(f"rollout-*{sid}*.jsonl"):
+        path = p
+        break
+    if path is None:
+        print(f"(Codex session `{sid}` not found under ~/.codex/sessions)")
+        return
+    print(f"# Codex session  `{sid}`")
+    print()
+    print(f"*file*: `{path}`")
+    print()
+    print("---")
+    print()
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if d.get("type") != "response_item":
+                    continue
+                payload = d.get("payload") or dict()
+                if payload.get("type") != "message":
+                    continue
+                role = payload.get("role")
+                if role not in ("user", "assistant"):
+                    continue
+                texts: list[str] = []
+                for c in payload.get("content", []) or []:
+                    if not isinstance(c, dict):
+                        continue
+                    if c.get("type") in ("input_text", "text", "output_text"):
+                        texts.append(c.get("text", "") or "")
+                text = "\n".join(t for t in texts if t).strip()
+                if not text:
+                    continue
+                if role == "user" and _is_system_prepend(text):
+                    continue
+                ts = d.get("timestamp", "") or payload.get("timestamp", "") or ""
+                _render_turn("User" if role == "user" else "Agent", text, ts=ts)
+    except OSError as e:
+        print(f"(error reading session file: {e})")
+
+
+def _transcript_opencode(sid: str) -> None:
+    db = HOME / ".local/share/opencode/opencode.db"
+    if not db.exists():
+        print("(~/.local/share/opencode/opencode.db not found)")
+        return
+    print(f"# OpenCode session  `{sid}`")
+    print()
+    print(f"*db*: `{db}`")
+    print()
+    print("---")
+    print()
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        cur = con.execute(
+            """
+            SELECT m.data, p.data, p.time_created
+            FROM part p JOIN message m ON p.message_id = m.id
+            WHERE p.session_id = ?
+              AND json_extract(p.data, '$.type') = 'text'
+            ORDER BY p.time_created ASC
+            """,
+            (sid,),
+        )
+        had_row = False
+        for m_data, p_data, tc in cur:
+            had_row = True
+            try:
+                m = json.loads(m_data)
+            except (json.JSONDecodeError, TypeError):
+                m = dict()
+            try:
+                p = json.loads(p_data)
+            except (json.JSONDecodeError, TypeError):
+                p = dict()
+            role = m.get("role")
+            if role not in ("user", "assistant"):
+                continue
+            text = p.get("text") or ""
+            if not text:
+                continue
+            if role == "user" and _is_system_prepend(text):
+                continue
+            ts = _fmt_when(tc) if tc else ""
+            _render_turn("User" if role == "user" else "Agent", text, ts=ts)
+        con.close()
+        if not had_row:
+            print(f"(no parts found for session `{sid}`)")
+    except sqlite3.Error as e:
+        print(f"(opencode SQL error: {e})")
+
+
+def _transcript(tag: str, sid: str) -> None:
+    # Prefer SpecStory's pre-rendered markdown when available — matches what
+    # the user sees on disk and handles providers we can't re-render locally.
+    ss = _specstory_path(sid)
+    if ss:
+        try:
+            sys.stdout.write(Path(ss).read_text(encoding="utf-8", errors="replace"))
+            return
+        except OSError:
+            # Fall through to raw-source rendering.
+            pass
+    if tag in ("cc", "[cc]"):
+        _transcript_claude(sid)
+    elif tag in ("cx", "[cx]"):
+        _transcript_codex(sid)
+    elif tag in ("oc", "[oc]"):
+        _transcript_opencode(sid)
+    else:
+        print(f"# session `{sid}`")
+        print()
+        print(
+            f"_Transcript rendering is not yet supported for agent tag `{tag}`_"
+            " — see the legacy preview cycle (`Ctrl+F`) for first-5 user"
+            " messages, or `Alt+E` to open the raw source."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -520,6 +839,17 @@ def _cursor_ide() -> None:
 # ---------------------------------------------------------------------------
 def main() -> int:
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+
+    if mode == "transcript":
+        if len(sys.argv) < 4:
+            print(
+                "usage: agent-sessions.py transcript <cc|cx|oc> <sid>",
+                file=sys.stderr,
+            )
+            return 2
+        _transcript(sys.argv[2], sys.argv[3])
+        return 0
+
     handlers = {
         "opencode": [_opencode],
         "claude": [_claude],
@@ -531,6 +861,12 @@ def main() -> int:
     if mode not in handlers:
         print(f"unknown mode: {mode}", file=sys.stderr)
         return 2
+
+    global _COLLECT
+    collect = mode == "all"
+    if collect:
+        _COLLECT = []
+
     for fn in handlers[mode]:
         try:
             result = fn()
@@ -541,6 +877,14 @@ def main() -> int:
         except Exception as e:
             # Never crash the channel.
             print(f"(error in {fn.__name__}: {e})", file=sys.stderr)
+
+    if collect and _COLLECT is not None:
+        buffer = _COLLECT
+        _COLLECT = None  # restore normal emit path for any stragglers
+        buffer.sort(key=lambda r: r[0], reverse=True)
+        for _ts, agent, when, sid, cwd, title, ss in buffer:
+            print(f"{agent}\t{when}\t{sid}\t{cwd}\t{title}\t{ss}")
+
     return 0
 
 

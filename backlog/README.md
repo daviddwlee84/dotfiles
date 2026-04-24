@@ -103,3 +103,4 @@ Add new entries here as you create them. Keep alphabetical.
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
 | [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
+| [`tv-agent-sessions-richer-preview`](tv-agent-sessions-richer-preview.md) | Done (batch 1) / P? deferred (Cursor) | "tv agent-sessions richer preview + SpecStory linkage" |

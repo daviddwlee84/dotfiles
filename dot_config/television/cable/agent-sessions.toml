@@ -8,7 +8,7 @@
 #   tv agent-sessions
 #
 # Source cycling (Ctrl+S):
-#   1. All agents merged       (default — sorted DESC within each agent)
+#   1. All agents merged       (default — globally sorted DESC by mtime)
 #   2. OpenCode only           (~/.local/share/opencode/opencode.db)
 #   3. Claude Code only        (~/.claude/projects/**/<sid>.jsonl)
 #   4. Codex only              (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl)
@@ -21,9 +21,18 @@
 # Title/snippet column is the first non-system user message (truncated 140ch),
 # so TV's fuzzy search matches by content as well as date / project / id.
 #
+# Each row also carries a matched `.specstory/history/*.md` path (col 5) when
+# SpecStory has written one for that session — see docs/tools/specstory-internals.md.
+#
 # Preview cycling (Ctrl+F):
-#   1. Session metadata + recent messages
-#   2. Raw record dump (head 200 lines / SQL dump)
+#   1. Metadata header + full chat transcript (glow-rendered; prefers the
+#      .specstory/history/*.md file when present, falls back to raw-source
+#      walk for live sessions). Cursor [cu]/[ci] show a "deferred" note and
+#      the legacy first-5 view in cycle 2 instead — see the backlog entry
+#      backlog/tv-agent-sessions-richer-preview.md.
+#   2. Metadata header + first 5 user messages (legacy; kept for fast
+#      content search across sessions).
+#   3. Raw record dump (head 200 lines / SQL dump).
 #
 # Keybindings:
 #   Enter      Print resume one-liner to stdout (cd <dir> && <agent-cmd> <id>)
@@ -31,6 +40,7 @@
 #   Ctrl+Y     Copy session ID to clipboard
 #   Alt+P      Copy directory path to clipboard
 #   Alt+R      Copy resume one-liner to clipboard
+#   Alt+S      Copy matched .specstory/history/*.md path to clipboard (S for SpecStory)
 #   Alt+E      Open raw session file in $EDITOR (claude/codex only)
 #
 # Ctrl+E is left as TV's global `go_to_input_end`.
@@ -61,7 +71,63 @@ output = "{split:\t:2}"
 
 [preview]
 command = [
-  # Preview 1: per-agent metadata + recent messages.
+  # Preview 1 (default): metadata header + full chat transcript.
+  #
+  # The transcript is rendered by the Python helper's `transcript` mode,
+  # which prefers the matched .specstory/history/*.md file (col 5) when
+  # present and falls back to walking the raw session source for live
+  # sessions. Output is piped through `glow` (if installed) or `bat`.
+  #
+  # IMPORTANT: do NOT embed Python/awk/JSON literals inline here — any bare
+  # `{...}` in this string (outside TV's own `{split:...}`/`{strip_ansi}`
+  # placeholders) silently breaks ALL placeholder substitution in the same
+  # command. See pitfalls/tv-channel-bare-braces-break-substitution.md.
+  # Keep the rich logic in the helper; this block is just shell glue.
+  '''
+  agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'; ss='{split:\t:5}'
+  printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
+  printf '\033[2mcwd:\033[0m       %s\n' "$dir"
+  if [ -n "$ss" ]; then
+    printf '\033[2mspecstory:\033[0m %s\n' "$ss"
+  fi
+  case "$agent" in
+    "[oc]")
+      sqlite3 "$HOME/.local/share/opencode/opencode.db" \
+        "SELECT 'title=    ' || title || char(10) || 'version=  ' || version FROM session WHERE id = '$sid';" 2>/dev/null
+      ;;
+    "[cc]")
+      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+      [ -n "$f" ] && printf 'file:      %s\n' "$f"
+      ;;
+    "[cx]")
+      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}*.jsonl" 2>/dev/null | head -1)
+      [ -n "$f" ] && printf 'file:      %s\n' "$f"
+      ;;
+  esac
+  printf '\n'
+  case "$agent" in
+    "[cc]") tag=cc ;;
+    "[cx]") tag=cx ;;
+    "[oc]") tag=oc ;;
+    *) tag="" ;;
+  esac
+  if [ -z "$tag" ]; then
+    printf '\033[2m(transcript rendering deferred for %s — press Ctrl+F to cycle to the legacy first-5 view.)\033[0m\n' "$agent"
+    exit 0
+  fi
+  if command -v glow >/dev/null 2>&1; then
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | glow --style auto - 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  else
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | bat -l md --color=always --plain --paging=never 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  fi
+  ''',
+  # Preview 2 (legacy): metadata + first 5 user messages — kept because
+  # content-searching sessions by "did I talk about X?" is faster here
+  # than scrolling a full transcript.
   '''
   agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'
   printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
@@ -308,6 +374,7 @@ alt-t = "actions:resume"
 ctrl-y = "actions:copy_id"
 alt-p = "actions:copy_dir"
 alt-r = "actions:copy_resume"
+alt-s = "actions:copy_specstory"
 alt-e = "actions:edit_jsonl"
 
 # ---------------------------------------------------------------------------
@@ -371,6 +438,19 @@ mode = "fork"
 description = "Copy directory path to clipboard"
 command = '''
 d='{split:\t:3}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_specstory]
+description = "Copy .specstory/history/*.md path to clipboard (SpecStory reverse-lookup)"
+command = '''
+d='{split:\t:5}'
 [ -z "$d" ] && exit 0
 if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
 elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy

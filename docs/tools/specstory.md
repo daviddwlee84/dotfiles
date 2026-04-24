@@ -54,7 +54,12 @@ specstory run codex --help
 chezmoi diff
 ```
 
+## See also
+
+- [SpecStory internals (filename algorithm, reverse lookup, markdown structure)](specstory-internals.md) — what this repo's `tv agent-sessions` channel uses to link live sessions back to `.specstory/history/*.md`.
+
 ## References
 
 - [SpecStory CLI usage docs](https://docs.specstory.com/integrations/terminal-coding-agents/usage#configuration)
 - [SpecStory CLI releases](https://github.com/specstoryai/getspecstory/releases)
+- [SpecStory CLI source on DeepWiki](https://deepwiki.com/specstoryai/getspecstory) — generated technical reference for the Go implementation.
