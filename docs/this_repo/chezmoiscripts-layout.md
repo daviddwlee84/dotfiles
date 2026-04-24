@@ -16,10 +16,41 @@ when the script changes) in the directory name:
     └── run_onchange_after_45_bootstrap_skills.sh.tmpl
 ```
 
-Plus the legacy `run_once_before_00_bootstrap.sh.tmpl` and any
-`run_*_after_*.sh.tmpl` that still live at the repo root for historical
-reasons (they sort independently before / after the nested tree depending
-on prefix and ASCII order — see below).
+Plus four `run_*before_*` scripts that intentionally stayed at the
+repo root — see [What's still at the repo root](#whats-still-at-the-repo-root-and-why)
+below.
+
+## What's still at the repo root (and why)
+
+Four `run_*before_*` scripts deliberately stayed at the repo root:
+
+| Script | Phase | Why not moved |
+|---|---|---|
+| `run_once_before_00_bootstrap.sh.tmpl` | once, before | sudo session init + locale fix; `run_once_*` is path-keyed in chezmoi state, so moving forces a re-run on every machine |
+| `run_before_01_backup_dotfiles.sh.tmpl` | every, before | Backs up `~/.zshrc` etc. before chezmoi overwrites; safe but bundled with the others for consistency |
+| `run_once_before_02_fix_intel_homebrew.sh.tmpl` | once, before | Intel Mac brew prefix migration; same `run_once_*` state-tracking concern as `00` |
+| `run_once_before_50_opencode_migrate.sh.tmpl` | once, before | One-shot opencode CLI config migration; would re-run if path changes |
+
+The `run_once_*` scripts are state-tracked **by path** in
+`chezmoi state` (the `scriptState` bucket is keyed on a hash that
+includes the script's source path). Moving them would either re-run the
+once-only logic on every existing machine, or require coordinated
+`chezmoi state delete-bucket --bucket=scriptState` surgery on each host.
+The `run_onchange_after_*` scripts moved earlier had the same property
+but their re-run cost was acceptable (idempotent ansible / brew bundle);
+for `run_once_before_*` the cost is higher and less predictable
+(`00_bootstrap` reinstalls base packages, `50_opencode_migrate` re-applies
+a one-shot migration).
+
+Plus there's no scope ambiguity to resolve: all four are global. The
+`global/` vs `repo/` split that motivated the move for `_after_` scripts
+doesn't exist on the `_before_` side, so the directory wouldn't carry
+information.
+
+If a future `run_*before_*` script genuinely needs `repo/` scope
+(e.g. a project-skills bootstrap that must run before chezmoi applies),
+revisit this decision — at that point the bucket starts to encode
+scope and the move is worth the re-run cost.
 
 ## Why nested?
 
