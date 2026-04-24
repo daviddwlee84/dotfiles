@@ -154,30 +154,12 @@ Shell-level equivalents live in [`03_tmux_capture.zsh`](../../../dot_config/zsh/
 
 ## Reviewing past commands with AI agents
 
-Built on top of the capture helpers: shell wrappers that pipe the captured block into a coding-agent CLI in one-shot / advisory mode (agent replies with text; no file edits).
+The AI wrappers — `aifix` / `aiexplain` + the `aiblock` TUI — pipe a captured block into a coding-agent CLI (Claude Code / OpenCode / Codex / Cursor Agent) in non-interactive advisory mode. Model defaults, prettify/metadata/spinner toggles, standalone setup (no chezmoi), and troubleshooting all live in the dedicated user guide:
 
-[`dot_config/zsh/tools/04_ai_capture.zsh`](../../../dot_config/zsh/tools/04_ai_capture.zsh) provides:
+- [`docs/tools/aicapture.md`](../aicapture.md) — single-page walkthrough, share this link with anyone who wants to try the tools
+- [`docs/this_repo/instant-llm-fix-prior-art.md`](../../this_repo/instant-llm-fix-prior-art.md) — where this layer fits against `thefuck`, Warp, `wut`/`tmuxai`, `butterfish`, `atuin`, and the OSC 133 terminals
 
-| Command | Default prompt |
-|---|---|
-| `aifix [N] [-a AGENT] [-p PROMPT]` | "Diagnose any errors and suggest a concrete fix" |
-| `aiexplain [N] [-a AGENT] [-p PROMPT]` | "Explain what happened in plain language" |
-
-Agent auto-detected from `$PATH` in order: `claude` → `opencode` → `codex` → `cursor-agent`. Override via `-a AGENT`. Reply goes to stdout (pipe-friendly), one-line status ("aifix: claude ← block -3") to stderr.
-
-For an interactive workflow — browse recent commands, edit prompt, pick where the reply lands — use the TUI:
-
-```sh
-aiblock    # launches scripts/aiblock.py (questionary + rich)
-```
-
-The TUI lets you: (1) pick a command from `fc -ln -20`, (2) preview the captured block, (3) edit the prompt, (4) choose agent when multiple are installed, (5) pick an action — print reply here, copy reply to clipboard, or **spawn a new tmux window with the agent running interactively** and the context pre-loaded into the `aiblock` paste-buffer (pull via `prefix + =`).
-
-Advisory-only by design: there is no `--execute` / `--allow-edits` flag on the shell wrappers. If you want the agent to apply edits, use the TUI's "Spawn interactive agent" action and drive it by hand.
-
-For where this fits in the broader "LLM-powered `thefuck` successor" design space (shell_gpt, aichat, wut, tmuxai, butterfish, Warp, Amazon Q, atuin, OSC 133 terminals) and what our aicapture layer does well vs what we could steal from the alternatives, see [`docs/this_repo/instant-llm-fix-prior-art.md`](../../this_repo/instant-llm-fix-prior-art.md).
-
-Opt out per shell: `export DISABLE_OSC133=1` before starting zsh. The tmux bindings become no-ops automatically when markers are absent — **including in shells that pre-date the `chezmoi apply` that added the hook** (reloading tmux config doesn't re-source zsh; run `exec zsh` in the affected pane or open a new one). Symptom of a pre-hook shell: `prefix + M-y` / `M-i` flash their success message but paste is empty. Verify with `echo $precmd_functions | tr ' ' '\n' | grep osc133`.
+Opt out of OSC 133 per shell: `export DISABLE_OSC133=1` before starting zsh. The copy-mode bindings become no-ops automatically when markers are absent — **including in shells that pre-date the `chezmoi apply` that added the hook** (reloading tmux config doesn't re-source zsh; run `exec zsh` in the affected pane or open a new one). Symptom of a pre-hook shell: `prefix + M-y` / `M-i` flash their success message but paste is empty. Verify with `echo $precmd_functions | tr ' ' '\n' | grep osc133`.
 
 ## Reload Config
 
