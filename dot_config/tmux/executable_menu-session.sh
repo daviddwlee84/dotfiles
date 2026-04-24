@@ -18,4 +18,5 @@ exec tmux display-menu -T " Session mgmt " -x R -y P \
   "Kill pane"          x  "confirm-before -p 'Kill pane? (y/n)' kill-pane" \
   "Kill window"        W  "confirm-before -p 'Kill window #W? (y/n)' kill-window" \
   "Kill session"       X  "confirm-before -p 'Kill session #S? (y/n)' kill-session" \
+  "Kill session & exit" E  "confirm-before -p 'Kill session #S and exit tmux? (y/n)' 'detach-client \\; kill-session -t \"#S\"'" \
   "Kill all sessions"  Q  "confirm-before -p 'Kill ALL sessions (tmux server)? (y/n)' kill-server"
