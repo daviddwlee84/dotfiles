@@ -20913,7 +20913,7 @@ M  scripts/aiblock.py
 
 _**Agent (claude-opus-4-7 2026-04-24 06:03:14Z)**_
 
-_**Agent (claude-opus-4-7 2026-04-24 06:03:26Z)**_
+_**Agent (claude-opus-4-7 2026-04-24 06:03:28Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -20960,5 +20960,403 @@ Extends aifix/aiexplain/aiblock with:
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )" 2>&1 | tail -6
+```
+
+```text
+Unstaged changes after reset:
+M	.specstory/history/2026-04-22_08-21-44Z.md
+M	.specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+Successfully redacted 1 file(s)
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+0
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 1753 +++++++++++++++++++-
+ dot_config/zsh/tools/04_ai_capture.zsh             |  145 +-
+ scripts/aiblock.py                                 |  124 +-
+ 3 files changed, 1983 insertions(+), 39 deletions(-)
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777010607-8268.
+[main 697eafd] aicapture: model defaults + glow/bat prettify + metadata stderr line
+ 3 files changed, 1983 insertions(+), 39 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:03:54Z)**_
+
+Commit `697eafd` 成功。
+
+## 更新摘要
+
+**已 commit 兩個 feature (`5c2959d` + `697eafd`)**
+
+| Feature | 內容 |
+|---|---|
+| `5c2959d` | cpblock/cpout/cpcmd 加 `[N]` 索引 + `aifix` / `aiexplain` / `aiblock` wrapper + Python TUI |
+| `697eafd` | Model 預設 (`haiku` / `github-copilot/claude-haiku-4.5` / `gpt-5-mini`) + `glow > bat > raw` prettify + metadata stderr line (Claude 解 JSON，其餘 agent 只印 `<agent> (<model>)`) |
+
+## 目前用法
+
+```sh
+aifix             # 最後 block → claude haiku，glow render，stderr 顯示 tokens/cost
+aifix 3           # 3rd-back block
+aifix --raw       # 關 prettify
+aifix --no-meta   # 關 metadata line
+aifix -h          # 列全部 flag + 當前 env var 值
+
+# Model override (put in your ~/.zshrc / 99_local_*.zsh)
+export AICAP_CLAUDE_MODEL=sonnet          # or claude-sonnet-4-6
+export AICAP_CODEX_MODEL=gpt-5.4-mini
+export AICAP_OPENCODE_MODEL=openai/gpt-5-nano
+export AICAP_SHOW_METADATA=0              # mute token/cost line
+export AICAP_PRETTIFY=0                   # always raw
+```
+
+實測 Claude `aifix -p "reply OK" --raw`：
+```
+stderr: claude (claude-haiku-4-5-20251001) | in=10 out=65 cache=(r:24402,w:12592) | cost=$0.0185 5425ms
+stdout: OK
+```
+
+## 未做的事（如果有 agent 在改 不 block 你）
+
+- 你之前 stash 的 `.pre-commit-config.yaml` / `.gitleaks.toml` / `dot_config/git/hooks/executable_pre-commit.tmpl` / `scripts/redact_secrets.py` / `scripts/init/dotfiles_init.py` 的 WIP 還在 stash commit **`6f2cec6dcd1dc41462460b4758a6930dfe64165a`**（reflog 裡可救）。要回收：
+  ```sh
+  git checkout 6f2cec6dc -- .pre-commit-config.yaml .gitleaks.toml dot_config/git/hooks/executable_pre-commit.tmpl scripts/redact_secrets.py scripts/init/dotfiles_init.py
+  ```
+  但如果其他 agent 正在改這幾個檔，可能要先跟它們同步避免衝突。
+
+- docs 還沒更新新的 `--raw` / `--no-meta` flag 跟 env var 列表。下個 commit 我可以補 `docs/zsh/aliases.md` 和 `docs/tools/tmux/README.md`（等其他 agent 的 docs 更動定下再做，避免衝突）。
+
+---
+
+_**User (2026-04-24 06:09:10Z)**_
+
+[Image #3] aiblock好像有問題 其他好像還可以 可以繼續改 (順便看看剛剛那個stage的問題feature change是不是有正常進入commit了沒有丟失)
+
+_**User (2026-04-24 06:09:10Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/5ea7a302-e272-4faa-8b86-856de8fd9b30/3.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 06:09:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:09:51Z)**_
+
+先確認 commit 沒丟 feature，再修 aiblock 的 `fc` 在 subshell 讀不到 history 的問題。
+
+_**Agent (claude-opus-4-7 2026-04-24 06:09:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit contents + diagnose fc-in-subshell bug
+
+```bash
+echo "=== 驗證 commits 內容完整 ==="
+git --no-pager show --stat 697eafd 5c2959d 2>&1 | head -30
+echo
+echo "=== 現在 zsh -ic 'fc -ln -5' 在 subshell 行為 ==="
+zsh -ic 'fc -ln -5' 2>&1 | head -10
+echo
+echo "=== zsh -ic 'fc -R; fc -ln -5' (reload first) ==="
+zsh -ic 'fc -R; fc -ln -5' 2>&1 | head -10
+```
+
+```text
+=== 驗證 commits 內容完整 ===
+commit 697eafd5af204ba423e11aa92b7a998ef87de985
+Author: Da-Wei Lee <daviddwlee84@gmail.com>
+Date:   Fri Apr 24 14:03:27 2026 +0800
+
+    aicapture: model defaults + glow/bat prettify + metadata stderr line
+    
+    Extends aifix/aiexplain/aiblock with:
+    
+    - Default to fast/cheap models (overridable via AICAP_* env vars):
+        AICAP_CLAUDE_MODEL=haiku
+        AICAP_OPENCODE_MODEL=github-copilot/claude-haiku-4.5
+        AICAP_CODEX_MODEL=gpt-5-mini
+        AICAP_CURSOR_MODEL=            (unset → cursor-agent picks)
+      Haiku-class models are plenty for the "diagnose this shell error"
+      use case and 1-2 orders of magnitude cheaper than Opus/Sonnet.
+    
+    - Two-layer prettify on shell side: glow > bat --language=md > raw.
+      Skipped when stdout isn't a tty (pipes stay clean) or when user
+      passes --raw / exports AICAP_PRETTIFY=0.
+    
+    - Metadata on stderr by default (toggle via AICAP_SHOW_METADATA or
+      --no-meta per-call). For Claude, --output-format json + jq pulls
+      model, input/output tokens, cache read/write, total cost (USD),
+      and duration. The TUI mirrors this into the rich Panel subtitle
+      and the copy-confirmation line. Other agents just get a "(model)"
+      stub — their JSON output is streaming JSONL and harder to pull a
+      single final answer from without more plumbing.
+    
+    - Fix: Claude's JSON has no top-level .model field; the actual model
+      name is the single key of .modelUsage (e.g. claude-haiku-4-5-20251001).
+
+=== 現在 zsh -ic 'fc -ln -5' 在 subshell 行為 ===
+(eval):1: can't change option: zle
+(eval):1: can't change option: zle
+zsh:fc:1: no such event: 0
+
+=== zsh -ic 'fc -R; fc -ln -5' (reload first) ===
+(eval):1: can't change option: zle
+(eval):1: can't change option: zle
+vm_stat
+cd Pictures
+cd /Volumes/KINGSTON
+cp .ssh ~/.ssh
+cp -r .ssh ~/.ssh
+cd .ssh
+rm config~
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:10:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:10:41Z)**_
+
+找到 root cause：`zsh -ic` 起新 subshell 看不到當前 shell 的 history。修法：shell wrapper `aiblock` 先把 history dump 到 temp file，TUI 讀它。
+
+_**Agent (claude-opus-4-7 2026-04-24 06:10:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:11:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:11:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test aiblock history-dump fix
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh && echo "zsh syntax OK"
+chezmoi apply 2>&1
+echo "---"
+# Simulate what aiblock does: dump history + run script
+tmux kill-session -t _ab 2>/dev/null
+tmux new-session -d -s _ab -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in ALPHA BETA GAMMA DELTA; do
+  tmux send-keys -t _ab "echo $c" Enter; sleep 0.8
+done
+# Run aiblock. Feed it Ctrl+C immediately to exit TUI after it lists.
+tmux send-keys -t _ab 'aiblock < /dev/null > /tmp/ab.out 2>/tmp/ab.err' Enter
+sleep 3
+tmux send-keys -t _ab C-c
+sleep 1
+echo "=== aiblock stdout (questionary output to stderr, so stdout may be empty) ==="
+cat /tmp/ab.out
+echo "=== stderr (if 'history empty' bug is fixed, should see commands being listed) ==="
+head -20 /tmp/ab.err
+tmux kill-session -t _ab
+rm -f /tmp/ab.*
+```
+
+```text
+zsh syntax OK
+---
+=== aiblock stdout (questionary output to stderr, so stdout may be empty) ===
+=== stderr (if 'history empty' bug is fixed, should see commands being listed) ===
+Warning: Input is not a terminal (fd=0).
+Traceback (most recent call last):
+  File "/Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py", line 398, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py", line 303, in main
+    ).ask()
+      ~~~^^
+  File "/Users/daviddwlee84/.cache/uv/environments-v2/aiblock-6255539ba28d9fe1/lib/python3.13/site-packages/questionary/question.py", line 64, in ask
+    return self.unsafe_ask(patch_stdout)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/daviddwlee84/.cache/uv/environments-v2/aiblock-6255539ba28d9fe1/lib/python3.13/site-packages/questionary/question.py", line 89, in unsafe_ask
+    return self.application.run()
+           ~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/daviddwlee84/.cache/uv/environments-v2/aiblock-6255539ba28d9fe1/lib/python3.13/site-packages/prompt_toolkit/application/application.py", line 1002, in run
+    return asyncio.run(coro)
+           ~~~~~~~~~~~^^^^^^
+  File "/Users/daviddwlee84/.local/share/uv/python/cpython-3.13.2-macos-aarch64-none/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:11:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:11:50Z)**_
+
+過了 "empty history" 那道門 — 只剩 stdin-not-terminal 的測試限制。直接驗 `list_recent_commands` 正確讀 dump：
+
+_**Agent (claude-opus-4-7 2026-04-24 06:11:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Standalone test of the dump-file parsing logic
+
+```bash
+cat > /tmp/hdump << 'EOF'
+echo first
+echo second
+echo third
+ls /tmp
+EOF
+AIBLOCK_HIST_DUMP=/tmp/hdump python3 -c "
+import sys
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi/scripts')
+# Can't easily import the script (uv PEP 723 shebang). Inline test:
+import os
+dump = os.environ['AIBLOCK_HIST_DUMP']
+with open(dump) as f:
+    lines = [ln.strip() for ln in f if ln.strip()]
+print('read', len(lines), 'entries')
+for i, cmd in enumerate(reversed(lines), 1):
+    print(f'  {i}: {cmd}')
+"
+rm /tmp/hdump
+```
+
+```text
+read 4 entries
+  1: ls /tmp
+  2: echo third
+  3: echo second
+  4: echo first
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:18Z)**_
+
+Commit 完整 + 修好 history 讀取。commit fix：
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit aiblock history fix
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+git add dot_config/zsh/tools/04_ai_capture.zsh scripts/aiblock.py .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "$(cat <<'EOF'
+aiblock: fix empty-history bug by dumping from caller's shell
+
+aiblock.py was calling `zsh -ic "fc -ln -20"` in a subprocess to list
+recent commands, but a new zsh instance has NO in-memory history —
+`fc` without explicit `fc -R` returns "no such event: 0", and even
+with `fc -R` you only see what HISTFILE has flushed (misses recent
+commands that haven't been written yet). Symptom: "Shell history is
+empty — no commands to pick from" even in a pane with 50+ commands.
+
+Fix: the zsh `aiblock()` wrapper now runs `fc -ln -30` in the caller's
+interactive shell (which does see live history), writes the output to
+a temp file via mktemp, passes the path through $AIBLOCK_HIST_DUMP,
+and cleans up on exit. The TUI reads the dump; falls back to parsing
+$HISTFILE directly if the env var isn't set (e.g. running the script
+without the wrapper).
+
+Verified: dump-file parsing produces the expected 1=most-recent
+ordering with each HistoryEntry.n mapping cleanly to cpblock's N arg.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -5
+echo "---"
+git --no-pager log --oneline -4
+```
+
+```text
+Skipping missing path: .opencode/plans/
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777011151-31165.
+---
+697eafd aicapture: model defaults + glow/bat prettify + metadata stderr line
+5c2959d tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+fa73e8f sesh/tmuxp: fix appended windows opening at $HOME after `sesh connect`
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:38Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check post-attempt state
+
+`git --no-pager status --short | head -10`
+
+```text
+ M .specstory/history/2026-04-22_08-21-44Z.md
+MM .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+M  dot_config/zsh/tools/04_ai_capture.zsh
+M  scripts/aiblock.py
+ M scripts/init/dotfiles_init.py
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:12:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit after re-redact
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -2
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "$(cat <<'EOF'
+aiblock: fix empty-history bug by dumping from caller's shell
+
+aiblock.py was calling `zsh -ic "fc -ln -20"` in a subprocess to list
+recent commands, but a new zsh instance has NO in-memory history —
+`fc` without explicit `fc -R` returns "no such event: 0", and even
+with `fc -R` you only see what HISTFILE has flushed (misses recent
+commands that haven't been written yet). Symptom: "Shell history is
+empty — no commands to pick from" even in a pane with 50+ commands.
+
+Fix: the zsh `aiblock()` wrapper runs `fc -ln -30` in the caller's
+interactive shell (which DOES see live history), writes to a
+mktemp file, passes the path through $AIBLOCK_HIST_DUMP. The TUI
+reads the dump; falls back to parsing $HISTFILE directly if the env
+var isn't set.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -6
+echo "---"
+git --no-pager log --oneline -3
 ```
 </details></tool-use>

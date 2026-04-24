@@ -199,6 +199,12 @@ aiexplain() {
 # aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
 # chezmoi source-path, cached per-shell. The Python side reads the same
 # AICAP_* env vars so model defaults stay consistent.
+#
+# History passing: `fc -ln …` only works inside this interactive zsh —
+# a `zsh -ic` subshell doesn't inherit the in-memory history buffer and
+# `fc -R` only pulls whatever the HISTFILE has on disk (which misses
+# unflushed recent commands). Dump the current shell's history into a
+# temp file and hand the path to the TUI via $AIBLOCK_HIST_DUMP.
 _AIBLOCK_SCRIPT=""
 aiblock() {
   emulate -L zsh
@@ -214,5 +220,15 @@ aiblock() {
     print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
     return 1
   fi
-  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+  local histdump
+  histdump=$(mktemp -t aiblock-hist.XXXXXX) || {
+    print -u2 "aiblock: mktemp failed"
+    return 1
+  }
+  # fc -ln -30: last 30 entries, no numbering. Trailing newline per entry.
+  fc -ln -30 > "$histdump" 2>/dev/null
+  AIBLOCK_HIST_DUMP="$histdump" uv run --script "$_AIBLOCK_SCRIPT" "$@"
+  local rc=$?
+  rm -f "$histdump"
+  return $rc
 }

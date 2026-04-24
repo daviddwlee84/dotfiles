@@ -95,14 +95,43 @@ def zsh_run(code: str, timeout: float = 5.0) -> str:
 
 
 def list_recent_commands(n: int = 20) -> list[HistoryEntry]:
-    """Fetch the last `n` shell commands via `fc -ln -{n}`.
+    """Return the last `n` shell commands as HistoryEntry(N, cmd).
 
-    Returns a list ordered most-recent-first, with `.n` matching what
+    Reads $AIBLOCK_HIST_DUMP (written by the zsh `aiblock` wrapper via
+    `fc -ln -30`) — a `zsh -ic fc …` subshell does NOT see the current
+    shell's in-memory history, and `fc -R` from HISTFILE misses commands
+    that haven't been flushed yet. The env-passed dump is the only
+    reliable source for "what did the USER just run".
+
+    Falls back to parsing $HISTFILE directly if the dump env var isn't
+    set (e.g. someone ran the script without the wrapper).
+
+    Returned list is ordered most-recent-first, with `.n` matching what
     cpblock/cpcmd/cpout expect as their positional N arg.
     """
-    out = zsh_run(f"fc -ln -{n}")
-    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
-    # fc output is oldest-first; reverse so index 1 == most recent
+    dump_path = os.environ.get("AIBLOCK_HIST_DUMP")
+    lines: list[str] = []
+    if dump_path and os.path.isfile(dump_path):
+        with open(dump_path, encoding="utf-8", errors="replace") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+    else:
+        # Fallback: parse HISTFILE directly.
+        histfile = os.environ.get("HISTFILE") or os.path.expanduser("~/.zsh_history")
+        if os.path.isfile(histfile):
+            with open(histfile, encoding="latin-1", errors="replace") as f:
+                raw = f.readlines()
+            for raw_ln in raw[-n * 3:]:  # last 3N raw lines (covers line continuations)
+                s = raw_ln.rstrip("\n").strip()
+                if not s:
+                    continue
+                # EXTENDED_HISTORY format: ": TIMESTAMP:DURATION;CMD"
+                if s.startswith(": "):
+                    parts = s.split(";", 1)
+                    if len(parts) == 2:
+                        s = parts[1]
+                lines.append(s)
+    # Take the last n, reverse so index 1 == most recent.
+    lines = lines[-n:]
     return [HistoryEntry(n=i, command=cmd) for i, cmd in enumerate(reversed(lines), start=1)]
 
 
