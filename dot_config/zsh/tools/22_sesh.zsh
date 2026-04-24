@@ -432,7 +432,7 @@ Usage:
         --agents A1,A2,A3[,...]
 
 Default: svibe 4 claude
-  window 1 "agents" — N panes (tiled), each running an agent
+  window 1 "agents" — N agent panes (≤3 = columns, ≥4 = tiled grid)
   window 2 "git"    — lazygit
   window 3 "edit"   — nvim
 
@@ -575,13 +575,23 @@ EOF
     tmux new-session -d -s "$session" -c "$repo_root" -n agents \
         "$(_vibe_agent_cmd "${agents[1]}")"
 
+    # Pick window layout based on final pane count:
+    #   N ≤ 3 → even-horizontal (N side-by-side columns, readable width)
+    #   N ≥ 4 → tiled (grid — columns would be too narrow)
+    local svibe_layout
+    if (( ${#agents} <= 3 )); then
+        svibe_layout="even-horizontal"
+    else
+        svibe_layout="tiled"
+    fi
+
     # Add remaining panes
     local i
     for (( i = 2; i <= ${#agents}; i++ )); do
         tmux split-window -t "${session}:agents" -c "$repo_root" \
             "$(_vibe_agent_cmd "${agents[$i]}")"
-        # Re-tile after each split so layout stays balanced
-        tmux select-layout -t "${session}:agents" tiled >/dev/null
+        # Re-balance after each split so layout stays uniform
+        tmux select-layout -t "${session}:agents" "$svibe_layout" >/dev/null
     done
 
     unset -f _vibe_agent_cmd

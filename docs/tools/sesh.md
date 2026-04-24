@@ -186,12 +186,18 @@ semantics unambiguous — pick one mode.
 Layout (3 windows):
 
 ```
-window 1 "agents"    — N tiled panes, each running its agent (mixed allowed)
+window 1 "agents"    — N agent panes: ≤3 = even-horizontal columns,
+                       ≥4 = tiled grid (mixed agents allowed)
 window 2 "git"       — lazygit (or `git status` fallback)
 window 3 "edit"      — nvim
 ```
 
-Pane count is bounded `[1, 12]`. Above ~6 the tiled layout becomes too
+The agents window prefers **side-by-side vertical columns** up to 3 panes
+so each transcript keeps a readable width, and falls back to a tiled grid
+at 4+ panes where columns would be too narrow. Press `prefix + Space`
+to cycle through tmux's built-in layouts if you want a different view.
+
+Pane count is bounded `[1, 12]`. Above ~6 the tiled grid becomes too
 cramped on most displays — the cap is conservative, not technical.
 
 ##### Validation (fail-fast)
