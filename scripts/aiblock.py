@@ -33,8 +33,10 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+import json
 import questionary
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 
 DEFAULT_FIX_PROMPT = (
@@ -42,11 +44,23 @@ DEFAULT_FIX_PROMPT = (
     "Diagnose any errors and suggest a concrete fix. Be brief and specific."
 )
 
-AGENT_FLAG_MAP = {
-    "claude": ("-p",),
-    "opencode": ("run",),
-    "codex": ("exec",),
-    "cursor-agent": ("-p",),
+# Env-var defaults mirror 04_ai_capture.zsh. If the shell has exported
+# AICAP_*, os.environ picks them up; otherwise these defaults kick in.
+AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
+AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
+AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "gpt-5-mini")
+AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
+AICAP_SHOW_METADATA = os.environ.get("AICAP_SHOW_METADATA", "1") == "1"
+AICAP_PRETTIFY = os.environ.get("AICAP_PRETTIFY", "1") == "1"
+
+# Each agent's non-interactive invocation args (model-aware). The Claude
+# entry is special-cased in invoke_agent_oneshot because we optionally
+# use --output-format json for metadata extraction.
+AGENT_CONFIG = {
+    "claude":       {"base": ["claude", "-p", "--model", AICAP_CLAUDE_MODEL]},
+    "opencode":     {"base": ["opencode", "run", "-m", AICAP_OPENCODE_MODEL]},
+    "codex":        {"base": ["codex", "exec", "-m", AICAP_CODEX_MODEL]},
+    "cursor-agent": {"base": ["cursor-agent", "-p"] + (["--model", AICAP_CURSOR_MODEL] if AICAP_CURSOR_MODEL else [])},
 }
 
 console = Console(stderr=False)
@@ -60,7 +74,7 @@ class HistoryEntry:
 
 def detect_agents() -> list[str]:
     """Return the subset of known agents found on PATH, in preference order."""
-    return [a for a in AGENT_FLAG_MAP if shutil.which(a)]
+    return [a for a in AGENT_CONFIG if shutil.which(a)]
 
 
 def zsh_run(code: str, timeout: float = 5.0) -> str:
@@ -97,11 +111,48 @@ def capture_block(n: int) -> str:
     return zsh_run(f"cpblock {n}", timeout=10.0)
 
 
-def invoke_agent_oneshot(agent: str, prompt: str) -> str:
-    """Invoke an agent in non-interactive mode, return its stdout."""
-    flags = AGENT_FLAG_MAP[agent]
+def invoke_agent_oneshot(agent: str, prompt: str) -> tuple[str, dict]:
+    """Invoke an agent in non-interactive mode; return (reply_text, metadata).
+
+    For Claude, we request --output-format json so we can pull usage/cost
+    into the metadata dict. Other agents fall back to text output with a
+    minimal metadata dict containing just the model name.
+    """
+    base = AGENT_CONFIG[agent]["base"]
+    meta: dict = {"agent": agent, "model": _model_for(agent)}
+
+    if agent == "claude" and AICAP_SHOW_METADATA:
+        result = subprocess.run(
+            [*base, "--output-format", "json", prompt],
+            capture_output=True,
+            text=True,
+            timeout=180.0,
+        )
+        if result.returncode != 0:
+            console.print(f"[red]{agent} exited {result.returncode}[/red]")
+            if result.stderr:
+                console.print(f"[dim]{result.stderr}[/dim]")
+            return "", meta
+        try:
+            parsed = json.loads(result.stdout)
+            # Claude's JSON has no top-level `.model`; the actual model name
+            # lives as the single key of `.modelUsage`.
+            mu = parsed.get("modelUsage") or {}
+            if mu:
+                meta["model"] = next(iter(mu.keys()))
+            usage = parsed.get("usage", {})
+            meta["input_tokens"] = usage.get("input_tokens")
+            meta["output_tokens"] = usage.get("output_tokens")
+            meta["cache_read"] = usage.get("cache_read_input_tokens") or 0
+            meta["cache_create"] = usage.get("cache_creation_input_tokens") or 0
+            meta["cost_usd"] = parsed.get("total_cost_usd")
+            meta["duration_ms"] = parsed.get("duration_ms")
+            return parsed.get("result", ""), meta
+        except json.JSONDecodeError:
+            return result.stdout, meta  # fall back to raw
+
     result = subprocess.run(
-        [agent, *flags, prompt],
+        [*base, prompt],
         capture_output=True,
         text=True,
         timeout=180.0,
@@ -110,7 +161,32 @@ def invoke_agent_oneshot(agent: str, prompt: str) -> str:
         console.print(f"[red]{agent} exited {result.returncode}[/red]")
         if result.stderr:
             console.print(f"[dim]{result.stderr}[/dim]")
-    return result.stdout
+    return result.stdout, meta
+
+
+def _model_for(agent: str) -> str:
+    return {
+        "claude": AICAP_CLAUDE_MODEL,
+        "opencode": AICAP_OPENCODE_MODEL,
+        "codex": AICAP_CODEX_MODEL,
+        "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
+    }[agent]
+
+
+def format_metadata(meta: dict) -> str:
+    """Single-line metadata summary for stderr / panel subtitle."""
+    parts = [f"{meta['agent']} ({meta['model']})"]
+    if meta.get("input_tokens") is not None:
+        parts.append(f"in={meta['input_tokens']}")
+    if meta.get("output_tokens") is not None:
+        parts.append(f"out={meta['output_tokens']}")
+    if meta.get("cache_read") or meta.get("cache_create"):
+        parts.append(f"cache=(r:{meta.get('cache_read', 0)},w:{meta.get('cache_create', 0)})")
+    if meta.get("cost_usd") is not None:
+        parts.append(f"cost=${meta['cost_usd']}")
+    if meta.get("duration_ms") is not None:
+        parts.append(f"{meta['duration_ms']}ms")
+    return " | ".join(parts)
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -251,19 +327,37 @@ def main() -> int:
         return 0
 
     # Print / Copy both need the agent to actually reply
-    with console.status(f"[cyan]Asking {agent}…[/cyan]", spinner="dots"):
-        reply = invoke_agent_oneshot(agent, full_prompt)
+    with console.status(f"[cyan]Asking {_model_for(agent)}…[/cyan]", spinner="dots"):
+        reply, meta = invoke_agent_oneshot(agent, full_prompt)
 
     if not reply.strip():
         console.print("[yellow]Agent returned empty reply.[/yellow]")
         return 1
 
+    subtitle = format_metadata(meta) if AICAP_SHOW_METADATA else None
+
     if action == "print":
-        console.print(Panel(reply.rstrip(), title=f"{agent} reply", expand=False))
+        # Render markdown so headings / code fences / lists look right.
+        if AICAP_PRETTIFY:
+            console.print(
+                Panel(
+                    Markdown(reply.rstrip()),
+                    title=f"{agent} reply",
+                    subtitle=subtitle,
+                    expand=False,
+                )
+            )
+        else:
+            console.print(
+                Panel(reply.rstrip(), title=f"{agent} reply", subtitle=subtitle, expand=False)
+            )
     elif action == "copy":
         ok = copy_to_clipboard(reply)
         if ok:
-            console.print(f"[green]Copied {len(reply)} bytes to clipboard.[/green]")
+            msg = f"[green]Copied {len(reply)} bytes to clipboard.[/green]"
+            if subtitle:
+                msg += f"\n[dim]{subtitle}[/dim]"
+            console.print(msg)
         else:
             console.print("[red]No clipboard tool available.[/red]")
             return 1

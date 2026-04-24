@@ -19158,7 +19158,7 @@ b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
 
 _**Agent (claude-opus-4-7 2026-04-24 05:51:11Z)**_
 
-_**Agent (claude-opus-4-7 2026-04-24 05:51:18Z)**_
+_**Agent (claude-opus-4-7 2026-04-24 05:51:20Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -19209,5 +19209,1756 @@ EOF
 )" 2>&1 | tail -8
 echo "---"
 git --no-pager log --oneline -3
+```
+
+```text
+Successfully redacted 1 file(s)
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+0
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777009879-73827.
+[main 5c2959d] tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+ 7 files changed, 8672 insertions(+), 314 deletions(-)
+ create mode 100644 dot_config/zsh/tools/04_ai_capture.zsh
+ create mode 100755 scripts/aiblock.py
+---
+5c2959d tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+fa73e8f sesh/tmuxp: fix appended windows opening at $HOME after `sesh connect`
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:24Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:25Z)**_
+
+Commit `5c2959d` landed — 7 files. 還原 stash。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Restore stashed WIP
+
+```bash
+git stash pop 2>&1 | tail -10
+echo "---"
+git --no-pager status --short | head -10
+```
+
+```text
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/plans/image-1-sesh-folder-synchronous-honey.md
+	.specstory/history/2026-04-24_05-34-54Z.md
+	.specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+	.specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+	scripts/init/Dockerfile.test
+
+no changes added to commit (use "git add" and/or "git commit -a")
+The stash entry is kept in case you need it again.
+---
+ M .specstory/history/2026-04-22_08-21-44Z.md
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+?? scripts/init/Dockerfile.test
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check stash status
+
+```bash
+git stash list
+echo "---"
+git --no-pager status
+```
+
+```text
+stash@{0}: On main: wip-non-aiblock
+stash@{1}: autostash
+stash@{2}: WIP on main: 14e5329 Add tldr with languages fallback (default to Traditional Chinese)
+---
+On branch main
+Your branch is ahead of 'origin/main' by 4 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-22_08-21-44Z.md
+	modified:   .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+	modified:   .specstory/history/2026-04-24_04-24-36Z.md
+	modified:   .specstory/statistics.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/plans/image-1-sesh-folder-synchronous-honey.md
+	.specstory/history/2026-04-24_05-34-54Z.md
+	.specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+	.specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+	scripts/init/Dockerfile.test
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect stash contents vs working tree
+
+```bash
+git --no-pager stash show stash@{0} --stat
+echo "---"
+git --no-pager diff .pre-commit-config.yaml | head -5
+echo "---"
+git --no-pager diff HEAD -- .pre-commit-config.yaml | head -5
+```
+
+```text
+ .../plans/tmux-scrolling-x-coding-rosy-clover.md   |  524 +-
+ .gitleaks.toml                                     |   32 +-
+ .pre-commit-config.yaml                            |    2 +-
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 7655 +++++++++++++++++++-
+ docs/tools/tmux/README.md                          |   31 +-
+ docs/zsh/aliases.md                                |   19 +-
+ dot_config/git/hooks/executable_pre-commit.tmpl    |    4 +-
+ dot_config/zsh/tools/03_tmux_capture.zsh           |  107 +-
+ dot_config/zsh/tools/04_ai_capture.zsh             |  119 +
+ scripts/aiblock.py                                 |  277 +
+ scripts/init/dotfiles_init.py                      |  132 +-
+ scripts/redact_secrets.py                          |   16 +-
+ 12 files changed, 8559 insertions(+), 359 deletions(-)
+---
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Diff between stashed pre-commit-config and HEAD
+
+```bash
+git --no-pager stash show stash@{0} -p -- .pre-commit-config.yaml | head -20
+echo "---"
+md5sum .pre-commit-config.yaml 2>&1
+git show HEAD:.pre-commit-config.yaml 2>&1 | md5sum
+```
+
+```text
+Too many revisions specified: 'stash@{0}' '.pre-commit-config.yaml'
+---
+afbc033b873c26d045eae394d1fe4c64  .pre-commit-config.yaml
+afbc033b873c26d045eae394d1fe4c64  -
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stash diff for pre-commit-config (proper syntax)
+
+`git --no-pager stash show -p stash@{0} -- .pre-commit-config.yaml 2>&1 | head -30`
+
+```text
+Too many revisions specified: 'stash@{0}' '.pre-commit-config.yaml'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare stashed version against HEAD
+
+```bash
+git --no-pager diff stash@{0} HEAD -- .pre-commit-config.yaml | head -20
+echo "---"
+git --no-pager diff stash@{0}^1 stash@{0} -- .pre-commit-config.yaml | head -20
+```
+
+```text
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 8effff1..2ad244f 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -14,7 +14,7 @@ repos:
+         entry: ./scripts/redact_secrets.py --fix
+         language: system
+         pass_filenames: false
+-        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
++        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.opencode/plans)/.*\.md$
+ 
+   # Gitleaks - detect secrets (blocks commit if secrets found)
+   - repo: https://github.com/gitleaks/gitleaks
+---
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 2ad244f..8effff1 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -14,7 +14,7 @@ repos:
+         entry: ./scripts/redact_secrets.py --fix
+         language: system
+         pass_filenames: false
+-        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.opencode/plans)/.*\.md$
++        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
+ 
+   # Gitleaks - detect secrets (blocks commit if secrets found)
+   - repo: https://github.com/gitleaks/gitleaks
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:34Z)**_
+
+Stash pop 其實沒有真的 apply (keep 那句是信號)。用 `stash apply` 重試：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply stash to restore WIP
+
+```bash
+git stash apply stash@{0} 2>&1 | tail -15
+echo "---"
+git --no-pager status --short | head -15
+```
+
+```text
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-22_08-21-44Z.md
+	modified:   .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+	modified:   .specstory/history/2026-04-24_04-24-36Z.md
+	modified:   .specstory/statistics.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/plans/image-1-sesh-folder-synchronous-honey.md
+	.specstory/history/2026-04-24_05-34-54Z.md
+	.specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+	.specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+	scripts/init/Dockerfile.test
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---
+ M .specstory/history/2026-04-22_08-21-44Z.md
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+?? scripts/init/Dockerfile.test
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:52:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if working tree actually has WIP changes
+
+```bash
+md5sum .pre-commit-config.yaml .gitleaks.toml scripts/redact_secrets.py scripts/init/dotfiles_init.py 2>&1
+echo "--- compare to HEAD ---"
+for f in .pre-commit-config.yaml .gitleaks.toml scripts/redact_secrets.py scripts/init/dotfiles_init.py; do
+  hd=$(git show HEAD:$f 2>/dev/null | md5sum | cut -d' ' -f1)
+  wt=$(md5sum $f | cut -d' ' -f1)
+  if [[ "$hd" == "$wt" ]]; then
+    echo "$f: matches HEAD"
+  else
+    echo "$f: DIFFERS from HEAD"
+  fi
+done
+```
+
+```text
+afbc033b873c26d045eae394d1fe4c64  .pre-commit-config.yaml
+39f7b07111f0b8b7679fbe8b1720d516  .gitleaks.toml
+b98959a3c630adc7fa161f653f901fa1  scripts/redact_secrets.py
+c30b16629c6be447ae632a4765ed2e8f  scripts/init/dotfiles_init.py
+--- compare to HEAD ---
+.pre-commit-config.yaml: matches HEAD
+.gitleaks.toml: matches HEAD
+scripts/redact_secrets.py: matches HEAD
+scripts/init/dotfiles_init.py: matches HEAD
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:53:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:53:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Drop that failed stash, check what's left
+
+```bash
+git stash drop stash@{0}
+git stash show stash@{0} --stat 2>&1
+echo "---"
+git --no-pager stash list
+```
+
+```text
+Dropped stash@{0} (6f2cec6dcd1dc41462460b4758a6930dfe64165a)
+ README.md                                          |  1 +
+ docs/initial_setup/0_ManualSetupRecord.md          |  7 ++
+ dot_ansible/roles/devtools/tasks/main.yml          | 81 +++++++++++++++++++++-
+ .../roles/python_uv_tools/defaults/main.yml        |  2 +
+ run_onchange_after_20_ansible_roles.sh.tmpl        |  2 +-
+ 5 files changed, 91 insertions(+), 2 deletions(-)
+---
+stash@{0}: autostash
+stash@{1}: WIP on main: 14e5329 Add tldr with languages fallback (default to Traditional Chinese)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:53:25Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:53:26Z)**_
+
+我 drop 早了 — WIP 還救得回（stash commit `6f2cec6` 在 reflog 裡）。手動從那個 SHA 恢復 5 個非 feature 檔案：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:53:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check what each non-feature file should look like
+
+```bash
+SHA=6f2cec6dcd1dc41462460b4758a6930dfe64165a
+echo "=== diff stash vs HEAD for non-feature files ==="
+for f in .pre-commit-config.yaml .gitleaks.toml dot_config/git/hooks/executable_pre-commit.tmpl scripts/redact_secrets.py scripts/init/dotfiles_init.py; do
+  echo "--- $f ---"
+  git --no-pager diff HEAD "$SHA" -- "$f" | head -15
+done
+```
+
+```text
+=== diff stash vs HEAD for non-feature files ===
+--- .pre-commit-config.yaml ---
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 2ad244f..8effff1 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -14,7 +14,7 @@ repos:
+         entry: ./scripts/redact_secrets.py --fix
+         language: system
+         pass_filenames: false
+-        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.opencode/plans)/.*\.md$
++        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
+ 
+   # Gitleaks - detect secrets (blocks commit if secrets found)
+   - repo: https://github.com/gitleaks/gitleaks
+--- .gitleaks.toml ---
+diff --git a/.gitleaks.toml b/.gitleaks.toml
+index fdbb097..c4150a9 100644
+--- a/.gitleaks.toml
++++ b/.gitleaks.toml
+@@ -7,9 +7,12 @@ title = "Dotfiles Gitleaks Config"
+ [extend]
+ useDefault = true
+ 
+-# Allow chezmoi template patterns + our redaction sentinels (not secrets)
+-[allowlist]
++# Allow chezmoi template patterns + our redaction sentinels (not secrets).
++# Uses [[allowlists]] array form — gitleaks v8 forbids mixing with the
++# deprecated [allowlist] singular.
++[[allowlists]]
+   description = "Chezmoi templates + redaction sentinels"
+--- dot_config/git/hooks/executable_pre-commit.tmpl ---
+diff --git a/dot_config/git/hooks/executable_pre-commit.tmpl b/dot_config/git/hooks/executable_pre-commit.tmpl
+index 750703f..e4d2146 100644
+--- a/dot_config/git/hooks/executable_pre-commit.tmpl
++++ b/dot_config/git/hooks/executable_pre-commit.tmpl
+@@ -17,7 +17,7 @@ fi
+ # Run gitleaks on ALL repos (user opted in via chezmoi init)
+ if command -v gitleaks >/dev/null 2>&1; then
+     # Only scan staged files for speed
+-    if ! gitleaks protect --staged --verbose; then
++    if ! gitleaks git --staged --verbose; then
+         echo "[global pre-commit] gitleaks detected secrets in staged files!" >&2
+         exit 1
+     fi
+@@ -26,7 +26,7 @@ fi
+ 
+--- scripts/redact_secrets.py ---
+diff --git a/scripts/redact_secrets.py b/scripts/redact_secrets.py
+index 945445c..b17a357 100755
+--- a/scripts/redact_secrets.py
++++ b/scripts/redact_secrets.py
+@@ -8,11 +8,15 @@ Check for secrets in agent artifact directories (specstory history + coding
+ agent plan dirs) using gitleaks and detect-private-key patterns. Reports
+ findings and suggests redaction.
+ 
+-Default covered prefixes:
++Default covered prefixes (kept in sync with agent-skills'
++agent-history-hygiene/assets/artifact-dirs.txt):
+     .specstory/history/   (SpecStory chat transcripts)
+     .claude/plans/        (Claude Code plans)
+     .cursor/plans/        (Cursor plans)
++    .cursor/rules/        (Cursor rules)
+--- scripts/init/dotfiles_init.py ---
+diff --git a/scripts/init/dotfiles_init.py b/scripts/init/dotfiles_init.py
+index 6127fa9..0fa26c1 100755
+--- a/scripts/init/dotfiles_init.py
++++ b/scripts/init/dotfiles_init.py
+@@ -225,7 +225,26 @@ BUNDLES: dict[str, dict[str, object]] = {
+         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
+     },
+     "minimal": {
+-        # Everything stays at prompt defaults (mostly off).
++        # Dotfiles only — every installX forced off so `chezmoi apply` in CI /
++        # Docker does the minimum work possible. Note this overrides the
++        # prompt-level defaults (which have coding-agents / python-uv /
++        # js-cli / backupDotfiles turned ON for fresh personal machines).
++        "installCodingAgents": False,
++        "installLlmTools": False,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:54:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:54:08Z)**_
+
+已 commit `5c2959d`。我原本 stash 的那批 WIP 在 `git stash pop` 沒乾淨 apply 後被我誤 drop — stash commit `6f2cec6dcd1dc41462460b4758a6930dfe64165a` 還在 reflog 裡可救，但既然有其他 agent 在改那些檔，我就**不碰了**（你要回收 WIP 時 `git checkout 6f2cec6dc -- <path>`）。我接著做 prettify + model defaults，只動我自己剛 commit 的 4 個 feature 檔。
+
+先 2 個選擇題再動工：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:03Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**Haiku / mini 的具體 model名字，用什麼當默認？（可以被 env var override）**
+
+Options:
+- **claude-haiku-4-5 / opencode anthropic/claude-haiku-4-5 / codex gpt-5-mini (Recommended)** - 用每個 CLI 的 latest fast SKU。Claude CLI 接受並自動解析到最新 dated version。Codex 同系列中最小的 reasoning model。
+- **精確 pin 到 dated version** - claude-haiku-4-5-20251001（或任何最新 Haiku的日期版）+ gpt-5-mini-20xx-xx-xx。重現性高但你必須定期更新。
+- **讓我幫你從各 CLI 自動問一下 list** - 之前先不 hardcode，跡一下 claude / opencode / codex 的下架 list 命令，幫你列出當下可用的 fast model。多一輪但比較準。
+
+**Prettify 管道預設？**
+
+Options:
+- **glow 為主，無 glow 则 raw (Recommended)** - Agent 回覆是 markdown，glow 是本 repo 已裝的 markdown renderer (readurl/readlocal 亦用之)。底 layer：no tty 時 (e.g. piped to file) 並自動繞回 raw。
+- **兩層 fallback：glow > bat --language=md > raw** - glow 沒就用 bat syntax-highlighting，都沒再 raw。用戶少但安全網更實。
+- **加個 AICAP_PRETTIFY env var 每次選** - AICAP_PRETTIFY=1（glow）/ 0（raw）/ bat，最降有 opt-out。默認 1。
+
+
+**Answer:** 兩層 fallback：glow > bat --language=md > raw, 讓我幫你從各 CLI 自動問一下 list
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:15Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:16Z)**_
+
+查各 CLI 看支援哪些 model：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Probe each CLI's model-listing interface
+
+```bash
+echo "=== claude --help (look for model / list) ==="
+claude --help 2>&1 | grep -iE 'model|list' | head -20
+echo
+echo "=== opencode --help ==="
+opencode --help 2>&1 | head -30
+echo
+echo "=== codex --help ==="
+codex --help 2>&1 | head -30
+```
+
+```text
+=== claude --help (look for model / list) ===
+  --allowedTools, --allowed-tools <tools...>        Comma or space-separated list of tool names to allow (e.g. "Bash(git *) Edit")
+  --disallowedTools, --disallowed-tools <tools...>  Comma or space-separated list of tool names to deny (e.g. "Bash(git *) Edit")
+  --fallback-model <model>                          Enable automatic fallback to specified model when default model is overloaded (only works with --print)
+  --model <model>                                   Model for the current session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a model's full name (e.g. 'claude-sonnet-4-6').
+  --setting-sources <sources>                       Comma-separated list of setting sources to load (user, project, local).
+  --tools <tools...>                                Specify the list of available tools from the built-in set. Use "" to disable all tools, "default" to use all tools, or specify tool names (e.g. "Bash,Edit,Read").
+
+=== opencode --help ===
+⠀                                ▄     
+█▀▀█ █▀▀█ █▀▀█ █▀▀▄ █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+█  █ █  █ █▀▀▀ █  █ █    █  █ █  █ █▀▀▀
+▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
+
+Commands:
+  opencode completion          generate shell completion script
+  opencode acp                 start ACP (Agent Client Protocol) server
+  opencode mcp                 manage MCP (Model Context Protocol) servers
+  opencode [project]           start opencode tui                                          [default]
+  opencode attach <url>        attach to a running opencode server
+  opencode run [message..]     run opencode with a message
+  opencode debug               debugging and troubleshooting tools
+  opencode providers           manage AI providers and credentials                   [aliases: auth]
+  opencode agent               manage agents
+  opencode upgrade [target]    upgrade opencode to the latest or a specific version
+  opencode uninstall           uninstall opencode and remove all related files
+  opencode serve               starts a headless opencode server
+  opencode web                 start opencode server and open web interface
+  opencode models [provider]   list all available models
+  opencode stats               show token usage and cost statistics
+  opencode export [sessionID]  export session data as JSON
+  opencode import <file>       import session data from JSON file or URL
+  opencode github              manage GitHub agent
+  opencode pr <number>         fetch and checkout a GitHub PR branch, then run opencode
+  opencode session             manage sessions
+  opencode plugin <module>     install plugin and update config                      [aliases: plug]
+  opencode db                  database tools
+
+Positionals:
+
+=== codex --help ===
+Codex CLI
+
+If no subcommand is specified, options will be forwarded to the interactive CLI.
+
+Usage: codex [OPTIONS] [PROMPT]
+       codex [OPTIONS] <COMMAND> [ARGS]
+
+Commands:
+  exec         Run Codex non-interactively [aliases: e]
+  review       Run a code review non-interactively
+  login        Manage login
+  logout       Remove stored authentication credentials
+  mcp          Manage external MCP servers for Codex
+  marketplace  Manage plugin marketplaces for Codex
+  mcp-server   Start Codex as an MCP server (stdio)
+  app-server   [experimental] Run the app server or related tooling
+  app          Launch the Codex desktop app (downloads the macOS installer if missing)
+  completion   Generate shell completion scripts
+  sandbox      Run commands within a Codex-provided sandbox
+  debug        Debugging tools
+  apply        Apply the latest diff produced by Codex agent as a `git apply` to your local working
+               tree [aliases: a]
+  resume       Resume a previous interactive session (picker by default; use --last to continue the
+               most recent)
+  fork         Fork a previous interactive session (picker by default; use --last to fork the most
+               recent)
+  cloud        [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally
+  exec-server  [EXPERIMENTAL] Run the standalone exec-server service
+  features     Inspect feature flags
+  help         Print this message or the help of the given subcommand(s)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:25Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get model list + flags per CLI
+
+```bash
+echo "=== opencode models (list of all available) ==="
+opencode models 2>&1 | head -40
+echo
+echo "=== opencode run --help ==="
+opencode run --help 2>&1 | head -40
+echo
+echo "=== codex exec --help ==="
+codex exec --help 2>&1 | grep -iE 'model|reasoning' | head -20
+```
+
+```text
+=== opencode models (list of all available) ===
+opencode/big-pickle
+opencode/gpt-5-nano
+opencode/hy3-preview-free
+opencode/ling-2.6-flash-free
+opencode/minimax-m2.5-free
+opencode/nemotron-3-super-free
+github-copilot/claude-haiku-4.5
+github-copilot/claude-opus-4.5
+github-copilot/claude-opus-4.6
+github-copilot/claude-opus-4.7
+github-copilot/claude-sonnet-4
+github-copilot/claude-sonnet-4.5
+github-copilot/claude-sonnet-4.6
+github-copilot/gemini-2.5-pro
+github-copilot/gemini-3-flash-preview
+github-copilot/gemini-3.1-pro-preview
+github-copilot/gpt-4.1
+github-copilot/gpt-4o
+github-copilot/gpt-5-mini
+github-copilot/gpt-5.2
+github-copilot/gpt-5.2-codex
+github-copilot/gpt-5.3-codex
+github-copilot/gpt-5.4
+github-copilot/gpt-5.4-mini
+openai/gpt-5-codex
+openai/gpt-5.1-codex
+openai/gpt-5.1-codex-max
+openai/gpt-5.1-codex-mini
+openai/gpt-5.2
+openai/gpt-5.2-codex
+openai/gpt-5.3-codex
+openai/gpt-5.3-codex-spark
+openai/gpt-5.4
+openai/gpt-5.4-fast
+openai/gpt-5.4-mini
+openai/gpt-5.4-mini-fast
+openai/gpt-5.5
+openai/gpt-5.5-fast
+
+=== opencode run --help ===
+opencode run [message..]
+
+run opencode with a message
+
+Positionals:
+  message  message to send                                                     [array] [default: []]
+
+Options:
+  -h, --help                          show help                                            [boolean]
+  -v, --version                       show version number                                  [boolean]
+      --print-logs                    print logs to stderr                                 [boolean]
+      --log-level                     log level [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure                          run without external plugins                         [boolean]
+      --command                       the command to run, use message for args              [string]
+  -c, --continue                      continue the last session                            [boolean]
+  -s, --session                       session id to continue                                [string]
+      --fork                          fork the session before continuing (requires --continue or
+                                      --session)                                           [boolean]
+      --share                         share the session                                    [boolean]
+  -m, --model                         model to use in the format of provider/model          [string]
+      --agent                         agent to use                                          [string]
+      --format                        format: default (formatted) or json (raw JSON events)
+                                          [string] [choices: "default", "json"] [default: "default"]
+  -f, --file                          file(s) to attach to message                           [array]
+      --title                         title for the session (uses truncated prompt if no value
+                                      provided)                                             [string]
+      --attach                        attach to a running opencode server (e.g.,
+                                      http://localhost:4096)                                [string]
+  -p, --password                      basic auth password (defaults to OPENCODE_SERVER_PASSWORD)
+                                                                                            [string]
+      --dir                           directory to run in, path on remote server if attaching
+                                                                                            [string]
+      --port                          port for the local server (defaults to random port if no value
+                                      provided)                                             [number]
+      --variant                       model variant (provider-specific reasoning effort, e.g., high,
+                                      max, minimal)                                         [string]
+      --thinking                      show thinking blocks                [boolean] [default: false]
+      --dangerously-skip-permissions  auto-approve permissions that are not explicitly denied
+                                      (dangerous!)                        [boolean] [default: false]
+=== codex exec --help ===
+          Examples: - `-c model="o3"` - `-c 'sandbox_permissions=["disk-full-read-access"]'` - `-c
+  -m, --model <MODEL>
+          Model the agent should use
+          Select the sandbox policy to use when executing model-generated shell commands
+          Path to a JSON Schema file describing the model's final response shape
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:51Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:55:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+JSON output / metadata format flags
+
+```bash
+claude --help 2>&1 | grep -iE 'output-format|format|json|usage' | head -10
+echo "---"
+codex exec --help 2>&1 | grep -iE 'json|output|format|usage' | head -10
+echo "---"
+cursor-agent --help 2>&1 | grep -iE 'model|json|format' | head -10
+```
+
+```text
+Usage: claude [options] [command] [prompt]
+  --agents <json>                                   JSON object defining custom agents (e.g. '{"reviewer": {"description": "Reviews code", "prompt": "You are a code reviewer"}}')
+  --file <specs...>                                 File resources to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)
+  --include-hook-events                             Include all hook lifecycle events in the output stream (only works with --output-format=stream-json)
+  --include-partial-messages                        Include partial message chunks as they arrive (only works with --print and --output-format=stream-json)
+  --input-format <format>                           Input format (only works with --print): "text" (default), or "stream-json" (realtime streaming input) (choices: "text", "stream-json")
+  --json-schema <schema>                            JSON Schema for structured output validation. Example: {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}
+  --mcp-config <configs...>                         Load MCP servers from JSON files or strings (space-separated)
+  --output-format <format>                          Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming) (choices: "text", "json", "stream-json")
+  --replay-user-messages                            Re-emit user messages from stdin back on stdout for acknowledgment (only works with --input-format=stream-json and --output-format=stream-json)
+---
+Usage: codex exec [OPTIONS] [PROMPT]
+      --output-schema <FILE>
+          Path to a JSON Schema file describing the model's final response shape
+          Specifies color settings for use in the output
+      --json
+          Print events to stdout as JSONL
+  -o, --output-last-message <FILE>
+---
+  -H, --header <header>        Add custom header to agent requests (format:
+  --output-format <format>     Output format (only works with --print): text |
+                               json | stream-json (default: "text")
+                               (only works with --print and stream-json format)
+  --model <model>              Model to use (e.g., gpt-5, sonnet-4,
+  --list-models                List available models and exit (default: false)
+                               .cursor/worktrees.json (default: false)
+  models                       List available models for this account
+  about                        Display version, system, and account information
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:56:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:56:31Z)**_
+
+清楚了。設計：
+
+- **Env vars** (shell override): `AICAP_CLAUDE_MODEL=haiku` / `AICAP_OPENCODE_MODEL=github-copilot/claude-haiku-4.5` / `AICAP_CODEX_MODEL=gpt-5-mini` / `AICAP_CURSOR_MODEL=` / `AICAP_SHOW_METADATA=1` / `AICAP_PRETTIFY=1`
+- **Metadata** (Claude only, 其他 CLI 的 JSON 是 streaming 不好解)：`--output-format json` 抓 `.result` + usage + cost + model → print to stderr
+- **Prettify** (non-pipe tty)：glow > bat > raw
+
+改 `04_ai_capture.zsh`：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:56:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/04_ai_capture.zsh`
+
+```text
+1	# AI-powered review of past commands — pipes the Nth block to a coding-agent
+2	# CLI in one-shot / advisory mode (agent prints its reply to stdout; no file
+3	# edits). Depends on 03_tmux_capture.zsh for `cpblock`.
+4	#
+5	#   aifix [N] [-a AGENT] [-p PROMPT]       # diagnose + suggest fix
+6	#   aiexplain [N] [-a AGENT] [-p PROMPT]   # explain what happened
+7	#   aiblock                                 # launch the questionary+rich TUI
+8	#
+9	# Agent auto-detection order: claude → opencode → codex → cursor-agent.
+10	# Override via -a AGENT. Advisory-only by design; there is no --execute flag.
+11	# For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+12	
+13	_aiagent_autodetect() {
+14	  local cand
+15	  for cand in claude opencode codex cursor-agent; do
+16	    if command -v "$cand" &>/dev/null; then
+17	      print -r -- "$cand"
+18	      return 0
+19	    fi
+20	  done
+21	  return 1
+22	}
+23	
+24	# Invoke a coding-agent in one-shot mode. Mirror of the case-map in
+25	# dot_config/zsh/tools/42_gitlab.zsh (glcreate-ai) so we stay consistent with
+26	# the repo's one canonical invocation style.
+27	_aiagent_invoke() {
+28	  local agent=$1 prompt=$2
+29	  case "$agent" in
+30	    claude)       claude -p "$prompt" ;;
+31	    opencode)     opencode run "$prompt" ;;
+32	    codex)        codex exec "$prompt" ;;
+33	    cursor-agent) cursor-agent -p "$prompt" ;;
+34	    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
+35	  esac
+36	}
+37	
+38	# Shared dispatcher for aifix / aiexplain. Parses flags, captures the block,
+39	# builds the prompt, invokes the agent. stdout = agent reply (pipe-friendly);
+40	# stderr = one-line status ("aifix: claude ← block -3").
+41	_ai_capture_dispatch() {
+42	  emulate -L zsh
+43	  local name=$1; shift
+44	  local default_prompt=$1; shift
+45	  local n=1 agent="" prompt_override=""
+46	  while (( $# )); do
+47	    case "$1" in
+48	      -a|--agent)  agent=$2; shift 2 ;;
+49	      -p|--prompt) prompt_override=$2; shift 2 ;;
+50	      -h|--help)
+51	        print -r -- "usage: $name [N] [-a AGENT] [-p PROMPT]"
+52	        print -r -- "  N          block index back (default 1 = last)"
+53	        print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+54	        print -r -- "  -p PROMPT  override default prompt"
+55	        return 0 ;;
+56	      --) shift; break ;;
+57	      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+58	      *)  n=$1; shift ;;
+59	    esac
+60	  done
+61	  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+62	    print -u2 "$name: N must be a positive integer (got: $n)"
+63	    return 1
+64	  fi
+65	  if [[ -z "$agent" ]]; then
+66	    agent=$(_aiagent_autodetect) || {
+67	      print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+68	      return 1
+69	    }
+70	  fi
+71	  # Capture block via cpblock. 2>/dev/null drops cpblock's own status line;
+72	  # we print our own below. cpblock's own clipboard-copy side-effect is OK.
+73	  local block
+74	  block=$(cpblock "$n" 2>/dev/null) || {
+75	    print -u2 "$name: cpblock $n failed (check: echo \$precmd_functions | grep osc133; run 'exec zsh' if the shell pre-dates chezmoi apply)"
+76	    return 1
+77	  }
+78	  if [[ -z "$block" ]]; then
+79	    print -u2 "$name: cpblock $n returned empty"
+80	    return 1
+81	  fi
+82	  local prompt="${prompt_override:-$default_prompt}
+83	
+84	$block"
+85	  print -u2 "$name: $agent ← block -$n"
+86	  _aiagent_invoke "$agent" "$prompt"
+87	}
+88	
+89	aifix() {
+90	  _ai_capture_dispatch aifix \
+91	    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+92	    "$@"
+93	}
+94	
+95	aiexplain() {
+96	  _ai_capture_dispatch aiexplain \
+97	    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+98	    "$@"
+99	}
+100	
+101	# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+102	# chezmoi source-path, cached per-shell.
+103	_AIBLOCK_SCRIPT=""
+104	aiblock() {
+105	  emulate -L zsh
+106	  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+107	    local base
+108	    base=$(chezmoi source-path 2>/dev/null) || {
+109	      print -u2 "aiblock: could not resolve chezmoi source-path"
+110	      return 1
+111	    }
+112	    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+113	  fi
+114	  if [[ ! -f "$_AIBLOCK_SCRIPT" ]]; then
+115	    print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
+116	    return 1
+117	  fi
+118	  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+119	}
+120
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```zsh
+# AI-powered review of past commands — pipes the Nth block to a coding-agent
+# CLI in one-shot / advisory mode (agent prints its reply; no file edits).
+# Depends on 03_tmux_capture.zsh for `cpblock`.
+#
+#   aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+#   aiexplain [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+#   aiblock                                                    # Python TUI
+#
+# Agent auto-detection order: claude → opencode → codex → cursor-agent.
+# Override via -a AGENT. Advisory-only by design; there is no --execute flag.
+# For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+#
+# Env-var defaults (set in ~/.zshrc or a 99_local_*.zsh to override):
+#
+#   AICAP_CLAUDE_MODEL     default: haiku           (claude --model alias)
+#   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5
+#   AICAP_CODEX_MODEL      default: gpt-5-mini
+#   AICAP_CURSOR_MODEL     default: (unset — let cursor-agent pick)
+#   AICAP_SHOW_METADATA    default: 1  (tokens / cost / model on stderr)
+#                                        only extracted from claude JSON output
+#                                        for now; other agents print agent
+#                                        name + model only.
+#   AICAP_PRETTIFY         default: 1  (auto: glow → bat → raw; non-tty = raw)
+#
+# Defaults are set below; do not edit this file to change them — `export
+# AICAP_*=…` in your shell rc instead.
+
+: "${AICAP_CLAUDE_MODEL:=haiku}"
+: "${AICAP_OPENCODE_MODEL:=github-copilot/claude-haiku-4.5}"
+: "${AICAP_CODEX_MODEL:=gpt-5-mini}"
+: "${AICAP_CURSOR_MODEL:=}"
+: "${AICAP_SHOW_METADATA:=1}"
+: "${AICAP_PRETTIFY:=1}"
+
+_aiagent_autodetect() {
+  local cand
+  for cand in claude opencode codex cursor-agent; do
+    if command -v "$cand" &>/dev/null; then
+      print -r -- "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Pretty-print stdin as Markdown: glow > bat > raw. Skips prettify if stdout
+# is NOT a tty (so pipes stay clean) or AICAP_PRETTIFY=0.
+_aicap_prettify() {
+  if [[ "$AICAP_PRETTIFY" != "1" ]] || [[ ! -t 1 ]]; then
+    cat
+  elif command -v glow &>/dev/null; then
+    glow -
+  elif command -v bat &>/dev/null; then
+    bat --language=md --style=plain --paging=never --color=always
+  else
+    cat
+  fi
+}
+
+# Invoke a coding-agent in one-shot mode.
+#
+# Writes reply (text) to stdout. Writes metadata line to stderr when
+# AICAP_SHOW_METADATA=1 and the agent supports structured JSON output.
+# Currently only Claude's JSON includes usage/cost — other agents just get a
+# "<agent> (<model>)" line on stderr.
+_aiagent_invoke() {
+  local agent=$1 prompt=$2
+  local json reply model_used tokens_in tokens_out cost
+
+  case "$agent" in
+    claude)
+      if [[ "$AICAP_SHOW_METADATA" == "1" ]] && command -v jq &>/dev/null; then
+        json=$(claude -p --model "$AICAP_CLAUDE_MODEL" --output-format json "$prompt") || return $?
+        reply=$(print -r -- "$json" | jq -r '.result // empty')
+        model_used=$(print -r -- "$json" | jq -r '.model // "?"')
+        tokens_in=$(print -r -- "$json" | jq -r '.usage.input_tokens // "?"')
+        tokens_out=$(print -r -- "$json" | jq -r '.usage.output_tokens // "?"')
+        cost=$(print -r -- "$json" | jq -r '.total_cost_usd // "?"')
+        print -u2 "claude ($model_used) | tokens in=$tokens_in out=$tokens_out | cost=\$$cost"
+        print -r -- "$reply"
+      else
+        print -u2 "claude ($AICAP_CLAUDE_MODEL)"
+        claude -p --model "$AICAP_CLAUDE_MODEL" "$prompt"
+      fi
+      ;;
+    opencode)
+      print -u2 "opencode ($AICAP_OPENCODE_MODEL)"
+      opencode run -m "$AICAP_OPENCODE_MODEL" "$prompt"
+      ;;
+    codex)
+      print -u2 "codex ($AICAP_CODEX_MODEL)"
+      codex exec -m "$AICAP_CODEX_MODEL" "$prompt"
+      ;;
+    cursor-agent)
+      if [[ -n "$AICAP_CURSOR_MODEL" ]]; then
+        print -u2 "cursor-agent ($AICAP_CURSOR_MODEL)"
+        cursor-agent -p --model "$AICAP_CURSOR_MODEL" "$prompt"
+      else
+        print -u2 "cursor-agent"
+        cursor-agent -p "$prompt"
+      fi
+      ;;
+    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
+  esac
+}
+
+# Shared dispatcher for aifix / aiexplain. Parses flags, captures the block,
+# builds the prompt, invokes the agent, pipes reply through the prettifier.
+_ai_capture_dispatch() {
+  emulate -L zsh
+  local name=$1; shift
+  local default_prompt=$1; shift
+  local n=1 agent="" prompt_override=""
+  local raw=0 no_meta=0
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent=$2; shift 2 ;;
+      -p|--prompt)  prompt_override=$2; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)
+        print -r -- "usage: $name [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+        print -r -- "  N          block index back (default 1 = last)"
+        print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+        print -r -- "  -p PROMPT  override default prompt"
+        print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
+        print -r -- "  --no-meta  suppress the stderr metadata line"
+        print -r -- ""
+        print -r -- "env vars:"
+        print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
+        print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
+        print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
+        print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+        print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
+        print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+        return 0 ;;
+      --) shift; break ;;
+      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+      *)  n=$1; shift ;;
+    esac
+  done
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    print -u2 "$name: N must be a positive integer (got: $n)"
+    return 1
+  fi
+  if [[ -z "$agent" ]]; then
+    agent=$(_aiagent_autodetect) || {
+      print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+      return 1
+    }
+  fi
+  local block
+  block=$(cpblock "$n" 2>/dev/null) || {
+    print -u2 "$name: cpblock $n failed (run 'exec zsh' if the shell pre-dates chezmoi apply)"
+    return 1
+  }
+  if [[ -z "$block" ]]; then
+    print -u2 "$name: cpblock $n returned empty"
+    return 1
+  fi
+  local prompt="${prompt_override:-$default_prompt}
+
+$block"
+  print -u2 "$name ← block -$n"
+
+  # Per-call overrides: --no-meta and --raw flip env-var behaviour locally.
+  local saved_show=$AICAP_SHOW_METADATA saved_pretty=$AICAP_PRETTIFY
+  (( no_meta )) && AICAP_SHOW_METADATA=0
+  (( raw ))    && AICAP_PRETTIFY=0
+
+  if (( raw )); then
+    _aiagent_invoke "$agent" "$prompt"
+  else
+    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
+  fi
+  local rc=$?
+
+  AICAP_SHOW_METADATA=$saved_show
+  AICAP_PRETTIFY=$saved_pretty
+  return $rc
+}
+
+aifix() {
+  _ai_capture_dispatch aifix \
+    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+    "$@"
+}
+
+aiexplain() {
+  _ai_capture_dispatch aiexplain \
+    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+    "$@"
+}
+
+# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+# chezmoi source-path, cached per-shell. The Python side reads the same
+# AICAP_* env vars so model defaults stay consistent.
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  emulate -L zsh
+  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      print -u2 "aiblock: could not resolve chezmoi source-path"
+      return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  if [[ ! -f "$_AIBLOCK_SCRIPT" ]]; then
+    print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
+    return 1
+  fi
+  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+}
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:26Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:28Z)**_
+
+同步更新 Python TUI — 用一樣的 env vars 傳 model flag + 解析 Claude metadata + rich markdown render。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:29Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/aiblock.py`
+
+```text
+36	import questionary
+37	from rich.console import Console
+38	from rich.panel import Panel
+39	
+40	DEFAULT_FIX_PROMPT = (
+41	    "Here is a command I ran in my terminal and its output. "
+42	    "Diagnose any errors and suggest a concrete fix. Be brief and specific."
+43	)
+44	
+45	AGENT_FLAG_MAP = {
+46	    "claude": ("-p",),
+47	    "opencode": ("run",),
+48	    "codex": ("exec",),
+49	    "cursor-agent": ("-p",),
+50	}
+51	
+52	console = Console(stderr=False)
+53	
+54	
+55	@dataclass
+56	class HistoryEntry:
+57	    n: int          # 1-based index: 1 = most recent
+58	    command: str    # the command text
+59	
+60	
+61	def detect_agents() -> list[str]:
+62	    """Return the subset of known agents found on PATH, in preference order."""
+63	    return [a for a in AGENT_FLAG_MAP if shutil.which(a)]
+64	
+65	
+66	def zsh_run(code: str, timeout: float = 5.0) -> str:
+67	    """Run `zsh -ic CODE` and return stdout (strip trailing newline).
+68	
+69	    -ic is needed so our zsh config loads (sourcing 03_tmux_capture.zsh etc.).
+70	    """
+71	    # $ZDOTDIR is set by chezmoi's 00_exports; pass-through so an interactive
+72	    # zsh finds the user's rc. Inherits TMUX so cpblock sees the right pane.
+73	    result = subprocess.run(
+74	        ["zsh", "-ic", code],
+75	        capture_output=True,
+76	        text=True,
+77	        timeout=timeout,
+78	        env=os.environ,
+79	    )
+80	    return result.stdout.rstrip("\n")
+81	
+82	
+83	def list_recent_commands(n: int = 20) -> list[HistoryEntry]:
+84	    """Fetch the last `n` shell commands via `fc -ln -{n}`.
+85	
+86	    Returns a list ordered most-recent-first, with `.n` matching what
+87	    cpblock/cpcmd/cpout expect as their positional N arg.
+88	    """
+89	    out = zsh_run(f"fc -ln -{n}")
+90	    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+91	    # fc output is oldest-first; reverse so index 1 == most recent
+92	    return [HistoryEntry(n=i, command=cmd) for i, cmd in enumerate(reversed(lines), start=1)]
+93	
+94	
+95	def capture_block(n: int) -> str:
+96	    """Return cpblock N's stdout."""
+97	    return zsh_run(f"cpblock {n}", timeout=10.0)
+98	
+99	
+100	def invoke_agent_oneshot(agent: str, prompt: str) -> str:
+101	    """Invoke an agent in non-interactive mode, return its stdout."""
+102	    flags = AGENT_FLAG_MAP[agent]
+103	    result = subprocess.run(
+104	        [agent, *flags, prompt],
+105	        capture_output=True,
+106	        text=True,
+107	        timeout=180.0,
+108	    )
+109	    if result.returncode != 0:
+110	        console.print(f"[red]{agent} exited {result.returncode}[/red]")
+111	        if result.stderr:
+112	            console.print(f"[dim]{result.stderr}[/dim]")
+113	    return result.stdout
+114	
+115
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:45Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:57:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:14Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:15Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/aiblock.py`
+
+```text
+250	        console.print("[red]Shell history is empty — no commands to pick from.[/red]")
+251	        return 1
+252	
+253	    # 1. Pick a command
+254	    choices = [
+255	        questionary.Choice(
+256	            title=f"{h.n:>2}  {h.command[:100]}",
+257	            value=h.n,
+258	        )
+259	        for h in history
+260	    ]
+261	    picked_n = questionary.select(
+262	        "Pick a command to review:",
+263	        choices=choices,
+264	        qmark="▸",
+265	    ).ask()
+266	    if picked_n is None:
+267	        return 1
+268	
+269	    # 2. Capture + preview the block
+270	    block = capture_block(picked_n)
+271	    if not block.strip():
+272	        console.print(
+273	            f"[red]cpblock {picked_n} returned empty.[/red]\n"
+274	            "[dim]Possible causes: shell pre-dates chezmoi apply (try `exec zsh`); "
+275	            "N exceeds this pane's command history.[/dim]"
+276	        )
+277	        return 1
+278	    console.print(Panel(block.rstrip(), title=f"Block -{picked_n}", expand=False))
+279	
+280	    # 3. Edit the prompt
+281	    prompt = questionary.text(
+282	        "Prompt (edit or accept):",
+283	        default=DEFAULT_FIX_PROMPT,
+284	        multiline=True,
+285	    ).ask()
+286	    if prompt is None:
+287	        return 1
+288	
+289	    # 4. Choose agent if multiple available
+290	    if len(agents) > 1:
+291	        agent = questionary.select(
+292	            "Agent:",
+293	            choices=agents,
+294	            default=agents[0],
+295	        ).ask()
+296	        if agent is None:
+297	            return 1
+298	    else:
+299	        agent = agents[0]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:22Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/aiblock.py`
+
+```text
+300	
+301	    # 5. Choose action
+302	    action = questionary.select(
+303	        "Action:",
+304	        choices=[
+305	            questionary.Choice("Print reply here", value="print"),
+306	            questionary.Choice("Copy reply to clipboard", value="copy"),
+307	            questionary.Choice(f"Spawn new tmux window running {agent} with context", value="spawn"),
+308	            questionary.Choice("Cancel", value="cancel"),
+309	        ],
+310	    ).ask()
+311	    if action in (None, "cancel"):
+312	        return 0
+313	
+314	    full_prompt = f"{prompt}\n\n{block}"
+315	
+316	    if action == "spawn":
+317	        spawn_interactive_agent(agent, block, prompt)
+318	        return 0
+319	
+320	    # Print / Copy both need the agent to actually reply
+321	    with console.status(f"[cyan]Asking {agent}…[/cyan]", spinner="dots"):
+322	        reply = invoke_agent_oneshot(agent, full_prompt)
+323	
+324	    if not reply.strip():
+325	        console.print("[yellow]Agent returned empty reply.[/yellow]")
+326	        return 1
+327	
+328	    if action == "print":
+329	        console.print(Panel(reply.rstrip(), title=f"{agent} reply", expand=False))
+330	    elif action == "copy":
+331	        ok = copy_to_clipboard(reply)
+332	        if ok:
+333	            console.print(f"[green]Copied {len(reply)} bytes to clipboard.[/green]")
+334	        else:
+335	            console.print("[red]No clipboard tool available.[/red]")
+336	            return 1
+337	    return 0
+338	
+339	
+340	if __name__ == "__main__":
+341	    try:
+342	        sys.exit(main())
+343	    except KeyboardInterrupt:
+344	        sys.exit(130)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:58:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax + apply + help outputs
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh && echo "zsh syntax OK"
+chezmoi apply 2>&1
+uv run --script /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py --help 2>&1 | head -5
+echo "---"
+zsh -ic 'source ~/.config/zsh/tools/04_ai_capture.zsh; aifix --help' 2>&1 | grep -vE 'zle' | head -20
+```
+
+```text
+zsh syntax OK
+aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+
+UI is a short sequence of questionary prompts + rich panels:
+  1. Pick which recent command you want reviewed (shell history list)
+  2. Preview the captured block (cpblock output)
+---
+usage: aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+  N          block index back (default 1 = last)
+  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+
+env vars:
+  AICAP_CLAUDE_MODEL   = haiku
+  AICAP_OPENCODE_MODEL = github-copilot/claude-haiku-4.5
+  AICAP_CODEX_MODEL    = gpt-5-mini
+  AICAP_CURSOR_MODEL   = <unset>
+  AICAP_SHOW_METADATA  = 1
+  AICAP_PRETTIFY       = 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:59:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:59:03Z)**_
+
+用極短 prompt 實測 Claude JSON parsing：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:59:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Live Claude test (minimal prompt, no-meta to avoid JSON overhead)
+
+```bash
+tmux kill-session -t _live 2>/dev/null
+tmux new-session -d -s _live -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _live 'echo HELLO-FOR-TEST' Enter; sleep 1.0
+# Test aifix with --no-meta to avoid JSON parsing costs (text mode)
+tmux send-keys -t _live 'aifix -p "reply with just the word OK and nothing else" --no-meta --raw > /tmp/reply.txt 2>/tmp/reply.err' Enter
+sleep 15  # allow agent time
+echo "=== aifix reply (raw, no-meta) ==="
+cat /tmp/reply.txt
+echo "=== stderr ==="
+cat /tmp/reply.err
+tmux kill-session -t _live
+rm -f /tmp/reply.*
+```
+
+```text
+=== aifix reply (raw, no-meta) ===
+OK
+=== stderr ===
+aifix ← block -1
+claude (haiku)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:59:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:59:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Live Claude test WITH metadata JSON parsing
+
+```bash
+tmux kill-session -t _live 2>/dev/null
+tmux new-session -d -s _live -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _live 'echo METADATA-TEST' Enter; sleep 1.0
+# With metadata (default)
+tmux send-keys -t _live 'aifix -p "reply with just OK" --raw > /tmp/reply.txt 2>/tmp/reply.err' Enter
+sleep 15
+echo "=== stdout ==="
+cat /tmp/reply.txt
+echo "=== stderr (should have model+tokens+cost line) ==="
+cat /tmp/reply.err
+tmux kill-session -t _live
+rm -f /tmp/reply.*
+```
+
+```text
+=== stdout ===
+OK
+=== stderr (should have model+tokens+cost line) ===
+aifix ← block -1
+claude (?) | tokens in=10 out=74 | cost=$0.018549200000000002
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:00:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:00:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect Claude's JSON shape
+
+```bash
+echo "=== Claude -p --output-format json --model haiku (raw JSON) ==="
+claude -p --model haiku --output-format json "reply OK" 2>&1 | head -20
+echo "---"
+echo "=== jq keys ==="
+claude -p --model haiku --output-format json "reply OK" 2>&1 | jq 'keys'
+```
+
+```text
+=== Claude -p --output-format json --model haiku (raw JSON) ===
+{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"duration_ms":7391,"duration_api_ms":5173,"num_turns":1,"result":"OK","stop_reason":"end_turn","session_id":"08bbaee0-c8e0-40df-9535-6c4fbacb3e31","total_cost_usd":0.01846545,"usage":{"input_tokens":10,"cache_creation_input_tokens":12487,"cache_read_input_tokens":25617,"output_tokens":57,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":12487,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[{"input_tokens":10,"output_tokens":57,"cache_read_input_tokens":25617,"cache_creation_input_tokens":12487,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":12487},"type":"message"}],"speed":"standard"},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":10,"outputTokens":57,"cacheReadInputTokens":25617,"cacheCreationInputTokens":12487,"webSearchRequests":0,"costUSD":0.01846545,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"fa6f90f0-17a9-4f9d-9135-a2017575651b"}
+---
+=== jq keys ===
+[
+  "api_error_status",
+  "duration_api_ms",
+  "duration_ms",
+  "fast_mode_state",
+  "is_error",
+  "modelUsage",
+  "num_turns",
+  "permission_denials",
+  "result",
+  "session_id",
+  "stop_reason",
+  "subtype",
+  "terminal_reason",
+  "total_cost_usd",
+  "type",
+  "usage",
+  "uuid"
+]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:00:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:00:44Z)**_
+
+修 model extraction (Claude 的 model 在 `.modelUsage` key 裡)：
+
+_**Agent (claude-opus-4-7 2026-04-24 06:00:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:01:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:01:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:01:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest metadata with fixed model extraction
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _live 2>/dev/null
+tmux new-session -d -s _live -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _live 'echo METADATA-V2' Enter; sleep 1.0
+tmux send-keys -t _live 'aifix -p "reply with just OK" --raw > /tmp/r.txt 2>/tmp/r.err' Enter
+sleep 18
+echo "=== stdout ==="
+cat /tmp/r.txt
+echo "=== stderr (full metadata line) ==="
+cat /tmp/r.err
+tmux kill-session -t _live
+rm -f /tmp/r.*
+```
+
+```text
+=== stdout ===
+OK
+=== stderr (full metadata line) ===
+aifix ← block -1
+claude (claude-haiku-4-5-20251001) | in=10 out=65 cache=(r:24402,w:12592) | cost=$0.018515200000000002 5425ms
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:02:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:02:12Z)**_
+
+Metadata 完整 (model/tokens/cache/cost/duration)。commit 此 feature。
+
+_**Agent (claude-opus-4-7 2026-04-24 06:02:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Pre-commit status check
+
+`git --no-pager status --short | head -10`
+
+```text
+ M .specstory/history/2026-04-22_08-21-44Z.md
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+ M dot_config/zsh/tools/04_ai_capture.zsh
+ M scripts/aiblock.py
+ M scripts/init/dotfiles_init.py
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:02:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:02:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit model defaults + prettify + metadata
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git add \
+  dot_config/zsh/tools/04_ai_capture.zsh \
+  scripts/aiblock.py \
+  .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "$(cat <<'EOF'
+aicapture: model defaults + glow/bat prettify + metadata stderr line
+
+Extends aifix/aiexplain/aiblock to be more useful day-to-day:
+
+- Default to fast/cheap models (overridable via AICAP_* env vars):
+    AICAP_CLAUDE_MODEL=haiku
+    AICAP_OPENCODE_MODEL=github-copilot/claude-haiku-4.5
+    AICAP_CODEX_MODEL=gpt-5-mini
+    AICAP_CURSOR_MODEL=            (unset → cursor-agent picks)
+  Replying with Opus/Sonnet/o3 for "diagnose this shell error" was slow
+  and overkill. Haiku-class models are plenty for the advisory use case
+  and 1-2 orders of magnitude cheaper.
+
+- Two-layer prettify on shell side: glow > bat --language=md > raw.
+  Skipped when stdout isn't a tty (so pipes stay clean) or when user
+  passes --raw / exports AICAP_PRETTIFY=0.
+
+- Metadata on stderr by default (toggle via AICAP_SHOW_METADATA or
+  --no-meta per-call). For Claude, --output-format json + jq pulls
+  model, input/output tokens, cache read/write, total cost (USD), and
+  duration. The TUI mirrors this into the rich Panel subtitle + the
+  copy-confirmation line. Other agents just get a "<agent> (<model>)"
+  stub line — their JSON output is streaming (JSONL) and harder to
+  extract a single final answer from.
+
+- Claude's JSON has no top-level `.model` field; the actual model name
+  is the single key of `.modelUsage` (e.g. claude-haiku-4-5-20251001).
+  Use `.modelUsage | keys | first` / Python `next(iter(...))` accordingly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -8
+echo "---"
+git --no-pager log --oneline -3
+```
+
+```text
+Skipping missing path: .opencode/plans/
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+26
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777010563-6466.
+---
+5c2959d tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+fa73e8f sesh/tmuxp: fix appended windows opening at $HOME after `sesh connect`
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:03:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:03:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check commit state
+
+```bash
+git --no-pager status --short
+echo "---"
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+```
+
+```text
+ M .specstory/history/2026-04-22_08-21-44Z.md
+MM .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+M  dot_config/zsh/tools/04_ai_capture.zsh
+M  scripts/aiblock.py
+ M scripts/init/dotfiles_init.py
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+?? .specstory/history/2026-04-24_05-59-14Z-reply-with-just-the.md
+?? .specstory/history/2026-04-24_05-59-39Z-reply-with-just-ok.md
+?? .specstory/history/2026-04-24_06-00-10Z-reply-ok.md
+?? .specstory/history/2026-04-24_06-00-21Z-reply-ok.md
+?? .specstory/history/2026-04-24_06-01-43Z-reply-with-just-ok.md
+?? scripts/init/Dockerfile.test
+---
+26
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:03:14Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:03:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Clean re-stage + commit
+
+```bash
+git reset HEAD -- .specstory/history/2026-04-22_08-21-44Z.md 2>&1 | head -3
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git add \
+  dot_config/zsh/tools/04_ai_capture.zsh \
+  scripts/aiblock.py \
+  .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git --no-pager diff --cached --stat
+git commit -m "$(cat <<'EOF'
+aicapture: model defaults + glow/bat prettify + metadata stderr line
+
+Extends aifix/aiexplain/aiblock with:
+
+- Default to fast/cheap models (overridable via AICAP_* env vars):
+    AICAP_CLAUDE_MODEL=haiku
+    AICAP_OPENCODE_MODEL=github-copilot/claude-haiku-4.5
+    AICAP_CODEX_MODEL=gpt-5-mini
+    AICAP_CURSOR_MODEL=            (unset → cursor-agent picks)
+  Haiku-class models are plenty for the "diagnose this shell error"
+  use case and 1-2 orders of magnitude cheaper than Opus/Sonnet.
+
+- Two-layer prettify on shell side: glow > bat --language=md > raw.
+  Skipped when stdout isn't a tty (pipes stay clean) or when user
+  passes --raw / exports AICAP_PRETTIFY=0.
+
+- Metadata on stderr by default (toggle via AICAP_SHOW_METADATA or
+  --no-meta per-call). For Claude, --output-format json + jq pulls
+  model, input/output tokens, cache read/write, total cost (USD),
+  and duration. The TUI mirrors this into the rich Panel subtitle
+  and the copy-confirmation line. Other agents just get a "(model)"
+  stub — their JSON output is streaming JSONL and harder to pull a
+  single final answer from without more plumbing.
+
+- Fix: Claude's JSON has no top-level .model field; the actual model
+  name is the single key of .modelUsage (e.g. claude-haiku-4-5-20251001).
+  Use `.modelUsage | keys | first` (jq) / `next(iter(...))` (Python).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -6
 ```
 </details></tool-use>
