@@ -71,14 +71,48 @@ within a phase** changes (path-aware now).
 
 ## Options considered
 
-| Option | Pros | Cons |
-|---|---|---|
-| **A. `.chezmoiscripts/{global,repo}/`** (2-level, scope-only) | Minimal taxonomy, matches current actual diversity (5 global + 1 repo). Easy to extend per-scope without re-organising. | Doesn't pre-empt finer slices (per-OS, per-tool). May split again later. |
-| **B. `.chezmoiscripts/global/{install,sync}/` + `repo/...`** (3-level by intent) | Models the install-only invariant explicitly: `install/ansible_roles` declares "never upgrades"; `sync/raycast_config` declares "re-imports state on every change". | 6 scripts is too few for a 3-level taxonomy; risk of over-engineering. Sync vs install line is fuzzy for `bat_theme` (cache rebuild — neither?). |
-| **C. `.chezmoiscripts/{darwin,linux,global,repo}/`** (twpayne's pattern) | Mirrors the project's sole maintainer-blessed example. Useful when a script becomes OS-specific (currently `bat_theme` and `brew_bundle` already template-branch internally — could split). | Premature: only `raycast_config` is truly macOS-only; rest run cross-platform. Splitting now duplicates the OS-detection logic that already lives inside the templates. |
-| **D. Stay flat at repo root** (current) | Zero migration cost. | Doesn't solve the visual noise or the global/repo confusion. |
+Eight namespace schemes brainstormed 2026-04. Listed by orthogonal axis they
+exploit (scope / OS / trigger-source / semantic / phase / hybrids).
 
-## Recommendation: Option A, leave room to grow
+| Option | Layout sketch | Pros | Cons |
+|---|---|---|---|
+| **A. Pure scope (2 dirs)** | `.chezmoiscripts/{global,repo}/` | Minimal taxonomy, matches current 5+1 distribution, zero judgement burden | `global/` still mixes ansible/brew/skills internally; not future-proof past ~10 scripts |
+| **B. Scope × OS** | `global/{darwin,linux,cross}/` + `repo/` | Maintainer-blessed pattern (`twpayne/dotfiles` uses it); OS-only logic exits templates | Premature: only `raycast_config` is truly darwin-only today; `cross/` is awkward naming |
+| **C. Scope × trigger source** | `global/{ansible,brew,config-cache,skills}/` + `repo/skills/` | One glance reveals what each script watches; new scripts auto-find a home | Most buckets would hold 1 script — directory-per-file overhead |
+| **D. Scope × semantic** | `global/{install,sync,bootstrap}/` + `repo/bootstrap/` | Encodes the [Install vs upgrade is split](../AGENTS.md#install-vs-upgrade-is-split-on-purpose) Hard invariant in directory names; `install/` literally declares "never upgrades" | install vs bootstrap line is fuzzy (skills install belongs where?); 6 scripts ÷ 3 buckets = density too low |
+| **E. Pure trigger source (no scope)** | `.chezmoiscripts/{ansible,brew,config-imports,skills-global,skills-repo}/` | Trigger-source as primary axis | Loses scope visibility — and scope is a hard contract (repo-only must NOT run on consumer machines); burying it in filenames is dangerous. `skills-global` vs `skills-repo` reintroduces scope, contradicting the premise |
+| **F. Scope × Phase (`before_`/`after_`)** | `global/{before,after}/` + `repo/{before,after}/` | Visually reinforces ordering | Currently 100% are `after_`, so the split would convey zero information; phase already lives in the filename — redundant |
+| **G. Hybrid: scope flat + OS sub-dir on demand** | `global/<NN>_*.sh.tmpl` + `global/darwin/<NN>_*.sh.tmpl` (only when truly OS-bound) + `repo/...` | A's simplicity + B's extensibility, but only pays the OS-dir cost when needed; raycast sinks one level, others stay flat | "When to open a sub-dir" is a soft judgement → future maintainers may answer inconsistently |
+| **H. Scope dirs + verb prefix in filename** | `global/20_install_ansible_roles.sh.tmpl`, `global/25_sync_bat_theme.sh.tmpl`, etc. | Verb visible without entering directory; greppable | Long filenames; squashes D's and B's axes into the name → readability loss |
+
+## Decision (2026-04)
+
+**Chose Option A (pure scope, 2 dirs)**.
+
+Inputs to the decision:
+
+- **Future OS-only scripts**: ≤ 1-2 expected (raycast is current outlier;
+  most "OS-specific" logic is internal `{{ if eq .chezmoi.os "darwin" }}`
+  template branching that doesn't justify directory-level split). → Option G
+  is over-engineered.
+- **1-year growth**: < 10 scripts total expected. → Option D's 3-bucket
+  semantic split would average 2-3 scripts per bucket — taxonomy denser than
+  data. Reconsider D when total exceeds ~12.
+- **Scope contract is hard, OS is soft**: repo-only scripts MUST NOT run on
+  consumer machines (script self-gates via `joinPath .chezmoi.sourceDir
+  "skills-lock.json" | stat`). OS-specific scripts merely should-not-run on
+  the wrong OS but failing safely is fine via template `exit 0`. So scope
+  deserves directory-level visibility; OS doesn't.
+
+Revisit triggers (when to upgrade A → something else):
+- Scripts ≥ 12 → consider D (semantic) or C (trigger-source)
+- OS-only scripts ≥ 3 → consider G (add `darwin/` sub-dir under `global/`)
+- New host class emerges (e.g., ML-only, server-only) → consider new
+  top-level scope dir alongside `global/` and `repo/` (e.g., `ml/`)
+
+## Recommendation
+
+Option A:
 
 ```
 .chezmoiscripts/
