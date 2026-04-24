@@ -92,13 +92,19 @@ RUN python3 $HOME/.local/share/chezmoi/scripts/init/dotfiles_init.py init \
         --email docker-test@example.com \
         --profile ubuntu_server
 
-# Quick in-build sanity check — if the config file is missing, something
-# went badly wrong and we want the build to fail here instead of producing
-# a useless image. Finer-grained assertions live in check_output.sh so we
-# can get a clean "which line failed" view without fighting Docker shell
-# quoting in heredoc-like chains.
-RUN test -f /home/devuser/.config/chezmoi/chezmoi.toml
+# Assert chezmoi.toml was rendered correctly with our overrides.
+# Note the template pads `profile` / `email` / `name` with varying spaces
+# for visual alignment — use `-E` and `[[:space:]]+` to be robust.
+RUN CFG=/home/devuser/.config/chezmoi/chezmoi.toml \
+    && test -f "$CFG" \
+    && grep -qE '^email[[:space:]]*=[[:space:]]*"docker-test@example.com"' "$CFG" \
+    && grep -qE '^name[[:space:]]*=[[:space:]]*"Docker Test"' "$CFG" \
+    && grep -qE '^profile[[:space:]]*=[[:space:]]*"ubuntu_server"' "$CFG" \
+    && grep -qE '^installCodingAgents[[:space:]]*=[[:space:]]*false' "$CFG" \
+    && grep -qE '^installPythonUvTools[[:space:]]*=[[:space:]]*false' "$CFG" \
+    && grep -qE '^backupDotfiles[[:space:]]*=[[:space:]]*false' "$CFG" \
+    && echo "OK: wrapper's non-interactive mode rendered chezmoi.toml correctly in Docker"
 
+# Default: show the rendered config when someone runs the image without args.
+# Overrideable: `docker run --rm -it dotfiles-init-test bash` drops to a shell.
 CMD ["cat", "/home/devuser/.config/chezmoi/chezmoi.toml"]
-
-CMD ["/bin/bash"]
