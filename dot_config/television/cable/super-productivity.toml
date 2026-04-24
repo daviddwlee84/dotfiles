@@ -76,10 +76,11 @@ no_sort = true
 # GET /tasks/:id only resolves for task ids — for project/tag rows the curl
 # returns 404 and we fall back to a friendly message. Same for the down-API
 # hint row (id "0"). All API responses are wrapped in {ok, data} — extract
-# .data for display.
+# .data for display. Use `jq -C` for built-in syntax coloring (single binary,
+# avoids `bat` PATH/TTY-detection gotchas inside TV's preview process).
 command = [
-  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data || echo 'No JSON detail for this row (project/tag entries do not have a /tasks/:id endpoint, or API is unreachable).'",
-  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -r '.data.notes // \"(no notes)\"' | { if command -v tspin >/dev/null 2>&1; then tspin --print 2>/dev/null; else cat; fi } || echo '(no notes available)'",
+  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -C .data || echo 'No JSON detail for this row (project/tag entries do not have a /tasks/:id endpoint, or API is unreachable).'",
+  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -r '.data.notes // \"(no notes)\"' || echo '(no notes available)'",
 ]
 header = "{split:\\t:1}  {split:\\t:3}"
 
@@ -98,7 +99,7 @@ alt-j = "actions:dump-json"
 
 [actions.open-detail]
 description = "Open full JSON detail in pager"
-command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -C .data | less -R; echo; echo '[Press Enter to exit]'; read -r _"
 mode = "execute"
 
 [actions.copy-id]
@@ -113,5 +114,5 @@ mode = "fork"
 
 [actions.dump-json]
 description = "Print full JSON to terminal"
-command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data ; echo; echo '[Press Enter to exit]'; read -r _"
+command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -C .data; echo; echo '[Press Enter to exit]'; read -r _"
 mode = "execute"
