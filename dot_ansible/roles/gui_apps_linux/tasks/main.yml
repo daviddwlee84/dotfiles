@@ -383,15 +383,30 @@
   become: true
   tags: [sudo]
   block:
-    - name: Download latest Cursor .deb (redirect from cursor.com)
-      ansible.builtin.get_url:
+    # cursor.com/api/download returns JSON ({downloadUrl, debUrl, rpmUrl, ...}),
+    # not a redirect to the binary. Must resolve debUrl first, then fetch.
+    - name: Fetch latest Cursor release metadata
+      ansible.builtin.uri:
         url: >-
           https://cursor.com/api/download?platform=linux-{{
             {'x86_64': 'x64', 'aarch64': 'arm64'}[target_architecture]
           }}&releaseTrack=stable
+        return_content: true
+      register: cursor_meta
+      ignore_errors: true
+
+    - name: Download latest Cursor .deb
+      when:
+        - cursor_meta is defined
+        - cursor_meta is succeeded
+        - cursor_meta.json is defined
+        - cursor_meta.json.debUrl is defined
+      ansible.builtin.get_url:
+        url: "{{ cursor_meta.json.debUrl }}"
         dest: /tmp/cursor.deb
         mode: '0644'
         timeout: 300
+        force: true
       register: cursor_dl
       ignore_errors: true
 
@@ -457,7 +472,6 @@
         dest: /tmp/discord.deb
         mode: '0644'
         timeout: 300
-        follow: true
       register: discord_dl
       ignore_errors: true
 

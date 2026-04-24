@@ -145,6 +145,19 @@ sudo_session_abort() {
     return 0
 }
 
+# Returns 0 iff sudo is configured to *never* prompt this user (i.e. a
+# NOPASSWD: ALL entry in sudoers). A bare `sudo -n true` is NOT enough —
+# it also succeeds when the user has merely cached credentials from a
+# recent interactive sudo, and that cache is per-(user, tty). Ansible's
+# become subprocess runs under a different tty (or none) and therefore
+# hits `sudo: a password is required` despite our parent shell thinking
+# sudo is free. Parsing `sudo -n -l` for the explicit NOPASSWD entry
+# avoids that confusion: the sudoers listing reflects configuration, not
+# cache state.
+_sudo_is_truly_passwordless() {
+    LC_ALL=C sudo -n -l 2>/dev/null | LC_ALL=C grep -Eq 'NOPASSWD:[[:space:]]+ALL'
+}
+
 sudo_session_init() {
     local label="${1:-chezmoi}"
     local dir
@@ -161,8 +174,11 @@ sudo_session_init() {
         return 0
     fi
 
-    # Truly passwordless? No file, no watchdog, no prompt.
-    if sudo -n true 2>/dev/null; then
+    # Truly passwordless (NOPASSWD: ALL in sudoers)? No file, no watchdog, no
+    # prompt. Do NOT short-circuit on mere cached credentials — see the helper
+    # comment; cached-in-parent-shell does not translate to ansible's become
+    # subprocess seeing a tty with a valid timestamp.
+    if _sudo_is_truly_passwordless; then
         return 0
     fi
 
@@ -309,13 +325,14 @@ sudo_session_skip_reason() {
     #                      sudo_session_init before proceeding. Returned so
     #                      defensive callers can detect "probe too early".
     #
-    # This function performs at most one cheap `sudo -n true` probe and no
-    # prompts of its own.
+    # This function performs at most one cheap `sudo -n -l` probe and no
+    # prompts of its own. Uses the sudoers listing to distinguish true
+    # NOPASSWD from a merely cached credential — see _sudo_is_truly_passwordless.
     if [[ -n "${CHEZMOI_SUDO_PASS_FILE:-}" && -f "${CHEZMOI_SUDO_PASS_FILE:-}" ]]; then
         printf 'cached\n'
         return 0
     fi
-    if sudo -n true 2>/dev/null; then
+    if _sudo_is_truly_passwordless; then
         printf 'passwordless\n'
         return 0
     fi

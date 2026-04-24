@@ -212,13 +212,26 @@
         state: directory
         mode: '0755'
 
+    # Single-key setup: the `InRelease` file is signed by the key at
+    # packages.opentofu.org/.../gpgkey (subkey 70DF59811A8B9109). The old
+    # dual-key approach also included get.opentofu.org/opentofu.gpg, but that
+    # is an unrelated OpenTofu project key that does NOT sign the repo —
+    # carrying it in signed-by= bought nothing. `deb-src` is dropped because
+    # this Cloudsmith-style repo has no source packages and apt-get update
+    # fails on the missing Sources file.
     - name: Install OpenTofu repo and package
       ansible.builtin.shell: |
-        set -e
-        curl -fsSL https://get.opentofu.org/opentofu.gpg | tee /etc/apt/keyrings/opentofu.gpg > /dev/null
-        curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey | gpg --no-tty --batch --dearmor -o /etc/apt/keyrings/opentofu-repo.gpg 2>/dev/null
-        echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main
-        deb-src [signed-by=/etc/apt/keyrings/opentofu.gpg,/etc/apt/keyrings/opentofu-repo.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" > /etc/apt/sources.list.d/opentofu.list
+        set -eo pipefail
+        # gpg --dearmor -o <file> refuses to overwrite without --yes; on a
+        # re-apply the keyring file exists from the previous run. Use --yes
+        # so the task is idempotent.
+        curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey \
+          | gpg --no-tty --batch --yes --dearmor -o /etc/apt/keyrings/opentofu.gpg
+        # Clean up the orphan keyring from the old dual-key layout so
+        # sources.list entries that still reference it don't trip apt.
+        rm -f /etc/apt/keyrings/opentofu-repo.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" \
+          > /etc/apt/sources.list.d/opentofu.list
         apt-get update
         apt-get install -y tofu
       args:
