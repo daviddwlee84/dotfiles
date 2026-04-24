@@ -7,3 +7,5 @@ mkdocs_site_bootstrap:
   stack: mkdocs-material
   auto_deploy: true
   existing_docs_decision: wrapped
+  pages_deployed: true
+  pages_enabled_at: "2026-04-24"
