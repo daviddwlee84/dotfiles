@@ -103,3 +103,77 @@ ghostty-ssh-terminfo() {
 
   echo "Installed xterm-ghostty terminfo on $host (in ~/.terminfo)"
 }
+
+# Switch Homebrew mirror on-the-fly (GFW workaround). Updates env vars AND
+# rewrites existing clone git remotes in-place, so a follow-up `brew update`
+# uses the new mirror without reinstalling. Default baseline (Aliyun) is set
+# in 00_exports.zsh.tmpl; use this only when a mirror misbehaves.
+# Usage: brew-mirror                    # show current endpoints
+#        brew-mirror {aliyun|ustc|bfsu|tuna}
+brew-mirror() {
+  emulate -L zsh
+  local mirror="${1:-}"
+  local api bottles brew_git core_git
+  case "$mirror" in
+    aliyun)
+      api="https://mirrors.aliyun.com/homebrew-bottles/api"
+      bottles="https://mirrors.aliyun.com/homebrew-bottles"
+      brew_git="https://mirrors.aliyun.com/homebrew/brew.git"
+      core_git="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
+      ;;
+    ustc)
+      api="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+      bottles="https://mirrors.ustc.edu.cn/homebrew-bottles"
+      brew_git="https://mirrors.ustc.edu.cn/brew.git"
+      core_git="https://mirrors.ustc.edu.cn/homebrew-core.git"
+      ;;
+    bfsu)
+      api="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+      bottles="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+      brew_git="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+      core_git="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
+      ;;
+    tuna)
+      api="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+      bottles="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+      brew_git="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+      core_git="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+      ;;
+    "")
+      echo "Current Homebrew mirror env vars:"
+      echo "  HOMEBREW_API_DOMAIN      = ${HOMEBREW_API_DOMAIN:-<unset>}"
+      echo "  HOMEBREW_BOTTLE_DOMAIN   = ${HOMEBREW_BOTTLE_DOMAIN:-<unset>}"
+      echo "  HOMEBREW_BREW_GIT_REMOTE = ${HOMEBREW_BREW_GIT_REMOTE:-<unset>}"
+      echo "  HOMEBREW_CORE_GIT_REMOTE = ${HOMEBREW_CORE_GIT_REMOTE:-<unset>}"
+      echo
+      echo "Usage: brew-mirror {aliyun|ustc|bfsu|tuna}"
+      return 0
+      ;;
+    *)
+      echo "brew-mirror: unknown mirror '$mirror'" >&2
+      echo "Usage: brew-mirror {aliyun|ustc|bfsu|tuna}" >&2
+      return 1
+      ;;
+  esac
+
+  export HOMEBREW_API_DOMAIN="$api"
+  export HOMEBREW_BOTTLE_DOMAIN="$bottles"
+  export HOMEBREW_BREW_GIT_REMOTE="$brew_git"
+  export HOMEBREW_CORE_GIT_REMOTE="$core_git"
+
+  # Rewrite origin of existing clones. `brew --repo homebrew/core` only exists
+  # if the user has tapped homebrew/core (optional in Homebrew 4.x — API/JSON
+  # is default), so guard on .git presence.
+  if command -v brew >/dev/null 2>&1; then
+    local brew_repo core_repo
+    brew_repo="$(brew --repo 2>/dev/null)"
+    [[ -n "$brew_repo" && -d "$brew_repo/.git" ]] && \
+      git -C "$brew_repo" remote set-url origin "$brew_git" 2>/dev/null
+    core_repo="$(brew --repo homebrew/core 2>/dev/null)"
+    [[ -n "$core_repo" && -d "$core_repo/.git" ]] && \
+      git -C "$core_repo" remote set-url origin "$core_git" 2>/dev/null
+  fi
+
+  echo "brew-mirror: switched to $mirror"
+  echo "  Run 'brew update' to re-sync indexes."
+}

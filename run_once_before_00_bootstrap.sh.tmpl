@@ -70,16 +70,41 @@ fi
 # GFW mirrors (useChineseMirror=true). Must be set BEFORE the first
 # `brew install`, `rustup`, or `mise install` so every bootstrap fetch
 # goes through the mirror instead of the blocked upstream.
-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/
-export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
-export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+# Homebrew mirrors (ordered by typical reliability behind GFW):
+#   - Aliyun (ACTIVE): commercial CDN, least queueing
+#       https://developer.aliyun.com/mirror/homebrew
+#   - USTC:  university mirror, low queueing; path is top-level (no /git/homebrew/)
+#       https://mirrors.ustc.edu.cn/help/brew.git.html
+#   - BFSU:  mirrors TUNA content but less congested
+#       https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
+#   - TUNA:  Tsinghua, upstream of BFSU; frequent "Waiting in queue" on brew.git
+#       https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+# Homebrew env vars are single-value — no native fallback. To switch, comment
+# out the active block and uncomment another.
+export HOMEBREW_API_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
+# USTC alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+# BFSU alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
+# TUNA alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
 export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
 export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
 export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
-info "useChineseMirror=true: using TUNA mirrors (Homebrew / Rustup / mise)"
+info "useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors"
 {{ end -}}
 
 # Add Homebrew to PATH if installed

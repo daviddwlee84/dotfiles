@@ -72,11 +72,37 @@ export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
 # =============================================================================
 
 # Homebrew: bottles (ghcr.io default → partial-transfer errors) + brew.git + core.
-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
-export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
-export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+# Mirrors ordered by typical reliability behind GFW:
+#   - Aliyun (ACTIVE): commercial CDN, least queueing
+#       https://developer.aliyun.com/mirror/homebrew
+#   - USTC:  university mirror, low queueing; path is top-level (no /git/homebrew/)
+#       https://mirrors.ustc.edu.cn/help/brew.git.html
+#   - BFSU:  mirrors TUNA content but less congested
+#       https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
+#   - TUNA:  Tsinghua, upstream of BFSU; frequent "Waiting in queue" on brew.git
+#       https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+# NOTE: Homebrew env vars are single-value — no native fallback like uv's
+# extra-index-url. To switch, comment out the active block and uncomment
+# another, then `brew update` once to re-sync remotes.
+export HOMEBREW_API_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
+# USTC alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+# BFSU alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
+# TUNA alternative:
+#   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
 
 # Rustup: affects `rustup install`, `rustup update`, `rustup self update`,
 # and mise's rust plugin (which invokes rustup internally).

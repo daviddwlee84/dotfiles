@@ -602,3 +602,4 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 |---------|------|-------------|-------------|
 | `load-nvm` | alias | `dot_config/zsh/10_aliases.zsh` | Lazy-load NVM into current session (normally skipped at startup) |
 | `bw-update-completion` | alias | `dot_config/zsh/10_aliases.zsh` | Regenerate cached Bitwarden zsh completion file |
+| `brew-mirror` | function | `dot_config/zsh/10_aliases.zsh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `00_exports.zsh.tmpl`) |
