@@ -82,22 +82,23 @@ RUN mkdir -p $HOME/.local/share \
     && echo "Seeded source dir."
 
 # The actual smoke test — fully non-interactive invocation of the wrapper.
-# Note we invoke with `python3` directly (not `uv run --script`) since we
-# pre-installed deps via pip above.
+# --no-apply scopes the test to config rendering only (skips the heavy ansible /
+# run_* / modify_* phases that would need the full toolchain installed).
 RUN python3 $HOME/.local/share/chezmoi/scripts/init/dotfiles_init.py init \
         --yes \
+        --no-apply \
         --bundle minimal \
         --name "Docker Test" \
         --email docker-test@example.com \
         --profile ubuntu_server
 
-# Assert chezmoi.toml was rendered correctly.
-RUN test -f $HOME/.config/chezmoi/chezmoi.toml \
-    && grep -q 'email = "docker-test@example.com"' $HOME/.config/chezmoi/chezmoi.toml \
-    && grep -q 'name = "Docker Test"' $HOME/.config/chezmoi/chezmoi.toml \
-    && grep -q 'profile = "ubuntu_server"' $HOME/.config/chezmoi/chezmoi.toml \
-    && grep -q 'installCodingAgents = false' $HOME/.config/chezmoi/chezmoi.toml \
-    && grep -q 'installPythonUvTools = false' $HOME/.config/chezmoi/chezmoi.toml \
-    && echo "OK: chezmoi.toml rendered correctly with wrapper's non-interactive mode"
+# Quick in-build sanity check — if the config file is missing, something
+# went badly wrong and we want the build to fail here instead of producing
+# a useless image. Finer-grained assertions live in check_output.sh so we
+# can get a clean "which line failed" view without fighting Docker shell
+# quoting in heredoc-like chains.
+RUN test -f /home/devuser/.config/chezmoi/chezmoi.toml
+
+CMD ["cat", "/home/devuser/.config/chezmoi/chezmoi.toml"]
 
 CMD ["/bin/bash"]

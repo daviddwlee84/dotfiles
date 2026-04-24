@@ -686,6 +686,7 @@ class InitCmd:
     ssh: Annotated[bool, tyro.conf.arg(help="Force --ssh even if no key is present")] = False
     yes: Annotated[bool, tyro.conf.arg(help="Fully non-interactive: no prompts, no confirmation, assume defaults")] = False
     dry_run: Annotated[bool, tyro.conf.arg(help="Print the chezmoi command instead of running it")] = False
+    no_apply: Annotated[bool, tyro.conf.arg(help="Render chezmoi.toml but skip `chezmoi apply` (for CI / Docker smoke tests)")] = False
 
 
 @dataclass
@@ -770,7 +771,7 @@ def run_init(cmd: InitCmd) -> int:
         chezmoi_bin=chezmoi_bin,
         repo=None if pf.source_exists else cmd.repo,
         use_ssh=use_ssh,
-        apply=True,
+        apply=not cmd.no_apply,
         darwin=(pf.os_name == "darwin"),
     )
 
