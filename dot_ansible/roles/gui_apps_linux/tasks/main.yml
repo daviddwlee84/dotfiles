@@ -395,6 +395,10 @@
       register: cursor_meta
       ignore_errors: true
 
+    # downloads.cursor.com routes poorly from GFW-region networks and TCP
+    # streams frequently drop mid-transfer ("Incomplete read" with partial
+    # st_size). get_url has no native resume, so retry the whole fetch up
+    # to 4 times — 4 x 174MB is cheaper than babysitting a failed install.
     - name: Download latest Cursor .deb
       when:
         - cursor_meta is defined
@@ -408,6 +412,9 @@
         timeout: 300
         force: true
       register: cursor_dl
+      until: cursor_dl is succeeded
+      retries: 4
+      delay: 5
       ignore_errors: true
 
     - name: Install Cursor .deb
