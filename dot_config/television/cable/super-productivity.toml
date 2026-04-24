@@ -1,0 +1,117 @@
+# Super Productivity channel for television (tv).
+# Read-only browser for tasks, projects and tags via SP's local REST API
+# (http://127.0.0.1:3876, exposed by the desktop Electron app).
+#
+# Usage:
+#   tv super-productivity
+#
+# Prerequisites (one-time):
+#   1. Super Productivity desktop ≥ 18.0.0 (the Local REST API was added in
+#      upstream PR #6981, first shipped 2026-03-26). The Brewfile cask gets
+#      the latest, but if you have an older install pinned, run:
+#        brew upgrade --cask super-productivity
+#      Confirm with: defaults read "/Applications/Super Productivity.app/Contents/Info.plist" CFBundleShortVersionString
+#   2. In the app: Settings → Misc → enable "Local REST API"
+#      (NOT in Sync & Export — that section only configures Dropbox/WebDAV/
+#      SuperSync data sync, which is independent of the REST API.)
+#   3. Restart the app
+#
+# Verify the API is up:
+#   curl -s http://127.0.0.1:3876/health | jq
+#   # -> {"ok":true,"data":{"server":"up","rendererReady":true}}
+#
+# When the API is unreachable, this channel shows a single hint row instead
+# of an empty list — so you always know whether SP is the problem or `tv` is.
+#
+# Reverse-engineered route reference + design rationale:
+#   docs/tools/super-productivity.md
+#
+# Source cycling (Ctrl+S):
+#   1. Active tasks      open tasks excluding done (▶ marks current)
+#   2. All active tasks  open + done tasks (✓ marks done)
+#   3. Archived tasks    moved-to-archive tasks
+#   4. Projects          all projects with task counts
+#   5. Tags              all tags
+#
+# Preview cycle (Ctrl+F):
+#   1. Full task JSON (jq-pretty)
+#   2. Notes only (tspin-highlighted when tailspin is installed)
+#
+# Keybindings (read-only by design — no mutations in v0.1):
+#   Enter      Open full JSON detail in pager
+#   Ctrl+Y     Copy task ID to clipboard (overrides TV default)
+#   Alt+Y      Copy task title to clipboard
+#   Alt+J      Dump full JSON to terminal
+#   Ctrl+F     Cycle preview
+#   Ctrl+O     Toggle preview panel
+#   Ctrl+S     Cycle source
+#
+# Refresh: every 5s (less aggressive than pueue's 2s — task data changes
+# slowly and the renderer round-trip is heavier than a local CLI call).
+#
+# NOTE on Phase 2 (mutations): start/stop/complete/archive via Alt-keys is
+# intentionally deferred until the read-only flow proves stable. The REST
+# API supports them today (POST /tasks/:id/start, POST /task-control/stop,
+# PATCH /tasks/:id with {isDone:true}, POST /tasks/:id/archive).
+
+[metadata]
+name = "super-productivity"
+description = "Super Productivity (read-only): browse tasks, projects, tags via local REST API"
+requirements = ["curl", "jq"]
+
+[source]
+command = [
+  "~/.config/television/super-productivity-source.sh tasks-active",
+  "~/.config/television/super-productivity-source.sh tasks-all",
+  "~/.config/television/super-productivity-source.sh tasks-archived",
+  "~/.config/television/super-productivity-source.sh projects",
+  "~/.config/television/super-productivity-source.sh tags",
+]
+display = "{split:\\t:0}  {split:\\t:1}  [{split:\\t:2}]  {split:\\t:3}"
+output = "{split:\\t:0}"
+watch = 5.0
+no_sort = true
+
+[preview]
+# GET /tasks/:id only resolves for task ids — for project/tag rows the curl
+# returns 404 and we fall back to a friendly message. Same for the down-API
+# hint row (id "0"). All API responses are wrapped in {ok, data} — extract
+# .data for display.
+command = [
+  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data || echo 'No JSON detail for this row (project/tag entries do not have a /tasks/:id endpoint, or API is unreachable).'",
+  "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -r '.data.notes // \"(no notes)\"' | { if command -v tspin >/dev/null 2>&1; then tspin --print 2>/dev/null; else cat; fi } || echo '(no notes available)'",
+]
+header = "{split:\\t:1}  {split:\\t:3}"
+
+[ui]
+input_header = "Super Productivity"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open-detail"
+# Override TV global ctrl-y (which copies the full display line) with id-only copy
+ctrl-y = "actions:copy-id"
+alt-y = "actions:copy-title"
+alt-j = "actions:dump-json"
+
+[actions.open-detail]
+description = "Open full JSON detail in pager"
+command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.copy-id]
+description = "Copy row id (task / project / tag) to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:0}' | _clip"""
+mode = "fork"
+
+[actions.copy-title]
+description = "Copy task title to clipboard (uses display title for non-task rows)"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; t=$(curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq -r '.data.title // empty'); [ -z "$t" ] && t='{split:\\t:3}'; printf '%s' "$t" | _clip"""
+mode = "fork"
+
+[actions.dump-json]
+description = "Print full JSON to terminal"
+command = "curl -sf -m 2 http://127.0.0.1:3876/tasks/'{split:\\t:0}' 2>/dev/null | jq .data ; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"

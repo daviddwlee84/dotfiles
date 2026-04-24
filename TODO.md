@@ -44,6 +44,8 @@ with a one-line summary of what shipped.
 
 - [ ] **[S] TA-Lib path management** — currently in `secrets.zsh` as machine-specific. Could move to a `99_local_*.zsh` create-only stub like the proxy pattern in `dot_config/zsh/99_local_proxy.zsh`.
 - [ ] **[S] Try / Toolkami custom tool aliases** — currently in `secrets.zsh`. Same `99_local_*.zsh` pattern as TA-Lib above; group together.
+- [ ] **[M] Super Productivity Linux install** — currently macOS-only via `dot_config/homebrew/Brewfile.darwin.tmpl:83` cask. For fleet parity (`fleet-apply` against Ubuntu desktops) need either AppImage in a new ansible task or snap. Defer until first Linux desktop host actually wants it. The `tv super-productivity` channel + REST API integration ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) are cross-platform; only the desktop install path is missing.
+- [ ] **[?/L] `spctl` + `super-productivity-mcp`** — wrap SP's local REST API ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) as a CLI for shell automation and an MCP server for coding agents. The TV channel (v0.1) intentionally exercises every read route first to validate behaviour. Phase 2 (mutations: start/stop/complete/archive) lands as Alt-key bindings on the same channel before extracting into a separate package. Open question: TypeScript monorepo vs. plain Python `uv` script — the latter matches the rest of this repo's `scripts/` style.
 
 ## P? — Needs evaluation before committing
 
