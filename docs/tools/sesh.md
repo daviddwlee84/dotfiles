@@ -162,7 +162,7 @@ Two ways to specify which agents run:
 
 ```bash
 # Homogeneous (positional): all panes run the same agent
-svibe                                            # 4× claude (default)
+svibe                                            # N auto-picked × claude (see below)
 svibe 2                                          # 2× claude
 svibe 4 codex                                    # 4× codex
 svibe 6 opencode                                 # 6× opencode (heavy — large monitor recommended)
@@ -176,6 +176,7 @@ svibe --agents 'claude, codex, opencode'         # whitespace around commas tole
 svibe --on-exit kill 4 claude                    # Ctrl+C closes panes
 svibe --on-exit restart --agents codex,opencode  # auto-respawn loop
 svibe --no-specstory 4 claude                    # 4× raw claude (no markdown auto-save)
+svibe --min-width 120                            # wider panes → fewer auto columns
 svibe -p ~/repo --agents claude,codex            # explicit path
 svibe -h                                         # help
 ```
@@ -183,19 +184,32 @@ svibe -h                                         # help
 Mixing positional `[N] [CLI]` with `--agents` is **rejected** to keep
 semantics unambiguous — pick one mode.
 
+##### Width-aware defaults
+
+Both **how many panes** (when `N` is omitted) and **how they're laid out**
+are derived from the current terminal width ÷ a min-width threshold.
+
+| Knob | Default | Override |
+|------|---------|----------|
+| `min_width` (cols) | `80` | env `SVIBE_MIN_WIDTH` or flag `--min-width COLS` |
+| `term_width` (cols) | `$COLUMNS` with `tput cols` fallback | (read at invocation time) |
+
+- **Auto N** (when neither positional `N` nor `--agents` was given):
+  `N = clamp(term_width / min_width, 1, 12)`. So on a 240-col terminal:
+  `min-width 80` → `N=3`; `min-width 120` → `N=2`; `min-width 60` → `N=4`.
+- **Agents-window layout**: if all `N` panes fit side-by-side at
+  `≥ min_width` each, use `even-horizontal` (N columns). Otherwise fall
+  back to `tiled` (grid). Press `prefix + Space` to cycle through tmux's
+  built-in layouts interactively if you want a different view.
+
 Layout (3 windows):
 
 ```
-window 1 "agents"    — N agent panes: ≤3 = even-horizontal columns,
-                       ≥4 = tiled grid (mixed agents allowed)
+window 1 "agents"    — N agent panes (columns if all fit at ≥min-width,
+                       else tiled grid; mixed agents allowed)
 window 2 "git"       — lazygit (or `git status` fallback)
 window 3 "edit"      — nvim
 ```
-
-The agents window prefers **side-by-side vertical columns** up to 3 panes
-so each transcript keeps a readable width, and falls back to a tiled grid
-at 4+ panes where columns would be too narrow. Press `prefix + Space`
-to cycle through tmux's built-in layouts if you want a different view.
 
 Pane count is bounded `[1, 12]`. Above ~6 the tiled grid becomes too
 cramped on most displays — the cap is conservative, not technical.

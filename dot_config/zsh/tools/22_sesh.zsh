@@ -410,14 +410,16 @@ EOF
 #   svibe --no-attach 4 claude                     # create in background
 function sesh-vibe() {
     local target="" no_attach=0 on_exit="shell" specstory_mode="auto"
-    local n_agents=4
+    local n_agents=4 n_agents_set=0
     local agent_cli="claude"
     local agents_csv=""
+    local min_width="${SVIBE_MIN_WIDTH:-80}"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
             --on-exit)      on_exit="$2"; shift 2 ;;
             --agents)       agents_csv="$2"; shift 2 ;;
+            --min-width)    min_width="$2"; shift 2 ;;
             --no-specstory) specstory_mode="never"; shift ;;
             --specstory)    specstory_mode="auto"; shift ;;
             --no-attach)    no_attach=1; shift ;;
@@ -427,12 +429,12 @@ svibe — parametric multi-agent vibe layout
 
 Usage:
   svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
-        [N_AGENTS] [AGENT_CLI]
+        [--min-width COLS] [N_AGENTS] [AGENT_CLI]
   svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
-        --agents A1,A2,A3[,...]
+        [--min-width COLS] --agents A1,A2,A3[,...]
 
-Default: svibe 4 claude
-  window 1 "agents" — N agent panes (≤3 = columns, ≥4 = tiled grid)
+Default: svibe           (N auto-picked from term_width ÷ min-width, clamp [1,12])
+  window 1 "agents" — N agent panes (columns if all fit at ≥min-width, else tiled)
   window 2 "git"    — lazygit
   window 3 "edit"   — nvim
 
@@ -454,11 +456,21 @@ Agent wrapping (auto, opt out with --no-specstory):
   kill                — let the pane/window close (tmux default)
   restart             — auto-respawn the command in a loop
 
+--min-width COLS sets the minimum readable per-pane width (default: value of
+$SVIBE_MIN_WIDTH, else 80). It drives two decisions:
+  • auto-pick N when you don't pass a count (N = term_width / min-width)
+  • columns vs tiled in the agents window: columns when all N panes fit at
+    ≥COLS wide side-by-side, otherwise tiled grid
+Example on a 240-col terminal:
+  min-width 80   → auto N=3, three even-horizontal columns
+  min-width 120  → auto N=2, two even-horizontal columns
+
 Examples:
-  svibe                                            # 4× claude
+  svibe                                            # auto N × claude, width-aware layout
   svibe 2                                          # 2× claude
   svibe 4 codex                                    # 4× codex
   svibe 6 opencode                                 # 6× opencode (heavy)
+  svibe --min-width 120                            # wider panes → fewer auto columns
   svibe --agents claude,codex,codex,opencode       # 4 panes, mixed
   svibe --agents claude,opencode --on-exit kill    # 2 panes, mixed
   svibe --no-specstory 4 claude                    # raw claude, no auto-save
@@ -469,9 +481,20 @@ EOF
         esac
     done
 
+    if ! [[ "$min_width" =~ ^[0-9]+$ ]] || (( min_width < 1 )); then
+        echo "svibe: --min-width must be a positive integer (got: $min_width)" >&2
+        return 1
+    fi
+
+    # Current terminal width, used for auto-picking N (when the user didn't
+    # pass a count) and for the columns-vs-tiled cutover. $COLUMNS is
+    # auto-maintained by zsh on SIGWINCH; tput is a fallback for corner cases
+    # (e.g. non-interactive invocation); 200 is a generous last resort.
+    local term_width="${COLUMNS:-$(tput cols 2>/dev/null || echo 200)}"
+
     # Build the agents array. Two paths:
     #   --agents claude,codex,…  → split csv, list length = pane count
-    #   positional [N] [CLI]     → repeat CLI N times
+    #   positional [N] [CLI]     → repeat CLI N times (N auto-picked if omitted)
     # Mixing both is rejected to keep semantics unambiguous.
     local -a agents
     if [[ -n "$agents_csv" ]]; then
@@ -497,10 +520,20 @@ EOF
         # Positional: [n_agents] [agent_cli]
         if [[ $# -gt 0 ]]; then
             if [[ "$1" =~ ^[0-9]+$ ]]; then
-                n_agents="$1"; shift
+                n_agents="$1"; n_agents_set=1; shift
             fi
         fi
         [[ $# -gt 0 ]] && agent_cli="$1"
+
+        # Auto-pick N from terminal width when the user didn't pass one.
+        # N = clamp(term_width / min_width, 1, 12). On a 240-col terminal
+        # with min-width 80 that's N=3; at min-width 120, N=2.
+        if (( ! n_agents_set )); then
+            n_agents=$(( term_width / min_width ))
+            (( n_agents < 1 )) && n_agents=1
+            (( n_agents > 12 )) && n_agents=12
+        fi
+
         # Build a homogeneous array of length n_agents
         local k
         for (( k = 1; k <= n_agents; k++ )); do
@@ -575,11 +608,14 @@ EOF
     tmux new-session -d -s "$session" -c "$repo_root" -n agents \
         "$(_vibe_agent_cmd "${agents[1]}")"
 
-    # Pick window layout based on final pane count:
-    #   N ≤ 3 → even-horizontal (N side-by-side columns, readable width)
-    #   N ≥ 4 → tiled (grid — columns would be too narrow)
+    # Pick window layout based on agent count vs what fits as readable
+    # side-by-side columns at --min-width:
+    #   N ≤ term_width / min_width → even-horizontal (columns)
+    #   otherwise                  → tiled (grid — columns would be too narrow)
+    local max_columns=$(( term_width / min_width ))
+    (( max_columns < 1 )) && max_columns=1
     local svibe_layout
-    if (( ${#agents} <= 3 )); then
+    if (( ${#agents} <= max_columns )); then
         svibe_layout="even-horizontal"
     else
         svibe_layout="tiled"
