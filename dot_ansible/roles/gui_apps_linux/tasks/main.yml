@@ -4,9 +4,10 @@
 #
 # Handles the "desktop-only" category of apps that aren't in the apt default
 # repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
-# (Microsoft apt repo), Cursor (.deb with graceful fallback), Zen Browser
-# (AppImage + .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a
-# placeholder hook for Antigravity once an official Linux package ships.
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
+# x86_64-only), Zen Browser (AppImage + .desktop), libfuse2 (AppImage runtime
+# on Ubuntu 22.04+), and a placeholder hook for Antigravity once an official
+# Linux package ships.
 #
 # No-op on:
 #   - macOS  → Brewfile (`cask "alacritty"`, `cask "visual-studio-code"` when
@@ -409,6 +410,72 @@
           download from https://cursor.com/download and drop it under
           ~/Applications/; AppImageLauncher will auto-integrate. See
           docs/tools/appimage.md for the full recipe.
+
+# =============================================================================
+# Discord — .deb from discord.com
+#
+# Mirrors the Cursor pattern: the download API returns a redirect to the
+# latest stable .deb. Discord only ships an amd64 build — no official
+# aarch64 / armhf package — so this block is x86_64-only. aarch64 users
+# can install via Flatpak (`flatpak install flathub com.discordapp.Discord`)
+# or a community build like Vesktop; see discord.com for the official stance.
+#
+# Discord auto-updates itself in-app on every launch, so this block is a
+# bootstrap-only install — `upgrade_tools.sh` does not need a Discord entry.
+# =============================================================================
+
+- name: Warn Discord is amd64-only on Linux (aarch64)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'aarch64'
+  ansible.builtin.debug:
+    msg: >-
+      Discord does not publish an official aarch64 .deb. Skipping — install
+      via Flatpak (`flatpak install flathub com.discordapp.Discord`) or a
+      community build like Vesktop if you need it on ARM64.
+
+- name: Check if Discord is installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+  ansible.builtin.command: dpkg -s discord
+  register: discord_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Discord via .deb
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (gui_apps_linux_no_root | bool)
+    - discord_check.rc != 0
+  become: true
+  tags: [sudo]
+  block:
+    - name: Download latest Discord .deb (redirect from discord.com)
+      ansible.builtin.get_url:
+        url: https://discord.com/api/download?platform=linux&format=deb
+        dest: /tmp/discord.deb
+        mode: '0644'
+        timeout: 300
+        follow: true
+      register: discord_dl
+      ignore_errors: true
+
+    - name: Install Discord .deb
+      when: discord_dl is defined and discord_dl is succeeded
+      ansible.builtin.apt:
+        deb: /tmp/discord.deb
+        state: present
+      ignore_errors: true
+  rescue:
+    - name: Warn Discord .deb install failed
+      ansible.builtin.debug:
+        msg: >-
+          Discord .deb install failed. Fall back to the official tarball at
+          https://discord.com/api/download?platform=linux&format=tar.gz
+          (extract to ~/Applications/Discord/ and wire up a .desktop entry),
+          or use Flatpak: `flatpak install flathub com.discordapp.Discord`.
 
 # =============================================================================
 # Zen Browser — Firefox-based browser, shipped as an AppImage
