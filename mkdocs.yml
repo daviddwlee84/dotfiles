@@ -64,7 +64,9 @@ plugins:
           - tools/sesh.md
           - tools/clipboard.md
           - tools/agent-overlays.md
-        This repo:
+        Playbooks:
+          - playbooks/workflow.md
+        Repo internals:
           - this_repo/architecture.md
           - this_repo/fleet-apply.md
           - this_repo/instant-llm-fix-prior-art.md
@@ -105,6 +107,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Playbooks:
+    - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
   - Tools:
     - tools/aicapture.md
     - tmux:
@@ -160,7 +164,7 @@ nav:
     - Completions: zsh/zsh-completions.md
   - Neovim:
     - Floating TUI: neovim/floating-tui.md
-  - This Repo:
+  - Repo Internals:
     - Architecture: this_repo/architecture.md
     - Cheatsheet: this_repo/cheatsheet.md
     - Ansible customization: this_repo/ansible_customization.md

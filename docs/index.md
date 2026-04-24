@@ -14,7 +14,7 @@ For the quick-install path, supported platforms table, and the "what do I get" b
 | Understand the tmux config (popup menu, OSC 133, copy-mode) | [tmux](tools/tmux/README.md) |
 | Get tmux keybindings at a glance | [tmux keybindings](tools/tmux/keybindings.md) |
 | See every custom zsh alias / function | [zsh aliases](zsh/aliases.md) |
-| Sesh session workflow (shere / sroot / scode / svibe) | [sesh](tools/sesh.md) · [workflow playbook](this_repo/workflow.md) |
+| Sesh session workflow (shere / sroot / scode / svibe) | [sesh](tools/sesh.md) · [workflow playbook](playbooks/workflow.md) |
 | Set up the agent CLIs (claude / opencode / codex / cursor) | [agent overlays](tools/agent-overlays.md) |
 | Clipboard over SSH (OSC 52, `x copy`, Neovim integration) | [clipboard](tools/clipboard.md) |
 

@@ -18,7 +18,7 @@ Temporarily set `validation.links.anchors: info` in `mkdocs.yml` so the first de
 - `docs/tools/tmux/README.md` → `./keybindings.md#popup-menu-prefix--space`
 - `docs/zsh/aliases.md` → `#github--gitlab`, `#package-managers--runtime` (local ToC drift)
 - `docs/tools/opencode.md` → `agent-overlays.md#opencode--agentsopencodeoverlayjson`
-- `docs/this_repo/workflow.md` → `../tools/worktrunk.md#per-worktree-claude--opencode`
+- `docs/playbooks/workflow.md` → `../tools/worktrunk.md#per-worktree-claude--opencode`
 - `docs/this_repo/fleet-apply.md` → `#conflict-handling---force-vs---keep-going`
 - `docs/this_repo/cheatsheet.md` → `#pre-commit--gitleaks`
 - `docs/tools/chezmoi-prefixes.md` → `#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite`, `#dot_claudemodify_settingsjson--partial-json-management-via-jq`

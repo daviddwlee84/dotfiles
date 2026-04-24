@@ -30295,3 +30295,553 @@ _**Agent (claude-opus-4-7 2026-04-24 08:35:29Z)**_
 ## 其他 agent 的 WIP
 
 這個 session 期間 upstream 多出 3 個 commits (`c59a79b` / `963a29c` / `cd9f1a2`)，都是別的 agent 的 `.chezmoiscripts/` / `scripts/init/` 相關工作。我這邊不動它們。如果要回收之前 stash 的 WIP：`git stash list` 看還在不在，`git stash apply stash@{N}` 挑。
+
+---
+
+_**User (2026-04-24 09:20:10Z)**_
+
+好啊 繼續處理代辦 看看需不需要回收之前的stash
+另外我想把 @docs/this_repo/workflow.md 挪到比如叫做 cookbook還是playbook之類的欄位 然後往前放
+因爲This Repo是之前比較隨意整理docs時弄的名字 這個的話有點誤導找不到
+
+_**User (2026-04-24 09:20:26Z)**_
+
+[Request interrupted by user]
+
+_**User (2026-04-24 09:20:53Z)**_
+
+好啊 繼續處理待辦 看看需不需要回收之前的stash
+另外我想把 @docs/this_repo/workflow.md 挪到比如叫做 cookbook還是playbook之類的欄位 然後往前放
+因爲This Repo是之前比較隨意整理docs時弄的名字 這個的話有點誤導找不到
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:18Z)**_
+
+先看 stash + workflow.md 的 git 狀態。
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stash + workflow.md tracking state
+
+```bash
+git --no-pager stash list
+echo "---"
+git --no-pager log --oneline docs/this_repo/workflow.md | head -3
+git --no-pager ls-files -- docs/this_repo/workflow.md
+echo "---"
+git --no-pager status --short | head -15
+```
+
+```text
+stash@{0}: On main: others-wip-phase-A
+stash@{1}: autostash
+stash@{2}: WIP on main: 14e5329 Add tldr with languages fallback (default to Traditional Chinese)
+---
+3c9688e docs: add workflow.md "one key per intent" index + Pages deploy sentinel
+docs/this_repo/workflow.md
+---
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/statistics.json
+?? .specstory/history/2026-04-24_09-09-09Z-commit-commit-backup-e.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stash content vs current HEAD
+
+```bash
+git --no-pager stash show stash@{0} --stat
+echo "--- compare stash@{0} files vs HEAD ---"
+for f in $(git --no-pager stash show stash@{0} --name-only); do
+  # Is stash content already in HEAD?
+  if git --no-pager diff HEAD stash@{0} -- "$f" | grep -q "^[+-]"; then
+    echo "DIFFERS: $f"
+  else
+    echo "same:    $f"
+  fi
+done 2>&1 | head -20
+```
+
+```text
+ .chezmoi.toml.tmpl                                 |    6 +
+ .chezmoiignore.tmpl                                |    6 +
+ .pre-commit-config.yaml                            |    5 +-
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 2857 +++++++++++++++++++-
+ CLAUDE.md                                          |   22 +-
+ Dockerfile                                         |    2 +
+ README.md                                          |    1 +
+ docs/tools/aicapture.md                            |  225 ++
+ docs/tools/sesh.md                                 |   12 +-
+ docs/tools/tmux/README.md                          |   26 +-
+ dot_config/tmux/executable_sesh-picker.sh          |   40 +-
+ dot_config/tmux/keybindings.conf                   |   20 +-
+ dot_config/zsh/tools/22_sesh.zsh                   |   26 +-
+ justfile                                           |   29 +
+ scripts/init/dotfiles_init.py                      |  260 +-
+ scripts/redact_secrets.py                          |   18 +-
+ 16 files changed, 3397 insertions(+), 158 deletions(-)
+--- compare stash@{0} files vs HEAD ---
+DIFFERS: .chezmoi.toml.tmpl
+DIFFERS: .chezmoiignore.tmpl
+same:    .pre-commit-config.yaml
+DIFFERS: .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+DIFFERS: CLAUDE.md
+DIFFERS: Dockerfile
+DIFFERS: README.md
+DIFFERS: docs/tools/aicapture.md
+DIFFERS: docs/tools/sesh.md
+same:    docs/tools/tmux/README.md
+DIFFERS: dot_config/tmux/executable_sesh-picker.sh
+DIFFERS: dot_config/tmux/keybindings.conf
+DIFFERS: dot_config/zsh/tools/22_sesh.zsh
+DIFFERS: justfile
+DIFFERS: scripts/init/dotfiles_init.py
+DIFFERS: scripts/redact_secrets.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:21:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:00Z)**_
+
+Stash@{0} 已過時 (HEAD 自己被 other agents 推進，stash 是舊快照)。Drop 掉，進 workflow.md 搬家。
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Drop obsolete stash@{0}
+
+```bash
+git stash drop stash@{0}
+git --no-pager stash list
+```
+
+```text
+Dropped stash@{0} (00bfe277a526389239fabdfaed81d71884f1ac79)
+stash@{0}: autostash
+stash@{1}: WIP on main: 14e5329 Add tldr with languages fallback (default to Traditional Chinese)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find all cross-references to workflow.md
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+echo "=== refs to workflow.md ==="
+grep -rn 'workflow\.md\|this_repo/workflow' docs/ README.md CLAUDE.md mkdocs.yml 2>/dev/null | grep -v "^Binary" | head -30
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+=== refs to workflow.md ===
+docs/index.md:17:| Sesh session workflow (shere / sroot / scode / svibe) | [sesh](tools/sesh.md) · [workflow playbook](this_repo/workflow.md) |
+docs/neovim/floating-tui.md:34:For the managed `gh-dash` / `diffnav` / `lazygit` setup behind `<leader>zg`, see [Git Diff Workflow](../tools/git_diff_workflow.md).
+README.md:369:See [CLAUDE.md](CLAUDE.md) for the agent-facing repo contract, [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for ansible customization, [docs/this_repo/testing.md](docs/this_repo/testing.md) for shell-script testing (bats, shellcheck, shfmt — and when to reach for ZUnit / ShellSpec instead), [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/tmux/README.md](docs/tools/tmux/README.md) for tmux usage and managed keybindings, [docs/tools/clipboard.md](docs/tools/clipboard.md) for how OSC 52 clipboard sync is wired across terminal / tmux / Neovim / `x` CLI (including SSH-remote yank), [docs/tools/ghostty.md](docs/tools/ghostty.md) for Ghostty/cmux notes and the `ghostty-ssh-terminfo` helper, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/pre-commit.md](docs/tools/pre-commit.md) for generic pre-commit reference (hook env model, `uv`-pinned bootstrap Python, debugging), [docs/tools/git_diff_workflow.md](docs/tools/git_diff_workflow.md) for the managed Git diff stack, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, [docs/tools/networking.md](docs/tools/networking.md) for networking tools, and [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md) for chezmoi source-state prefix semantics and when each is safe to `chezmoi add`.
+mkdocs.yml:136:      - git diff workflow: tools/git_diff_workflow.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+sesh + worktrunk refs
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+grep -rn 'this_repo/workflow\|workflow\.md' docs/tools/sesh.md docs/tools/worktrunk.md README.md 2>/dev/null | head
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+README.md:369:See [CLAUDE.md](CLAUDE.md) for the agent-facing repo contract, [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for ansible customization, [docs/this_repo/testing.md](docs/this_repo/testing.md) for shell-script testing (bats, shellcheck, shfmt — and when to reach for ZUnit / ShellSpec instead), [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/tmux/README.md](docs/tools/tmux/README.md) for tmux usage and managed keybindings, [docs/tools/clipboard.md](docs/tools/clipboard.md) for how OSC 52 clipboard sync is wired across terminal / tmux / Neovim / `x` CLI (including SSH-remote yank), [docs/tools/ghostty.md](docs/tools/ghostty.md) for Ghostty/cmux notes and the `ghostty-ssh-terminfo` helper, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/pre-commit.md](docs/tools/pre-commit.md) for generic pre-commit reference (hook env model, `uv`-pinned bootstrap Python, debugging), [docs/tools/git_diff_workflow.md](docs/tools/git_diff_workflow.md) for the managed Git diff stack, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, [docs/tools/networking.md](docs/tools/networking.md) for networking tools, and [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md) for chezmoi source-state prefix semantics and when each is safe to `chezmoi add`.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+All references to workflow.md across whole repo
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+# Broader grep across all repo (not just docs)
+grep -rn 'this_repo/workflow\|docs/this_repo/workflow\|workflow playbook' --include='*.md' --include='*.toml' --include='*.conf' --include='*.sh' --include='*.py' . 2>/dev/null | grep -v node_modules | grep -v site/ | grep -v .git/ | grep -v .venv/ | head -20
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+README.md:151:- `~/.config/worktrunk/config.toml` - Worktrunk (`wt`) git-worktree manager config — aliases (`wt sw`/`ls`/`rm`/`cc`/`oc`); hooks & LLM commit generation kept commented as opt-in ([workflow playbook](docs/tools/worktrunk.md))
+README.md:225:- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, worktrunk ([workflow playbook](docs/tools/worktrunk.md)), zellij, btop, htop, taplo, television, pandoc
+backlog/mkdocs-anchor-drift.md:21:- `docs/this_repo/workflow.md` → `../tools/worktrunk.md#per-worktree-claude--opencode`
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:3759:5. Any existing documentation on "how I switch projects" in `docs/tools/tmux/`, `docs/tools/sesh.md`, or `docs/workflow.md`/`docs/this_repo/workflow.md`?
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:6623:5	**workflow playbook**: how I actually use it in this dotfiles environment,
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7478:- **Docs-only 工作流手冊 (Recommended)** - 寫一份 docs/this_repo/workflow.md,把 sesh / worktrunk / zoxide / tv / yazi 的既有能力整合成一套「不用記指令」的 decision tree + 快捷鍵清單。不動 code。最低風險、可迭代。
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7620:**New file**: `docs/this_repo/workflow.md` — single-page playbook.
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7651:`docs/this_repo/workflow.md`." Do the same for the `Alt+S` row.
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7660:| `docs/this_repo/workflow.md` | **new**; single-page end-to-end playbook |
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7701:7. **Docs sanity**: grep that `docs/this_repo/workflow.md` resolves all relative
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7848:**New file**: `docs/this_repo/workflow.md` — single-page playbook.
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7879:`docs/this_repo/workflow.md`." Do the same for the `Alt+S` row.
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7888:| `docs/this_repo/workflow.md` | **new**; single-page end-to-end playbook |
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:7929:7. **Docs sanity**: grep that `docs/this_repo/workflow.md` resolves all relative
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:8355:Task #3 created successfully: Write docs/this_repo/workflow.md
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:8605:# docs/this_repo/workflow.md for the user-facing flow.
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:8921:File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/workflow.md
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:9098:151:- `~/.config/worktrunk/config.toml` - Worktrunk (`wt`) git-worktree manager config — aliases (`wt sw`/`ls`/`rm`/`cc`/`oc`); hooks & LLM commit generation kept commented as opt-in ([workflow playbook](docs/tools/worktrunk.md))
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:9107:224:- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, worktrunk ([workflow playbook](docs/tools/worktrunk.md)), zellij, btop, htop, taplo, television, pandoc
+.specstory/history/2026-04-24_06-31-18Z-yazi-z-zoxide-sesh.md:9299:+# docs/this_repo/workflow.md for the user-facing flow.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:22:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find all relative references to workflow.md in docs
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+grep -rn 'this_repo/workflow\.md\|\.\./\.\./workflow\.md\|\.\./workflow\.md' --include='*.md' . 2>/dev/null | grep -v .specstory/ | grep -v site/
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+backlog/mkdocs-anchor-drift.md:21:- `docs/this_repo/workflow.md` → `../tools/worktrunk.md#per-worktree-claude--opencode`
+.claude/plans/yazi-z-swift-rain.md:110:**New file**: `docs/this_repo/workflow.md` — single-page playbook.
+.claude/plans/yazi-z-swift-rain.md:141:`docs/this_repo/workflow.md`." Do the same for the `Alt+S` row.
+.claude/plans/yazi-z-swift-rain.md:150:| `docs/this_repo/workflow.md` | **new**; single-page end-to-end playbook |
+.claude/plans/yazi-z-swift-rain.md:191:7. **Docs sanity**: grep that `docs/this_repo/workflow.md` resolves all relative
+docs/index.md:17:| Sesh session workflow (shere / sroot / scode / svibe) | [sesh](tools/sesh.md) · [workflow playbook](this_repo/workflow.md) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+sesh + worktrunk workflow mentions
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+# Also check docs/tools/sesh.md and docs/tools/worktrunk.md for internal workflow.md refs
+grep -n 'workflow' docs/tools/sesh.md docs/tools/worktrunk.md 2>/dev/null | head -20
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+docs/tools/sesh.md:54:> because the heavy editor-first workflow is now `scode`. If you want the old
+docs/tools/sesh.md:75:the headline pain point of the old `sesh connect coding-agent` workflow:
+docs/tools/sesh.md:137:> `coding-agent` workflow was "I hit Ctrl+C in the agent and lost the pane
+docs/tools/sesh.md:452:Existing entries with higher scores are preserved. Sample workflow lives
+docs/tools/worktrunk.md:5:**workflow playbook**: how I actually use it in this dotfiles environment,
+docs/tools/worktrunk.md:448:| **Claude headless** | Agent-driven workflow, want the agent to also write the message | `command = "claude -p"` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:12Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Current workflow refs in mkdocs.yml
+
+`grep -n 'workflow' /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml | head`
+
+```text
+56:        workflows on macOS / Ubuntu. Covers tmux, zsh, OSC 133 shell
+136:      - git diff workflow: tools/git_diff_workflow.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Move file + check its internal relative links
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+mkdir -p docs/playbooks
+git mv docs/this_repo/workflow.md docs/playbooks/workflow.md
+# Verify relative links in workflow.md still resolve
+grep -n '\.\./\|tools/\|this_repo/' docs/playbooks/workflow.md | head -15
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+7:[`docs/tools/sesh.md`](../tools/sesh.md) (picker, layouts, sesh config),
+8:[`docs/tools/worktrunk.md`](../tools/worktrunk.md) (worktrees, parallel agents,
+9:hooks), and [`docs/tools/tmux/`](../tools/tmux/) (panes, popup menu, theme).
+19:| Spin up a new parallel branch + agent | `wt cc <branch> -- '<prompt>'` | [`worktrunk.md`](../tools/worktrunk.md#per-worktree-claude--opencode) |
+20:| Peek at sibling worktree (no session swap) | `wtcd` (fzf-tmux picker) | [`worktrunk.md`](../tools/worktrunk.md#the-wtcd-rationale) |
+21:| Refresh coding-agent layout on current repo | `scode` (manual override) | [`sesh.md`](../tools/sesh.md) |
+76:See [`docs/tools/sesh.md`](../tools/sesh.md) for the full helper spec.
+82:Stolen from [`docs/tools/worktrunk.md`](../tools/worktrunk.md#mental-model)
+155:- [`docs/tools/sesh.md`](../tools/sesh.md) — sesh config, helpers, sesh.toml
+157:- [`docs/tools/worktrunk.md`](../tools/worktrunk.md) — worktree workflow,
+159:- [`docs/tools/tmux/`](../tools/tmux/) — tmux config, popup menu, OSC 52
+161:- [`docs/zsh/aliases.md`](../zsh/aliases.md) — every alias and function
+163:- [`dot_config/tmux/executable_smart-picker.sh`](../../dot_config/tmux/executable_smart-picker.sh)
+165:- [`dot_config/sesh/sesh.toml`](../../dot_config/sesh/sesh.toml) — named
+173:[`TODO.md`](../../TODO.md) and [`backlog/`](../../backlog/README.md):
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:49Z)**_
+
+既然 workflow.md 是同層級 subdir 搬家，相對連結都還對得上。繼續改 cross-refs + nav，順帶把 "This Repo" label 改成 "Repo Internals"（較貼合內容：architecture / fleet / testing / sudo / upgrades…）。
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/index.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:23:59Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/backlog/mkdocs-anchor-drift.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:04Z)**_
+
+現在 mkdocs.yml — 加 "Playbooks" 到 Home 之後、改 "This Repo" → "Repo Internals"：
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:04Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./mkdocs.yml`
+
+```text
+92	  - pymdownx.details
+93	  - pymdownx.superfences
+94	  - pymdownx.highlight:
+95	      anchor_linenums: true
+96	  - pymdownx.inlinehilite
+97	  - pymdownx.snippets:
+98	      base_path:
+99	        - .
+100	        - docs
+101	        - docs/_snippets
+102	      check_paths: true
+103	  - pymdownx.tabbed:
+104	      alternate_style: true
+105	
+106	nav:
+107	  - Home: index.md
+108	  - Tools:
+109	    - tools/aicapture.md
+110	    - tmux:
+111	      - Overview: tools/tmux/README.md
+112	      - Keybindings: tools/tmux/keybindings.md
+113	      - Themes: tools/tmux/themes.md
+114	      - Vim integration: tools/tmux/vim.md
+115	    - Shell & terminal:
+116	      - Ghostty: tools/ghostty.md
+117	      - Starship: tools/starship.md
+118	      - Clipboard: tools/clipboard.md
+119	      - XDG: tools/xdg.md
+120	      - Fzf: tools/fzf.md
+121	      - Television (tv): tools/tv.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Strict build verification
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+uv run mkdocs build --strict 2>&1 | tail -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+INFO    -  Doc file 'zsh/aliases.md' contains a link '#github--gitlab', but there is no such anchor on this page.
+INFO    -  Doc file 'zsh/aliases.md' contains a link '#package-managers--runtime', but there is no such anchor on this page.
+INFO    -  Documentation built in 2.32 seconds
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:52Z)**_
+
+Build 通。Commit + push：
+
+_**Agent (claude-opus-4-7 2026-04-24 09:24:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage for commit
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+uv run --script scripts/redact_secrets.py --fix >/dev/null 2>&1
+git --no-pager status --short | head
+echo "---"
+# Stage: the rename + related nav / link updates + my specstory
+git add \
+  docs/this_repo/workflow.md \
+  docs/playbooks/workflow.md \
+  docs/index.md \
+  backlog/mkdocs-anchor-drift.md \
+  mkdocs.yml \
+  .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git --no-pager diff --cached --stat
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/statistics.json
+ M backlog/mkdocs-anchor-drift.md
+ M docs/assets/copy-to-llm/copy-to-llm-custom.css
+ M docs/index.md
+R  docs/this_repo/workflow.md -> docs/playbooks/workflow.md
+ M mkdocs.yml
+?? .specstory/history/2026-04-24_09-09-09Z-commit-commit-backup-e.md
+---
+fatal: pathspec 'docs/this_repo/workflow.md' did not match any files
+ docs/{this_repo => playbooks}/workflow.md | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 09:25:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 09:25:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage cleanly
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+git add docs/playbooks/workflow.md docs/index.md backlog/mkdocs-anchor-drift.md mkdocs.yml .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git --no-pager diff --cached --stat
+```
+</details></tool-use>
