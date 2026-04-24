@@ -2296,3 +2296,94 @@ Find latest specstory files
 .rw-rw-r--  93k daviddwlee84 25 Apr 02:49  2026-04-24_13-41-56Z-macos-arc-ubuntu-desktop.md
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 18:49:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 18:49:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage Discord-related files
+
+`git add dot_ansible/roles/gui_apps_linux/tasks/main.yml README.md dot_config/homebrew/Brewfile.darwin.tmpl .specstory/history/2026-04-24_13-41-56Z-macos-arc-ubuntu-desktop.md && git status --short`
+
+```text
+ M .specstory/history/2026-04-24_13-34-14Z.md
+M  .specstory/history/2026-04-24_13-41-56Z-macos-arc-ubuntu-desktop.md
+M  README.md
+ M docs/assets/copy-to-llm/copy-to-llm-custom.css
+M  dot_ansible/roles/gui_apps_linux/tasks/main.yml
+M  dot_config/homebrew/Brewfile.darwin.tmpl
+?? .specstory/history/2026-04-23_14-43-13Z-for-the-ubuntu-desktop.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 18:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Create Discord commit
+
+```bash
+git commit -m "$(cat <<'EOF'
+ansible: add Discord (.deb on Ubuntu x86_64) + enable cask on macOS
+
+Ubuntu Desktop gets the official discord.com .deb via the Cursor pattern —
+aarch64 is skipped (no official ARM64 build; debug message points at
+Flatpak / Vesktop). Discord auto-updates in-app on launch, so no
+upgrade_tools.sh entry is needed. macOS side uncomments `cask "discord"`
+in Brewfile.darwin.tmpl.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1777056580-1237877.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1777056580-1237877.
+[main 85b5ca3] ansible: add Discord (.deb on Ubuntu x86_64) + enable cask on macOS
+ 4 files changed, 676 insertions(+), 5 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 18:49:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit and leftover state
+
+`git log --oneline -3 && echo "---" && git status --short`
+
+```text
+85b5ca3 ansible: add Discord (.deb on Ubuntu x86_64) + enable cask on macOS
+cf48f02 ansible: add Zen Browser to gui_apps_linux (AppImage + .desktop)
+31e545d shell: default Homebrew mirror Aliyun (was TUNA) + brew-mirror switcher
+---
+ M .specstory/history/2026-04-24_13-34-14Z.md
+ M .specstory/history/2026-04-24_13-41-56Z-macos-arc-ubuntu-desktop.md
+ M docs/assets/copy-to-llm/copy-to-llm-custom.css
+?? .specstory/history/2026-04-23_14-43-13Z-for-the-ubuntu-desktop.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 18:49:51Z)**_
+
+Commit `85b5ca3` 入庫：**ansible: add Discord (.deb on Ubuntu x86_64) + enable cask on macOS**，4 files / +676 / -5（含本次 SpecStory 的 Discord 部分）。pre-commit 全綠。
+
+剩餘 working tree 都是無關項目：另一個 session 的 transcript 持續追加、本次 SpecStory 被 commit 動作本身又加了幾行、`copy-to-llm-custom.css` 跟 `2026-04-23_*` 則是 pre-existing — 不屬於本次工作。

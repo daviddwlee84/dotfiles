@@ -392,7 +392,6 @@
         dest: /tmp/cursor.deb
         mode: '0644'
         timeout: 300
-        follow: true
       register: cursor_dl
       ignore_errors: true
 
