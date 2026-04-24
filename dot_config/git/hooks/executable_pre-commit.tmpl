@@ -17,7 +17,7 @@ fi
 # Run gitleaks on ALL repos (user opted in via chezmoi init)
 if command -v gitleaks >/dev/null 2>&1; then
     # Only scan staged files for speed
-    if ! gitleaks protect --staged --verbose; then
+    if ! gitleaks git --staged --verbose; then
         echo "[global pre-commit] gitleaks detected secrets in staged files!" >&2
         exit 1
     fi
@@ -26,7 +26,7 @@ fi
 
 # Run gitleaks only if repo has .gitleaks.toml (default behavior)
 if [ -f .gitleaks.toml ] && command -v gitleaks >/dev/null 2>&1; then
-    if ! gitleaks protect --staged --verbose; then
+    if ! gitleaks git --staged --verbose; then
         echo "[global pre-commit] gitleaks detected secrets in staged files!" >&2
         exit 1
     fi

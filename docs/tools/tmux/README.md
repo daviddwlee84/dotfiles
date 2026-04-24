@@ -175,6 +175,8 @@ The TUI lets you: (1) pick a command from `fc -ln -20`, (2) preview the captured
 
 Advisory-only by design: there is no `--execute` / `--allow-edits` flag on the shell wrappers. If you want the agent to apply edits, use the TUI's "Spawn interactive agent" action and drive it by hand.
 
+For where this fits in the broader "LLM-powered `thefuck` successor" design space (shell_gpt, aichat, wut, tmuxai, butterfish, Warp, Amazon Q, atuin, OSC 133 terminals) and what our aicapture layer does well vs what we could steal from the alternatives, see [`docs/this_repo/instant-llm-fix-prior-art.md`](../../this_repo/instant-llm-fix-prior-art.md).
+
 Opt out per shell: `export DISABLE_OSC133=1` before starting zsh. The tmux bindings become no-ops automatically when markers are absent — **including in shells that pre-date the `chezmoi apply` that added the hook** (reloading tmux config doesn't re-source zsh; run `exec zsh` in the affected pane or open a new one). Symptom of a pre-hook shell: `prefix + M-y` / `M-i` flash their success message but paste is empty. Verify with `echo $precmd_functions | tr ' ' '\n' | grep osc133`.
 
 ## Reload Config

@@ -8,11 +8,15 @@ Check for secrets in agent artifact directories (specstory history + coding
 agent plan dirs) using gitleaks and detect-private-key patterns. Reports
 findings and suggests redaction.
 
-Default covered prefixes:
+Default covered prefixes (kept in sync with agent-skills'
+agent-history-hygiene/assets/artifact-dirs.txt):
     .specstory/history/   (SpecStory chat transcripts)
     .claude/plans/        (Claude Code plans)
     .cursor/plans/        (Cursor plans)
+    .cursor/rules/        (Cursor rules)
     .opencode/plans/      (OpenCode plans)
+    .specify/             (GitHub spec-kit artifacts)
+    .codex/               (Codex CLI artifacts)
 
 Usage:
     ./scripts/redact_secrets.py                         # Check staged files (default paths)
@@ -34,7 +38,10 @@ DEFAULT_PATHS = [
     ".specstory/history",
     ".claude/plans",
     ".cursor/plans",
+    ".cursor/rules",
     ".opencode/plans",
+    ".specify",
+    ".codex",
 ]
 
 # Repo-root gitleaks config; we pass it explicitly so custom rules apply
@@ -57,9 +64,10 @@ def run_gitleaks_staged() -> list[dict]:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         report_path = f.name
 
+    # Post v8.19.0 `gitleaks protect` is deprecated in favor of `gitleaks git`.
     cmd = [
         "gitleaks",
-        "protect",
+        "git",
         "--staged",
         "--report-format",
         "json",
@@ -87,10 +95,10 @@ def run_gitleaks_workdir(target_path: str) -> list[dict]:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         report_path = f.name
 
+    # Post v8.19.0 `gitleaks detect` is deprecated in favor of `gitleaks dir`.
     cmd = [
         "gitleaks",
-        "detect",
-        "--source",
+        "dir",
         target_path,
         "--report-format",
         "json",

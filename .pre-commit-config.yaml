@@ -14,7 +14,7 @@ repos:
         entry: ./scripts/redact_secrets.py --fix
         language: system
         pass_filenames: false
-        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.opencode/plans)/.*\.md$
+        files: ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
 
   # Gitleaks - detect secrets (blocks commit if secrets found)
   - repo: https://github.com/gitleaks/gitleaks
