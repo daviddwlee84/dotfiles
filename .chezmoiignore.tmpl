@@ -14,6 +14,12 @@ docker-compose.yml
 justfile
 .dockerignore
 
+# curl|sh bootstrap for `dotfiles-init` — lives at repo root so
+# `curl … | bash` is a simple one-liner, but it's tooling-for-init,
+# not something that should land in $HOME/bootstrap.sh.
+# See scripts/init/README.md.
+bootstrap.sh
+
 *.txt   # ignore *.txt in the target directory
 */*.txt # ignore *.txt in subdirectories of the target directory
         # but not in subdirectories of subdirectories;

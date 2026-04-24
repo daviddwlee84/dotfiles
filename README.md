@@ -53,8 +53,20 @@ flowchart TB
 
 ## Quick Setup
 
+### Interactive (recommended)
+
 ```bash
-# One-liner to initialize and apply (installs chezmoi to ~/.local/bin)
+curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | bash
+```
+
+Installs [`uv`](https://docs.astral.sh/uv/) (if missing) and launches `dotfiles-init` — a Python wrapper that groups the ~19 chezmoi prompts into a clean multi-select UI, offers pre-set bundles (`personal-mac` / `work-mac` / `server-linux` / `minimal`), checks SSH keys, then calls real `chezmoi init` with your answers pre-filled. Full docs: [`scripts/init/README.md`](scripts/init/README.md).
+
+Behind GFW? Set `DOTFILES_RAW_URL` / `DOTFILES_REF` to point at a mirror, or use the non-interactive path below.
+
+### Non-interactive (direct chezmoi)
+
+```bash
+# Installs chezmoi to ~/.local/bin and walks through the raw prompts one-by-one.
 # Uses HTTPS to avoid SSH key setup on fresh machines.
 export GITHUB_USERNAME=daviddwlee84
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" init --apply "https://github.com/$GITHUB_USERNAME/dotfiles.git"

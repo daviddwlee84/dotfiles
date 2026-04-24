@@ -23,14 +23,15 @@ Keep README.md concise and user-focused. Technical details belong here or in `do
 
 When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
 
-### Dockerfile
+### Dockerfile + dotfiles_init wrapper
 
-When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, also update `Dockerfile`:
+When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, three files must be updated in the same commit:
 
-1. Add corresponding `ARG CHEZMOI_*` build argument.
-2. Add `--promptBool` or `--promptString` flag to the `chezmoi init` command.
+1. `Dockerfile` — add `ARG CHEZMOI_*` build argument, add `--promptBool` / `--promptString` flag to `chezmoi init`.
+2. `scripts/init/dotfiles_init.py` — add a matching entry to the `PROMPTS` tuple (key, kind, group, label, desc, default).
+3. (If the prompt should be part of any named bundle) `BUNDLES` dict in the same file.
 
-This keeps Docker testing in sync with all configuration options.
+Verify parity with: `uv run --script scripts/init/dotfiles_init.py doctor`. The subcommand greps `.chezmoi.toml.tmpl` + `Dockerfile` and compares against the embedded `PROMPTS`; non-zero exit means drift.
 
 ### Agent artifact redaction
 
