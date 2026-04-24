@@ -57,7 +57,7 @@ chmod +x ~/Applications/appimagelauncher-lite.AppImage
 ~/Applications/appimagelauncher-lite.AppImage install   # one-time integration
 ```
 
-The Ansible role runs this when `gui_apps_linux_no_root=true` is passed (automatically set by `run_onchange_after_20_ansible_roles.sh.tmpl` in the `noRoot` chezmoi profile).
+The Ansible role runs this when `gui_apps_linux_no_root=true` is passed (automatically set by `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl` in the `noRoot` chezmoi profile).
 
 ## `ail-cli` — scripted integration
 

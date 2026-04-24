@@ -24,8 +24,8 @@ chezmoi repo/
 | Script | Behavior |
 |--------|----------|
 | `run_once_before_00_bootstrap.sh.tmpl` | Installs Homebrew (macOS and Linux), uv, mise, ansible |
-| `run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
-| `run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps`, or on macOS if `installAiDesktopApps`) |
+| `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl` | Runs ansible with all tags |
+| `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` | Runs brew bundle (if `installBrewApps`, or on macOS if `installAiDesktopApps`) |
 
 The onchange script includes SHA256 hashes of all role files. It runs on **fresh install** (no previous hash state) and on **updates** (any role's `tasks/main.yml` or `defaults/main.yml` changes).
 

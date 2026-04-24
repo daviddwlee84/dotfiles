@@ -50,7 +50,7 @@ places so every code path gets the mirror:
 |---|---|---|
 | Interactive shells | `dot_config/zsh/00_exports.zsh.tmpl` | `brew install`, `rustup install`, `mise install`, `go install` from the terminal |
 | First-run bootstrap | `run_once_before_00_bootstrap.sh.tmpl` | Installing Homebrew itself, first `brew install` + first `uv`/`ansible` setup (before `.zshrc` exists) |
-| Ansible re-runs | `run_onchange_after_20_ansible_roles.sh.tmpl` | `community.general.homebrew`, `mise install`, etc. in ansible subprocesses — regardless of the shell that invoked `chezmoi apply` |
+| Ansible re-runs | `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl` | `community.general.homebrew`, `mise install`, etc. in ansible subprocesses — regardless of the shell that invoked `chezmoi apply` |
 
 ## What's NOT auto-mirrored (and why)
 
@@ -102,7 +102,7 @@ When adding a new ansible task that runs `npm install -g <pkg>`:
 1. Identify the ecosystem (env var or config file driven?).
 2. **Env-var driven**: add to all three layers (`00_exports.zsh.tmpl` +
    `run_once_before_00_bootstrap.sh.tmpl` +
-   `run_onchange_after_20_ansible_roles.sh.tmpl`) inside the
+   `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`) inside the
    `{{ if .useChineseMirror -}} ... {{ end -}}` block.
 3. **Config-file driven**: template the config under
    `dot_<tool>/<config>.tmpl` with `{{ if .useChineseMirror }} ... {{ else }} ... {{ end }}`.

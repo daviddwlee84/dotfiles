@@ -58,7 +58,7 @@ if [[ -f "$_REPO_ROOT/scripts/lib/sudo_shared.sh" ]]; then
 fi
 
 # ----------------------------------------------------------------------------
-# Homebrew PATH detection (mirrors run_onchange_after_30_brew_bundle.sh.tmpl)
+# Homebrew PATH detection (mirrors .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl)
 # ----------------------------------------------------------------------------
 setup_brew_path() {
   if command -v brew >/dev/null 2>&1; then

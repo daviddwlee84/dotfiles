@@ -171,4 +171,4 @@ sudo update-locale LANG=en_US.UTF-8
 
 ## This Dotfiles Repo
 
-The bootstrap script (`run_once_before_00_bootstrap.sh.tmpl`) detects broken locales and falls back to `C.UTF-8` before running Ansible. The ansible onchange script (`run_onchange_after_20_ansible_roles.sh.tmpl`) unconditionally exports `LC_ALL=C.UTF-8` for the same reason.
+The bootstrap script (`run_once_before_00_bootstrap.sh.tmpl`) detects broken locales and falls back to `C.UTF-8` before running Ansible. The ansible onchange script (`.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`) unconditionally exports `LC_ALL=C.UTF-8` for the same reason.

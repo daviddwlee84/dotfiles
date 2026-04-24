@@ -37,16 +37,24 @@ Verify parity with: `uv run --script scripts/init/dotfiles_init.py doctor`. The 
 
 SpecStory transcripts and coding-agent plan files commonly paste shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
 
-| Prefix | Source |
-|--------|--------|
-| `.specstory/history/` | SpecStory chat transcripts |
-| `.claude/plans/` | Claude Code plan files |
-| `.cursor/plans/` | Cursor plan files |
-| `.opencode/plans/` | OpenCode plan files |
+| Prefix | Source | Suffix |
+|--------|--------|--------|
+| `.specstory/history/` | SpecStory chat transcripts | `.md` |
+| `.claude/plans/` | Claude Code plan files | `.md` |
+| `.cursor/plans/` | Cursor plan files | `.md` |
+| `.cursor/rules/` | Cursor rules files | `.md` |
+| `.opencode/plans/` | OpenCode plan files | `.md` |
+| `.specify/` | Specify plan files | `.md` |
+| `.codex/` | Codex plan files | `.md` |
+| `raycast/` | Raycast config sync (non-Pro) — see [docs/tools/raycast-sync.md](docs/tools/raycast-sync.md) | `.json` |
 
 Tooling: `scripts/redact_secrets.py` (gitleaks + `PRIVATE KEY` pattern), `just check-secrets` / `just redact-secrets` / `just add-and-redact`. Pre-commit hook `redact-agent-secrets` runs `--fix` before `gitleaks-system`; if it rewrites a file, stage and retry.
 
-When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+When introducing a new agent-artifact or config-sync directory that could contain secrets, update **three** places in the same commit:
+
+1. `DEFAULT_PATHS` in `scripts/redact_secrets.py`
+2. `REDACTABLE_SUFFIXES` in `scripts/redact_secrets.py` if the new surface is not `.md` (Raycast adds `.json`)
+3. `files:` regex of the `redact-agent-secrets` pre-commit hook in `.pre-commit-config.yaml`
 
 ### Keyboard shortcuts (cross-tool conflict check)
 
@@ -68,7 +76,7 @@ Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV glo
 
 This repo uses the `project-knowledge-harness` agent skill (managed via
 `~/.agents/.skill-lock.json` → restored by
-`run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
+`.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
 see [docs/tools/agent-skills.md](docs/tools/agent-skills.md)). **Load the skill**
 for the full template, disambiguation table, and upgrade path.
 

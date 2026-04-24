@@ -3,8 +3,8 @@
 #
 # Consumed by:
 #   - run_once_before_00_bootstrap.sh.tmpl
-#   - run_onchange_after_20_ansible_roles.sh.tmpl
-#   - run_onchange_after_30_brew_bundle.sh.tmpl
+#   - .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl
+#   - .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
 # via `{{ include "scripts/lib/sudo_shared.sh" }}` at render time. `include`
 # (not `includeTemplate`) is used because this file is plain bash, not a
 # chezmoi template — no `{{ … }}` tokens need re-rendering.

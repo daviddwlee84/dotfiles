@@ -33,7 +33,7 @@ __pycache__/
 # Agent skills (installed via `npx skills`). Only the lock file is tracked;
 # the skill source clones are owned by the npx CLI (rewritten on every
 # `update`). Auto-restored on `chezmoi apply` by
-# run_onchange_after_45_repo_bootstrap_skills.sh.tmpl, or manually via
+# .chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl, or manually via
 # `just bootstrap-skills`. See docs/tools/agent-skills.md.
 .agents/
 .claude/skills/

@@ -180,7 +180,7 @@ The `iac_tools` role already retries each brew install 3 times with a 20s delay 
 
    - `~/.config/zsh/00_exports.zsh` — for interactive shells
    - `run_once_before_00_bootstrap.sh` — for the first-run Homebrew installer
-   - `run_onchange_after_20_ansible_roles.sh` — so ansible's `community.general.homebrew` subprocess inherits them
+   - `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh` — so ansible's `community.general.homebrew` subprocess inherits them
 
    If you didn't enable it at init, re-run `chezmoi init` (or edit `~/.config/chezmoi/chezmoi.toml` and set `useChineseMirror = true`) then `chezmoi apply`. To set it manually for a one-off session:
 

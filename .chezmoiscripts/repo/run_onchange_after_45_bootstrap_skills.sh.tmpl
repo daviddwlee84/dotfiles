@@ -4,16 +4,15 @@
 # chezmoi repo itself (i.e. you're using this machine to edit the repo with an
 # agent, not just consuming dotfiles from it).
 #
-# Naming convention (provisional, will be formalised in a future refactor):
-#   `repo_` infix = scope is THIS chezmoi repo's working tree (project-scope).
-#   No infix     = global / every-machine (current default — most run_onchange
-#                  scripts here belong to that bucket).
-# See pitfalls/ for the eventual rename plan.
+# Scope encoded by directory: lives under `.chezmoiscripts/repo/` because it
+# only fires when the source dir IS this repo. Global counterparts live under
+# `.chezmoiscripts/global/`. See docs/this_repo/chezmoiscripts-layout.md.
 #
 # Why this script exists:
 #   Global skills (`~/.agents/skills/`) are restored by
-#   run_onchange_after_40_install_global_skills.sh.tmpl from the merged
-#   ~/.agents/.skill-lock.json. That handles the "every machine" case.
+#   .chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl
+#   from the merged ~/.agents/.skill-lock.json. That handles the "every
+#   machine" case.
 #
 #   Project skills (`./.agents/skills/` inside this repo) are different: they
 #   only make sense when an agent is launched from the repo working tree to

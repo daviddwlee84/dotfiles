@@ -35,7 +35,6 @@ with a one-line summary of what shipped.
 ## P2 — Worth doing, no rush
 
 - [ ] **[M] miniforge/conda ansible role** — `dot_config/zsh/tools/04_conda_mamba.zsh` already lazy-loads if conda is present, but no role installs it. Decide: ansible role vs delegate to `mise`/`brew install --cask miniforge`.
-- [ ] **[M] Migrate `run_onchange_*` scripts into `.chezmoiscripts/{global,repo}/`** — repo root has 6 `run_onchange_after_*.sh.tmpl` files mixing genuinely-global (ansible_roles, brew_bundle, install_skills) with repo-scope (`repo_bootstrap_skills`, only meaningful when source dir == this repo). The `repo_` infix added in Step 1 is provisional; Step 2 makes the scope explicit via directory name. Layout decided 2026-04 after 8-option brainstorm: pure-scope 2-dir layout (Option A). Nested folders are de facto supported (twpayne's own dotfiles use the pattern; issues #2013, #3246). One-time cost: every machine re-runs ansible playbook idempotently (~5-10 min). → [research](backlog/chezmoiscripts-namespace-refactor.md)
 - [ ] **[M] nvm ansible role** — `02_legacy_tools.zsh` wires PATH + provides `load-nvm` alias, but no role installs nvm itself. May be obviated by mise consolidation (see P? below).
 - [ ] **[S] bun / pnpm / go install via ansible** — PATH wiring already in `02_legacy_tools.zsh`; just need install steps (likely additions to `js_cli_tools` and a new `go_tools` role, or fold into `devtools`).
 - [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`).
@@ -64,6 +63,8 @@ with a one-line summary of what shipped.
 ---
 
 ## Done (recent, kept for context — older items pruned)
+
+- ✅ **`.chezmoiscripts/{global,repo}/` layout** — six `run_onchange_after_*.sh.tmpl` scripts moved out of repo root into a 2-bucket nested layout (Option A). `repo_` infix dropped from `45_bootstrap_skills` (scope now encoded in directory). Cross-refs updated in AGENTS/CLAUDE/docs/ignore files. Layout doc: [docs/this_repo/chezmoiscripts-layout.md](docs/this_repo/chezmoiscripts-layout.md). Decision log: [backlog/chezmoiscripts-namespace-refactor.md](backlog/chezmoiscripts-namespace-refactor.md). One-time cost: chezmoi re-runs each script once on every machine after the path change.
 
 - ✅ **tmux built-in window activity/bell flags** — `monitor-activity`/`monitor-bell` enabled in `dot_config/tmux/common.conf` so Catppuccin's `#{window_flags}` shows `#`/`!` glyphs for non-current windows that produced output or rang the bell. `monitor-silence` left disabled (agent panes have a perpetual spinner, would never fire). Option A of `backlog/tmux-window-status-indicators.md`; option C (hook-based semantic state) scoped + deferred.
 - ✅ **conda/mamba lazy init** — `dot_config/zsh/tools/04_conda_mamba.zsh` finds miniforge3/miniconda3/anaconda3 and lazy-loads on first `conda`/`mamba` call.

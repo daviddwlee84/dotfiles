@@ -7,8 +7,8 @@ agent skills two ways, with sharply different scopes.
 
 | Scope | Lock file | Where the skill lives | Restored by |
 |---|---|---|---|
-| **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
-| **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `run_onchange_after_45_repo_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
+| **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
+| **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
 
 The two scopes happen to overlap today (both install
 `project-knowledge-harness`), but they serve different purposes — see "Why two
@@ -54,7 +54,7 @@ that script:
 Then run `chezmoi apply`. The merger writes the new entry into the lock; the
 restore script (next section) sees the missing on-disk skill and installs it.
 
-### `run_onchange_after_40_install_global_skills.sh.tmpl` — the restorer
+### `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` — the restorer
 
 `onchange` hash trigger is the merger script's own SHA256 — so this script
 re-runs whenever the **managed-set** is edited (not whenever the live lock
@@ -91,7 +91,7 @@ deployed (chezmoi-ignored: see `.chezmoiignore.tmpl` → `.agents/skills`,
 `skills-lock.json` (`.gitignore` covers `.agents/`, `.claude/skills/`).
 
 Restore is automatic on `chezmoi apply` via
-`run_onchange_after_45_repo_bootstrap_skills.sh.tmpl`. The script:
+`.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl`. The script:
 
 1. Checks whether `.chezmoi.sourceDir` contains a `skills-lock.json` (i.e.
    this machine's chezmoi source dir IS the repo). If not, exits silently —
@@ -172,7 +172,7 @@ flatter). Don't symlink one to the other.
 | `npx skills experimental_install` | Restores **project** lock (`./skills-lock.json`) only |
 | `npx skills experimental_install -g` | `-g` is **silently ignored**, still project-only ([#283](https://github.com/vercel-labs/skills/issues/283), [#549](https://github.com/vercel-labs/skills/issues/549)) |
 | `npx skills update -g` | Updates already-installed global skills; does **not** backfill missing entries from the lock |
-| `npx skills add <source> -s <name> -g -y` | The only working "restore one missing global skill" idiom — what `run_onchange_after_40_install_global_skills.sh.tmpl` loops over |
+| `npx skills add <source> -s <name> -g -y` | The only working "restore one missing global skill" idiom — what `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` loops over |
 
 ### CLI flag gotchas
 
@@ -221,7 +221,7 @@ new location; chezmoi's lock-file management still uses
 ## References
 
 - Live `dot_agents/modify_dot_skill-lock.json.tmpl` — merger source of truth
-- Live `run_onchange_after_40_install_global_skills.sh.tmpl` — restore loop
+- Live `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` — restore loop
 - [`vercel-labs/skills` README](https://github.com/vercel-labs/skills) — CLI docs
 - [Issue #283 — `skills install -g`](https://github.com/vercel-labs/skills/issues/283)
 - [Issue #549 — global lock restore](https://github.com/vercel-labs/skills/issues/549)

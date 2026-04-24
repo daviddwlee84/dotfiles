@@ -124,7 +124,7 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
   - `onchange_` — run when the script body changes (filename-keyed; unlike `once_`, editing the script re-runs it).
   - `before_` / `after_` — run before / after applying target files.
 - **`chezmoi add`**: does not apply — scripts have no file target.
-- **Already in this repo**: `run_once_before_00_bootstrap.sh.tmpl`, `run_onchange_after_20_ansible_roles.sh.tmpl`, `run_onchange_after_30_brew_bundle.sh.tmpl`. See [docs/this_repo/architecture.md → Auto-run scripts](../this_repo/architecture.md#auto-run-scripts).
+- **Already in this repo**: `run_once_before_00_bootstrap.sh.tmpl`, `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`, `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`. See [docs/this_repo/architecture.md → Auto-run scripts](../this_repo/architecture.md#auto-run-scripts).
 
 ## Allowed prefix ordering
 
@@ -265,7 +265,7 @@ chezmoi apply                 # normal cadence: checks refreshPeriod,
 chezmoi apply --refresh-externals   # force: pull every external now
 ```
 
-Externals are evaluated **before** `run_onchange_after_20_ansible_roles.sh.tmpl`, so by the time ansible runs, `~/.oh-my-zsh`, `~/.tmux/plugins/tpm`, `~/.fzf`, and `~/.local/share/toolkami/toolkami.rb` already exist. Ansible's remaining responsibilities for these tools:
+Externals are evaluated **before** `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`, so by the time ansible runs, `~/.oh-my-zsh`, `~/.tmux/plugins/tpm`, `~/.fzf`, and `~/.local/share/toolkami/toolkami.rb` already exist. Ansible's remaining responsibilities for these tools:
 
 - `zsh` role: install the `zsh` package + change login shell (sudo).
 - `devtools` role: run `tpm/bin/install_plugins` once (sentinel at `~/.tmux/plugins/.ansible-installed`).

@@ -1,6 +1,6 @@
 # Shared sudo session for `chezmoi apply`
 
-All three `run_*` scripts (`run_once_before_00_bootstrap.sh.tmpl`, `run_onchange_after_20_ansible_roles.sh.tmpl`, `run_onchange_after_30_brew_bundle.sh.tmpl`) share a single sudo session via `scripts/lib/sudo_shared.sh`. The user is prompted **once** at the very start of `chezmoi apply` and every downstream script reuses the cached credential silently.
+All three `run_*` scripts (`run_once_before_00_bootstrap.sh.tmpl`, `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`, `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`) share a single sudo session via `scripts/lib/sudo_shared.sh`. The user is prompted **once** at the very start of `chezmoi apply` and every downstream script reuses the cached credential silently.
 
 > **Hard rule for new run-scripts**: do NOT re-implement `sudo -k` / `sudo -v` / TTY-read logic. Call the shared helper instead.
 
