@@ -164,6 +164,7 @@ All three `run_*` scripts share one sudo session via `scripts/lib/sudo_shared.sh
 - Do **not** run `sudo -k` (invalidates the shared cache for the whole flow).
 - Do **not** register a `trap … EXIT` that removes state (next run-script needs it).
 - Do **not** read the password into a shell variable. Always pipe via `sudo -S <file`.
+- Do **not** replace `_sudo_spawn_watchdog`'s `setsid`/`nohup` fallback with bare `setsid`. macOS has `setsid(2)` as a libc call but no `setsid(1)` CLI in base, and the backgrounded failure is silent (redirected to `/dev/null`) — every run-script then re-prompts because `_sudo_state_valid`'s `kill -0` probe finds a dead PID. See [`pitfalls/sudo-shared-setsid-macos.md`](pitfalls/sudo-shared-setsid-macos.md).
 
 Adding a new sudo surface in a run-script:
 

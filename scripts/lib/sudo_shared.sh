@@ -114,12 +114,25 @@ _sudo_state_valid() {
 _sudo_spawn_watchdog() {
     local state_dir="$1"
     local watch_pid="$2"
-    # setsid detaches from the controlling TTY + session so the watchdog is
-    # not reaped when the invoking run-script exits normally.
+    # Goal: detach the watchdog from the current shell's TTY + session so it
+    # survives a run-script exit and keeps the shared state dir alive across
+    # subsequent run-scripts in the same chezmoi apply.
+    #
+    # `setsid(1)` is the clean way (new session, no controlling TTY) but it
+    # only ships by default on Linux (util-linux). macOS has setsid(2) as a
+    # libc call but no setsid(1) in base — see pitfalls/sudo-shared-setsid-macos.md.
+    # Using `setsid` unconditionally caused every run-script to re-prompt for
+    # sudo on macOS because $! captured a short-lived "command not found"
+    # shell, and _sudo_state_valid's `kill -0` probe then invalidated the dir.
+    #
+    # Fallback: `nohup` (present on macOS and Linux) + `trap "" HUP` in the
+    # child + `disown` in the parent. Not a new session, but the watchdog
+    # survives parent shell exit, which is what we actually need here.
     # SC2016: body is passed to the child `bash -c` where $1/$2 are its own
     # positional params, so single-quoting is intentional (no expansion here).
     # shellcheck disable=SC2016
-    setsid bash -c '
+    local body='
+        trap "" HUP
         STATE_DIR="$1"
         WATCH_PID="$2"
         # WHY: the real "keep-alive" is the sudo.pass + `sudo -S` pattern —
@@ -131,7 +144,12 @@ _sudo_spawn_watchdog() {
             sleep 50
         done
         rm -rf "$STATE_DIR"
-    ' _ "$state_dir" "$watch_pid" </dev/null >/dev/null 2>&1 &
+    '
+    if command -v setsid >/dev/null 2>&1; then
+        setsid bash -c "$body" _ "$state_dir" "$watch_pid" </dev/null >/dev/null 2>&1 &
+    else
+        nohup bash -c "$body" _ "$state_dir" "$watch_pid" </dev/null >/dev/null 2>&1 &
+    fi
     local pid=$!
     disown 2>/dev/null || true
     printf '%s\n' "$pid"
