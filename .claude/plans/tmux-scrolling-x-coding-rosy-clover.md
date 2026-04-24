@@ -1,307 +1,307 @@
-# tmux Scrollback × Coding-Agent TUI + Warp-like Copy-Last-Output
+# tmux Capture Helpers Extension: indexed blocks + agent pipe + TUI
 
 ## Context
 
-Two UX papercuts surface when running coding agents (Claude Code, OpenCode, Codex, Aider) inside tmux on this repo:
+Previous task (committed in `b5e8da0`) shipped `cpout` / `cpcmd` / `cpblock`
+plus OSC 133 shell integration and tmux scrollback tuning. This extension
+builds on that baseline:
 
-1. **Scrollback looks "broken" while a TUI is running.** Streaming agents repaint the same region with ANSI sequences. On the **main screen** (not alt-screen), tmux captures each frame into history, producing ghost/duplicated lines that are jarring compared to running the same agent in a native terminal. Partly fundamental to ANSI redraw + scrollback, but one tmux option (`scroll-on-clear off`) + a known workflow (`prefix + [` freeze + wheel) takes most of the sting out.
+1. **Indexed lookback** — currently the three helpers only grab the LAST
+   block. Real debugging often wants "the one 3 commands back" (the error
+   is usually not the last thing on screen). Add a positional `N` arg.
+2. **One-shot pipe to coding-agent** — chaining `cpblock N` into `claude
+   -p "fix this"` is a common-enough idiom to deserve its own command.
+   User confirmed: **advisory only** by default (agent prints suggestion,
+   doesn't touch files); **name `aifix` + `aiexplain`** (not `askai`).
+3. **Interactive TUI** — a Python `uv run --script` tool that lets the
+   user scroll previous commands, edit the prompt, and pick where the
+   agent's reply goes (stdout / clipboard / interactive-agent-with-context).
 
-2. **No Warp-like "copy last command output".** The repo already has `prefix + y/Y/C-y` for capture-pane helpers, but nothing that bounds a copy to the last shell command. Requires OSC 133 prompt markers that zsh+starship doesn't currently emit. Once markers exist, tmux 3.4+ gets `next-prompt`/`previous-prompt` navigation for free, plus a one-keybind "yank last output" becomes a 5-line copy-mode macro.
+Underlying mechanics are unchanged: OSC 133 markers in tmux's grid
+line-attrs, navigated via `previous-prompt` / `previous-prompt -o`; the
+agent is invoked in non-interactive mode (`claude -p`, `opencode run`,
+`codex exec`, `cursor-agent -p`) with the block as context.
 
-**Intended outcome**: smoother tmux scrolling around agent panes, plus Warp-style command-boundary navigation and a `prefix + M-y` for "copy last output". All additive — existing bindings and agent behaviour unchanged.
+## Design decisions (confirmed with user)
 
----
+- **Naming**: `aifix` (diagnose + suggest fix) and `aiexplain` (explain what
+  happened). Two small fixed-purpose commands beat one `askai -m MODE`.
+- **Agent mode**: **advisory only** — the default is print-only, no file
+  edits. `--execute` / `--allow-edits` not offered in v1; escalation path
+  is "spawn an interactive agent pane with this context" via the TUI.
+- **Agent auto-detection**: `claude` → `opencode` → `codex` → `cursor-agent`,
+  whichever is on `$PATH` first. Override via `-a AGENT`.
+- **TUI library**: `questionary` + `rich` — matches
+  [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py)
+  and [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py). No new deps.
+- **Script location**: `scripts/aiblock.py` (source of truth, agent-visible,
+  matches `fleet_apply.py` convention); shell alias `aiblock` in
+  `dot_config/zsh/tools/04_ai_capture.zsh` resolves the path via
+  `chezmoi source-path` (cached once).
 
-## Design decisions
+## Indexed lookback (shell-level)
 
-Confirmed with user:
+### UX
 
-- **OSC 133 source**: manual zsh precmd/preexec hook in a new `dot_config/zsh/tools/02_shell_integration.zsh`. Framework-agnostic; works in Ghostty / cmux / SSH-to-any-remote; opt-out via `DISABLE_OSC133=1`.
-- **Pitfall doc**: yes — new `pitfalls/tmux-scrollback-tui-repaint-ghosting.md` (symptom-titled, per `project-knowledge-harness` convention).
-- **Copy-last-output key**: `prefix + M-y`, extending the `prefix + y/Y/C-y` capture family. M-namespace is free (only fine-resize `M-h/j/k/l` use it).
+```sh
+cpblock          # last block (unchanged default)
+cpblock 3        # block 3 back (third-to-last command + its output)
+cpout 2          # output of the 2nd-to-last command
+cpcmd 4          # input line of the 4th-to-last command
+```
 
-Skipped (considered, not doing):
+`N` is always "how many commands back, counting from the current prompt"
+(1 = last, 2 = one before that, ...). No range/combine syntax in v1 —
+that's the TUI's job.
 
-- **Bumping `history-limit`** — already 50000 at `dot_config/tmux/common.conf:71`, plenty.
-- **Changing `alternate-screen`** — default on; correct for curses apps. Claude Code uses alt-screen so its paint cycles don't pollute scrollback at all.
-- **New menu submenu entry** for these bindings — copy-mode navigation is power-user territory, documenting in `docs/tools/tmux/keybindings.md` is enough.
-- **Wait for Starship native OSC 133** — feature request still open upstream; hook is 15 lines and we can delete it if/when Starship ships native.
+### Implementation
 
----
+**`dot_config/zsh/tools/03_tmux_capture.zsh`**: thread `N` through the
+existing helper, ripple into the three public commands.
+
+- `_cpx_tmux_select <name> <count> <start-cmd> [args]` — generalise the
+  helper: `count` is how many `previous-*` repetitions before
+  `begin-selection`, followed by a single `next-prompt` to close.
+- `cpout [N]`: call helper with `count=N`, start=`previous-prompt -o`.
+  (Because preexec skips C for cpout/cpcmd/cpblock, N=1 finds the PREVIOUS
+  command's C, N=2 finds the one before that, etc.)
+- `cpblock [N]`: call helper with `count=N+1`, start=`previous-prompt`.
+  (The +1 skips cpblock's own A; the remaining N lands on the Nth block
+  back's A.)
+- `cpcmd [N]`: replace `fc -ln -1` with `fc -ln -N -N` (range from Nth
+  back to Nth back — a single entry).
+
+Validate `N` is a positive integer; default to `1`; reject `0` or negative
+with stderr diagnostic.
+
+## One-shot agent wrapper (shell-level)
+
+### UX
+
+```sh
+aifix              # last block, default "diagnose + fix" prompt, auto-detected agent
+aifix 3            # 3rd block back
+aifix -a opencode  # force agent
+aifix -p "why does this segfault?"  # override prompt
+aiexplain          # same args, different default prompt
+```
+
+Defaults:
+
+- **aifix prompt**: "Here is a command I ran in my terminal and its output.
+  Diagnose any errors and suggest a concrete fix. Be brief and specific."
+- **aiexplain prompt**: "Here is a command I ran in my terminal and its
+  output. Explain what happened in plain language. Be concise."
+
+### Implementation
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (new):
+
+```zsh
+_aiagent_invoke() {
+  # Args: <agent> <prompt>
+  # Invokes agent in non-interactive mode. prompt is sent via the agent's
+  # one-shot flag; no file edits are requested.
+  local agent=$1 prompt=$2
+  case "$agent" in
+    claude)       claude -p "$prompt" ;;
+    opencode)     opencode run "$prompt" ;;
+    codex)        codex exec "$prompt" ;;
+    cursor-agent) cursor-agent -p "$prompt" ;;
+    *) print -u2 "aifix: unknown agent: $agent"; return 1 ;;
+  esac
+}
+
+_aiagent_autodetect() {
+  for cand in claude opencode codex cursor-agent; do
+    command -v "$cand" &>/dev/null && { print -r -- "$cand"; return 0; }
+  done
+  return 1
+}
+
+# aifix [N] [-a AGENT] [-p PROMPT]
+aifix() { _ai_capture_dispatch aifix 'Diagnose any errors ...' "$@"; }
+aiexplain() { _ai_capture_dispatch aiexplain 'Explain what happened ...' "$@"; }
+
+_ai_capture_dispatch() {
+  # parses N, -a, -p; calls cpblock $N; prepends prompt; invokes agent.
+  # advisory only — no flag to enable edits in v1.
+  ...
+}
+```
+
+Output goes to stdout (pipe-friendly for `aifix | tee /tmp/advice.md`).
+Diagnostic line to stderr ("aifix: claude invoked with 3rd block back").
+
+### Call graph
+
+```
+aifix / aiexplain           <-- user types this
+  → cpblock N               <-- reuses committed helper
+  → _aiagent_invoke         <-- claude / opencode / codex / cursor-agent
+```
+
+## Python TUI
+
+### UX sketch
+
+```
+$ aiblock
+┌─ Recent commands (pick one) ──────────────────────────────────────┐
+│ > 1  (45s ago)  cargo build --release                              │
+│   2  (2m ago)   git rebase -i HEAD~5                               │
+│   3  (4m ago)   pytest tests/integration/test_auth.py             │
+│   4  (7m ago)   just fleet-apply                                   │
+│   ...                                                              │
+└───────────────────────────────────────────────────────────────────┘
+
+[after selection, rich panel shows the captured block]
+
+? Edit prompt (default: Diagnose any errors ...):
+  [editable text box]
+
+? Action:
+  ▸ Print reply here (default)
+    Copy reply to clipboard
+    Spawn interactive agent pane with this context
+    Cancel
+
+[agent invoked, rich panel renders reply]
+```
+
+### Implementation
+
+**`scripts/aiblock.py`** (new, PEP 723 shebang):
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["questionary>=2.0", "rich>=13.9"]
+# ///
+"""aiblock — TUI for reviewing a past command + asking an AI agent about it."""
+
+import subprocess, os, sys, shlex
+from rich.console import Console
+from rich.panel import Panel
+import questionary
+
+def list_recent_commands(n=20):
+    # zsh: `fc -ln -<n>` — last n commands; parse into (index, text)
+    out = subprocess.run(["zsh", "-ic", f"fc -ln -{n}"],
+                         capture_output=True, text=True).stdout
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    return list(enumerate(reversed(lines), start=1))  # (N=1 is most recent)
+
+def capture_block(n):
+    # Delegate to our committed cpblock function
+    return subprocess.run(["zsh", "-ic", f"cpblock {n}"],
+                          capture_output=True, text=True).stdout
+
+def invoke_agent(agent, prompt):
+    # Mirror _aiagent_invoke logic from the shell wrapper
+    flagmap = {"claude": ["-p"], "opencode": ["run"],
+               "codex": ["exec"], "cursor-agent": ["-p"]}
+    return subprocess.run([agent, *flagmap[agent], prompt],
+                          capture_output=True, text=True).stdout
+
+def main():
+    # 1. pick command
+    # 2. capture block, show preview in rich Panel
+    # 3. questionary.text(default=DEFAULT_FIX_PROMPT) — editable
+    # 4. questionary.select(actions) — Print / Copy / Spawn / Cancel
+    # 5. invoke + route per action
+    ...
+```
+
+Action routing:
+
+- **Print reply**: write to stdout in a `rich.Panel`. User sees it in the
+  same pane; scroll up to review. No clipboard.
+- **Copy reply**: pipe reply through `tmux load-buffer -w -` when `$TMUX`
+  set, else `pbcopy` / `xclip` / `xsel` / `wl-copy` (reuse the detection
+  logic from `03_tmux_capture.zsh` `_cpx_to_clipboard`).
+- **Spawn interactive agent pane**: build a command like `claude` (no
+  `-p`) with the block pre-injected via a heredoc or temp-file, launch in
+  a new tmux window with `tmux new-window -n ai 'claude <temp-file>'`.
+  Concrete syntax TBD per agent; may need per-agent tweaks.
+- **Cancel**: exit 0, no-op.
+
+### Shell alias
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (same file as `aifix`):
+
+```zsh
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      print -u2 "aiblock: chezmoi source-path failed"; return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+}
+```
+
+Resolves once per shell (cached in `_AIBLOCK_SCRIPT`). `uv run --script`
+handles dep install/cache.
 
 ## Files to modify
 
-### 1. `dot_config/tmux/common.conf` (~line 71 area)
-
-Add one option after `history-limit`:
-
-```tmux
-# Don't push the pre-clear screen contents into scrollback when a TUI issues a
-# full-screen clear (ED). Streaming coding agents (Claude Code, OpenCode, etc.)
-# that run on the main screen (not alternate-screen) otherwise leave ghost
-# frames in history every repaint. Alt-screen apps (vim, htop) are unaffected.
-# Default in tmux 3.3+ is `on`; we explicitly turn it off for cleaner scrollback.
-# See pitfalls/tmux-scrollback-tui-repaint-ghosting.md.
-set -g scroll-on-clear off
-```
-
-### 2. `dot_config/tmux/keybindings.conf`
-
-**Add below the existing `bind -T copy-mode-vi DoubleClick1Pane ...` block (around line 103), before the "Capture Pane Helpers" section:**
-
-```tmux
-# -----------------------------------------------------------------------------
-# Command-boundary navigation in copy-mode (requires OSC 133 markers from shell
-# — emitted by dot_config/zsh/tools/02_shell_integration.zsh). In a plain shell
-# (no markers, e.g. `sh`, `bash` without our hook, or `DISABLE_OSC133=1`),
-# these keys become no-ops. tmux 3.4+ required for next-prompt/previous-prompt;
-# `-o` variant (jump to output start, not prompt start) is tmux 3.5+.
-#
-#   {  / }    previous/next prompt (prompt line)
-#   M-[ / M-] previous/next output (the line AFTER the prompt — usually what
-#             you want for "skip to the output of the previous command")
-# -----------------------------------------------------------------------------
-bind -T copy-mode-vi '{' send-keys -X previous-prompt
-bind -T copy-mode-vi '}' send-keys -X next-prompt
-bind -T copy-mode-vi M-[ send-keys -X previous-prompt -o
-bind -T copy-mode-vi M-] send-keys -X next-prompt -o
-```
-
-**Add to the "Capture Pane Helpers" section (after the existing `bind C-y ...` at line 122):**
-
-```tmux
-# prefix + M-y: copy the LAST command's output to clipboard (Warp-style).
-# Uses OSC 133 markers — if the shell doesn't emit them, selection ends up
-# empty and tmux displays "Empty selection" harmlessly. Implementation:
-# enter copy-mode, jump to start of previous command's output, start selection,
-# jump forward to the next prompt, copy, exit copy-mode.
-bind M-y copy-mode \; \
-  send-keys -X previous-prompt -o \; \
-  send-keys -X begin-selection \; \
-  send-keys -X next-prompt \; \
-  send-keys -X copy-pipe-and-cancel "tmux load-buffer -w -" \; \
-  display-message "Last command output copied to clipboard"
-```
-
-### 3. `dot_config/zsh/tools/02_shell_integration.zsh` (NEW file)
-
-Numbered `02_` so it loads after `01_starship.zsh` (starship needs to finish `eval "$(starship init zsh)"` first — starship installs its own precmd that we chain after via `add-zsh-hook`).
-
-```zsh
-# OSC 133 shell integration — emits prompt/command markers so tmux can
-# navigate command boundaries (next-prompt / previous-prompt in copy-mode)
-# and our prefix + M-y binding can copy the last command's output.
-#
-# Protocol reference: https://gitlab.freedesktop.org/Per_Bothner/specifications/blob/master/proposals/semantic-prompts.md
-#
-#   OSC 133 ; A ST   before prompt (start of prompt)
-#   OSC 133 ; B ST   between prompt and command input (end of prompt)
-#   OSC 133 ; C ST   after Enter, before command output (start of output)
-#   OSC 133 ; D ; exit_code ST   after command finishes (end of output)
-#
-# Uses add-zsh-hook to chain after starship / zsh-vi-mode / oh-my-zsh hooks
-# (they all also use add-zsh-hook — no conflict).
-#
-# Opt-out: export DISABLE_OSC133=1 before shell start.
-
-[[ -n "$DISABLE_OSC133" ]] && return
-[[ "$TERM" == "dumb" ]] && return
-
-autoload -Uz add-zsh-hook
-
-_osc133_precmd() {
-  local ec=$?
-  # D: end of previous command's output (with exit code); A: start of new prompt
-  printf '\e]133;D;%s\a\e]133;A\a' "$ec"
-}
-
-_osc133_preexec() {
-  # C: start of command output (Enter was just pressed)
-  printf '\e]133;C\a'
-}
-
-add-zsh-hook precmd _osc133_precmd
-add-zsh-hook preexec _osc133_preexec
-
-# B (end-of-prompt marker) is conventionally printed at the tail of PS1.
-# Starship renders the whole prompt via its own mechanism, so we prepend
-# the B marker to RPROMPT's LHS via PROMPT_EOL_MARK? No — the cleanest
-# place is `precmd_functions` right before starship's hook emits its
-# prompt. But because starship uses `precmd` too, and add-zsh-hook runs
-# them in registration order, starship's hook fires after ours -> our
-# "A" lands before starship paints and our "B" would need to land after.
-# Workaround: append B to PS1 via a widget. Since tmux's next-prompt /
-# previous-prompt only needs A and C markers (B is optional per the
-# protocol), we skip B for now. If a future consumer (e.g. Ghostty
-# semantic shell integration) requires B, revisit with a zle-line-init
-# approach.
-```
-
-### 4. `docs/tools/tmux/README.md`
-
-Add a new section after "OSC 52 Clipboard" (the current OSC section):
-
-```markdown
-## Scrollback & Coding Agents
-
-Streaming TUIs (Claude Code, OpenCode, Codex) repaint the same screen region via
-ANSI sequences. On the **alternate screen** (vim, htop) tmux's scrollback is
-unaffected. On the **main screen** (some coding agents), every frame gets
-pushed into history by default, producing ghost/duplicated lines.
-
-Two settings and one workflow keep this clean:
-
-- `set -g scroll-on-clear off` (in `common.conf`) — discards pre-clear contents
-  instead of pushing them into history on full-screen clear.
-- `history-limit 50000` — already set; 50k lines is plenty even for a full day
-  of agent sessions.
-- **Freeze before scrolling**: `prefix + [` enters copy-mode, which snapshots
-  the current frame. Scroll the wheel or use `C-u`/`C-d` without the UI
-  continuing to repaint under you. `q` exits.
-
-For a pitfall-level description of why this can't be "fixed" further (ANSI
-redraw + linear scrollback is fundamentally lossy), see
-[pitfalls/tmux-scrollback-tui-repaint-ghosting.md](../../../pitfalls/tmux-scrollback-tui-repaint-ghosting.md).
-
-## OSC 133 Command-Boundary Navigation (Warp-style)
-
-`dot_config/zsh/tools/02_shell_integration.zsh` emits OSC 133 prompt markers
-via precmd/preexec. tmux 3.4+ parses them, enabling:
-
-| Key (in copy-mode) | Action |
+| Path | Change |
 |---|---|
-| `{` | Jump to previous prompt |
-| `}` | Jump to next prompt |
-| `Alt+[` | Jump to previous command **output** start |
-| `Alt+]` | Jump to next command **output** start |
-
-And a top-level shortcut that wraps the above into a one-press copy:
-
-| Key | Action |
-|---|---|
-| `prefix + M-y` | Copy the **last command's output** to clipboard |
-
-Opt out per shell: `export DISABLE_OSC133=1` before starting zsh. Has no effect
-if the remote shell isn't zsh or doesn't source our tools dir (e.g. a bare
-`bash` on a production server) — the bindings just become no-ops.
-```
-
-### 5. `docs/tools/tmux/keybindings.md`
-
-Add the new bindings to the Copy Mode section (existing table). Match the file's current style — read it first to confirm column headers.
-
-### 6. `pitfalls/tmux-scrollback-tui-repaint-ghosting.md` (NEW)
-
-Following the symptom-first convention from `pitfalls/README.md`:
-
-```markdown
-# tmux scrollback shows duplicated / ghost lines while Claude Code / OpenCode runs
-
-**Symptoms** (grep this section): ghost lines in tmux scrollback, repeated
-spinner frames in history, scrollback looks "broken" when scrolling up in a
-coding-agent pane, tmux history contains dozens of half-repainted copies of
-the same prompt
-
-**First seen**: 2026-04 (observed on daily Claude Code / OpenCode workflow)
-**Affects**: tmux × any main-screen TUI that repaints via ANSI (some coding
-agents, progress bars, live log viewers without `\e[?1049h` alt-screen toggle)
-**Status**: mitigated (`scroll-on-clear off` + `prefix + [` workflow);
-fundamental limit of ANSI redraw + linear scrollback.
-
-## Symptom
-
-Scrolling up through a pane that ran Claude Code / OpenCode / a long
-`cargo build` with live progress shows frames of the TUI stacked like a flipbook
-in history. Unlike a native terminal, where the same repaint cycles just
-overwrite the visible region and never enter history.
-
-## Root cause
-
-Two-layer issue:
-
-1. **ANSI redraw writes to the main screen.** TUIs that don't enter
-   alternate-screen (`\e[?1049h`) repaint by erasing + rewriting the same
-   region. Native terminals don't remember erased content; tmux, which
-   captures into a scrollback buffer for cursor-up / copy-mode, does.
-
-2. **`scroll-on-clear on` (tmux default).** When a TUI issues a full-screen
-   clear before repaint, tmux pushes the pre-clear screen into history
-   instead of dropping it, multiplying the problem.
-
-Alt-screen apps (vim, htop, less, most modern TUIs including Claude Code's
-interactive sessions) are NOT affected — tmux keeps alt-screen's buffer
-separate and doesn't pollute history with repaints.
-
-## Workaround
-
-Applied in this repo:
-
-- `set -g scroll-on-clear off` in `dot_config/tmux/common.conf`.
-
-Manual workflow for inspection:
-
-- `prefix + [` enters copy-mode, which snapshots the current frame. Scroll
-  freely with wheel / `C-u` / `C-d` without the UI continuing to repaint
-  under you.
-- For a clean export of a pane (history + screen), use `prefix + Y` (full
-  scrollback to clipboard) or `tmux capture-pane -pS -` on the CLI.
-
-## Prevention
-
-Not really preventable while the TUI runs on the main screen. If you find a
-new agent that looks unusually bad, check whether it supports alt-screen
-mode (some accept `--alt-screen` / `--tui` flags; otherwise upstream issue).
-
-## Related
-
-- tmux manpage `scroll-on-clear`: "If this option is on, whenever contents are
-  cleared from the terminal they are moved into the history."
-- `pitfalls/tmux-display-menu-silent-fail.md` — separate tmux redraw gotcha.
-- `docs/tools/tmux/README.md` → "Scrollback & Coding Agents" (the positive
-  workflow version of this pitfall).
-```
-
----
+| `dot_config/zsh/tools/03_tmux_capture.zsh` | Thread `N` through `_cpx_tmux_select`; extend cpout/cpcmd/cpblock |
+| `dot_config/zsh/tools/04_ai_capture.zsh` | **NEW** — aifix / aiexplain / aiblock (shell shim) + `_aiagent_*` helpers |
+| `scripts/aiblock.py` | **NEW** — Python TUI |
+| `docs/zsh/aliases.md` | Add rows under "Tmux Integration" + new "AI Capture" section |
+| `docs/tools/tmux/README.md` | New section: "Reviewing past commands with AI agents" |
 
 ## Verification
 
-End-to-end sanity checks after `chezmoi apply` and `tmux kill-server && tmux`:
+End-to-end checks after apply:
 
-1. **OSC 133 markers emitting**: run `cat -v` after typing a command, then
-   look for `^[]133;A^G` / `^[]133;C^G` / `^[]133;D;0^G` escape bytes in the
-   output of `tmux capture-pane -pe -S -`. (The `-e` flag preserves escape
-   sequences.) If markers are absent, the hook isn't wired.
+1. **Indexed cpblock**: in a fresh tmux pane, run `echo A; echo B; echo C`
+   as three separate commands. Then:
    ```sh
-   echo test; tmux capture-pane -pe -S - | grep -c '\x1b]133'
-   # expect: at least 3 matches (A, C, D)
+   cpblock     # should print "❯ echo C\nC"
+   cpblock 2   # should print "❯ echo B\nB"
+   cpblock 3   # should print "❯ echo A\nA"
+   cpblock 99  # should print stderr "empty — …", exit 1
    ```
-2. **Copy-mode navigation**: `prefix + [`, then press `{` — cursor should jump
-   to the previous prompt line. `M-[` should jump to the OUTPUT start of the
-   previous command (one line lower). No-op / unchanged cursor = markers not
-   reaching tmux.
-3. **Copy-last-output**: run `echo hello && ls` somewhere, then press
-   `prefix + M-y`. Paste (⌘V / middle-click / `tmux paste-buffer`) — should
-   contain `hello\n<ls output>`. Status line should show "Last command output
-   copied to clipboard".
-4. **Scrollback sanity**: open a Claude Code / OpenCode session; let it
-   stream a long response; `prefix + [` and scroll up — no ghost frames
-   from the clear cycles. Compare to the same workflow with
-   `tmux set -g scroll-on-clear on` (reverts to the problematic behaviour)
-   for a side-by-side.
-5. **Opt-out works**: `DISABLE_OSC133=1 zsh` → no markers emitted,
-   step 1 returns 0 matches. `prefix + M-y` in such a pane becomes a
-   harmless "Empty selection" message.
-6. **Coexistence with starship / zsh-vi-mode**: `echo $precmd_functions` —
-   should list `_osc133_precmd` alongside starship's and zsh-vi-mode's hooks
-   (no clobbering). `tmux new` into a fresh pane, run a few commands, vi-mode
-   cursor still changes on ESC, starship prompt still renders.
+2. **cpout / cpcmd indexed**: same pattern, verify the right command's
+   OUTPUT and INPUT come back.
+3. **Agent auto-detect**: `aifix 1` in a pane where a command failed.
+   Verify stderr logs which agent was picked; stdout has the agent's reply.
+   Re-run with `-a opencode` / `-a codex` and verify override.
+4. **Agent override**: `aifix -p "custom prompt" 2` verifies both overrides
+   compose.
+5. **aiblock TUI**: run `aiblock` in a tmux pane after 5+ commands. Confirm:
+   (a) recent commands list shows correct N (from `fc`);
+   (b) selecting one shows the block in a rich Panel;
+   (c) prompt editor has the aifix default;
+   (d) each action (Print / Copy / Spawn / Cancel) routes correctly.
+6. **Graceful degradation**: `aifix` in a non-tmux shell → stderr error
+   from cpblock (inherits existing behaviour); exit 1.
+7. **No-agent-installed**: `aifix` with no CLI on PATH → stderr "no
+   coding-agent CLI found (tried: claude, opencode, codex, cursor-agent)";
+   exit 1.
 
-## Critical files
+## Critical files found during exploration
 
-- `dot_config/tmux/common.conf:71` (history-limit, where `scroll-on-clear` inserts)
-- `dot_config/tmux/keybindings.conf:98-103` (copy-mode-vi block, where `{}` bindings go)
-- `dot_config/tmux/keybindings.conf:107-122` (capture helpers, where `M-y` goes)
-- `dot_config/zsh/tools/01_starship.zsh` (reference — the new `02_` file loads after)
-- `docs/tools/tmux/README.md` (existing OSC 52 section to slot in after)
-- `docs/tools/tmux/keybindings.md` (copy-mode table)
-- `pitfalls/README.md` (format template, already confirmed)
+- [`dot_config/zsh/tools/42_gitlab.zsh:100-103`](../../dot_config/zsh/tools/42_gitlab.zsh) —
+  canonical non-interactive agent invocation map; reuse the exact
+  flag syntax (`claude -p`, `opencode run`, `codex exec`,
+  `cursor-agent -p`).
+- [`dot_config/zsh/tools/03_tmux_capture.zsh`](../../dot_config/zsh/tools/03_tmux_capture.zsh) —
+  committed baseline; `_cpx_tmux_select` and `_cpx_to_clipboard` helpers
+  to extend / reuse.
+- [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py) —
+  questionary + rich + tyro pattern to mirror in `aiblock.py`.
+- [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) — same stack;
+  good reference for subprocess + rich.live patterns if we want progress
+  UI while the agent is thinking.
+- [`dot_config/zsh/tools/22_sesh.zsh:92-115`](../../dot_config/zsh/tools/22_sesh.zsh) —
+  `_sesh_wrap_agent` pattern for spawning an interactive agent pane; copy
+  the shape for "Spawn agent with this context" action in the TUI.

@@ -1,9 +1,11 @@
 # tmux + OSC 133 capture helpers — shell-level counterparts of the
-# prefix + M-y / M-i tmux bindings.
+# prefix + M-y / M-i tmux bindings, with an N-back index.
 #
-#   cpcmd    last command's INPUT  (zsh history; works inside OR outside tmux)
-#   cpout    last command's OUTPUT (tmux copy-mode chain; tmux-only)
-#   cpblock  last command's FULL BLOCK, Warp-style (tmux-only)
+#   cpcmd [N]    last (or Nth-latest) command's INPUT  (zsh history; universal)
+#   cpout [N]    last (or Nth-latest) command's OUTPUT (tmux copy-mode chain)
+#   cpblock [N]  last (or Nth-latest) command's FULL BLOCK, Warp-style
+#
+# N defaults to 1 (= latest). N=2 is the one before that, and so on.
 #
 # Each prints captured text to stdout (pipe-friendly: `cpout | grep ERROR`)
 # AND copies to system clipboard. Diagnostic + byte count go to stderr so
@@ -38,13 +40,28 @@ _cpx_to_clipboard() {
   fi
 }
 
+# Validate a positive-integer argument. Echoes the value on success; prints
+# a usage hint to stderr and returns 1 on invalid input.
+_cpx_parse_n() {
+  local name=$1 n=${2:-1}
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    print -u2 "$name: N must be a positive integer (got: $n). Usage: $name [N]"
+    return 1
+  fi
+  print -r -- "$n"
+}
+
 # Run a tmux copy-mode selection chain on the current pane. Prints selection
 # to stdout, diagnostic (name + byte count) to stderr. Returns 1 on empty.
 #
-#   _cpx_tmux_select <display-name> <start-cmd> [start-args...]
+#   _cpx_tmux_select <display-name> <prev-count> <prev-cmd> [prev-args...]
 #
-# Chain: copy-mode → <start-cmd> → begin-selection → next-prompt →
+# Chain: copy-mode → (<prev-cmd> <prev-args...>) × <prev-count> →
+#        begin-selection → next-prompt →
 #        copy-pipe-and-cancel "tee <tmp> | tmux load-buffer -w -" → wait-for
+#
+# <prev-count> is how many times to repeat the `previous-*` command before
+# starting the selection — that's how N-back lookback is done.
 #
 # Depends on 02_shell_integration.zsh skipping the OSC 133 C marker for
 # these helpers' own invocation (see the case statement there). Without
@@ -52,14 +69,28 @@ _cpx_to_clipboard() {
 # start and the selection would be empty.
 _cpx_tmux_select() {
   local name=$1; shift
-  local tmp sentinel
+  local prev_count=$1; shift
+  local tmp sentinel i _y
   tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
   sentinel="cpx-$$-$RANDOM"
   : > "$tmp"
   tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || return 1
-  tmux send-keys -t "$TMUX_PANE" -X "$@" 2>/dev/null
+  # Seek to history bottom so N-back math is measured from a known origin.
+  tmux send-keys -t "$TMUX_PANE" -X history-bottom 2>/dev/null
+  # Sync barrier between `send-keys -X` calls: an assignment from
+  # `$(tmux display-message -p …)` is what actually forces the tmux server
+  # to commit the previous copy-mode command before it answers. Without
+  # this round-trip, bursts of `previous-prompt` calls collapse to a single
+  # cursor jump on tmux 3.6a — `sleep`, `: "$(…)"`, and bare redirection
+  # (`>/dev/null`) are ALL insufficient. The variable read is what makes zsh
+  # wait for subprocess output, which in turn serialises tmux's queue.
+  for (( i = 0; i < prev_count; i++ )); do
+    tmux send-keys -t "$TMUX_PANE" -X "$@" 2>/dev/null
+    _y=$(tmux display-message -p -t "$TMUX_PANE" '#{copy_cursor_y}' 2>/dev/null)
+  done
   tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
   tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null
+  _y=$(tmux display-message -p -t "$TMUX_PANE" '#{copy_cursor_y}' 2>/dev/null)
   tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
     "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
   tmux wait-for "$sentinel" 2>/dev/null
@@ -75,16 +106,19 @@ _cpx_tmux_select() {
   return 1
 }
 
-# cpcmd — last command's INPUT. Universal: reads zsh shell history. Clean
-# output (no prompt chrome, no terminal-echo artefacts).
+# cpcmd [N] — last (or Nth-latest) command's INPUT. Universal: reads zsh
+# shell history. Clean output (no prompt chrome, no terminal-echo artefacts).
 cpcmd() {
   emulate -L zsh
+  local n
+  n=$(_cpx_parse_n cpcmd "${1:-1}") || return 1
   local cmd
-  cmd=$(fc -ln -1 2>/dev/null)
+  # fc -ln -N -N: list entries from (-N) to (-N), inclusive — just the Nth back
+  cmd=$(fc -ln -"$n" -"$n" 2>/dev/null)
   cmd="${cmd#	}"   # strip fc's leading tab
   cmd="${cmd# }"
   if [[ -z "$cmd" ]]; then
-    print -u2 "cpcmd: no previous command in shell history"
+    print -u2 "cpcmd: no command at N=$n in shell history"
     return 1
   fi
   printf '%s\n' "$cmd" | _cpx_to_clipboard || {
@@ -92,57 +126,40 @@ cpcmd() {
     return 1
   }
   printf '%s\n' "$cmd"
-  print -u2 "cpcmd: ${#cmd} bytes (zsh history) copied to clipboard"
+  print -u2 "cpcmd: ${#cmd} bytes (zsh history -$n) copied to clipboard"
 }
 
-# cpout — last command's OUTPUT via tmux's OSC 133 line attrs.
+# cpout [N] — last (or Nth-latest) command's OUTPUT via tmux's OSC 133 line
+# attrs. cpout/cpcmd/cpblock themselves are preexec-skipped for C, so N=1
+# lands on the *previous* command's output start, N=2 on the one before, etc.
 cpout() {
   emulate -L zsh
   if [[ -z "$TMUX" ]]; then
     print -u2 "cpout: requires tmux (OSC 133 boundaries are stored per-pane by tmux). Use cpcmd for input, or your terminal's native 'copy output' if available."
     return 1
   fi
-  _cpx_tmux_select cpout previous-prompt -o || {
-    print -u2 "cpout: empty — possible causes: (a) shell pre-dates chezmoi apply, run 'exec zsh' (verify: echo \$precmd_functions | grep osc133); (b) no command has been run yet in this pane; (c) previous command is an alt-screen TUI (vim, htop) with no OSC 133 output."
+  local n
+  n=$(_cpx_parse_n cpout "${1:-1}") || return 1
+  _cpx_tmux_select "cpout -$n" "$n" previous-prompt -o || {
+    print -u2 "cpout: empty at N=$n — (a) shell pre-dates chezmoi apply, run 'exec zsh' (verify: echo \$precmd_functions | grep osc133); (b) N exceeds command history in this pane; (c) target command is an alt-screen TUI (vim, htop) with no OSC 133 output."
     return 1
   }
 }
 
-# cpblock — last command's FULL BLOCK (prompt + input + output), Warp-style.
-# The OSC 133 A marker is embedded in PROMPT itself (02_shell_integration.zsh),
-# so cpblock's OWN current prompt line has an A marker too — unlike the C
-# marker which we can skip in preexec. So we call previous-prompt TWICE to
-# skip the current prompt and land on the previous command's prompt.
+# cpblock [N] — last (or Nth-latest) command's FULL BLOCK (prompt + input +
+# output), Warp-style. The OSC 133 A marker is embedded in PROMPT itself
+# (02_shell_integration.zsh) so cpblock's OWN prompt carries an A too —
+# call previous-prompt N+1 times to skip self + land N-back.
 cpblock() {
   emulate -L zsh
   if [[ -z "$TMUX" ]]; then
     print -u2 "cpblock: requires tmux (see cpout for why)."
     return 1
   fi
-  local tmp sentinel
-  tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
-  sentinel="cpx-$$-$RANDOM"
-  : > "$tmp"
-  tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || {
-    print -u2 "cpblock: failed to enter copy-mode"
+  local n
+  n=$(_cpx_parse_n cpblock "${1:-1}") || return 1
+  _cpx_tmux_select "cpblock -$n" $(( n + 1 )) previous-prompt || {
+    print -u2 "cpblock: empty at N=$n — run 'exec zsh' if the shell pre-dates chezmoi apply, or N exceeds command history in this pane."
     return 1
   }
-  tmux send-keys -t "$TMUX_PANE" -X previous-prompt 2>/dev/null   # lands on cpblock's own A
-  tmux send-keys -t "$TMUX_PANE" -X previous-prompt 2>/dev/null   # previous command's A
-  tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
-  tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null       # forward to cpblock's A
-  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
-    "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
-  tmux wait-for "$sentinel" 2>/dev/null
-  if [[ -s "$tmp" ]]; then
-    cat "$tmp"
-    local bytes
-    bytes=$(wc -c <"$tmp" | tr -d ' ')
-    rm -f "$tmp"
-    print -u2 "cpblock: $bytes bytes copied to clipboard"
-    return 0
-  fi
-  rm -f "$tmp"
-  print -u2 "cpblock: empty — run 'exec zsh' if the shell pre-dates chezmoi apply."
-  return 1
 }

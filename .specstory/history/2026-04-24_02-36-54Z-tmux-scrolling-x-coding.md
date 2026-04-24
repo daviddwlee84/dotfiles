@@ -11302,3 +11302,7912 @@ Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
 0
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 04:56:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 04:56:59Z)**_
+
+redact script 成功(exit 1 是 rewrite 信號，不是錯誤)，但 `&&` 被卡住。改用 `;`：
+
+_**Agent (claude-opus-4-7 2026-04-24 04:57:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry with ; instead of &&
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+echo "=== staged content grep ==="
+git show :.specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | grep -c "PRIV***KEY"
+echo "=== attempting commit now ==="
+git commit -m "$(cat <<'EOF'
+tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+
+- common.conf: set scroll-on-clear off so streaming coding agents
+  (Claude Code, OpenCode) that repaint via ED on the main screen
+  don't pollute scrollback with ghost frames every redraw
+- 02_shell_integration.zsh (new): OSC 133 A/C/D markers via add-zsh-hook.
+  A is embedded in $PROMPT via %{...%} because printf'ing from precmd
+  hits a ZLE-timing race that prevents tmux's line-attr tracker from
+  associating A with the rendered prompt line (see new pitfall)
+- keybindings.conf: in copy-mode { } jumps to previous/next prompt,
+  M-[ M-] to previous/next output; at the root, prefix + M-y copies
+  the last command's output and prefix + M-i copies the input line
+- 03_tmux_capture.zsh (new): cpout / cpcmd / cpblock shell functions
+  that print to stdout (pipe-friendly) and copy to clipboard via
+  tmux's OSC 52 bridge (fallback chain: pbcopy/wl-copy/xclip/xsel).
+  cpcmd uses zsh history so it works outside tmux too; cpout/cpblock
+  delegate to tmux's OSC 133 line-attr navigation via copy-mode chain.
+  preexec skips C for these three commands so their own navigation
+  lands on the previous command, not on themselves
+- 2 pitfall files: main-screen TUI repaint ghosting (fundamental limit,
+  workaround documented) and the precmd-printf-A silent-failure trap
+  that took 5 debug rounds to track down
+- docs/tools/tmux/{README,keybindings}.md + docs/zsh/aliases.md and
+  pitfalls/README.md index entries updated per the repo's cross-file
+  maintenance rules
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -10
+echo "=== log ==="
+git --no-pager log --oneline -3
+```
+
+```text
+Successfully redacted 1 file(s)
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+0
+0
+=== staged content grep ===
+0
+=== attempting commit now ===
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777006628-99229.
+[main b5e8da0] tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+ 12 files changed, 12084 insertions(+)
+ create mode 100644 .claude/plans/tmux-scrolling-x-coding-rosy-clover.md
+ create mode 100644 .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ create mode 100644 dot_config/zsh/tools/02_shell_integration.zsh
+ create mode 100644 dot_config/zsh/tools/03_tmux_capture.zsh
+ create mode 100644 pitfalls/tmux-scrollback-tui-repaint-ghosting.md
+ create mode 100644 pitfalls/zsh-osc133-precmd-printf-a-not-stored.md
+=== log ===
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+8521569 scripts/init: add dotfiles-init wrapper around `chezmoi init`
+11500b5 fleet-apply followups: ts_nas npm pitfall + 3 TODO items
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 04:57:18Z)**_
+
+Commit 成功：**`b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input`** — 12 files / 12084 insertions.
+
+包含內容：
+- `common.conf` (scroll-on-clear off)
+- `02_shell_integration.zsh` (OSC 133 hook, A 塞進 PROMPT)
+- `03_tmux_capture.zsh` (cpout/cpcmd/cpblock)
+- `keybindings.conf` (`{`/`}`/`M-[`/`M-]` in copy-mode + `prefix + M-y`/`M-i`)
+- docs/tools/tmux/{README,keybindings}.md、docs/zsh/aliases.md
+- 2 pitfalls + index
+- plan 檔 + specstory chat history（已被 redact hook 清掉任何 PRIV***KEY 提及）
+
+沒 push。另有你 pre-staged 的 bootstrap / dotfiles_init 其他 WIP（`dot_config/tmuxp/project.yaml`、新的 plan 檔、specstory 04-24-36Z 等）還在未 commit 狀態沒動到。
+
+---
+
+_**User (2026-04-24 05:04:09Z)**_
+
+有了這個 我們現在來擴充實現 cpblock 可以指定 N blocks 這樣可以往上recursively的找 另外也可以通過指定index (從當前往回數)
+
+然後再在這個基礎之上 我們可以選擇以一個簡短的fix prompt + pipe的形式扔給OpenCode 或 Claude, Codex 等等agent 通過那種non-tty的方式自動fix 或是不要自動執行而是給出簡短的fix 方法等等(依照不同需求而定)
+
+另外這個可以做一個簡單的TUI (可以用Python uv script寫)
+
+就是可以往前選code block
+可以edit預設prompt
+然後送出
+可以讓輸出貼回terminal 或是 clipboard 或是就直接進入agent session等等
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 05:05:01Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:05:02Z)**_
+
+先讀舊 plan + 並行 explore 現有 patterns。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:05:03Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.claude/plans/tmux-scrolling-x-coding-rosy-clover.md`
+
+```text
+File unchanged since last read. The content from the earlier Read tool_result in this conversation is still current — refer to that instead of re-reading.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:05:57Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="Agent"><details>
+<summary>Tool use: **Agent**</summary>
+Agent CLI invocation patterns
+
+```text
+Perfect! Now I have comprehensive information. Let me compile the final report.
+
+## Report: Agent CLI One-Shot Invocation Patterns
+
+### 1. Non-interactive Stdin-piped Invocations Found
+
+**File: `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh` (lines 100-103)**
+
+The `glcreate-ai` function sends prompts directly to agent CLIs via stdin-piped flags:
+```bash
+case "$agent" in
+  opencode)       opencode run "$prompt" ;;
+  claude)         claude -p "$prompt" ;;
+  codex)          codex exec "$prompt" ;;
+  cursor-agent)   cursor-agent -p "$prompt" ;;
+esac
+```
+
+**Supported agents**: OpenCode (`run`), Claude Code (`-p`), Codex CLI (`exec`), Cursor Agent (`-p`)
+
+**File: `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh` (lines 92-115)**
+
+The `_sesh_wrap_agent` function wraps specstory-compatible agents for session startup:
+```bash
+case "$agent" in
+  claude|codex|cursor|droid|gemini)
+    print -r -- "specstory run $agent"
+```
+Then these wrapped commands are passed to tmux panes via `_sesh_on_exit_wrap` (lines 130-155), enabling agents to run in tmux panes spawned by `scode` and `svibe` helpers.
+
+### 2. Agent Binaries Known to Be Installed/Supported
+
+From `README.md` (line 100) + `dot_ansible/roles/coding_agents/`:
+
+| Agent | Type | Install Method | CLI Flags (One-Shot) |
+|-------|------|-----------------|----------------------|
+| Claude Code | Canonical (installed) | macOS: `homebrew_cask`, Linux: `curl install.sh` | `-p` (stdin) |
+| OpenCode | Canonical (installed) | macOS: `homebrew_tap`, Linux: GitHub binary | `run` (positional arg) |
+| Codex CLI | Canonical (installed) | Installed via install script | `exec` (positional arg) |
+| Cursor Agent | Optional (installed) | Installed via package manager | `-p` (stdin) |
+| Gemini CLI | Optional (installed) | Installed (referenced in wrap logic) | TBD (no usage found) |
+
+### 3. Existing "Send to Agent" Patterns
+
+- **`glcreate-ai` (gitlab.zsh:63-106)**: AI-assisted GitLab repo creation. Supports 4 agents with auto-wrapped prompts in Chinese/English.
+- **`scode` & `svibe` (sesh.zsh:254-610)**: Spawn tmux panes running agents, with optional `specstory run` wrapping. Exit handlers (`--on-exit`) control pane behavior.
+- **SpecStory wrapping**: Known providers (claude/codex/cursor/droid/gemini) auto-wrapped in `specstory run X` for markdown auto-save; others (opencode) pass-through raw.
+
+### 4. CLI Non-Interactive Syntax from Repo
+
+From code inspection:
+
+| Agent | Flag | Usage | Context |
+|-------|------|-------|---------|
+| `claude` | `-p` | `claude -p "$prompt"` | stdin-piped prompt (gitlab.zsh:101) |
+| `opencode` | (positional) | `opencode run "$prompt"` | positional argument (gitlab.zsh:100) |
+| `codex` | `exec` | `codex exec "$prompt"` | positional after `exec` (gitlab.zsh:102) |
+| `cursor-agent` | `-p` | `cursor-agent -p "$prompt"` | stdin-piped (gitlab.zsh:103) |
+| All (via specstory) | N/A | `specstory run <agent>` | Wraps agents for auto-save (sesh.zsh:104-107) |
+
+No slash-command wrappers found in `dot_claude/` — configs are `modify_` overlays only (settings.json, hook notify scripts).
+```
+</details></tool-use>
+
+_**Agent - sidechain (2026-04-24 05:05:14Z)**_
+
+Explore /Users/daviddwlee84/.local/share/chezmoi and report:
+
+1. **Non-interactive / one-shot invocation of coding-agent CLIs in this repo**: any shell wrappers, aliases, or functions that call `claude`, `opencode`, `codex`, `codex exec`, `aider`, `gemini`, etc. via stdin-piped prompts or `-p` / `--print` / `exec` flags. Check at minimum:
+   - `dot_config/zsh/tools/34_openclaw.zsh`
+   - `dot_config/zsh/tools/40_codexbar.zsh`
+   - `dot_config/zsh/tools/22_sesh.zsh` (for how it spawns agents in panes)
+   - any `scripts/` that invoke agents
+   - `dot_claude/` for any slash-commands or wrappers
+
+2. **Agent binaries known to be installed / supported**: from `README.md`, `docs/tools/`, `dot_ansible/` roles, `dot_config/homebrew/Brewfile*` — list which agent CLIs are canonical for this repo (Claude Code, OpenCode, Codex CLI, Gemini, Aider — which exist and which invocations work headless).
+
+3. **Existing "send block to agent" patterns**: anything the user has already built that pipes scrollback / selection / command output into an agent. Look for keywords like `claude -p`, `| claude`, `opencode run`, `codex exec`, `fix`, `explain` in shell configs.
+
+4. **Agent non-interactive CLI syntax known from docs or comments in repo**: grep `docs/tools/` and `dot_claude/` for recorded flags (the user cares about ONE-SHOT mode, not TTY).
+
+Report with file:line references. Keep it under 250 words. Thoroughness: medium.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:16Z)**_
+
+I'll explore this repository to find agent CLI invocations and patterns. Let me start with a systematic search.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi -type f -name "*.md" | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/TODO.md
+/Users/daviddwlee84/.local/share/chezmoi/README.md
+/Users/daviddwlee84/.local/share/chezmoi/NOTES.md
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md
+/Users/daviddwlee84/.local/share/chezmoi/backlog/tmux-window-status-indicators.md
+/Users/daviddwlee84/.local/share/chezmoi/backlog/specstory-opencode-support.md
+/Users/daviddwlee84/.local/share/chezmoi/backlog/README.md
+/Users/daviddwlee84/.local/share/chezmoi/backlog/tmux2k-tuning.md
+/Users/daviddwlee84/.local/share/chezmoi/backlog/starship-context-modules.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/linux-package-sources.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/locale.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/keyboard-shortcuts.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/ansible-js-cli-tools-old-system-node.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/npm-postinstall-github-releases-hang.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/nvim-fs-find-enoent-stale-cwd.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/tmux-scrollback-tui-repaint-ghosting.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/tmuxp-append-ignores-session-start-directory.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/zsh-osc133-precmd-printf-a-not-stored.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/tmux-join-pane-numeric-target-pane-not-window.md
+/Users/daviddwlee84/.local/share/chezmoi/pitfalls/tv-channel-bare-braces-break-substitution.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:18Z)**_
+
+Now let me search the target files for agent CLI invocations:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:19Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./README.md`
+
+```text
+1	# dotfiles
+2	
+3	Cross-platform development environment setup using **chezmoi** + **ansible**.
+4	
+5	- **chezmoi**: manages config files (dotfiles)
+6	- **ansible**: installs system dependencies and tools
+7	
+8	## Prerequisites
+9	
+10	- [chezmoi](https://www.chezmoi.io/install/)
+11	- [uv](https://docs.astral.sh/uv/getting-started/installation/) (for ansible)
+12	
+13	## Architecture
+14	
+15	```mermaid
+16	flowchart TB
+17	    subgraph Bootstrap["1. Bootstrap"]
+18	        BREW[Homebrew macOS]
+19	        UV[uv] --> ANS[ansible]
+20	        MISE[mise]
+21	    end
+22	
+23	    subgraph Chezmoi["2. chezmoi apply"]
+24	        DOT[Config files<br/>~/.gitconfig, ~/.config/]
+25	        ANSDIR[~/.ansible/]
+26	        BREWFILE[Brewfiles<br/>~/.config/homebrew/]
+27	    end
+28	
+29	    subgraph Ansible["3. Ansible Playbooks"]
+30	        BASE[base]
+31	        ZSH[zsh]
+32	        NVIM[neovim]
+33	        DEVTOOLS[devtools]
+34	        UVTOOLS[python_uv_tools]
+35	        CARGO[rust_cargo_tools]
+36	        LLMTOOLS[llm_tools]
+37	    end
+38	
+39	    subgraph BrewBundle["4. Brew Bundle opt-in"]
+40	        CASKS[GUI Apps]
+41	        MAS[App Store]
+42	    end
+43	
+44	    Bootstrap --> Chezmoi --> Ansible
+45	    Chezmoi -.-> BrewBundle
+46	    MISE -.->|Node.js, Rust| NVIM
+47	    MISE -.->|Rust| CARGO
+48	    UV -.->|Python tools| UVTOOLS
+49	    UV -.->|LiteLLM| LLMTOOLS
+50	    BREW -.->|casks| CASKS
+51	    BREW -.->|formulae / casks| LLMTOOLS
+52	```
+53	
+54	## Quick Setup
+55	
+56	### Interactive (recommended)
+57	
+58	```bash
+59	curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | bash
+60	```
+61	
+62	Installs [`uv`](https://docs.astral.sh/uv/) (if missing) and launches `dotfiles-init` — a Python wrapper that groups the ~19 chezmoi prompts into a clean multi-select UI, offers pre-set bundles (`personal-mac` / `work-mac` / `server-linux` / `minimal`), checks SSH keys, then calls real `chezmoi init` with your answers pre-filled. Full docs: [`scripts/init/README.md`](scripts/init/README.md).
+63	
+64	Behind GFW? Set `DOTFILES_RAW_URL` / `DOTFILES_REF` to point at a mirror, or use the non-interactive path below.
+65	
+66	### Non-interactive (direct chezmoi)
+67	
+68	```bash
+69	# Installs chezmoi to ~/.local/bin and walks through the raw prompts one-by-one.
+70	# Uses HTTPS to avoid SSH key setup on fresh machines.
+71	export GITHUB_USERNAME=daviddwlee84
+72	sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" init --apply "https://github.com/$GITHUB_USERNAME/dotfiles.git"
+73	
+74	# After install, switch the chezmoi source repo to SSH (so future `chezmoi update` uses your SSH key):
+75	#   chezmoi cd
+76	#   git remote set-url origin git@github.com:$GITHUB_USERNAME/dotfiles.git
+77	#   exit
+78	```
+79	
+80	This automatically:
+81	
+82	1. Bootstraps Homebrew (macOS/Linux), uv, mise, ansible
+83	2. Deploys all config files
+84	3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
+85	4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled)
+86	
+87	### After install
+88	
+89	- `~/.local/bin` is auto-appended to `~/.bashrc` so `chezmoi`, `uv`, and `mise` stay reachable from bash.
+90	- On sudo-enabled machines, the ansible `zsh` role switches your login shell to zsh automatically. Log out / back in to pick it up, or run `exec zsh` now.
+91	- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER`.
+92	- Open a new shell (or `source ~/.bashrc`) after install so PATH changes take effect.
+93	
+94	### Optional Components
+95	
+96	During `chezmoi init`, you'll be prompted for optional installs:
+97	
+98	| Option | Default | Description |
+99	|--------|---------|-------------|
+100	| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, RTK, td, sidecar, specify-cli, etc. |
+101	| `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
+102	| `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
+103	| `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
+104	| `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`) |
+105	| `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps) |
+106	| `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux) |
+107	| `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
+108	| `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
+109	| `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
+110	| `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
+111	
+112	To change options later: `chezmoi init --force`
+113	
+114	## What You Get
+115	
+116	### Config Files
+117	
+118	- `~/.gitconfig` - Git configuration
+119	- `~/.config/git/hooks/` - Global Git hooks (pre-commit + Git LFS hooks)
+120	- `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
+121	- `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff pager
+122	- `~/.config/bat/themes/tokyonight_night.tmTheme` - Managed Tokyo Night theme for bat
+123	- `~/.config/nvim/` - Neovim (LazyVim) configuration; system clipboard via `unnamedplus`, with an SSH-conditional OSC 52 override so remote yanks reach the local clipboard (pairs with tmux `set-clipboard on`, see [docs](docs/tools/tmux/README.md#osc-52-clipboard-ssh-friendly-yank))
+124	- `~/.config/uv/uv.toml` - uv package manager config (PyPI: official / Aliyun+TUNA+USTC via `useChineseMirror`)
+125	- `~/.cargo/config.toml` - Cargo registry config (crates.io / TUNA sparse index via `useChineseMirror`)
+126	- `~/.npmrc` - npm registry config (official/npmmirror via `useChineseMirror`)
+127	- `~/.config/.bunfig.toml` - Bun global registry config (official/npmmirror via `useChineseMirror`)
+128	- `~/.gemrc` - RubyGems source + common options (TUNA mirror; only managed when `useChineseMirror=true`, gated via `.chezmoiignore.tmpl`)
+129	- `~/.condarc` - Conda/Mamba channels with TUNA Anaconda mirror (only managed when `useChineseMirror=true`, preserves `auto_activate_base`/user channel prefs)
+130	- `~/.config/zsh/00_exports.zsh` - Env-var mirror bundle (Homebrew / Rustup / mise / GOPROXY) when `useChineseMirror=true`; also exported by bootstrap + ansible runner scripts so first-run installs and ansible subprocesses inherit them ([docs](docs/tools/mirrors.md))
+131	- `~/.config/zsh/99_local_proxy.zsh` - Create-only machine-local proxy override stub; uncomment `LOCAL_PROXY_URL` / `LOCAL_PROXY_SOCKS_URL` here to pin Clash ports without future chezmoi diffs
+132	- `~/.docker/config.json` - Docker client `proxies.default` block (auto-injected from `$LOCAL_PROXY_URL` / `$LOCAL_PROXY_SOCKS_URL`; preserves `auths` / `credsStore` via chezmoi modify-script) ([docs](docs/tools/containers.md))
+133	- `~/.config/docker/daemon.json` - Rootless Docker `registry-mirrors` (DaoCloud / USTC / NJU / ...; Linux + `useChineseMirror` only) ([docs](docs/tools/containers.md#strategy-a-registry-mirrors-in-daemonjson))
+134	- `~/.config/alacritty/` - Alacritty terminal config (CSI-u keybindings for `Ctrl+Number` tmux window switching, `option_as_alt` for Meta keys)
+135	- `~/Library/Application Support/{Code,Cursor,Antigravity}/User/` (macOS) + `~/.config/{Code,Cursor,Antigravity}/User/` (Linux) - Editor settings overlay: `modify_settings.json` deep-merges a 6-key baseline (Hack Nerd Font Mono, relative line numbers, format on save, smart-accept suggestion, terminal font) into each editor's live `settings.json` without overwriting other keys; `create_keybindings.json` seeds 5 universal keybindings on a fresh machine and never overwrites editor-added entries. Canonical templates live under [`.chezmoitemplates/editor/`](.chezmoitemplates/editor/); `.chezmoiignore.tmpl` gates each editor dir with a `stat` presence check so uninstalled editors never produce phantom directories.
+136	- `~/.config/ghostty/config` - Ghostty/cmux terminal config (`macos-option-as-alt` for tmux Meta keybindings, disabled ligatures, explicit `clipboard-write = allow` / `clipboard-read = ask` for OSC 52) ([docs](docs/tools/ghostty.md))
+137	- `~/.config/starship.toml` - Starship cross-shell prompt config
+138	- `~/.config/direnv/direnvrc` - direnv helper functions, including `.venv`-aware Python activation
+139	- `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))
+140	  - `yazi.toml` - Main config with open rules and openers (`o`/`O`)
+141	  - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
+142	- `~/.claude/` - Claude Code settings
+143	- `~/.cursor/cli-config.json`, `~/.config/opencode/opencode.json`, `~/.codex/config.toml` - Coding-agent CLI overlays: each `modify_*` script deep-merges a small managed baseline (preferences, features, curated plugins) into the CLI's live config, preserving auth tokens, per-project trust, sessions, and other machine-local state. Codex specifically round-trips `[projects]` and `[marketplaces.*]` so per-project trust paths never get clobbered. OpenCode legacy `~/.config/opencode/config.json` is migrated to the modern filename by a one-shot `run_once_before_50_opencode_migrate.sh.tmpl`. Full design: [docs/tools/agent-overlays.md](docs/tools/agent-overlays.md).
+144	- `~/.specstory/cli/config.toml` - Global SpecStory defaults for `specstory run` across all projects
+145	- `~/.tmux.conf` - Tmux configuration with TPM plugins (resurrect, continuum, tmux-floax floating pane, tmux-fzf for fuzzy keybinding/session/pane search rebound to `prefix+?`, tmux-fzf-url, tmux-open), vim-style copy mode with clipboard yank, capture-pane helpers (`prefix+y`/`Y`/`C-y`), a native popup menu (`prefix+Space` or `prefix+e`, script-driven with submenus and height-aware trimming) with layout/resize/session management, popup shell (`prefix+\``) and lazygit popup (`prefix+G`), a glow-rendered cheatsheet (`prefix+Space` → `?`), vim-style pane nav, `Ctrl+1..9` quick window switching (CSI-u terminals), extended-keys for coding agents (including `Ctrl+/` in Neovim), sesh keybindings (`prefix+g` fzf picker, `prefix+T` television picker, `prefix+O` built-in picker, `prefix+W` window picker, `prefix+S` last), responsive Catppuccin status bar (adapts modules to terminal width for mobile), and config reload on `prefix+R` ([docs](docs/tools/tmux/README.md))
+146	- `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`, with an OSC 52 fallback so `x copy` reaches the local clipboard over SSH ([docs](docs/tools/clipboard.md))
+147	- `~/bin/sms` - Huawei router SMS reader (HiLink XML API; verification-code extraction, clipboard integration, TV channel) ([docs](docs/tools/sms.md))
+148	- `~/.config/sms/config.toml.example` - Starter config for the `sms` CLI (real `config.toml` is created at runtime, never committed)
+149	- `~/.config/television/cable/sms.toml` - Television channel for browsing router SMS inbox
+150	- `~/.config/sesh/sesh.toml` - Sesh session manager config (named sessions with windows, wildcards, defaults) ([docs](docs/tools/sesh.md))
+151	- `~/.config/worktrunk/config.toml` - Worktrunk (`wt`) git-worktree manager config — aliases (`wt sw`/`ls`/`rm`/`cc`/`oc`); hooks & LLM commit generation kept commented as opt-in ([workflow playbook](docs/tools/worktrunk.md))
+152	- `~/.config/television/cable/sesh.toml` - Television custom cable channel for sesh (overrides built-in with richer sources and actions)
+153	- `~/.config/television/cable/lan-devices.toml` + `~/.config/television/lan-scan.sh` - Television channel for LAN device discovery with open ports, MAC/vendor, hostname, RTT; streams results incrementally via a cache file ([docs](docs/tools/tv.md))
+154	- `~/.config/television/cable/azure.toml` + `~/.config/television/azure-{source,preview,rotate-ip}.sh` - Television channel for Azure resources (Resource Groups / VMs / Public IPs / NICs+NSGs / all) with VM actions (restart, start/stop, deallocate, rotate public IP, SSH, open in portal) and graceful login prompt ([docs](docs/tools/tv.md))
+155	- `~/.config/television/cable/clash.toml` - YAML-backed Clash / mihomo Television channel; auto-resolves Clash's active `profiles/<time>.yml` from `~/.config/clash/profiles/list.yml`, falls back to legacy `config.{yaml,yml}`, and turns empty proxies/groups/rules tabs into informative placeholder rows instead of blank panes ([docs](docs/tools/tv.md))
+156	- `~/.config/television/cable/clash-api.toml` - Live Clash external-controller Television channel for `/proxies`, `/rules`, `/configs`, and `/connections`; supports remote controllers via `CLASH_CONTROLLER` / `CLASH_SECRET` without adding an in-UI host switch ([docs](docs/tools/tv.md))
+157	- `~/.config/television/cable/logs.toml` - Television channel for fuzzy-browsing log files with tailspin/bat previews, `Enter` opens in `lnav`, `Alt+T` live tails with tailspin ([docs](docs/tools/log-tools.md))
+158	- `~/.config/television/cable/services.toml` - Cross-platform services channel for systemd (Linux) / launchd (macOS) — 5 source cycles (running/all/failed/user-scope/installed-on-disk), tailspin log preview, Alt-key lifecycle actions (restart/stop/start/reload/enable), sudo-aware ([docs](docs/tools/services.md))
+159	- `~/.config/television/cable/skills.toml` + `~/.config/television/cable/skills-walk.toml` - Two Television channels for browsing agent skills: `skills` parses `npx skills list` (project + global, with Agents column), `skills-walk` walks `~/.agents/`, `~/.claude/`, `~/.codex/`, `~/.cursor/skills-cursor/` directly without invoking npx; both preview SKILL.md with bat
+160	- `~/.config/television/cable/agent-sessions.toml` + `~/.config/television/agent-sessions.py` - Unified Television channel for coding-agent sessions across OpenCode (SQLite), Claude Code (JSONL), Codex (JSONL), Cursor Agent CLI (store.db), and Cursor IDE composer chats (state.vscdb); 6 source cycles (all/per-agent), content-searchable via first-user-message snippet, `Enter` prints `cd <dir> && <agent> --resume <id>`, `Alt+T` resumes in current shell (Cursor IDE: opens workspace folder via `cursor <dir>` since IDE has no chat-resume CLI flag)
+161	- `~/.config/zsh/tools/22_sesh.zsh` - Sesh keybinding (`Alt+S` for session picker), `shere`/`sroot` session helpers (supports bare command args, e.g. `shere specstory run codex`), and shell completion
+162	- `~/.config/zsh/tools/36_pueue.zsh` - Pueue queue summary helper (`pqsum`)
+163	- `~/.config/zsh/tools/41_github.zsh` - GitHub helper with `ghget` for downloading a repo subdirectory from a tree URL
+164	- `~/.config/zsh/tools/50_networking.zsh` - Networking aliases plus loopback proxy helpers (`proxy-on`, `proxy-off`, `proxy-status`, `withproxy`) that prefer `$LOCAL_PROXY_URL`, then Clash's active config, then loopback port probing
+165	- `~/.config/zsh/tools/37_lazygit.zsh` - LazyGit shell alias: `lg`
+166	- `~/.config/zsh/tools/28_tldr.zsh` - `tldrf` helper with `TLDR_LANGUAGES` fallback order
+167	- `~/.config/zsh/tools/29_log_tools.zsh` - Log viewer wrappers: `catl` (tspin colorful cat), `lessl` (ccze + less), `logtail` (tspin live follow) ([docs](docs/tools/log-tools.md))
+168	- `~/.config/zsh/tools/29_marimo.zsh` - `marimo` zsh shell completion
+169	- `~/.config/zsh/tools/26_eza.zsh` - `eza`-backed `ls`/`la`/`ll` aliases, plus `llt` for tree view with git-aware subdirectory context
+170	- `~/.config/zsh/tools/32_try.zsh` - `try-cli` shell integration, with default `TRY_PATH` and graduate-friendly `TRY_PROJECTS`
+171	- `~/.config/zsh/tools/94_ssh_agent.zsh` - SSH agent with Bitwarden-first fallback to persistent `ssh-agent` (auto-loads keys)
+172	- `~/.config/zsh/tools/95_bitwarden.zsh` - Bitwarden CLI zsh completion
+173	- `~/.ssh/config` - SSH main config skeleton (create-only: `Include ~/.ssh/config.d/*` + conservative `Host *` defaults)
+174	- `~/.ssh/config.d/00-defaults` - SSH global defaults stub (commented examples only)
+175	- `~/.ssh/config.d/git` - SSH host entries for `github.com` and `gitlab.com` with commented multi-account/Bitwarden examples
+176	- `~/.config/tmuxp/claude-sidecar.yaml` - tmuxp workspace for Claude + Sidecar
+177	- `~/.config/tmuxp/coding-agent.yaml` - tmuxp workspace for coding agent (nvim 75% | specstory 25%, btop tab)
+178	- `~/.config/tmuxinator/coding-agent.yml` - tmuxinator workspace for coding agent (alternative to tmuxp, native sesh integration)
+179	- `~/.config/tmuxinator/chezmoi.yml` - tmuxinator workspace for chezmoi session (shell + lazygit + nvim overrides, native sesh integration)
+180	- `~/.config/zellij/config.kdl` - Zellij config (locked default mode for coding agent compatibility, kitty keyboard protocol)
+181	- `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
+182	- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
+183	
+184	SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
+185	
+186	### Upstream Clones (via `.chezmoiexternal.toml.tmpl`)
+187	
+188	Vendored upstream sources are declared in [`.chezmoiexternal.toml.tmpl`](.chezmoiexternal.toml.tmpl) and auto-refreshed weekly by chezmoi (`refreshPeriod = "168h"`). Force an immediate pull with `chezmoi apply --refresh-externals`.
+189	
+190	- `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
+191	- `~/.tmux/plugins/tpm` (TPM)
+192	- `~/.fzf` (Linux only; apt version lacks `--zsh`)
+193	- `~/.local/share/toolkami/toolkami.rb`
+194	
+195	See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat) for details and when to add entries here vs. ansible.
+196	
+197	### Tools (via ansible)
+198	
+199	- **Base**: git, git-lfs, curl, ripgrep, fd, just, build tools
+200	- **Neovim**: >= 0.11.2 with LazyVim dependencies
+201	- **LazyVim deps**: fzf, lazygit, tree-sitter-cli, Node.js
+202	- **Git review stack**: gh, glab, gh-dash (via `gh` extension), diffnav, git-delta, lazygit
+203	- **Markdown reader**: `glow` for terminal Markdown rendering, plus `readurl <url>` / `readlocal` / `readnode` / `readraw` to render web pages as markdown in the terminal with auto proxy fallback (see [docs/tools/web-reader.md](docs/tools/web-reader.md))
+204	- **Shell testing**: `bats` (bats-core) — Bash test runner with TAP/JUnit output
+205	- **Structured-data CLIs**: `jq` (JSON), `yq` (YAML/JSON; Mike Farah Go build), `dasel` (YAML/TOML/XML/JSON/CSV unified query & modify), `jnv` (interactive `jq` JSON viewer); `taplo` for TOML format/lint
+206	- **DuckDB CLI**: `duckdb` (Homebrew on macOS, official downloads on Linux)
+207	- **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
+208	- **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
+209	- **Coding Agents** (optional): Claude Code, `claude-hud` statusline plugin, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli
+210	- **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection
+211	- **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
+212	- **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
+213	- **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
+214	- **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
+215	- **Docker**: OrbStack (macOS) or Docker Engine (Linux)
+216	- **Cargo tools**: pueue (process queue manager)
+217	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+218	
+219	### Bootstrap (installed before ansible)
+220	- **Homebrew** (macOS): Package manager for macOS
+221	- **uv**: Python package manager for ansible
+222	- **mise**: Runtime manager for Node.js and Rust (pins versions from `~/.config/mise/config.toml`; upgrade with `just upgrade-mise`, see [Keeping tools up-to-date](#keeping-tools-up-to-date))
+223	- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, worktrunk ([workflow playbook](docs/tools/worktrunk.md)), zellij, btop, htop, taplo, television, pandoc
+224	- **Log viewers**: tailspin (`tspin`), lnav, grc, ccze (Linux only — no Homebrew formula) — plus `catl`/`lessl`/`logtail` zsh wrappers and a `tv logs` Television channel ([docs](docs/tools/log-tools.md))
+225	- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
+226	- **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
+227	- **Python tools (via uv)**: thefuck, apprise, sqlit-tui, dotenv, git-filter-repo, mlflow, tmuxp, trafilatura
+228	- **JS CLI tools (via npm)** (optional): readability-cli (`readable` — Mozilla Readability for `readnode` terminal web reader)
+229	- **NerdFonts**: Hack Nerd Font for terminal emulators
+230	
+231	### Reference docs (no install)
+232	
+233	- **Infrastructure & virtualization**: [docs/infra/](docs/infra/) — Proxmox / ESXi / OrbStack / UTM / VirtualBox / libvirt comparison; CephFS / BeeGFS / NFS / Lustre shared storage; SLURM / Kubernetes / Nomad compute scheduling; FreeIPA + shared-home patterns. Documentation only; nothing is installed by chezmoi for these.
+234	
+235	## Supported Platforms
+236	
+237	| Platform | Package Manager | Notes |
+238	|----------|-----------------|-------|
+239	| macOS | Homebrew | Full support |
+240	| Ubuntu Desktop | apt + snap | Full support |
+241	| Ubuntu Server | apt + snap | Full support |
+242	| Ubuntu Server (no root) | GitHub binaries + mise + cargo + uv | `noRoot=true`, tools installed to `~/.local/bin` |
+243	| Raspberry Pi 5 (64-bit OS) | apt + Linuxbrew | Full support (same as Ubuntu Server) |
+244	| Raspberry Pi 4 (32-bit OS) | apt + GitHub binaries | Linuxbrew skipped; some tools without armhf builds are skipped |
+245	
+246	## Manual Commands
+247	
+248	```bash
+249	chezmoi diff          # Preview changes
+250	chezmoi apply         # Apply config files
+251	chezmoi cd            # Go to source directory
+252	
+253	# Re-run ansible manually
+254	cd ~/.ansible && ansible-playbook playbooks/macos.yml
+255	```
+256	
+257	## Keeping tools up-to-date
+258	
+259	`chezmoi apply` is deliberately **install-only** — ansible roles mostly use
+260	`state: present` / `creates:` idempotency so re-applying never silently bumps
+261	every tool on your machine. For explicit upgrades, use the dedicated entry
+262	points (see [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md) for the full matrix):
+263	
+264	```bash
+265	just upgrade-all          # externals + brew + mise + uv + npm + cargo + dotnet + gem + agents + plugins
+266	just upgrade-dry-run      # preview without executing
+267	
+268	# Per category (compose as you like):
+269	just upgrade-brew         # formulas + casks (--greedy) + Brewfile (no --no-upgrade) + cleanup
+270	just upgrade-mise         # mise self-update + `mise upgrade`
+271	just upgrade-uv           # Python CLI tools (apprise, mlflow, sqlit-tui, ...)
+272	just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
+273	just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
+274	just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
+275	just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
+276	just upgrade-agents       # re-runs install.sh for Claude Code / OpenCode / Cursor CLI / Ollama / llmfit / RTK
+277	just upgrade-plugins      # LazyVim :Lazy sync + TPM + claude-hud + pre-commit autoupdate + tldr + gh extensions
+278	just upgrade-externals    # chezmoi upgrade + chezmoi apply --refresh-externals
+279	```
+280	
+281	Underlying script: [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh) —
+282	best-effort, prints a `SUCCESS / SKIPPED / FAILED` summary at the end. Full
+283	docs, rationale, run-order diagram, and extension guide live in
+284	[docs/this_repo/upgrades.md](docs/this_repo/upgrades.md).
+285	
+286	When installed, `just upgrade-plugins` also refreshes `claude-hud` to the
+287	latest upstream release. Upstream `claude-hud` `v0.0.12+` now follows Claude
+288	Code's official stdin `rate_limits` only, so the old credential-derived `Max`
+289	plan badge may disappear after upgrade.
+290	
+291	## Multi-host apply (`just fleet-apply`)
+292	
+293	Push the same `chezmoi update --init` to every host in
+294	`~/.config/fleet/machines.toml`, in parallel, with sudo password sourced from
+295	plaintext / interactive prompt / Bitwarden CLI:
+296	
+297	```bash
+298	just fleet-apply                     # parallel, all hosts (chezmoi update --init)
+299	just fleet-apply-dry-run             # `chezmoi diff` on each host (no changes)
+300	just fleet-apply-one lab-box         # single host, --serial mode (debug)
+301	```
+302	
+303	Connection prefers `~/.ssh/config` aliases (`ProxyJump`, `IdentityAgent`,
+304	etc. all inherited) and falls back to explicit `hostname/user/port/identity_file`.
+305	Per-host log: `logs/fleet-apply/<UTC-timestamp>/<host>.log`. Exit code = number
+306	of failed hosts. Inventory file is seeded once by chezmoi as a
+307	`create_private_` template, so your edits are never overwritten.
+308	
+309	Conflict-handling defaults match the "push canonical config" mental model:
+310	`--keep-going` is **on** (skip drifted files non-destructively, continue
+311	the rest), `--force` is **off** (don't auto-overwrite). Pass
+312	`--no-keep-going` to fail-fast, or `--force` to silently overwrite local
+313	drift on the remote — see [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
+314	for the full flag reference and per-machine git override convention
+315	(`~/.gitconfig.local`, same self-managed pattern as `~/.zshrc.adhoc`).
+316	
+317	## Testing
+318	
+319	Two layers, both opt-in — this is a personal dotfiles repo, tests only cover painful-regression zones:
+320	
+321	- **`just bats`** — fast unit tests (no Docker, no network). Covers proxy helpers (`tests/unit/zsh_proxy.bats`), `ghget` URL parsing (`tests/unit/ghget.bats`), and `lan-scan.sh` pure helpers (`tests/unit/lan_scan.bats`).
+322	- **`just docker-test`** — smoke tests in a clean Ubuntu container: re-apply idempotency, zsh config parses, `oh-my-zsh` plugins present, core CLI tools on PATH, nested unit tests pass under Ubuntu zsh (`tests/smoke/docker_install.bats`).
+323	- **`just check-all`** — everything: ansible syntax + pre-commit + `bats` + `docker-test`.
+324	
+325	`shellcheck` and `shfmt` run via pre-commit on `scripts/*.sh` (see `.pre-commit-config.yaml`).
+326	
+327	## Docker Testing
+328	
+329	```bash
+330	# Build and run the bats smoke suite
+331	just docker-test
+332	
+333	# Interactive devbox shell
+334	just docker-run
+335	
+336	# Build specific profiles
+337	just docker-desktop    # Ubuntu desktop profile
+338	just docker-china      # China mirror profile
+339	```
+340	
+341	## Development with justfile
+342	
+343	This project uses [just](https://github.com/casey/just) as a command runner:
+344	
+345	```bash
+346	just                  # List all commands
+347	just lint             # Ansible syntax check
+348	just check            # Full lint + dry-run
+349	just docker-build     # Build Docker image
+350	just info             # Show system info
+351	```
+352	
+353	## Roadmap & lessons learned
+354	
+355	Forward-looking work — long-term ideas, deferred items, things needing
+356	evaluation — lives in [`TODO.md`](TODO.md), prioritised P1 → P3 with effort
+357	estimates (S/M/L/XL). Items with accompanying research, design notes, or paused
+358	troubleshooting link to a corresponding [`backlog/<slug>.md`](backlog/) doc.
+359	
+360	Backward-looking knowledge — past traps and non-obvious debugging — lives in
+361	[`pitfalls/`](pitfalls/), titled by symptom so future-you can grep the error
+362	message and land on the root cause + workaround instead of re-debugging from
+363	scratch.
+364	
+365	## Customization
+366	
+367	See [CLAUDE.md](CLAUDE.md) for the agent-facing repo contract, [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for ansible customization, [docs/this_repo/testing.md](docs/this_repo/testing.md) for shell-script testing (bats, shellcheck, shfmt — and when to reach for ZUnit / ShellSpec instead), [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/tmux/README.md](docs/tools/tmux/README.md) for tmux usage and managed keybindings, [docs/tools/clipboard.md](docs/tools/clipboard.md) for how OSC 52 clipboard sync is wired across terminal / tmux / Neovim / `x` CLI (including SSH-remote yank), [docs/tools/ghostty.md](docs/tools/ghostty.md) for Ghostty/cmux notes and the `ghostty-ssh-terminfo` helper, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/pre-commit.md](docs/tools/pre-commit.md) for generic pre-commit reference (hook env model, `uv`-pinned bootstrap Python, debugging), [docs/tools/git_diff_workflow.md](docs/tools/git_diff_workflow.md) for the managed Git diff stack, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, [docs/tools/networking.md](docs/tools/networking.md) for networking tools, and [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md) for chezmoi source-state prefix semantics and when each is safe to `chezmoi add`.
+368
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:19Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./CLAUDE.md`
+
+```text
+1	# Dotfiles Repository — Agent Contract
+2	
+3	Cross-platform dotfiles managed by **chezmoi** (configs) + **ansible** (system deps). This file is the agent-facing contract: maintenance rules, hard invariants, and pointers to docs. User-facing intro is in [README.md](README.md).
+4	
+5	> **Headroom rule**: keep this file under ~30k chars. Push handbook content into `docs/`; keep only edit rules and cross-file invariants here.
+6	
+7	## Cross-file maintenance rules
+8	
+9	When you change one of these surfaces, update the listed mirror file in the same commit. These are the rules most often forgotten.
+10	
+11	### README.md
+12	
+13	When adding/modifying configurations, update [README.md](README.md):
+14	
+15	- **New config files** → "What You Get > Config Files" section
+16	- **New ansible roles/tools** → "What You Get > Tools" section
+17	- **New platforms** → "Supported Platforms" table
+18	- **Changed setup steps** → "Quick Setup" section
+19	
+20	Keep README.md concise and user-focused. Technical details belong here or in `docs/`.
+21	
+22	### Custom aliases & shell functions → `docs/zsh/aliases.md`
+23	
+24	When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
+25	
+26	### Dockerfile + dotfiles_init wrapper
+27	
+28	When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, three files must be updated in the same commit:
+29	
+30	1. `Dockerfile` — add `ARG CHEZMOI_*` build argument, add `--promptBool` / `--promptString` flag to `chezmoi init`.
+31	2. `scripts/init/dotfiles_init.py` — add a matching entry to the `PROMPTS` tuple (key, kind, group, label, desc, default).
+32	3. (If the prompt should be part of any named bundle) `BUNDLES` dict in the same file.
+33	
+34	Verify parity with: `uv run --script scripts/init/dotfiles_init.py doctor`. The subcommand greps `.chezmoi.toml.tmpl` + `Dockerfile` and compares against the embedded `PROMPTS`; non-zero exit means drift.
+35	
+36	### Agent artifact redaction
+37	
+38	SpecStory transcripts and coding-agent plan files commonly paste shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+39	
+40	| Prefix | Source |
+41	|--------|--------|
+42	| `.specstory/history/` | SpecStory chat transcripts |
+43	| `.claude/plans/` | Claude Code plan files |
+44	| `.cursor/plans/` | Cursor plan files |
+45	| `.opencode/plans/` | OpenCode plan files |
+46	
+47	Tooling: `scripts/redact_secrets.py` (gitleaks + `PRIV***KEY` pattern), `just check-secrets` / `just redact-secrets` / `just add-and-redact`. Pre-commit hook `redact-agent-secrets` runs `--fix` before `gitleaks-system`; if it rewrites a file, stage and retry.
+48	
+49	When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+50	
+51	### Keyboard shortcuts (cross-tool conflict check)
+52	
+53	When adding/modifying keybindings in any tool config, cross-check against other tools — multiple tools share the terminal's key namespace, especially `Ctrl+` and `Alt+`.
+54	
+55	| Tool | Config file | Conflict risk |
+56	|------|-------------|---------------|
+57	| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+58	| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+59	| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
+60	| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+61	| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+62	
+63	Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta).
+64	
+65	**Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
+66	
+67	### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
+68	
+69	This repo uses the `project-knowledge-harness` agent skill (managed via
+70	`~/.agents/.skill-lock.json` → restored by
+71	`run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
+72	see [docs/tools/agent-skills.md](docs/tools/agent-skills.md)). **Load the skill**
+73	for the full template, disambiguation table, and upgrade path.
+74	
+75	**Fallback (if the skill cannot be loaded)** — minimum viable rules so this
+76	section still constrains agents who can't see the skill:
+77	
+78	- Three repo-root surfaces, all `chezmoi`-ignored, all NOT auto-redacted:
+79	  [`TODO.md`](TODO.md) (priority/effort tags `P1`/`P2`/`P3`/`P?` × `S`/`M`/`L`/`XL`),
+80	  [`backlog/`](backlog/README.md) (research/design notes; needed for `P?` /
+81	  `[L]` / `[XL]` / multi-option entries), [`pitfalls/`](pitfalls/README.md)
+82	  (debugged traps, **titled by symptom not root cause**, verbatim error
+83	  messages — never paraphrase).
+84	- Triggers to capture future work: "maybe later", "nice to have", "if I'm
+85	  interested", "工程量太大需要再評估", "先記下來".
+86	- Triggers to capture pitfalls: >~15 min debugging, not googleable,
+87	  non-obvious fix, silent failure mode.
+88	- Do **not** spawn `ROADMAP.md` / `IDEAS.md` / `LESSONS.md` /
+89	  `TROUBLESHOOTING.md` — three surfaces, always.
+90	- A pitfall *graduates* to a Hard invariant in this file when it (a) recurs
+91	  across machines, (b) silently corrupts state, or (c) has a non-obvious
+92	  workaround. Link from the new invariant back to `pitfalls/<slug>.md`.
+93	
+94	### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
+95	
+96	Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:
+97	
+98	- `scripts/fleet_apply.py` — CLI flags, mode semantics, sudo helper integration, log/sentinel paths
+99	- `justfile` `fleet-*` recipes — name, args, doc-comment
+100	- `dot_config/fleet/create_private_machines.toml.tmpl` — schema (`local`, `chezmoi_path`, `no_root_machine`, `password.source`, etc.)
+101	- Any change to `scripts/lib/sudo_shared.sh` that affects how `CHEZMOI_SUDO_PASSWORD_FILE` is consumed (also see "Sudo session" invariant below)
+102	
+103	`README.md` only needs an update if the user-facing `## Multi-host apply` block changes (top-level recipe names, exit-code semantics).
+104	
+105	## Chezmoi templating conventions
+106	
+107	**Hard rule**: before adding a `{{ if eq .profile ... }}` branch, ask if the predicate is auto-detectable. If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
+108	
+109	| Predicate | Use |
+110	|---|---|
+111	| Any macOS (Apple Silicon or Intel) | `eq .chezmoi.os "darwin"` |
+112	| Any Linux | `eq .chezmoi.os "linux"` |
+113	| Apple Silicon only | `eq .chezmoi.arch "arm64"` (inside darwin-scoped files) or `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64")` |
+114	| Intel Mac only | `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "amd64")` |
+115	| Desktop vs headless (user role) | `.profile` — `ubuntu_desktop` / `ubuntu_server`; macOS side covered by `eq .chezmoi.os "darwin"` |
+116	
+117	Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. **Do not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
+118	
+119	Full decision table, before/after examples, and the `macos_intel` migration snippet: [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
+120	
+121	## Hard repo invariants
+122	
+123	### Install vs upgrade is split on purpose
+124	
+125	`chezmoi apply` (+ ansible phase) is deliberately **install-only**: roles use `state: present` / `creates:` so re-applying never silently bumps every tool. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes.
+126	
+127	- **Do not** rewrite ansible roles to `state: latest`.
+128	- **Do not** add `apt upgrade` / system package bumps to default scope.
+129	- `scripts/**` is in `.chezmoiignore.tmpl`, so `upgrade_tools.sh` is never deployed; it runs from the repo directly.
+130	- Adding a new upgrade category: see [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md) → "Adding a new category". For a tool already managed by an existing package manager (brew/uv/npm/cargo/dotnet/gem/mise) you do nothing — generic `upgrade` picks it up.
+131	
+132	Full per-category matrix, sample output, and troubleshooting: [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md). The short version is also mirrored in `README.md`.
+133	
+134	### Sudo session is shared across all run-scripts
+135	
+136	All three `run_*` scripts share one sudo session via `scripts/lib/sudo_shared.sh`. The user is prompted **once** at the start of `chezmoi apply` and downstream scripts reuse the cached credential silently.
+137	
+138	**Hard rules** when touching run-scripts:
+139	
+140	- Do **not** re-implement `sudo -k` / `sudo -v` / TTY-read logic. Call the shared helper.
+141	- Do **not** run `sudo -k` (invalidates the shared cache for the whole flow).
+142	- Do **not** register a `trap … EXIT` that removes state (next run-script needs it).
+143	- Do **not** read the password into a shell variable. Always pipe via `sudo -S <file`.
+144	
+145	Adding a new sudo surface in a run-script:
+146	
+147	1. `{{ include "scripts/lib/sudo_shared.sh" }}` near the top of the template.
+148	2. Set the `NEED_SUDO` template flag (mirror existing run-scripts).
+149	3. Call `sudo_session_init "yourlabel"`; branch on return code + `sudo_session_skip_reason`.
+150	4. Run privileged commands via `sudo_run …` (simple cases) or pass `-e @$CHEZMOI_ANSIBLE_BECOME_FILE` to ansible.
+151	
+152	Full helper API, runtime state, cleanup model: [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md).
+153	
+154	**Non-interactive password injection** (used by `scripts/fleet_apply.py` over
+155	SSH): `sudo_session_init` adopts `CHEZMOI_SUDO_PASSWORD_FILE` (a 0600 file
+156	path) instead of prompting on `/dev/tty`. The helper validates with `sudo -S
+157	-v -p ''` and writes into the same shared state dir, so downstream
+158	run-scripts see the cached state and never re-prompt. Do **not** read
+159	`CHEZMOI_SUDO_PASSWORD_FILE` from your run-script directly — always go
+160	through `sudo_session_init`. See [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md)
+161	→ "Non-interactive password injection" and [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
+162	for the orchestrator side.
+163	
+164	### fleet-apply semantics (counter-intuitive defaults)
+165	
+166	A few `just fleet-apply*` behaviours WILL trip up agents who don't know them. Full docs in [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md); the load-bearing invariants:
+167	
+168	- **`drift` ≠ `failed`**. When chezmoi can't prompt to overwrite a hand-edited file (no PTY over SSH), the host is shown as yellow ⚠ `drift` in the live table and the per-file paths are listed, but it does **not** count toward the exit code. Don't "fix" drift hosts unless the user asks. Resolution: hand-fix the remote, or `--force` to let the template win.
+169	- **`fleet-apply-file PATH` skips `run_*` scripts**. Uses `chezmoi apply --exclude=scripts <PATH>` after an explicit `git pull`. Means ansible / Brewfile changes will NOT execute. If you edit `dot_ansible/...` and test with `fleet-apply-file`, the change won't apply — use full `fleet-apply` for ansible iterations. Same applies to Brewfile.
+170	- **`--branch BRANCH` is no-op on local hosts**. The local source dir IS the user's editor working tree; switching it would be hostile. Local hosts log a warning and run against the working tree as-is. The flag also forces mode to `apply` (since `chezmoi update` would re-pull main and undo the checkout).
+171	- **Install-only by design**. fleet-apply inherits the [Install vs upgrade is split](#install-vs-upgrade-is-split-on-purpose) invariant: it never silently bumps tools. The explicit upgrade path is `just upgrade-*` which must be run on each host (fleet-apply does NOT broadcast upgrades).
+172	- **Process substitution + sentinel are load-bearing**. `> >(tee -a $log) 2>&1 & _cz_pid=$!; wait $_cz_pid; _rc=$?; echo $_rc > $sentinel` is the contract that `--status` / `--tail` / `--watch` rely on. Don't change to a pipeline (`| tee`) — the wrapper's SIGHUP trap depends on `$_cz_pid` pointing to chezmoi, not tee. See [docs/this_repo/fleet-apply.md → Killing orphans, checking status, re-attaching](docs/this_repo/fleet-apply.md#killing-orphans-checking-status-re-attaching).
+173	- **Conservative drift classifier**. `_classify_drift()` only downgrades stderr lines matching the exact `chezmoi: <path>: could not open a new TTY: open /dev/tty:` fingerprint. Any unrecognised stderr line keeps `failed` state. Don't broaden the regex without explicit user request — silent downgrades hide real errors.
+174	
+175	### `modify_` and `create_` prefix semantics
+176	
+177	Two chezmoi source prefixes tame files that would otherwise churn on every apply:
+178	
+179	- **`modify_`** files are executable scripts: chezmoi pipes current target contents into stdin, expects new contents on stdout. Used for `~/.claude/settings.json` (jq overlay), the editor `settings.json` files (VSCode/Cursor/Antigravity), and the coding-agent CLI configs (`~/.cursor/cli-config.json`, `~/.config/opencode/opencode.json`, `~/.codex/config.toml`). Do **not** `chezmoi add` a `modify_` target — it would overwrite your script with the live file.
+180	- **`create_`** files seed once, then chezmoi never touches the contents. Used for `~/.config/nvim/lazy-lock.json` and editor `keybindings.json`. To refresh a `create_` baseline, copy the live file directly into the source path: `cp <target> "$(chezmoi source-path <target>)"`. Neither `chezmoi add` (strips the prefix) nor `chezmoi re-add` (silently skips) is correct.
+181	
+182	Full case studies (`dot_claude/modify_settings.json`, `.chezmoitemplates/editor/*`, `dot_config/nvim/create_lazy-lock.json`, `dot_codex/modify_config.toml`), failure modes, presence-gating in `.chezmoiignore.tmpl`: [docs/tools/chezmoi-prefixes.md → Case studies in this repo](docs/tools/chezmoi-prefixes.md#case-studies-in-this-repo). For the three coding-agent CLI overlays specifically, the deep-dive lives at [docs/tools/agent-overlays.md](docs/tools/agent-overlays.md) (overlay key rationale, what's intentionally NOT managed and why, OpenCode legacy `config.json` migration, Codex `[projects]`/`[marketplaces.*]` round-trip, **and the Claude hook-aware merger that lets our overlay coexist with [CodeIsland](https://github.com/wxtsky/CodeIsland)'s auto-installed hook entries on macOS** without ping-ponging on every apply).
+183	
+184	### Tmux ≥ 3.3 required for popup menu, and menu must fit terminal height
+185	
+186	The popup menu is bound to **both** `prefix + Space` and `prefix + e` (alias) and is **generated by `~/.config/tmux/menu.sh`**, not defined inline in `keybindings.conf`. Two unrelated tmux quirks force this:
+187	
+188	1. **Position clamping (tmux ≥ 3.3 required)**: `display-menu -x R -y P` places the menu past the terminal edge on tmux 3.2a (Ubuntu 22.04 apt) and silently suppresses it. tmux 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically (Linuxbrew when present, otherwise user-level [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`). After the upgrade, run `tmux kill-server` once — running servers keep the old binary in memory.
+189	2. **Menu-too-tall silent failure (all tmux versions)**: `display-menu` does **not** paginate. If the menu is taller than the terminal (after status bar + `-y` anchor offset), the entire popup is suppressed with no error, no log entry, nothing in `tmux show-messages`. `man tmux`: _"If the menu is too large to fit on the terminal, it is not displayed."_ This was misdiagnosed for hours as a `csi-u` / `extended-keys` keysym encoding bug after a 50-row flat menu started failing on smaller terminal heights — the keys (`Space` then `Enter` then `e`) were all bound correctly the whole time.
+190	
+191	Hard rules when touching the popup menu:
+192	
+193	- **Top menu cap is ~14 rows.** Adding a 15th row will start failing on smaller heights (mobile SSH, half-screen splits). Push lower-frequency items into the appropriate submenu in `~/.config/tmux/menu-<category>.sh` instead.
+194	- **Submenus are separate scripts**, each `exec tmux display-menu …`. Quoting context resets per script — keeps the inline `\"` / `{` / `}` / `;` quoting disasters out of `keybindings.conf`.
+195	- **Complex commands** (anything with `{`, `}`, `;`, backticks, or nested fzf binds) must live in their own script (`~/.config/tmux/sesh-picker.sh`, `sesh-windows.sh`, etc.), not inline in a menu row. tmux's parser treats `{` `}` `;` as command-block delimiters / separators even inside `'…'` inside `"…"`, silently aborting parse.
+196	- **Test by shrinking the terminal vertically.** Verifying on a full-height window does not catch the height-fit failure. The top menu generator reads `#{client_height}` and tier-trims; if you change the tiers, retest at heights 14 / 22 / 60.
+197	
+198	See `pitfalls/tmux-display-menu-silent-fail.md` for the full debugging story (red herrings included). Adjacent pitfall: `pitfalls/yazi-tmux-popup-crash.md`.
+199	
+200	### Key tmux settings for coding agents
+201	
+202	These are non-obvious settings that other tools depend on; do not remove without checking:
+203	
+204	- `extended-keys always` + `terminal-features 'xterm*:extkeys'` — forwards Shift+Enter, Ctrl+Enter through tmux to inner apps (Claude Code, Neovim, etc.)
+205	- `escape-time 0` — eliminates ESC delay for Neovim
+206	- `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) — OSC 52 over SSH without terminfo `Ms`. Paired with SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua`. See [docs/tools/tmux/README.md](docs/tools/tmux/README.md) → "OSC 52 Clipboard".
+207	- `allow-passthrough on` — OSC passthrough for terminal images
+208	- macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See [docs/tools/ghostty.md](docs/tools/ghostty.md).
+209	
+210	Full tmux config breakdown, theme switching, keybindings table, troubleshooting: [docs/tools/tmux/](docs/tools/tmux/).
+211	
+212	### Zellij `default_mode "locked"`
+213	
+214	`dot_config/zellij/config.kdl` uses `default_mode "locked"` so all keys pass through to inner applications by default. Press `Ctrl+G` to unlock Zellij commands. This prevents key conflicts with coding agents and vim-style applications. On first Zellij launch (without existing config), select the "Unlock-First (non-colliding)" keybinding preset.
+215
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi -path "*/dot_config/zsh/tools/*.zsh" -o -path "*/scripts/*" -o -path "*/dot_claude/*" | grep -E "(34_openclaw|40_codexbar|22_sesh|scripts|dot_claude)" | head -30`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/scripts/install_specstory.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init
+/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_specstory.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/__pycache__
+/Users/daviddwlee84/.local/share/chezmoi/scripts/adhoc
+/Users/daviddwlee84/.local/share/chezmoi/scripts/import_ssh_to_bw.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_secrets.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/lib
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/upgrade_tools.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/pre-commit-doctor.sh
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/plugins
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/hooks
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/plugins/claude-hud
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/hooks/executable_notify.sh.tmpl
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/__pycache__
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/README.md
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/__pycache__/fleet_apply.cpython-313.pyc
+/Users/daviddwlee84/.local/share/chezmoi/scripts/adhoc/test_ubuntu_mirror.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/adhoc/check_brew_cast.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/lib/sudo_shared.sh
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/__pycache__/dotfiles_init.cpython-313.pyc
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/scripts/import_ssh_to_bw.sh.md
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/plugins/claude-hud/config.json
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/34_openclaw.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:22Z)**_
+
+Now let me read the specific tool files:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:22Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/34_openclaw.zsh`
+
+```text
+1	# 34_openclaw.zsh - OpenClaw completion
+2	
+3	# Check if openclaw is installed
+4	command -v openclaw &>/dev/null || return 0
+5	
+6	# Source OpenClaw completions
+7	[[ -f ~/.openclaw/completions/openclaw.zsh ]] && source ~/.openclaw/completions/openclaw.zsh
+8
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:22Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/40_codexbar.zsh`
+
+```text
+1	# 40_codexbar.zsh - CodexBar CLI aliases (AI usage tracker)
+2	
+3	# Check if codexbar is installed
+4	command -v codexbar &>/dev/null || return 0
+5	
+6	# Usage aliases (--source cli required on Linux)
+7	alias cbu="codexbar usage --provider claude --source cli"
+8	alias cbc="codexbar cost --provider claude"
+9	alias cbca="codexbar cost"
+10
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:23Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/22_sesh.zsh`
+
+```text
+1	# 22_sesh.zsh - sesh tmux session manager
+2	# https://github.com/joshmedeski/sesh
+3	
+4	# Check if sesh is installed
+5	command -v sesh &>/dev/null || return 0
+6	
+7	# Auto-generate shell completion into ~/.zfunc/ (regenerates on version change)
+8	if [[ -d ~/.zfunc ]]; then
+9	    local _sesh_ver="$(sesh --version 2>/dev/null)"
+10	    if [[ ! -f ~/.zfunc/_sesh ]] || ! grep -q "${_sesh_ver}" ~/.zfunc/_sesh 2>/dev/null; then
+11	        sesh completion zsh > ~/.zfunc/_sesh 2>/dev/null
+12	    fi
+13	fi
+14	
+15	# Sesh session switcher with fzf (full-featured picker)
+16	# Supports icons, preview, filtering by source, and session killing
+17	function sesh-sessions() {
+18	    {
+19	        exec </dev/tty
+20	        exec <&1
+21	        local session
+22	        session=$(sesh list --icons | fzf-tmux -p 80%,70% \
+23	            --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+24	            --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+25	            --bind 'tab:down,btab:up' \
+26	            --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+27	            --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+28	            --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+29	            --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+30	            --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+31	            --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+32	            --preview-window 'right:55%' \
+33	            --preview 'sesh preview {}' \
+34	        )
+35	        zle reset-prompt > /dev/null 2>&1 || true
+36	        [[ -z "$session" ]] && return
+37	        sesh connect "$session"
+38	    }
+39	}
+40	
+41	# ── Internal helpers ────────────────────────────────────────────────────────
+42	#
+43	# All helpers below take care to avoid the lowercase `path` / `cdpath` /
+44	# `manpath` / `fpath` zsh-tied-array trap (see
+45	# pitfalls/zsh-tied-array-path-shadowing.md).
+46	
+47	# Resolve the git repo root, or return non-zero if not in a repo.
+48	function _sesh_git_root() {
+49	    git rev-parse --show-toplevel 2>/dev/null
+50	}
+51	
+52	# Sanitize a string for use as a tmux session name.
+53	# tmux forbids `.` and `:` in session names; we also strip whitespace.
+54	function _sesh_sanitize() {
+55	    print -r -- "${1//[.:[:space:]]/-}"
+56	}
+57	
+58	# Switch to or attach to a tmux session named $1 (creating it at $2 if needed).
+59	# Inside tmux: `switch-client`. Outside tmux: `attach-session`.
+60	function _sesh_attach_or_switch() {
+61	    local session="$1"
+62	    if [[ -n "$TMUX" ]]; then
+63	        tmux switch-client -t "$session"
+64	    else
+65	        tmux attach-session -t "$session"
+66	    fi
+67	}
+68	
+69	# Create (or no-op if exists) a detached tmux session at the given path.
+70	# Returns 0 if the session already existed, 1 if newly created. (Caller uses
+71	# this to decide whether to apply layout setup or just attach.)
+72	function _sesh_ensure_session() {
+73	    local session="$1" target="$2"
+74	    if tmux has-session -t "=$session" 2>/dev/null; then
+75	        return 0   # already exists
+76	    fi
+77	    tmux new-session -d -s "$session" -c "$target"
+78	    return 1       # newly created
+79	}
+80	
+81	# Wrap a known specstory provider in `specstory run X` so the agent picks up
+82	# auto-save markdown logging. Bare CLI names that aren't specstory providers
+83	# (currently: opencode — see backlog/specstory-opencode-support.md) pass
+84	# through unchanged.
+85	#
+86	# Update the case list when specstory adds providers (track upstream:
+87	# specstoryai/getspecstory#146 for opencode, similar issues for others).
+88	#
+89	# Args: $1=agent, $2=specstory_mode (auto|never; default auto)
+90	#   auto  — wrap if known provider, raw otherwise (the historical default)
+91	#   never — pass through raw regardless (CLI flag --no-specstory sets this)
+92	function _sesh_wrap_agent() {
+93	    local agent="$1" specstory_mode="${2:-auto}"
+94	    if [[ "$specstory_mode" == "never" ]]; then
+95	        # Even an empty agent goes raw → caller's responsibility to pick a
+96	        # sensible default (we choose `claude` upstream when --no-specstory
+97	        # is set, since `specstory run` with no arg defaults to claude too).
+98	        print -r -- "${agent:-claude}"
+99	        return
+100	    fi
+101	    case "$agent" in
+102	        ""|"specstory")
+103	            # No agent specified → bare `specstory run` (default = claude).
+104	            print -r -- "specstory run"
+105	            ;;
+106	        claude|codex|cursor|droid|gemini)
+107	            print -r -- "specstory run $agent"
+108	            ;;
+109	        *)
+110	            # Pass-through for non-specstory providers (opencode today, more
+111	            # later as specstory adds support).
+112	            print -r -- "$agent"
+113	            ;;
+114	    esac
+115	}
+116	
+117	# Build a wrapper command that controls what happens when the inner command
+118	# exits (Ctrl+C, agent quit, crash). `--on-exit shell|kill|restart`:
+119	#   shell   — print a hint, then drop into $SHELL so user can restart agent,
+120	#             switch to lazygit, kill the pane manually, etc. (default)
+121	#   kill    — let the pane close on exit (tmux default `remain-on-exit off`)
+122	#   restart — wrap in `while true; do CMD; sleep 1; done` so the agent
+123	#             auto-respawns. Use Ctrl+C twice quickly to break the loop and
+124	#             land in shell.
+125	#
+126	# Args: $1=inner_cmd, $2=mode, $3=label_for_hint
+127	# Stdout: the wrapped shell command (single string suitable for `tmux
+128	# new-window … "<cmd>"`). Quoting is structured so user $SHELL is the one
+129	# evaluating the inner command — we don't double-eval.
+130	function _sesh_on_exit_wrap() {
+131	    local inner="$1" mode="$2" label="${3:-agent}"
+132	    # Ctrl+C sends SIGINT to the entire foreground process group, so the
+133	    # wrapper shell itself dies before it can print the hint or exec the
+134	    # login shell — the pane just vanishes. `trap '' INT` makes the wrapper
+135	    # ignore SIGINT; the inner command still receives it and exits normally,
+136	    # then control returns to the wrapper which prints the hint as intended.
+137	    # (Tools that install their own SIGINT handler — btop, htop, less — were
+138	    # the visible failure case; agent CLIs happened to handle Ctrl+C as
+139	    # clean exit so this was masked for them.)
+140	    local guard="trap '' INT;"
+141	    case "$mode" in
+142	        kill)
+143	            print -r -- "$inner"
+144	            ;;
+145	        restart)
+146	            # `|| true` so a crash exit doesn't abort the loop on `set -e` shells
+147	            print -r -- "$guard while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
+148	            ;;
+149	        shell|*)
+150	            # Default. Hint message uses tmux color codes — works in all
+151	            # terminals tmux supports.
+152	            print -r -- "$guard $inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
+153	            ;;
+154	    esac
+155	}
+156	
+157	# Connect to a sesh session for the current directory (creates it if missing).
+158	# Lightweight: drops you into a plain shell at $PWD with NO startup command.
+159	# For an editor-first session use `scode` (repo-aware, full layout) or just
+160	# launch nvim manually inside the new session.
+161	#
+162	# Smart argument handling:
+163	#   shere                              # plain shell at $PWD, no command
+164	#   shere specstory run codex          # bare args → treated as command
+165	#   shere -c "specstory run codex"     # explicit --command flag
+166	#   shere -p ~/my-proj                 # explicit path, plain shell
+167	#   shere -p ~/my-proj npm run dev     # explicit path + command
+168	function sesh-here() {
+169	    local cmd="" target=""
+170	    while [[ $# -gt 0 ]]; do
+171	        case "$1" in
+172	            -c|--command) cmd="$2"; shift 2 ;;
+173	            -p|--path)    target="$2"; shift 2 ;;
+174	            -*)           echo "sesh-here: unknown flag $1" >&2; return 1 ;;
+175	            *)            break ;;  # remaining args are the command
+176	        esac
+177	    done
+178	    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
+179	    target="${target:-$PWD}"
+180	    if [[ -n "$cmd" ]]; then
+181	        sesh connect --command "$cmd" "$target"
+182	    else
+183	        # Bypass sesh's default_session.startup_command (nvim) for a plain
+184	        # shell. We create the session via tmux directly, then attach. This
+185	        # also means the wildcard startup_command (project layout) is
+186	        # bypassed — `shere` is intentionally lightweight; use `scode`,
+187	        # `svibe`, or `sesh connect <path>` for layouts.
+188	        local session
+189	        session=$(_sesh_sanitize "$(basename "$target")")
+190	        _sesh_ensure_session "$session" "$target"
+191	        _sesh_attach_or_switch "$session"
+192	    fi
+193	}
+194	
+195	# Connect to the current git root when available, otherwise use $PWD.
+196	# Same smart argument handling as sesh-here.
+197	#   sroot                              # default startup_command
+198	#   sroot specstory run codex          # bare args → command
+199	#   sroot -c "specstory run codex"     # explicit --command flag
+200	function sesh-root() {
+201	    local cmd="" root
+202	    while [[ $# -gt 0 ]]; do
+203	        case "$1" in
+204	            -c|--command) cmd="$2"; shift 2 ;;
+205	            -*)           shift ;;
+206	            *)            break ;;
+207	        esac
+208	    done
+209	    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
+210	    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
+211	    if [[ -n "$cmd" ]]; then
+212	        sesh connect --command "$cmd" "$root"
+213	    else
+214	        sesh connect "$root"
+215	    fi
+216	}
+217	
+218	alias shere='sesh-here'
+219	alias sroot='sesh-root'
+220	alias scode='sesh-code'
+221	alias svibe='sesh-vibe'
+222	
+223	# ── scode: repo-aware coding-agent layout ───────────────────────────────────
+224	#
+225	# Open the coding-agent layout (nvim 75% | specstory-wrapped agent 25%, btop
+226	# window) in a session NAMED FOR THE CURRENT REPO, so different repos don't
+227	# collide on the single `coding-agent` session name.
+228	#
+229	# Session naming:
+230	#   In repo /Volumes/Data/Program/Personal/foo  → session `coding-agent/foo`
+231	#   Same repo re-invocation                     → attach (no duplicate)
+232	#   Different repo                              → new session `coding-agent/<other>`
+233	#
+234	# Outside a git repo the function refuses with a hint to use `shere` or `svibe`
+235	# (the heavy layout doesn't make sense for ad-hoc directories).
+236	#
+237	# Agent wrapping: known specstory providers (claude/codex/cursor/droid/gemini)
+238	# are auto-wrapped in `specstory run X` for markdown auto-save. Others
+239	# (opencode today) pass through raw — see _sesh_wrap_agent + backlog entry
+240	# `specstory-opencode-support` for the upstream tracking.
+241	#
+242	# Exit behavior: `--on-exit shell` (default) drops to a shell with a hint when
+243	# the agent exits, so Ctrl+C doesn't kill the pane. Use `--on-exit kill` for
+244	# the old behavior, or `--on-exit restart` for an auto-respawn loop.
+245	#
+246	# Usage:
+247	#   scode                              # current repo, default agent (specstory → claude)
+248	#   scode codex                        # specstory run codex
+249	#   scode opencode                     # opencode raw (not yet a specstory provider)
+250	#   scode --on-exit kill claude        # Ctrl+C kills the right pane
+251	#   scode --on-exit restart codex      # codex auto-respawns on crash
+252	#   scode -p ~/some/other/repo         # explicit repo path
+253	#   scode --no-attach                  # create session in background, don't switch
+254	function sesh-code() {
+255	    local target="" agent="" no_attach=0 on_exit="shell" specstory_mode="auto"
+256	    while [[ $# -gt 0 ]]; do
+257	        case "$1" in
+258	            -p|--path)      target="$2"; shift 2 ;;
+259	            -a|--agent)     agent="$2"; shift 2 ;;
+260	            --on-exit)      on_exit="$2"; shift 2 ;;
+261	            --no-specstory) specstory_mode="never"; shift ;;
+262	            --specstory)    specstory_mode="auto"; shift ;;
+263	            --no-attach)    no_attach=1; shift ;;
+264	            --agents)
+265	                echo "scode: --agents is svibe-only (scode is single-agent)." >&2
+266	                echo "       For multi-agent layouts: svibe --agents '$2'" >&2
+267	                return 1 ;;
+268	            -h|--help)
+269	                cat <<'EOF'
+270	scode — open repo-scoped coding-agent layout
+271	
+272	Usage: scode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-specstory]
+273	             [--no-attach] [AGENT]
+274	
+275	Layout: window `editor` (nvim 75% | agent 25%) + window `monitor` (btop).
+276	Session name: `coding-agent/<repo-basename>` (one session per repo).
+277	Requires:     git repo (errors otherwise — use `shere` or `svibe`).
+278	
+279	Agent wrapping (auto, opt out with --no-specstory):
+280	  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+281	  opencode (and other unknown CLIs)         → raw passthrough
+282	
+283	--on-exit MODE controls what happens when ANY pane command exits/Ctrl+C
+284	(applies to the agent pane, the nvim pane, and the btop monitor window):
+285	  shell    (default) — drop to shell with a hint, command re-runnable
+286	  kill                — let the pane/window close (tmux default)
+287	  restart             — auto-respawn the command in a loop
+288	
+289	Examples:
+290	  scode                            # current repo, default agent (specstory → claude)
+291	  scode codex                      # right pane: specstory run codex
+292	  scode opencode                   # right pane: opencode (raw)
+293	  scode --no-specstory claude      # right pane: claude (raw, no markdown auto-save)
+294	  scode --on-exit kill claude      # right pane closes when claude exits
+295	  scode -p ~/work/foo              # explicit repo path
+296	EOF
+297	                return 0 ;;
+298	            -*)             echo "scode: unknown flag $1" >&2; return 1 ;;
+299	            *)              [[ -z "$agent" ]] && agent="$1" || true; shift ;;
+300	        esac
+301	    done
+302	
+303	    case "$on_exit" in
+304	        shell|kill|restart) ;;
+305	        *) echo "scode: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+306	    esac
+307	
+308	    # Resolve repo root
+309	    local repo_root
+310	    if [[ -n "$target" ]]; then
+311	        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+312	    else
+313	        repo_root=$(_sesh_git_root)
+314	    fi
+315	    if [[ -z "$repo_root" ]]; then
+316	        echo "scode: not inside a git repo." >&2
+317	        echo "       Use \`shere\` for a plain shell, or \`svibe\` for a vibe layout in any dir." >&2
+318	        return 1
+319	    fi
+320	
+321	    # Validate agent CLI exists in PATH (fail-fast). Specstory itself isn't
+322	    # checked here — if the user passed a known provider but specstory is
+323	    # missing, the pane will exit with specstory's error message and
+324	    # --on-exit=shell will leave a shell to read it.
+325	    if [[ -n "$agent" ]] && ! command -v "$agent" >/dev/null 2>&1; then
+326	        echo "scode: agent CLI '$agent' not found in PATH." >&2
+327	        return 1
+328	    fi
+329	
+330	    local repo_name session
+331	    repo_name=$(basename "$repo_root")
+332	    session=$(_sesh_sanitize "coding-agent/${repo_name}")
+333	
+334	    # If session already exists, just attach (idempotent — solves the
+335	    # cross-repo collision problem the old single `coding-agent` session had).
+336	    if tmux has-session -t "=$session" 2>/dev/null; then
+337	        (( no_attach )) || _sesh_attach_or_switch "$session"
+338	        return 0
+339	    fi
+340	
+341	    # Create session + build layout directly with tmux commands (see svibe
+342	    # comment block for why not tmuxp).
+343	    #
+344	    # Window 1 "editor": nvim (left, will be 75%) | wrapped agent (right, 25%)
+345	    # Window 2 "monitor": btop (or htop / top fallback)
+346	    local agent_inner agent_cmd
+347	    agent_inner=$(_sesh_wrap_agent "$agent" "$specstory_mode")
+348	    agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "${agent:-agent}")
+349	
+350	    # nvim and monitor get the same on-exit treatment as the agent so that
+351	    # quitting them drops to a shell with a re-launch hint instead of the
+352	    # pane/window vanishing.
+353	    local nvim_cmd monitor_inner monitor_cmd
+354	    nvim_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+355	
+356	    tmux new-session -d -s "$session" -c "$repo_root" -n editor "$nvim_cmd"
+357	    tmux split-window -h -t "${session}:editor" -c "$repo_root" "$agent_cmd"
+358	    # main-vertical layout, then size the LEFT pane to 75% of window width
+359	    tmux select-layout -t "${session}:editor" main-vertical >/dev/null
+360	    tmux resize-pane -t "${session}:editor.1" -x 75% 2>/dev/null
+361	
+362	    # Monitor window
+363	    if   command -v btop >/dev/null 2>&1; then monitor_inner=btop
+364	    elif command -v htop >/dev/null 2>&1; then monitor_inner=htop
+365	    else                                       monitor_inner=top
+366	    fi
+367	    monitor_cmd=$(_sesh_on_exit_wrap "$monitor_inner" "$on_exit" "$monitor_inner")
+368	    tmux new-window -t "$session" -n monitor -c "$repo_root" "$monitor_cmd"
+369	
+370	    # Focus editor window, left (nvim) pane
+371	    tmux select-window -t "${session}:editor"
+372	    tmux select-pane -t "${session}:editor.1"
+373	
+374	    (( no_attach )) || _sesh_attach_or_switch "$session"
+375	}
+376	
+377	# ── svibe: parametric multi-agent vibe layout ───────────────────────────────
+378	#
+379	# A "vibe coding" session: window 1 has N agent panes (default 4), window 2
+380	# is lazygit, window 3 is nvim. Built directly with tmux split/new-window
+381	# commands so it stays parametric (tmuxp YAML can't express dynamic pane counts).
+382	#
+383	# Session naming: `vibe/<dir-basename>` — collision-safe across directories.
+384	# Refuses outside a git repo (use `shere` for plain shells in arbitrary dirs).
+385	#
+386	# Each agent pane is wrapped in `specstory run X` (for known providers, opt
+387	# out with --no-specstory) and additionally wrapped in an exit handler
+388	# controlled by `--on-exit MODE` — same semantics as `scode`. Default `shell`
+389	# keeps the pane open with a hint after the agent exits, so Ctrl+C is
+390	# recoverable.
+391	#
+392	# Two modes for choosing which agents run:
+393	#   1. Homogeneous (positional): `svibe 4 codex` → 4 panes all running codex
+394	#   2. Heterogeneous (--agents):  `svibe --agents claude,codex,codex,opencode`
+395	#                                 → 4 panes running those specific agents
+396	#                                 (list LENGTH determines pane count;
+397	#                                 positional N_AGENTS is rejected to avoid
+398	#                                 ambiguity)
+399	#
+400	# Usage:
+401	#   svibe                                          # 4× claude (specstory)
+402	#   svibe 2                                        # 2× claude
+403	#   svibe 4 codex                                  # 4× specstory run codex
+404	#   svibe 3 opencode                               # 3× opencode (raw)
+405	#   svibe --agents claude,codex,codex,opencode     # 4 panes, mixed
+406	#   svibe --agents claude,opencode --on-exit kill  # 2 panes, mixed, hard exit
+407	#   svibe --no-specstory 4 claude                  # 4× claude (raw, no md auto-save)
+408	#   svibe --on-exit restart 4 codex                # auto-respawn loop
+409	#   svibe -p ~/repo 4 claude                       # explicit path
+410	#   svibe --no-attach 4 claude                     # create in background
+411	function sesh-vibe() {
+412	    local target="" no_attach=0 on_exit="shell" specstory_mode="auto"
+413	    local n_agents=4
+414	    local agent_cli="claude"
+415	    local agents_csv=""
+416	    while [[ $# -gt 0 ]]; do
+417	        case "$1" in
+418	            -p|--path)      target="$2"; shift 2 ;;
+419	            --on-exit)      on_exit="$2"; shift 2 ;;
+420	            --agents)       agents_csv="$2"; shift 2 ;;
+421	            --no-specstory) specstory_mode="never"; shift ;;
+422	            --specstory)    specstory_mode="auto"; shift ;;
+423	            --no-attach)    no_attach=1; shift ;;
+424	            -h|--help)
+425	                cat <<'EOF'
+426	svibe — parametric multi-agent vibe layout
+427	
+428	Usage:
+429	  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+430	        [N_AGENTS] [AGENT_CLI]
+431	  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+432	        --agents A1,A2,A3[,...]
+433	
+434	Default: svibe 4 claude
+435	  window 1 "agents" — N panes (tiled), each running an agent
+436	  window 2 "git"    — lazygit
+437	  window 3 "edit"   — nvim
+438	
+439	Two modes for choosing agents:
+440	  Homogeneous:    `svibe 4 codex` → 4 panes all codex
+441	  Heterogeneous:  `svibe --agents claude,codex,codex,opencode`
+442	                  → 4 panes (one each, in order); list length = pane count
+443	
+444	Session name: `vibe/<repo-basename>` (collision-safe per directory).
+445	Requires:     git repo (use `shere` for plain shells elsewhere).
+446	
+447	Agent wrapping (auto, opt out with --no-specstory):
+448	  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+449	  opencode (and other unknown CLIs)         → raw passthrough
+450	
+451	--on-exit MODE controls per-pane behavior on Ctrl+C / clean exit
+452	(applies to all agent panes, the lazygit window, and the nvim window):
+453	  shell    (default) — drop to shell with a hint, command re-runnable
+454	  kill                — let the pane/window close (tmux default)
+455	  restart             — auto-respawn the command in a loop
+456	
+457	Examples:
+458	  svibe                                            # 4× claude
+459	  svibe 2                                          # 2× claude
+460	  svibe 4 codex                                    # 4× codex
+461	  svibe 6 opencode                                 # 6× opencode (heavy)
+462	  svibe --agents claude,codex,codex,opencode       # 4 panes, mixed
+463	  svibe --agents claude,opencode --on-exit kill    # 2 panes, mixed
+464	  svibe --no-specstory 4 claude                    # raw claude, no auto-save
+465	EOF
+466	                return 0 ;;
+467	            -*)             echo "svibe: unknown flag $1" >&2; return 1 ;;
+468	            *)              break ;;
+469	        esac
+470	    done
+471	
+472	    # Build the agents array. Two paths:
+473	    #   --agents claude,codex,…  → split csv, list length = pane count
+474	    #   positional [N] [CLI]     → repeat CLI N times
+475	    # Mixing both is rejected to keep semantics unambiguous.
+476	    local -a agents
+477	    if [[ -n "$agents_csv" ]]; then
+478	        if [[ $# -gt 0 ]]; then
+479	            echo "svibe: cannot combine --agents with positional N_AGENTS/AGENT_CLI." >&2
+480	            echo "       Pick one. (e.g. drop the trailing args)" >&2
+481	            return 1
+482	        fi
+483	        # Split CSV. Trim whitespace per element so 'claude, codex' works.
+484	        local IFS=','
+485	        agents=( ${=agents_csv} )
+486	        # Trim leading/trailing whitespace on each element
+487	        local j
+488	        for (( j = 1; j <= ${#agents}; j++ )); do
+489	            agents[$j]="${agents[$j]## }"
+490	            agents[$j]="${agents[$j]%% }"
+491	        done
+492	        if (( ${#agents} == 0 )); then
+493	            echo "svibe: --agents list is empty." >&2
+494	            return 1
+495	        fi
+496	    else
+497	        # Positional: [n_agents] [agent_cli]
+498	        if [[ $# -gt 0 ]]; then
+499	            if [[ "$1" =~ ^[0-9]+$ ]]; then
+500	                n_agents="$1"; shift
+501	            fi
+502	        fi
+503	        [[ $# -gt 0 ]] && agent_cli="$1"
+504	        # Build a homogeneous array of length n_agents
+505	        local k
+506	        for (( k = 1; k <= n_agents; k++ )); do
+507	            agents+=( "$agent_cli" )
+508	        done
+509	    fi
+510	
+511	    case "$on_exit" in
+512	        shell|kill|restart) ;;
+513	        *) echo "svibe: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+514	    esac
+515	
+516	    if (( ${#agents} < 1 || ${#agents} > 12 )); then
+517	        echo "svibe: agent count = ${#agents} out of range [1, 12]" >&2
+518	        return 1
+519	    fi
+520	
+521	    # Resolve repo root
+522	    local repo_root
+523	    if [[ -n "$target" ]]; then
+524	        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+525	    else
+526	        repo_root=$(_sesh_git_root)
+527	    fi
+528	    if [[ -z "$repo_root" ]]; then
+529	        echo "svibe: not inside a git repo." >&2
+530	        echo "       Use \`shere\` for a plain shell in arbitrary directories." >&2
+531	        return 1
+532	    fi
+533	
+534	    # Validate ALL agent CLIs exist in PATH (fail-fast — we don't want to
+535	    # build a 4-pane layout where one pane is dead). De-dup the list to keep
+536	    # the error message readable.
+537	    local -a missing
+538	    local -A seen
+539	    local a
+540	    for a in "${agents[@]}"; do
+541	        [[ -n "${seen[$a]:-}" ]] && continue
+542	        seen[$a]=1
+543	        if ! command -v "$a" >/dev/null 2>&1; then
+544	            missing+=( "$a" )
+545	        fi
+546	    done
+547	    if (( ${#missing} > 0 )); then
+548	        echo "svibe: agent CLI(s) not found in PATH: ${missing[*]}" >&2
+549	        echo "       Available: $(for c in claude codex opencode cursor droid gemini; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
+550	        return 1
+551	    fi
+552	
+553	    local repo_name session
+554	    repo_name=$(basename "$repo_root")
+555	    session=$(_sesh_sanitize "vibe/${repo_name}")
+556	
+557	    # Idempotent: existing session = just attach
+558	    if tmux has-session -t "=$session" 2>/dev/null; then
+559	        (( no_attach )) || _sesh_attach_or_switch "$session"
+560	        return 0
+561	    fi
+562	
+563	    # Build wrapped command for each agent (the wrapping is pane-specific so
+564	    # we can mix providers in one window).
+565	    #
+566	    # Helper: turn agent name → fully-wrapped tmux command string.
+567	    _vibe_agent_cmd() {
+568	        local inner
+569	        inner=$(_sesh_wrap_agent "$1" "$specstory_mode")
+570	        _sesh_on_exit_wrap "$inner" "$on_exit" "$1"
+571	    }
+572	
+573	    # ── Build the session ───────────────────────────────────────────────
+574	    # Window 1: agents (start with first pane running agents[1])
+575	    tmux new-session -d -s "$session" -c "$repo_root" -n agents \
+576	        "$(_vibe_agent_cmd "${agents[1]}")"
+577	
+578	    # Add remaining panes
+579	    local i
+580	    for (( i = 2; i <= ${#agents}; i++ )); do
+581	        tmux split-window -t "${session}:agents" -c "$repo_root" \
+582	            "$(_vibe_agent_cmd "${agents[$i]}")"
+583	        # Re-tile after each split so layout stays balanced
+584	        tmux select-layout -t "${session}:agents" tiled >/dev/null
+585	    done
+586	
+587	    unset -f _vibe_agent_cmd
+588	
+589	    # Window 2: git (lazygit if present)
+590	    # lazygit and nvim get the same on-exit handling as agents — quitting
+591	    # them drops to shell with a re-launch hint rather than killing the window.
+592	    local git_cmd edit_cmd
+593	    if command -v lazygit >/dev/null 2>&1; then
+594	        git_cmd=$(_sesh_on_exit_wrap "lazygit" "$on_exit" "lazygit")
+595	        tmux new-window -t "$session" -n git -c "$repo_root" "$git_cmd"
+596	    else
+597	        # `git status; exec $SHELL` already lands in shell — no wrap needed.
+598	        tmux new-window -t "$session" -n git -c "$repo_root" "git status; exec \$SHELL"
+599	    fi
+600	
+601	    # Window 3: edit (nvim)
+602	    edit_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+603	    tmux new-window -t "$session" -n edit -c "$repo_root" "$edit_cmd"
+604	
+605	    # Focus agents window, first pane
+606	    tmux select-window -t "${session}:agents"
+607	    tmux select-pane -t "${session}:agents.1"
+608	
+609	    (( no_attach )) || _sesh_attach_or_switch "$session"
+610	}
+611	
+612	# Register as zsh widget
+613	zle -N sesh-sessions
+614	
+615	# Key bindings (Alt+S for session switcher, avoids conflict with Ctrl+A tmux prefix)
+616	bindkey -M emacs '\es' sesh-sessions
+617	bindkey -M viins '\es' sesh-sessions
+618	bindkey -M vicmd '\es' sesh-sessions
+619
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:06:43Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="Agent"><details>
+<summary>Tool use: **Agent**</summary>
+Python uv scripts + TUI patterns
+
+```text
+Perfect! I now have comprehensive information. Let me compile the findings:
+
+## Exploration Summary
+
+**1. Python PEP 723 `uv run --script` patterns:**
+
+Four files use the inline-dependency shebang:
+
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_secrets.py` — Scans agent artifact dirs (`.specstory/`, `.claude/plans/`, `.cursor/plans/`, `.opencode/plans/`) for secrets using gitleaks + regex. No dependencies declared.
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py` — Multi-host chezmoi apply orchestrator with live Rich tables + per-host logs. Deps: `asyncssh>=2.18`, `tyro>=0.9`, `rich>=13.9`.
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py` — Interactive chezmoi init wrapper (bundles + grouped feature flag selection via questionary). Deps: `questionary>=2.0`, `rich>=13.9`, `tyro>=0.9`.
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_clash-parse.py` — Parser for Clash/mihomo proxy configs. Deps: `PyYAML>=6.0`.
+
+**2. TUI/interactive-prompt libraries in use:**
+
+- **questionary** (choice pickers, multi-select, text prompts) — `dotfiles_init.py` line 5+
+- **rich** (tables, panels, console output, live updates) — `fleet_apply.py` + `dotfiles_init.py` 
+- **tyro** (struct-to-CLI via dataclasses & unions; subcommand routing) — `fleet_apply.py` + `dotfiles_init.py`
+- Not in use: `prompt_toolkit`, `textual`, `click`, `inquirer`
+
+**3. fzf-based multi-step selection workflows:**
+
+- `22_sesh.zsh`: sesh session switcher (fzf picker → `sesh connect`). Dynamic filtering with `ctrl-a` (all sources) / `ctrl-t` (tmux) / `ctrl-g` (configs) / `ctrl-x` (zoxide) → reload pipeline. Preview via `sesh preview {2..}`. Session then passed to `sesh connect <session>`.
+- `11_tools_picker.zsh`: Tool invocation picker from markdown table (Alt+T widget). fzf pulls tool + description from table → `--with-nth` → `--preview` runs `tldr` or `--help` → `Enter` pastes invocation to shell buffer (cursor-positioned for args).
+- `agent-sessions.toml` (Television): Multi-step agent-session browser (OpenCode/Claude Code/Codex/Cursor). Ctrl+S cycles sources (all/by-agent). Selection output is session ID; Enter calls resume actions (cd + exec).
+
+**4. Pick-from-scrollback patterns:**
+
+- `agent-sessions.toml` (Television) provides the primary "pick from history" interface: browses `.claude/projects/**/*.jsonl`, `.codex/sessions/`, `.cursor/chats/` in a single TV channel. Actions: `Enter` (print resume one-liner), `Alt+T` (cd + exec), `Alt+R` (copy resume line to clipboard), `Alt+E` (open raw file in editor).
+- No dedicated "pick tmux scrollback" channel found; sesh manages session history instead.
+
+**5. Skill authoring convention (from CLAUDE.md):**
+
+Lines 68–93 reference `project-knowledge-harness` skill for TODO/backlog/pitfalls structure. For new Python scripts in `scripts/`, the guidance is:
+
+- Declare a new chezmoi prompt + update three mirrors: `.chezmoi.toml.tmpl`, `Dockerfile`, `dotfiles_init.py::PROMPTS` (CLAUDE.md line 26–34).
+- Use PEP 723 inline deps + `#!/usr/bin/env -S uv run --script` for zero-overhead tool scripts.
+- Existing scripts use `tyro` for CLI struct routing (subcommands via Union types) and `rich` for human-readable output. No style guide doc found; infer from `dotfiles_init.py` and `fleet_apply.py` examples.
+```
+</details></tool-use>
+
+_**Agent - sidechain (2026-04-24 05:05:23Z)**_
+
+Explore /Users/daviddwlee84/.local/share/chezmoi and report:
+
+1. **Python `uv run --script` patterns used in this repo**: find every Python file that uses the PEP 723 inline-dependency shebang (`#!/usr/bin/env -S uv run --script` or similar). List them with their path + one-line purpose + what deps they declare. Check `scripts/` first (especially `scripts/redact_secrets.py`, `scripts/fleet_apply.py`, `scripts/init/dotfiles_init.py`).
+
+2. **TUI / interactive-prompt libraries used**: look for `textual`, `rich`, `prompt_toolkit`, `questionary`, `inquirer`, `click`, `typer` anywhere in the Python scripts' dependency declarations. Report which are already in use.
+
+3. **fzf-based selection workflows**: the repo uses fzf extensively. Find examples of multi-step fzf flows (selection → edit → action) — look in `dot_config/tmux/`, `dot_config/zsh/tools/` (especially `22_sesh.zsh`, `11_tools_picker.zsh`), `dot_config/television/cable/*.toml`. Report how they pass selections to downstream commands.
+
+4. **Existing "pick from scrollback" or "pick a command" patterns**: anything that lets the user fuzzy-select from a list of historical commands or outputs. Check `tv history` and related Television channels.
+
+5. **Skill authoring convention for new scripts**: CLAUDE.md mentions `skill-author` and `project-knowledge-harness` skills. What does the repo's style guide (via `docs/this_repo/` or similar) say about adding new Python scripts to `scripts/`?
+
+Report with file:line references. Keep under 250 words. Thoroughness: medium.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:24Z)**_
+
+I'll explore this chezmoi dotfiles repo systematically to answer your questions.
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi -type f -name "*.py" | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_specstory.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_secrets.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/callback_plugins/clean.py
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_clash-parse.py
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/files/claude_hud_sync.py
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:25Z)**_
+
+Now let me search for agent invocations in the scripts directory and dot_claude:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "claude\|opencode\|codex\|aider\|gemini" /Users/daviddwlee84/.local/share/chezmoi/dot_claude --include="*.sh" --include="*.zsh" --include="*.json" -n | head -40`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:3:# ~/.claude/settings.json.
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:36:            "command": "~/.claude/hooks/notify.sh"
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:46:            "command": "~/.claude/hooks/notify.sh"
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:53:    "pyright-lsp@claude-plugins-official": true,
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:54:    "claude-hud@claude-hud": true
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:57:    "claude-hud": {
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:60:        "repo": "jarrodwatts/claude-hud"
+/Users/daviddwlee84/.local/share/chezmoi/dot_claude/modify_settings.json:67:    "command": "bash -c 'plugin_dir=$(ls -d \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | sort -V | tail -1); runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null); [ -z \"$runtime\" ] && exit 0; rt=\"${runtime##*/}\"; if [ \"$rt\" = \"bun\" ]; then exec \"$runtime\" --env-file /dev/null \"${plugin_dir}src/index.ts\"; else exec \"$runtime\" \"${plugin_dir}dist/index.js\"; fi'"
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles -name "*llm*" -o -name "*agent*" -o -name "*coding*" | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/llm_tools
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:28Z)**_
+
+Now let me search for PEP 723 shebangs and TUI library imports:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "#!/usr/bin/env -S uv run" /Users/daviddwlee84/.local/share/chezmoi --include="*.py" -l`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_clash-parse.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_secrets.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents -type f | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/defaults/main.yml
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/files/claude_hud_sync.py
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/redact_secrets.py`
+
+```text
+1	#!/usr/bin/env -S uv run --script
+2	# /// script
+3	# requires-python = ">=3.11"
+4	# dependencies = []
+5	# ///
+6	"""
+7	Check for secrets in agent artifact directories (specstory history + coding
+8	agent plan dirs) using gitleaks and detect-private-key patterns. Reports
+9	findings and suggests redaction.
+10	
+11	Default covered prefixes:
+12	    .specstory/history/   (SpecStory chat transcripts)
+13	    .claude/plans/        (Claude Code plans)
+14	    .cursor/plans/        (Cursor plans)
+15	    .opencode/plans/      (OpenCode plans)
+16	
+17	Usage:
+18	    ./scripts/redact_secrets.py                         # Check staged files (default paths)
+19	    ./scripts/redact_secrets.py --fix                   # Auto-redact and re-stage files
+20	    ./scripts/redact_secrets.py --working-dir           # Scan working directory instead of staged
+21	    ./scripts/redact_secrets.py --paths .specstory/history
+22	    ./scripts/redact_secrets.py --fix --paths .cursor/plans .claude/plans
+23	"""
+24	import argparse
+25	import json
+26	import re
+27	import subprocess
+28	import sys
+29	import tempfile
+30	from pathlib import Path
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "stdin\|-p\|--print\|exec\|pipe" /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools --include="*.zsh" -A 2 -B 2 | grep -E "(claude|codex|opencode|aider)" -A 2 -B 2`
+
+```text
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh-  case "$agent" in
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh-    opencode)       opencode run "$prompt" ;;
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh:    claude)         claude -p "$prompt" ;;
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh:    codex)          codex exec "$prompt" ;;
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh:    cursor-agent)   cursor-agent -p "$prompt" ;;
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh-    *)              echo "Unknown agent: ${agent}"; return 1 ;;
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/12_television.zsh-  if [[ -n $output ]]; then
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/12_television.zsh-    RBUFFER=""
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh-
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh-# Usage aliases (--source cli required on Linux)
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh:alias cbu="codexbar usage --provider claude --source cli"
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh:alias cbc="codexbar cost --provider claude"
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh-alias cbca="codexbar cost"
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/41_github.zsh-# Download a subdirectory from a GitHub repository tree URL.
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/41_github.zsh-# Example:
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-    esac
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   shere specstory run codex          # bare args → treated as command
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   shere -c "specstory run codex"     # explicit --command flag
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:#   shere -p ~/my-proj                 # explicit path, plain shell
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:#   shere -p ~/my-proj npm run dev     # explicit path + command
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-        sesh connect --command "$cmd" "$root"
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   scode --on-exit kill claude        # Ctrl+C kills the right pane
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   scode --on-exit restart codex      # codex auto-respawns on crash
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:#   scode -p ~/some/other/repo         # explicit repo path
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   scode --no-attach                  # create session in background, don't switch
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-  scode --no-specstory claude      # right pane: claude (raw, no markdown auto-save)
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-  scode --on-exit kill claude      # right pane closes when claude exits
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:  scode -p ~/work/foo              # explicit repo path
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-EOF
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-    (( no_attach )) || _sesh_attach_or_switch "$session"
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   svibe --no-specstory 4 claude                  # 4× claude (raw, no md auto-save)
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   svibe --on-exit restart 4 codex                # auto-respawn loop
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:#   svibe -p ~/repo 4 claude                       # explicit path
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-#   svibe --no-attach 4 claude                     # create in background
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-function sesh-vibe() {
+--
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-
+--
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-  opencode (and other unknown CLIs)         → raw passthrough
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh-
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh:--on-exit MODE controls per-pane behavior on Ctrl+C / clean exit
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/fleet_apply.py`
+
+```text
+1	#!/usr/bin/env -S uv run --script
+2	# /// script
+3	# requires-python = ">=3.11"
+4	# dependencies = [
+5	#   "asyncssh>=2.18",
+6	#   "tyro>=0.9",
+7	#   "rich>=13.9",
+8	# ]
+9	# ///
+10	"""
+11	fleet_apply.py — Run `chezmoi update --init` (or `apply` / `diff`) across a
+12	fleet of remote hosts in parallel, with optional sudo password injection.
+13	
+14	Why this exists:
+15	    Pushing dotfile changes to N machines by hand (ssh, type password, wait,
+16	    grep logs) is error-prone. This wraps that flow:
+17	
+18	      * Host list + connection details live in ~/.config/fleet/machines.toml
+19	      * Connection prefers ssh_config alias (ProxyJump, IdentityAgent, etc. all
+20	        kept) — falls back to explicit hostname/user/port/identity_file.
+21	      * Sudo password sources: plaintext (TOML), interactive prompt (asked once
+22	        at startup), Bitwarden CLI (`bw get password <item>`), or omitted.
+23	      * Per-host `no_root_machine = true` skips sudo entirely (matches the
+24	        chezmoi `noRoot=true` init choice on that host).
+25	      * Live Rich table of progress + per-host log files under
+26	        logs/fleet-apply/<UTC-timestamp>/<host>.log
+27	
+28	Exit code: number of failed hosts (0 = all good, capped at 125).
+29	
+30	See docs/this_repo/fleet-apply.md for full schema, examples, troubleshooting.
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:32Z)**_
+
+Great! Now let me read the GitLab tool and check the Brewfile:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:33Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/42_gitlab.zsh`
+
+```text
+1	# 42_gitlab.zsh - GitLab helpers using glab CLI
+2	
+3	# ==============================================================================
+4	# Method 1: Direct shell function (no AI agent needed)
+5	# ==============================================================================
+6	
+7	# Create a GitLab repo under a group from the current git repo, set origin, and push.
+8	# Detects current folder name as repo name and current branch automatically.
+9	#
+10	# Usage:
+11	#   glcreate <group> [description]
+12	#
+13	# Examples:
+14	#   glcreate david_quick_tries
+15	#   glcreate david_quick_tries "My awesome project"
+16	#
+17	# If no description is given, the repo is created without one.
+18	# The repo is created as private by default.
+19	glcreate() {
+20	  emulate -L zsh
+21	
+22	  local group="${1:?Usage: glcreate <group> [description]}"
+23	  local desc="${2:-}"
+24	  local name=$(basename "$(pwd)")
+25	  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+26	
+27	  echo "Creating: ${group}/${name} (branch: ${branch})"
+28	
+29	  glab repo create "${group}/${name}" \
+30	    --private \
+31	    --defaultBranch "$branch" \
+32	    --skipGitInit \
+33	    ${desc:+--description "$desc"} \
+34	  && {
+35	    # Add or update origin remote
+36	    git remote add origin "git@gitlab.com:${group}/${name}.git" 2>/dev/null \
+37	      || git remote set-url origin "git@gitlab.com:${group}/${name}.git"
+38	  } \
+39	  && git push -u origin "$branch"
+40	}
+41	
+42	# ==============================================================================
+43	# Method 2: AI agent assisted (summarizes description from project content)
+44	# ==============================================================================
+45	
+46	# Create a GitLab repo using an AI coding agent to inspect the project,
+47	# auto-generate a description, create the repo, set origin, and push.
+48	#
+49	# Supported agents: opencode (default), claude, codex, cursor-agent
+50	# Set GLCREATE_AGENT to change the default agent.
+51	# Set GLCREATE_LANG to change the default prompt language (zh or en, default: zh).
+52	#
+53	# Usage:
+54	#   glcreate-ai <group> [description] [--agent <name>] [--lang zh|en]
+55	#
+56	# Examples:
+57	#   glcreate-ai david_quick_tries
+58	#   glcreate-ai david_quick_tries "Override description"
+59	#   glcreate-ai david_quick_tries --agent claude
+60	#   glcreate-ai david_quick_tries --lang en
+61	#
+62	# If no description is given, the agent will summarize one from the project content.
+63	glcreate-ai() {
+64	  emulate -L zsh
+65	
+66	  local group="" desc="" agent="${GLCREATE_AGENT:-opencode}" lang="${GLCREATE_LANG:-zh}"
+67	
+68	  # Parse arguments
+69	  while [[ $# -gt 0 ]]; do
+70	    case "$1" in
+71	      --agent) agent="$2"; shift 2 ;;
+72	      --lang)  lang="$2"; shift 2 ;;
+73	      *) [[ -z "$group" ]] && group="$1" || desc="$1"; shift ;;
+74	    esac
+75	  done
+76	
+77	  if [[ -z "$group" ]]; then
+78	    echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent] [--lang zh|en]"
+79	    echo "  Set GLCREATE_AGENT env var to change default agent (default: opencode)"
+80	    echo "  Set GLCREATE_LANG  env var to change default language (default: zh)"
+81	    return 1
+82	  fi
+83	
+84	  local name=$(basename "$(pwd)")
+85	  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+86	  local prompt
+87	
+88	  case "$lang" in
+89	    en)
+90	      prompt="Use glab to create a private repo under gitlab.com/${group}, repo name: ${name}, default branch: ${branch}. Set the origin remote and push.${desc:+ Description: ${desc}.} If no description is provided, summarize one sentence from the project content."
+91	      ;;
+92	    zh|*)
+93	      prompt="用 glab 把這個 repo 建到 gitlab.com/${group} 底下，repo name: ${name}，private，default branch: ${branch}，設定 origin remote 並 push。${desc:+Description: ${desc}。}如果沒給 description 就根據項目內容總結一句。"
+94	      ;;
+95	  esac
+96	
+97	  echo "Agent: ${agent} | Lang: ${lang} | Repo: ${group}/${name} | Branch: ${branch}"
+98	
+99	  case "$agent" in
+100	    opencode)       opencode run "$prompt" ;;
+101	    claude)         claude -p "$prompt" ;;
+102	    codex)          codex exec "$prompt" ;;
+103	    cursor-agent)   cursor-agent -p "$prompt" ;;
+104	    *)              echo "Unknown agent: ${agent}"; return 1 ;;
+105	  esac
+106	}
+107
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "claude\|codex\|opencode\|aider\|gemini" /Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew --include="*.tmpl" -n | head -30`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl:21:cask "claude"
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl:25:cask "opencode-desktop"
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl:28:cask "codex-app"
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:35Z)**_
+
+Now let me check the coding_agents ansible role and look at docs:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:36Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/coding_agents/tasks/main.yml`
+
+```text
+1	---
+2	# Coding Agents Installation
+3	# Installs various AI coding assistants and companion tools
+4	# All installations include idempotency checks to avoid slow reinstalls
+5	
+6	# === Notification Tools (from claude_deps) ===
+7	
+8	# macOS - terminal-notifier
+9	- name: Install terminal-notifier (macOS)
+10	  when: ansible_facts["os_family"] == "Darwin"
+11	  community.general.homebrew:
+12	    name: terminal-notifier
+13	    state: present
+14	
+15	# Linux - libnotify-bin (provides notify-send)
+16	- name: Install libnotify-bin (Debian/Ubuntu)
+17	  when: ansible_facts["os_family"] == "Debian"
+18	  become: true
+19	  tags: [sudo]
+20	  ansible.builtin.apt:
+21	    name: libnotify-bin
+22	    state: present
+23	
+24	# === Claude Code ===
+25	
+26	- name: Check if Claude Code is installed (macOS)
+27	  when: ansible_facts["os_family"] == "Darwin"
+28	  ansible.builtin.command: which claude
+29	  register: claude_macos_check
+30	  changed_when: false
+31	  failed_when: false
+32	
+33	- name: Install Claude Code (macOS)
+34	  when:
+35	    - ansible_facts["os_family"] == "Darwin"
+36	    - claude_macos_check.rc != 0
+37	  community.general.homebrew_cask:
+38	    name: claude-code
+39	    state: present
+40	
+41	- name: Check if Claude Code is installed (Linux)
+42	  when: ansible_facts["os_family"] == "Debian"
+43	  ansible.builtin.command: which claude
+44	  register: claude_check
+45	  changed_when: false
+46	  failed_when: false
+47	
+48	- name: Skip Claude Code on unsupported architecture (Linux)
+49	  when:
+50	    - ansible_facts["os_family"] == "Debian"
+51	    - claude_check.rc != 0
+52	    - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
+53	  ansible.builtin.debug:
+54	    msg: "Claude Code skipped: install.sh downloads arm64/amd64 binaries; no build for {{ target_architecture }}"
+55	
+56	- name: Install Claude Code (Linux)
+57	  when:
+58	    - ansible_facts["os_family"] == "Debian"
+59	    - claude_check.rc != 0
+60	    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+61	  ansible.builtin.shell: |
+62	    curl -fsSL https://claude.ai/install.sh | bash
+63	  args:
+64	    creates: "{{ ansible_facts['env']['HOME'] }}/.claude/local/bin/claude"
+65	
+66	# === OpenCode ===
+67	
+68	- name: Check if OpenCode is installed (macOS)
+69	  when: ansible_facts["os_family"] == "Darwin"
+70	  ansible.builtin.command: which opencode
+71	  register: opencode_macos_check
+72	  changed_when: false
+73	  failed_when: false
+74	
+75	- name: Tap anomalyco/tap for OpenCode (macOS)
+76	  when:
+77	    - ansible_facts["os_family"] == "Darwin"
+78	    - opencode_macos_check.rc != 0
+79	  community.general.homebrew_tap:
+80	    name: anomalyco/tap
+81	    state: present
+82	
+83	- name: Install OpenCode (macOS)
+84	  when:
+85	    - ansible_facts["os_family"] == "Darwin"
+86	    - opencode_macos_check.rc != 0
+87	  community.general.homebrew:
+88	    name: opencode
+89	    state: present
+90	
+91	- name: Check if OpenCode is installed (Linux)
+92	  when: ansible_facts["os_family"] == "Debian"
+93	  ansible.builtin.command: which opencode
+94	  register: opencode_check
+95	  changed_when: false
+96	  failed_when: false
+97	
+98	- name: Install OpenCode (Linux)
+99	  when:
+100	    - ansible_facts["os_family"] == "Debian"
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/docs -name "*agent*" -o -name "*coding*" -o -name "*claude*" | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/agent-overlays.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/ssh-agent.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/agent-skills.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tutorials/bitwarden_ssh_agent.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:38Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/init/dotfiles_init.py`
+
+```text
+1	#!/usr/bin/env -S uv run --script
+2	# /// script
+3	# requires-python = ">=3.11"
+4	# dependencies = [
+5	#   "questionary>=2.0",
+6	#   "rich>=13.9",
+7	#   "tyro>=0.9",
+8	# ]
+9	# ///
+10	"""
+11	dotfiles_init.py — Interactive wrapper around `chezmoi init` inspired by
+12	Vercel Labs' `skills` CLI (https://github.com/vercel-labs/skills).
+13	
+14	The existing `.chezmoi.toml.tmpl` defines ~19 prompts (profile, email, name,
+15	16 feature flags). `chezmoi init` asks them sequentially, which works but
+16	hides the feature flags from each other and makes "set up a new machine
+17	the way I always do" a manual checklist. This wrapper:
+18	
+19	  1. Pre-flights chezmoi / git / SSH key and offers to fix gaps.
+20	  2. Lets you pick a pre-configured BUNDLE (personal-mac, work-mac,
+21	     server-linux, minimal) that ticks typical feature flags for you.
+22	  3. Presents feature flags grouped, as a questionary multi-select you can
+23	     fly through with Space + Enter.
+24	  4. Shells out to `chezmoi init <repo> --apply [--ssh] --promptString ... `
+25	     so chezmoi remains the source of truth — we just pre-answer its prompts.
+26	  5. Streams chezmoi's output live and prints a recap at the end.
+27	
+28	The wrapper also has a `doctor` subcommand that greps `.chezmoi.toml.tmpl`
+29	and `Dockerfile` and fails loudly if any prompt key in those files is
+30	missing from this script's PROMPTS list (or vice versa). Run it in CI / a
+31	pre-commit hook to catch drift — per CLAUDE.md's "Dockerfile" cross-file
+32	rule, adding a chezmoi prompt means updating three files in one commit.
+33	
+34	Invocation:
+35	    # Fresh machine (via bootstrap.sh which installs uv first):
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:39Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/agent-overlays.md`
+
+```text
+1	# Coding-agent CLI overlays (Cursor / OpenCode / Codex)
+2	
+3	This repo manages the *global* config files of three coding-agent CLIs via chezmoi `modify_` overlays:
+4	
+5	| CLI | Live file | Source script | Merge engine |
+6	|---|---|---|---|
+7	| Cursor | `~/.cursor/cli-config.json` | [`dot_cursor/modify_cli-config.json.tmpl`](../../dot_cursor/modify_cli-config.json.tmpl) | `jq '. * $overlay'` |
+8	| OpenCode | `~/.config/opencode/opencode.json` | [`dot_config/opencode/modify_opencode.json.tmpl`](../../dot_config/opencode/modify_opencode.json.tmpl) | `jq '. * $overlay'` |
+9	| Codex | `~/.codex/config.toml` | [`dot_codex/modify_config.toml.tmpl`](../../dot_codex/modify_config.toml.tmpl) | Python `tomllib` + inline emitter |
+10	
+11	Overlay payloads live under [`.chezmoitemplates/agents/`](../../.chezmoitemplates/agents/) and are sourced via `{{ template ... }}` includes so the merge logic can be tested independently of overlay contents.
+12	
+13	## Why `modify_` and not full file management
+14	
+15	All three CLIs **rewrite their config file at runtime** to record machine-local state: auth tokens, telemetry IDs, per-project trust grants, marketplace registrations with absolute paths, plugin-cache hashes, last-used provider hints, etc. Tracking the whole file as managed content would:
+16	
+17	1. Leak secrets (`authInfo`, `auth.json` content) into the dotfiles repo.
+18	2. Bake one machine's absolute paths (`/Users/me/.codex/.tmp/...`) into another machine's apply.
+19	3. Produce constant `chezmoi diff` noise as the CLI churns the file.
+20	
+21	The `modify_` overlay model deep-merges only the keys we explicitly enforce; everything else passes through verbatim.
+22	
+23	## What each overlay enforces
+24	
+25	### Cursor — [`agents/cursor.cli-config.overlay.json`](../../.chezmoitemplates/agents/cursor.cli-config.overlay.json)
+26	
+27	```json
+28	{
+29	  "editor": { "vimMode": true }
+30	}
+31	```
+32	
+33	- `editor.vimMode = true` — universal preference; sibling `editor.fontSize` etc. survive the deep merge.
+34	- **`permissions` is intentionally NOT in the overlay.** `jq '. * $overlay'` replaces arrays wholesale, so listing any `permissions.allow` / `permissions.deny` entries here would clobber the user's live machine-specific allow-list on every `chezmoi apply`. Manage those per machine via the live file directly, or move to a `--argjson allow $merged` array-union approach if you ever need a shared baseline.
+35	
+36	### OpenCode — [`agents/opencode.overlay.json`](../../.chezmoitemplates/agents/opencode.overlay.json)
+37	
+38	```json
+39	{
+40	  "$schema": "https://opencode.ai/config.json",
+41	  "autoupdate": true,
+42	  "default_agent": "build",
+43	  "small_model": "github-copilot/gpt-5-mini",
+44	  "agent": { "title": { "reasoningEffort": "low" } },
+45	  "provider": {
+46	    "github-copilot": {
+47	      "options": { "timeout": 600000 }
+48	    }
+49	  }
+50	}
+51	```
+52	
+53	- `$schema` — keeps editors aware of the schema for autocomplete.
+54	- `autoupdate = true` — let the CLI self-update.
+55	- `default_agent = "build"` — primary agent on TUI/CLI startup. Override per-session via `--agent` or the picker.
+56	- `small_model = "github-copilot/gpt-5-mini"` — cheap model for title generation, summarisation, and other lightweight calls. Avoids billing Claude Opus quota for trivial tasks. Pairs with `agent.title.reasoningEffort = "low"`.
+57	- `agent.title.reasoningEffort = "low"` — cheap completions for short title generation; sibling `agent.*` entries (per-agent provider, model overrides) survive.
+58	- `provider.github-copilot.options.timeout = 600000` (10 min) — request-level timeout. Default is 5 min; bumped to give long Claude Opus generations more room before the SDK aborts the whole call. **Note**: `chunkTimeout` is intentionally NOT set here, see [docs/tools/opencode.md → Claude Opus stream stall](opencode.md#claude-opus-stream-stall-on-github-copilot) for the rationale (upstream bug [anomalyco/opencode#20466](https://github.com/anomalyco/opencode/issues/20466) — SSE-chunk-timeout errors aren't retried, so setting `chunkTimeout` would convert silent hangs into hard failures with no recovery).
+59	
+60	### Codex — [`agents/codex.config.overlay.toml`](../../.chezmoitemplates/agents/codex.config.overlay.toml)
+61	
+62	```toml
+63	personality = "pragmatic"
+64	model = "gpt-5.4"
+65	model_reasoning_effort = "xhigh"
+66	
+67	[features]
+68	codex_hooks = true
+69	unified_exec = true
+70	shell_snapshot = true
+71	steer = true
+72	multi_agent = true
+73	
+74	[plugins."github@openai-curated"]
+75	enabled = true
+76	
+77	[plugins."google-drive@openai-curated"]
+78	enabled = true
+79	
+80	[plugins."computer-use@openai-bundled"]
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -n "stdin\|\-p\|\-\-print\|exec\|pipe\|headless" /Users/daviddwlee84/.local/share/chezmoi/README.md | head -20`
+
+```text
+3:Cross-platform development environment setup using **chezmoi** + **ansible**.
+90:- On sudo-enabled machines, the ansible `zsh` role switches your login shell to zsh automatically. Log out / back in to pick it up, or run `exec zsh` now.
+91:- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER`.
+143:- `~/.cursor/cli-config.json`, `~/.config/opencode/opencode.json`, `~/.codex/config.toml` - Coding-agent CLI overlays: each `modify_*` script deep-merges a small managed baseline (preferences, features, curated plugins) into the CLI's live config, preserving auth tokens, per-project trust, sessions, and other machine-local state. Codex specifically round-trips `[projects]` and `[marketplaces.*]` so per-project trust paths never get clobbered. OpenCode legacy `~/.config/opencode/config.json` is migrated to the modern filename by a one-shot `run_once_before_50_opencode_migrate.sh.tmpl`. Full design: [docs/tools/agent-overlays.md](docs/tools/agent-overlays.md).
+145:- `~/.tmux.conf` - Tmux configuration with TPM plugins (resurrect, continuum, tmux-floax floating pane, tmux-fzf for fuzzy keybinding/session/pane search rebound to `prefix+?`, tmux-fzf-url, tmux-open), vim-style copy mode with clipboard yank, capture-pane helpers (`prefix+y`/`Y`/`C-y`), a native popup menu (`prefix+Space` or `prefix+e`, script-driven with submenus and height-aware trimming) with layout/resize/session management, popup shell (`prefix+\``) and lazygit popup (`prefix+G`), a glow-rendered cheatsheet (`prefix+Space` → `?`), vim-style pane nav, `Ctrl+1..9` quick window switching (CSI-u terminals), extended-keys for coding agents (including `Ctrl+/` in Neovim), sesh keybindings (`prefix+g` fzf picker, `prefix+T` television picker, `prefix+O` built-in picker, `prefix+W` window picker, `prefix+S` last), responsive Catppuccin status bar (adapts modules to terminal width for mobile), and config reload on `prefix+R` ([docs](docs/tools/tmux/README.md))
+146:- `~/.local/bin/x` - Cross-platform terminal wrapper for `copy` / `paste` / `open`, with an OSC 52 fallback so `x copy` reaches the local clipboard over SSH ([docs](docs/tools/clipboard.md))
+158:- `~/.config/television/cable/services.toml` - Cross-platform services channel for systemd (Linux) / launchd (macOS) — 5 source cycles (running/all/failed/user-scope/installed-on-disk), tailspin log preview, Alt-key lifecycle actions (restart/stop/start/reload/enable), sudo-aware ([docs](docs/tools/services.md))
+195:See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat) for details and when to add entries here vs. ansible.
+208:- **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
+254:cd ~/.ansible && ansible-playbook playbooks/macos.yml
+266:just upgrade-dry-run      # preview without executing
+277:just upgrade-plugins      # LazyVim :Lazy sync + TPM + claude-hud + pre-commit autoupdate + tldr + gh extensions
+286:When installed, `just upgrade-plugins` also refreshes `claude-hud` to the
+288:Code's official stdin `rate_limits` only, so the old credential-derived `Max`
+367:See [CLAUDE.md](CLAUDE.md) for the agent-facing repo contract, [docs/this_repo/ansible_customization.md](docs/this_repo/ansible_customization.md) for ansible customization, [docs/this_repo/testing.md](docs/this_repo/testing.md) for shell-script testing (bats, shellcheck, shfmt — and when to reach for ZUnit / ShellSpec instead), [docs/input_methods/README.md](docs/input_methods/README.md) for McBopomofo / Rime / Squirrel notes and backup strategy, [docs/tools/tmux/README.md](docs/tools/tmux/README.md) for tmux usage and managed keybindings, [docs/tools/clipboard.md](docs/tools/clipboard.md) for how OSC 52 clipboard sync is wired across terminal / tmux / Neovim / `x` CLI (including SSH-remote yank), [docs/tools/ghostty.md](docs/tools/ghostty.md) for Ghostty/cmux notes and the `ghostty-ssh-terminfo` helper, [docs/tools/direnv.md](docs/tools/direnv.md) for `.venv`-aware direnv usage, [docs/tools/pre-commit.md](docs/tools/pre-commit.md) for generic pre-commit reference (hook env model, `uv`-pinned bootstrap Python, debugging), [docs/tools/git_diff_workflow.md](docs/tools/git_diff_workflow.md) for the managed Git diff stack, [docs/tools/specstory.md](docs/tools/specstory.md) for SpecStory configuration, [docs/tools/td_sidecar.md](docs/tools/td_sidecar.md) for td/sidecar usage, [docs/tools/specify_cli.md](docs/tools/specify_cli.md) for Specify CLI, [docs/tools/llm.md](docs/tools/llm.md) for local LLM tools, [docs/tools/networking.md](docs/tools/networking.md) for networking tools, and [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md) for chezmoi source-state prefix semantics and when each is safe to `chezmoi add`.
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:41Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/executable_clash-parse.py`
+
+```text
+1	#!/usr/bin/env -S uv run --script
+2	# /// script
+3	# requires-python = ">=3.11"
+4	# dependencies = ["PyYAML>=6.0"]
+5	# ///
+6	"""Parser for Clash / mihomo config YAML files, used by the `clash` tv channel.
+7	
+8	Subcommands emit TSV rows for the TV source (`proxies`, `groups`, `rules`,
+9	`summary`) or plain text for previews / copy actions (`path`, `yaml`, `server`,
+10	`controller`).
+11	
+12	TSV schema: kind \t name \t type_or_meta \t server_or_target \t extra
+13	kind ∈ {proxy, group, rule, config, none}
+14	
+15	Config discovery order (first existing file wins):
+16	    $CLASH_CONFIG env var (explicit override)
+17	    ~/.config/clash/profiles/list.yml -> active profiles/<time>.yml
+18	    ~/.config/clash/config.{yaml,yml}
+19	    ~/.config/mihomo/config.{yaml,yml}
+20	    ~/Library/Application Support/clash/config.{yaml,yml}   (macOS)
+21	    ~/Library/Application Support/mihomo/config.{yaml,yml}  (macOS)
+22	
+23	Parsed config is cached as YAML.safe_load output; this script never writes back
+24	to the config file.
+25	"""
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:41Z)**_
+
+Perfect! Now let me check for any documentation on CLI flags and stdin patterns:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/docs/tools -name "*.md" | xargs grep -l "claude\|codex\|opencode" 2>/dev/null | head -10`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/chezmoi-prefixes.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/tv.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/worktrunk.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/codexbar.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/web-reader.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/xdg.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/agent-overlays.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/sesh.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/llm.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/tools/opencode.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:42Z)**_
+
+Now let me check for TUI libraries used across all Python files:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "textual\|rich\|prompt_toolkit\|questionary\|inquirer\|click\|typer\|tyro" /Users/daviddwlee84/.local/share/chezmoi --include="*.py" | head -40`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:#   "questionary>=2.0",
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:#   "rich>=13.9",
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:#   "tyro>=0.9",
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:  3. Presents feature flags grouped, as a questionary multi-select you can
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:import questionary
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:import tyro
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:from rich.console import Console
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:from rich.panel import Panel
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:from rich.table import Table
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    if not questionary.confirm("chezmoi not found. Install via get.chezmoi.io/lb?", default=True).ask():
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    if not questionary.confirm(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    email = questionary.text(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    questionary.press_any_key_to_continue("Press any key once you've added the key to GitHub...").ask()
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:        questionary.Choice(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    return questionary.select(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:        profile = questionary.select(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    name = questionary.text(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    email = questionary.text(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    choices: list[questionary.Choice] = []
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:        choices.append(questionary.Separator(f"── {group} ──"))
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:            choices.append(questionary.Choice(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    selected_keys = questionary.checkbox(
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    return questionary.confirm("Proceed?", default=True).ask() or False
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    repo: Annotated[str, tyro.conf.arg(help="Chezmoi repo arg (omit on re-init)")] = DEFAULT_REPO
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    bundle: Annotated[str | None, tyro.conf.arg(help="Skip the picker; use this bundle")] = None
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    ssh: Annotated[bool, tyro.conf.arg(help="Force --ssh even if no key is present")] = False
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    yes: Annotated[bool, tyro.conf.arg(help="Skip final confirmation")] = False
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    dry_run: Annotated[bool, tyro.conf.arg(help="Print the chezmoi command instead of running it")] = False
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    source: Annotated[Path, tyro.conf.arg(help="Path to chezmoi source dir")] = CHEZMOI_SOURCE_DIR
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    Annotated[InitCmd, tyro.conf.subcommand(name="init")]
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    | Annotated[DoctorCmd, tyro.conf.subcommand(name="doctor")]
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    | Annotated[ListBundlesCmd, tyro.conf.subcommand(name="list-bundles")]
+/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py:    cmd = tyro.cli(Command, default=InitCmd())
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:#   "tyro>=0.9",
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:#   "rich>=13.9",
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:import tyro
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:from rich.console import Console
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:from rich.live import Live
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:from rich.table import Table
+/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:    per-host log file used by SSH hosts so the rich live table is
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/sesh.md`
+
+```text
+1	# Sesh - Smart Tmux Session Manager
+2	
+3	[Sesh](https://github.com/joshmedeski/sesh) is a CLI that manages tmux sessions using zoxide, giving you instant access to your most-used projects with smart session naming, startup commands, and preview.
+4	
+5	## Installation
+6	
+7	Sesh is installed automatically by the `devtools` ansible role:
+8	
+9	- **macOS**: `brew install sesh`
+10	- **Linux**: GitHub release binary → `~/.local/bin/sesh`
+11	
+12	No manual installation needed after `chezmoi apply`.
+13	
+14	## Keybindings
+15	
+16	### ZSH (`Alt+S`)
+17	
+18	Press `Alt+S` anywhere in the shell to open the sesh picker. This uses `fzf-tmux` as a popup with full filtering support.
+19	
+20	Source: `~/.config/zsh/tools/22_sesh.zsh`
+21	
+22	### ZSH Helpers
+23	
+24	The managed zsh config provides four shell helpers, each with a distinct
+25	weight class so you can pick the right tool for the moment:
+26	
+27	| Command | Weight | When to use | Session name |
+28	|---------|--------|-------------|--------------|
+29	| `shere` | Bare shell | Ad-hoc cd: just need a tmux session at `$PWD`, no editor, no layout | `<basename>` |
+30	| `sroot` | Sesh defaults | Want sesh's wildcard / `default_session` behavior at the git root | sesh-determined (`dir_length=2`) |
+31	| `scode` | Heavy | "Open the coding-agent layout for *this* repo" — nvim 75% \| `specstory run` 25% + btop window | `coding-agent/<repo>` |
+32	| `svibe` | Heaviest | "Vibe coding" — N tiled agent panes + lazygit + nvim | `vibe/<repo>` |
+33	
+34	The underlying functions are `sesh-here` / `sesh-root` / `sesh-code` /
+35	`sesh-vibe`; you can call them directly if you prefer function names over
+36	aliases.
+37	
+38	#### `shere` — bare shell at `$PWD`
+39	
+40	Intentionally lightweight: creates a tmux session named after the basename of
+41	the directory, drops you into a shell, **does not** trigger sesh's
+42	`default_session.startup_command` (nvim) or any wildcard layout. Use it when
+43	you've cd'd somewhere ephemeral and just want session persistence.
+44	
+45	```bash
+46	shere                          # bare shell session at $PWD
+47	shere npm run dev              # session that runs `npm run dev` instead of a shell
+48	shere -c "specstory run"       # explicit --command flag
+49	shere -p ~/some/dir            # explicit path; -p + bare args also works
+50	```
+51	
+52	> **Behavior change (2026-04)**: `shere` used to inherit sesh's default
+53	> startup_command, which opened nvim. It was renamed to "lightweight session"
+54	> because the heavy editor-first workflow is now `scode`. If you want the old
+55	> behavior, use `sroot` (which honors the sesh wildcards/defaults) or
+56	> `sesh connect "$PWD"` directly.
+57	
+58	#### `sroot` — git root with sesh defaults
+59	
+60	Connects to the current git repo's top-level (or `$PWD` if not in a repo) and
+61	honors all of sesh.toml: wildcard layouts (e.g. `/Volumes/Data/Program/*/*`
+62	auto-applies `project.yaml`), `default_session.startup_command`, etc. This is
+63	the right choice if you've been customizing sesh.toml and want those
+64	customizations to apply.
+65	
+66	```bash
+67	sroot                          # connect to git root, sesh.toml decides layout
+68	sroot specstory run codex      # explicit command override
+69	```
+70	
+71	#### `scode` — repo-scoped coding-agent layout
+72	
+73	`scode` creates a session **named after the current repo**, so different
+74	repos no longer collide on the single `coding-agent` session name. This was
+75	the headline pain point of the old `sesh connect coding-agent` workflow:
+76	the second invocation from a different repo would silently reuse the
+77	existing session pointing at the *wrong* repo.
+78	
+79	```bash
+80	scode                          # current repo, default agent (specstory → claude)
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/opencode.md`
+
+```text
+1	# OpenCode
+2	
+3	Notes for the local OpenCode setup on this machine — covers the chezmoi-managed overlay, the upstream `title` agent regression, and the GitHub Copilot Claude Opus stream-stall workaround.
+4	
+5	## How the global config is managed
+6	
+7	The `~/.config/opencode/opencode.json` global config is **partially** managed via a chezmoi `modify_` overlay (jq deep-merge). See [agent-overlays.md → OpenCode](agent-overlays.md#opencode--agentsopencodeoverlayjson) for the canonical overlay contents and per-key rationale.
+8	
+9	The legacy `~/.config/opencode/config.json` filename is migrated to the modern `opencode.json` once per machine by [`run_once_before_50_opencode_migrate.sh.tmpl`](../../run_once_before_50_opencode_migrate.sh.tmpl); see [agent-overlays.md → OpenCode legacy migration](agent-overlays.md#opencode-legacy-configjson-migration).
+10	
+11	What's intentionally **not** in the overlay (i.e. left as machine-local state):
+12	
+13	- `plugin` paths — the local config carries an absolute path under `~/.config/opencode/plugins/`; an overlay would clobber per-machine paths.
+14	- Auth tokens, telemetry IDs, last-used provider hints — written by the CLI at runtime; overlay would either erase them or fight the CLI on every apply.
+15	
+16	If you ever need to share a plugin across machines, package it as an npm module and add it to the overlay's `plugin` array as a package name (not a `file://` path).
+17	
+18	## Known issue: session title stuck as `New session - ...`
+19	
+20	Observed on this machine starting with OpenCode `1.4.6`; still applies on `1.14.x`.
+21	
+22	Symptom:
+23	
+24	- new sessions stay at the fallback title `New session - <timestamp>`
+25	- title generation does not complete automatically
+26	
+27	Root cause:
+28	
+29	- the hidden `title` agent uses `github-copilot/gpt-5-mini` for a lightweight title request
+30	- OpenCode sends `reasoning_effort = "minimal"`
+31	- `gpt-5-mini` rejects that value because it only accepts `low`, `medium`, or `high`
+32	
+33	Upstream tracking:
+34	
+35	- [anomalyco/opencode#22796](https://github.com/anomalyco/opencode/issues/22796) — title agent uses unsupported `reasoning_effort: minimal`
+36	
+37	### Workaround (managed)
+38	
+39	The overlay enforces:
+40	
+41	```json
+42	{
+43	  "agent": { "title": { "reasoningEffort": "low" } },
+44	  "small_model": "github-copilot/gpt-5-mini"
+45	}
+46	```
+47	
+48	`reasoningEffort: "low"` sidesteps the `minimal` rejection. `small_model` is pinned explicitly so the title-agent + summarisation pipeline always uses the cheap model regardless of which provider the main session uses.
+49	
+50	### When to remove the workaround
+51	
+52	Drop the `agent.title.reasoningEffort` override from the overlay after verifying all of the following:
+53	
+54	- the upstream regression is fixed
+55	- a new OpenCode version is installed locally
+56	- a fresh session auto-generates a non-fallback title
+57	- the OpenCode log no longer shows `reasoning_effort: "minimal"` for the title request
+58	
+59	## Claude Opus stream stall on GitHub Copilot
+60	
+61	When using the `github-copilot/claude-opus-4.x` channel for long-running tool calls — typically a single large `write` against a multi-thousand-line file — the TUI shows a repeating `~ Preparing write...` followed by `Tool execution aborted`, sometimes for many minutes, until the user hits ESC.
+62	
+63	### Diagnosis from log
+64	
+65	`~/.local/share/opencode/log/<timestamp>.log` shows:
+66	
+67	- the same `messageID` re-streaming over and over with the SDK retry-backoff sequence: `+2009ms → +4013ms → +8045ms → +16011ms → +30023ms → +30015ms ...` (the `30000ms` cap is the SDK's max backoff)
+68	- between each retry, a `+60000ms` gap with no `message.part.delta` events — the SSE stream went idle and the GitHub Copilot proxy server-side closed it
+69	- the model had already emitted `tool_use` for `write` but the JSON `input` field is still streaming when the SSE dies — that's exactly what produces the "Preparing write..." → "aborted" UX, because the tool call is structurally incomplete
+70	
+71	### Root cause
+72	
+73	GitHub Copilot's proxy in front of the Anthropic upstream enforces an idle timeout (community-observed at ~60 s) on streaming responses. Claude Opus generating a very large single tool-call payload can stay below the chunk emission threshold long enough to trip this, after which the connection silently dies. Direct Anthropic API does not have this behaviour. Sonnet trips it less often than Opus because it generates faster.
+74	
+75	There is **no client-side flag to disable the proxy's idle timeout** — it's enforced server-side.
+76	
+77	### Upstream tracking
+78	
+79	- [anomalyco/opencode#17578](https://github.com/anomalyco/opencode/issues/17578) — exact symptom match: `Write tool SSE timeout with claude-opus-4.x via GitHub Copilot when generating long markdown files`. Reporter found that **Pyright LSP diagnostics get appended to tool responses** and inflate the SSE payload, making the stall more likely. Even writing a `.md` file can trigger a full project re-scan in repos containing Python sources without a configured venv. Fix in PR `#18894` (not merged at time of writing).
+80	- [anomalyco/opencode#17574](https://github.com/anomalyco/opencode/issues/17574), [#17307](https://github.com/anomalyco/opencode/issues/17307), [#17318](https://github.com/anomalyco/opencode/issues/17318), [#17336](https://github.com/anomalyco/opencode/issues/17336) — additional reports of the same SSE-stall pattern; `#17307` is the original issue under which `chunkTimeout` was added as a stop-gap.
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:45Z)**_
+
+Now let me check fzf patterns and television channels:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools -name "*.zsh" -type f`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/37_worktrunk.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/06_cargo.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/36_pueue.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/55_web_reader.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/11_tools_picker.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_log_tools.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/95_bitwarden.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/35_yazi.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/50_networking.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_marimo.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/02_shell_integration.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/25_bat.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/05_mise.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/30_direnv.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/20_zoxide.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/90_completions.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_conda_mamba.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/01_starship.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/07_bunx_cli.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/34_openclaw.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/94_ssh_agent.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/41_github.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/12_television.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/26_eza.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/40_codexbar.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/28_tldr.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/27_thefuck.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/37_lazygit.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/32_try.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/38_lazyvim.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/10_fzf.zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/96_ssh_setup.zsh
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:48Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/22_sesh.zsh`
+
+```text
+1	# 22_sesh.zsh - sesh tmux session manager
+2	# https://github.com/joshmedeski/sesh
+3	
+4	# Check if sesh is installed
+5	command -v sesh &>/dev/null || return 0
+6	
+7	# Auto-generate shell completion into ~/.zfunc/ (regenerates on version change)
+8	if [[ -d ~/.zfunc ]]; then
+9	    local _sesh_ver="$(sesh --version 2>/dev/null)"
+10	    if [[ ! -f ~/.zfunc/_sesh ]] || ! grep -q "${_sesh_ver}" ~/.zfunc/_sesh 2>/dev/null; then
+11	        sesh completion zsh > ~/.zfunc/_sesh 2>/dev/null
+12	    fi
+13	fi
+14	
+15	# Sesh session switcher with fzf (full-featured picker)
+16	# Supports icons, preview, filtering by source, and session killing
+17	function sesh-sessions() {
+18	    {
+19	        exec </dev/tty
+20	        exec <&1
+21	        local session
+22	        session=$(sesh list --icons | fzf-tmux -p 80%,70% \
+23	            --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+24	            --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+25	            --bind 'tab:down,btab:up' \
+26	            --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+27	            --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+28	            --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+29	            --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+30	            --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+31	            --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+32	            --preview-window 'right:55%' \
+33	            --preview 'sesh preview {}' \
+34	        )
+35	        zle reset-prompt > /dev/null 2>&1 || true
+36	        [[ -z "$session" ]] && return
+37	        sesh connect "$session"
+38	    }
+39	}
+40	
+41	# ── Internal helpers ────────────────────────────────────────────────────────
+42	#
+43	# All helpers below take care to avoid the lowercase `path` / `cdpath` /
+44	# `manpath` / `fpath` zsh-tied-array trap (see
+45	# pitfalls/zsh-tied-array-path-shadowing.md).
+46	
+47	# Resolve the git repo root, or return non-zero if not in a repo.
+48	function _sesh_git_root() {
+49	    git rev-parse --show-toplevel 2>/dev/null
+50	}
+51	
+52	# Sanitize a string for use as a tmux session name.
+53	# tmux forbids `.` and `:` in session names; we also strip whitespace.
+54	function _sesh_sanitize() {
+55	    print -r -- "${1//[.:[:space:]]/-}"
+56	}
+57	
+58	# Switch to or attach to a tmux session named $1 (creating it at $2 if needed).
+59	# Inside tmux: `switch-client`. Outside tmux: `attach-session`.
+60	function _sesh_attach_or_switch() {
+61	    local session="$1"
+62	    if [[ -n "$TMUX" ]]; then
+63	        tmux switch-client -t "$session"
+64	    else
+65	        tmux attach-session -t "$session"
+66	    fi
+67	}
+68	
+69	# Create (or no-op if exists) a detached tmux session at the given path.
+70	# Returns 0 if the session already existed, 1 if newly created. (Caller uses
+71	# this to decide whether to apply layout setup or just attach.)
+72	function _sesh_ensure_session() {
+73	    local session="$1" target="$2"
+74	    if tmux has-session -t "=$session" 2>/dev/null; then
+75	        return 0   # already exists
+76	    fi
+77	    tmux new-session -d -s "$session" -c "$target"
+78	    return 1       # newly created
+79	}
+80	
+81	# Wrap a known specstory provider in `specstory run X` so the agent picks up
+82	# auto-save markdown logging. Bare CLI names that aren't specstory providers
+83	# (currently: opencode — see backlog/specstory-opencode-support.md) pass
+84	# through unchanged.
+85	#
+86	# Update the case list when specstory adds providers (track upstream:
+87	# specstoryai/getspecstory#146 for opencode, similar issues for others).
+88	#
+89	# Args: $1=agent, $2=specstory_mode (auto|never; default auto)
+90	#   auto  — wrap if known provider, raw otherwise (the historical default)
+91	#   never — pass through raw regardless (CLI flag --no-specstory sets this)
+92	function _sesh_wrap_agent() {
+93	    local agent="$1" specstory_mode="${2:-auto}"
+94	    if [[ "$specstory_mode" == "never" ]]; then
+95	        # Even an empty agent goes raw → caller's responsibility to pick a
+96	        # sensible default (we choose `claude` upstream when --no-specstory
+97	        # is set, since `specstory run` with no arg defaults to claude too).
+98	        print -r -- "${agent:-claude}"
+99	        return
+100	    fi
+101	    case "$agent" in
+102	        ""|"specstory")
+103	            # No agent specified → bare `specstory run` (default = claude).
+104	            print -r -- "specstory run"
+105	            ;;
+106	        claude|codex|cursor|droid|gemini)
+107	            print -r -- "specstory run $agent"
+108	            ;;
+109	        *)
+110	            # Pass-through for non-specstory providers (opencode today, more
+111	            # later as specstory adds support).
+112	            print -r -- "$agent"
+113	            ;;
+114	    esac
+115	}
+116	
+117	# Build a wrapper command that controls what happens when the inner command
+118	# exits (Ctrl+C, agent quit, crash). `--on-exit shell|kill|restart`:
+119	#   shell   — print a hint, then drop into $SHELL so user can restart agent,
+120	#             switch to lazygit, kill the pane manually, etc. (default)
+121	#   kill    — let the pane close on exit (tmux default `remain-on-exit off`)
+122	#   restart — wrap in `while true; do CMD; sleep 1; done` so the agent
+123	#             auto-respawns. Use Ctrl+C twice quickly to break the loop and
+124	#             land in shell.
+125	#
+126	# Args: $1=inner_cmd, $2=mode, $3=label_for_hint
+127	# Stdout: the wrapped shell command (single string suitable for `tmux
+128	# new-window … "<cmd>"`). Quoting is structured so user $SHELL is the one
+129	# evaluating the inner command — we don't double-eval.
+130	function _sesh_on_exit_wrap() {
+131	    local inner="$1" mode="$2" label="${3:-agent}"
+132	    # Ctrl+C sends SIGINT to the entire foreground process group, so the
+133	    # wrapper shell itself dies before it can print the hint or exec the
+134	    # login shell — the pane just vanishes. `trap '' INT` makes the wrapper
+135	    # ignore SIGINT; the inner command still receives it and exits normally,
+136	    # then control returns to the wrapper which prints the hint as intended.
+137	    # (Tools that install their own SIGINT handler — btop, htop, less — were
+138	    # the visible failure case; agent CLIs happened to handle Ctrl+C as
+139	    # clean exit so this was masked for them.)
+140	    local guard="trap '' INT;"
+141	    case "$mode" in
+142	        kill)
+143	            print -r -- "$inner"
+144	            ;;
+145	        restart)
+146	            # `|| true` so a crash exit doesn't abort the loop on `set -e` shells
+147	            print -r -- "$guard while true; do $inner || true; echo '[$label exited — respawning in 1s; Ctrl+C twice to break]'; sleep 1; done; exec \$SHELL -l"
+148	            ;;
+149	        shell|*)
+150	            # Default. Hint message uses tmux color codes — works in all
+151	            # terminals tmux supports.
+152	            print -r -- "$guard $inner; printf '\\n\\033[33m[$label exited — back in shell. Re-run with: \\033[1m%s\\033[0;33m]\\033[0m\\n' \"$inner\"; exec \$SHELL -l"
+153	            ;;
+154	    esac
+155	}
+156	
+157	# Connect to a sesh session for the current directory (creates it if missing).
+158	# Lightweight: drops you into a plain shell at $PWD with NO startup command.
+159	# For an editor-first session use `scode` (repo-aware, full layout) or just
+160	# launch nvim manually inside the new session.
+161	#
+162	# Smart argument handling:
+163	#   shere                              # plain shell at $PWD, no command
+164	#   shere specstory run codex          # bare args → treated as command
+165	#   shere -c "specstory run codex"     # explicit --command flag
+166	#   shere -p ~/my-proj                 # explicit path, plain shell
+167	#   shere -p ~/my-proj npm run dev     # explicit path + command
+168	function sesh-here() {
+169	    local cmd="" target=""
+170	    while [[ $# -gt 0 ]]; do
+171	        case "$1" in
+172	            -c|--command) cmd="$2"; shift 2 ;;
+173	            -p|--path)    target="$2"; shift 2 ;;
+174	            -*)           echo "sesh-here: unknown flag $1" >&2; return 1 ;;
+175	            *)            break ;;  # remaining args are the command
+176	        esac
+177	    done
+178	    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
+179	    target="${target:-$PWD}"
+180	    if [[ -n "$cmd" ]]; then
+181	        sesh connect --command "$cmd" "$target"
+182	    else
+183	        # Bypass sesh's default_session.startup_command (nvim) for a plain
+184	        # shell. We create the session via tmux directly, then attach. This
+185	        # also means the wildcard startup_command (project layout) is
+186	        # bypassed — `shere` is intentionally lightweight; use `scode`,
+187	        # `svibe`, or `sesh connect <path>` for layouts.
+188	        local session
+189	        session=$(_sesh_sanitize "$(basename "$target")")
+190	        _sesh_ensure_session "$session" "$target"
+191	        _sesh_attach_or_switch "$session"
+192	    fi
+193	}
+194	
+195	# Connect to the current git root when available, otherwise use $PWD.
+196	# Same smart argument handling as sesh-here.
+197	#   sroot                              # default startup_command
+198	#   sroot specstory run codex          # bare args → command
+199	#   sroot -c "specstory run codex"     # explicit --command flag
+200	function sesh-root() {
+201	    local cmd="" root
+202	    while [[ $# -gt 0 ]]; do
+203	        case "$1" in
+204	            -c|--command) cmd="$2"; shift 2 ;;
+205	            -*)           shift ;;
+206	            *)            break ;;
+207	        esac
+208	    done
+209	    [[ $# -gt 0 && -z "$cmd" ]] && cmd="$*"
+210	    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
+211	    if [[ -n "$cmd" ]]; then
+212	        sesh connect --command "$cmd" "$root"
+213	    else
+214	        sesh connect "$root"
+215	    fi
+216	}
+217	
+218	alias shere='sesh-here'
+219	alias sroot='sesh-root'
+220	alias scode='sesh-code'
+221	alias svibe='sesh-vibe'
+222	
+223	# ── scode: repo-aware coding-agent layout ───────────────────────────────────
+224	#
+225	# Open the coding-agent layout (nvim 75% | specstory-wrapped agent 25%, btop
+226	# window) in a session NAMED FOR THE CURRENT REPO, so different repos don't
+227	# collide on the single `coding-agent` session name.
+228	#
+229	# Session naming:
+230	#   In repo /Volumes/Data/Program/Personal/foo  → session `coding-agent/foo`
+231	#   Same repo re-invocation                     → attach (no duplicate)
+232	#   Different repo                              → new session `coding-agent/<other>`
+233	#
+234	# Outside a git repo the function refuses with a hint to use `shere` or `svibe`
+235	# (the heavy layout doesn't make sense for ad-hoc directories).
+236	#
+237	# Agent wrapping: known specstory providers (claude/codex/cursor/droid/gemini)
+238	# are auto-wrapped in `specstory run X` for markdown auto-save. Others
+239	# (opencode today) pass through raw — see _sesh_wrap_agent + backlog entry
+240	# `specstory-opencode-support` for the upstream tracking.
+241	#
+242	# Exit behavior: `--on-exit shell` (default) drops to a shell with a hint when
+243	# the agent exits, so Ctrl+C doesn't kill the pane. Use `--on-exit kill` for
+244	# the old behavior, or `--on-exit restart` for an auto-respawn loop.
+245	#
+246	# Usage:
+247	#   scode                              # current repo, default agent (specstory → claude)
+248	#   scode codex                        # specstory run codex
+249	#   scode opencode                     # opencode raw (not yet a specstory provider)
+250	#   scode --on-exit kill claude        # Ctrl+C kills the right pane
+251	#   scode --on-exit restart codex      # codex auto-respawns on crash
+252	#   scode -p ~/some/other/repo         # explicit repo path
+253	#   scode --no-attach                  # create session in background, don't switch
+254	function sesh-code() {
+255	    local target="" agent="" no_attach=0 on_exit="shell" specstory_mode="auto"
+256	    while [[ $# -gt 0 ]]; do
+257	        case "$1" in
+258	            -p|--path)      target="$2"; shift 2 ;;
+259	            -a|--agent)     agent="$2"; shift 2 ;;
+260	            --on-exit)      on_exit="$2"; shift 2 ;;
+261	            --no-specstory) specstory_mode="never"; shift ;;
+262	            --specstory)    specstory_mode="auto"; shift ;;
+263	            --no-attach)    no_attach=1; shift ;;
+264	            --agents)
+265	                echo "scode: --agents is svibe-only (scode is single-agent)." >&2
+266	                echo "       For multi-agent layouts: svibe --agents '$2'" >&2
+267	                return 1 ;;
+268	            -h|--help)
+269	                cat <<'EOF'
+270	scode — open repo-scoped coding-agent layout
+271	
+272	Usage: scode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-specstory]
+273	             [--no-attach] [AGENT]
+274	
+275	Layout: window `editor` (nvim 75% | agent 25%) + window `monitor` (btop).
+276	Session name: `coding-agent/<repo-basename>` (one session per repo).
+277	Requires:     git repo (errors otherwise — use `shere` or `svibe`).
+278	
+279	Agent wrapping (auto, opt out with --no-specstory):
+280	  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+281	  opencode (and other unknown CLIs)         → raw passthrough
+282	
+283	--on-exit MODE controls what happens when ANY pane command exits/Ctrl+C
+284	(applies to the agent pane, the nvim pane, and the btop monitor window):
+285	  shell    (default) — drop to shell with a hint, command re-runnable
+286	  kill                — let the pane/window close (tmux default)
+287	  restart             — auto-respawn the command in a loop
+288	
+289	Examples:
+290	  scode                            # current repo, default agent (specstory → claude)
+291	  scode codex                      # right pane: specstory run codex
+292	  scode opencode                   # right pane: opencode (raw)
+293	  scode --no-specstory claude      # right pane: claude (raw, no markdown auto-save)
+294	  scode --on-exit kill claude      # right pane closes when claude exits
+295	  scode -p ~/work/foo              # explicit repo path
+296	EOF
+297	                return 0 ;;
+298	            -*)             echo "scode: unknown flag $1" >&2; return 1 ;;
+299	            *)              [[ -z "$agent" ]] && agent="$1" || true; shift ;;
+300	        esac
+301	    done
+302	
+303	    case "$on_exit" in
+304	        shell|kill|restart) ;;
+305	        *) echo "scode: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+306	    esac
+307	
+308	    # Resolve repo root
+309	    local repo_root
+310	    if [[ -n "$target" ]]; then
+311	        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+312	    else
+313	        repo_root=$(_sesh_git_root)
+314	    fi
+315	    if [[ -z "$repo_root" ]]; then
+316	        echo "scode: not inside a git repo." >&2
+317	        echo "       Use \`shere\` for a plain shell, or \`svibe\` for a vibe layout in any dir." >&2
+318	        return 1
+319	    fi
+320	
+321	    # Validate agent CLI exists in PATH (fail-fast). Specstory itself isn't
+322	    # checked here — if the user passed a known provider but specstory is
+323	    # missing, the pane will exit with specstory's error message and
+324	    # --on-exit=shell will leave a shell to read it.
+325	    if [[ -n "$agent" ]] && ! command -v "$agent" >/dev/null 2>&1; then
+326	        echo "scode: agent CLI '$agent' not found in PATH." >&2
+327	        return 1
+328	    fi
+329	
+330	    local repo_name session
+331	    repo_name=$(basename "$repo_root")
+332	    session=$(_sesh_sanitize "coding-agent/${repo_name}")
+333	
+334	    # If session already exists, just attach (idempotent — solves the
+335	    # cross-repo collision problem the old single `coding-agent` session had).
+336	    if tmux has-session -t "=$session" 2>/dev/null; then
+337	        (( no_attach )) || _sesh_attach_or_switch "$session"
+338	        return 0
+339	    fi
+340	
+341	    # Create session + build layout directly with tmux commands (see svibe
+342	    # comment block for why not tmuxp).
+343	    #
+344	    # Window 1 "editor": nvim (left, will be 75%) | wrapped agent (right, 25%)
+345	    # Window 2 "monitor": btop (or htop / top fallback)
+346	    local agent_inner agent_cmd
+347	    agent_inner=$(_sesh_wrap_agent "$agent" "$specstory_mode")
+348	    agent_cmd=$(_sesh_on_exit_wrap "$agent_inner" "$on_exit" "${agent:-agent}")
+349	
+350	    # nvim and monitor get the same on-exit treatment as the agent so that
+351	    # quitting them drops to a shell with a re-launch hint instead of the
+352	    # pane/window vanishing.
+353	    local nvim_cmd monitor_inner monitor_cmd
+354	    nvim_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+355	
+356	    tmux new-session -d -s "$session" -c "$repo_root" -n editor "$nvim_cmd"
+357	    tmux split-window -h -t "${session}:editor" -c "$repo_root" "$agent_cmd"
+358	    # main-vertical layout, then size the LEFT pane to 75% of window width
+359	    tmux select-layout -t "${session}:editor" main-vertical >/dev/null
+360	    tmux resize-pane -t "${session}:editor.1" -x 75% 2>/dev/null
+361	
+362	    # Monitor window
+363	    if   command -v btop >/dev/null 2>&1; then monitor_inner=btop
+364	    elif command -v htop >/dev/null 2>&1; then monitor_inner=htop
+365	    else                                       monitor_inner=top
+366	    fi
+367	    monitor_cmd=$(_sesh_on_exit_wrap "$monitor_inner" "$on_exit" "$monitor_inner")
+368	    tmux new-window -t "$session" -n monitor -c "$repo_root" "$monitor_cmd"
+369	
+370	    # Focus editor window, left (nvim) pane
+371	    tmux select-window -t "${session}:editor"
+372	    tmux select-pane -t "${session}:editor.1"
+373	
+374	    (( no_attach )) || _sesh_attach_or_switch "$session"
+375	}
+376	
+377	# ── svibe: parametric multi-agent vibe layout ───────────────────────────────
+378	#
+379	# A "vibe coding" session: window 1 has N agent panes (default 4), window 2
+380	# is lazygit, window 3 is nvim. Built directly with tmux split/new-window
+381	# commands so it stays parametric (tmuxp YAML can't express dynamic pane counts).
+382	#
+383	# Session naming: `vibe/<dir-basename>` — collision-safe across directories.
+384	# Refuses outside a git repo (use `shere` for plain shells in arbitrary dirs).
+385	#
+386	# Each agent pane is wrapped in `specstory run X` (for known providers, opt
+387	# out with --no-specstory) and additionally wrapped in an exit handler
+388	# controlled by `--on-exit MODE` — same semantics as `scode`. Default `shell`
+389	# keeps the pane open with a hint after the agent exits, so Ctrl+C is
+390	# recoverable.
+391	#
+392	# Two modes for choosing which agents run:
+393	#   1. Homogeneous (positional): `svibe 4 codex` → 4 panes all running codex
+394	#   2. Heterogeneous (--agents):  `svibe --agents claude,codex,codex,opencode`
+395	#                                 → 4 panes running those specific agents
+396	#                                 (list LENGTH determines pane count;
+397	#                                 positional N_AGENTS is rejected to avoid
+398	#                                 ambiguity)
+399	#
+400	# Usage:
+401	#   svibe                                          # 4× claude (specstory)
+402	#   svibe 2                                        # 2× claude
+403	#   svibe 4 codex                                  # 4× specstory run codex
+404	#   svibe 3 opencode                               # 3× opencode (raw)
+405	#   svibe --agents claude,codex,codex,opencode     # 4 panes, mixed
+406	#   svibe --agents claude,opencode --on-exit kill  # 2 panes, mixed, hard exit
+407	#   svibe --no-specstory 4 claude                  # 4× claude (raw, no md auto-save)
+408	#   svibe --on-exit restart 4 codex                # auto-respawn loop
+409	#   svibe -p ~/repo 4 claude                       # explicit path
+410	#   svibe --no-attach 4 claude                     # create in background
+411	function sesh-vibe() {
+412	    local target="" no_attach=0 on_exit="shell" specstory_mode="auto"
+413	    local n_agents=4
+414	    local agent_cli="claude"
+415	    local agents_csv=""
+416	    while [[ $# -gt 0 ]]; do
+417	        case "$1" in
+418	            -p|--path)      target="$2"; shift 2 ;;
+419	            --on-exit)      on_exit="$2"; shift 2 ;;
+420	            --agents)       agents_csv="$2"; shift 2 ;;
+421	            --no-specstory) specstory_mode="never"; shift ;;
+422	            --specstory)    specstory_mode="auto"; shift ;;
+423	            --no-attach)    no_attach=1; shift ;;
+424	            -h|--help)
+425	                cat <<'EOF'
+426	svibe — parametric multi-agent vibe layout
+427	
+428	Usage:
+429	  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+430	        [N_AGENTS] [AGENT_CLI]
+431	  svibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
+432	        --agents A1,A2,A3[,...]
+433	
+434	Default: svibe 4 claude
+435	  window 1 "agents" — N panes (tiled), each running an agent
+436	  window 2 "git"    — lazygit
+437	  window 3 "edit"   — nvim
+438	
+439	Two modes for choosing agents:
+440	  Homogeneous:    `svibe 4 codex` → 4 panes all codex
+441	  Heterogeneous:  `svibe --agents claude,codex,codex,opencode`
+442	                  → 4 panes (one each, in order); list length = pane count
+443	
+444	Session name: `vibe/<repo-basename>` (collision-safe per directory).
+445	Requires:     git repo (use `shere` for plain shells elsewhere).
+446	
+447	Agent wrapping (auto, opt out with --no-specstory):
+448	  claude / codex / cursor / droid / gemini  → `specstory run <agent>`
+449	  opencode (and other unknown CLIs)         → raw passthrough
+450	
+451	--on-exit MODE controls per-pane behavior on Ctrl+C / clean exit
+452	(applies to all agent panes, the lazygit window, and the nvim window):
+453	  shell    (default) — drop to shell with a hint, command re-runnable
+454	  kill                — let the pane/window close (tmux default)
+455	  restart             — auto-respawn the command in a loop
+456	
+457	Examples:
+458	  svibe                                            # 4× claude
+459	  svibe 2                                          # 2× claude
+460	  svibe 4 codex                                    # 4× codex
+461	  svibe 6 opencode                                 # 6× opencode (heavy)
+462	  svibe --agents claude,codex,codex,opencode       # 4 panes, mixed
+463	  svibe --agents claude,opencode --on-exit kill    # 2 panes, mixed
+464	  svibe --no-specstory 4 claude                    # raw claude, no auto-save
+465	EOF
+466	                return 0 ;;
+467	            -*)             echo "svibe: unknown flag $1" >&2; return 1 ;;
+468	            *)              break ;;
+469	        esac
+470	    done
+471	
+472	    # Build the agents array. Two paths:
+473	    #   --agents claude,codex,…  → split csv, list length = pane count
+474	    #   positional [N] [CLI]     → repeat CLI N times
+475	    # Mixing both is rejected to keep semantics unambiguous.
+476	    local -a agents
+477	    if [[ -n "$agents_csv" ]]; then
+478	        if [[ $# -gt 0 ]]; then
+479	            echo "svibe: cannot combine --agents with positional N_AGENTS/AGENT_CLI." >&2
+480	            echo "       Pick one. (e.g. drop the trailing args)" >&2
+481	            return 1
+482	        fi
+483	        # Split CSV. Trim whitespace per element so 'claude, codex' works.
+484	        local IFS=','
+485	        agents=( ${=agents_csv} )
+486	        # Trim leading/trailing whitespace on each element
+487	        local j
+488	        for (( j = 1; j <= ${#agents}; j++ )); do
+489	            agents[$j]="${agents[$j]## }"
+490	            agents[$j]="${agents[$j]%% }"
+491	        done
+492	        if (( ${#agents} == 0 )); then
+493	            echo "svibe: --agents list is empty." >&2
+494	            return 1
+495	        fi
+496	    else
+497	        # Positional: [n_agents] [agent_cli]
+498	        if [[ $# -gt 0 ]]; then
+499	            if [[ "$1" =~ ^[0-9]+$ ]]; then
+500	                n_agents="$1"; shift
+501	            fi
+502	        fi
+503	        [[ $# -gt 0 ]] && agent_cli="$1"
+504	        # Build a homogeneous array of length n_agents
+505	        local k
+506	        for (( k = 1; k <= n_agents; k++ )); do
+507	            agents+=( "$agent_cli" )
+508	        done
+509	    fi
+510	
+511	    case "$on_exit" in
+512	        shell|kill|restart) ;;
+513	        *) echo "svibe: --on-exit must be one of: shell, kill, restart (got: $on_exit)" >&2; return 1 ;;
+514	    esac
+515	
+516	    if (( ${#agents} < 1 || ${#agents} > 12 )); then
+517	        echo "svibe: agent count = ${#agents} out of range [1, 12]" >&2
+518	        return 1
+519	    fi
+520	
+521	    # Resolve repo root
+522	    local repo_root
+523	    if [[ -n "$target" ]]; then
+524	        repo_root=$(cd "$target" 2>/dev/null && _sesh_git_root)
+525	    else
+526	        repo_root=$(_sesh_git_root)
+527	    fi
+528	    if [[ -z "$repo_root" ]]; then
+529	        echo "svibe: not inside a git repo." >&2
+530	        echo "       Use \`shere\` for a plain shell in arbitrary directories." >&2
+531	        return 1
+532	    fi
+533	
+534	    # Validate ALL agent CLIs exist in PATH (fail-fast — we don't want to
+535	    # build a 4-pane layout where one pane is dead). De-dup the list to keep
+536	    # the error message readable.
+537	    local -a missing
+538	    local -A seen
+539	    local a
+540	    for a in "${agents[@]}"; do
+541	        [[ -n "${seen[$a]:-}" ]] && continue
+542	        seen[$a]=1
+543	        if ! command -v "$a" >/dev/null 2>&1; then
+544	            missing+=( "$a" )
+545	        fi
+546	    done
+547	    if (( ${#missing} > 0 )); then
+548	        echo "svibe: agent CLI(s) not found in PATH: ${missing[*]}" >&2
+549	        echo "       Available: $(for c in claude codex opencode cursor droid gemini; do command -v $c >/dev/null 2>&1 && echo -n "$c "; done)" >&2
+550	        return 1
+551	    fi
+552	
+553	    local repo_name session
+554	    repo_name=$(basename "$repo_root")
+555	    session=$(_sesh_sanitize "vibe/${repo_name}")
+556	
+557	    # Idempotent: existing session = just attach
+558	    if tmux has-session -t "=$session" 2>/dev/null; then
+559	        (( no_attach )) || _sesh_attach_or_switch "$session"
+560	        return 0
+561	    fi
+562	
+563	    # Build wrapped command for each agent (the wrapping is pane-specific so
+564	    # we can mix providers in one window).
+565	    #
+566	    # Helper: turn agent name → fully-wrapped tmux command string.
+567	    _vibe_agent_cmd() {
+568	        local inner
+569	        inner=$(_sesh_wrap_agent "$1" "$specstory_mode")
+570	        _sesh_on_exit_wrap "$inner" "$on_exit" "$1"
+571	    }
+572	
+573	    # ── Build the session ───────────────────────────────────────────────
+574	    # Window 1: agents (start with first pane running agents[1])
+575	    tmux new-session -d -s "$session" -c "$repo_root" -n agents \
+576	        "$(_vibe_agent_cmd "${agents[1]}")"
+577	
+578	    # Add remaining panes
+579	    local i
+580	    for (( i = 2; i <= ${#agents}; i++ )); do
+581	        tmux split-window -t "${session}:agents" -c "$repo_root" \
+582	            "$(_vibe_agent_cmd "${agents[$i]}")"
+583	        # Re-tile after each split so layout stays balanced
+584	        tmux select-layout -t "${session}:agents" tiled >/dev/null
+585	    done
+586	
+587	    unset -f _vibe_agent_cmd
+588	
+589	    # Window 2: git (lazygit if present)
+590	    # lazygit and nvim get the same on-exit handling as agents — quitting
+591	    # them drops to shell with a re-launch hint rather than killing the window.
+592	    local git_cmd edit_cmd
+593	    if command -v lazygit >/dev/null 2>&1; then
+594	        git_cmd=$(_sesh_on_exit_wrap "lazygit" "$on_exit" "lazygit")
+595	        tmux new-window -t "$session" -n git -c "$repo_root" "$git_cmd"
+596	    else
+597	        # `git status; exec $SHELL` already lands in shell — no wrap needed.
+598	        tmux new-window -t "$session" -n git -c "$repo_root" "git status; exec \$SHELL"
+599	    fi
+600	
+601	    # Window 3: edit (nvim)
+602	    edit_cmd=$(_sesh_on_exit_wrap "nvim" "$on_exit" "nvim")
+603	    tmux new-window -t "$session" -n edit -c "$repo_root" "$edit_cmd"
+604	
+605	    # Focus agents window, first pane
+606	    tmux select-window -t "${session}:agents"
+607	    tmux select-pane -t "${session}:agents.1"
+608	
+609	    (( no_attach )) || _sesh_attach_or_switch "$session"
+610	}
+611	
+612	# Register as zsh widget
+613	zle -N sesh-sessions
+614	
+615	# Key bindings (Alt+S for session switcher, avoids conflict with Ctrl+A tmux prefix)
+616	bindkey -M emacs '\es' sesh-sessions
+617	bindkey -M viins '\es' sesh-sessions
+618	bindkey -M vicmd '\es' sesh-sessions
+619
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:51Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/11_tools_picker.zsh`
+
+```text
+1	# 11_tools_picker.zsh - Interactive CLI tools picker (fzf ZLE widget)
+2	# Reads ~/.config/docs/tools/cli-tools.md for the tool list (deployed by chezmoi).
+3	#
+4	# Alt+T  →  open picker
+5	#   Enter      paste invocation to shell buffer (you still press Enter to run)
+6	#   Ctrl+E     execute the tool directly (good for TUI apps: btop, lazygit, etc.)
+7	#   Ctrl+/     toggle preview panel (shows tldr or --help)
+8	#
+9	# The invocation for tools that need arguments has a trailing space,
+10	# so pressing Enter pastes e.g. "rg " — cursor lands after the space,
+11	# ready for you to type your arguments.
+12	
+13	_TOOLS_DOC="${HOME}/.config/docs/tools/cli-tools.md"
+14	
+15	# Bail silently if the data file hasn't been deployed yet or fzf is missing
+16	[[ -f "$_TOOLS_DOC" ]] || return 0
+17	command -v fzf &>/dev/null || return 0
+18	
+19	# Parse the markdown tables into "INVOCATION<TAB>DESCRIPTION" lines.
+20	# Tab separator preserves the trailing space in invocations like "rg ".
+21	_tools_list() {
+22	    awk -F'|' '/^[[:space:]]*\|[[:space:]]*`/ {
+23	      inv=$3; sub(/^[[:space:]]*`/,"",inv); sub(/`[[:space:]]*$/,"",inv)
+24	      desc=$4; sub(/^[[:space:]]*/,"",desc); sub(/[[:space:]]*$/,"",desc)
+25	      printf "%s\t%s\n", inv, desc
+26	    }' "$_TOOLS_DOC"
+27	}
+28	
+29	# ZLE widget: opens fzf picker, pastes selected invocation to the shell command line.
+30	tools-picker() {
+31	    {
+32	        exec </dev/tty
+33	        exec <&1
+34	
+35	        local selected
+36	        selected=$(
+37	            _tools_list | fzf \
+38	                --ansi \
+39	                --border \
+40	                --prompt ' tools  ' \
+41	                --header 'Enter: paste  Ctrl+E: execute  Ctrl+/: preview' \
+42	                --delimiter=$'\t' \
+43	                --with-nth=1,2 \
+44	                --preview 'tool=$(printf "%s" {1} | awk "{print \$1}" | sed "s/ *$//"); (command -v tldr >/dev/null 2>&1 && tldr "$tool" 2>/dev/null) || "$tool" --help 2>&1 | head -50' \
+45	                --preview-window='right:55%:wrap:hidden' \
+46	                --bind='ctrl-/:toggle-preview' \
+47	                --bind='ctrl-e:execute(eval $(printf "%s" {1} | awk "{print \$1}"))+abort'
+48	        )
+49	
+50	        zle reset-prompt >/dev/null 2>&1 || true
+51	        [[ -z "$selected" ]] && return
+52	
+53	        # Extract the invocation (field 1 before the tab), preserving trailing space
+54	        local invocation
+55	        invocation=$(printf '%s' "$selected" | cut -f1)
+56	
+57	        # Paste to shell command line buffer without executing
+58	        LBUFFER="${LBUFFER}${invocation}"
+59	        zle redisplay
+60	    }
+61	}
+62	
+63	zle -N tools-picker
+64	
+65	# Alt+T (mnemonic: Tools)
+66	# Alt+S = sesh-sessions, Alt+C = fzf cd — Alt+T is free
+67	bindkey -M emacs '\et' tools-picker
+68	bindkey -M viins '\et' tools-picker
+69	bindkey -M vicmd '\et' tools-picker
+70
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:52Z)**_
+
+Now let me check for Television channels and CLAUDE.md:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable -name "*.toml" -type f | head -10`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/super-productivity.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/sms.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/clash-api.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/azure.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/skills.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ansible.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/skills-walk.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/agent-sessions.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/git-ops.toml
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -l "history\|command" /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/*.toml`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/agent-sessions.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/aliases.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ansible.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/clash.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/azure.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/clash-api.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/channels.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/lan-devices.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ports.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/git-ops.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/skills.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/kill-process.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/sms.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/tools.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/skills-walk.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/super-productivity.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/pueue.toml
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ssh-config.toml
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:57Z)**_
+
+Perfect! Now I have comprehensive information. Let me compile the final report.
+
+## Report: Agent CLI One-Shot Invocation Patterns
+
+### 1. Non-interactive Stdin-piped Invocations Found
+
+**File: `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh` (lines 100-103)**
+
+The `glcreate-ai` function sends prompts directly to agent CLIs via stdin-piped flags:
+```bash
+case "$agent" in
+  opencode)       opencode run "$prompt" ;;
+  claude)         claude -p "$prompt" ;;
+  codex)          codex exec "$prompt" ;;
+  cursor-agent)   cursor-agent -p "$prompt" ;;
+esac
+```
+
+**Supported agents**: OpenCode (`run`), Claude Code (`-p`), Codex CLI (`exec`), Cursor Agent (`-p`)
+
+**File: `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/22_sesh.zsh` (lines 92-115)**
+
+The `_sesh_wrap_agent` function wraps specstory-compatible agents for session startup:
+```bash
+case "$agent" in
+  claude|codex|cursor|droid|gemini)
+    print -r -- "specstory run $agent"
+```
+Then these wrapped commands are passed to tmux panes via `_sesh_on_exit_wrap` (lines 130-155), enabling agents to run in tmux panes spawned by `scode` and `svibe` helpers.
+
+### 2. Agent Binaries Known to Be Installed/Supported
+
+From `README.md` (line 100) + `dot_ansible/roles/coding_agents/`:
+
+| Agent | Type | Install Method | CLI Flags (One-Shot) |
+|-------|------|-----------------|----------------------|
+| Claude Code | Canonical (installed) | macOS: `homebrew_cask`, Linux: `curl install.sh` | `-p` (stdin) |
+| OpenCode | Canonical (installed) | macOS: `homebrew_tap`, Linux: GitHub binary | `run` (positional arg) |
+| Codex CLI | Canonical (installed) | Installed via install script | `exec` (positional arg) |
+| Cursor Agent | Optional (installed) | Installed via package manager | `-p` (stdin) |
+| Gemini CLI | Optional (installed) | Installed (referenced in wrap logic) | TBD (no usage found) |
+
+### 3. Existing "Send to Agent" Patterns
+
+- **`glcreate-ai` (gitlab.zsh:63-106)**: AI-assisted GitLab repo creation. Supports 4 agents with auto-wrapped prompts in Chinese/English.
+- **`scode` & `svibe` (sesh.zsh:254-610)**: Spawn tmux panes running agents, with optional `specstory run` wrapping. Exit handlers (`--on-exit`) control pane behavior.
+- **SpecStory wrapping**: Known providers (claude/codex/cursor/droid/gemini) auto-wrapped in `specstory run X` for markdown auto-save; others (opencode) pass-through raw.
+
+### 4. CLI Non-Interactive Syntax from Repo
+
+From code inspection:
+
+| Agent | Flag | Usage | Context |
+|-------|------|-------|---------|
+| `claude` | `-p` | `claude -p "$prompt"` | stdin-piped prompt (gitlab.zsh:101) |
+| `opencode` | (positional) | `opencode run "$prompt"` | positional argument (gitlab.zsh:100) |
+| `codex` | `exec` | `codex exec "$prompt"` | positional after `exec` (gitlab.zsh:102) |
+| `cursor-agent` | `-p` | `cursor-agent -p "$prompt"` | stdin-piped (gitlab.zsh:103) |
+| All (via specstory) | N/A | `specstory run <agent>` | Wraps agents for auto-save (sesh.zsh:104-107) |
+
+No slash-command wrappers found in `dot_claude/` — configs are `modify_` overlays only (settings.json, hook notify scripts).
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:05:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/agent-sessions.toml`
+
+```text
+1	# Coding-agent sessions cable channel for television (tv)
+2	#
+3	# Unified browser for OpenCode + Claude Code + Codex + Cursor sessions.
+4	# Backed by `dot_config/television/executable_agent-sessions.py` (Python helper
+5	# that walks SQLite + JSONL + store.db and emits a single TSV stream).
+6	#
+7	# Usage:
+8	#   tv agent-sessions
+9	#
+10	# Source cycling (Ctrl+S):
+11	#   1. All agents merged       (default — sorted DESC within each agent)
+12	#   2. OpenCode only           (~/.local/share/opencode/opencode.db)
+13	#   3. Claude Code only        (~/.claude/projects/**/<sid>.jsonl)
+14	#   4. Codex only              (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl)
+15	#   5. Cursor Agent CLI only   (~/.cursor/chats/<wsHash>/<chatId>/store.db)
+16	#   6. Cursor IDE composers    (~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage})
+17	#
+18	# Agent tags: [oc] OpenCode, [cc] Claude Code, [cx] Codex,
+19	#             [cu] Cursor Agent CLI, [ci] Cursor IDE composer chats
+20	#
+21	# Title/snippet column is the first non-system user message (truncated 140ch),
+22	# so TV's fuzzy search matches by content as well as date / project / id.
+23	#
+24	# Preview cycling (Ctrl+F):
+25	#   1. Session metadata + recent messages
+26	#   2. Raw record dump (head 200 lines / SQL dump)
+27	#
+28	# Keybindings:
+29	#   Enter      Print resume one-liner to stdout (cd <dir> && <agent-cmd> <id>)
+30	#   Alt+T      Resume in same shell (cd + exec; T for "take over")
+31	#   Ctrl+Y     Copy session ID to clipboard
+32	#   Alt+P      Copy directory path to clipboard
+33	#   Alt+R      Copy resume one-liner to clipboard
+34	#   Alt+E      Open raw session file in $EDITOR (claude/codex only)
+35	#
+36	# Ctrl+E is left as TV's global `go_to_input_end`.
+37	
+38	[metadata]
+39	name = "agent-sessions"
+40	description = "Coding-agent sessions: OpenCode + Claude Code + Codex + Cursor (CLI & IDE) — content-searchable"
+41	requirements = ["python3", "bat"]
+42	
+43	[source]
+44	# Each cycle calls the helper with a different mode. Mode "all" is the default.
+45	# TSV columns produced by the helper:
+46	#   0. agent  ([oc]/[cc]/[cx]/[cu])
+47	#   1. when   (YYYY-MM-DD HH:MM)
+48	#   2. id     (session id)
+49	#   3. dir    (cwd)
+50	#   4. title/snippet
+51	command = [
+52	  "~/.config/television/agent-sessions.py all",
+53	  "~/.config/television/agent-sessions.py opencode",
+54	  "~/.config/television/agent-sessions.py claude",
+55	  "~/.config/television/agent-sessions.py codex",
+56	  "~/.config/television/agent-sessions.py cursor",
+57	  "~/.config/television/agent-sessions.py cursor-ide",
+58	]
+59	display = "{split:\t:0} {split:\t:1}  │  {split:\t:4}  │  {split:\t:3|split:/:-1}"
+60	output = "{split:\t:2}"
+61	
+62	[preview]
+63	command = [
+64	  # Preview 1: per-agent metadata + recent messages.
+65	  '''
+66	  agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'
+67	  printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
+68	  printf '\033[2mcwd:\033[0m %s\n\n' "$dir"
+69	  case "$agent" in
+70	    "[oc]")
+71	      sqlite3 "$HOME/.local/share/opencode/opencode.db" \
+72	        "SELECT 'title=' || title || char(10) || 'version=' || version || char(10) || 'project_id=' || project_id || char(10) || coalesce('share=' || share_url, '') FROM session WHERE id = '$sid';" 2>/dev/null
+73	      printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+74	      sqlite3 "$HOME/.local/share/opencode/opencode.db" "
+75	        SELECT '  ' || substr(replace(replace(json_extract(p.data, '\$.text'), char(10), ' '), '  ', ' '), 1, 280)
+76	        FROM part p JOIN message m ON p.message_id = m.id
+77	        WHERE p.session_id = '$sid'
+78	          AND m.data LIKE '%\"role\":\"user\"%'
+79	          AND p.data LIKE '%\"type\":\"text\"%'
+80	          AND p.data NOT LIKE '%\"synthetic\":true%'
+81	        ORDER BY p.time_created ASC
+82	        LIMIT 5;" 2>/dev/null
+83	      ;;
+84	    "[cc]")
+85	      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+86	      if [ -n "$f" ]; then
+87	        printf 'file: %s\n\n' "$f"
+88	        printf '\033[1mFirst 5 user messages:\033[0m\n'
+89	        head -200 "$f" | python3 -c "
+90	import sys, json, re
+91	n=0
+92	for line in sys.stdin:
+93	  try: d=json.loads(line)
+94	  except: continue
+95	  if d.get('type') != 'user': continue
+96	  m=d.get('message') or dict()
+97	  c=m.get('content')
+98	  txt=''
+99	  if isinstance(c,str): txt=c
+100	  elif isinstance(c,list):
+101	    for p in c:
+102	      if isinstance(p,dict) and p.get('type')=='text': txt=p.get('text',''); break
+103	  if not txt or txt.lstrip().startswith(('<','#')): continue
+104	  txt=re.sub(r'\s+',' ',txt).strip()[:300]
+105	  print('  ' + txt)
+106	  n+=1
+107	  if n>=5: break
+108	" 2>/dev/null
+109	      else
+110	        echo "(jsonl not found for $sid)"
+111	      fi
+112	      ;;
+113	    "[cx]")
+114	      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1)
+115	      if [ -n "$f" ]; then
+116	        printf 'file: %s\n\n' "$f"
+117	        printf '\033[1mFirst 5 user messages:\033[0m\n'
+118	        head -200 "$f" | python3 -c "
+119	import sys, json, re
+120	n=0
+121	for line in sys.stdin:
+122	  try: d=json.loads(line)
+123	  except: continue
+124	  if d.get('type')!='response_item': continue
+125	  p=d.get('payload') or dict()
+126	  if p.get('type')!='message' or p.get('role')!='user': continue
+127	  for c in p.get('content',[]):
+128	    if isinstance(c,dict) and c.get('type') in ('input_text','text'):
+129	      txt=c.get('text','')
+130	      if not txt or txt.lstrip().startswith('<'): continue
+131	      txt=re.sub(r'\s+',' ',txt).strip()[:300]
+132	      print('  ' + txt)
+133	      n+=1
+134	      break
+135	  if n>=5: break
+136	" 2>/dev/null
+137	      else
+138	        echo "(rollout not found for $sid)"
+139	      fi
+140	      ;;
+141	    "[cu]")
+142	      db=$(find "$HOME/.cursor/chats" -path "*/${sid}/store.db" 2>/dev/null | head -1)
+143	      if [ -n "$db" ]; then
+144	        printf 'db: %s\n\n' "$db"
+145	        # meta value is hex-encoded JSON; decode and pretty-print
+146	        sqlite3 "$db" "SELECT value FROM meta LIMIT 1;" 2>/dev/null \
+147	          | python3 -c "
+148	import sys, json
+149	raw = sys.stdin.read().strip()
+150	try: text = bytes.fromhex(raw).decode('utf-8','replace')
+151	except ValueError: text = raw
+152	try:
+153	    d = json.loads(text)
+154	    for k in ('name','mode','lastUsedModel','agentId','createdAt','latestRootBlobId'):
+155	        if k in d:
+156	            v = d[k]
+157	            print('  ' + k + ': ' + str(v))
+158	except Exception:
+159	    print(text[:500])
+160	" 2>/dev/null
+161	        printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+162	        # Read blobs directly via python sqlite3 (avoids CLI binary/newline issues)
+163	        python3 -c "
+164	import sqlite3, json, re, sys
+165	con = sqlite3.connect('file:$db?mode=ro', uri=True)
+166	n = 0
+167	for (data,) in con.execute('SELECT data FROM blobs'):
+168	  if isinstance(data, (bytes, bytearray)):
+169	    try: text = bytes(data).decode('utf-8','replace')
+170	    except Exception: continue
+171	  else:
+172	    text = str(data)
+173	  try: d = json.loads(text)
+174	  except Exception: continue
+175	  if not isinstance(d, dict): continue
+176	  if d.get('role') != 'user': continue
+177	  c = d.get('content')
+178	  txt = ''
+179	  if isinstance(c, str): txt = c
+180	  elif isinstance(c, list):
+181	    for p in c:
+182	      if isinstance(p, dict) and p.get('type') == 'text':
+183	        txt = p.get('text',''); break
+184	  if not txt: continue
+185	  s = txt.lstrip()
+186	  if s.startswith(('<user_info>','<system_reminder>','<attached_files>','<environment_context>','<local-command-','
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:01Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./CLAUDE.md`
+
+```text
+1	# Dotfiles Repository — Agent Contract
+2	
+3	Cross-platform dotfiles managed by **chezmoi** (configs) + **ansible** (system deps). This file is the agent-facing contract: maintenance rules, hard invariants, and pointers to docs. User-facing intro is in [README.md](README.md).
+4	
+5	> **Headroom rule**: keep this file under ~30k chars. Push handbook content into `docs/`; keep only edit rules and cross-file invariants here.
+6	
+7	## Cross-file maintenance rules
+8	
+9	When you change one of these surfaces, update the listed mirror file in the same commit. These are the rules most often forgotten.
+10	
+11	### README.md
+12	
+13	When adding/modifying configurations, update [README.md](README.md):
+14	
+15	- **New config files** → "What You Get > Config Files" section
+16	- **New ansible roles/tools** → "What You Get > Tools" section
+17	- **New platforms** → "Supported Platforms" table
+18	- **Changed setup steps** → "Quick Setup" section
+19	
+20	Keep README.md concise and user-focused. Technical details belong here or in `docs/`.
+21	
+22	### Custom aliases & shell functions → `docs/zsh/aliases.md`
+23	
+24	When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
+25	
+26	### Dockerfile + dotfiles_init wrapper
+27	
+28	When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, three files must be updated in the same commit:
+29	
+30	1. `Dockerfile` — add `ARG CHEZMOI_*` build argument, add `--promptBool` / `--promptString` flag to `chezmoi init`.
+31	2. `scripts/init/dotfiles_init.py` — add a matching entry to the `PROMPTS` tuple (key, kind, group, label, desc, default).
+32	3. (If the prompt should be part of any named bundle) `BUNDLES` dict in the same file.
+33	
+34	Verify parity with: `uv run --script scripts/init/dotfiles_init.py doctor`. The subcommand greps `.chezmoi.toml.tmpl` + `Dockerfile` and compares against the embedded `PROMPTS`; non-zero exit means drift.
+35	
+36	### Agent artifact redaction
+37	
+38	SpecStory transcripts and coding-agent plan files commonly paste shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+39	
+40	| Prefix | Source |
+41	|--------|--------|
+42	| `.specstory/history/` | SpecStory chat transcripts |
+43	| `.claude/plans/` | Claude Code plan files |
+44	| `.cursor/plans/` | Cursor plan files |
+45	| `.opencode/plans/` | OpenCode plan files |
+46	
+47	Tooling: `scripts/redact_secrets.py` (gitleaks + `PRIV***KEY` pattern), `just check-secrets` / `just redact-secrets` / `just add-and-redact`. Pre-commit hook `redact-agent-secrets` runs `--fix` before `gitleaks-system`; if it rewrites a file, stage and retry.
+48	
+49	When introducing a new coding-agent artifact directory that could contain secrets, add its prefix to `DEFAULT_PATHS` in `scripts/redact_secrets.py` **and** the `files:` regex of the `redact-agent-secrets` pre-commit hook.
+50	
+51	### Keyboard shortcuts (cross-tool conflict check)
+52	
+53	When adding/modifying keybindings in any tool config, cross-check against other tools — multiple tools share the terminal's key namespace, especially `Ctrl+` and `Alt+`.
+54	
+55	| Tool | Config file | Conflict risk |
+56	|------|-------------|---------------|
+57	| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+58	| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+59	| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
+60	| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+61	| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+62	
+63	Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta).
+64	
+65	**Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
+66	
+67	### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
+68	
+69	This repo uses the `project-knowledge-harness` agent skill (managed via
+70	`~/.agents/.skill-lock.json` → restored by
+71	`run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
+72	see [docs/tools/agent-skills.md](docs/tools/agent-skills.md)). **Load the skill**
+73	for the full template, disambiguation table, and upgrade path.
+74	
+75	**Fallback (if the skill cannot be loaded)** — minimum viable rules so this
+76	section still constrains agents who can't see the skill:
+77	
+78	- Three repo-root surfaces, all `chezmoi`-ignored, all NOT auto-redacted:
+79	  [`TODO.md`](TODO.md) (priority/effort tags `P1`/`P2`/`P3`/`P?` × `S`/`M`/`L`/`XL`),
+80	  [`backlog/`](backlog/README.md) (research/design notes; needed for `P?` /
+81	  `[L]` / `[XL]` / multi-option entries), [`pitfalls/`](pitfalls/README.md)
+82	  (debugged traps, **titled by symptom not root cause**, verbatim error
+83	  messages — never paraphrase).
+84	- Triggers to capture future work: "maybe later", "nice to have", "if I'm
+85	  interested", "工程量太大需要再評估", "先記下來".
+86	- Triggers to capture pitfalls: >~15 min debugging, not googleable,
+87	  non-obvious fix, silent failure mode.
+88	- Do **not** spawn `ROADMAP.md` / `IDEAS.md` / `LESSONS.md` /
+89	  `TROUBLESHOOTING.md` — three surfaces, always.
+90	- A pitfall *graduates* to a Hard invariant in this file when it (a) recurs
+91	  across machines, (b) silently corrupts state, or (c) has a non-obvious
+92	  workaround. Link from the new invariant back to `pitfalls/<slug>.md`.
+93	
+94	### fleet-apply (`scripts/fleet_apply.py` + `dot_config/fleet/`)
+95	
+96	Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:
+97	
+98	- `scripts/fleet_apply.py` — CLI flags, mode semantics, sudo helper integration, log/sentinel paths
+99	- `justfile` `fleet-*` recipes — name, args, doc-comment
+100	- `dot_config/fleet/create_private_machines.toml.tmpl` — schema (`local`, `chezmoi_path`, `no_root_machine`, `password.source`, etc.)
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/docs/this_repo -name "*.md" -type f`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/architecture.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/fleet-apply-vs-fabric.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/cheatsheet.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/upgrades.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/testing.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/fleet-apply.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/sudo-session.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/ansible_customization.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/initial_setup/1_ApplyToNewMachine.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/initial_setup/0_ManualSetupRecord.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/scripts/import_ssh_to_bw.sh.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/scripts/`
+
+```text
+ **__pycache__
+ **adhoc
+ **init
+ **lib
+ fleet_apply.py
+ import_ssh_to_bw.sh
+ install_specstory.sh
+ pre-commit-doctor.sh
+ redact_secrets.py
+ redact_specstory.py
+ upgrade_tools.sh
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:10Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./CLAUDE.md`
+
+```text
+100	- `dot_config/fleet/create_private_machines.toml.tmpl` — schema (`local`, `chezmoi_path`, `no_root_machine`, `password.source`, etc.)
+101	- Any change to `scripts/lib/sudo_shared.sh` that affects how `CHEZMOI_SUDO_PASSWORD_FILE` is consumed (also see "Sudo session" invariant below)
+102	
+103	`README.md` only needs an update if the user-facing `## Multi-host apply` block changes (top-level recipe names, exit-code semantics).
+104	
+105	## Chezmoi templating conventions
+106	
+107	**Hard rule**: before adding a `{{ if eq .profile ... }}` branch, ask if the predicate is auto-detectable. If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname` instead. `.profile` exists only for user-role choices chezmoi cannot infer (server vs desktop).
+108	
+109	| Predicate | Use |
+110	|---|---|
+111	| Any macOS (Apple Silicon or Intel) | `eq .chezmoi.os "darwin"` |
+112	| Any Linux | `eq .chezmoi.os "linux"` |
+113	| Apple Silicon only | `eq .chezmoi.arch "arm64"` (inside darwin-scoped files) or `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64")` |
+114	| Intel Mac only | `and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "amd64")` |
+115	| Desktop vs headless (user role) | `.profile` — `ubuntu_desktop` / `ubuntu_server`; macOS side covered by `eq .chezmoi.os "darwin"` |
+116	
+117	Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. **Do not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
+118	
+119	Full decision table, before/after examples, and the `macos_intel` migration snippet: [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
+120	
+121	## Hard repo invariants
+122	
+123	### Install vs upgrade is split on purpose
+124	
+125	`chezmoi apply` (+ ansible phase) is deliberately **install-only**: roles use `state: present` / `creates:` so re-applying never silently bumps every tool. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes.
+126	
+127	- **Do not** rewrite ansible roles to `state: latest`.
+128	- **Do not** add `apt upgrade` / system package bumps to default scope.
+129	- `scripts/**` is in `.chezmoiignore.tmpl`, so `upgrade_tools.sh` is never deployed; it runs from the repo directly.
+130	- Adding a new upgrade category: see [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md) → "Adding a new category". For a tool already managed by an existing package manager (brew/uv/npm/cargo/dotnet/gem/mise) you do nothing — generic `upgrade` picks it up.
+131	
+132	Full per-category matrix, sample output, and troubleshooting: [docs/this_repo/upgrades.md](docs/this_repo/upgrades.md). The short version is also mirrored in `README.md`.
+133	
+134	### Sudo session is shared across all run-scripts
+135	
+136	All three `run_*` scripts share one sudo session via `scripts/lib/sudo_shared.sh`. The user is prompted **once** at the start of `chezmoi apply` and downstream scripts reuse the cached credential silently.
+137	
+138	**Hard rules** when touching run-scripts:
+139	
+140	- Do **not** re-implement `sudo -k` / `sudo -v` / TTY-read logic. Call the shared helper.
+141	- Do **not** run `sudo -k` (invalidates the shared cache for the whole flow).
+142	- Do **not** register a `trap … EXIT` that removes state (next run-script needs it).
+143	- Do **not** read the password into a shell variable. Always pipe via `sudo -S <file`.
+144	
+145	Adding a new sudo surface in a run-script:
+146	
+147	1. `{{ include "scripts/lib/sudo_shared.sh" }}` near the top of the template.
+148	2. Set the `NEED_SUDO` template flag (mirror existing run-scripts).
+149	3. Call `sudo_session_init "yourlabel"`; branch on return code + `sudo_session_skip_reason`.
+150	4. Run privileged commands via `sudo_run …` (simple cases) or pass `-e @$CHEZMOI_ANSIBLE_BECOME_FILE` to ansible.
+151	
+152	Full helper API, runtime state, cleanup model: [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md).
+153	
+154	**Non-interactive password injection** (used by `scripts/fleet_apply.py` over
+155	SSH): `sudo_session_init` adopts `CHEZMOI_SUDO_PASSWORD_FILE` (a 0600 file
+156	path) instead of prompting on `/dev/tty`. The helper validates with `sudo -S
+157	-v -p ''` and writes into the same shared state dir, so downstream
+158	run-scripts see the cached state and never re-prompt. Do **not** read
+159	`CHEZMOI_SUDO_PASSWORD_FILE` from your run-script directly — always go
+160	through `sudo_session_init`. See [docs/this_repo/sudo-session.md](docs/this_repo/sudo-session.md)
+161	→ "Non-interactive password injection" and [docs/this_repo/fleet-apply.md](docs/this_repo/fleet-apply.md)
+162	for the orchestrator side.
+163	
+164	### fleet-apply semantics (counter-intuitive defaults)
+165	
+166	A few `just fleet-apply*` behaviours WILL trip up agents who don't know them. Full docs in [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md); the load-bearing invariants:
+167	
+168	- **`drift` ≠ `failed`**. When chezmoi can't prompt to overwrite a hand-edited file (no PTY over SSH), the host is shown as yellow ⚠ `drift` in the live table and the per-file paths are listed, but it does **not** count toward the exit code. Don't "fix" drift hosts unless the user asks. Resolution: hand-fix the remote, or `--force` to let the template win.
+169	- **`fleet-apply-file PATH` skips `run_*` scripts**. Uses `chezmoi apply --exclude=scripts <PATH>` after an explicit `git pull`. Means ansible / Brewfile changes will NOT execute. If you edit `dot_ansible/...` and test with `fleet-apply-file`, the change won't apply — use full `fleet-apply` for ansible iterations. Same applies to Brewfile.
+170	- **`--branch BRANCH` is no-op on local hosts**. The local source dir IS the user's editor working tree; switching it would be hostile. Local hosts log a warning and run against the working tree as-is. The flag also forces mode to `apply` (since `chezmoi update` would re-pull main and undo the checkout).
+171	- **Install-only by design**. fleet-apply inherits the [Install vs upgrade is split](#install-vs-upgrade-is-split-on-purpose) invariant: it never silently bumps tools. The explicit upgrade path is `just upgrade-*` which must be run on each host (fleet-apply does NOT broadcast upgrades).
+172	- **Process substitution + sentinel are load-bearing**. `> >(tee -a $log) 2>&1 & _cz_pid=$!; wait $_cz_pid; _rc=$?; echo $_rc > $sentinel` is the contract that `--status` / `--tail` / `--watch` rely on. Don't change to a pipeline (`| tee`) — the wrapper's SIGHUP trap depends on `$_cz_pid` pointing to chezmoi, not tee. See [docs/this_repo/fleet-apply.md → Killing orphans, checking status, re-attaching](docs/this_repo/fleet-apply.md#killing-orphans-checking-status-re-attaching).
+173	- **Conservative drift classifier**. `_classify_drift()` only downgrades stderr lines matching the exact `chezmoi: <path>: could not open a new TTY: open /dev/tty:` fingerprint. Any unrecognised stderr line keeps `failed` state. Don't broaden the regex without explicit user request — silent downgrades hide real errors.
+174	
+175	### `modify_` and `create_` prefix semantics
+176	
+177	Two chezmoi source prefixes tame files that would otherwise churn on every apply:
+178	
+179	- **`modify_`** files are executable scripts: chezmoi pipes current target contents into stdin, expects new contents on stdout. Used for `~/.claude/settings.json` (jq overlay), the editor `settings.json` files (VSCode/Cursor/Antigravity), and the coding-agent CLI configs (`~/.cursor/cli-config.json`, `~/.config/opencode/opencode.json`, `~/.codex/config.toml`). Do **not** `chezmoi add` a `modify_` target — it would overwrite your script with the live file.
+180	- **`create_`** files seed once, then chezmoi never touches the contents. Used for `~/.config/nvim/lazy-lock.json` and editor `keybindings.json`. To refresh a `create_` baseline, copy the live file directly into the source path: `cp <target> "$(chezmoi source-path <target>)"`. Neither `chezmoi add` (strips the prefix) nor `chezmoi re-add` (silently skips) is correct.
+181	
+182	Full case studies (`dot_claude/modify_settings.json`, `.chezmoitemplates/editor/*`, `dot_config/nvim/create_lazy-lock.json`, `dot_codex/modify_config.toml`), failure modes, presence-gating in `.chezmoiignore.tmpl`: [docs/tools/chezmoi-prefixes.md → Case studies in this repo](docs/tools/chezmoi-prefixes.md#case-studies-in-this-repo). For the three coding-agent CLI overlays specifically, the deep-dive lives at [docs/tools/agent-overlays.md](docs/tools/agent-overlays.md) (overlay key rationale, what's intentionally NOT managed and why, OpenCode legacy `config.json` migration, Codex `[projects]`/`[marketplaces.*]` round-trip, **and the Claude hook-aware merger that lets our overlay coexist with [CodeIsland](https://github.com/wxtsky/CodeIsland)'s auto-installed hook entries on macOS** without ping-ponging on every apply).
+183	
+184	### Tmux ≥ 3.3 required for popup menu, and menu must fit terminal height
+185	
+186	The popup menu is bound to **both** `prefix + Space` and `prefix + e` (alias) and is **generated by `~/.config/tmux/menu.sh`**, not defined inline in `keybindings.conf`. Two unrelated tmux quirks force this:
+187	
+188	1. **Position clamping (tmux ≥ 3.3 required)**: `display-menu -x R -y P` places the menu past the terminal edge on tmux 3.2a (Ubuntu 22.04 apt) and silently suppresses it. tmux 3.3+ clamps the position. The Ansible `devtools` role detects old tmux on Debian/Ubuntu and upgrades automatically (Linuxbrew when present, otherwise user-level [`nelsonenzo/tmux-appimage`](https://github.com/nelsonenzo/tmux-appimage) extracted to `~/.local/share/tmux-appimage/` with a shim at `~/.local/bin/tmux`). After the upgrade, run `tmux kill-server` once — running servers keep the old binary in memory.
+189	2. **Menu-too-tall silent failure (all tmux versions)**: `display-menu` does **not** paginate. If the menu is taller than the terminal (after status bar + `-y` anchor offset), the entire popup is suppressed with no error, no log entry, nothing in `tmux show-messages`. `man tmux`: _"If the menu is too large to fit on the terminal, it is not displayed."_ This was misdiagnosed for hours as a `csi-u` / `extended-keys` keysym encoding bug after a 50-row flat menu started failing on smaller terminal heights — the keys (`Space` then `Enter` then `e`) were all bound correctly the whole time.
+190	
+191	Hard rules when touching the popup menu:
+192	
+193	- **Top menu cap is ~14 rows.** Adding a 15th row will start failing on smaller heights (mobile SSH, half-screen splits). Push lower-frequency items into the appropriate submenu in `~/.config/tmux/menu-<category>.sh` instead.
+194	- **Submenus are separate scripts**, each `exec tmux display-menu …`. Quoting context resets per script — keeps the inline `\"` / `{` / `}` / `;` quoting disasters out of `keybindings.conf`.
+195	- **Complex commands** (anything with `{`, `}`, `;`, backticks, or nested fzf binds) must live in their own script (`~/.config/tmux/sesh-picker.sh`, `sesh-windows.sh`, etc.), not inline in a menu row. tmux's parser treats `{` `}` `;` as command-block delimiters / separators even inside `'…'` inside `"…"`, silently aborting parse.
+196	- **Test by shrinking the terminal vertically.** Verifying on a full-height window does not catch the height-fit failure. The top menu generator reads `#{client_height}` and tier-trims; if you change the tiers, retest at heights 14 / 22 / 60.
+197	
+198	See `pitfalls/tmux-display-menu-silent-fail.md` for the full debugging story (red herrings included). Adjacent pitfall: `pitfalls/yazi-tmux-popup-crash.md`.
+199	
+200	### Key tmux settings for coding agents
+201	
+202	These are non-obvious settings that other tools depend on; do not remove without checking:
+203	
+204	- `extended-keys always` + `terminal-features 'xterm*:extkeys'` — forwards Shift+Enter, Ctrl+Enter through tmux to inner apps (Claude Code, Neovim, etc.)
+205	- `escape-time 0` — eliminates ESC delay for Neovim
+206	- `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) — OSC 52 over SSH without terminfo `Ms`. Paired with SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua`. See [docs/tools/tmux/README.md](docs/tools/tmux/README.md) → "OSC 52 Clipboard".
+207	- `allow-passthrough on` — OSC passthrough for terminal images
+208	- macOS terminals must send Option as Meta/Esc+ for `M-` keybindings (theme switching, layouts, fine resize). Ghostty/cmux: `macos-option-as-alt = left` (managed in `dot_config/ghostty/config`). See [docs/tools/ghostty.md](docs/tools/ghostty.md).
+209	
+210	Full tmux config breakdown, theme switching, keybindings table, troubleshooting: [docs/tools/tmux/](docs/tools/tmux/).
+211	
+212	### Zellij `default_mode "locked"`
+213	
+214	`dot_config/zellij/config.kdl` uses `default_mode "locked"` so all keys pass through to inner applications by default. Press `Ctrl+G` to unlock Zellij commands. This prevents key conflicts with coding agents and vim-style applications. On first Zellij launch (without existing config), select the "Unlock-First (non-colliding)" keybinding preset.
+215
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:12Z)**_
+
+Perfect! Now let me look for info about the `skill-author` and script writing conventions:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`grep -r "skill-author\|project-knowledge" /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md -A 5`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md:### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md:This repo uses the `project-knowledge-harness` agent skill (managed via
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-`~/.agents/.skill-lock.json` → restored by
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-`run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply`;
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-see [docs/tools/agent-skills.md](docs/tools/agent-skills.md)). **Load the skill**
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-for the full template, disambiguation table, and upgrade path.
+/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md-
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/agent-skills.md`
+
+```text
+1	# Agent skills (`vercel-labs/skills`)
+2	
+3	This repo manages [`vercel-labs/skills`](https://github.com/vercel-labs/skills)
+4	agent skills two ways, with sharply different scopes.
+5	
+6	## TL;DR
+7	
+8	| Scope | Lock file | Where the skill lives | Restored by |
+9	|---|---|---|---|
+10	| **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
+11	| **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `just bootstrap-skills` after a fresh clone |
+12	
+13	The two scopes happen to overlap today (both install
+14	`project-knowledge-harness`), but they serve different purposes — see "Why two
+15	scopes?" below.
+16	
+17	## Global scope: must-have skills, on every machine
+18	
+19	The skills CLI does **not** yet support `npx skills install -g` from a lock
+20	file ([upstream issue #283](https://github.com/vercel-labs/skills/issues/283),
+21	[#549](https://github.com/vercel-labs/skills/issues/549)). So we hand-roll
+22	restore in two pieces:
+23	
+24	### `dot_agents/modify_dot_skill-lock.json.tmpl` — the merger
+25	
+26	A `modify_` script that owns `~/.agents/.skill-lock.json`. Every `chezmoi
+27	apply`:
+28	
+29	1. Reads the live lock file via stdin.
+30	2. Merges the **managed-set** declared in `$managed` (top of the script) into
+31	   `.skills`, preserving any `installedAt`/`updatedAt`/`skillFolderHash` from
+32	   the live entry.
+33	3. Preserves any `.skills.<name>` entries **not** in the managed-set (so
+34	   ad-hoc `npx skills add … -g` installs survive).
+35	4. Preserves `.dismissed` and `.lastSelectedAgents` per-machine state
+36	   verbatim.
+37	
+38	To declare a new must-have global skill, edit the inline `$managed` JSON in
+39	that script:
+40	
+41	```json
+42	{
+43	  "skills": {
+44	    "your-new-skill": {
+45	      "source": "owner/repo",
+46	      "sourceType": "github",
+47	      "sourceUrl": "https://github.com/owner/repo.git",
+48	      "skillPath": "skills/your-new-skill/SKILL.md"
+49	    }
+50	  }
+51	}
+52	```
+53	
+54	Then run `chezmoi apply`. The merger writes the new entry into the lock; the
+55	restore script (next section) sees the missing on-disk skill and installs it.
+56	
+57	### `run_onchange_after_40_install_global_skills.sh.tmpl` — the restorer
+58	
+59	`onchange` hash trigger is the merger script's own SHA256 — so this script
+60	re-runs whenever the **managed-set** is edited (not whenever the live lock
+61	mutates from random `npx skills update -g` activity).
+62	
+63	For each entry in `~/.agents/.skill-lock.json`:
+64	
+65	- If `~/.agents/skills/<name>/SKILL.md` exists → skip (already installed).
+66	- Otherwise → `npx skills add <source> -s <name> -g -y`.
+67	
+68	This is idempotent: a re-run on a fully-installed machine prints
+69	"All globally-managed agent skills present; nothing to install" and exits.
+70	
+71	### After installing a new skill manually
+72	
+73	If you `npx skills add foo/bar -g` interactively on a machine and want it to
+74	become managed across the fleet:
+75	
+76	1. `cat ~/.agents/.skill-lock.json` — find the entry the CLI just wrote.
+77	2. Copy `source` / `sourceType` / `sourceUrl` / `skillPath` into the
+78	   `$managed.skills` block of `dot_agents/modify_dot_skill-lock.json.tmpl`.
+79	3. Commit. Other hosts pick it up at next `chezmoi apply`.
+80
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:22Z)**_
+
+Now let me search for any documentation about adding new Python scripts:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+`find /Users/daviddwlee84/.local/share/chezmoi/docs -name "*.md" | xargs grep -l "script\|python\|uv run" | head -5`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/docs/linux-package-sources.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/locale.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/input_methods/macos-system-switching.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/input_methods/README.md
+/Users/daviddwlee84/.local/share/chezmoi/docs/infra/compute-scheduling.md
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:27Z)**_
+
+Let me verify the tmux section more thoroughly:
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/22_sesh.zsh`
+
+```text
+15	# Sesh session switcher with fzf (full-featured picker)
+16	# Supports icons, preview, filtering by source, and session killing
+17	function sesh-sessions() {
+18	    {
+19	        exec </dev/tty
+20	        exec <&1
+21	        local session
+22	        session=$(sesh list --icons | fzf-tmux -p 80%,70% \
+23	            --no-sort --ansi --border-label ' sesh ' --prompt '⚡  ' \
+24	            --header '  ^a all ^t tmux ^g configs ^x zoxide ^d tmux kill ^f find' \
+25	            --bind 'tab:down,btab:up' \
+26	            --bind 'ctrl-a:change-prompt(⚡  )+reload(sesh list --icons)' \
+27	            --bind 'ctrl-t:change-prompt(🪟  )+reload(sesh list -t --icons)' \
+28	            --bind 'ctrl-g:change-prompt(⚙️  )+reload(sesh list -c --icons)' \
+29	            --bind 'ctrl-x:change-prompt(📁  )+reload(sesh list -z --icons)' \
+30	            --bind 'ctrl-f:change-prompt(🔎  )+reload(fd -H -d 2 -t d -E .Trash . ~)' \
+31	            --bind 'ctrl-d:execute(tmux kill-session -t {2..})+change-prompt(⚡  )+reload(sesh list --icons)' \
+32	            --preview-window 'right:55%' \
+33	            --preview 'sesh preview {}' \
+34	        )
+35	        zle reset-prompt > /dev/null 2>&1 || true
+36	        [[ -z "$session" ]] && return
+37	        sesh connect "$session"
+38	    }
+39	}
+40	
+41	# ── Internal helpers ────────────────────────────────────────────────────────
+42	#
+43	# All helpers below take care to avoid the lowercase `path` / `cdpath` /
+44	# `manpath` / `fpath` zsh-tied-array trap (see
+45	# pitfalls/zsh-tied-array-path-shadowing.md).
+46	
+47	# Resolve the git repo root, or return non-zero if not in a repo.
+48	function _sesh_git_root() {
+49	    git rev-parse --show-toplevel 2>/dev/null
+50	}
+51	
+52	# Sanitize a string for use as a tmux session name.
+53	# tmux forbids `.` and `:` in session names; we also strip whitespace.
+54	function _sesh_sanitize() {
+55	    print -r -- "${1//[.:[:space:]]/-}"
+56	}
+57	
+58	# Switch to or attach to a tmux session named $1 (creating it at $2 if needed).
+59	# Inside tmux: `switch-client`. Outside tmux: `attach-session`.
+```
+</details></tool-use>
+
+_**Agent - sidechain (claude-haiku-4-5-20251001 2026-04-24 05:06:43Z)**_
+
+Perfect! I now have comprehensive information. Let me compile the findings:
+
+## Exploration Summary
+
+**1. Python PEP 723 `uv run --script` patterns:**
+
+Four files use the inline-dependency shebang:
+
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/redact_secrets.py` — Scans agent artifact dirs (`.specstory/`, `.claude/plans/`, `.cursor/plans/`, `.opencode/plans/`) for secrets using gitleaks + regex. No dependencies declared.
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py` — Multi-host chezmoi apply orchestrator with live Rich tables + per-host logs. Deps: `asyncssh>=2.18`, `tyro>=0.9`, `rich>=13.9`.
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py` — Interactive chezmoi init wrapper (bundles + grouped feature flag selection via questionary). Deps: `questionary>=2.0`, `rich>=13.9`, `tyro>=0.9`.
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_clash-parse.py` — Parser for Clash/mihomo proxy configs. Deps: `PyYAML>=6.0`.
+
+**2. TUI/interactive-prompt libraries in use:**
+
+- **questionary** (choice pickers, multi-select, text prompts) — `dotfiles_init.py` line 5+
+- **rich** (tables, panels, console output, live updates) — `fleet_apply.py` + `dotfiles_init.py` 
+- **tyro** (struct-to-CLI via dataclasses & unions; subcommand routing) — `fleet_apply.py` + `dotfiles_init.py`
+- Not in use: `prompt_toolkit`, `textual`, `click`, `inquirer`
+
+**3. fzf-based multi-step selection workflows:**
+
+- `22_sesh.zsh`: sesh session switcher (fzf picker → `sesh connect`). Dynamic filtering with `ctrl-a` (all sources) / `ctrl-t` (tmux) / `ctrl-g` (configs) / `ctrl-x` (zoxide) → reload pipeline. Preview via `sesh preview {2..}`. Session then passed to `sesh connect <session>`.
+- `11_tools_picker.zsh`: Tool invocation picker from markdown table (Alt+T widget). fzf pulls tool + description from table → `--with-nth` → `--preview` runs `tldr` or `--help` → `Enter` pastes invocation to shell buffer (cursor-positioned for args).
+- `agent-sessions.toml` (Television): Multi-step agent-session browser (OpenCode/Claude Code/Codex/Cursor). Ctrl+S cycles sources (all/by-agent). Selection output is session ID; Enter calls resume actions (cd + exec).
+
+**4. Pick-from-scrollback patterns:**
+
+- `agent-sessions.toml` (Television) provides the primary "pick from history" interface: browses `.claude/projects/**/*.jsonl`, `.codex/sessions/`, `.cursor/chats/` in a single TV channel. Actions: `Enter` (print resume one-liner), `Alt+T` (cd + exec), `Alt+R` (copy resume line to clipboard), `Alt+E` (open raw file in editor).
+- No dedicated "pick tmux scrollback" channel found; sesh manages session history instead.
+
+**5. Skill authoring convention (from CLAUDE.md):**
+
+Lines 68–93 reference `project-knowledge-harness` skill for TODO/backlog/pitfalls structure. For new Python scripts in `scripts/`, the guidance is:
+
+- Declare a new chezmoi prompt + update three mirrors: `.chezmoi.toml.tmpl`, `Dockerfile`, `dotfiles_init.py::PROMPTS` (CLAUDE.md line 26–34).
+- Use PEP 723 inline deps + `#!/usr/bin/env -S uv run --script` for zero-overhead tool scripts.
+- Existing scripts use `tyro` for CLI struct routing (subcommands via Union types) and `rich` for human-readable output. No style guide doc found; infer from `dotfiles_init.py` and `fleet_apply.py` examples.
+
+_**Agent (claude-opus-4-7 2026-04-24 05:08:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:08:17Z)**_
+
+老 plan 是已 commit 的工作；新的 task 是延伸。我會把 plan 檔改寫成這個 extension 的實作計畫。先問 2 個選擇題讓設計定下來。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:10:01Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**shell wrapper 的名字？這是一行式「cpblock N | agent -p ‘fix this’」的快捷動作，不進 TUI。**
+
+Options:
+- **aifix (+ aiexplain, Recommended)** - aifix = 預設 prompt「diagnose the error + suggest a fix」。aiexplain = 預設「explain what happened」。直觀，分開二者适合不同目的。名空間清緊。
+- **askai 單一入口「欠 -m mode」** - askai -m fix / askai -m explain / askai -m review。一個指令檔出多 mode。比較少動詞但鍵盤稍長。
+- **沒獨立 wrapper—使用者自己拼 pipe** - 只提供擴充後的 cpblock/cpout/cpcmd (帶 N)，使用者自己 `cpblock 3 | claude -p “fix”`。最簡單但缺少 discoverability。
+
+**預設問 agent 時的模式？**
+
+Options:
+- **Advisory only (print suggestion) (Recommended)** - Agent 不改檔案，只輸出建議文字。安全，適合快速查詢。需要 execute 的話用旗子 --execute / --allow-edits 切換。
+- **Auto-apply edits when possible** - Agent 直接 dispatch edit tools 改檔。比較危險但有時很方便。默認打開這個需要清楚了解毫無「先確認」的性格。
+- **每次問 (默認衝突 advisory，但提示式確認)** - Shell wrapper 每次跑前問、TUI 確認物理 action。UX 稍複雜但最安全。
+
+
+**Answer:** aifix (+ aiexplain, Recommended), Advisory only (print suggestion) (Recommended)
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:11:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# tmux Capture Helpers Extension: indexed blocks + agent pipe + TUI
+
+## Context
+
+Previous task (committed in `b5e8da0`) shipped `cpout` / `cpcmd` / `cpblock`
+plus OSC 133 shell integration and tmux scrollback tuning. This extension
+builds on that baseline:
+
+1. **Indexed lookback** — currently the three helpers only grab the LAST
+   block. Real debugging often wants "the one 3 commands back" (the error
+   is usually not the last thing on screen). Add a positional `N` arg.
+2. **One-shot pipe to coding-agent** — chaining `cpblock N` into `claude
+   -p "fix this"` is a common-enough idiom to deserve its own command.
+   User confirmed: **advisory only** by default (agent prints suggestion,
+   doesn't touch files); **name `aifix` + `aiexplain`** (not `askai`).
+3. **Interactive TUI** — a Python `uv run --script` tool that lets the
+   user scroll previous commands, edit the prompt, and pick where the
+   agent's reply goes (stdout / clipboard / interactive-agent-with-context).
+
+Underlying mechanics are unchanged: OSC 133 markers in tmux's grid
+line-attrs, navigated via `previous-prompt` / `previous-prompt -o`; the
+agent is invoked in non-interactive mode (`claude -p`, `opencode run`,
+`codex exec`, `cursor-agent -p`) with the block as context.
+
+## Design decisions (confirmed with user)
+
+- **Naming**: `aifix` (diagnose + suggest fix) and `aiexplain` (explain what
+  happened). Two small fixed-purpose commands beat one `askai -m MODE`.
+- **Agent mode**: **advisory only** — the default is print-only, no file
+  edits. `--execute` / `--allow-edits` not offered in v1; escalation path
+  is "spawn an interactive agent pane with this context" via the TUI.
+- **Agent auto-detection**: `claude` → `opencode` → `codex` → `cursor-agent`,
+  whichever is on `$PATH` first. Override via `-a AGENT`.
+- **TUI library**: `questionary` + `rich` — matches
+  [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py)
+  and [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py). No new deps.
+- **Script location**: `scripts/aiblock.py` (source of truth, agent-visible,
+  matches `fleet_apply.py` convention); shell alias `aiblock` in
+  `dot_config/zsh/tools/04_ai_capture.zsh` resolves the path via
+  `chezmoi source-path` (cached once).
+
+## Indexed lookback (shell-level)
+
+### UX
+
+\```sh
+cpblock          # last block (unchanged default)
+cpblock 3        # block 3 back (third-to-last command + its output)
+cpout 2          # output of the 2nd-to-last command
+cpcmd 4          # input line of the 4th-to-last command
+\```
+
+`N` is always "how many commands back, counting from the current prompt"
+(1 = last, 2 = one before that, ...). No range/combine syntax in v1 —
+that's the TUI's job.
+
+### Implementation
+
+**`dot_config/zsh/tools/03_tmux_capture.zsh`**: thread `N` through the
+existing helper, ripple into the three public commands.
+
+- `_cpx_tmux_select <name> <count> <start-cmd> [args]` — generalise the
+  helper: `count` is how many `previous-*` repetitions before
+  `begin-selection`, followed by a single `next-prompt` to close.
+- `cpout [N]`: call helper with `count=N`, start=`previous-prompt -o`.
+  (Because preexec skips C for cpout/cpcmd/cpblock, N=1 finds the PREVIOUS
+  command's C, N=2 finds the one before that, etc.)
+- `cpblock [N]`: call helper with `count=N+1`, start=`previous-prompt`.
+  (The +1 skips cpblock's own A; the remaining N lands on the Nth block
+  back's A.)
+- `cpcmd [N]`: replace `fc -ln -1` with `fc -ln -N -N` (range from Nth
+  back to Nth back — a single entry).
+
+Validate `N` is a positive integer; default to `1`; reject `0` or negative
+with stderr diagnostic.
+
+## One-shot agent wrapper (shell-level)
+
+### UX
+
+\```sh
+aifix              # last block, default "diagnose + fix" prompt, auto-detected agent
+aifix 3            # 3rd block back
+aifix -a opencode  # force agent
+aifix -p "why does this segfault?"  # override prompt
+aiexplain          # same args, different default prompt
+\```
+
+Defaults:
+
+- **aifix prompt**: "Here is a command I ran in my terminal and its output.
+  Diagnose any errors and suggest a concrete fix. Be brief and specific."
+- **aiexplain prompt**: "Here is a command I ran in my terminal and its
+  output. Explain what happened in plain language. Be concise."
+
+### Implementation
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (new):
+
+\```zsh
+_aiagent_invoke() {
+  # Args: <agent> <prompt>
+  # Invokes agent in non-interactive mode. prompt is sent via the agent's
+  # one-shot flag; no file edits are requested.
+  local agent=$1 prompt=$2
+  case "$agent" in
+    claude)       claude -p "$prompt" ;;
+    opencode)     opencode run "$prompt" ;;
+    codex)        codex exec "$prompt" ;;
+    cursor-agent) cursor-agent -p "$prompt" ;;
+    *) print -u2 "aifix: unknown agent: $agent"; return 1 ;;
+  esac
+}
+
+_aiagent_autodetect() {
+  for cand in claude opencode codex cursor-agent; do
+    command -v "$cand" &>/dev/null && { print -r -- "$cand"; return 0; }
+  done
+  return 1
+}
+
+# aifix [N] [-a AGENT] [-p PROMPT]
+aifix() { _ai_capture_dispatch aifix 'Diagnose any errors ...' "$@"; }
+aiexplain() { _ai_capture_dispatch aiexplain 'Explain what happened ...' "$@"; }
+
+_ai_capture_dispatch() {
+  # parses N, -a, -p; calls cpblock $N; prepends prompt; invokes agent.
+  # advisory only — no flag to enable edits in v1.
+  ...
+}
+\```
+
+Output goes to stdout (pipe-friendly for `aifix | tee /tmp/advice.md`).
+Diagnostic line to stderr ("aifix: claude invoked with 3rd block back").
+
+### Call graph
+
+\```
+aifix / aiexplain           <-- user types this
+  → cpblock N               <-- reuses committed helper
+  → _aiagent_invoke         <-- claude / opencode / codex / cursor-agent
+\```
+
+## Python TUI
+
+### UX sketch
+
+\```
+$ aiblock
+┌─ Recent commands (pick one) ──────────────────────────────────────┐
+│ > 1  (45s ago)  cargo build --release                              │
+│   2  (2m ago)   git rebase -i HEAD~5                               │
+│   3  (4m ago)   pytest tests/integration/test_auth.py             │
+│   4  (7m ago)   just fleet-apply                                   │
+│   ...                                                              │
+└───────────────────────────────────────────────────────────────────┘
+
+[after selection, rich panel shows the captured block]
+
+? Edit prompt (default: Diagnose any errors ...):
+  [editable text box]
+
+? Action:
+  ▸ Print reply here (default)
+    Copy reply to clipboard
+    Spawn interactive agent pane with this context
+    Cancel
+
+[agent invoked, rich panel renders reply]
+\```
+
+### Implementation
+
+**`scripts/aiblock.py`** (new, PEP 723 shebang):
+
+\```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["questionary>=2.0", "rich>=13.9"]
+# ///
+"""aiblock — TUI for reviewing a past command + asking an AI agent about it."""
+
+import subprocess, os, sys, shlex
+from rich.console import Console
+from rich.panel import Panel
+import questionary
+
+def list_recent_commands(n=20):
+    # zsh: `fc -ln -<n>` — last n commands; parse into (index, text)
+    out = subprocess.run(["zsh", "-ic", f"fc -ln -{n}"],
+                         capture_output=True, text=True).stdout
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    return list(enumerate(reversed(lines), start=1))  # (N=1 is most recent)
+
+def capture_block(n):
+    # Delegate to our committed cpblock function
+    return subprocess.run(["zsh", "-ic", f"cpblock {n}"],
+                          capture_output=True, text=True).stdout
+
+def invoke_agent(agent, prompt):
+    # Mirror _aiagent_invoke logic from the shell wrapper
+    flagmap = {"claude": ["-p"], "opencode": ["run"],
+               "codex": ["exec"], "cursor-agent": ["-p"]}
+    return subprocess.run([agent, *flagmap[agent], prompt],
+                          capture_output=True, text=True).stdout
+
+def main():
+    # 1. pick command
+    # 2. capture block, show preview in rich Panel
+    # 3. questionary.text(default=DEFAULT_FIX_PROMPT) — editable
+    # 4. questionary.select(actions) — Print / Copy / Spawn / Cancel
+    # 5. invoke + route per action
+    ...
+\```
+
+Action routing:
+
+- **Print reply**: write to stdout in a `rich.Panel`. User sees it in the
+  same pane; scroll up to review. No clipboard.
+- **Copy reply**: pipe reply through `tmux load-buffer -w -` when `$TMUX`
+  set, else `pbcopy` / `xclip` / `xsel` / `wl-copy` (reuse the detection
+  logic from `03_tmux_capture.zsh` `_cpx_to_clipboard`).
+- **Spawn interactive agent pane**: build a command like `claude` (no
+  `-p`) with the block pre-injected via a heredoc or temp-file, launch in
+  a new tmux window with `tmux new-window -n ai 'claude <temp-file>'`.
+  Concrete syntax TBD per agent; may need per-agent tweaks.
+- **Cancel**: exit 0, no-op.
+
+### Shell alias
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (same file as `aifix`):
+
+\```zsh
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      print -u2 "aiblock: chezmoi source-path failed"; return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+}
+\```
+
+Resolves once per shell (cached in `_AIBLOCK_SCRIPT`). `uv run --script`
+handles dep install/cache.
+
+## Files to modify
+
+| Path | Change |
+|---|---|
+| `dot_config/zsh/tools/03_tmux_capture.zsh` | Thread `N` through `_cpx_tmux_select`; extend cpout/cpcmd/cpblock |
+| `dot_config/zsh/tools/04_ai_capture.zsh` | **NEW** — aifix / aiexplain / aiblock (shell shim) + `_aiagent_*` helpers |
+| `scripts/aiblock.py` | **NEW** — Python TUI |
+| `docs/zsh/aliases.md` | Add rows under "Tmux Integration" + new "AI Capture" section |
+| `docs/tools/tmux/README.md` | New section: "Reviewing past commands with AI agents" |
+
+## Verification
+
+End-to-end checks after apply:
+
+1. **Indexed cpblock**: in a fresh tmux pane, run `echo A; echo B; echo C`
+   as three separate commands. Then:
+   \```sh
+   cpblock     # should print "❯ echo C\nC"
+   cpblock 2   # should print "❯ echo B\nB"
+   cpblock 3   # should print "❯ echo A\nA"
+   cpblock 99  # should print stderr "empty — …", exit 1
+   \```
+2. **cpout / cpcmd indexed**: same pattern, verify the right command's
+   OUTPUT and INPUT come back.
+3. **Agent auto-detect**: `aifix 1` in a pane where a command failed.
+   Verify stderr logs which agent was picked; stdout has the agent's reply.
+   Re-run with `-a opencode` / `-a codex` and verify override.
+4. **Agent override**: `aifix -p "custom prompt" 2` verifies both overrides
+   compose.
+5. **aiblock TUI**: run `aiblock` in a tmux pane after 5+ commands. Confirm:
+   (a) recent commands list shows correct N (from `fc`);
+   (b) selecting one shows the block in a rich Panel;
+   (c) prompt editor has the aifix default;
+   (d) each action (Print / Copy / Spawn / Cancel) routes correctly.
+6. **Graceful degradation**: `aifix` in a non-tmux shell → stderr error
+   from cpblock (inherits existing behaviour); exit 1.
+7. **No-agent-installed**: `aifix` with no CLI on PATH → stderr "no
+   coding-agent CLI found (tried: claude, opencode, codex, cursor-agent)";
+   exit 1.
+
+## Critical files found during exploration
+
+- [`dot_config/zsh/tools/42_gitlab.zsh:100-103`](../../dot_config/zsh/tools/42_gitlab.zsh) —
+  canonical non-interactive agent invocation map; reuse the exact
+  flag syntax (`claude -p`, `opencode run`, `codex exec`,
+  `cursor-agent -p`).
+- [`dot_config/zsh/tools/03_tmux_capture.zsh`](../../dot_config/zsh/tools/03_tmux_capture.zsh) —
+  committed baseline; `_cpx_tmux_select` and `_cpx_to_clipboard` helpers
+  to extend / reuse.
+- [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py) —
+  questionary + rich + tyro pattern to mirror in `aiblock.py`.
+- [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) — same stack;
+  good reference for subprocess + rich.live patterns if we want progress
+  UI while the agent is thinking.
+- [`dot_config/zsh/tools/22_sesh.zsh:92-115`](../../dot_config/zsh/tools/22_sesh.zsh) —
+  `_sesh_wrap_agent` pattern for spawning an interactive agent pane; copy
+  the shape for "Spawn agent with this context" action in the TUI.
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.claude/plans/tmux-scrolling-x-coding-rosy-clover.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:41Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
+<summary>Tool use: **ExitPlanMode**</summary>
+
+```text
+User has approved your plan. You can now start coding. Start with updating your todo list if applicable
+
+Your plan has been saved to: /Users/daviddwlee84/.local/share/chezmoi/.claude/plans/tmux-scrolling-x-coding-rosy-clover.md
+You can refer back to it if needed during implementation.
+
+## Approved Plan (edited by user):
+# tmux Capture Helpers Extension: indexed blocks + agent pipe + TUI
+
+## Context
+
+Previous task (committed in `b5e8da0`) shipped `cpout` / `cpcmd` / `cpblock`
+plus OSC 133 shell integration and tmux scrollback tuning. This extension
+builds on that baseline:
+
+1. **Indexed lookback** — currently the three helpers only grab the LAST
+   block. Real debugging often wants "the one 3 commands back" (the error
+   is usually not the last thing on screen). Add a positional `N` arg.
+2. **One-shot pipe to coding-agent** — chaining `cpblock N` into `claude
+   -p "fix this"` is a common-enough idiom to deserve its own command.
+   User confirmed: **advisory only** by default (agent prints suggestion,
+   doesn't touch files); **name `aifix` + `aiexplain`** (not `askai`).
+3. **Interactive TUI** — a Python `uv run --script` tool that lets the
+   user scroll previous commands, edit the prompt, and pick where the
+   agent's reply goes (stdout / clipboard / interactive-agent-with-context).
+
+Underlying mechanics are unchanged: OSC 133 markers in tmux's grid
+line-attrs, navigated via `previous-prompt` / `previous-prompt -o`; the
+agent is invoked in non-interactive mode (`claude -p`, `opencode run`,
+`codex exec`, `cursor-agent -p`) with the block as context.
+
+## Design decisions (confirmed with user)
+
+- **Naming**: `aifix` (diagnose + suggest fix) and `aiexplain` (explain what
+  happened). Two small fixed-purpose commands beat one `askai -m MODE`.
+- **Agent mode**: **advisory only** — the default is print-only, no file
+  edits. `--execute` / `--allow-edits` not offered in v1; escalation path
+  is "spawn an interactive agent pane with this context" via the TUI.
+- **Agent auto-detection**: `claude` → `opencode` → `codex` → `cursor-agent`,
+  whichever is on `$PATH` first. Override via `-a AGENT`.
+- **TUI library**: `questionary` + `rich` — matches
+  [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py)
+  and [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py). No new deps.
+- **Script location**: `scripts/aiblock.py` (source of truth, agent-visible,
+  matches `fleet_apply.py` convention); shell alias `aiblock` in
+  `dot_config/zsh/tools/04_ai_capture.zsh` resolves the path via
+  `chezmoi source-path` (cached once).
+
+## Indexed lookback (shell-level)
+
+### UX
+
+```sh
+cpblock          # last block (unchanged default)
+cpblock 3        # block 3 back (third-to-last command + its output)
+cpout 2          # output of the 2nd-to-last command
+cpcmd 4          # input line of the 4th-to-last command
+```
+
+`N` is always "how many commands back, counting from the current prompt"
+(1 = last, 2 = one before that, ...). No range/combine syntax in v1 —
+that's the TUI's job.
+
+### Implementation
+
+**`dot_config/zsh/tools/03_tmux_capture.zsh`**: thread `N` through the
+existing helper, ripple into the three public commands.
+
+- `_cpx_tmux_select <name> <count> <start-cmd> [args]` — generalise the
+  helper: `count` is how many `previous-*` repetitions before
+  `begin-selection`, followed by a single `next-prompt` to close.
+- `cpout [N]`: call helper with `count=N`, start=`previous-prompt -o`.
+  (Because preexec skips C for cpout/cpcmd/cpblock, N=1 finds the PREVIOUS
+  command's C, N=2 finds the one before that, etc.)
+- `cpblock [N]`: call helper with `count=N+1`, start=`previous-prompt`.
+  (The +1 skips cpblock's own A; the remaining N lands on the Nth block
+  back's A.)
+- `cpcmd [N]`: replace `fc -ln -1` with `fc -ln -N -N` (range from Nth
+  back to Nth back — a single entry).
+
+Validate `N` is a positive integer; default to `1`; reject `0` or negative
+with stderr diagnostic.
+
+## One-shot agent wrapper (shell-level)
+
+### UX
+
+```sh
+aifix              # last block, default "diagnose + fix" prompt, auto-detected agent
+aifix 3            # 3rd block back
+aifix -a opencode  # force agent
+aifix -p "why does this segfault?"  # override prompt
+aiexplain          # same args, different default prompt
+```
+
+Defaults:
+
+- **aifix prompt**: "Here is a command I ran in my terminal and its output.
+  Diagnose any errors and suggest a concrete fix. Be brief and specific."
+- **aiexplain prompt**: "Here is a command I ran in my terminal and its
+  output. Explain what happened in plain language. Be concise."
+
+### Implementation
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (new):
+
+```zsh
+_aiagent_invoke() {
+  # Args: <agent> <prompt>
+  # Invokes agent in non-interactive mode. prompt is sent via the agent's
+  # one-shot flag; no file edits are requested.
+  local agent=$1 prompt=$2
+  case "$agent" in
+    claude)       claude -p "$prompt" ;;
+    opencode)     opencode run "$prompt" ;;
+    codex)        codex exec "$prompt" ;;
+    cursor-agent) cursor-agent -p "$prompt" ;;
+    *) print -u2 "aifix: unknown agent: $agent"; return 1 ;;
+  esac
+}
+
+_aiagent_autodetect() {
+  for cand in claude opencode codex cursor-agent; do
+    command -v "$cand" &>/dev/null && { print -r -- "$cand"; return 0; }
+  done
+  return 1
+}
+
+# aifix [N] [-a AGENT] [-p PROMPT]
+aifix() { _ai_capture_dispatch aifix 'Diagnose any errors ...' "$@"; }
+aiexplain() { _ai_capture_dispatch aiexplain 'Explain what happened ...' "$@"; }
+
+_ai_capture_dispatch() {
+  # parses N, -a, -p; calls cpblock $N; prepends prompt; invokes agent.
+  # advisory only — no flag to enable edits in v1.
+  ...
+}
+```
+
+Output goes to stdout (pipe-friendly for `aifix | tee /tmp/advice.md`).
+Diagnostic line to stderr ("aifix: claude invoked with 3rd block back").
+
+### Call graph
+
+```
+aifix / aiexplain           <-- user types this
+  → cpblock N               <-- reuses committed helper
+  → _aiagent_invoke         <-- claude / opencode / codex / cursor-agent
+```
+
+## Python TUI
+
+### UX sketch
+
+```
+$ aiblock
+┌─ Recent commands (pick one) ──────────────────────────────────────┐
+│ > 1  (45s ago)  cargo build --release                              │
+│   2  (2m ago)   git rebase -i HEAD~5                               │
+│   3  (4m ago)   pytest tests/integration/test_auth.py             │
+│   4  (7m ago)   just fleet-apply                                   │
+│   ...                                                              │
+└───────────────────────────────────────────────────────────────────┘
+
+[after selection, rich panel shows the captured block]
+
+? Edit prompt (default: Diagnose any errors ...):
+  [editable text box]
+
+? Action:
+  ▸ Print reply here (default)
+    Copy reply to clipboard
+    Spawn interactive agent pane with this context
+    Cancel
+
+[agent invoked, rich panel renders reply]
+```
+
+### Implementation
+
+**`scripts/aiblock.py`** (new, PEP 723 shebang):
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["questionary>=2.0", "rich>=13.9"]
+# ///
+"""aiblock — TUI for reviewing a past command + asking an AI agent about it."""
+
+import subprocess, os, sys, shlex
+from rich.console import Console
+from rich.panel import Panel
+import questionary
+
+def list_recent_commands(n=20):
+    # zsh: `fc -ln -<n>` — last n commands; parse into (index, text)
+    out = subprocess.run(["zsh", "-ic", f"fc -ln -{n}"],
+                         capture_output=True, text=True).stdout
+    lines = [l.strip() for l in out.splitlines() if l.strip()]
+    return list(enumerate(reversed(lines), start=1))  # (N=1 is most recent)
+
+def capture_block(n):
+    # Delegate to our committed cpblock function
+    return subprocess.run(["zsh", "-ic", f"cpblock {n}"],
+                          capture_output=True, text=True).stdout
+
+def invoke_agent(agent, prompt):
+    # Mirror _aiagent_invoke logic from the shell wrapper
+    flagmap = {"claude": ["-p"], "opencode": ["run"],
+               "codex": ["exec"], "cursor-agent": ["-p"]}
+    return subprocess.run([agent, *flagmap[agent], prompt],
+                          capture_output=True, text=True).stdout
+
+def main():
+    # 1. pick command
+    # 2. capture block, show preview in rich Panel
+    # 3. questionary.text(default=DEFAULT_FIX_PROMPT) — editable
+    # 4. questionary.select(actions) — Print / Copy / Spawn / Cancel
+    # 5. invoke + route per action
+    ...
+```
+
+Action routing:
+
+- **Print reply**: write to stdout in a `rich.Panel`. User sees it in the
+  same pane; scroll up to review. No clipboard.
+- **Copy reply**: pipe reply through `tmux load-buffer -w -` when `$TMUX`
+  set, else `pbcopy` / `xclip` / `xsel` / `wl-copy` (reuse the detection
+  logic from `03_tmux_capture.zsh` `_cpx_to_clipboard`).
+- **Spawn interactive agent pane**: build a command like `claude` (no
+  `-p`) with the block pre-injected via a heredoc or temp-file, launch in
+  a new tmux window with `tmux new-window -n ai 'claude <temp-file>'`.
+  Concrete syntax TBD per agent; may need per-agent tweaks.
+- **Cancel**: exit 0, no-op.
+
+### Shell alias
+
+**`dot_config/zsh/tools/04_ai_capture.zsh`** (same file as `aifix`):
+
+```zsh
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      print -u2 "aiblock: chezmoi source-path failed"; return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+}
+```
+
+Resolves once per shell (cached in `_AIBLOCK_SCRIPT`). `uv run --script`
+handles dep install/cache.
+
+## Files to modify
+
+| Path | Change |
+|---|---|
+| `dot_config/zsh/tools/03_tmux_capture.zsh` | Thread `N` through `_cpx_tmux_select`; extend cpout/cpcmd/cpblock |
+| `dot_config/zsh/tools/04_ai_capture.zsh` | **NEW** — aifix / aiexplain / aiblock (shell shim) + `_aiagent_*` helpers |
+| `scripts/aiblock.py` | **NEW** — Python TUI |
+| `docs/zsh/aliases.md` | Add rows under "Tmux Integration" + new "AI Capture" section |
+| `docs/tools/tmux/README.md` | New section: "Reviewing past commands with AI agents" |
+
+## Verification
+
+End-to-end checks after apply:
+
+1. **Indexed cpblock**: in a fresh tmux pane, run `echo A; echo B; echo C`
+   as three separate commands. Then:
+   ```sh
+   cpblock     # should print "❯ echo C\nC"
+   cpblock 2   # should print "❯ echo B\nB"
+   cpblock 3   # should print "❯ echo A\nA"
+   cpblock 99  # should print stderr "empty — …", exit 1
+   ```
+2. **cpout / cpcmd indexed**: same pattern, verify the right command's
+   OUTPUT and INPUT come back.
+3. **Agent auto-detect**: `aifix 1` in a pane where a command failed.
+   Verify stderr logs which agent was picked; stdout has the agent's reply.
+   Re-run with `-a opencode` / `-a codex` and verify override.
+4. **Agent override**: `aifix -p "custom prompt" 2` verifies both overrides
+   compose.
+5. **aiblock TUI**: run `aiblock` in a tmux pane after 5+ commands. Confirm:
+   (a) recent commands list shows correct N (from `fc`);
+   (b) selecting one shows the block in a rich Panel;
+   (c) prompt editor has the aifix default;
+   (d) each action (Print / Copy / Spawn / Cancel) routes correctly.
+6. **Graceful degradation**: `aifix` in a non-tmux shell → stderr error
+   from cpblock (inherits existing behaviour); exit 1.
+7. **No-agent-installed**: `aifix` with no CLI on PATH → stderr "no
+   coding-agent CLI found (tried: claude, opencode, codex, cursor-agent)";
+   exit 1.
+
+## Critical files found during exploration
+
+- [`dot_config/zsh/tools/42_gitlab.zsh:100-103`](../../dot_config/zsh/tools/42_gitlab.zsh) —
+  canonical non-interactive agent invocation map; reuse the exact
+  flag syntax (`claude -p`, `opencode run`, `codex exec`,
+  `cursor-agent -p`).
+- [`dot_config/zsh/tools/03_tmux_capture.zsh`](../../dot_config/zsh/tools/03_tmux_capture.zsh) —
+  committed baseline; `_cpx_tmux_select` and `_cpx_to_clipboard` helpers
+  to extend / reuse.
+- [`scripts/init/dotfiles_init.py`](../../scripts/init/dotfiles_init.py) —
+  questionary + rich + tyro pattern to mirror in `aiblock.py`.
+- [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) — same stack;
+  good reference for subprocess + rich.live patterns if we want progress
+  UI while the agent is thinking.
+- [`dot_config/zsh/tools/22_sesh.zsh:92-115`](../../dot_config/zsh/tools/22_sesh.zsh) —
+  `_sesh_wrap_agent` pattern for spawning an interactive agent pane; copy
+  the shape for "Spawn agent with this context" action in the TUI.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:48Z)**_
+
+Plan approved. Starting implementation — first extending `03_tmux_capture.zsh` to thread `N` through.
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:48Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/03_tmux_capture.zsh`
+
+```text
+1	# tmux + OSC 133 capture helpers — shell-level counterparts of the
+2	# prefix + M-y / M-i tmux bindings.
+3	#
+4	#   cpcmd    last command's INPUT  (zsh history; works inside OR outside tmux)
+5	#   cpout    last command's OUTPUT (tmux copy-mode chain; tmux-only)
+6	#   cpblock  last command's FULL BLOCK, Warp-style (tmux-only)
+7	#
+8	# Each prints captured text to stdout (pipe-friendly: `cpout | grep ERROR`)
+9	# AND copies to system clipboard. Diagnostic + byte count go to stderr so
+10	# stdout stays clean for pipes.
+11	#
+12	# WHY cpout/cpblock need tmux:
+13	# tmux consumes OSC 133 marker bytes and only stores them as per-line
+14	# attributes in its grid — `tmux capture-pane -pe` does NOT re-emit them.
+15	# Outside tmux there's no portable way to recover boundaries of a past
+16	# command's output (terminals like iTerm2/Ghostty have proprietary APIs,
+17	# but nothing cross-terminal). cpcmd uses zsh shell history instead, so it
+18	# works universally.
+19	#
+20	# Requires: zsh; plus tmux for cpout/cpblock.
+21	
+22	# Pipe stdin to system clipboard, preferring tmux's OSC 52 bridge (SSH-safe)
+23	# and falling back to platform-native clipboard tools.
+24	_cpx_to_clipboard() {
+25	  if [[ -n "$TMUX" ]]; then
+26	    tmux load-buffer -w -
+27	  elif command -v pbcopy &>/dev/null; then
+28	    pbcopy
+29	  elif command -v wl-copy &>/dev/null; then
+30	    wl-copy
+31	  elif command -v xclip &>/dev/null; then
+32	    xclip -selection clipboard -in
+33	  elif command -v xsel &>/dev/null; then
+34	    xsel --clipboard --input
+35	  else
+36	    cat >/dev/null
+37	    return 1
+38	  fi
+39	}
+40	
+41	# Run a tmux copy-mode selection chain on the current pane. Prints selection
+42	# to stdout, diagnostic (name + byte count) to stderr. Returns 1 on empty.
+43	#
+44	#   _cpx_tmux_select <display-name> <start-cmd> [start-args...]
+45	#
+46	# Chain: copy-mode → <start-cmd> → begin-selection → next-prompt →
+47	#        copy-pipe-and-cancel "tee <tmp> | tmux load-buffer -w -" → wait-for
+48	#
+49	# Depends on 02_shell_integration.zsh skipping the OSC 133 C marker for
+50	# these helpers' own invocation (see the case statement there). Without
+51	# that skip, `previous-prompt -o` would land on this command's own output
+52	# start and the selection would be empty.
+53	_cpx_tmux_select() {
+54	  local name=$1; shift
+55	  local tmp sentinel
+56	  tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
+57	  sentinel="cpx-$$-$RANDOM"
+58	  : > "$tmp"
+59	  tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || return 1
+60	  tmux send-keys -t "$TMUX_PANE" -X "$@" 2>/dev/null
+61	  tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
+62	  tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null
+63	  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
+64	    "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
+65	  tmux wait-for "$sentinel" 2>/dev/null
+66	  if [[ -s "$tmp" ]]; then
+67	    cat "$tmp"
+68	    local bytes
+69	    bytes=$(wc -c <"$tmp" | tr -d ' ')
+70	    rm -f "$tmp"
+71	    print -u2 "$name: $bytes bytes copied to clipboard"
+72	    return 0
+73	  fi
+74	  rm -f "$tmp"
+75	  return 1
+76	}
+77	
+78	# cpcmd — last command's INPUT. Universal: reads zsh shell history. Clean
+79	# output (no prompt chrome, no terminal-echo artefacts).
+80	cpcmd() {
+81	  emulate -L zsh
+82	  local cmd
+83	  cmd=$(fc -ln -1 2>/dev/null)
+84	  cmd="${cmd#	}"   # strip fc's leading tab
+85	  cmd="${cmd# }"
+86	  if [[ -z "$cmd" ]]; then
+87	    print -u2 "cpcmd: no previous command in shell history"
+88	    return 1
+89	  fi
+90	  printf '%s\n' "$cmd" | _cpx_to_clipboard || {
+91	    print -u2 "cpcmd: no clipboard tool available (install pbcopy / xclip / xsel / wl-copy, or run inside tmux)"
+92	    return 1
+93	  }
+94	  printf '%s\n' "$cmd"
+95	  print -u2 "cpcmd: ${#cmd} bytes (zsh history) copied to clipboard"
+96	}
+97	
+98	# cpout — last command's OUTPUT via tmux's OSC 133 line attrs.
+99	cpout() {
+100	  emulate -L zsh
+101	  if [[ -z "$TMUX" ]]; then
+102	    print -u2 "cpout: requires tmux (OSC 133 boundaries are stored per-pane by tmux). Use cpcmd for input, or your terminal's native 'copy output' if available."
+103	    return 1
+104	  fi
+105	  _cpx_tmux_select cpout previous-prompt -o || {
+106	    print -u2 "cpout: empty — possible causes: (a) shell pre-dates chezmoi apply, run 'exec zsh' (verify: echo \$precmd_functions | grep osc133); (b) no command has been run yet in this pane; (c) previous command is an alt-screen TUI (vim, htop) with no OSC 133 output."
+107	    return 1
+108	  }
+109	}
+110	
+111	# cpblock — last command's FULL BLOCK (prompt + input + output), Warp-style.
+112	# The OSC 133 A marker is embedded in PROMPT itself (02_shell_integration.zsh),
+113	# so cpblock's OWN current prompt line has an A marker too — unlike the C
+114	# marker which we can skip in preexec. So we call previous-prompt TWICE to
+115	# skip the current prompt and land on the previous command's prompt.
+116	cpblock() {
+117	  emulate -L zsh
+118	  if [[ -z "$TMUX" ]]; then
+119	    print -u2 "cpblock: requires tmux (see cpout for why)."
+120	    return 1
+121	  fi
+122	  local tmp sentinel
+123	  tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
+124	  sentinel="cpx-$$-$RANDOM"
+125	  : > "$tmp"
+126	  tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || {
+127	    print -u2 "cpblock: failed to enter copy-mode"
+128	    return 1
+129	  }
+130	  tmux send-keys -t "$TMUX_PANE" -X previous-prompt 2>/dev/null   # lands on cpblock's own A
+131	  tmux send-keys -t "$TMUX_PANE" -X previous-prompt 2>/dev/null   # previous command's A
+132	  tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
+133	  tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null       # forward to cpblock's A
+134	  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
+135	    "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
+136	  tmux wait-for "$sentinel" 2>/dev/null
+137	  if [[ -s "$tmp" ]]; then
+138	    cat "$tmp"
+139	    local bytes
+140	    bytes=$(wc -c <"$tmp" | tr -d ' ')
+141	    rm -f "$tmp"
+142	    print -u2 "cpblock: $bytes bytes copied to clipboard"
+143	    return 0
+144	  fi
+145	  rm -f "$tmp"
+146	  print -u2 "cpblock: empty — run 'exec zsh' if the shell pre-dates chezmoi apply."
+147	  return 1
+148	}
+149
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:12:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:13:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```zsh
+# tmux + OSC 133 capture helpers — shell-level counterparts of the
+# prefix + M-y / M-i tmux bindings, with an N-back index.
+#
+#   cpcmd [N]    last (or Nth-latest) command's INPUT  (zsh history; universal)
+#   cpout [N]    last (or Nth-latest) command's OUTPUT (tmux copy-mode chain)
+#   cpblock [N]  last (or Nth-latest) command's FULL BLOCK, Warp-style
+#
+# N defaults to 1 (= latest). N=2 is the one before that, and so on.
+#
+# Each prints captured text to stdout (pipe-friendly: `cpout | grep ERROR`)
+# AND copies to system clipboard. Diagnostic + byte count go to stderr so
+# stdout stays clean for pipes.
+#
+# WHY cpout/cpblock need tmux:
+# tmux consumes OSC 133 marker bytes and only stores them as per-line
+# attributes in its grid — `tmux capture-pane -pe` does NOT re-emit them.
+# Outside tmux there's no portable way to recover boundaries of a past
+# command's output (terminals like iTerm2/Ghostty have proprietary APIs,
+# but nothing cross-terminal). cpcmd uses zsh shell history instead, so it
+# works universally.
+#
+# Requires: zsh; plus tmux for cpout/cpblock.
+
+# Pipe stdin to system clipboard, preferring tmux's OSC 52 bridge (SSH-safe)
+# and falling back to platform-native clipboard tools.
+_cpx_to_clipboard() {
+  if [[ -n "$TMUX" ]]; then
+    tmux load-buffer -w -
+  elif command -v pbcopy &>/dev/null; then
+    pbcopy
+  elif command -v wl-copy &>/dev/null; then
+    wl-copy
+  elif command -v xclip &>/dev/null; then
+    xclip -selection clipboard -in
+  elif command -v xsel &>/dev/null; then
+    xsel --clipboard --input
+  else
+    cat >/dev/null
+    return 1
+  fi
+}
+
+# Validate a positive-integer argument. Echoes the value on success; prints
+# a usage hint to stderr and returns 1 on invalid input.
+_cpx_parse_n() {
+  local name=$1 n=${2:-1}
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    print -u2 "$name: N must be a positive integer (got: $n). Usage: $name [N]"
+    return 1
+  fi
+  print -r -- "$n"
+}
+
+# Run a tmux copy-mode selection chain on the current pane. Prints selection
+# to stdout, diagnostic (name + byte count) to stderr. Returns 1 on empty.
+#
+#   _cpx_tmux_select <display-name> <prev-count> <prev-cmd> [prev-args...]
+#
+# Chain: copy-mode → (<prev-cmd> <prev-args...>) × <prev-count> →
+#        begin-selection → next-prompt →
+#        copy-pipe-and-cancel "tee <tmp> | tmux load-buffer -w -" → wait-for
+#
+# <prev-count> is how many times to repeat the `previous-*` command before
+# starting the selection — that's how N-back lookback is done.
+#
+# Depends on 02_shell_integration.zsh skipping the OSC 133 C marker for
+# these helpers' own invocation (see the case statement there). Without
+# that skip, `previous-prompt -o` would land on this command's own output
+# start and the selection would be empty.
+_cpx_tmux_select() {
+  local name=$1; shift
+  local prev_count=$1; shift
+  local tmp sentinel i
+  tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
+  sentinel="cpx-$$-$RANDOM"
+  : > "$tmp"
+  tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || return 1
+  for (( i = 0; i < prev_count; i++ )); do
+    tmux send-keys -t "$TMUX_PANE" -X "$@" 2>/dev/null
+  done
+  tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
+  tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null
+  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
+    "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
+  tmux wait-for "$sentinel" 2>/dev/null
+  if [[ -s "$tmp" ]]; then
+    cat "$tmp"
+    local bytes
+    bytes=$(wc -c <"$tmp" | tr -d ' ')
+    rm -f "$tmp"
+    print -u2 "$name: $bytes bytes copied to clipboard"
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# cpcmd [N] — last (or Nth-latest) command's INPUT. Universal: reads zsh
+# shell history. Clean output (no prompt chrome, no terminal-echo artefacts).
+cpcmd() {
+  emulate -L zsh
+  local n
+  n=$(_cpx_parse_n cpcmd "${1:-1}") || return 1
+  local cmd
+  # fc -ln -N -N: list entries from (-N) to (-N), inclusive — just the Nth back
+  cmd=$(fc -ln -"$n" -"$n" 2>/dev/null)
+  cmd="${cmd#	}"   # strip fc's leading tab
+  cmd="${cmd# }"
+  if [[ -z "$cmd" ]]; then
+    print -u2 "cpcmd: no command at N=$n in shell history"
+    return 1
+  fi
+  printf '%s\n' "$cmd" | _cpx_to_clipboard || {
+    print -u2 "cpcmd: no clipboard tool available (install pbcopy / xclip / xsel / wl-copy, or run inside tmux)"
+    return 1
+  }
+  printf '%s\n' "$cmd"
+  print -u2 "cpcmd: ${#cmd} bytes (zsh history -$n) copied to clipboard"
+}
+
+# cpout [N] — last (or Nth-latest) command's OUTPUT via tmux's OSC 133 line
+# attrs. cpout/cpcmd/cpblock themselves are preexec-skipped for C, so N=1
+# lands on the *previous* command's output start, N=2 on the one before, etc.
+cpout() {
+  emulate -L zsh
+  if [[ -z "$TMUX" ]]; then
+    print -u2 "cpout: requires tmux (OSC 133 boundaries are stored per-pane by tmux). Use cpcmd for input, or your terminal's native 'copy output' if available."
+    return 1
+  fi
+  local n
+  n=$(_cpx_parse_n cpout "${1:-1}") || return 1
+  _cpx_tmux_select "cpout -$n" "$n" previous-prompt -o || {
+    print -u2 "cpout: empty at N=$n — (a) shell pre-dates chezmoi apply, run 'exec zsh' (verify: echo \$precmd_functions | grep osc133); (b) N exceeds command history in this pane; (c) target command is an alt-screen TUI (vim, htop) with no OSC 133 output."
+    return 1
+  }
+}
+
+# cpblock [N] — last (or Nth-latest) command's FULL BLOCK (prompt + input +
+# output), Warp-style. The OSC 133 A marker is embedded in PROMPT itself
+# (02_shell_integration.zsh) so cpblock's OWN prompt carries an A too —
+# call previous-prompt N+1 times to skip self + land N-back.
+cpblock() {
+  emulate -L zsh
+  if [[ -z "$TMUX" ]]; then
+    print -u2 "cpblock: requires tmux (see cpout for why)."
+    return 1
+  fi
+  local n
+  n=$(_cpx_parse_n cpblock "${1:-1}") || return 1
+  _cpx_tmux_select "cpblock -$n" $(( n + 1 )) previous-prompt || {
+    print -u2 "cpblock: empty at N=$n — run 'exec zsh' if the shell pre-dates chezmoi apply, or N exceeds command history in this pane."
+    return 1
+  }
+}
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:13:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply + end-to-end indexed cpblock/cpout/cpcmd test
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh && echo "syntax OK"
+chezmoi apply 2>&1
+echo "==== test indexed cpblock ===="
+tmux kill-session -t _idx 2>/dev/null
+tmux new-session -d -s _idx -x 140 -y 40 'zsh -i'
+sleep 1.0
+tmux send-keys -t _idx 'echo AAA-1' Enter; sleep 0.3
+tmux send-keys -t _idx 'echo BBB-2' Enter; sleep 0.3
+tmux send-keys -t _idx 'echo CCC-3' Enter; sleep 0.3
+tmux send-keys -t _idx 'cpblock > /tmp/b1.txt 2>/tmp/b1.err' Enter; sleep 0.8
+tmux send-keys -t _idx 'cpblock 2 > /tmp/b2.txt 2>/tmp/b2.err' Enter; sleep 0.8
+tmux send-keys -t _idx 'cpblock 3 > /tmp/b3.txt 2>/tmp/b3.err' Enter; sleep 0.8
+tmux send-keys -t _idx 'cpout 1 > /tmp/o1.txt 2>/tmp/o1.err' Enter; sleep 0.8
+tmux send-keys -t _idx 'cpout 2 > /tmp/o2.txt 2>/tmp/o2.err' Enter; sleep 0.8
+tmux send-keys -t _idx 'cpcmd 1 > /tmp/c1.txt 2>/tmp/c1.err' Enter; sleep 0.5
+tmux send-keys -t _idx 'cpcmd 3 > /tmp/c3.txt 2>/tmp/c3.err' Enter; sleep 0.5
+tmux send-keys -t _idx 'cpblock abc > /tmp/bad.txt 2>/tmp/bad.err; echo "rc=$?"' Enter; sleep 0.5
+for f in b1 b2 b3 o1 o2 c1 c3 bad; do
+  echo "=== $f stdout ==="
+  cat /tmp/$f.txt | sed 's/$/|/'
+  echo "=== $f stderr ==="
+  cat /tmp/$f.err
+done
+tmux kill-session -t _idx
+rm -f /tmp/b?.txt /tmp/b?.err /tmp/o?.txt /tmp/o?.err /tmp/c?.txt /tmp/c?.err /tmp/bad.*
+```
+
+```text
+syntax OK
+==== test indexed cpblock ====
+=== b1 stdout ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+=== b1 stderr ===
+cpblock -1: 50 bytes copied to clipboard
+=== b2 stdout ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+=== b2 stderr ===
+cpblock -2: 50 bytes copied to clipboard
+=== b3 stdout ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+=== b3 stderr ===
+cpblock -3: 50 bytes copied to clipboard
+=== o1 stdout ===
+CCC-3|
+|
+=== o1 stderr ===
+cpout -1: 7 bytes copied to clipboard
+=== o2 stdout ===
+BBB-2|
+|
+=== o2 stderr ===
+cpout -2: 7 bytes copied to clipboard
+=== c1 stdout ===
+cpout 2 > /tmp/o2.txt 2>/tmp/o2.err|
+=== c1 stderr ===
+cpcmd: 35 bytes (zsh history -1) copied to clipboard
+=== c3 stdout ===
+cpout 1 > /tmp/o1.txt 2>/tmp/o1.err|
+=== c3 stderr ===
+cpcmd: 35 bytes (zsh history -3) copied to clipboard
+=== bad stdout ===
+=== bad stderr ===
+cpblock: N must be a positive integer (got: abc). Usage: cpblock [N]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:14:46Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:14:47Z)**_
+
+cpblock N 沒前進。懷疑是 tmux send-keys 太快沒處理到，或對 consecutive A markers 行為不同。加 debug 測 cursor 位置：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:14:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Manual step-by-step previous-prompt to see cursor advance behavior
+
+```bash
+tmux kill-session -t _dbg 2>/dev/null
+tmux new-session -d -s _dbg -x 140 -y 40 'zsh -i'
+sleep 1.0
+tmux send-keys -t _dbg 'echo AAA-1' Enter; sleep 0.3
+tmux send-keys -t _dbg 'echo BBB-2' Enter; sleep 0.3
+tmux send-keys -t _dbg 'echo CCC-3' Enter; sleep 0.3
+echo "=== pane visible content ==="
+tmux capture-pane -p -t _dbg
+echo "=== step through previous-prompt manually ==="
+tmux copy-mode -t _dbg
+tmux send-keys -t _dbg -X history-bottom
+echo "bottom: $(tmux display-message -p -t _dbg '#{copy_cursor_x},#{copy_cursor_y}')"
+for i in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _dbg -X previous-prompt
+  echo "after prev-prompt #$i: $(tmux display-message -p -t _dbg '#{copy_cursor_x},#{copy_cursor_y}')"
+done
+tmux kill-session -t _dbg
+```
+
+```text
+=== pane visible content ===
+echo AAA-1
+echo BBB-2
+echo CCC-3
+
+chezmoi on  main [$!?⇡2]
+❯ echo AAA-1
+AAA-1
+echo BBB-2
+echo CCC-3
+
+chezmoi on  main [$!?⇡2]
+❯ echo BBB-2
+echo CCC-3
+BBB-2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== step through previous-prompt manually ===
+bottom: 0,39
+after prev-prompt #1: 0,9
+after prev-prompt #2: 0,3
+after prev-prompt #3: 0,3
+after prev-prompt #4: 0,3
+after prev-prompt #5: 0,3
+after prev-prompt #6: 0,3
+after prev-prompt #7: 0,3
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:05Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with slower pacing (1s between Enter)
+
+```bash
+tmux kill-session -t _dbg 2>/dev/null
+tmux new-session -d -s _dbg -x 140 -y 40 'zsh -i'
+sleep 2.0
+tmux send-keys -t _dbg 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _dbg 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _dbg 'echo CCC-3' Enter; sleep 1.0
+echo "=== pane ==="
+tmux capture-pane -p -t _dbg
+echo "=== step ==="
+tmux copy-mode -t _dbg
+tmux send-keys -t _dbg -X history-bottom
+echo "bottom: $(tmux display-message -p -t _dbg '#{copy_cursor_x},#{copy_cursor_y}')"
+for i in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _dbg -X previous-prompt
+  echo "prev-prompt #$i: $(tmux display-message -p -t _dbg '#{copy_cursor_x},#{copy_cursor_y}')"
+done
+tmux kill-session -t _dbg
+```
+
+```text
+=== pane ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo AAA-1
+AAA-1
+
+chezmoi on  main [$!?⇡2]
+❯ echo BBB-2
+BBB-2
+
+chezmoi on  main [$!?⇡2]
+❯ echo CCC-3
+CCC-3
+
+chezmoi on  main [$!?⇡2]
+❯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== step ===
+bottom: 0,39
+prev-prompt #1: 0,12
+prev-prompt #2: 0,8
+prev-prompt #3: 0,4
+prev-prompt #4: 0,0
+prev-prompt #5: 0,0
+prev-prompt #6: 0,0
+prev-prompt #7: 0,0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:23Z)**_
+
+Timing 問題解決。用 1 秒 sleep 每 command，cursor 能正確跳 4 個 A markers。再測一次 cpblock N：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Proper-pacing retest of cpblock N
+
+```bash
+tmux kill-session -t _rt 2>/dev/null
+tmux new-session -d -s _rt -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _rt 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo CCC-3' Enter; sleep 1.0
+tmux send-keys -t _rt 'cpblock   > /tmp/b1.txt 2>/tmp/b1.err' Enter; sleep 1.0
+tmux send-keys -t _rt 'cpblock 2 > /tmp/b2.txt 2>/tmp/b2.err' Enter; sleep 1.0
+tmux send-keys -t _rt 'cpblock 3 > /tmp/b3.txt 2>/tmp/b3.err' Enter; sleep 1.0
+tmux send-keys -t _rt 'cpblock 4 > /tmp/b4.txt 2>/tmp/b4.err' Enter; sleep 1.0
+for f in b1 b2 b3 b4; do
+  echo "=== $f ==="
+  cat /tmp/$f.txt | sed 's/$/|/'
+  echo "-- err: $(cat /tmp/$f.err)"
+done
+tmux kill-session -t _rt
+rm -f /tmp/b?.txt /tmp/b?.err
+```
+
+```text
+=== b1 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -1: 50 bytes copied to clipboard
+=== b2 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -2: 50 bytes copied to clipboard
+=== b3 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -3: 50 bytes copied to clipboard
+=== b4 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -4: 50 bytes copied to clipboard
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:51Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:51Z)**_
+
+加 tiny sleep 在 for-loop 內每次 send-keys 之間測：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:15:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:16:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest cpblock N with 20ms sleep between send-keys
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _rt 2>/dev/null
+tmux new-session -d -s _rt -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _rt 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo CCC-3' Enter; sleep 1.0
+tmux send-keys -t _rt 'cpblock   > /tmp/b1.txt 2>/tmp/b1.err' Enter; sleep 1.2
+tmux send-keys -t _rt 'cpblock 2 > /tmp/b2.txt 2>/tmp/b2.err' Enter; sleep 1.2
+tmux send-keys -t _rt 'cpblock 3 > /tmp/b3.txt 2>/tmp/b3.err' Enter; sleep 1.2
+for f in b1 b2 b3; do
+  echo "=== $f ==="
+  cat /tmp/$f.txt | sed 's/$/|/'
+  echo "-- err: $(cat /tmp/$f.err)"
+done
+tmux kill-session -t _rt
+rm -f /tmp/b?.txt /tmp/b?.err
+```
+
+```text
+=== b1 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -1: 50 bytes copied to clipboard
+=== b2 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -2: 50 bytes copied to clipboard
+=== b3 ===
+|
+chezmoi on  main [$!?⇡2]|
+❯ echo CCC-3|
+CCC-3|
+|
+-- err: cpblock -3: 50 bytes copied to clipboard
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:16:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:16:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare burst vs delayed repeated previous-prompt from outside the pane
+
+```bash
+tmux kill-session -t _dbg 2>/dev/null
+tmux new-session -d -s _dbg -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _dbg 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _dbg 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _dbg 'echo CCC-3' Enter; sleep 1.0
+# Now invoke cpblock-like chain from OUTSIDE the pane (via tmux commands from bash)
+# This simulates what the for-loop inside _cpx_tmux_select does
+tmux copy-mode -t _dbg
+echo "initial: $(tmux display-message -p -t _dbg '#{copy_cursor_y}')"
+# Simulate tight loop of prev-prompt with NO sleep (like zsh for-loop rapidly)
+for i in 1 2 3 4; do
+  tmux send-keys -t _dbg -X previous-prompt
+done
+echo "after burst of 4: $(tmux display-message -p -t _dbg '#{copy_cursor_y}')"
+tmux send-keys -t _dbg -X cancel
+# Retry with delay
+tmux copy-mode -t _dbg
+for i in 1 2 3 4; do
+  tmux send-keys -t _dbg -X previous-prompt
+  sleep 0.05
+done
+echo "after delayed 4: $(tmux display-message -p -t _dbg '#{copy_cursor_y}')"
+tmux kill-session -t _dbg
+```
+
+```text
+initial: 15
+after burst of 4: 1
+after delayed 4: 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:17:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:17:09Z)**_
+
+從外面 pane 測 `-N 2` 跟 multiple calls 對比：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:17:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test -N 3 with -X vs 3 separate calls from outside
+
+```bash
+tmux kill-session -t _dn 2>/dev/null
+tmux new-session -d -s _dn -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _dn 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _dn 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _dn 'echo CCC-3' Enter; sleep 1.0
+echo "=== test: send-keys -N 3 -X previous-prompt from outside ==="
+tmux copy-mode -t _dn
+echo "initial: $(tmux display-message -p -t _dn '#{copy_cursor_y}')"
+tmux send-keys -t _dn -N 3 -X previous-prompt
+echo "after -N 3 -X prev-prompt: $(tmux display-message -p -t _dn '#{copy_cursor_y}')"
+tmux send-keys -t _dn -X cancel
+echo "=== test: dispatch 3 sep calls in a bash loop from outside ==="
+tmux copy-mode -t _dn
+for _ in 1 2 3; do tmux send-keys -t _dn -X previous-prompt; done
+echo "after 3x calls no sleep: $(tmux display-message -p -t _dn '#{copy_cursor_y}')"
+tmux kill-session -t _dn
+```
+
+```text
+=== test: send-keys -N 3 -X previous-prompt from outside ===
+initial: 15
+after -N 3 -X prev-prompt: 13
+=== test: dispatch 3 sep calls in a bash loop from outside ===
+after 3x calls no sleep: 5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:18:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:18:00Z)**_
+
+讓 `_cpx_tmux_select` 加 debug 輸出 cursor 位置，搞清楚發生什麼：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:18:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Debug: print cursor pos after each previous-prompt inside a cpblock-like loop
+
+```bash
+tmux kill-session -t _rt 2>/dev/null
+tmux new-session -d -s _rt -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _rt 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _rt 'echo CCC-3' Enter; sleep 1.0
+# Run a debug cpblock 3 that prints cursor pos between each step
+tmux send-keys -t _rt '_debug_cpblock() { local n=$1; local i; tmux copy-mode -t "$TMUX_PANE"; echo "start: $(tmux display-message -p -t "$TMUX_PANE" "#{copy_cursor_y}")" >&2; for (( i = 0; i <= n; i++ )); do tmux send-keys -t "$TMUX_PANE" -X previous-prompt; echo "after #$i: $(tmux display-message -p -t "$TMUX_PANE" "#{copy_cursor_y}")" >&2; done; tmux send-keys -t "$TMUX_PANE" -X cancel; }' Enter
+sleep 0.5
+tmux send-keys -t _rt '_debug_cpblock 3 2>/tmp/dbg.log' Enter
+sleep 2.0
+cat /tmp/dbg.log
+tmux kill-session -t _rt
+rm -f /tmp/dbg.log
+```
+
+```text
+start: 20
+after #0: 17
+after #1: 12
+after #2: 8
+after #3: 4
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:18:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:18:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check whether cpblock's own A marker makes it into scrollback
+
+```bash
+tmux kill-session -t _am 2>/dev/null
+tmux new-session -d -s _am -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _am 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _am 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _am 'echo CCC-3' Enter; sleep 1.0
+# Run a cpblock
+tmux send-keys -t _am 'cpblock > /tmp/_am.out 2>&1' Enter; sleep 1.2
+# Run another echo so we have a NEW prompt after cpblock
+tmux send-keys -t _am 'echo DDD-4' Enter; sleep 1.0
+echo "=== pane ==="
+tmux capture-pane -p -t _am
+echo "=== step through prev-prompt, how many A markers? ==="
+tmux copy-mode -t _am
+tmux send-keys -t _am -X history-bottom
+echo "bottom: $(tmux display-message -p -t _am '#{copy_cursor_y}')"
+for i in 1 2 3 4 5 6 7 8; do
+  tmux send-keys -t _am -X previous-prompt
+  echo "prev #$i: $(tmux display-message -p -t _am '#{copy_cursor_y}')"
+done
+tmux kill-session -t _am
+rm -f /tmp/_am.out
+```
+
+```text
+=== pane ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo AAA-1
+AAA-1
+
+chezmoi on  main [$!?⇡2]
+❯ echo BBB-2
+BBB-2
+
+chezmoi on  main [$!?⇡2]
+❯ echo CCC-3
+CCC-3
+
+chezmoi on  main [$!?⇡2]
+❯ cpblock > /tmp/_am.out 2>&1
+
+chezmoi on  main [$!?⇡2]
+❯ echo DDD-4
+DDD-4
+
+chezmoi on  main [$!?⇡2]
+❯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=== step through prev-prompt, how many A markers? ===
+bottom: 39
+prev #1: 19
+prev #2: 15
+prev #3: 12
+prev #4: 8
+prev #5: 4
+prev #6: 0
+prev #7: 0
+prev #8: 0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:19:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:19:45Z)**_
+
+Wait — 先再想一下 semantics。`cpblock 2` at b2 time — 從 b2 看「2 back」= b1（當時 hist[1]=cpblock）, 所以 hist[2]=CCC-3. 我的 code 給 CCC-3 **是對的**。剛剛 b3 test 也給 CCC-3 其實也正確：從 b3 看 3 back = hist[3] = CCC-3。
+
+讓我測到 cpblock 4 和 5 確認 N 真的在前進：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:20:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Varied N tests (v1..v6) to confirm N actually scales
+
+```bash
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+tmux send-keys -t _v 'echo AAA-1' Enter; sleep 1.0
+tmux send-keys -t _v 'echo BBB-2' Enter; sleep 1.0
+tmux send-keys -t _v 'echo CCC-3' Enter; sleep 1.0
+tmux send-keys -t _v 'echo DDD-4' Enter; sleep 1.0
+tmux send-keys -t _v 'echo EEE-5' Enter; sleep 1.0
+# Now one cpblock invocation with different N values, fresh each time (each in own shell to avoid polluting hist)
+# Actually, since each cpblock adds to history, let's just call 5 of them and expect semantic N-back from CURRENT cpblock
+# (so cpblock 1 → prev cpblock (or EEE), cpblock 2 → one before that, etc.)
+# To cleanly test, we'll run them in sequence and the user CAN reason about what each N maps to
+tmux send-keys -t _v 'cpblock 1 > /tmp/v1.txt 2>&1' Enter; sleep 1.0
+tmux send-keys -t _v 'cpblock 2 > /tmp/v2.txt 2>&1' Enter; sleep 1.0
+tmux send-keys -t _v 'cpblock 3 > /tmp/v3.txt 2>&1' Enter; sleep 1.0
+tmux send-keys -t _v 'cpblock 4 > /tmp/v4.txt 2>&1' Enter; sleep 1.0
+tmux send-keys -t _v 'cpblock 5 > /tmp/v5.txt 2>&1' Enter; sleep 1.0
+tmux send-keys -t _v 'cpblock 6 > /tmp/v6.txt 2>&1' Enter; sleep 1.0
+for i in 1 2 3 4 5 6; do
+  echo "=== v$i (first 200 chars) ==="
+  head -c 200 /tmp/v$i.txt
+  echo
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+=== v1 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -1: 50 bytes copied to clipboard
+
+=== v2 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -2: 50 bytes copied to clipboard
+
+=== v3 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -3: 50 bytes copied to clipboard
+
+=== v4 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -4: 50 bytes copied to clipboard
+
+=== v5 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -5: 50 bytes copied to clipboard
+
+=== v6 (first 200 chars) ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo EEE-5
+EEE-5
+
+cpblock -6: 50 bytes copied to clipboard
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:20:32Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:20:34Z)**_
+
+Debug 版本成功的差別在每次 send-keys 後都 `tmux display-message` 當 sync barrier。20ms sleep 可能還不夠。試更大 sleep 或加 display-message 同步：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:20:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:21:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest after adding display-message sync barrier
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5 6; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>&1" Enter; sleep 1.2
+done
+for n in 1 2 3 4 5 6; do
+  echo "=== v$n ==="
+  grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -2 | tr '\n' ' '
+  echo
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+=== v1 ===
+EEE-5 EEE-5 
+=== v2 ===
+EEE-5 EEE-5 
+=== v3 ===
+EEE-5 EEE-5 
+=== v4 ===
+EEE-5 EEE-5 
+=== v5 ===
+EEE-5 EEE-5 
+=== v6 ===
+EEE-5 EEE-5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:21:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:21:23Z)**_
+
+可能 copy-mode 進入時 cursor 不在 bottom。加 `history-bottom` 確保起點：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:21:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with history-bottom seek added
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>&1" Enter; sleep 1.2
+done
+for n in 1 2 3 4 5 6 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  echo "v$n → $m"
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+v1 → EEE-5
+v2 → EEE-5
+v3 → EEE-5
+v4 → EEE-5
+v5 → EEE-5
+v6 → EEE-5
+v7 → EEE-5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:05Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:06Z)**_
+
+寫 inline 測試直接看 cursor 在 cpblock 執行時每一步位置：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inline debug mirroring _cpx_tmux_select with echo between steps
+
+```bash
+cat > /tmp/debug_cpblock.zsh << 'EOF'
+debug_cpblock() {
+  local n=${1:-3}
+  local prev_count=$(( n + 1 ))
+  echo "=== starting debug cpblock with N=$n (prev_count=$prev_count) ==="
+  tmux copy-mode -t "$TMUX_PANE"
+  echo "after copy-mode: cursor=$(tmux display-message -p '#{copy_cursor_y}')"
+  tmux send-keys -t "$TMUX_PANE" -X history-bottom
+  echo "after history-bottom: cursor=$(tmux display-message -p '#{copy_cursor_y}')"
+  local i
+  for (( i = 0; i < prev_count; i++ )); do
+    tmux send-keys -t "$TMUX_PANE" -X previous-prompt
+    echo "after prev-prompt #$i: cursor=$(tmux display-message -p '#{copy_cursor_y}')"
+  done
+  tmux send-keys -t "$TMUX_PANE" -X begin-selection
+  tmux send-keys -t "$TMUX_PANE" -X next-prompt
+  echo "after next-prompt: cursor=$(tmux display-message -p '#{copy_cursor_y}')"
+  tmux send-keys -t "$TMUX_PANE" -X cancel
+}
+EOF
+tmux kill-session -t _z 2>/dev/null
+tmux new-session -d -s _z -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _z "echo $c" Enter; sleep 1.0
+done
+tmux send-keys -t _z 'source /tmp/debug_cpblock.zsh' Enter; sleep 0.5
+tmux send-keys -t _z 'debug_cpblock 3 > /tmp/dbg.log 2>&1' Enter; sleep 2.5
+echo "=== debug output ==="
+cat /tmp/dbg.log
+tmux kill-session -t _z
+rm -f /tmp/debug_cpblock.zsh /tmp/dbg.log
+```
+
+```text
+=== debug output ===
+=== starting debug cpblock with N=3 (prev_count=4) ===
+after copy-mode: cursor=26
+after history-bottom: cursor=39
+after prev-prompt #0: cursor=23
+after prev-prompt #1: cursor=20
+after prev-prompt #2: cursor=16
+after prev-prompt #3: cursor=12
+after next-prompt: cursor=16
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:32Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:33Z)**_
+
+`display-message -p ''` 不夠 — 必須 query 一個真值才算 round-trip。改用 `'#{copy_cursor_y}'`：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:22:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated. All occurrences were successfully replaced.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with display-message querying copy_cursor_y
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>&1" Enter; sleep 1.2
+done
+echo "=== expected map (at cpblock N invocation, N-back by full history) ==="
+echo "v1: prev = (cpblock N's own prev: the last command completed). Depends on history."
+for n in 1 2 3 4 5 6 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  echo "v$n → $m"
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+=== expected map (at cpblock N invocation, N-back by full history) ===
+v1: prev = (cpblock N's own prev: the last command completed). Depends on history.
+v1 → EEE-5
+v2 → EEE-5
+v3 → EEE-5
+v4 → EEE-5
+v5 → EEE-5
+v6 → EEE-5
+v7 → EEE-5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:14Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full debug with selection capture
+
+```bash
+cat > /tmp/dbg_full.zsh << 'EOF'
+debug_cpblock_full() {
+  local n=${1:-3}
+  local prev_count=$(( n + 1 ))
+  local tmp=/tmp/dbg_sel.$$
+  local sentinel=dbg-$$
+  : > "$tmp"
+  tmux copy-mode -t "$TMUX_PANE"
+  tmux send-keys -t "$TMUX_PANE" -X history-bottom
+  local i
+  for (( i = 0; i < prev_count; i++ )); do
+    tmux send-keys -t "$TMUX_PANE" -X previous-prompt
+    echo "after prev-prompt #$i: $(tmux display-message -p '#{copy_cursor_y}')" >&2
+  done
+  tmux send-keys -t "$TMUX_PANE" -X begin-selection
+  tmux send-keys -t "$TMUX_PANE" -X next-prompt
+  echo "after next-prompt: $(tmux display-message -p '#{copy_cursor_y}')" >&2
+  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel "tee $tmp; tmux wait-for -S $sentinel"
+  tmux wait-for "$sentinel"
+  echo "=== SELECTION ===" >&2
+  cat "$tmp" >&2
+  echo "=== END ===" >&2
+  rm -f "$tmp"
+}
+EOF
+tmux kill-session -t _z 2>/dev/null
+tmux new-session -d -s _z -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _z "echo $c" Enter; sleep 1.0
+done
+tmux send-keys -t _z 'source /tmp/dbg_full.zsh' Enter; sleep 0.5
+tmux send-keys -t _z 'debug_cpblock_full 3 2>/tmp/dbg.log' Enter; sleep 2.5
+cat /tmp/dbg.log
+tmux kill-session -t _z
+rm -f /tmp/dbg_full.zsh /tmp/dbg.log
+```
+
+```text
+after prev-prompt #0: 23
+after prev-prompt #1: 20
+after prev-prompt #2: 16
+after prev-prompt #3: 12
+after next-prompt: 16
+=== SELECTION ===
+
+chezmoi on  main [$!?⇡2]
+❯ echo DDD-4
+DDD-4
+
+=== END ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:45Z)**_
+
+改用 `_=$(...)` 捕獲 display-message output — 強制 subprocess 完成 round-trip：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:23:47Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated. All occurrences were successfully replaced.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:24:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with _=$(...) capture
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>&1" Enter; sleep 1.5
+done
+for n in 1 2 3 4 5 6 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  echo "v$n → ${m:-<empty>}"
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+v1 → EEE-5
+v2 → EEE-5
+v3 → EEE-5
+v4 → EEE-5
+v5 → EEE-5
+v6 → EEE-5
+v7 → EEE-5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:24:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:24:23Z)**_
+
+把真正管用的 stderr echo 放回 production code 看是不是 echo 本身是 load-bearing：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:24:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:25:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test with stderr echo in the loop
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 3 5 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>/tmp/v$n.err" Enter; sleep 1.5
+done
+for n in 1 3 5 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  echo "=== v$n → $m ==="
+  echo "stderr:"
+  cat /tmp/v$n.err
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt /tmp/v*.err
+```
+
+```text
+=== v1 → EEE-5 ===
+stderr:
+_cpx step #0 cursor=20
+_cpx step #1 cursor=16
+cpblock -1: 50 bytes copied to clipboard
+=== v3 → DDD-4 ===
+stderr:
+_cpx step #0 cursor=23
+_cpx step #1 cursor=20
+_cpx step #2 cursor=16
+_cpx step #3 cursor=12
+cpblock -3: 50 bytes copied to clipboard
+=== v5 → CCC-3 ===
+stderr:
+_cpx step #0 cursor=26
+_cpx step #1 cursor=23
+_cpx step #2 cursor=20
+_cpx step #3 cursor=16
+_cpx step #4 cursor=12
+_cpx step #5 cursor=8
+cpblock -5: 50 bytes copied to clipboard
+=== v7 → BBB-2 ===
+stderr:
+_cpx step #0 cursor=29
+_cpx step #1 cursor=26
+_cpx step #2 cursor=23
+_cpx step #3 cursor=20
+_cpx step #4 cursor=16
+_cpx step #5 cursor=12
+_cpx step #6 cursor=8
+_cpx step #7 cursor=4
+cpblock -7: 50 bytes copied to clipboard
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:25:15Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:25:16Z)**_
+
+Echo 能同步是因為 `$(tmux display-message)` 被作為 arg 展開；`_=$(...)` 可能被 zsh 最佳化掉。改用 `: "$(tmux ...)"`（讀取但丟棄）：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:25:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:25:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with : "$(...)" sync
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5 6 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>/tmp/v$n.err" Enter; sleep 1.5
+done
+for n in 1 2 3 4 5 6 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  err=$(cat /tmp/v$n.err)
+  echo "v$n → ${m:-<empty>}  ($err)"
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt /tmp/v*.err
+```
+
+```text
+v1 → EEE-5  (cpblock -1: 50 bytes copied to clipboard)
+v2 → EEE-5  (cpblock -2: 50 bytes copied to clipboard)
+v3 → EEE-5  (cpblock -3: 50 bytes copied to clipboard)
+v4 → EEE-5  (cpblock -4: 50 bytes copied to clipboard)
+v5 → EEE-5  (cpblock -5: 50 bytes copied to clipboard)
+v6 → EEE-5  (cpblock -6: 50 bytes copied to clipboard)
+v7 → EEE-5  (cpblock -7: 50 bytes copied to clipboard)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:09Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:09Z)**_
+
+試 `local x=$(...)` 強制有 assignment 效果：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated. All occurrences were successfully replaced.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retest with local _y=$(...)
+
+```bash
+chezmoi apply 2>&1
+tmux kill-session -t _v 2>/dev/null
+tmux new-session -d -s _v -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _v "echo $c" Enter; sleep 1.0
+done
+for n in 1 3 5 7; do
+  tmux send-keys -t _v "cpblock $n > /tmp/v$n.txt 2>&1" Enter; sleep 1.5
+done
+for n in 1 3 5 7; do
+  m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/v$n.txt | head -1)
+  echo "v$n → ${m:-<empty>}"
+done
+tmux kill-session -t _v
+rm -f /tmp/v*.txt
+```
+
+```text
+v1 → EEE-5
+v3 → DDD-4
+v5 → CCC-3
+v7 → BBB-2
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:45Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:46Z)**_
+
+搞定。`local _y=$(...)` 是正確的 sync barrier；`: "$(...)"` 會被 zsh 當 no-op 最佳化掉。清理 + 驗所有三個 helper。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:26:47Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/03_tmux_capture.zsh`
+
+```text
+60	#        begin-selection → next-prompt →
+61	#        copy-pipe-and-cancel "tee <tmp> | tmux load-buffer -w -" → wait-for
+62	#
+63	# <prev-count> is how many times to repeat the `previous-*` command before
+64	# starting the selection — that's how N-back lookback is done.
+65	#
+66	# Depends on 02_shell_integration.zsh skipping the OSC 133 C marker for
+67	# these helpers' own invocation (see the case statement there). Without
+68	# that skip, `previous-prompt -o` would land on this command's own output
+69	# start and the selection would be empty.
+70	_cpx_tmux_select() {
+71	  local name=$1; shift
+72	  local prev_count=$1; shift
+73	  local tmp sentinel i
+74	  tmp="${TMPDIR:-/tmp}/cpx-$$-$RANDOM"
+75	  sentinel="cpx-$$-$RANDOM"
+76	  : > "$tmp"
+77	  tmux copy-mode -t "$TMUX_PANE" 2>/dev/null || return 1
+78	  # Seek to bottom so N-back math is measured from a known origin.
+79	  tmux send-keys -t "$TMUX_PANE" -X history-bottom 2>/dev/null
+80	  # Sync barrier: `: "$(tmux display-message ...)"` forces the shell to wait
+81	  # for display-message to return, which in turn makes the tmux server commit
+82	  # the preceding `send-keys -X` before answering. Without this round-trip,
+83	  # bursts of `send-keys -X previous-prompt` collapse to a single cursor jump
+84	  # (observed on tmux 3.6a — the server processes send-keys lazily when the
+85	  # next incoming command doesn't force it to flush).
+86	  for (( i = 0; i < prev_count; i++ )); do
+87	    tmux send-keys -t "$TMUX_PANE" -X "$@" 2>/dev/null
+88	    local _y; _y=$(tmux display-message -p -t "$TMUX_PANE" '#{copy_cursor_y}' 2>/dev/null)
+89	  done
+90	  tmux send-keys -t "$TMUX_PANE" -X begin-selection 2>/dev/null
+91	  tmux send-keys -t "$TMUX_PANE" -X next-prompt 2>/dev/null
+92	  local _y; _y=$(tmux display-message -p -t "$TMUX_PANE" '#{copy_cursor_y}' 2>/dev/null)
+93	  tmux send-keys -t "$TMUX_PANE" -X copy-pipe-and-cancel \
+94	    "tee $tmp | tmux load-buffer -w - ; tmux wait-for -S $sentinel" 2>/dev/null
+95	  tmux wait-for "$sentinel" 2>/dev/null
+96	  if [[ -s "$tmp" ]]; then
+97	    cat "$tmp"
+98	    local bytes
+99	    bytes=$(wc -c <"$tmp" | tr -d ' ')
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:27:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:27:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Final sanity: cpout/cpblock/cpcmd with N=1,3,5 + invalid-N error
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/03_tmux_capture.zsh && echo syntax OK
+chezmoi apply 2>&1
+# Final sanity: test all 3 helpers with varied N
+tmux kill-session -t _final 2>/dev/null
+tmux new-session -d -s _final -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _final "echo $c" Enter; sleep 1.0
+done
+for fn in cpout cpblock cpcmd; do
+  for n in 1 3 5; do
+    tmux send-keys -t _final "$fn $n > /tmp/${fn}_$n.txt 2>&1" Enter; sleep 1.5
+  done
+done
+for fn in cpout cpblock cpcmd; do
+  echo "=== $fn ==="
+  for n in 1 3 5; do
+    m=$(grep -oE '(AAA-1|BBB-2|CCC-3|DDD-4|EEE-5)' /tmp/${fn}_$n.txt | head -1)
+    echo "  $fn $n → ${m:-<empty>}"
+  done
+done
+# Test invalid N
+tmux send-keys -t _final 'cpblock abc > /tmp/bad.txt 2>/tmp/bad.err; echo rc=$?' Enter; sleep 1.0
+echo "--- invalid N ---"
+cat /tmp/bad.err
+tmux kill-session -t _final
+rm -f /tmp/cp*_*.txt /tmp/bad.*
+```
+
+```text
+syntax OK
+=== cpout ===
+  cpout 1 → EEE-5
+  cpout 3 → CCC-3
+  cpout 5 → AAA-1
+=== cpblock ===
+  cpblock 1 → <empty>
+  cpblock 3 → <empty>
+  cpblock 5 → <empty>
+=== cpcmd ===
+  cpcmd 1 → <empty>
+  cpcmd 3 → <empty>
+  cpcmd 5 → <empty>
+--- invalid N ---
+cpblock: N must be a positive integer (got: abc). Usage: cpblock [N]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:27:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:28:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Isolate cpblock N test
+
+```bash
+tmux kill-session -t _fd 2>/dev/null
+tmux new-session -d -s _fd -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _fd "echo $c" Enter; sleep 1.0
+done
+# Now ONLY test cpblock in isolation
+tmux send-keys -t _fd 'cpblock 1 > /tmp/x1.txt 2>/tmp/x1.err' Enter; sleep 1.5
+tmux send-keys -t _fd 'cpblock 3 > /tmp/x3.txt 2>/tmp/x3.err' Enter; sleep 1.5
+tmux send-keys -t _fd 'cpblock 5 > /tmp/x5.txt 2>/tmp/x5.err' Enter; sleep 1.5
+for n in 1 3 5; do
+  echo "=== cpblock $n stdout (first 80b) ==="
+  head -c 80 /tmp/x$n.txt | sed 's/$/|/'
+  echo
+  echo "--- stderr ---"
+  cat /tmp/x$n.err
+done
+tmux kill-session -t _fd
+rm -f /tmp/x*.txt /tmp/x*.err
+```
+
+```text
+=== cpblock 1 stdout (first 80b) ===
+|
+chezmoi on  main [$!?⇡3]|
+❯ echo EEE-5|
+EEE-5|
+|
+
+--- stderr ---
+cpblock -1: 50 bytes copied to clipboard
+=== cpblock 3 stdout (first 80b) ===
+|
+chezmoi on  main [$!?⇡3]|
+❯ echo DDD-4|
+DDD-4|
+|
+
+--- stderr ---
+cpblock -3: 50 bytes copied to clipboard
+=== cpblock 5 stdout (first 80b) ===
+|
+chezmoi on  main [$!?⇡3]|
+❯ echo CCC-3|
+CCC-3|
+|
+
+--- stderr ---
+cpblock -5: 50 bytes copied to clipboard
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:28:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:28:29Z)**_
+
+All working. 之前 combined test 空值是測試工具問題不是實作問題 — cpblock isolation 確認 N=1/3/5 正確。接著測 cpcmd:
+
+_**Agent (claude-opus-4-7 2026-04-24 05:28:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test cpcmd N + invalid N
+
+```bash
+tmux kill-session -t _c 2>/dev/null
+tmux new-session -d -s _c -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in AAA-1 BBB-2 CCC-3 DDD-4 EEE-5; do
+  tmux send-keys -t _c "echo $c" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5; do
+  tmux send-keys -t _c "cpcmd $n > /tmp/m$n.txt 2>/tmp/m$n.err" Enter; sleep 1.0
+done
+for n in 1 2 3 4 5; do
+  echo "cpcmd $n → $(head -c 60 /tmp/m$n.txt)"
+done
+echo ""
+echo "--- invalid N ---"
+tmux send-keys -t _c 'cpout 0 > /tmp/z.txt 2>/tmp/z.err; echo rc=$?' Enter; sleep 1.0
+cat /tmp/z.err
+tmux send-keys -t _c 'cpblock -1 > /tmp/z.txt 2>/tmp/z.err; echo rc=$?' Enter; sleep 1.0
+cat /tmp/z.err
+tmux kill-session -t _c
+rm -f /tmp/m*.txt /tmp/m*.err /tmp/z.*
+```
+
+```text
+cpcmd 1 → echo EEE-5
+cpcmd 2 → echo EEE-5
+cpcmd 3 → echo EEE-5
+cpcmd 4 → echo EEE-5
+cpcmd 5 → echo EEE-5
+
+--- invalid N ---
+cpout: N must be a positive integer (got: 0). Usage: cpout [N]
+cpblock: N must be a positive integer (got: -1). Usage: cpblock [N]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:02Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:02Z)**_
+
+cpcmd N 壞了。先直接測 `fc -ln -N -N` 的語義：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Direct test of fc -ln -N -N
+
+```bash
+tmux kill-session -t _fc 2>/dev/null
+tmux new-session -d -s _fc -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in CMD-A CMD-B CMD-C CMD-D CMD-E; do
+  tmux send-keys -t _fc "echo $c" Enter; sleep 0.8
+done
+# Test fc behaviors
+tmux send-keys -t _fc 'fc -ln -1 -1 > /tmp/f1.txt' Enter; sleep 0.8
+tmux send-keys -t _fc 'fc -ln -2 -2 > /tmp/f2.txt' Enter; sleep 0.8
+tmux send-keys -t _fc 'fc -ln -3 -3 > /tmp/f3.txt' Enter; sleep 0.8
+tmux send-keys -t _fc 'fc -ln -5 -5 > /tmp/f5.txt' Enter; sleep 0.8
+for n in 1 2 3 5; do
+  echo "fc -ln -$n -$n → [$(cat /tmp/f$n.txt)]"
+done
+tmux kill-session -t _fc
+rm -f /tmp/f*.txt
+```
+
+```text
+fc -ln -1 -1 → [echo CMD-E]
+fc -ln -2 -2 → [echo CMD-E]
+fc -ln -3 -3 → [echo CMD-E]
+fc -ln -5 -5 → [echo CMD-D]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Understand fc single-arg vs range-arg semantics
+
+```bash
+tmux kill-session -t _fc 2>/dev/null
+tmux new-session -d -s _fc -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in CMD-A CMD-B CMD-C CMD-D CMD-E; do
+  tmux send-keys -t _fc "echo $c" Enter; sleep 0.8
+done
+# Range test
+tmux send-keys -t _fc 'fc -ln -5 -1 > /tmp/range.txt' Enter; sleep 0.8
+echo "=== fc -ln -5 -1 (range) ==="
+cat /tmp/range.txt
+echo "=== fc -ln -1 (single, positive idx for 1st back) ==="
+tmux send-keys -t _fc 'fc -ln -1 > /tmp/s1.txt' Enter; sleep 0.8
+cat /tmp/s1.txt
+echo "=== fc -ln -3 (single, positive idx for 3rd back? or all from -3 to now?) ==="
+tmux send-keys -t _fc 'fc -ln -3 > /tmp/s3.txt' Enter; sleep 0.8
+cat /tmp/s3.txt
+tmux kill-session -t _fc
+rm -f /tmp/*.txt
+```
+
+```text
+=== fc -ln -5 -1 (range) ===
+echo CMD-A
+echo CMD-B
+echo CMD-C
+echo CMD-D
+echo CMD-E
+=== fc -ln -1 (single, positive idx for 1st back) ===
+fc -ln -5 -1 > /tmp/range.txt
+=== fc -ln -3 (single, positive idx for 3rd back? or all from -3 to now?) ===
+echo CMD-E
+fc -ln -5 -1 > /tmp/range.txt
+fc -ln -1 > /tmp/s1.txt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:29:53Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:30:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Try $history array direct indexing
+
+```bash
+tmux kill-session -t _fc 2>/dev/null
+tmux new-session -d -s _fc -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in CMD-A CMD-B CMD-C CMD-D CMD-E; do
+  tmux send-keys -t _fc "echo $c" Enter; sleep 0.8
+done
+# Use zsh's history array directly
+tmux send-keys -t _fc 'echo "HISTCMD=$HISTCMD"' Enter; sleep 0.5
+tmux send-keys -t _fc 'for i in 1 2 3 4 5; do echo "hist[HISTCMD-$i]=${history[$((HISTCMD-i))]}"; done > /tmp/ha.txt' Enter; sleep 0.8
+cat /tmp/ha.txt
+echo "---"
+tmux send-keys -t _fc 'echo "--"; print -r -- "${history[$((HISTCMD-2))]}" > /tmp/h2.txt' Enter; sleep 0.8
+cat /tmp/h2.txt
+tmux kill-session -t _fc
+rm -f /tmp/*.txt
+```
+
+```text
+hist[HISTCMD-1]=echo "HISTCMD=$HISTCMD"
+hist[HISTCMD-2]=echo CMD-E
+hist[HISTCMD-3]=echo CMD-D
+hist[HISTCMD-4]=echo CMD-C
+hist[HISTCMD-5]=echo CMD-B
+---
+echo "HISTCMD=$HISTCMD"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:30:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:30:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+fc -ln -N -N with different N to locate the off-by-one
+
+```bash
+tmux kill-session -t _fc 2>/dev/null
+tmux new-session -d -s _fc -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in CMD-A CMD-B CMD-C CMD-D CMD-E; do
+  tmux send-keys -t _fc "echo $c" Enter; sleep 0.8
+done
+tmux send-keys -t _fc 'fc -ln -2 > /tmp/s2.txt' Enter; sleep 0.5
+tmux send-keys -t _fc 'fc -ln -3 -3 > /tmp/s33.txt' Enter; sleep 0.5
+tmux send-keys -t _fc 'fc -ln -4 -4 > /tmp/s44.txt' Enter; sleep 0.5
+tmux send-keys -t _fc 'fc -ln -2 -2 > /tmp/s22.txt' Enter; sleep 0.5
+echo "=== fc -ln -2 ==="
+cat /tmp/s2.txt
+echo "=== fc -ln -2 -2 ==="
+cat /tmp/s22.txt
+echo "=== fc -ln -3 -3 ==="
+cat /tmp/s33.txt
+echo "=== fc -ln -4 -4 ==="
+cat /tmp/s44.txt
+tmux kill-session -t _fc
+rm -f /tmp/s*.txt
+```
+
+```text
+=== fc -ln -2 ===
+echo CMD-D
+echo CMD-E
+=== fc -ln -2 -2 ===
+fc -ln -3 -3 > /tmp/s33.txt
+=== fc -ln -3 -3 ===
+echo CMD-D
+=== fc -ln -4 -4 ===
+echo CMD-D
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:31:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:31:05Z)**_
+
+cpcmd 實際運作正確，只是我的測試案例設計讓所有 N 恰好 map 到同一個 echo。用更好的測試驗證：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:31:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+cpcmd sequential with varied N so each returns different entry
+
+```bash
+tmux kill-session -t _cc 2>/dev/null
+tmux new-session -d -s _cc -x 140 -y 40 'zsh -i'
+sleep 1.5
+for c in A B C D E F G; do
+  tmux send-keys -t _cc "echo $c" Enter; sleep 0.8
+done
+# Now a SINGLE cpcmd with different N
+tmux send-keys -t _cc 'cpcmd 1 > /tmp/m.txt 2>/tmp/m.err' Enter; sleep 1.0
+echo "=== cpcmd 1 (expected: echo G) ==="; cat /tmp/m.txt
+tmux send-keys -t _cc 'cpcmd 3 > /tmp/m.txt' Enter; sleep 1.0
+echo "=== cpcmd 3 (expected: cpcmd 1 > /tmp/m.txt, since 3-back = after echo G = cpcmd 1 hist entry) ==="; cat /tmp/m.txt
+tmux send-keys -t _cc 'cpcmd 5 > /tmp/m.txt' Enter; sleep 1.0
+echo "=== cpcmd 5 (expected: echo F — 5 back from cpcmd 5 = after echo G, cpcmd 1, cpcmd 3, cpcmd 5 call itself is HISTCMD, -5 goes 5 real commands back)==="; cat /tmp/m.txt
+tmux send-keys -t _cc 'cpcmd 7 > /tmp/m.txt' Enter; sleep 1.0
+echo "=== cpcmd 7 ==="; cat /tmp/m.txt
+tmux send-keys -t _cc 'cpcmd 9 > /tmp/m.txt' Enter; sleep 1.0
+echo "=== cpcmd 9 ==="; cat /tmp/m.txt
+tmux kill-session -t _cc
+rm -f /tmp/m.*
+```
+
+```text
+=== cpcmd 1 (expected: echo G) ===
+echo G
+=== cpcmd 3 (expected: cpcmd 1 > /tmp/m.txt, since 3-back = after echo G = cpcmd 1 hist entry) ===
+echo F
+=== cpcmd 5 (expected: echo F — 5 back from cpcmd 5 = after echo G, cpcmd 1, cpcmd 3, cpcmd 5 call itself is HISTCMD, -5 goes 5 real commands back)===
+echo E
+=== cpcmd 7 ===
+echo D
+=== cpcmd 9 ===
+echo C
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:31:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:31:40Z)**_
+
+cpout/cpblock/cpcmd 都已驗證 N 正確。開始 Phase 2: `04_ai_capture.zsh` (aifix/aiexplain/aiblock 的 shell wrapper)。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:32:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```zsh
+# AI-powered review of past commands — pipes the Nth block to a coding-agent
+# CLI in one-shot / advisory mode (agent prints its reply to stdout; no file
+# edits). Depends on 03_tmux_capture.zsh for `cpblock`.
+#
+#   aifix [N] [-a AGENT] [-p PROMPT]       # diagnose + suggest fix
+#   aiexplain [N] [-a AGENT] [-p PROMPT]   # explain what happened
+#   aiblock                                 # launch the questionary+rich TUI
+#
+# Agent auto-detection order: claude → opencode → codex → cursor-agent.
+# Override via -a AGENT. Advisory-only by design; there is no --execute flag.
+# For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+
+_aiagent_autodetect() {
+  local cand
+  for cand in claude opencode codex cursor-agent; do
+    if command -v "$cand" &>/dev/null; then
+      print -r -- "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Invoke a coding-agent in one-shot mode. Mirror of the case-map in
+# dot_config/zsh/tools/42_gitlab.zsh (glcreate-ai) so we stay consistent with
+# the repo's one canonical invocation style.
+_aiagent_invoke() {
+  local agent=$1 prompt=$2
+  case "$agent" in
+    claude)       claude -p "$prompt" ;;
+    opencode)     opencode run "$prompt" ;;
+    codex)        codex exec "$prompt" ;;
+    cursor-agent) cursor-agent -p "$prompt" ;;
+    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
+  esac
+}
+
+# Shared dispatcher for aifix / aiexplain. Parses flags, captures the block,
+# builds the prompt, invokes the agent. stdout = agent reply (pipe-friendly);
+# stderr = one-line status ("aifix: claude ← block -3").
+_ai_capture_dispatch() {
+  emulate -L zsh
+  local name=$1; shift
+  local default_prompt=$1; shift
+  local n=1 agent="" prompt_override=""
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)  agent=$2; shift 2 ;;
+      -p|--prompt) prompt_override=$2; shift 2 ;;
+      -h|--help)
+        print -r -- "usage: $name [N] [-a AGENT] [-p PROMPT]"
+        print -r -- "  N          block index back (default 1 = last)"
+        print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+        print -r -- "  -p PROMPT  override default prompt"
+        return 0 ;;
+      --) shift; break ;;
+      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+      *)  n=$1; shift ;;
+    esac
+  done
+  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    print -u2 "$name: N must be a positive integer (got: $n)"
+    return 1
+  fi
+  if [[ -z "$agent" ]]; then
+    agent=$(_aiagent_autodetect) || {
+      print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+      return 1
+    }
+  fi
+  # Capture block via cpblock. 2>/dev/null drops cpblock's own status line;
+  # we print our own below. cpblock's own clipboard-copy side-effect is OK.
+  local block
+  block=$(cpblock "$n" 2>/dev/null) || {
+    print -u2 "$name: cpblock $n failed (check: echo \$precmd_functions | grep osc133; run 'exec zsh' if the shell pre-dates chezmoi apply)"
+    return 1
+  }
+  if [[ -z "$block" ]]; then
+    print -u2 "$name: cpblock $n returned empty"
+    return 1
+  fi
+  local prompt="${prompt_override:-$default_prompt}
+
+$block"
+  print -u2 "$name: $agent ← block -$n"
+  _aiagent_invoke "$agent" "$prompt"
+}
+
+aifix() {
+  _ai_capture_dispatch aifix \
+    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+    "$@"
+}
+
+aiexplain() {
+  _ai_capture_dispatch aiexplain \
+    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+    "$@"
+}
+
+# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+# chezmoi source-path, cached per-shell.
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  emulate -L zsh
+  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      print -u2 "aiblock: could not resolve chezmoi source-path"
+      return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  if [[ ! -f "$_AIBLOCK_SCRIPT" ]]; then
+    print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
+    return 1
+  fi
+  uv run --script "$_AIBLOCK_SCRIPT" "$@"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:32:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+aifix help + failure paths
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh && echo syntax OK
+chezmoi apply 2>&1
+# Test aifix help and autodetect behavior (agents not installed locally, expected error path)
+zsh -ic 'source ~/.config/zsh/tools/03_tmux_capture.zsh; source ~/.config/zsh/tools/04_ai_capture.zsh; aifix --help'
+echo "---"
+# Autodetect without any agent installed: we can only test paths that fail fast outside tmux
+zsh -ic 'source ~/.config/zsh/tools/03_tmux_capture.zsh; source ~/.config/zsh/tools/04_ai_capture.zsh; aifix 1 2>&1 | head -3'
+echo "---"
+# Invalid N
+zsh -ic 'source ~/.config/zsh/tools/03_tmux_capture.zsh; source ~/.config/zsh/tools/04_ai_capture.zsh; aifix abc 2>&1; echo "rc=$?"'
+```
+
+```text
+syntax OK
+(eval):1: can't change option: zle
+(eval):1: can't change option: zle
+usage: aifix [N] [-a AGENT] [-p PROMPT]
+  N          block index back (default 1 = last)
+  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)
+  -p PROMPT  override default prompt
+---
+(eval):1: can't change option: zle
+(eval):1: can't change option: zle
+aifix: cpblock 1 returned empty
+---
+(eval):1: can't change option: zle
+(eval):1: can't change option: zle
+aifix: N must be a positive integer (got: abc)
+rc=1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:32:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:32:38Z)**_
+
+Phase 3: Python TUI `scripts/aiblock.py`.
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "questionary>=2.0",
+#     "rich>=13.9",
+# ]
+# ///
+"""aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+
+UI is a short sequence of questionary prompts + rich panels:
+  1. Pick which recent command you want reviewed (shell history list)
+  2. Preview the captured block (cpblock output)
+  3. Edit the prompt (default: "diagnose + fix")
+  4. Choose an action: print reply / copy / spawn interactive agent / cancel
+
+Advisory-only: agent is invoked with its one-shot flag so replies are text,
+no auto-edits. To iterate further with the context pre-loaded, pick the
+"Spawn interactive agent" action.
+
+Depends on:
+  - dot_config/zsh/tools/02_shell_integration.zsh (OSC 133 markers)
+  - dot_config/zsh/tools/03_tmux_capture.zsh (cpblock)
+  - zsh on PATH (calls `zsh -ic …` for history + cpblock)
+  - tmux (we run inside a pane)
+  - at least one of: claude / opencode / codex / cursor-agent
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+
+import questionary
+from rich.console import Console
+from rich.panel import Panel
+
+DEFAULT_FIX_PROMPT = (
+    "Here is a command I ran in my terminal and its output. "
+    "Diagnose any errors and suggest a concrete fix. Be brief and specific."
+)
+
+AGENT_FLAG_MAP = {
+    "claude": ("-p",),
+    "opencode": ("run",),
+    "codex": ("exec",),
+    "cursor-agent": ("-p",),
+}
+
+console = Console(stderr=False)
+
+
+@dataclass
+class HistoryEntry:
+    n: int          # 1-based index: 1 = most recent
+    command: str    # the command text
+
+
+def detect_agents() -> list[str]:
+    """Return the subset of known agents found on PATH, in preference order."""
+    return [a for a in AGENT_FLAG_MAP if shutil.which(a)]
+
+
+def zsh_run(code: str, timeout: float = 5.0) -> str:
+    """Run `zsh -ic CODE` and return stdout (strip trailing newline).
+
+    -ic is needed so our zsh config loads (sourcing 03_tmux_capture.zsh etc.).
+    """
+    # $ZDOTDIR is set by chezmoi's 00_exports; pass-through so an interactive
+    # zsh finds the user's rc. Inherits TMUX so cpblock sees the right pane.
+    result = subprocess.run(
+        ["zsh", "-ic", code],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        env=os.environ,
+    )
+    return result.stdout.rstrip("\n")
+
+
+def list_recent_commands(n: int = 20) -> list[HistoryEntry]:
+    """Fetch the last `n` shell commands via `fc -ln -{n}`.
+
+    Returns a list ordered most-recent-first, with `.n` matching what
+    cpblock/cpcmd/cpout expect as their positional N arg.
+    """
+    out = zsh_run(f"fc -ln -{n}")
+    lines = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    # fc output is oldest-first; reverse so index 1 == most recent
+    return [HistoryEntry(n=i, command=cmd) for i, cmd in enumerate(reversed(lines), start=1)]
+
+
+def capture_block(n: int) -> str:
+    """Return cpblock N's stdout."""
+    return zsh_run(f"cpblock {n}", timeout=10.0)
+
+
+def invoke_agent_oneshot(agent: str, prompt: str) -> str:
+    """Invoke an agent in non-interactive mode, return its stdout."""
+    flags = AGENT_FLAG_MAP[agent]
+    result = subprocess.run(
+        [agent, *flags, prompt],
+        capture_output=True,
+        text=True,
+        timeout=180.0,
+    )
+    if result.returncode != 0:
+        console.print(f"[red]{agent} exited {result.returncode}[/red]")
+        if result.stderr:
+            console.print(f"[dim]{result.stderr}[/dim]")
+    return result.stdout
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Write text to the system clipboard. Mirror of _cpx_to_clipboard in zsh."""
+    if os.environ.get("TMUX"):
+        proc = subprocess.run(["tmux", "load-buffer", "-w", "-"], input=text, text=True)
+        return proc.returncode == 0
+    for cmd in [["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard", "-in"], ["xsel", "--clipboard", "--input"]]:
+        if shutil.which(cmd[0]):
+            proc = subprocess.run(cmd, input=text, text=True)
+            return proc.returncode == 0
+    return False
+
+
+def spawn_interactive_agent(agent: str, context: str, prompt: str) -> None:
+    """Open a new tmux window running `agent` with block + prompt pre-loaded.
+
+    Implementation: write context+prompt to a temp file, start the agent in a
+    new tmux window with a shell that cats the file to the agent's stdin,
+    then execs the interactive agent. This gives the user an ongoing session
+    seeded with the context.
+    """
+    if not os.environ.get("TMUX"):
+        console.print("[red]Spawn requires tmux.[/red]")
+        return
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+        f.write(prompt + "\n\n" + context + "\n")
+        ctx_file = f.name
+    # Build an appropriate interactive invocation per agent. This is
+    # best-effort — agents vary in how they accept piped context. The
+    # common pattern: paste context into the first user message, then
+    # continue interactively.
+    # For now, launch the agent plain in a new window and drop the context
+    # file path into the window title so the user can paste it with Enter.
+    title = f"ai:{agent}"
+    # Try to pre-paste context via tmux paste-buffer: load the file into a
+    # named buffer, start the agent, then paste the buffer.
+    subprocess.run(["tmux", "load-buffer", "-b", "aiblock", ctx_file])
+    subprocess.run([
+        "tmux", "new-window", "-n", title,
+        f"{agent}; rm -f {ctx_file}",
+    ])
+    console.print(
+        f"[green]Opened new tmux window '{title}' running {agent}.[/green]\n"
+        f"[dim]Context in tmux paste-buffer 'aiblock' — "
+        f"press `prefix + =` to choose it, or `tmux paste-buffer -b aiblock`.[/dim]"
+    )
+
+
+def main() -> int:
+    if "--help" in sys.argv or "-h" in sys.argv:
+        console.print(__doc__)
+        return 0
+
+    if not os.environ.get("TMUX"):
+        console.print("[red]aiblock must run inside a tmux pane (uses cpblock).[/red]")
+        return 1
+
+    agents = detect_agents()
+    if not agents:
+        console.print(
+            "[red]No coding-agent CLI on PATH.[/red]\n"
+            "[dim]Install one of: claude, opencode, codex, cursor-agent.[/dim]"
+        )
+        return 1
+
+    history = list_recent_commands(n=20)
+    if not history:
+        console.print("[red]Shell history is empty — no commands to pick from.[/red]")
+        return 1
+
+    # 1. Pick a command
+    choices = [
+        questionary.Choice(
+            title=f"{h.n:>2}  {h.command[:100]}",
+            value=h.n,
+        )
+        for h in history
+    ]
+    picked_n = questionary.select(
+        "Pick a command to review:",
+        choices=choices,
+        qmark="▸",
+    ).ask()
+    if picked_n is None:
+        return 1
+
+    # 2. Capture + preview the block
+    block = capture_block(picked_n)
+    if not block.strip():
+        console.print(
+            f"[red]cpblock {picked_n} returned empty.[/red]\n"
+            "[dim]Possible causes: shell pre-dates chezmoi apply (try `exec zsh`); "
+            "N exceeds this pane's command history.[/dim]"
+        )
+        return 1
+    console.print(Panel(block.rstrip(), title=f"Block -{picked_n}", expand=False))
+
+    # 3. Edit the prompt
+    prompt = questionary.text(
+        "Prompt (edit or accept):",
+        default=DEFAULT_FIX_PROMPT,
+        multiline=True,
+    ).ask()
+    if prompt is None:
+        return 1
+
+    # 4. Choose agent if multiple available
+    if len(agents) > 1:
+        agent = questionary.select(
+            "Agent:",
+            choices=agents,
+            default=agents[0],
+        ).ask()
+        if agent is None:
+            return 1
+    else:
+        agent = agents[0]
+
+    # 5. Choose action
+    action = questionary.select(
+        "Action:",
+        choices=[
+            questionary.Choice("Print reply here", value="print"),
+            questionary.Choice("Copy reply to clipboard", value="copy"),
+            questionary.Choice(f"Spawn new tmux window running {agent} with context", value="spawn"),
+            questionary.Choice("Cancel", value="cancel"),
+        ],
+    ).ask()
+    if action in (None, "cancel"):
+        return 0
+
+    full_prompt = f"{prompt}\n\n{block}"
+
+    if action == "spawn":
+        spawn_interactive_agent(agent, block, prompt)
+        return 0
+
+    # Print / Copy both need the agent to actually reply
+    with console.status(f"[cyan]Asking {agent}…[/cyan]", spinner="dots"):
+        reply = invoke_agent_oneshot(agent, full_prompt)
+
+    if not reply.strip():
+        console.print("[yellow]Agent returned empty reply.[/yellow]")
+        return 1
+
+    if action == "print":
+        console.print(Panel(reply.rstrip(), title=f"{agent} reply", expand=False))
+    elif action == "copy":
+        ok = copy_to_clipboard(reply)
+        if ok:
+            console.print(f"[green]Copied {len(reply)} bytes to clipboard.[/green]")
+        else:
+            console.print("[red]No clipboard tool available.[/red]")
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Smoke-test script parses + deps resolve
+
+```bash
+chmod +x /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py
+# Compile-check: does the script parse + its deps install?
+uv run --script /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py --help 2>&1 | head -20
+```
+
+```text
+Installed 7 packages in 26ms
+aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+
+UI is a short sequence of questionary prompts + rich panels:
+  1. Pick which recent command you want reviewed (shell history list)
+  2. Preview the captured block (cpblock output)
+  3. Edit the prompt (default: "diagnose + fix")
+  4. Choose an action: print reply / copy / spawn interactive agent / cancel
+
+Advisory-only: agent is invoked with its one-shot flag so replies are text,
+no auto-edits. To iterate further with the context pre-loaded, pick the
+"Spawn interactive agent" action.
+
+Depends on:
+  - dot_config/zsh/tools/02_shell_integration.zsh (OSC 133 markers)
+  - dot_config/zsh/tools/03_tmux_capture.zsh (cpblock)
+  - zsh on PATH (calls `zsh -ic …` for history + cpblock)
+  - tmux (we run inside a pane)
+  - at least one of: claude / opencode / codex / cursor-agent
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:42Z)**_
+
+更新 docs：aliases.md 加三個新 function。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:43Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/zsh/aliases.md`
+
+```text
+560	
+561	## Shell Utilities
+562	
+563	| Command | Type | Source File | Description |
+564	|---------|------|-------------|-------------|
+565	| `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | Profile zsh startup time (`ZSH_PROF=1 zsh -i -c exit`) |
+566	| `ghostty-ssh-terminfo` | function | `dot_config/zsh/10_aliases.zsh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
+567	| `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
+568	
+569	---
+570	
+571	## Tmux Integration
+572	
+573	> Requires tmux + OSC 133 markers in the pane's scrollback (emitted by [`02_shell_integration.zsh`](../../dot_config/zsh/tools/02_shell_integration.zsh) — if missing, run `exec zsh` to reload). All three functions print to stdout (pipe-friendly: `cpout | grep ERROR`) AND copy to the system clipboard via tmux's OSC 52 bridge. Shell-level counterparts of the `prefix + M-y` / `M-i` tmux bindings — see [docs/tools/tmux/README.md → OSC 133](../tools/tmux/README.md#osc-133-command-boundary-navigation-warp-style).
+574	
+575	| Command | Type | Source File | Description |
+576	|---------|------|-------------|-------------|
+577	| `cpout` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's output** (Warp-style "copy output") |
+578	| `cpcmd` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's input line** (prompt + typed command) |
+579	| `cpblock` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's full block** (prompt + input + output) |
+580	
+581	---
+582	
+583	## Package Managers & Runtime
+584	
+585	| Command | Type | Source File | Description |
+586	|---------|------|-------------|-------------|
+587	| `load-nvm` | alias | `dot_config/zsh/10_aliases.zsh` | Lazy-load NVM into current session (normally skipped at startup) |
+588	| `bw-update-completion` | alias | `dot_config/zsh/10_aliases.zsh` | Regenerate cached Bitwarden zsh completion file |
+589
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:33:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:08Z)**_
+
+tmux README 加「AI review」 section：
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/tools/tmux/README.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:29Z)**_
+
+跑 chezmoi apply + 完整 sanity。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply + verify deployment
+
+```bash
+chezmoi apply 2>&1
+echo "---"
+# Verify new files deployed and zsh syntax
+for f in ~/.config/zsh/tools/03_tmux_capture.zsh ~/.config/zsh/tools/04_ai_capture.zsh; do
+  zsh -n "$f" && echo "syntax OK: $f"
+done
+echo "---"
+# Verify the aiblock shim resolves (without invoking TUI)
+zsh -ic 'source ~/.config/zsh/tools/04_ai_capture.zsh; type aiblock; type aifix; type aiexplain' 2>&1 | grep -v 'zle'
+```
+
+```text
+---
+syntax OK: /Users/daviddwlee84/.config/zsh/tools/03_tmux_capture.zsh
+syntax OK: /Users/daviddwlee84/.config/zsh/tools/04_ai_capture.zsh
+---
+aiblock is a shell function from /Users/daviddwlee84/.config/zsh/tools/04_ai_capture.zsh
+aifix is a shell function from /Users/daviddwlee84/.config/zsh/tools/04_ai_capture.zsh
+aiexplain is a shell function from /Users/daviddwlee84/.config/zsh/tools/04_ai_capture.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:34:45Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:35:03Z)**_
+
+全部 3 層完成。
+
+## 交付清單
+
+| 檔案 | 內容 |
+|---|---|
+| `dot_config/zsh/tools/03_tmux_capture.zsh` | cpout/cpcmd/cpblock 加 N arg (default=1)。修好 tmux send-keys burst collapse race — 每個 `-X` 後用 `_y=$(tmux display-message …)` 強制 server round-trip |
+| `dot_config/zsh/tools/04_ai_capture.zsh` (新) | `aifix [N] [-a] [-p]` / `aiexplain` / `aiblock` |
+| `scripts/aiblock.py` (新) | Python TUI (PEP 723 + questionary + rich)：選 command → 預覽 block → 編輯 prompt → 選 agent → action = print / copy / spawn 新 tmux window |
+| `docs/zsh/aliases.md` | 新 AI Capture section |
+| `docs/tools/tmux/README.md` | 新 "Reviewing past commands with AI agents" section |
+
+## 用法
+
+```sh
+exec zsh    # 載入 04_ai_capture + 新版 03_tmux_capture
+
+# 既有 cpout/cpcmd/cpblock 現在吃 N:
+cpblock 3         # 3rd-latest command 的 full block
+cpout 2 | tee log # 2nd-latest 的 output, pipe 出去
+
+# 新的 one-shot agent wrappers (advisory only, 不會改檔案):
+aifix             # 最後一條 command, 預設 "diagnose + fix"
+aifix 2           # 第 2 條回去
+aifix -a opencode # 指定 agent
+aiexplain -p "專門從 security 角度解釋" 3
+
+# TUI (recommended when you want to pick + edit + choose action):
+aiblock
+```
+
+TUI 流程：
+1. questionary picker 列 `fc -ln -20` 最近 20 條 command
+2. 選完後 rich panel 預覽抓到的 block
+3. questionary text (multiline) 編輯 prompt
+4. 多個 agent 時 picker 挑一個
+5. action picker:
+   - **Print reply here** — rich panel 印在當前 pane
+   - **Copy reply to clipboard** — `tmux load-buffer -w -` (OSC 52, SSH-safe)
+   - **Spawn new tmux window with agent** — 開新 window 跑互動式 agent，context 塞進 paste-buffer `aiblock`（用 `prefix + =` 貼進去）
+
+## Debugging 踩雷 (記在 code comments 裡)
+
+tmux 3.6a: 從 shell 連發 `tmux send-keys -X previous-prompt` 會 collapse 到只執行一次。`sleep` 沒用、`: "$(…)"` 沒用（zsh 把 `:` 當 no-op 優化掉 command sub），也不是 `>/dev/null` 的問題。正確 sync 是 **variable assignment 抓 `tmux display-message` 的輸出** — zsh 必須等 subprocess 吐出字才能 assign，強制 tmux server commit 上一個 copy-mode command 再答覆。
+
+沒 commit — 等你測完決定。
+
+---
+
+_**User (2026-04-24 05:48:43Z)**_
+
+好像還可以 先commit related changes
+
+然後看看是不是能加上什麼prettify log的套在後面(當然有原始的做fallback)
+以及預設配一些model
+因爲現在預設可能用了Opus 4.7啥的 響應有點慢
+可以Claude, OpenCode先用Haiku 然後Codex看啥mini的好
+
+然後這個model相關default可以有ZSH config配置一下
+有必要時 可以也能把其他metadata印出來的選項 比如用了多少input/output token等等 (可以先default on)
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:24Z)**_
+
+先 commit，再規劃 prettify + model defaults。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check current working tree state
+
+`git --no-pager status --short`
+
+```text
+ M .claude/plans/tmux-scrolling-x-coding-rosy-clover.md
+ M .gitleaks.toml
+ M .pre-commit-config.yaml
+ M .specstory/history/2026-04-22_08-21-44Z.md
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+ M docs/tools/tmux/README.md
+ M docs/zsh/aliases.md
+ M dot_config/git/hooks/executable_pre-commit.tmpl
+ M dot_config/zsh/tools/03_tmux_capture.zsh
+ M scripts/init/dotfiles_init.py
+ M scripts/redact_secrets.py
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+?? dot_config/zsh/tools/04_ai_capture.zsh
+?? scripts/aiblock.py
+?? scripts/init/Dockerfile.test
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Identify which specstory files map to this session
+
+```bash
+for f in .specstory/history/2026-04-24_05-34-54Z.md .specstory/history/2026-04-24_04-24-36Z.md .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md; do
+  echo "=== $f ==="
+  head -5 "$f"
+  echo "--- last 3 lines ---"
+  tail -3 "$f"
+  echo
+done
+```
+
+```text
+=== .specstory/history/2026-04-24_05-34-54Z.md ===
+<!-- Generated by SpecStory, Markdown v2.1.0 -->
+
+# 2026-04-24 05:34:54Z
+
+<!-- Claude Code Session 26b22076-0a4d-4a08-abf3-7992c056c9f2 (2026-04-24 05:34:54Z) -->
+--- last 3 lines ---
+_**User (2026-04-24 05:35:15Z)**_
+
+<local-command-caveat>Caveat: The messages below were generated by the user while running local commands. DO NOT respond to these messages or otherwise consider them in your response unless the user explicitly asks you to.</local-command-caveat>
+
+=== .specstory/history/2026-04-24_04-24-36Z.md ===
+<!-- Generated by SpecStory, Markdown v2.1.0 -->
+
+# 2026-04-24 04:24:36Z
+
+<!-- Claude Code Session 79782cd9-3824-4436-9f88-a35f3487218f (2026-04-24 04:24:36Z) -->
+--- last 3 lines ---
+_**Agent (claude-opus-4-7 2026-04-24 05:24:56Z)**_
+
+Committed as `fa73e8f`. Pre-commit hooks (gitleaks, yaml/toml checks, whitespace) all passed. Remaining dirty files are unrelated to this fix (SpecStory transcripts, stats, the other plan, and a work-in-progress zsh tool).
+
+=== .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md ===
+<!-- Generated by SpecStory, Markdown v2.1.0 -->
+
+# 2026-04-24 02:36:54Z
+
+<!-- Claude Code Session 5ea7a302-e272-4faa-8b86-856de8fd9b30 (2026-04-24 02:36:54Z) -->
+--- last 3 lines ---
+?? scripts/init/Dockerfile.test
+```
+</details></tool-use>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:49:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Pre-redact + stage only feature files
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+echo "---"
+git add \
+  .claude/plans/tmux-scrolling-x-coding-rosy-clover.md \
+  .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md \
+  docs/tools/tmux/README.md \
+  docs/zsh/aliases.md \
+  dot_config/zsh/tools/03_tmux_capture.zsh \
+  dot_config/zsh/tools/04_ai_capture.zsh \
+  scripts/aiblock.py
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git --no-pager diff --cached --stat
+```
+
+```text
+Skipping missing path: .codex/
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+---
+23
+ .../plans/tmux-scrolling-x-coding-rosy-clover.md   |  524 +-
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 7655 +++++++++++++++++++-
+ docs/tools/tmux/README.md                          |   31 +-
+ docs/zsh/aliases.md                                |   19 +-
+ dot_config/zsh/tools/03_tmux_capture.zsh           |  107 +-
+ dot_config/zsh/tools/04_ai_capture.zsh             |  119 +
+ scripts/aiblock.py                                 |  277 +
+ 7 files changed, 8401 insertions(+), 331 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit feature bundle
+
+```bash
+git commit -m "$(cat <<'EOF'
+tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+
+Extends the OSC 133 capture helpers (committed in b5e8da0) with a
+positional N arg so `cpblock 3` grabs the 3rd-latest command's block
+instead of only the last. Adds a one-shot pipe to coding-agent CLIs
+and a Python TUI for the interactive flow.
+
+- 03_tmux_capture.zsh: thread N through _cpx_tmux_select; cpout/cpcmd/
+  cpblock now accept a positional [N] (default 1). cpcmd uses
+  `fc -ln -N -N`; cpout/cpblock use N repetitions of previous-prompt.
+  Added _cpx_parse_n validation. Crucially fixed a tmux 3.6a race
+  where consecutive `tmux send-keys -X previous-prompt` bursts from a
+  shell subprocess collapse to a single cursor jump — the fix is a
+  per-step `_y=$(tmux display-message -p '#{copy_cursor_y}')` sync
+  barrier (bare `sleep`, `: "$(…)"`, and `>/dev/null` all insufficient;
+  only variable assignment forces zsh to wait on the subprocess and
+  thus serialise tmux's copy-mode queue).
+
+- 04_ai_capture.zsh (new): advisory-only wrappers that capture via
+  cpblock then pipe through an agent's one-shot flag.
+    aifix [N] [-a AGENT] [-p PROMPT]      # diagnose + fix
+    aiexplain [N] [-a AGENT] [-p PROMPT]  # explain what happened
+    aiblock                                # launches the TUI
+  Agent auto-detected in claude → opencode → codex → cursor-agent
+  order (mirroring glcreate-ai in 42_gitlab.zsh). Reply goes to
+  stdout (pipe-friendly); one-line status ("aifix: claude ← block -3")
+  to stderr.
+
+- scripts/aiblock.py (new): PEP 723 uv script + questionary + rich
+  TUI. Pick from last 20 commands (fc -ln -20) → preview captured
+  block → edit prompt → choose agent → action = print reply / copy
+  to clipboard / spawn new tmux window with agent + context in the
+  'aiblock' paste-buffer. Advisory by default; "spawn" is the
+  escalation path when you want the agent to actually edit files.
+
+- docs: aliases.md gets a new "AI Capture" section and cpout/cpcmd/
+  cpblock rows now show [N]. tmux README gets a new "Reviewing past
+  commands with AI agents" section.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -20
+echo "---"
+git --no-pager log --oneline -3
+```
+
+```text
+[ERROR] Your pre-commit configuration is unstaged.
+`git add .pre-commit-config.yaml` to fix this.
+---
+fa73e8f sesh/tmuxp: fix appended windows opening at $HOME after `sesh connect`
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+8521569 scripts/init: add dotfiles-init wrapper around `chezmoi init`
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:43Z)**_
+
+Pre-commit 對 unstaged config 報錯。stash 那個（還有 .gitleaks.toml / hooks template，都 config 家族）暫時讓 commit 通過，然後還原。
+
+_**Agent (claude-opus-4-7 2026-04-24 05:50:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stash unrelated modified files so pre-commit doesn't block
+
+```bash
+# Stash everything NOT in my commit, keep my commit staged
+git stash push --keep-index -m "wip-non-aiblock" -- \
+  .pre-commit-config.yaml \
+  .gitleaks.toml \
+  dot_config/git/hooks/executable_pre-commit.tmpl \
+  scripts/redact_secrets.py \
+  scripts/init/dotfiles_init.py
+echo "---"
+git --no-pager status --short | head -20
+```
+
+```text
+Saved working directory and index state On main: wip-non-aiblock
+---
+M  .claude/plans/tmux-scrolling-x-coding-rosy-clover.md
+ M .specstory/history/2026-04-22_08-21-44Z.md
+MM .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+M  docs/tools/tmux/README.md
+M  docs/zsh/aliases.md
+M  dot_config/zsh/tools/03_tmux_capture.zsh
+A  dot_config/zsh/tools/04_ai_capture.zsh
+A  scripts/aiblock.py
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+?? scripts/init/Dockerfile.test
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit with non-feature configs stashed
+
+```bash
+git commit -m "$(cat <<'EOF'
+tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+
+Extends the OSC 133 capture helpers (committed in b5e8da0) with a
+positional N arg so `cpblock 3` grabs the 3rd-latest command's block
+instead of only the last. Adds a one-shot pipe to coding-agent CLIs
+and a Python TUI for the interactive flow.
+
+- 03_tmux_capture.zsh: thread N through _cpx_tmux_select; cpout/cpcmd/
+  cpblock now accept a positional [N] (default 1). cpcmd uses
+  `fc -ln -N -N`; cpout/cpblock use N repetitions of previous-prompt.
+  Added _cpx_parse_n validation. Crucially fixed a tmux 3.6a race
+  where consecutive `tmux send-keys -X previous-prompt` bursts from a
+  shell subprocess collapse to a single cursor jump — the fix is a
+  per-step `_y=$(tmux display-message -p '#{copy_cursor_y}')` sync
+  barrier (bare `sleep`, `: "$(…)"`, and `>/dev/null` all insufficient;
+  only variable assignment forces zsh to wait on the subprocess and
+  thus serialise tmux's copy-mode queue).
+
+- 04_ai_capture.zsh (new): advisory-only wrappers that capture via
+  cpblock then pipe through an agent's one-shot flag.
+    aifix [N] [-a AGENT] [-p PROMPT]      # diagnose + fix
+    aiexplain [N] [-a AGENT] [-p PROMPT]  # explain what happened
+    aiblock                                # launches the TUI
+  Agent auto-detected in claude → opencode → codex → cursor-agent
+  order (mirroring glcreate-ai in 42_gitlab.zsh). Reply goes to
+  stdout (pipe-friendly); one-line status ("aifix: claude ← block -3")
+  to stderr.
+
+- scripts/aiblock.py (new): PEP 723 uv script + questionary + rich
+  TUI. Pick from last 20 commands (fc -ln -20) → preview captured
+  block → edit prompt → choose agent → action = print reply / copy
+  to clipboard / spawn new tmux window with agent + context in the
+  'aiblock' paste-buffer.
+
+- docs: aliases.md gets a new "AI Capture" section and cpout/cpcmd/
+  cpblock rows now show [N]. tmux README gets a new "Reviewing past
+  commands with AI agents" section.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -20
+echo "---"
+git --no-pager log --oneline -3
+```
+
+```text
+Redacting secrets...
+  Redacted: .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+
+Successfully redacted 1 file(s)
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777009860-72732.
+---
+fa73e8f sesh/tmuxp: fix appended windows opening at $HOME after `sesh connect`
+b5e8da0 tmux+zsh: OSC 133 shell integration + Warp-style copy-last-output/input
+8521569 scripts/init: add dotfiles-init wrapper around `chezmoi init`
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 05:51:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Redact → stage → commit atomic
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -3
+grep -c "PRIV***KEY" .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "$(cat <<'EOF'
+tmux+ai: cpblock N lookback + aifix/aiexplain/aiblock wrappers + TUI
+
+Extends the OSC 133 capture helpers (committed in b5e8da0) with a
+positional N arg so `cpblock 3` grabs the 3rd-latest command's block
+instead of only the last. Adds a one-shot pipe to coding-agent CLIs
+and a Python TUI for the interactive flow.
+
+- 03_tmux_capture.zsh: thread N through _cpx_tmux_select; cpout/cpcmd/
+  cpblock now accept a positional [N] (default 1). cpcmd uses
+  `fc -ln -N -N`; cpout/cpblock use N repetitions of previous-prompt.
+  Added _cpx_parse_n validation. Crucially fixed a tmux 3.6a race
+  where consecutive `tmux send-keys -X previous-prompt` bursts from a
+  shell subprocess collapse to a single cursor jump — the fix is a
+  per-step `_y=$(tmux display-message -p '#{copy_cursor_y}')` sync
+  barrier (bare `sleep`, `: "$(…)"`, and `>/dev/null` all insufficient;
+  only variable assignment forces zsh to wait on the subprocess and
+  thus serialise tmux's copy-mode queue).
+
+- 04_ai_capture.zsh (new): advisory-only wrappers that capture via
+  cpblock then pipe through an agent's one-shot flag.
+    aifix [N] [-a AGENT] [-p PROMPT]      # diagnose + fix
+    aiexplain [N] [-a AGENT] [-p PROMPT]  # explain what happened
+    aiblock                                # launches the TUI
+  Agent auto-detected in claude → opencode → codex → cursor-agent
+  order (mirroring glcreate-ai in 42_gitlab.zsh).
+
+- scripts/aiblock.py (new): PEP 723 uv script + questionary + rich
+  TUI. Pick from last 20 commands → preview captured block → edit
+  prompt → choose agent → action = print reply / copy to clipboard /
+  spawn new tmux window with agent + context in the 'aiblock'
+  paste-buffer.
+
+- docs: aliases.md gets a new "AI Capture" section; tmux README gets
+  a new "Reviewing past commands with AI agents" section.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -8
+echo "---"
+git --no-pager log --oneline -3
+```
+</details></tool-use>

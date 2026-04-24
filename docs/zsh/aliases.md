@@ -22,6 +22,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Log Viewers](#log-viewers)
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
+- [AI Capture](#ai-capture)
 - [Package Managers & Runtime](#package-managers--runtime)
 
 ---
@@ -574,9 +575,21 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cpout` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's output** (Warp-style "copy output") |
-| `cpcmd` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's input line** (prompt + typed command) |
-| `cpblock` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy **last command's full block** (prompt + input + output) |
+| `cpout [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's output** (default N=1). Accepts positional integer for lookback |
+| `cpcmd [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's input line** (default N=1). Reads zsh history so works outside tmux too |
+| `cpblock [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's full block** (prompt + input + output). Default N=1 |
+
+---
+
+## AI Capture
+
+> One-shot pipeline: capture a past block (via `cpblock N`) and pass it to a coding-agent CLI (claude / opencode / codex / cursor-agent) in non-interactive / advisory mode. Agent auto-detected in the order listed; override with `-a AGENT`. Prompt override via `-p PROMPT`. Agent reply goes to stdout (pipe-friendly: `aifix | tee /tmp/advice.md`), status line to stderr.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block, ask agent to diagnose + suggest a fix |
+| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block, ask agent to explain what happened |
+| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
 
 ---
 
