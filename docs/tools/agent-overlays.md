@@ -5,7 +5,8 @@ This repo manages the *global* config files of three coding-agent CLIs via chezm
 | CLI | Live file | Source script | Merge engine |
 |---|---|---|---|
 | Cursor | `~/.cursor/cli-config.json` | [`dot_cursor/modify_cli-config.json.tmpl`](../../dot_cursor/modify_cli-config.json.tmpl) | `jq '. * $overlay'` |
-| OpenCode | `~/.config/opencode/opencode.json` | [`dot_config/opencode/modify_opencode.json.tmpl`](../../dot_config/opencode/modify_opencode.json.tmpl) | `jq '. * $overlay'` |
+| OpenCode (server/runtime) | `~/.config/opencode/opencode.json` | [`dot_config/opencode/modify_opencode.json.tmpl`](../../dot_config/opencode/modify_opencode.json.tmpl) | `jq '. * $overlay'` |
+| OpenCode (TUI) | `~/.config/opencode/tui.json` | [`dot_config/opencode/modify_tui.json.tmpl`](../../dot_config/opencode/modify_tui.json.tmpl) | `jq '. * $overlay'` |
 | Codex | `~/.codex/config.toml` | [`dot_codex/modify_config.toml.tmpl`](../../dot_codex/modify_config.toml.tmpl) | Python `tomllib` + inline emitter |
 
 Overlay payloads live under [`.chezmoitemplates/agents/`](../../.chezmoitemplates/agents/) and are sourced via `{{ template ... }}` includes so the merge logic can be tested independently of overlay contents.
@@ -57,6 +58,38 @@ The `modify_` overlay model deep-merges only the keys we explicitly enforce; eve
 - `agent.title.reasoningEffort = "low"` — cheap completions for short title generation; sibling `agent.*` entries (per-agent provider, model overrides) survive.
 - `provider.github-copilot.options.timeout = 600000` (10 min) — request-level timeout. Default is 5 min; bumped to give long Claude Opus generations more room before the SDK aborts the whole call. **Note**: `chunkTimeout` is intentionally NOT set here, see [docs/tools/opencode.md → Claude Opus stream stall](opencode.md#claude-opus-stream-stall-on-github-copilot) for the rationale (upstream bug [anomalyco/opencode#20466](https://github.com/anomalyco/opencode/issues/20466) — SSE-chunk-timeout errors aren't retried, so setting `chunkTimeout` would convert silent hangs into hard failures with no recovery).
 
+### OpenCode TUI — [`agents/opencode.tui.overlay.json`](../../.chezmoitemplates/agents/opencode.tui.overlay.json)
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": { "leader": "ctrl+x" },
+  "mouse": true,
+  "diff_style": "auto",
+  "scroll_acceleration": { "enabled": true }
+}
+```
+
+The TUI lives in a **separate file** from server/runtime config: `~/.config/opencode/tui.json` with its own schema `https://opencode.ai/tui.json`. See upstream docs:
+
+- [Config → TUI](https://opencode.ai/docs/config/#tui) — file location, schema URL, precedence
+- [TUI → Configure → Options](https://opencode.ai/docs/tui/#options) — per-key semantics
+
+Key-by-key rationale:
+
+- `$schema = "https://opencode.ai/tui.json"` — TUI schema (different from `opencode.json`'s `config.json` schema). Lets editors validate + autocomplete.
+- `keybinds.leader = "ctrl+x"` — explicit pin of the upstream default. Declaring it ensures muscle memory + the `<leader>` references in [docs/keybinds](https://opencode.ai/docs/keybinds/) survive any future upstream default change. The other ~80 keybind defaults are intentionally NOT pinned here — they stay tracking upstream so new actions added by OpenCode become available without overlay churn.
+- `mouse = true` — explicit pin of the upstream default. Trades terminal-native select-to-copy for OpenCode's in-TUI mouse support (scroll, click).
+- `diff_style = "auto"` — adapts diff layout to terminal width (vs `"stacked"` which forces single-column). Pinning the upstream default makes intent explicit.
+- `scroll_acceleration.enabled = true` — macOS-style smooth/accelerated scrolling. Per upstream docs this **takes precedence over and overrides** `scroll_speed`, so we deliberately omit `scroll_speed` from the overlay (setting both would mislead — the latter would be silently ignored).
+
+What's intentionally NOT in the TUI overlay:
+
+- `theme` — left unset so OpenCode's auto light/dark detection stays in effect (matches the system theme just like `ghostty` and the `tmux` theme switcher in this repo).
+- Individual `keybinds.*` entries beyond `leader` — see above. fzf's shell-level `Ctrl+T` and OpenCode's `variant_cycle = ctrl+t` do not collide because they live in disjoint namespaces (shell prompt vs OpenCode TUI).
+- `username_toggle` / `tips_toggle` / `display_thinking` — these are persisted by the TUI's `/help` customisation panel at runtime. Pinning them in the overlay would clobber the user's last in-app choice on every `chezmoi apply`, same anti-pattern as managing `plugin` paths or auth tokens.
+- `scroll_speed` — see `scroll_acceleration.enabled` above; OpenCode ignores `scroll_speed` whenever acceleration is enabled.
+
 ### Codex — [`agents/codex.config.overlay.toml`](../../.chezmoitemplates/agents/codex.config.overlay.toml)
 
 ```toml
@@ -92,6 +125,7 @@ enabled = true
 | `~/.cursor/{authInfo,auth*,privacyCache,statsigBootstrap,version,hasChangedDefaultModel,...}` | Cursor | Auth + telemetry; runtime-only. |
 | `~/.cursor/{extensions,plugins,projects,worktrees,workers,browser-logs,chats,plans,prompt_history.json,argv.json,ide_state.json,agent-cli-state.json,ai-tracking,mcp.json,skills-cursor}` | Cursor | CLI-managed state, per-project, machine-local. |
 | `~/.config/opencode/{node_modules,package.json,bun.lock,package-lock.json,plugins/}` | OpenCode | Node runtime + locally-installed plugin source trees. |
+| `~/.config/opencode/tui.json` keys outside the TUI overlay (`theme`, `keybinds.*` other than `leader`, `username_toggle`, `tips_toggle`, `display_thinking`, `scroll_speed`) | OpenCode | TUI runtime customisation panel persists user choices here; overlay only pins stable preferences. |
 | `~/.codex/auth.json` | Codex | OpenAI auth token. **Never** check in. |
 | `~/.codex/[projects."<absolute-path>"]` | Codex | Per-project trust grants — absolute paths are machine-specific. **Round-tripped** by the modify_ script (see below). |
 | `~/.codex/[marketplaces.<id>]` | Codex | Marketplace registrations with absolute `source = "/Users/.../.codex/.tmp/..."` paths. **Round-tripped**. |

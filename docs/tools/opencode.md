@@ -4,7 +4,9 @@ Notes for the local OpenCode setup on this machine — covers the chezmoi-manage
 
 ## How the global config is managed
 
-The `~/.config/opencode/opencode.json` global config is **partially** managed via a chezmoi `modify_` overlay (jq deep-merge). See [agent-overlays.md → OpenCode](agent-overlays.md#opencode--agentsopencodeoverlayjson) for the canonical overlay contents and per-key rationale.
+The `~/.config/opencode/opencode.json` global config is **partially** managed via a chezmoi `modify_` overlay (jq deep-merge). See [agent-overlays.md → OpenCode](agent-overlays.md#opencode-agentsopencodeoverlayjson) for the canonical overlay contents and per-key rationale.
+
+The TUI-specific config `~/.config/opencode/tui.json` (separate file, separate schema — see upstream [Config → TUI](https://opencode.ai/docs/config/#tui)) is also managed via a `modify_` overlay; see [agent-overlays.md → OpenCode TUI](agent-overlays.md#opencode-tui-agentsopencodetuioverlayjson) for what's pinned (currently `keybinds.leader`, `mouse`, `diff_style`, `scroll_acceleration.enabled`) and what's intentionally left to the TUI's runtime customisation panel (`theme`, `username_toggle`, etc.).
 
 The legacy `~/.config/opencode/config.json` filename is migrated to the modern `opencode.json` once per machine by [`run_once_before_50_opencode_migrate.sh.tmpl`](../../run_once_before_50_opencode_migrate.sh.tmpl); see [agent-overlays.md → OpenCode legacy migration](agent-overlays.md#opencode-legacy-configjson-migration).
 

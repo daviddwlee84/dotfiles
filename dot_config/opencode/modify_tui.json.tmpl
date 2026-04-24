@@ -1,0 +1,34 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.config/opencode/tui.json.
+#
+# Why: TUI-specific settings live in tui.json (separate from opencode.json
+# server/runtime config — see https://opencode.ai/docs/config/#tui). The TUI
+# customisation panel (`/help` → "username toggle", "tips_toggle", etc.)
+# persists user choices back to this file at runtime, so we use the same
+# jq deep-merge pattern as modify_opencode.json.tmpl: enforce only stable
+# preferences and let everything else through verbatim.
+#
+# How: chezmoi pipes the current target file into stdin; this script prints
+# the new contents on stdout. `jq '. * $overlay'` does recursive object merge.
+#
+# What's intentionally NOT in the overlay:
+#   - theme: left unset so OpenCode's auto light/dark detection stays in effect
+#   - individual keybinds.* entries: only `leader` is pinned; the other ~80
+#     defaults stay tracking upstream (see docs/tools/agent-overlays.md)
+#   - username_toggle / tips_toggle / display_thinking: these are persisted by
+#     the TUI's `/help` panel, so the overlay must not touch them or every
+#     `chezmoi apply` would clobber the user's last choice.
+#
+# To manage an additional key: edit .chezmoitemplates/agents/opencode.tui.overlay.json
+# Requires: jq (installed by the `base` ansible role).
+set -eu
+
+overlay=$(cat <<'JSON'
+{{ template "agents/opencode.tui.overlay.json" . }}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'
