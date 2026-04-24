@@ -1,0 +1,103 @@
+# Smoke test for dotfiles_init.py's non-interactive mode.
+#
+#   cd ~/.local/share/chezmoi
+#   # One-time: pre-download chezmoi binary to avoid build-time network flakes.
+#   curl -fsSL -o scripts/init/chezmoi-linux-arm64.tar.gz \
+#     https://github.com/twpayne/chezmoi/releases/download/v2.70.2/chezmoi_2.70.2_linux_arm64.tar.gz
+#   docker build -f scripts/init/Dockerfile.test -t dotfiles-init-test .
+#
+# Success criteria:
+#   1. Build completes without interactive prompts.
+#   2. The wrapper's non-interactive path renders chezmoi.toml with the
+#      overrides we passed via --name / --email / --profile + --bundle minimal.
+#
+# This image is intentionally smaller than the main Dockerfile — we're testing
+# the wrapper, not the full ansible/brew stack. --bundle minimal keeps every
+# installX flag off and `--include=none` makes chezmoi init skip apply entirely
+# so we're only validating config rendering.
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Huawei mirror — same pattern as the main Dockerfile under useChineseMirror.
+# Much more reliable than ports.ubuntu.com on our network.
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then MIRROR="http://repo.huaweicloud.com/ubuntu"; \
+    else MIRROR="http://repo.huaweicloud.com/ubuntu-ports"; fi && \
+    printf '%s\n' \
+        "Types: deb" \
+        "URIs: ${MIRROR}" \
+        "Suites: noble noble-updates noble-backports" \
+        "Components: main restricted universe multiverse" \
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+        "" \
+        "Types: deb" \
+        "URIs: ${MIRROR}" \
+        "Suites: noble-security" \
+        "Components: main restricted universe multiverse" \
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+        > /etc/apt/sources.list.d/ubuntu.sources
+
+# python3-pip so we can install the wrapper's deps without depending on uv
+# (astral.sh / GitHub release downloads are flaky on this network).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates curl git python3 python3-pip sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash devuser \
+    && echo 'devuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/devuser \
+    && chmod 0440 /etc/sudoers.d/devuser
+
+# Copy chezmoi binary tarball + the wrapper source in one shot.
+# The tarball lives in scripts/init/ which is already chezmoi-ignored; it's
+# also git-ignored via scripts/init/.gitignore.
+COPY --chown=devuser:devuser . /tmp/dotfiles-source
+
+USER devuser
+WORKDIR /home/devuser
+ENV PATH="/home/devuser/.local/bin:${PATH}"
+
+# Extract pre-downloaded chezmoi binary (from the build context) into PATH.
+RUN mkdir -p $HOME/.local/bin \
+    && tar -xzf /tmp/dotfiles-source/scripts/init/chezmoi-linux-arm64.tar.gz \
+        -C $HOME/.local/bin chezmoi \
+    && chmod +x $HOME/.local/bin/chezmoi \
+    && chezmoi --version
+
+# Install the wrapper's Python deps via pip (no uv needed).
+# --break-system-packages is required on Ubuntu 24.04 which enforces PEP 668.
+RUN pip3 install --user --break-system-packages --no-cache-dir \
+        "questionary>=2.0" "rich>=13.9" "tyro>=0.9"
+
+# Seed chezmoi's source dir from the local copy so we can test the re-init
+# path without needing github.com access during build.
+RUN mkdir -p $HOME/.local/share \
+    && cp -r /tmp/dotfiles-source $HOME/.local/share/chezmoi \
+    && cd $HOME/.local/share/chezmoi \
+    && git init -q \
+    && git -c user.email=test@example.com -c user.name=test add -A \
+    && git -c user.email=test@example.com -c user.name=test commit -q -m "seed" \
+    && echo "Seeded source dir."
+
+# The actual smoke test — fully non-interactive invocation of the wrapper.
+# Note we invoke with `python3` directly (not `uv run --script`) since we
+# pre-installed deps via pip above.
+RUN python3 $HOME/.local/share/chezmoi/scripts/init/dotfiles_init.py init \
+        --yes \
+        --bundle minimal \
+        --name "Docker Test" \
+        --email docker-test@example.com \
+        --profile ubuntu_server
+
+# Assert chezmoi.toml was rendered correctly.
+RUN test -f $HOME/.config/chezmoi/chezmoi.toml \
+    && grep -q 'email = "docker-test@example.com"' $HOME/.config/chezmoi/chezmoi.toml \
+    && grep -q 'name = "Docker Test"' $HOME/.config/chezmoi/chezmoi.toml \
+    && grep -q 'profile = "ubuntu_server"' $HOME/.config/chezmoi/chezmoi.toml \
+    && grep -q 'installCodingAgents = false' $HOME/.config/chezmoi/chezmoi.toml \
+    && grep -q 'installPythonUvTools = false' $HOME/.config/chezmoi/chezmoi.toml \
+    && echo "OK: chezmoi.toml rendered correctly with wrapper's non-interactive mode"
+
+CMD ["/bin/bash"]

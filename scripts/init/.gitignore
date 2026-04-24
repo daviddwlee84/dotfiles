@@ -1,0 +1,5 @@
+# Pre-downloaded chezmoi binary used by Dockerfile.test. Not committed because
+# it's machine-arch-specific and regenerable:
+#   curl -fsSL -o chezmoi-linux-arm64.tar.gz \
+#     https://github.com/twpayne/chezmoi/releases/download/v2.70.2/chezmoi_2.70.2_linux_arm64.tar.gz
+chezmoi-linux-*.tar.gz

@@ -1,0 +1,62 @@
+#!/bin/bash
+# Re-import Raycast config whenever raycast/raycast.json (or extensions.json)
+# changes. Non-Pro cross-machine sync. See docs/tools/raycast-sync.md.
+#
+# Opt-in: controlled by the `syncRaycast` chezmoi prompt. Defaults to false —
+# turn on via `chezmoi init --force` or by editing .config/chezmoi/chezmoi.toml.
+#
+# Runs AFTER brew_bundle (30) so Raycast.app is installed before we try to
+# feed it an import.
+#
+# Profile: {{ .profile }}
+# syncRaycast: {{ (index . "syncRaycast" | default false) }}
+
+{{ if or (ne .chezmoi.os "darwin") (not (index . "syncRaycast" | default false)) -}}
+# Not macOS, or syncRaycast is disabled; nothing to do.
+exit 0
+{{ end -}}
+
+# === raycast/ source hashes (changes trigger re-run) ===
+# raycast.json:     {{ if stat (joinPath .chezmoi.sourceDir "raycast" "raycast.json") }}{{ include "raycast/raycast.json" | sha256sum }}{{ else }}missing{{ end }}
+# extensions.json:  {{ if stat (joinPath .chezmoi.sourceDir "raycast" "extensions.json") }}{{ include "raycast/extensions.json" | sha256sum }}{{ else }}missing{{ end }}
+
+set -eu
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+info()    { echo -e "${BLUE}[raycast-sync]${NC} $1"; }
+warn()    { echo -e "${YELLOW}[raycast-sync]${NC} $1"; }
+error()   { echo -e "${RED}[raycast-sync]${NC} $1" >&2; }
+success() { echo -e "${GREEN}[raycast-sync]${NC} $1"; }
+
+SRC_DIR="{{ .chezmoi.sourceDir }}/raycast"
+SCRIPT="{{ .chezmoi.sourceDir }}/scripts/raycast_sync.py"
+
+if [[ ! -d "$SRC_DIR" ]]; then
+    warn "raycast/ source dir missing at $SRC_DIR; nothing to import."
+    warn "Run 'just raycast-export' on a machine that has the config to populate it."
+    exit 0
+fi
+if [[ ! -f "$SRC_DIR/raycast.json" ]]; then
+    warn "raycast/raycast.json missing; nothing to import."
+    exit 0
+fi
+if [[ ! -x "$SCRIPT" ]]; then
+    error "scripts/raycast_sync.py missing or not executable."
+    exit 1
+fi
+if [[ ! -d "/Applications/Raycast.app" ]]; then
+    warn "Raycast.app not installed yet; skipping import."
+    warn "Re-run 'chezmoi apply' after Raycast is installed via Brewfile."
+    exit 0
+fi
+
+info "Importing Raycast config from $SRC_DIR ..."
+info "(This triggers extension reinstall via raycast:// deep links, then"
+info " prompts you to complete the Import dialog manually.)"
+
+# Run in --skip-extensions=false (default). The script handles its own
+# user-facing prompts on stderr; we just pass through.
+"$SCRIPT" import --dir "$SRC_DIR"
+
+success "Raycast import dispatched. Complete the import dialog inside Raycast."
+success "Extension API keys / OAuth tokens: see $SRC_DIR/secrets.env.example."
