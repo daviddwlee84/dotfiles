@@ -61,6 +61,18 @@ curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstra
 
 Installs [`uv`](https://docs.astral.sh/uv/) (if missing) and launches `dotfiles-init` — a Python wrapper that groups the ~19 chezmoi prompts into a clean multi-select UI, offers pre-set bundles (`personal-mac` / `work-mac` / `server-linux` / `minimal`), checks SSH keys, then calls real `chezmoi init` with your answers pre-filled. Full docs: [`scripts/init/README.md`](scripts/init/README.md).
 
+On first-run or slow networks the `uv` resolver can sit silently for a few minutes — use the verbose form to see timestamped progress + `uv --verbose` resolver output + `set -x`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | DOTFILES_BOOTSTRAP_VERBOSE=1 bash
+```
+
+Pass extra args through to the wrapper via `bash -s --` (e.g. run the schema-parity checker instead of the default `init`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | bash -s -- doctor
+```
+
 Behind GFW? Set `DOTFILES_RAW_URL` / `DOTFILES_REF` to point at a mirror, or use the non-interactive path below.
 
 ### Non-interactive (direct chezmoi)
