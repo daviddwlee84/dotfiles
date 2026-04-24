@@ -4,9 +4,9 @@
 #
 # Handles the "desktop-only" category of apps that aren't in the apt default
 # repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
-# (Microsoft apt repo), Cursor (.deb with graceful fallback), libfuse2
-# (AppImage runtime on Ubuntu 22.04+), and a placeholder hook for Antigravity
-# once an official Linux package ships.
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), Zen Browser
+# (AppImage + .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a
+# placeholder hook for Antigravity once an official Linux package ships.
 #
 # No-op on:
 #   - macOS  → Brewfile (`cask "alacritty"`, `cask "visual-studio-code"` when
@@ -409,6 +409,108 @@
           download from https://cursor.com/download and drop it under
           ~/Applications/; AppImageLauncher will auto-integrate. See
           docs/tools/appimage.md for the full recipe.
+
+# =============================================================================
+# Zen Browser — Firefox-based browser, shipped as an AppImage
+#
+# User-level install under ~/Applications/, mirrors the Alacritty pattern for
+# desktop integration (icon + .desktop entry + update-desktop-database) so
+# the app is searchable in GNOME/KDE launchers without needing to run the
+# AppImage once to let AppImageLauncher auto-integrate it.
+#
+# noRoot-friendly: the whole block is user-level, no `become: true`, no
+# `tags: [sudo]`. Works identically in `gui_apps_linux_no_root=true` mode.
+# =============================================================================
+
+- name: Check if Zen AppImage is already installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
+  register: zen_appimage_check
+
+- name: Install Zen Browser AppImage + desktop integration
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - not zen_appimage_check.stat.exists
+  block:
+    - name: Ensure ~/Applications exists (Zen)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/Applications"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest Zen Browser release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/zen-browser/desktop/releases/latest
+        return_content: true
+      register: zen_release
+
+    - name: Resolve Zen AppImage asset URL
+      ansible.builtin.set_fact:
+        zen_appimage_url: >-
+          {{ (zen_release.json.assets
+              | selectattr('name', 'match', '^zen-' + target_architecture + '\\.AppImage$')
+              | map(attribute='browser_download_url')
+              | list
+              | first) | default('') }}
+
+    - name: Download Zen AppImage
+      when: zen_appimage_url | length > 0
+      ansible.builtin.get_url:
+        url: "{{ zen_appimage_url }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
+        mode: '0755'
+        timeout: 300
+      retries: 3
+      delay: 5
+      register: zen_appimage_dl
+
+    - name: Download Zen SVG icon
+      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/zen-browser/desktop/dev/docs/assets/zen-browser.svg
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/icons/hicolor/scalable/apps/zen-browser.svg"
+        mode: '0644'
+      retries: 3
+      delay: 5
+      ignore_errors: true
+
+    - name: Install Zen Browser .desktop entry
+      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      ansible.builtin.copy:
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/applications/zen-browser.desktop"
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Type=Application
+          Name=Zen Browser
+          GenericName=Web Browser
+          Comment=Experience tranquillity while browsing the web without people tracking you
+          Exec={{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage %U
+          TryExec={{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage
+          Icon=zen-browser
+          Terminal=false
+          StartupNotify=true
+          StartupWMClass=zen
+          Categories=Network;WebBrowser;
+          MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/ftp;x-scheme-handler/chrome;video/webm;application/x-xpinstall;
+          Keywords=web;browser;internet;firefox;zen;
+
+    - name: Refresh desktop application database (Zen)
+      when: zen_appimage_dl is defined and zen_appimage_dl is succeeded
+      ansible.builtin.command: update-desktop-database "{{ ansible_facts['env']['HOME'] }}/.local/share/applications"
+      changed_when: false
+      failed_when: false
+  rescue:
+    - name: Warn Zen install failed
+      ansible.builtin.debug:
+        msg: >-
+          Zen Browser install failed — you can fall back to downloading the
+          AppImage manually from https://github.com/zen-browser/desktop/releases/latest
+          into ~/Applications/ and re-running `update-desktop-database ~/.local/share/applications`.
 
 # =============================================================================
 # Antigravity (placeholder)

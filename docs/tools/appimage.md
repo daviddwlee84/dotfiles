@@ -88,6 +88,10 @@ ail-cli integrate ~/Applications/Cursor.AppImage
 
 Editor user settings (`settings.json`, `keybindings.json`) are independent of install method — chezmoi manages them via [`.chezmoitemplates/editor/`](../../.chezmoitemplates/editor/) regardless of whether Cursor came from `.deb` or AppImage.
 
+### Zen Browser (installed automatically)
+
+The [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) role downloads the latest `zen-<arch>.AppImage` from [`zen-browser/desktop`](https://github.com/zen-browser/desktop/releases) to `~/Applications/zen.AppImage` and writes a `~/.local/share/applications/zen-browser.desktop` + SVG icon so the browser is immediately searchable in the GNOME/KDE launcher — no need to run the AppImage once to trigger AppImageLauncher's first-run integration prompt. macOS equivalent is Arc (Brewfile). To upgrade: delete `~/Applications/zen.AppImage` and re-run `just apply-ubuntu_desktop`, or download a newer AppImage over the existing path.
+
 ### Obsidian / Bitwarden Desktop / Joplin
 
 Same pattern: drop AppImage in `~/Applications/`, integrate with `ail-cli` or the first-run prompt. These apps self-update via AppImage delta (AppImageLauncher handles the update prompt too).
