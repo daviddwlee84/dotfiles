@@ -5087,3 +5087,575 @@ _**User (2026-04-24 11:05:13Z)**_
 又或者是某種combo 就是類似tmux prefix + c (但是是一個alias) 開啓新window
 但是新window是 1. 開了新的worktree 有切分pane 左邊nvim 右邊agent 之類的
 (是說好久以前有個 https://sidecar.haplab.com/ 不知道這個combo好不好用)
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 11:06:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:06:03Z)**_
+
+B (per-feature hotkey = new worktree + nvim/agent split in a new tmux window) is the stronger primitive — it matches the one-task-at-a-time rhythm Sidecar popularized and reuses `worktrunk` + `wt`/`wtcd` you already have, where A (N standby worktrees) pre-commits you to N idle agents burning tokens for uncertain payoff and degenerates back to plain svibe when the agents end up on the same branch anyway. The main design call before building B is the branch-name source — fzf-pick among existing branches vs auto-name `wip/YYYY-MM-DD-hhmm` and rename on first commit — everything else (keybinding, layout ratio, cleanup path) is mechanical.
+
+Since you explicitly flagged this as "可能後面還會有一個想法", want me to drop a `P?` backlog entry (`backlog/svibe-worktree-per-feature.md`) capturing both A and B with the open design questions, so we can come back to it without re-deriving?
+
+---
+
+_**User (2026-04-24 11:09:20Z)**_
+
+好啊 看看
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 11:09:32Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:09:32Z)**_
+
+Quick look at the worktrunk surface so the doc references real helpers, then I'll draft the backlog.
+
+_**Agent (claude-opus-4-7 2026-04-24 11:09:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Scan worktrunk.md headings
+
+`grep -n "^#\|^##\|^###" /Users/daviddwlee84/.local/share/chezmoi/docs/tools/worktrunk.md 2>/dev/null | head -30`
+
+```text
+1:# Worktrunk — Git Worktree Workflow Playbook
+18:## Table of Contents
+34:## Mental model
+56:## Install & shell integration in this repo
+88:## The three-layer navigation: sesh + wt + wtcd
+100:### Concrete example
+103:# Morning: open the dotfiles project
+106:# Pick up where I left off on the worktrunk-docs branch
+109:# Quick look at what main looks like right now (don't lose my place)
+114:# New parallel task: spin up a worktree + Claude in one go
+116:# Now there's a 2nd Claude running in ../dotfiles.fix-tmux-menu while I keep editing here.
+119:### The `wtcd` rationale
+128:# Defined in dot_config/zsh/tools/37_worktrunk.zsh
+143:## Per-worktree Claude / OpenCode
+162:# Three Claude agents working in parallel, one prompt each
+167:# Or with OpenCode
+170:# Check on progress (markers come from the Claude/OpenCode plugins; 🤖 = working, 💬 = waiting)
+172:#   Branch          Status   ...  Marker  ...
+173:# @ main                            ^
+174:# + add-auth        +   ↕↑    ↑3   🤖
+175:# + fix-pagination  +   ↕↑    ↑1   💬     ← needs my input
+176:# + write-tests     +   ↕     ↑2   🤖
+178:# Jump to the one waiting for input
+182:### Caveats
+197:## Per-worktree dev server (`hash_port`)
+222:# post-start runs `npm run dev -- --port 14823` in the background
+223:# Hook output goes to a log file; tail it with:
+227:# URL column shows http://localhost:14823 (clickable in iTerm/Ghostty)
+228:# Port is deterministic — fix-checkout-ui ALWAYS gets 14823, on any machine
+230:# When done, wt remove cleans up:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:09:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find wt/wtcd definitions
+
+`grep -rn "alias wt\|function wt\|alias wtcd\|function wtcd" /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/ 2>/dev/null | head`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/37_worktrunk.zsh:57:function wtcd() {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:09:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:10:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# `svibe` + worktree: per-feature editor/agent pair, on a hotkey
+
+**Status**: P? — idea only, not spiked yet
+**Effort**: M (option B) / L (option A — bigger, probably not worth it)
+**Related**: `dot_config/zsh/tools/22_sesh.zsh` (`sesh-vibe`/`sesh-code`), `dot_config/zsh/tools/37_worktrunk.zsh` (`wtcd`), `dot_config/tmux/menu.sh` (popup menu), [docs/tools/worktrunk.md](../docs/tools/worktrunk.md), [docs/tools/sesh.md](../docs/tools/sesh.md) → `scode`/`svibe`
+
+## Context
+
+Current svibe + scode run every agent in the **same working directory**
+(the current repo, no worktree). That works great for "multiple agents
+on the same problem" but fights the "pick up a parallel feature" flow
+that `worktrunk` already optimizes for. worktrunk's docs
+([docs/tools/worktrunk.md → "The three-layer navigation"](../docs/tools/worktrunk.md#the-three-layer-navigation-sesh--wt--wtcd))
+show the intended shape: `wt add fix-tmux-menu && wtcd fix-tmux-menu &&
+claude` — one task = one worktree = one agent.
+
+What's missing: a single hotkey that stitches "new worktree + agent +
+editor" into one tmux motion, analogous to what
+[Sidecar](https://sidecar.haplab.com/) does for desktop apps. Two
+shapes were considered when the user raised this:
+
+- **A.** Standby pool — `svibe-wt N` creates N worktrees up front, one
+  agent per worktree, all on scratch branches. Rename/rebase later when
+  the user decides what each agent will work on.
+- **B.** Per-feature hotkey — a tmux binding (`prefix + W`? new menu
+  row?) that opens **one** new tmux window: new worktree + split pane
+  (left: nvim, right: agent).
+
+Recommendation captured at decision time: build **B** when there's
+demand; skip **A** unless a pattern actually emerges. Details below.
+
+## Why B over A
+
+1. **Matches existing workflow**. worktrunk is already one-worktree-
+   per-task. B automates the last manual step (tmux split + launch
+   editor + launch agent). A introduces a second mental model (agent
+   pool) that doesn't fit what's there.
+2. **No idle-agent cost**. A starts N agents on standby — if the user
+   doesn't assign tasks immediately, that's N processes consuming
+   context window / tokens / session-store disk on nothing. B starts
+   agents on demand.
+3. **A degenerates back to `svibe`**. If the user ends up having all N
+   agents work the same repo state (no real parallel branches), the
+   worktree isolation is pure overhead — and regular `svibe` does that
+   better because the panes share one working dir.
+4. **Disk cost**. Each worktree is a full checkout. N≥4 standby
+   worktrees on larger repos = real disk. Per-feature creation only
+   pays when the feature exists.
+
+## B — design sketch
+
+### Shape
+
+\```
+prefix + W (or menu-row "Worktree → New feature window")
+ └─ prompt: new branch name  (fzf over existing branches too — pick
+                              or type a new one)
+    └─ `wt add <branch>`                     (reuses worktrunk)
+       └─ `tmux new-window -c <new-worktree-path> -n <short-name>`
+          └─ pane L (75%): `nvim`            (scode-style width split)
+          └─ pane R (25%): `specstory run <agent>`  (default = claude)
+\```
+
+Exit behavior: the window's panes inherit `--on-exit shell` semantics
+already used by `scode` / `svibe` (drop to `$SHELL` with a re-run hint,
+don't close the window on Ctrl+C).
+
+### Open design questions
+
+1. **Key binding**. `prefix + c` is tmux's new-window — shadowing it
+   would break muscle memory. Options, least-disruptive first:
+   - Add a **menu row** in `~/.config/tmux/menu.sh` (Worktree → New
+     feature). Zero new keys. User invokes via `prefix + Space` →
+     Worktree → New. Cheapest.
+   - Bind `prefix + W` (uppercase W, free today per the existing
+     keybindings.conf) to the same script. Two-key muscle memory.
+   - Bind `prefix + C-w` (ctrl-w inside prefix) — closer to "worktree"
+     mnemonic but conflicts with vim's window nav for anyone doing
+     `:<C-w>` in a nested neovim; probably avoid.
+2. **Branch-name source**. Three candidates:
+   - `fzf` popup over `git branch --all` results, with a "type to
+     create new" fallback. Highest affordance, most interactive.
+   - Plain `read -p "branch: "` prompt inside a tmux `display-popup`.
+     Smallest surface.
+   - Auto-name `wip/YYYY-MM-DD-hhmm-RAND`; user renames with
+     `git branch -m` when the feature firms up. Fastest path-of-least-
+     resistance for "I just want to start coding".
+   Leaning fzf + auto-name fallback when user hits enter on empty.
+3. **Layout shape inside the new window**. Copy `scode` (nvim 75% |
+   agent 25%) exactly, or something else? scode is battle-tested —
+   copy it.
+4. **Agent choice**. Default `claude` (matches scode). Optional
+   positional arg (`svibe-wt codex` / `svibe-wt opencode`) for picking
+   another. Honor the same `--no-specstory` / `--on-exit` flags
+   `scode`/`svibe` already parse (share `_sesh_wrap_agent` +
+   `_sesh_on_exit_wrap`).
+5. **Window naming**. worktrunk's `wt` already picks good tmux-safe
+   branch names; the new window name can just echo the branch slug
+   (`fix-tmux-menu` or similar).
+6. **Cleanup**. `wt remove <branch>` already exists in worktrunk for
+   the worktree. The tmux side: user closes the window manually (same
+   as every other tmux window). No lifecycle coupling needed — if the
+   user removes the worktree via `wt remove`, the nvim pane's CWD
+   becomes stale but tmux doesn't care.
+7. **Interplay with `scode`/`svibe` session names**. `scode` uses
+   `coding-agent/<repo>`, `svibe` uses `vibe/<repo>`. A per-feature
+   worktree window could live inside the **current** session (adds a
+   window, not a session) to stay ergonomic — or spawn its own session
+   named `feature/<branch>`. Current-session is less surprising;
+   defer the "own session" variant until someone wants it.
+8. **First-run behavior when not inside a session**. Fall back to
+   `wt add <branch>; cd <worktree>; nvim` inline, no tmux layout,
+   and print a hint? Or hard-require tmux? Probably: hard-require
+   tmux (the binding implies it anyway).
+
+### Naming & entry points
+
+- **Command**: `svibe-wt` (or `svibe-worktree` / `scode-wt`) zsh
+  function alongside `sesh-vibe`. The scode-shaped name would honor
+  the 1-agent layout, so `scode-wt` is probably the more honest name
+  — `svibe-wt` implies parametric pane count, which this doesn't
+  have.
+- **Tmux entry**: menu row (Worktree → New feature window) + an
+  optional top-level `prefix + W` binding.
+- **Alias**: `swt` (short; `scode-wt` as the full name). Matches the
+  `shere` / `sroot` / `scode` / `svibe` family.
+
+### Reuse from existing code
+
+Everything below already exists in `dot_config/zsh/tools/22_sesh.zsh`
+and should be shared, not copy-pasted:
+
+- `_sesh_git_root` — resolve the source repo root (to branch off).
+- `_sesh_sanitize` — session/window name sanitizer (forbids `.` `:`).
+- `_sesh_wrap_agent` — specstory wrapping (known-provider detection).
+- `_sesh_on_exit_wrap` — the shell/kill/restart wrapper with the
+  yellow re-run hint.
+
+`wtcd` is defined at `dot_config/zsh/tools/37_worktrunk.zsh:57`; call
+it rather than re-implementing the cd-to-worktree logic.
+
+## A — why deferred (kept for context)
+
+Standby pool. Rejected for the reasons listed in "Why B over A", plus:
+
+- Requires a lifecycle model (when do standby agents get assigned? by
+  the user picking a pane? by a menu? what happens if all N are
+  already busy when a new task arrives?) that B sidesteps entirely.
+- Rebalancing (move an agent from worktree X to worktree Y after it
+  turned out Y is the branch that matters) is error-prone; rebuilding
+  state (chat history, context) across a move is not free.
+- A proponent's strongest argument — "I want to context-switch fast" —
+  is already handled by `wtcd` + multiple tmux windows. The latency
+  saving from pre-warmed agent processes is seconds at most.
+
+If A becomes interesting later, the simplest revival is: call B in a
+loop from a parent script, feeding it N pre-picked branch names. No
+new primitives needed.
+
+## Verification plan (when we pick B up)
+
+1. `swt` (no arg, not inside a session) → refuses with a hint to
+   `tmux new-session` first.
+2. `swt` (inside a session, in a git repo) → popup prompts for branch
+   name; accepting a new name creates worktree + window + split.
+3. `swt codex` → same, right pane runs `specstory run codex`.
+4. `swt --on-exit restart feature-x codex` → right pane auto-respawns.
+5. After `wt remove feature-x`, the stale tmux window's nvim pane
+   still behaves (CWD just doesn't exist anymore); user closes it
+   manually.
+6. `prefix + Space` → Worktree → New feature window reaches the same
+   flow.
+7. `swt -h` help text lists all the flags.
+
+## Out of scope (explicit non-goals)
+
+- **Agent pool / standby mode** (option A above). Revisit only if a
+  user pattern demands it.
+- **Cross-worktree agent handoff**. "Move this agent from worktree X
+  to Y" is not a feature. Close and re-open.
+- **Automated branch naming from agent output** ("agent infers a good
+  branch name from its first task"). Cute but fragile; prompt-based
+  naming is more predictable.
+- **Integration with GitHub PR creation**. `worktrunk` has its own
+  story for this; no need to duplicate in `swt`.
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/backlog/svibe-worktree-per-feature.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:10:54Z)**_
+
+Now add a TODO entry pointing at it.
+
+_**Agent (claude-opus-4-7 2026-04-24 11:10:54Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+55	## P? — Needs evaluation before committing
+56	
+57	- [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
+58	- [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
+59	- [ ] **[?/M] tv agent-sessions: Cursor Agent (`[cu]`) + Cursor IDE (`[ci]`) full transcript rendering** — the first round of richer preview (2026-04; see Done) shipped Claude / Codex / OpenCode full transcripts only. Cursor-side is deferred: `[cu]` needs blob decode + role guessing (fragile), `[ci]` needs a two-table `composerData` + `bubbleId:*` join (straightforward but ~50 LOC). Both keep the legacy "first 5 user messages" preview for now. Promote when the user actually browses Cursor sessions often. → [research](backlog/tv-agent-sessions-richer-preview.md)
+60	- [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
+61	- [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
+62	- [ ] **[?/XL] CUDA / ML toolchain ansible role** — driver/cudnn/nccl version matrix is large; only relevant on Linux ML hosts. Defer until there's a concrete host that needs it. Likely belongs behind a new `ml_linux` profile.
+63	- [ ] **[?/XL] SLURM client config** — same shape as CUDA above: host-specific, likely a `dot_slurm/` template gated by profile. No machine currently needs it.
+64	- [ ] **[?/XL] Raycast config sync for non-Pro users** — git-tracked, redacted cross-machine sync for hotkeys / quicklinks / snippets / aliases / extensions. Full scaffold was built (key-name redactor, extensions-manifest walker, secrets.env.example emitter, chezmoi `syncRaycast` prompt with 3-file parity, `just raycast-*` recipes) but paused: Raycast's `.rayconfig` export is AES-encrypted with a non-public KDF that mixes in keychain-bound material — we brute-forced 150+ scheme combinations (PBKDF2/scrypt/SHA*/EVP_BytesToKey) against password `12345678` with zero plausible decodes, and Raycast forces a non-empty password field so even the empty-password bypass is closed. Cheapest revival spike: inspect the separate `Export Quicklinks` / `Export Snippets` commands for a plaintext format. Adjacent pitfall (`raycast-library-files-not-portable-across-machines.md`) stays live. → [research](backlog/raycast-sync-non-pro.md)
+65	
+66	---
+67	
+68	## Done (recent, kept for context — older items pruned)
+69
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate svibe entries in TODO.md
+
+`grep -n "svibe" /Users/daviddwlee84/.local/share/chezmoi/TODO.md`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:09Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check TODO.md history
+
+`git log --oneline -5 -- TODO.md`
+
+```text
+3e2fcbb tv/agent-sessions: richer preview + SpecStory reverse lookup
+b6e1616 raycast-sync: pause project, move WIP to backlog/
+c309d80 docs: bootstrap mkdocs-material site + GH Pages auto-deploy
+c59a79b .chezmoiscripts/{global,repo}/: finalize Step 2 cross-references + layout doc
+cd9f1a2 backlog: record .chezmoiscripts/ namespace decision (Option A)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify what 3e2fcbb did to TODO.md
+
+`git show 3e2fcbb -- TODO.md | head -30`
+
+```text
+commit 3e2fcbb44cf5d9dc9b8d07b04a85fdb1c34a02ac
+Author: Da-Wei Lee <daviddwlee84@gmail.com>
+Date:   Fri Apr 24 18:55:07 2026 +0800
+
+    tv/agent-sessions: richer preview + SpecStory reverse lookup
+    
+    Three gaps in the existing TV channel closed in one pass:
+    
+    - `all` mode now globally sorts rows by raw mtime DESC across agents.
+      Previously each per-agent handler sorted internally but the five
+      blocks were concatenated, which looked random.
+    - New TSV column 5 carries the matched `.specstory/history/*.md`
+      path, found by grep'ing the `<!-- <Provider> Session <uuid> -->`
+      comment SpecStory embeds on line 5 of every transcript. `Alt+S`
+      copies it to clipboard (pbcopy / wl-copy / xclip / OSC52 fallback).
+    - Preview cycle (Ctrl+F) is now 3 stages. New default: metadata
+      header + full back-and-forth transcript rendered through `glow`
+      (fallback `bat -l md`). The helper's `transcript` subcommand
+      prefers SpecStory's pre-rendered .md when the session has been
+      synced (zero-parsing, matches what user sees on disk) and falls
+      back to a raw-source walk for live sessions — Claude JSONL, Codex
+      rollout, OpenCode SQLite. Legacy first-5 + raw dump stay as
+      cycle 2 and 3. Cursor `[cu]`/`[ci]` surface a "deferred" note on
+      cycle 1 and the legacy first-5 view on cycle 2.
+    
+    Docs split:
+    - `docs/tools/specstory.md` stays user-facing (install / providers /
+      safety trade-off); added a "See also" footer.
+    - New `docs/tools/specstory-internals.md` — filename algorithm,
+      reverse-lookup recipe, markdown body structure, caveats. Sources
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full TODO.md diff from 3e2fcbb
+
+`git show 3e2fcbb -- TODO.md`
+
+```text
+commit 3e2fcbb44cf5d9dc9b8d07b04a85fdb1c34a02ac
+Author: Da-Wei Lee <daviddwlee84@gmail.com>
+Date:   Fri Apr 24 18:55:07 2026 +0800
+
+    tv/agent-sessions: richer preview + SpecStory reverse lookup
+    
+    Three gaps in the existing TV channel closed in one pass:
+    
+    - `all` mode now globally sorts rows by raw mtime DESC across agents.
+      Previously each per-agent handler sorted internally but the five
+      blocks were concatenated, which looked random.
+    - New TSV column 5 carries the matched `.specstory/history/*.md`
+      path, found by grep'ing the `<!-- <Provider> Session <uuid> -->`
+      comment SpecStory embeds on line 5 of every transcript. `Alt+S`
+      copies it to clipboard (pbcopy / wl-copy / xclip / OSC52 fallback).
+    - Preview cycle (Ctrl+F) is now 3 stages. New default: metadata
+      header + full back-and-forth transcript rendered through `glow`
+      (fallback `bat -l md`). The helper's `transcript` subcommand
+      prefers SpecStory's pre-rendered .md when the session has been
+      synced (zero-parsing, matches what user sees on disk) and falls
+      back to a raw-source walk for live sessions — Claude JSONL, Codex
+      rollout, OpenCode SQLite. Legacy first-5 + raw dump stay as
+      cycle 2 and 3. Cursor `[cu]`/`[ci]` surface a "deferred" note on
+      cycle 1 and the legacy first-5 view on cycle 2.
+    
+    Docs split:
+    - `docs/tools/specstory.md` stays user-facing (install / providers /
+      safety trade-off); added a "See also" footer.
+    - New `docs/tools/specstory-internals.md` — filename algorithm,
+      reverse-lookup recipe, markdown body structure, caveats. Sources
+      cross-checked against DeepWiki
+      (https://deepwiki.com/specstoryai/getspecstory) and empirical
+      files in this repo's .specstory/history/.
+    
+    Backlog entry `tv-agent-sessions-richer-preview.md` tracks the full
+    landscape — shipped items, deferred Cursor transcript work, and
+    design trade-offs (SpecStory-first vs raw-source, buffer-sort
+    placement, grep vs slug-replication).
+    
+    All inline Python/awk/JSON stays out of the TOML preview block per
+    pitfalls/tv-channel-bare-braces-break-substitution.md; the TOML is
+    shell glue only.
+    
+    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+diff --git a/TODO.md b/TODO.md
+index eca4c35..8f926ae 100644
+--- a/TODO.md
++++ b/TODO.md
+@@ -56,6 +56,7 @@ with a one-line summary of what shipped.
+ 
+ - [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
+ - [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
++- [ ] **[?/M] tv agent-sessions: Cursor Agent (`[cu]`) + Cursor IDE (`[ci]`) full transcript rendering** — the first round of richer preview (2026-04; see Done) shipped Claude / Codex / OpenCode full transcripts only. Cursor-side is deferred: `[cu]` needs blob decode + role guessing (fragile), `[ci]` needs a two-table `composerData` + `bubbleId:*` join (straightforward but ~50 LOC). Both keep the legacy "first 5 user messages" preview for now. Promote when the user actually browses Cursor sessions often. → [research](backlog/tv-agent-sessions-richer-preview.md)
+ - [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
+ - [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
+ - [ ] **[?/XL] CUDA / ML toolchain ansible role** — driver/cudnn/nccl version matrix is large; only relevant on Linux ML hosts. Defer until there's a concrete host that needs it. Likely belongs behind a new `ml_linux` profile.
+@@ -66,6 +67,7 @@ with a one-line summary of what shipped.
+ 
+ ## Done (recent, kept for context — older items pruned)
+ 
++- ✅ **tv agent-sessions richer preview + SpecStory linkage** (2026-04) — three gaps fixed in one pass. (1) `all` mode now sorts globally by mtime DESC across agents (helper previously printed five per-agent blocks each sorted internally). (2) New TSV column 5 carries the matched `.specstory/history/*.md` path (grep-based reverse lookup via the `<!-- <Provider> Session <uuid> -->` comment SpecStory embeds on line 5 of every file); `Alt+S` copies it to clipboard. (3) Preview 1 (default) now shows metadata + full back-and-forth transcript rendered via `glow` (fallback `bat -l md`), preferring SpecStory's pre-rendered markdown when present and falling back to raw-source walk for live sessions — Claude Code / Codex / OpenCode covered; Cursor side deferred (P? above). Docs split: deep-dive moved to [docs/tools/specstory-internals.md](docs/tools/specstory-internals.md); install/config stays in [docs/tools/specstory.md](docs/tools/specstory.md). Decision log: [backlog/tv-agent-sessions-richer-preview.md](backlog/tv-agent-sessions-richer-preview.md).
+ - ✅ **`.chezmoiscripts/{global,repo}/` layout** — six `run_onchange_after_*.sh.tmpl` scripts moved out of repo root into a 2-bucket nested layout (Option A). `repo_` infix dropped from `45_bootstrap_skills` (scope now encoded in directory). Cross-refs updated in AGENTS/CLAUDE/docs/ignore files. Layout doc: [docs/this_repo/chezmoiscripts-layout.md](docs/this_repo/chezmoiscripts-layout.md). Decision log: [backlog/chezmoiscripts-namespace-refactor.md](backlog/chezmoiscripts-namespace-refactor.md). One-time cost: chezmoi re-runs each script once on every machine after the path change.
+ 
+ - ✅ **tmux built-in window activity/bell flags** — `monitor-activity`/`monitor-bell` enabled in `dot_config/tmux/common.conf` so Catppuccin's `#{window_flags}` shows `#`/`!` glyphs for non-current windows that produced output or rang the bell. `monitor-silence` left disabled (agent panes have a perpetual spinner, would never fire). Option A of `backlog/tmux-window-status-indicators.md`; option C (hook-based semantic state) scoped + deferred.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:11:41Z)**_
+
+Correction: 3e2fcbb only added the two tv-agent-sessions TODO.md lines, not my svibe-multi-window-spillover line. I misread the earlier grep output and dropped my stash under a false assumption — the spillover backlog file exists but nothing in TODO.md points to it. Let me add both entries (the lost spillover one + the new worktree one).
+
+_**Agent (claude-opus-4-7 2026-04-24 11:12:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/TODO.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:12:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:12:18Z)**_
+
+Done — two files changed:
+
+- `backlog/svibe-worktree-per-feature.md` — new P?/M design doc: why B (per-feature hotkey) over A (standby pool), open questions (keybinding, branch-name source, layout shape), entry-point naming (`swt` / `scode-wt`), and reuse from existing `_sesh_wrap_agent` / `_sesh_on_exit_wrap` helpers
+- `TODO.md` — added the new `swt` P?/M entry **and** re-added the `svibe-multi-window-spillover` P?/L entry I accidentally dropped earlier (my plan mis-claimed 3e2fcbb had absorbed it; it hadn't, and dropping the stash lost the TODO line — the backlog file was fine, only the index pointer went missing)
+
+Both are unstaged. Want me to commit them as a single `backlog: ...` entry, or hold off in case you want to tweak the doc first?
+
+---
+
+_**User (2026-04-24 11:16:28Z)**_
+
+sure
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-24 11:16:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:16:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit backlog doc + TODO entries + session transcript
+
+```bash
+git add backlog/svibe-worktree-per-feature.md && git commit -m "$(cat <<'EOF'
+backlog: svibe worktree-per-feature + restore spillover TODO pointer
+
+Two entries:
+- New P?/M: `swt` per-feature worktree + editor/agent split on a
+  hotkey (Sidecar-style). Design doc weighs hotkey-per-feature (B)
+  vs standby agent pool (A) and records open questions on binding,
+  branch-name source, and layout shape.
+- Restore the P?/L svibe multi-window spillover entry that went
+  missing when the earlier stash was dropped — the backlog file has
+  been on main since 9dccead, only the TODO.md index pointer was
+  lost.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" -- backlog/svibe-worktree-per-feature.md TODO.md .specstory/history/2026-04-24_10-12-53Z-svibe-split-pane-grid.md
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1777029403-83307.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777029403-83307.
+[main b7aa2d4] backlog: svibe worktree-per-feature + restore spillover TODO pointer
+ 3 files changed, 714 insertions(+)
+ create mode 100644 backlog/svibe-worktree-per-feature.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:16:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit and remaining state
+
+`git log --oneline -3 && git status --short`
+
+```text
+b7aa2d4 backlog: svibe worktree-per-feature + restore spillover TODO pointer
+87ae175 Backup some chat history
+9dccead svibe: width-aware layout + auto-default N (--min-width, SVIBE_MIN_WIDTH)
+ M .specstory/history/2026-04-24_10-12-53Z-svibe-split-pane-grid.md
+ M .specstory/statistics.json
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 11:16:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 11:16:58Z)**_
+
+Committed as `b7aa2d4`. Both backlog entries are now indexed from TODO.md, and the spillover pointer I lost earlier is restored. Working tree is back to just the live transcript + statistics updates.
