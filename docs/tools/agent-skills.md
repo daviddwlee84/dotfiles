@@ -8,7 +8,7 @@ agent skills two ways, with sharply different scopes.
 | Scope | Lock file | Where the skill lives | Restored by |
 |---|---|---|---|
 | **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
-| **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `just bootstrap-skills` after a fresh clone |
+| **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `run_onchange_after_45_repo_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
 
 The two scopes happen to overlap today (both install
 `project-knowledge-harness`), but they serve different purposes — see "Why two
@@ -90,16 +90,27 @@ deployed (chezmoi-ignored: see `.chezmoiignore.tmpl` → `.agents/skills`,
 `.claude/skills`, `skills-lock.json`) and **not** git-tracked except for
 `skills-lock.json` (`.gitignore` covers `.agents/`, `.claude/skills/`).
 
-Restore on a fresh clone:
+Restore is automatic on `chezmoi apply` via
+`run_onchange_after_45_repo_bootstrap_skills.sh.tmpl`. The script:
+
+1. Checks whether `.chezmoi.sourceDir` contains a `skills-lock.json` (i.e.
+   this machine's chezmoi source dir IS the repo). If not, exits silently —
+   project skills only matter when you're editing the repo with an agent.
+2. Fast-path: if every skill named in the lock already has a
+   `./.agents/skills/<name>/SKILL.md`, exits without invoking npx.
+3. Otherwise runs `npx skills@latest experimental_install` from the source
+   dir to rebuild `./.agents/skills/...` and `./.claude/skills/...` symlinks.
+
+Trigger hash: SHA256 of `skills-lock.json` content, so the script only
+re-runs when the lock actually changes.
+
+Manual fallback (if you want to force a re-bootstrap, or you cloned the repo
+to a path that isn't your chezmoi source dir):
 
 ```sh
 just bootstrap-skills
 # → npx skills@latest experimental_install
 ```
-
-This rebuilds `./.agents/skills/...` and `./.claude/skills/...` symlinks from
-the lock. If you've never used a project-scope skill in this repo, the recipe
-is a no-op.
 
 ## Why two scopes?
 

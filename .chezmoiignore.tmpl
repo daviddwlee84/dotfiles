@@ -39,10 +39,11 @@ pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user confi
 # Agent skills installed via `npx skills`.
 #
 # Project-scope (chezmoi repo's own .agents/skills/ + .claude/skills/ + skills-lock.json):
-#   These exist purely so the chezmoi repo itself can use the harness skill
+#   These exist purely so the chezmoi repo itself can use project-scope skills
 #   while you edit it.  They MUST NOT deploy — global install at ~/.agents/skills/
-#   already covers every machine.  Restore project-scope on a new machine with
-#   `npx skills experimental_install` from inside this repo.
+#   already covers every machine.  Auto-restored on `chezmoi apply` by
+#   run_onchange_after_45_repo_bootstrap_skills.sh.tmpl when source dir == repo;
+#   manual fallback: `just bootstrap-skills` (or `npx skills experimental_install`).
 #
 # Global-scope (~/.agents/.skill-lock.json + ~/.agents/skills/):
 #   The lock file IS chezmoi-managed via dot_agents/modify_dot_skill-lock.json.tmpl
