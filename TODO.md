@@ -39,6 +39,7 @@ with a one-line summary of what shipped.
 - [ ] **[S] bun / pnpm / go install via ansible** — PATH wiring already in `02_legacy_tools.zsh`; just need install steps (likely additions to `js_cli_tools` and a new `go_tools` role, or fold into `devtools`).
 - [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`).
 - [ ] **[L] secrets.zsh encryption with age** — currently plaintext + chezmoi-ignored. Age-encrypted version could live in the source tree. Needs key distribution plan across machines.
+- [ ] **[M] aicapture: non-tmux output capture (Tier 2)** — Tier 1 (`aifix-stdin` / `aifix-run` / `aifix-rerun`) shipped; transparent preexec/precmd tee redirect would remove the "remember to prefix" friction for non-tmux daily users. Tier 3 (script(1) or PTY proxy) explicitly rejected. → [research](backlog/ai-capture-non-tmux-output.md)
 
 ## P3 — Someday / nice to have
 

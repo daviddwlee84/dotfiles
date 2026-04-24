@@ -163,37 +163,77 @@ _aiagent_invoke() {
   esac
 }
 
-# Shared dispatcher for aifix / aiexplain. Parses flags, captures the block,
-# builds the prompt, invokes the agent, pipes reply through the prettifier.
+# Core dispatcher: given an already-captured block, build the prompt, invoke
+# the agent, pipe reply through the prettifier. Shared by the four sources:
+# cpblock (aifix/aiexplain), stdin (aifix-stdin), tee'd CMD run (aifix-run),
+# and thefuck-style rerun (aifix-rerun).
+#
+#   _ai_dispatch_core <name> <source-label> <default-prompt>
+#                     <agent> <raw> <no-meta> <prompt-override> <block>
+_ai_dispatch_core() {
+  local name=$1 source_label=$2 default_prompt=$3
+  local agent=$4 raw=$5 no_meta=$6 prompt_override=$7 block=$8
+  if [[ -z "$block" ]]; then
+    print -u2 "$name: empty block"
+    return 1
+  fi
+  local prompt="${prompt_override:-$default_prompt}
+
+$block"
+  print -u2 "$name ← $source_label"
+
+  # Per-call env overrides: --no-meta / --raw flip env-var behaviour locally
+  # so _aiagent_invoke + _aicap_prettify see the intended values.
+  local saved_show=$AICAP_SHOW_METADATA saved_pretty=$AICAP_PRETTIFY
+  (( no_meta )) && AICAP_SHOW_METADATA=0
+  (( raw ))    && AICAP_PRETTIFY=0
+
+  if (( raw )); then
+    _aiagent_invoke "$agent" "$prompt"
+  else
+    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
+  fi
+  local rc=$?
+
+  AICAP_SHOW_METADATA=$saved_show
+  AICAP_PRETTIFY=$saved_pretty
+  return $rc
+}
+
+# Print the shared flag-help + env-var snapshot. Used by -h on each wrapper.
+_ai_print_help() {
+  local name=$1 usage=$2
+  print -r -- "usage: $name $usage"
+  print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+  print -r -- "  -p PROMPT  override default prompt"
+  print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
+  print -r -- "  --no-meta  suppress the stderr metadata line"
+  print -r -- ""
+  print -r -- "env vars:"
+  print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
+  print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
+  print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
+  print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+  print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
+  print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+  print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
+}
+
+# Shared dispatcher for aifix / aiexplain. Captures via cpblock.
 _ai_capture_dispatch() {
   emulate -L zsh
   local name=$1; shift
   local default_prompt=$1; shift
-  local n=1 agent="" prompt_override=""
-  local raw=0 no_meta=0
+  local n=1 agent="" prompt_override="" raw=0 no_meta=0
   while (( $# )); do
     case "$1" in
       -a|--agent)   agent=$2; shift 2 ;;
       -p|--prompt)  prompt_override=$2; shift 2 ;;
       --raw)        raw=1; shift ;;
       --no-meta)    no_meta=1; shift ;;
-      -h|--help)
-        print -r -- "usage: $name [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
-        print -r -- "  N          block index back (default 1 = last)"
-        print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
-        print -r -- "  -p PROMPT  override default prompt"
-        print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
-        print -r -- "  --no-meta  suppress the stderr metadata line"
-        print -r -- ""
-        print -r -- "env vars:"
-        print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
-        print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
-        print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
-        print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
-        print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
-        print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
-        print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
-        return 0 ;;
+      -h|--help)    _ai_print_help "$name" "[N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                    print -r -- "  N          block index back (default 1 = last)"
+                    return 0 ;;
       --) shift; break ;;
       -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
       *)  n=$1; shift ;;
@@ -214,30 +254,8 @@ _ai_capture_dispatch() {
     print -u2 "$name: cpblock $n failed (run 'exec zsh' if the shell pre-dates chezmoi apply)"
     return 1
   }
-  if [[ -z "$block" ]]; then
-    print -u2 "$name: cpblock $n returned empty"
-    return 1
-  fi
-  local prompt="${prompt_override:-$default_prompt}
-
-$block"
-  print -u2 "$name ← block -$n"
-
-  # Per-call overrides: --no-meta and --raw flip env-var behaviour locally.
-  local saved_show=$AICAP_SHOW_METADATA saved_pretty=$AICAP_PRETTIFY
-  (( no_meta )) && AICAP_SHOW_METADATA=0
-  (( raw ))    && AICAP_PRETTIFY=0
-
-  if (( raw )); then
-    _aiagent_invoke "$agent" "$prompt"
-  else
-    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
-  fi
-  local rc=$?
-
-  AICAP_SHOW_METADATA=$saved_show
-  AICAP_PRETTIFY=$saved_pretty
-  return $rc
+  _ai_dispatch_core "$name" "block -$n" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
 }
 
 aifix() {
@@ -250,6 +268,143 @@ aiexplain() {
   _ai_capture_dispatch aiexplain \
     "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
     "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Non-tmux Tier 1: stdin / run / rerun sources
+# -----------------------------------------------------------------------------
+# These three cover the "no tmux available" case (VSCode integrated terminal,
+# bare Ghostty without tmux, quick SSH) by NOT relying on cpblock / OSC 133.
+# Each composes zero magic — user explicitly picks the source.
+#
+# See backlog/ai-capture-non-tmux-output.md for why we don't do automatic
+# tee redirection (Tier 2) or PTY proxy wrapping (Tier 3).
+
+# aifix-stdin: read whatever the caller piped in. Universal.
+#   tail -200 /var/log/nginx/error.log | aifix-stdin
+#   curl -sS https://weird.api/thing | aifix-stdin -p "explain this JSON"
+#   aifix-stdin < build.log
+aifix-stdin() {
+  emulate -L zsh
+  local name=aifix-stdin agent="" prompt_override="" raw=0 no_meta=0
+  local default_prompt="Here is output captured from my terminal. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent=$2; shift 2 ;;
+      -p|--prompt)  prompt_override=$2; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                    print -r -- "  Reads block from stdin. No tmux / cpblock dependency."
+                    return 0 ;;
+      *) print -u2 "$name: unexpected arg: $1 (did you mean -p?)"; return 1 ;;
+    esac
+  done
+  if [[ -z "$agent" ]]; then
+    agent=$(_aiagent_autodetect) || {
+      print -u2 "$name: no coding-agent CLI found on PATH"
+      return 1
+    }
+  fi
+  # -t 0 checks if stdin is a terminal. If it is, user likely forgot to pipe.
+  if [[ -t 0 ]]; then
+    print -u2 "$name: stdin is a tty — did you forget to pipe? Example:"
+    print -u2 "  some-command 2>&1 | $name"
+    return 1
+  fi
+  local block
+  block=$(cat)
+  _ai_dispatch_core "$name" "stdin" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+}
+
+# aifix-run: run CMD, tee stdout+stderr to a log, feed "$ CMD\n<output>\n(exit code: N)"
+# to the agent. Use `--` to separate flags from the command.
+#   aifix-run -- cargo build --release
+#   aifix-run -p "is this safe?" -- ansible-playbook deploy.yml
+#
+# isatty caveat: teeing makes CMD's stdout a pipe, so TUI apps (vim, less)
+# render in degraded mode. Don't use this for interactive tools.
+aifix-run() {
+  emulate -L zsh
+  local name=aifix-run agent="" prompt_override="" raw=0 no_meta=0
+  local default_prompt="Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent=$2; shift 2 ;;
+      -p|--prompt)  prompt_override=$2; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta] -- CMD [ARG...]"
+                    print -r -- "  Runs CMD with stdout+stderr teed to a log, feeds to agent."
+                    print -r -- "  Use \`--\` to separate flags from the command."
+                    return 0 ;;
+      --) shift; break ;;
+      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+      *) break ;;
+    esac
+  done
+  if (( $# == 0 )); then
+    print -u2 "$name: missing command. Usage: $name [flags] -- CMD [ARG...]"
+    return 1
+  fi
+  if [[ -z "$agent" ]]; then
+    agent=$(_aiagent_autodetect) || {
+      print -u2 "$name: no coding-agent CLI found on PATH"
+      return 1
+    }
+  fi
+  local log
+  log=$(mktemp -t aifix-run.XXXXXX) || { print -u2 "$name: mktemp failed"; return 1; }
+  # Record the command line as the block's first line so the agent knows
+  # what was run. Use $(print -r -- "$*") to preserve args verbatim.
+  print -r -- "\$ $*" > "$log"
+  "$@" 2>&1 | tee -a "$log"
+  local rc=${pipestatus[1]}
+  print -r -- "" >> "$log"
+  print -r -- "(exit code: $rc)" >> "$log"
+  local block
+  block=$(<"$log")
+  rm -f "$log"
+  _ai_dispatch_core "$name" "run \`${1}…\` (exit $rc)" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+}
+
+# aifix-rerun: thefuck-style. Re-executes the last command from shell history
+# via aifix-run. Prompts for confirmation unless -y, because re-running has
+# side effects if the command isn't idempotent.
+aifix-rerun() {
+  emulate -L zsh
+  local name=aifix-rerun yes=0 forward=()
+  while (( $# )); do
+    case "$1" in
+      -y|--yes) yes=1; shift ;;
+      -h|--help) _ai_print_help "$name" "[-y] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                 print -r -- "  Re-executes the last command from zsh history via aifix-run."
+                 print -r -- "  Prompts for confirmation unless -y (side effects beware)."
+                 return 0 ;;
+      *) forward+=("$1"); shift ;;
+    esac
+  done
+  # fc -ln -2 -2: skip aifix-rerun itself (which is -1), grab the one before.
+  local cmd
+  cmd=$(fc -ln -2 -2 2>/dev/null)
+  cmd="${cmd#	}"; cmd="${cmd# }"
+  if [[ -z "$cmd" ]]; then
+    print -u2 "$name: no prior command in shell history"
+    return 1
+  fi
+  print -u2 "$name: will re-execute:"
+  print -u2 "  $cmd"
+  print -u2 "⚠ side effects if the command is not idempotent (network calls, file writes, etc.)"
+  if (( ! yes )); then
+    local reply
+    read -q "reply?Proceed? [y/N] "
+    print
+    [[ "$reply" != "y" ]] && { print -u2 "$name: aborted"; return 130; }
+  fi
+  # Delegate to aifix-run via eval (preserves quoting for $cmd's shell syntax).
+  eval "aifix-run ${forward[*]} -- $cmd"
 }
 
 # aiblock — launch the Python TUI (scripts/aiblock.py) resolved via

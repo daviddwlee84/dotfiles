@@ -587,9 +587,12 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block, ask agent to diagnose + suggest a fix |
-| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block, ask agent to explain what happened |
-| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
+| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
+| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to explain what happened |
+| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
+| `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
+| `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
+| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
 
 ---
 

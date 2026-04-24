@@ -26190,7 +26190,7 @@ Saved working directory and index state On main: others-wip-phase-A
 ```
 </details></tool-use>
 
-_**Agent (claude-opus-4-7 2026-04-24 07:00:07Z)**_
+_**Agent (claude-opus-4-7 2026-04-24 07:00:19Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -26215,5 +26215,788 @@ Blob URL to share:
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -4
 git --no-pager log --oneline -3
+```
+
+```text
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777014016-48448.
+[main 8d4dca0] docs: aicapture user guide (for sharing w/o whole dotfiles)
+ 4 files changed, 3152 insertions(+), 23 deletions(-)
+ create mode 100644 docs/tools/aicapture.md
+8d4dca0 docs: aicapture user guide (for sharing w/o whole dotfiles)
+eba646b gitleaks + redactor modernization + agent-artifact allowlist
+430326d docs: instant-LLM-fix prior art survey
+[This command modified 1 file you've previously read: .claude/plans/tmux-scrolling-x-coding-rosy-clover.md. Call Read before editing.]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:00:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:00:27Z)**_
+
+Push Phase A：
+
+_**Agent (claude-opus-4-7 2026-04-24 07:00:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Push + restore others' WIP
+
+```bash
+git push origin main 2>&1 | tail -10
+echo "---"
+git stash pop stash@{0} 2>&1 | tail -5
+```
+
+```text
+To github.com:daviddwlee84/dotfiles.git
+   eba646b..8d4dca0  main -> main
+---
+	scripts/init/Dockerfile.test
+	scripts/raycast_sync.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+The stash entry is kept in case you need it again.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check post-pop state
+
+```bash
+git --no-pager status --short | head -10
+echo "---"
+git --no-pager stash list
+```
+
+```text
+ M .claude/plans/tmux-scrolling-x-coding-rosy-clover.md
+ M .specstory/history/2026-04-22_08-21-44Z.md
+ M .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+ M .specstory/history/2026-04-24_04-24-36Z.md
+ M .specstory/statistics.json
+?? .claude/plans/image-1-sesh-folder-synchronous-honey.md
+?? .claude/plans/yazi-z-swift-rain.md
+?? .specstory/history/2026-04-24_05-34-54Z.md
+?? .specstory/history/2026-04-24_05-43-40Z-here-is-a-command.md
+?? .specstory/history/2026-04-24_05-46-52Z-security-chezmoi-on-main.md
+---
+stash@{0}: On main: others-wip-phase-A
+stash@{1}: autostash
+stash@{2}: WIP on main: 14e5329 Add tldr with languages fallback (default to Traditional Chinese)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:23Z)**_
+
+Phase A pushed ✓ at `8d4dca0`。Stash 沒 pop 成 (others 的 WIP 在 `stash@{0}`，你想回收時 `git stash apply stash@{0}` — 我不動它避免跟其他 agent race)。
+
+Phase B：改 `04_ai_capture.zsh` 加 3 個 non-tmux wrapper。
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:24Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/04_ai_capture.zsh`
+
+```text
+140	    codex)
+141	      print -u2 "codex ($AICAP_CODEX_MODEL)"
+142	      _aicap_spinner_start "codex $AICAP_CODEX_MODEL…"
+143	      codex exec -m "$AICAP_CODEX_MODEL" "$prompt"
+144	      rc=$?
+145	      _aicap_spinner_stop
+146	      return $rc
+147	      ;;
+148	    cursor-agent)
+149	      if [[ -n "$AICAP_CURSOR_MODEL" ]]; then
+150	        print -u2 "cursor-agent ($AICAP_CURSOR_MODEL)"
+151	        _aicap_spinner_start "cursor-agent $AICAP_CURSOR_MODEL…"
+152	        cursor-agent -p --model "$AICAP_CURSOR_MODEL" "$prompt"
+153	      else
+154	        print -u2 "cursor-agent"
+155	        _aicap_spinner_start "cursor-agent…"
+156	        cursor-agent -p "$prompt"
+157	      fi
+158	      rc=$?
+159	      _aicap_spinner_stop
+160	      return $rc
+161	      ;;
+162	    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
+163	  esac
+164	}
+165	
+166	# Shared dispatcher for aifix / aiexplain. Parses flags, captures the block,
+167	# builds the prompt, invokes the agent, pipes reply through the prettifier.
+168	_ai_capture_dispatch() {
+169	  emulate -L zsh
+170	  local name=$1; shift
+171	  local default_prompt=$1; shift
+172	  local n=1 agent="" prompt_override=""
+173	  local raw=0 no_meta=0
+174	  while (( $# )); do
+175	    case "$1" in
+176	      -a|--agent)   agent=$2; shift 2 ;;
+177	      -p|--prompt)  prompt_override=$2; shift 2 ;;
+178	      --raw)        raw=1; shift ;;
+179	      --no-meta)    no_meta=1; shift ;;
+180	      -h|--help)
+181	        print -r -- "usage: $name [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+182	        print -r -- "  N          block index back (default 1 = last)"
+183	        print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+184	        print -r -- "  -p PROMPT  override default prompt"
+185	        print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
+186	        print -r -- "  --no-meta  suppress the stderr metadata line"
+187	        print -r -- ""
+188	        print -r -- "env vars:"
+189	        print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
+190	        print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
+191	        print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
+192	        print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+193	        print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
+194	        print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+195	        print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
+196	        return 0 ;;
+197	      --) shift; break ;;
+198	      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+199	      *)  n=$1; shift ;;
+200	    esac
+201	  done
+202	  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+203	    print -u2 "$name: N must be a positive integer (got: $n)"
+204	    return 1
+205	  fi
+206	  if [[ -z "$agent" ]]; then
+207	    agent=$(_aiagent_autodetect) || {
+208	      print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+209	      return 1
+210	    }
+211	  fi
+212	  local block
+213	  block=$(cpblock "$n" 2>/dev/null) || {
+214	    print -u2 "$name: cpblock $n failed (run 'exec zsh' if the shell pre-dates chezmoi apply)"
+215	    return 1
+216	  }
+217	  if [[ -z "$block" ]]; then
+218	    print -u2 "$name: cpblock $n returned empty"
+219	    return 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:29Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/04_ai_capture.zsh`
+
+```text
+220	  fi
+221	  local prompt="${prompt_override:-$default_prompt}
+222	
+223	$block"
+224	  print -u2 "$name ← block -$n"
+225	
+226	  # Per-call overrides: --no-meta and --raw flip env-var behaviour locally.
+227	  local saved_show=$AICAP_SHOW_METADATA saved_pretty=$AICAP_PRETTIFY
+228	  (( no_meta )) && AICAP_SHOW_METADATA=0
+229	  (( raw ))    && AICAP_PRETTIFY=0
+230	
+231	  if (( raw )); then
+232	    _aiagent_invoke "$agent" "$prompt"
+233	  else
+234	    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
+235	  fi
+236	  local rc=$?
+237	
+238	  AICAP_SHOW_METADATA=$saved_show
+239	  AICAP_PRETTIFY=$saved_pretty
+240	  return $rc
+241	}
+242	
+243	aifix() {
+244	  _ai_capture_dispatch aifix \
+245	    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+246	    "$@"
+247	}
+248	
+249	aiexplain() {
+250	  _ai_capture_dispatch aiexplain \
+251	    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+252	    "$@"
+253	}
+254	
+255	# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+256	# chezmoi source-path, cached per-shell. The Python side reads the same
+257	# AICAP_* env vars so model defaults stay consistent.
+258	#
+259	# History passing: `fc -ln …` only works inside this interactive zsh —
+260	# a `zsh -ic` subshell doesn't inherit the in-memory history buffer and
+261	# `fc -R` only pulls whatever the HISTFILE has on disk (which misses
+262	# unflushed recent commands). Dump the current shell's history into a
+263	# temp file and hand the path to the TUI via $AIBLOCK_HIST_DUMP.
+264	_AIBLOCK_SCRIPT=""
+265	aiblock() {
+266	  emulate -L zsh
+267	  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+268	    local base
+269	    base=$(chezmoi source-path 2>/dev/null) || {
+270	      print -u2 "aiblock: could not resolve chezmoi source-path"
+271	      return 1
+272	    }
+273	    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+274	  fi
+275	  if [[ ! -f "$_AIBLOCK_SCRIPT" ]]; then
+276	    print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
+277	    return 1
+278	  fi
+279	  local histdump
+280	  histdump=$(mktemp -t aiblock-hist.XXXXXX) || {
+281	    print -u2 "aiblock: mktemp failed"
+282	    return 1
+283	  }
+284	  # fc -ln -30: last 30 entries, no numbering. Trailing newline per entry.
+285	  fc -ln -30 > "$histdump" 2>/dev/null
+286	  AIBLOCK_HIST_DUMP="$histdump" uv run --script "$_AIBLOCK_SCRIPT" "$@"
+287	  local rc=$?
+288	  rm -f "$histdump"
+289	  return $rc
+290	}
+291
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:01:53Z)**_
+
+重寫 `04_ai_capture.zsh` 的後半部：extract `_ai_dispatch_core`，加 3 個 tier 1 wrappers。
+
+_**Agent (claude-opus-4-7 2026-04-24 07:02:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax + help smoke tests
+
+```bash
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh && echo syntax OK
+chezmoi apply 2>&1 | head -3
+echo "=== help outputs ==="
+zsh -ic 'source ~/.config/zsh/tools/04_ai_capture.zsh; aifix-stdin --help' 2>&1 | grep -v zle | head -15
+echo "---"
+zsh -ic 'source ~/.config/zsh/tools/04_ai_capture.zsh; aifix-run --help' 2>&1 | grep -v zle | head -10
+echo "---"
+zsh -ic 'source ~/.config/zsh/tools/04_ai_capture.zsh; aifix-rerun --help' 2>&1 | grep -v zle | head -10
+```
+
+```text
+syntax OK
+chezmoi: warning: config file template has changed, run chezmoi init to regenerate config file
+chezmoi: template: .chezmoiignore.tmpl:92:11: executing ".chezmoiignore.tmpl" at <.useChineseMirror>: map has no entry for key "useChineseMirror"
+=== help outputs ===
+zsh: command not found: aifix-stdin
+---
+zsh: command not found: aifix-run
+---
+zsh: command not found: aifix-rerun
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check what functions actually got defined
+
+`zsh -c 'source /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh 2>&1; typeset -f | grep "^aifix\|^aiexplain\|^_ai_" | head -10'`
+
+```text
+_ai_capture_dispatch () {
+_ai_dispatch_core () {
+_ai_print_help () {
+aiexplain () {
+aifix () {
+aifix-rerun () {
+aifix-run () {
+aifix-stdin () {
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:29Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run aifix-stdin --help via direct source (no oh-my-zsh interference)
+
+```bash
+zsh -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh
+aifix-stdin --help
+echo "---"
+aifix-run --help
+' 2>&1 | head -30
+```
+
+```text
+usage: aifix-stdin [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+
+env vars:
+  AICAP_CLAUDE_MODEL   = haiku
+  AICAP_OPENCODE_MODEL = github-copilot/claude-haiku-4.5
+  AICAP_CODEX_MODEL    = gpt-5-mini
+  AICAP_CURSOR_MODEL   = <unset>
+  AICAP_SHOW_METADATA  = 1
+  AICAP_PRETTIFY       = 1
+  AICAP_SPINNER        = 1
+  Reads block from stdin. No tmux / cpblock dependency.
+---
+usage: aifix-run [-a AGENT] [-p PROMPT] [--raw] [--no-meta] -- CMD [ARG...]
+  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+
+env vars:
+  AICAP_CLAUDE_MODEL   = haiku
+  AICAP_OPENCODE_MODEL = github-copilot/claude-haiku-4.5
+  AICAP_CODEX_MODEL    = gpt-5-mini
+  AICAP_CURSOR_MODEL   = <unset>
+  AICAP_SHOW_METADATA  = 1
+  AICAP_PRETTIFY       = 1
+  AICAP_SPINNER        = 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Live test: aifix-stdin with a tiny prompt
+
+```bash
+# Live test: aifix-stdin
+echo "BUILD ERROR: missing serde dependency in Cargo.toml" | zsh -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh
+aifix-stdin -p "reply with just OK" --raw --no-meta
+' 2>&1 | tail -8
+```
+
+```text
+aifix-stdin ← stdin
+claude (haiku)
+OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:03:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Live test: aifix-run with a failing ls
+
+```bash
+zsh -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_ai_capture.zsh
+aifix-run -p "reply just OK" --raw --no-meta -- ls /nonexistent_path_xyz
+' 2>&1 | tail -10
+```
+
+```text
+ls: /nonexistent_path_xyz: No such file or directory
+aifix-run ← run `ls…` (exit 1)
+claude (haiku)
+OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:17Z)**_
+
+Tier 1 works. 更新 aicapture.md 加 non-tmux 章節：
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/tools/aicapture.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:40Z)**_
+
+現在 docs/zsh/aliases.md 加新 rows：
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:04:57Z)**_
+
+Phase C：backlog 檔案 + TODO.md。
+
+_**Agent (claude-opus-4-7 2026-04-24 07:05:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Non-tmux output capture for aifix / aiexplain
+
+**Status**: P2 deferred (Tier 2); **P3 rejected** (Tier 3)
+**Effort**: M (Tier 2) / XL-won't-do (Tier 3)
+**Related**: [`TODO.md`](../TODO.md) · [`dot_config/zsh/tools/04_ai_capture.zsh`](../dot_config/zsh/tools/04_ai_capture.zsh) · [`docs/tools/aicapture.md`](../docs/tools/aicapture.md) · [`docs/this_repo/instant-llm-fix-prior-art.md`](../docs/this_repo/instant-llm-fix-prior-art.md)
+
+## Context
+
+**2026-04**: shipped `aifix` / `aiexplain` / `cpblock` / `aiblock` which all require tmux because they lean on OSC 133 line-attribute tracking in tmux's grid. Users in non-tmux environments (VSCode integrated terminal, bare Ghostty without tmux, quick SSH where starting tmux is inconvenient) can use `cpcmd` (shell history — input only) but not the output-level capture.
+
+Tier 1 shipped in the same batch: `aifix-stdin` / `aifix-run` / `aifix-rerun` — three zero-magic wrappers where the user explicitly provides the context (stdin / fresh invocation / re-execute). They cover the common cases but require the user to remember which one to pick.
+
+This entry records what a more-transparent "Tier 2" or "Tier 3" would look like, and — more importantly — **why we're not building them**, so future-us doesn't spend a weekend rediscovering these trade-offs.
+
+## Investigation
+
+From [`docs/this_repo/instant-llm-fix-prior-art.md`](../docs/this_repo/instant-llm-fix-prior-art.md), the four known strategies for "bound the previous command":
+
+1. **Shell history file** — only sees the command string, no output. What `thefuck` does; works fine for typos, useless for runtime errors.
+2. **Shell hooks + OSC 133** — what we do. Needs a terminal multiplexer or OSC-133-aware terminal to store the markers; tmux consumes the marker bytes into grid line attributes and doesn't re-emit them from `capture-pane -pe`.
+3. **tmux `capture-pane`** — what `wut` / `tmuxai` / our `cpblock` do. Fails outside tmux.
+4. **PTY proxy** — `butterfish` / Warp. The AI shell IS the terminal.
+
+No one has a "automatic, no shell integration, no PTY proxy, no tmux" solution — it's a physics limit, not an engineering gap.
+
+### thefuck's approach (for comparison)
+
+\```zsh
+# thefuck/shells/zsh.py fuck() alias snippet
+TF_HISTORY="$(fc -ln -10)"
+TF_CMD=$(thefuck THEFUCK_ARGUMENT_PLACEHOLDER "$@") && eval $TF_CMD
+\```
+
+Then Python:
+
+\```python
+proc = Popen(script, shell=True, env=..., stderr=STDOUT, stdout=PIPE)
+output = proc.communicate(timeout=settings.wait_command)[0]
+\```
+
+**It re-runs the command** to get stdout+stderr — exactly what our Tier 1 `aifix-rerun` does, but with less ceremony. Cost: `rm`, `curl -X POST`, `cargo build` get executed twice.
+
+### atuin's choice to NOT store output
+
+[atuin](https://github.com/atuinsh/atuin) is the closest "serious shell-history database" project. It stores command, exit code, duration, cwd, host — [explicitly not output](https://blog.atuin.sh/) because output is typically large and rarely needed later. If we went further we'd be reinventing their design space; better to compose with atuin than compete.
+
+## Options considered
+
+| Option | Pros | Cons |
+|---|---|---|
+| **Tier 1 (SHIPPED)** — `aifix-stdin` / `aifix-run` / `aifix-rerun` | Zero magic, composes with any pipe, user has full control | User must remember to prefix / pipe; no "just works after a failed command" reflex |
+| **Tier 2 — zsh preexec/precmd tee redirect** | Transparent: user just runs commands, `aifix` finds the output automatically | `exec > >(tee FILE)` breaks `isatty(1)` for the running command → TUI apps (vim, less, htop, ncurses) render in degraded mode; ZLE timing is fragile (same family as the [OSC 133 A-marker pitfall](../pitfalls/zsh-osc133-precmd-printf-a-not-stored.md)); `/tmp` fills up if not capped |
+| **Tier 3a — wrap every shell in `script(1)`** | PTY emulation keeps `isatty(1)` truthy, so TUIs still work | `script(1)` has job-control quirks with zsh (fg/bg misbehave), some tools detect they're "inside script" and change behaviour, log files pile up, you end up with layers like `zsh inside script inside tmux inside terminal` which is hell to debug |
+| **Tier 3b — PTY proxy (butterfish-style)** | Richest context (every keystroke + every output byte) | Effectively rewriting our own terminal; gives up portability; puts us in the Warp/butterfish product category which this repo intentionally isn't |
+
+## Current blocker / open questions
+
+**Deferred, not blocked.** Tier 1 (shipped) handles the common cases. Tier 2 needs research on keeping `isatty(1)` truthy under tee (maybe a PTY-pair shim? Maybe `zpty` from `zsh/zpty` module?). Tier 3 is a deliberate "no" — see Decision below.
+
+Re-evaluate Tier 2 if:
+
+- Three or more users (or recurring personal workflows) report needing output capture in non-tmux sessions specifically, AND the Tier 1 commands aren't good enough;
+- Someone finds a clean way to keep `isatty(1)` truthy during transparent tee, maybe via `zsh/zpty` module or a custom `mkfifo` dance;
+- The TUI-app-breakage testing burden becomes tractable (a small curated whitelist turns out to be 95% sufficient).
+
+## Decision (2026-04)
+
+- **Tier 1 shipped** in the same batch as this backlog entry.
+- **Tier 2 deferred** — the effort is "Medium" (maybe 4-8 hours of plumbing) but the *testing* burden is L-to-XL: we'd need to validate against every TUI the user runs (vim, nvim, less, htop, btop, lazygit, fzf, tldr, systemctl status, journalctl -f, tmux-itself…) to make sure we aren't breaking them. Benefit is limited to the subset of users who (a) work without tmux daily AND (b) hit the "forgot to pipe" reflex often enough that Tier 1 isn't good enough. Low ROI.
+- **Tier 3 rejected.** Matches the "What we intentionally don't do and shouldn't start" section of [`instant-llm-fix-prior-art.md`](../docs/this_repo/instant-llm-fix-prior-art.md). Both variants require re-architecting this repo around a shell-subsuming wrapper, giving up portability and adding a permanent extra layer. "Just use tmux" is this repo's house style — we already have the tmux invariant (see [`CLAUDE.md`](../CLAUDE.md) → tmux ≥ 3.3 required for popup menu), so asking output-capture users to do the same isn't a new constraint.
+
+## References
+
+- thefuck's eval-alias approach: [nvbn/thefuck/shells/zsh.py](https://github.com/nvbn/thefuck/blob/master/thefuck/shells/zsh.py)
+- butterfish PTY proxy design post: [pbbakkum.com/blog/20230927](https://pbbakkum.com/blog/20230927/)
+- atuin's decision to not capture output: [blog.atuin.sh](https://blog.atuin.sh/)
+- Related pitfall about ZLE timing: [`pitfalls/zsh-osc133-precmd-printf-a-not-stored.md`](../pitfalls/zsh-osc133-precmd-printf-a-not-stored.md)
+- Prior art survey: [`docs/this_repo/instant-llm-fix-prior-art.md`](../docs/this_repo/instant-llm-fix-prior-art.md)
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/backlog/ai-capture-non-tmux-output.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:05:56Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./backlog/README.md`
+
+```text
+95	Add new entries here as you create them. Keep alphabetical.
+96	
+97	| Slug | Status | TODO entry |
+98	|---|---|---|
+99	| [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
+100	| [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
+101	| [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
+102	| [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
+103
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/backlog/README.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find P? section anchor in TODO.md
+
+`grep -n "^## P?\|^## P2\|^## P3\|^## Done" /Users/daviddwlee84/.local/share/chezmoi/TODO.md | head -5`
+
+```text
+35:## P2 — Worth doing, no rush
+43:## P3 — Someday / nice to have
+53:## P? — Needs evaluation before committing
+64:## Done (recent, kept for context — older items pruned)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+53	## P? — Needs evaluation before committing
+54	
+55	- [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
+56	- [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
+57	- [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
+58	- [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
+59	- [ ] **[?/XL] CUDA / ML toolchain ansible role** — driver/cudnn/nccl version matrix is large; only relevant on Linux ML hosts. Defer until there's a concrete host that needs it. Likely belongs behind a new `ml_linux` profile.
+60	- [ ] **[?/XL] SLURM client config** — same shape as CUDA above: host-specific, likely a `dot_slurm/` template gated by profile. No machine currently needs it.
+61	
+62	---
+63	
+64	## Done (recent, kept for context — older items pruned)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:31Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+35	## P2 — Worth doing, no rush
+36	
+37	- [ ] **[M] miniforge/conda ansible role** — `dot_config/zsh/tools/04_conda_mamba.zsh` already lazy-loads if conda is present, but no role installs it. Decide: ansible role vs delegate to `mise`/`brew install --cask miniforge`.
+38	- [ ] **[M] nvm ansible role** — `02_legacy_tools.zsh` wires PATH + provides `load-nvm` alias, but no role installs nvm itself. May be obviated by mise consolidation (see P? below).
+39	- [ ] **[S] bun / pnpm / go install via ansible** — PATH wiring already in `02_legacy_tools.zsh`; just need install steps (likely additions to `js_cli_tools` and a new `go_tools` role, or fold into `devtools`).
+40	- [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`).
+41	- [ ] **[L] secrets.zsh encryption with age** — currently plaintext + chezmoi-ignored. Age-encrypted version could live in the source tree. Needs key distribution plan across machines.
+42
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/TODO.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:47Z)**_
+
+Apply + commit Phase B + C：
+
+_**Agent (claude-opus-4-7 2026-04-24 07:06:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage Phase B+C
+
+```bash
+chezmoi apply 2>&1 | grep -v warning | head -3
+echo "---"
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -2
+git add dot_config/zsh/tools/04_ai_capture.zsh docs/tools/aicapture.md docs/zsh/aliases.md backlog/ai-capture-non-tmux-output.md backlog/README.md TODO.md .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git --no-pager diff --cached --stat
+```
+
+```text
+chezmoi: template: .chezmoiignore.tmpl:92:11: executing ".chezmoiignore.tmpl" at <.useChineseMirror>: map has no entry for key "useChineseMirror"
+---
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+ ...2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md | 713 ++++++++++++++++++++-
+ TODO.md                                            |   1 +
+ backlog/README.md                                  |   1 +
+ backlog/ai-capture-non-tmux-output.md              |  78 +++
+ docs/tools/aicapture.md                            |  32 +
+ docs/zsh/aliases.md                                |   9 +-
+ dot_config/zsh/tools/04_ai_capture.zsh             | 245 +++++--
+ 7 files changed, 1001 insertions(+), 78 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:07:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Phase B+C commit
+
+```bash
+git commit -m "$(cat <<'EOF'
+aicapture: Tier 1 non-tmux wrappers + backlog Tier 2/3 trade-offs
+
+Three new shell functions in 04_ai_capture.zsh, alongside the
+existing aifix/aiexplain:
+
+- aifix-stdin — read stdin as context (no tmux needed)
+    tail -100 /var/log/nginx/error.log | aifix-stdin
+    curl -sS https://weird.api/thing | aifix-stdin -p "explain"
+
+- aifix-run -- CMD [ARG...] — run CMD, tee stdout+stderr to a log,
+  feed command + output + exit code to agent
+    aifix-run -- cargo build --release
+
+- aifix-rerun — thefuck-style, re-execute last history command via
+  aifix-run. Confirms with "⚠ side effects" warning unless -y.
+
+Shared code refactored: _ai_dispatch_core takes a pre-captured block
+and handles prompt build + agent invoke + metadata/prettify/spinner
+toggle. cpblock path (aifix/aiexplain), stdin path, and run path all
+call it. Per-agent invocation, spinner, prettify fallback, and
+metadata extraction unchanged from previous batch.
+
+isatty caveat on aifix-run: teeing makes CMD's stdout a pipe, so TUI
+apps (vim/less/htop) render in degraded mode. Documented; not
+auto-whitelisted (that's Tier 2 territory).
+
+Backlog entry backlog/ai-capture-non-tmux-output.md records why
+Tier 2 (transparent preexec/precmd tee) is deferred M and Tier 3
+(script(1) wrapping / PTY proxy à la butterfish) is explicitly
+rejected — so future-us doesn't spend a weekend rediscovering the
+trade-offs. Matches the "What we intentionally don't do" section of
+docs/this_repo/instant-llm-fix-prior-art.md.
+
+docs/tools/aicapture.md gains a "Non-tmux alternatives" section
+before Configuration; docs/zsh/aliases.md adds three rows under
+AI Capture; TODO.md gains a P2 entry pointing at the backlog;
+backlog/README.md index gets the new slug.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -5
+git --no-pager log --oneline -4
+```
+
+```text
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777014433-61274.
+8d4dca0 docs: aicapture user guide (for sharing w/o whole dotfiles)
+eba646b gitleaks + redactor modernization + agent-artifact allowlist
+430326d docs: instant-LLM-fix prior art survey
+c457a78 aicapture: add opt-out stderr spinner while agent is thinking
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 07:07:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 07:07:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -2
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "aicapture: Tier 1 non-tmux wrappers + backlog Tier 2/3 trade-offs
+
+Three new shell functions in 04_ai_capture.zsh:
+
+- aifix-stdin — read stdin as context (no tmux needed)
+- aifix-run -- CMD — run CMD, tee output, feed command + output +
+  exit code to agent
+- aifix-rerun — thefuck-style, re-execute last command via aifix-run.
+  Confirms with '⚠ side effects' warning unless -y.
+
+Shared code refactored: _ai_dispatch_core takes a pre-captured block
+and handles prompt build + agent invoke + metadata/prettify/spinner
+toggle. cpblock / stdin / run paths all call it.
+
+isatty caveat on aifix-run: teeing makes CMD's stdout a pipe → TUI
+apps render degraded. Documented, not auto-whitelisted (Tier 2).
+
+Backlog entry backlog/ai-capture-non-tmux-output.md records why
+Tier 2 (transparent tee) is deferred M and Tier 3 (script(1) or
+PTY proxy) is explicitly rejected — matches 'What we intentionally
+don't do' in docs/this_repo/instant-llm-fix-prior-art.md.
+
+Also: aicapture.md 'Non-tmux alternatives' section, aliases.md
+three new rows, TODO.md P2 entry, backlog/README.md index.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -4
+git --no-pager log --oneline -4
 ```
 </details></tool-use>

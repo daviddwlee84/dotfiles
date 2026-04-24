@@ -95,6 +95,38 @@ Launches a [questionary](https://github.com/tmbo/questionary) + [rich](https://g
 
 The TUI depends on `uv` (PEP 723 inline deps) — no separate install step required; first run populates the uv cache.
 
+## Non-tmux alternatives
+
+When you're not in tmux (VSCode integrated terminal, bare Ghostty without tmux, quick SSH session), `cpblock` / `aifix` / `aiexplain` / `aiblock` can't see scrollback — they depend on tmux's OSC 133 line attributes. Three Tier 1 wrappers cover the common cases without magic (no shell hooks, no PTY proxy, no `script(1)` wrapping — see [`backlog/ai-capture-non-tmux-output.md`](../../backlog/ai-capture-non-tmux-output.md) for why we reject those paths):
+
+| Command | Source of context | Typical use |
+|---|---|---|
+| `aifix-stdin` | whatever you pipe in | `tail -100 build.log \| aifix-stdin` |
+| `aifix-run -- CMD [ARG...]` | runs `CMD`, tees stdout+stderr to a log, reviews | `aifix-run -- cargo build --release` |
+| `aifix-rerun` | re-executes the previous shell command (confirm prompt) | `aifix-rerun` after a transient error |
+
+All three accept the same flags as `aifix` (`-a AGENT` / `-p PROMPT` / `--raw` / `--no-meta`). `aifix-rerun` adds `-y` to skip the "⚠ side effects" confirmation. Default prompt for each is the `aifix` "diagnose + fix"; use `-p "explain what happened"` if you want the explain behaviour.
+
+```sh
+# stdin — compose with any producer
+tail -200 /var/log/nginx/error.log | aifix-stdin
+curl -sS https://weird.api/thing | aifix-stdin -p "what is this JSON telling me?"
+aifix-stdin < /tmp/build-fail.log
+
+# run — capture a fresh invocation (double-run safe, no prior history needed)
+aifix-run -- ls /missing
+aifix-run -p "is this safe on prod?" -- ansible-playbook deploy.yml
+
+# rerun — thefuck-style, re-execute last cmd. Confirms by default.
+mvn compile      # fails
+aifix-rerun      # "⚠ side effects…  Proceed? [y/N]"
+aifix-rerun -y   # skip confirm
+```
+
+**isatty caveat** for `aifix-run`: teeing makes CMD's stdout a pipe, so TUI apps (vim, less, htop) render in degraded mode. Don't `aifix-run` an interactive tool — pipe its log file via `aifix-stdin` after the fact instead.
+
+**Side-effect warning** for `aifix-rerun`: re-running `rm`, `curl -X POST`, `git push`, migrations, etc. is dangerous. The confirmation prompt is there for a reason; don't `-y` without reading what will be re-executed.
+
 ## Configuration
 
 Put any of these in `~/.zshrc`, a `99_local_*.zsh` override, or export them per-session:
