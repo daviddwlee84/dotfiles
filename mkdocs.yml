@@ -66,7 +66,6 @@ plugins:
           - tools/agent-overlays.md
         This repo:
           - this_repo/architecture.md
-          - this_repo/workflow.md
           - this_repo/fleet-apply.md
           - this_repo/instant-llm-fix-prior-art.md
   - copy-to-llm:
@@ -147,7 +146,6 @@ nav:
     - Productivity:
       - td / sidecar: tools/td_sidecar.md
       - Super Productivity: tools/super-productivity.md
-      - Raycast sync: tools/raycast-sync.md
       - Web reader: tools/web-reader.md
       - Log tools: tools/log-tools.md
       - SMS (Huawei router): tools/sms.md
@@ -164,7 +162,6 @@ nav:
     - Floating TUI: neovim/floating-tui.md
   - This Repo:
     - Architecture: this_repo/architecture.md
-    - Workflow playbook: this_repo/workflow.md
     - Cheatsheet: this_repo/cheatsheet.md
     - Ansible customization: this_repo/ansible_customization.md
     - Upgrades: this_repo/upgrades.md
