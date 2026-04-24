@@ -6,13 +6,16 @@
 #     "rich>=13.9",
 # ]
 # ///
-"""aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+"""aiblock — pick recent shell command(s), edit a prompt, send to a coding-agent.
 
 UI is a short sequence of questionary prompts + rich panels:
-  1. Pick which recent command you want reviewed (shell history list)
-  2. Preview the captured block (cpblock output)
-  3. Edit the prompt (default: "diagnose + fix")
-  4. Choose an action: print reply / copy / spawn interactive agent / cancel
+  1. Pick one or more recent commands (checkbox; Space toggles, Enter confirms).
+     Skipping the selection defaults to "last block".
+  2. Preview the captured block(s). Multi-select concats them in chronological
+     order (oldest first) with "--- Block -N ---" separators so the agent
+     can tell the turns apart.
+  3. Edit the prompt (default: "diagnose + fix").
+  4. Choose an action: print reply / copy / spawn interactive agent / cancel.
 
 Advisory-only: agent is invoked with its one-shot flag so replies are text,
 no auto-edits. To iterate further with the context pre-loaded, pick the
@@ -21,7 +24,8 @@ no auto-edits. To iterate further with the context pre-loaded, pick the
 Depends on:
   - dot_config/zsh/tools/02_shell_integration.zsh (OSC 133 markers)
   - dot_config/zsh/tools/03_tmux_capture.zsh (cpblock)
-  - zsh on PATH (calls `zsh -ic …` for history + cpblock)
+  - dot_config/zsh/tools/04_ai_capture.zsh (aiblock() wrapper dumps history)
+  - zsh on PATH (wrapper runs `fc -ln -30` in the caller's shell)
   - tmux (we run inside a pane)
   - at least one of: claude / opencode / codex / cursor-agent
 """
@@ -288,7 +292,8 @@ def main() -> int:
         console.print("[red]Shell history is empty — no commands to pick from.[/red]")
         return 1
 
-    # 1. Pick a command
+    # 1. Pick one or more commands (multi-select via checkbox).
+    # Space toggles, Enter accepts; picking zero falls back to "last block".
     choices = [
         questionary.Choice(
             title=f"{h.n:>2}  {h.command[:100]}",
@@ -296,24 +301,54 @@ def main() -> int:
         )
         for h in history
     ]
-    picked_n = questionary.select(
-        "Pick a command to review:",
+    picked = questionary.checkbox(
+        "Pick command(s) to review (Space toggles, Enter confirms):",
         choices=choices,
         qmark="▸",
     ).ask()
-    if picked_n is None:
+    if picked is None:
         return 1
+    if not picked:
+        picked = [1]  # default to most recent
 
-    # 2. Capture + preview the block
-    block = capture_block(picked_n)
-    if not block.strip():
+    # Sort descending so the OLDEST-first chronological order when we iterate
+    # (N=5 is older than N=1; we want history-order concat).
+    picked_ns = sorted(set(picked), reverse=True)
+
+    # 2. Capture each block + show a combined preview. Concat with separators
+    # so the agent can see boundaries.
+    blocks: list[tuple[int, str]] = []
+    for n in picked_ns:
+        text = capture_block(n)
+        if not text.strip():
+            console.print(
+                f"[yellow]cpblock {n} returned empty — skipping.[/yellow]"
+            )
+            continue
+        blocks.append((n, text.rstrip()))
+    if not blocks:
         console.print(
-            f"[red]cpblock {picked_n} returned empty.[/red]\n"
-            "[dim]Possible causes: shell pre-dates chezmoi apply (try `exec zsh`); "
-            "N exceeds this pane's command history.[/dim]"
+            "[red]All selected blocks were empty.[/red]\n"
+            "[dim]Try `exec zsh` if the shell pre-dates chezmoi apply, "
+            "or pick different indices.[/dim]"
         )
         return 1
-    console.print(Panel(block.rstrip(), title=f"Block -{picked_n}", expand=False))
+
+    # Single-block: preserve the original Panel shape. Multi-block: show each
+    # in its own Panel so boundaries are obvious before the user commits.
+    if len(blocks) == 1:
+        n, text = blocks[0]
+        console.print(Panel(text, title=f"Block -{n}", expand=False))
+        block = text
+    else:
+        for n, text in blocks:
+            console.print(Panel(text, title=f"Block -{n}", expand=False))
+        # Agent sees: --- Block -5 ---\n<text>\n\n--- Block -3 ---\n<text>
+        # Picking a clear separator helps the model know these are distinct
+        # turns rather than one long transcript.
+        block = "\n\n".join(
+            f"--- Block -{n} ---\n{text}" for n, text in blocks
+        )
 
     # 3. Edit the prompt
     prompt = questionary.text(

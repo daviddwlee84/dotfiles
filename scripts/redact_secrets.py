@@ -200,7 +200,7 @@ def redact_private_keys(file_path: Path) -> bool:
     content = read_text(file_path)
     original = content
     # Replace full PEM blocks
-    content = _PEM_BLOCK_RE.sub("[REDACTED PRIVATE KEY BLOCK]", content)
+    content = _PEM_BLOCK_RE.sub("[REDACTED PEM PRIVKEY BLOCK]", content)
     # Replace remaining literal "PRIVATE KEY" mentions
     content = content.replace(_PRIVATE_KEY_STR, "PRIV***KEY")
     if content != original:

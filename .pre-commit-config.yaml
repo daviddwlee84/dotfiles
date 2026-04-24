@@ -29,6 +29,11 @@ repos:
     rev: v5.0.0
     hooks:
       - id: detect-private-key
+        # scripts/redact_secrets.py contains `-----BEGIN[^-]*PRIVATE KEY[^-]*-----`
+        # regex literals needed to *match* real PEM blocks; they are not
+        # PEM blocks themselves. Exclude the redactor file to avoid a
+        # self-referential false positive.
+        exclude: ^scripts/redact_secrets\.py$
       - id: check-added-large-files
         args: ['--maxkb=2048']
       - id: check-merge-conflict

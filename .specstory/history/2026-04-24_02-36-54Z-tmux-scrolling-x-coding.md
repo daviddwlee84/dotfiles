@@ -22963,7 +22963,7 @@ c457a78 aicapture: add opt-out stderr spinner while agent is thinking
 
 _**Agent (claude-opus-4-7 2026-04-24 06:23:46Z)**_
 
-_**Agent (claude-opus-4-7 2026-04-24 06:23:49Z)**_
+_**Agent (claude-opus-4-7 2026-04-24 06:23:50Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -22981,6 +22981,316 @@ shell integration, atuin, asciinema. Honest compare section listing
 what we do well vs what we could steal.
 
 Cross-ref from tmux README's AI section.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -3
+git --no-pager log --oneline -3
+```
+
+```text
+Review changes with: git diff
+Then stage with: git add .specstory/history/ .claude/plans/ .cursor/plans/
+[main 430326d] docs: instant-LLM-fix prior art survey
+ 7 files changed, 709 insertions(+), 10 deletions(-)
+ create mode 100644 docs/this_repo/instant-llm-fix-prior-art.md
+430326d docs: instant-LLM-fix prior art survey
+c457a78 aicapture: add opt-out stderr spinner while agent is thinking
+3993b7b aiblock: fix empty-history bug by dumping from caller's shell
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:23:56Z)**_
+
+Doc commit `430326d` 進了。現在做 aiblock multi-select。
+
+_**Agent (claude-opus-4-7 2026-04-24 06:23:56Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/aiblock.py`
+
+```text
+253	    # file path into the window title so the user can paste it with Enter.
+254	    title = f"ai:{agent}"
+255	    # Try to pre-paste context via tmux paste-buffer: load the file into a
+256	    # named buffer, start the agent, then paste the buffer.
+257	    subprocess.run(["tmux", "load-buffer", "-b", "aiblock", ctx_file])
+258	    subprocess.run([
+259	        "tmux", "new-window", "-n", title,
+260	        f"{agent}; rm -f {ctx_file}",
+261	    ])
+262	    console.print(
+263	        f"[green]Opened new tmux window '{title}' running {agent}.[/green]\n"
+264	        f"[dim]Context in tmux paste-buffer 'aiblock' — "
+265	        f"press `prefix + =` to choose it, or `tmux paste-buffer -b aiblock`.[/dim]"
+266	    )
+267	
+268	
+269	def main() -> int:
+270	    if "--help" in sys.argv or "-h" in sys.argv:
+271	        console.print(__doc__)
+272	        return 0
+273	
+274	    if not os.environ.get("TMUX"):
+275	        console.print("[red]aiblock must run inside a tmux pane (uses cpblock).[/red]")
+276	        return 1
+277	
+278	    agents = detect_agents()
+279	    if not agents:
+280	        console.print(
+281	            "[red]No coding-agent CLI on PATH.[/red]\n"
+282	            "[dim]Install one of: claude, opencode, codex, cursor-agent.[/dim]"
+283	        )
+284	        return 1
+285	
+286	    history = list_recent_commands(n=20)
+287	    if not history:
+288	        console.print("[red]Shell history is empty — no commands to pick from.[/red]")
+289	        return 1
+290	
+291	    # 1. Pick a command
+292	    choices = [
+293	        questionary.Choice(
+294	            title=f"{h.n:>2}  {h.command[:100]}",
+295	            value=h.n,
+296	        )
+297	        for h in history
+298	    ]
+299	    picked_n = questionary.select(
+300	        "Pick a command to review:",
+301	        choices=choices,
+302	        qmark="▸",
+303	    ).ask()
+304	    if picked_n is None:
+305	        return 1
+306	
+307	    # 2. Capture + preview the block
+308	    block = capture_block(picked_n)
+309	    if not block.strip():
+310	        console.print(
+311	            f"[red]cpblock {picked_n} returned empty.[/red]\n"
+312	            "[dim]Possible causes: shell pre-dates chezmoi apply (try `exec zsh`); "
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:24:14Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:24:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify aiblock still imports + runs --help after multi-select changes
+
+```bash
+uv run --script /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py --help 2>&1 | head -5
+echo "---"
+chezmoi apply 2>&1
+# Smoke-test: populate dump file, launch aiblock, feed stdin via python (simulate checkbox = space space enter)
+cat > /tmp/mhdump << 'EOF'
+echo AAA
+echo BBB
+echo CCC
+echo DDD
+EOF
+# Can't easily simulate tty checkbox input; just check --help still works + imports succeed
+AIBLOCK_HIST_DUMP=/tmp/mhdump uv run --script /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py --help 2>&1 | tail -3
+rm -f /tmp/mhdump
+```
+
+```text
+aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+
+UI is a short sequence of questionary prompts + rich panels:
+  1. Pick which recent command you want reviewed (shell history list)
+  2. Preview the captured block (cpblock output)
+---
+  - tmux (we run inside a pane)
+  - at least one of: claude / opencode / codex / cursor-agent
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:24:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:24:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+File content has changed since it was last read. This commonly happens when a linter or formatter run via Bash rewrites the file. Call Read on this file to refresh, then retry the edit.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:24:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if multi-select is in file
+
+`grep -n "checkbox\|picked_ns\|Block -" /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py | head -10`
+
+```text
+291:    # 1. Pick one or more commands (multi-select via checkbox).
+300:    picked = questionary.checkbox(
+312:    picked_ns = sorted(set(picked), reverse=True)
+317:    for n in picked_ns:
+337:        console.print(Panel(text, title=f"Block -{n}", expand=False))
+341:            console.print(Panel(text, title=f"Block -{n}", expand=False))
+342:        # Agent sees: --- Block -5 ---\n<text>\n\n--- Block -3 ---\n<text>
+346:            f"--- Block -{n} ---\n{text}" for n, text in blocks
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:20Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:25Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./scripts/aiblock.py`
+
+```text
+1	#!/usr/bin/env -S uv run --script
+2	# /// script
+3	# requires-python = ">=3.11"
+4	# dependencies = [
+5	#     "questionary>=2.0",
+6	#     "rich>=13.9",
+7	# ]
+8	# ///
+9	"""aiblock — pick a recent shell command, edit a prompt, send to a coding-agent.
+10	
+11	UI is a short sequence of questionary prompts + rich panels:
+12	  1. Pick which recent command you want reviewed (shell history list)
+13	  2. Preview the captured block (cpblock output)
+14	  3. Edit the prompt (default: "diagnose + fix")
+15	  4. Choose an action: print reply / copy / spawn interactive agent / cancel
+16	
+17	Advisory-only: agent is invoked with its one-shot flag so replies are text,
+18	no auto-edits. To iterate further with the context pre-loaded, pick the
+19	"Spawn interactive agent" action.
+20	
+21	Depends on:
+22	  - dot_config/zsh/tools/02_shell_integration.zsh (OSC 133 markers)
+23	  - dot_config/zsh/tools/03_tmux_capture.zsh (cpblock)
+24	  - zsh on PATH (calls `zsh -ic …` for history + cpblock)
+25	  - tmux (we run inside a pane)
+26	  - at least one of: claude / opencode / codex / cursor-agent
+27	"""
+28	from __future__ import annotations
+29	
+30	import os
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:25:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply + smoke + commit multi-select
+
+```bash
+chezmoi apply 2>&1
+uv run --script /Users/daviddwlee84/.local/share/chezmoi/scripts/aiblock.py --help 2>&1 | head -12
+echo "---"
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -2
+git add scripts/aiblock.py .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "$(cat <<'EOF'
+aiblock: multi-select blocks via questionary.checkbox
+
+Replace the single-pick select with a checkbox picker so users can
+grab several history entries at once. Space toggles, Enter confirms.
+Picking nothing falls back to "last block" (N=1) to preserve the
+prior single-block default.
+
+Selected N values are sorted descending (oldest-first chronological
+order) and each block is captured with cpblock N, previewed in its
+own rich Panel for clarity, and concatenated with "--- Block -N ---"
+separators so the agent can tell the turns apart rather than treating
+them as one long transcript.
+
+Docstring updated to describe the new flow.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -4
+git --no-pager log --oneline -3
+```
+
+```text
+aiblock — pick recent shell command(s), edit a prompt, send to a coding-agent.
+
+UI is a short sequence of questionary prompts + rich panels:
+  1. Pick one or more recent commands (checkbox; Space toggles, Enter confirms).
+     Skipping the selection defaults to "last block".
+  2. Preview the captured block(s). Multi-select concats them in chronological
+     order (oldest first) with "--- Block -N ---" separators so the agent
+     can tell the turns apart.
+  3. Edit the prompt (default: "diagnose + fix").
+  4. Choose an action: print reply / copy / spawn interactive agent / cancel.
+
+Advisory-only: agent is invoked with its one-shot flag so replies are text,
+---
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777011952-80466.
+430326d docs: instant-LLM-fix prior art survey
+c457a78 aicapture: add opt-out stderr spinner while agent is thinking
+3993b7b aiblock: fix empty-history bug by dumping from caller's shell
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-24 06:26:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit after specstory re-flush
+
+```bash
+uv run --script scripts/redact_secrets.py --fix 2>&1 | tail -2
+git add .specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md
+git commit -m "aiblock: multi-select blocks via questionary.checkbox
+
+Replace the single-pick select with a checkbox picker so users can
+grab several history entries at once. Space toggles, Enter confirms.
+Empty selection falls back to last block (N=1).
+
+Selected N values are sorted descending (oldest-first chronological
+order) and each block is captured, previewed in its own rich Panel,
+and concatenated with '--- Block -N ---' separators so the agent
+treats them as distinct turns rather than one transcript.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -3
 git --no-pager log --oneline -3
