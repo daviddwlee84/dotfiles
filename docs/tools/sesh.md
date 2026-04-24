@@ -353,14 +353,26 @@ underlying mechanic.
 # All repos under /Volumes/Data/Program/<group>/<repo>
 [[wildcard]]
 pattern = "/Volumes/Data/Program/*/*"
-startup_command = "start_directory={} tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
+startup_command = "cd {} && tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
 ```
 
-The `{}` placeholder is the matched path. We pass it as a `start_directory`
-env var so [`~/.config/tmuxp/project.yaml`](../../dot_config/tmuxp/project.yaml)'s
-`start_directory: ${start_directory:-.}` picks it up. After the append, the
-empty initial window sesh always creates is killed (`-t :1`), and focus
-moves to the `editor` window so nvim is foregrounded immediately.
+The `{}` placeholder is the matched path. The leading `cd {}` is
+load-bearing, and pairs with an equally load-bearing **omission** in the
+yaml: neither `project.yaml` nor `coding-agent.yaml` sets session-level
+`start_directory`. Every "obvious" value silently breaks in one of three
+ways — tmuxp resolves yaml strings via Python's `os.path.expandvars` (no
+bash `${VAR:-default}` fallback); tmuxp resolves `.` / `./foo` against
+the yaml **file's** directory (not the process cwd); and when libtmux
+passes any of those results to `tmux new-window -c`, an invalid path
+silently falls back to `$HOME`. By omitting `start_directory` entirely,
+libtmux calls `tmux new-window` without `-c`, so tmux inherits the cwd
+from the caller — and sesh's `send-keys` runs tmuxp from inside a pane
+that `cd {}` has already moved to the matched path. Full write-up in
+[pitfalls/tmuxp-append-ignores-session-start-directory.md](../../pitfalls/tmuxp-append-ignores-session-start-directory.md).
+
+After the append, the empty initial window sesh always creates is killed
+(`-t :1`), and focus moves to the `editor` window so nvim is foregrounded
+immediately.
 
 The pattern targets `/Volumes/Data/Program/*/*` (canonical paths) rather
 than `~/Documents/Program/*/*` because zoxide records canonical paths
@@ -576,8 +588,11 @@ Config in `sesh.toml`:
 [[session]]
 name = "coding-agent"
 path = "~"
-startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1"
+startup_command = "cd ~ && tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1"
 ```
+
+(The leading `cd ~` is load-bearing for the same tmuxp-append reason
+described under the wildcard section above.)
 
 Layout defined in `~/.config/tmuxp/coding-agent.yaml`:
 ```yaml

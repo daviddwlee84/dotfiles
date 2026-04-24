@@ -71,10 +71,22 @@ disable_startup_command = true
 # After appending windows, kill the empty sesh window, then force the correct
 # 75% width on the main pane (works around tmuxp layout not sizing correctly
 # when appended into an existing tmux session with a different terminal size).
+#
+# The leading `cd ~` is load-bearing, and pairs with the deliberate
+# OMISSION of `start_directory:` in ~/.config/tmuxp/coding-agent.yaml.
+# tmuxp has three silent-failure modes around `start_directory` that make
+# every "obvious" yaml value wrong: (a) `os.path.expandvars` doesn't
+# understand `${VAR:-default}`, leaving it literal; (b) `.` / `./foo` are
+# resolved against the yaml FILE's dir (tmuxp/cli/load.py:359), not the
+# process cwd; (c) when any of those reach `tmux new-window -c` as an
+# invalid path, tmux silently falls back to $HOME. Omitting the key
+# makes libtmux skip `-c` and tmux inherits the caller pane's cwd — which
+# `cd ~` controls. See:
+# pitfalls/tmuxp-append-ignores-session-start-directory.md
 [[session]]
 name = "coding-agent"
 path = "~"
-startup_command = "tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1 && sleep 0.3 && tmux select-window -t coding-agent:editor && tmux select-pane -t .1 && tmux resize-pane -x 75%"
+startup_command = "cd ~ && tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml && tmux kill-window -t coding-agent:1 && sleep 0.3 && tmux select-window -t coding-agent:editor && tmux select-pane -t .1 && tmux resize-pane -x 75%"
 
 # Approach C: tmuxinator (uncomment to use, comment Approach B above)
 # [[session]]
@@ -99,9 +111,23 @@ tmuxinator = "coding-agent-mux"
 # sesh always creates. Same trick as the `coding-agent` named session above —
 # see ~/.config/tmuxp/project.yaml for the layout.
 #
-# The wildcard `{}` placeholder is the matched path; we set it as
-# start_directory env var so tmuxp's `start_directory: ${start_directory:-.}`
-# picks it up.
+# The wildcard `{}` placeholder is the matched path. The leading `cd {}`
+# is load-bearing and pairs with the deliberate OMISSION of
+# `start_directory:` in ~/.config/tmuxp/project.yaml. tmuxp has three
+# silent-failure modes that make every "obvious" yaml value wrong:
+#   (a) `os.path.expandvars` doesn't understand `${VAR:-default}`,
+#       leaving it literal.
+#   (b) `.` / `./foo` are resolved against the yaml FILE's directory
+#       (tmuxp/cli/load.py:359), not the process cwd — so windows land
+#       in ~/.config/tmuxp/ instead of the repo.
+#   (c) When any of those reach `tmux new-window -c` as an invalid path,
+#       tmux silently falls back to $HOME — no error, no log. (sesh's
+#       own `tmux new-session -c` still shows up correctly in
+#       `#{session_path}`, so this looks like a shell-rc / CDPATH bug —
+#       it isn't.)
+# By omitting `start_directory` in the yaml entirely, libtmux skips `-c`
+# and tmux inherits the caller pane's cwd — which `cd {} &&` here
+# controls. See: pitfalls/tmuxp-append-ignores-session-start-directory.md
 
 # All repos under /Volumes/Data/Program/<group>/<repo>
 # (e.g. JingleAI/AShare_T0_RL, Personal/career-ops, Tadronaut/tarlin)
@@ -110,7 +136,7 @@ tmuxinator = "coding-agent-mux"
 # so a single wildcard pattern catches both entry points.
 [[wildcard]]
 pattern = "/Volumes/Data/Program/*/*"
-startup_command = "start_directory={} tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
+startup_command = "cd {} && tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmux kill-window -t :1 2>/dev/null; tmux select-window -t :editor 2>/dev/null"
 
 [[wildcard]]
 pattern = "~/repos/*"

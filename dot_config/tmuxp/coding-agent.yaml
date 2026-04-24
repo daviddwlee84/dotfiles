@@ -12,15 +12,21 @@
 #   Configured automatically -- just `sesh connect coding-agent`
 #   See ~/.config/sesh/sesh.toml for the startup_command integration.
 #
-# For a specific project directory:
-#   tmuxp load -y -s my-project ~/.config/tmuxp/coding-agent.yaml
-#   (or set start_directory env var)
+# For a specific project directory (the yaml has no `start_directory:` —
+# see note below — so cwd at invocation time is what sticks):
+#   cd ~/some/repo && tmuxp load -y -s my-project ~/.config/tmuxp/coding-agent.yaml
 #
 # Append to an existing tmux session:
-#   tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml
+#   cd ~/some/repo && tmuxp load -a -y ~/.config/tmuxp/coding-agent.yaml
 
 session_name: coding-agent
-start_directory: ${start_directory:-.}
+# No session-level `start_directory:` — see the sibling note in
+# ./project.yaml and pitfalls/tmuxp-append-ignores-session-start-directory.md.
+# Short version: tmuxp's two traps (`${VAR:-default}` not expanded;
+# `.`/`./*` resolved against the yaml file's dir, not process cwd) make
+# every obvious value wrong. Omitting the key lets libtmux skip `-c`, so
+# `tmux new-window` inherits the calling pane's cwd, which the sesh
+# `startup_command` (`cd ~ && tmuxp load -a …`) controls.
 
 windows:
   - window_name: editor

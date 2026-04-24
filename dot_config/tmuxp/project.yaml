@@ -2,9 +2,10 @@
 #
 # Generic layout for any code repo. Use via sesh wildcard
 # (~/.config/sesh/sesh.toml: pattern = "/Volumes/Data/Program/*/*"), or
-# directly:
+# directly — the yaml has no `start_directory:` (see note below), so the
+# pane's cwd at invocation time controls where windows land:
 #
-#   start_directory=~/some/repo tmuxp load -a -y ~/.config/tmuxp/project.yaml
+#   cd ~/some/repo && tmuxp load -a -y ~/.config/tmuxp/project.yaml
 #
 # Windows:
 #   1. editor   — nvim (full pane)
@@ -19,7 +20,19 @@
 #   this template is the per-repo workhorse.
 
 session_name: project
-start_directory: ${start_directory:-.}
+# No session-level `start_directory:` on purpose. Two tmuxp traps make
+# every "obvious" value wrong in append mode (which is how sesh uses us):
+#   1. `${VAR:-default}` isn't expanded by Python's `os.path.expandvars`,
+#      so it's passed literally to `tmux new-window -c` → invalid path →
+#      tmux silently falls back to $HOME for every window.
+#   2. `.` / `./foo` ARE resolved, but relative to the YAML file's
+#      directory (tmuxp/cli/load.py:359), not to tmuxp's process cwd —
+#      so windows would land in `~/.config/tmuxp/`, not the repo.
+# With no `start_directory` in the yaml, libtmux omits `-c` on
+# `tmux new-window`, and tmux inherits the calling pane's cwd. The sesh
+# `startup_command` (~/.config/sesh/sesh.toml) does `cd {} && tmuxp load
+# -a …` from inside the pane, so "calling pane's cwd" IS the matched
+# repo path. See pitfalls/tmuxp-append-ignores-session-start-directory.md.
 
 windows:
   - window_name: editor
