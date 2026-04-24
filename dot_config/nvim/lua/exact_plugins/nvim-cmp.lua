@@ -34,6 +34,18 @@ return {
             fallback()
           end
         end, { "i", "s" }),
+        -- VSCode "smart" accept: Enter only confirms when the user has
+        -- explicitly navigated to an entry (arrow keys / C-n / C-p).
+        -- Auto-preselected items are ignored, so Enter stays a real
+        -- newline even when the popup is open with a suggestion
+        -- highlighted. Use <Tab> to accept.
+        ["<CR>"] = cmp.mapping(function(fallback)
+          if cmp.visible() and cmp.get_active_entry() then
+            cmp.confirm({ behavior = cmp.ConfirmBehavior.Replace, select = false })
+          else
+            fallback()
+          end
+        end, { "i", "s" }),
       })
     end,
   },
