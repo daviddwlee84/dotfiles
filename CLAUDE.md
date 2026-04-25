@@ -46,6 +46,10 @@ All four categories are **referenced** from [`docs/for-maintainers.md`](docs/for
 
 When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
 
+### `gui_apps_linux` ansible role → `docs/playbooks/linux-gui-apps.md`
+
+When adding/modifying/removing a Linux GUI app in [`dot_ansible/roles/gui_apps_linux/tasks/main.yml`](dot_ansible/roles/gui_apps_linux/tasks/main.yml), update the **Inventory** table in [`docs/playbooks/linux-gui-apps.md`](docs/playbooks/linux-gui-apps.md). The playbook is the single source of truth for the per-app mechanism / auto-update story, and is the first thing a maintainer (or agent) should read before adding a new app — it contains the `.deb` / Snap / Flatpak / AppImage decision tree and the concrete copy-paste patterns. Read it first; update it in the same commit.
+
 ### Dockerfile + dotfiles_init wrapper
 
 When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, three files must be updated in the same commit:

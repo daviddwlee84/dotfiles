@@ -23,6 +23,11 @@
 # Editor user-config overlays (settings.json / keybindings.json) are handled
 # by chezmoi itself, NOT ansible — see `.chezmoitemplates/editor/` and the
 # `modify_settings.json.tmpl` / `create_keybindings.json.tmpl` source files.
+#
+# Adding a new GUI app: read docs/playbooks/linux-gui-apps.md FIRST. It
+# contains the .deb / Snap / Flatpak / AppImage decision tree, the
+# "concrete patterns" you'd copy here, and the inventory table you must
+# also update so the doc stays in sync with this role.
 # =============================================================================
 
 # --- Platform banner ---
