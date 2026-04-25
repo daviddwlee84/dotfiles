@@ -4,13 +4,13 @@
 
 ## How this repo installs Warp
 
-| Platform | Source | Where it's wired |
-|---|---|---|
-| macOS | Homebrew cask `warp` | [`dot_config/homebrew/Brewfile.darwin.tmpl`](../../dot_config/homebrew/Brewfile.darwin.tmpl) |
-| Ubuntu / Debian | Warp's own apt repo (`https://releases.warp.dev/linux/deb stable main`) | Manual install once; the repo file at `/etc/apt/sources.list.d/warpdotdev.list` is dropped by Warp's `.deb` postinst |
-| Other Linux | Not managed | — |
+| Platform | Source | Where it's wired | Upgrade path |
+|---|---|---|---|
+| macOS | Homebrew cask `warp` | [`dot_config/homebrew/Brewfile.darwin.tmpl`](../../dot_config/homebrew/Brewfile.darwin.tmpl) | `just upgrade-brew` (cask `--greedy`) |
+| Ubuntu / Debian | Warp's own apt repo (`https://releases.warp.dev/linux/deb stable main`) | Manual install once; the repo file at `/etc/apt/sources.list.d/warpdotdev.list` is dropped by Warp's `.deb` postinst | `just upgrade-warp` (apt `--only-upgrade`) — see [§ How `cat_warp` works](#how-cat_warp-works) |
+| Other Linux | Not managed | — | — |
 
-Warp is **not** in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh) — it self-updates from the GUI on both platforms (see below). If you want it under `just upgrade-*`, see [§ Adding Warp to upgrade_tools.sh](#adding-warp-to-upgrade_toolssh).
+Both flows are picked up by `just upgrade-all`. The Linux path replaces the on-disk binary but does **not** restart the running Warp process — you must quit + relaunch Warp to load the new version. Why it can't auto-restart: see [§ The Ubuntu in-app update flow](#the-ubuntu-in-app-update-flow).
 
 ## The Ubuntu in-app update flow
 
@@ -62,28 +62,30 @@ On macOS Warp is a `.app` bundle under `/Applications/Warp.app`. The Sparkle-sty
 - The OS-level "running app vs on-disk app" semantics differ on macOS — Cocoa apps can be hot-swapped via the standard updater hand-off helper without an IPC handshake.
 - Cask installs go through Homebrew's `brew upgrade --cask --greedy` (covered by [`upgrade-brew`](../this_repo/upgrades.md#category-matrix)), so when this repo is in use the in-app updater is largely redundant.
 
-## Adding Warp to `upgrade_tools.sh`
+## How `cat_warp` works
 
-If you want Linux Warp to be moved by `just upgrade-*`, the **safe** version of step 2 above is what to wire in — *not* `warp_finish_update`, which only works inside a live Warp session and would be `command not found` from a generic shell:
+The `warp` category in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh) does the **apt half** of the in-app flow — but never `warp_finish_update`, which is unusable from outside a live Warp session (the token is per-session and the function isn't on `$PATH`):
 
 ```bash
-# inside a future cat_warp() or appended to an apt-tools category
-if [[ "$(uname -s)" == "Linux" ]] \
-  && command -v warp-terminal >/dev/null 2>&1; then
-  info "Upgrading warp-terminal (Linux apt repo)"
-  _run sudo apt update || any_fail=1
-  _run sudo apt install --only-upgrade -y warp-terminal || any_fail=1
-fi
+sudo apt-get update \
+  && sudo apt-get install --only-upgrade -y warp-terminal
 ```
 
-Caveats if you do this:
+Operational details:
 
-- **Restart is on the user.** Without the in-app token, the running Warp process keeps the old binary in memory. The user has to fully quit and relaunch Warp before the new version is active. (Mention this in the `info` line.)
-- **Sudo session is shared.** Use the existing [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) helper (`sudo_session_init "upgrade-warp"`) so the user isn't re-prompted; see [the sudo-session invariant](../this_repo/sudo-session.md).
-- **Don't add `apt upgrade` for unrelated packages.** That violates the [install-vs-upgrade scope rule](../this_repo/upgrades.md#things-intentionally-excluded). Pin the apt operation to `--only-upgrade warp-terminal` (or whatever package list you actually intend).
+- **Linux only.** On macOS the category short-circuits with `SKIPPED` because `cask "warp"` + `brew upgrade --cask --greedy` (covered by `cat_brew`) already moves it.
+- **Skipped when `warp-terminal` is absent.** Returns `77` so the upgrade summary marks it as SKIPPED, not FAILED — machines that don't run Warp aren't penalised.
+- **Sudo session reuse.** Calls `sudo_session_init "upgrade-warp"` so it shares the cached ticket from earlier categories (notably `cat_brew` on macOS, or any earlier sudo-using step). When sudo is `non-interactive` and not passwordless, the category skips itself rather than hanging — see [the sudo-session invariant](../this_repo/sudo-session.md).
+- **Restart is on the user.** apt successfully replacing `/opt/warpdotdev/warp-terminal/...` does **not** swap the running process's in-memory binary. The category logs an `[INFO]` reminder; you have to quit + relaunch Warp before the new version is active.
 - **Repo signature drift.** Warp rotates its signing key occasionally; if `apt update` errors with `NO_PUBKEY`, fetch the fresh key from `https://app.warp.dev/download` and re-import to `/usr/share/keyrings/warpdotdev.gpg`. We don't pre-pin the key in this repo.
 
-A new `cat_warp` category (rather than appending to `cat_agents`) would be appropriate if Warp ever ships a CLI installer or `warp-terminal --self-update` flag — until then it's a one-off `apt`-only step that doesn't justify its own category.
+Run isolated:
+
+```bash
+just upgrade-warp           # this category only
+just upgrade-all            # included in the standard chain (between flatpak and agents)
+just upgrade-dry-run        # see what it would run
+```
 
 ## See also
 

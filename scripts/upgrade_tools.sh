@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak agents plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak warp agents plugins)
 
 usage() {
   cat <<EOF
@@ -137,7 +137,7 @@ while [[ $# -gt 0 ]]; do
       SELECTED=("${ALL_CATEGORIES[@]}")
       shift
       ;;
-    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | agents | plugins)
+    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | warp | agents | plugins)
       SELECTED+=("$1")
       shift
       ;;
@@ -564,6 +564,58 @@ cat_flatpak() {
 }
 
 # ============================================================================
+# Category: warp — Linux apt-only upgrade for Warp Terminal
+# ============================================================================
+# macOS Warp is handled by `cat_brew` (cask "warp" + --greedy). On Linux,
+# Warp's only supported channel is its own apt repo, but the in-app updater
+# pastes `... && warp_finish_update <token>` into the prompt — that token is
+# only valid inside a live Warp session and `warp_finish_update` is a
+# Warp-injected shell function (not on PATH otherwise). So this category
+# does the apt half only and leaves the user to restart Warp themselves.
+#
+# See docs/tools/warp.md for the full mechanism (token IPC handshake, etc.).
+cat_warp() {
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    info "Not Linux — Warp is upgraded via brew cask, skipping"
+    return $SKIP_RC
+  fi
+  if ! command -v warp-terminal >/dev/null 2>&1; then
+    warn "warp-terminal not installed — skipping"
+    return $SKIP_RC
+  fi
+
+  # warp-terminal is gated behind sudo apt. Reuse the shared sudo session so
+  # the user isn't re-prompted across upgrade categories.
+  if [[ "$DRY_RUN" -eq 0 ]] && declare -F sudo_session_init >/dev/null 2>&1; then
+    if ! sudo_session_init "upgrade-warp"; then
+      warn "Sudo session could not be established — skipping"
+      return $SKIP_RC
+    fi
+    case "$(sudo_session_skip_reason)" in
+      non-interactive | "")
+        warn "Non-interactive mode without passwordless sudo — skipping warp"
+        return $SKIP_RC
+        ;;
+    esac
+  fi
+
+  local any_fail=0
+  info "Refreshing Warp apt repo + installing only the warp-terminal candidate"
+  # `apt update` covers all repos (cheap; usually run once per session anyway).
+  _run sudo apt-get update || any_fail=1
+  # `--only-upgrade` ensures we never accidentally re-install if the package
+  # was uninstalled between commands; `-y` is safe because we're pinned to
+  # one package name.
+  _run sudo apt-get install --only-upgrade -y warp-terminal || any_fail=1
+
+  if [[ "$any_fail" -eq 0 ]]; then
+    info "Warp on-disk binary updated. Quit + relaunch Warp to load the new version."
+    info "(The in-app 'warp_finish_update <token>' graceful-restart only works from inside Warp.)"
+  fi
+  return "$any_fail"
+}
+
+# ============================================================================
 # Category: agents — re-run install.sh for curl-installed CLI tools
 # ============================================================================
 # Only re-runs when the binary is already present. The installers are (by
@@ -783,6 +835,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         dotnet) run_category dotnet cat_dotnet ;;
         gem) run_category gem cat_gem ;;
         flatpak) run_category flatpak cat_flatpak ;;
+        warp) run_category warp cat_warp ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
       esac

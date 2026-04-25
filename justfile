@@ -290,7 +290,7 @@ info:
 # run them when you actually want tools to advance.
 # See `## Upgrades` section in AGENTS.md for rationale + category matrix.
 
-# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, flatpak, agents, plugins
+# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, flatpak, warp, agents, plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
 
@@ -325,6 +325,10 @@ upgrade-gem:
 # `flatpak update --user` for Flathub apps (Discord etc. when discordChannel=flatpak)
 upgrade-flatpak:
     ./scripts/upgrade_tools.sh flatpak
+
+# Linux-only: `apt install --only-upgrade warp-terminal` (macOS Warp is in upgrade-brew)
+upgrade-warp:
+    ./scripts/upgrade_tools.sh warp
 
 # curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:
