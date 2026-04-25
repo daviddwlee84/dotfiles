@@ -49,12 +49,15 @@ installAiDesktopApps = false
 {{ end -}}
 # 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
 installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)" false }}
-# Discord channel: 哪一條安裝路徑（Linux only — macOS 走 Brewfile cask）
+# Discord channel: 哪一條安裝路徑（ubuntu_desktop only — macOS 走 Brewfile cask，
+# ubuntu_server 沒有 GUI 不需要）
 #   - flatpak: 推薦，Flathub 走 com.discordapp.Discord，自動更新
 #   - deb:     官方 .deb，每次版本更新需手動跑 `chezmoi apply` 重抓
 #   - none:    完全不裝，留給使用者自行處理
 # 詳細決策 + sandbox 副作用見 docs/playbooks/linux-gui-apps.md
-{{ if eq .chezmoi.os "linux" -}}
+# 注意: 這裡引用前面定義的 $profile local variable（不是 .profile，因為
+# .chezmoi.toml.tmpl 正在產生 .profile，init 階段 .profile 還不存在）
+{{ if eq $profile "ubuntu_desktop" -}}
 discordChannel = {{ promptChoiceOnce . "discordChannel" "Discord install channel (flatpak|deb|none)" (list "flatpak" "deb" "none") "flatpak" | quote }}
 {{ else -}}
 discordChannel = "none"

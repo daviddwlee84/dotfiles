@@ -188,7 +188,7 @@ PROMPTS: tuple[Prompt, ...] = (
            prompt_text="Install Traditional Chinese input methods (McBopomofo, RIME)"),
     Prompt("discordChannel", "choice", "System & apps",
            "Discord install channel",
-           "Linux only — pick how Discord gets installed/upgraded. flatpak (recommended): Flathub auto-updates via `flatpak update`. deb: official .deb, manual re-deploy each release. none: skip.",
+           "ubuntu_desktop only (macOS → Brewfile cask, ubuntu_server → skipped). flatpak (recommended): Flathub auto-updates via `flatpak update`. deb: official .deb, manual re-deploy each release. none: skip.",
            default="flatpak",
            prompt_text="Discord install channel (flatpak|deb|none)",
            choices=("flatpak", "deb", "none")),
