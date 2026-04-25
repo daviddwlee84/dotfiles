@@ -30,8 +30,11 @@ useChineseMirror = {{ promptBoolOnce . "useChineseMirror" "Are you in China (beh
 gitleaksAllRepos = {{ promptBoolOnce . "gitleaksAllRepos" "Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)" false }}
 # 是否安裝 coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)
 installCodingAgents = {{ promptBoolOnce . "installCodingAgents" "Install coding agents (Claude Code, OpenCode, Cursor, Copilot, Gemini, etc.)" true }}
-# 是否安裝 Bitwarden CLI 並啟用 SSH Agent 自動偵測 + Zsh completion
-installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion" false }}
+# 是否安裝 Bitwarden CLI（+ SSH Agent 自動偵測 + Zsh completion）；在
+# ubuntu_desktop / macOS profile 上同時也會裝 Bitwarden Desktop（snap 優先、
+# .deb fallback / Homebrew Cask）。詳細邏輯見 docs/playbooks/linux-gui-apps.md
+# 和 dot_ansible/roles/bitwarden/。
+installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (and Desktop on ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent integration" false }}
 # 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
 # 是否安裝 standalone JS/npm CLI utilities (readability-cli for `readnode`, etc.)

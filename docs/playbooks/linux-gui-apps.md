@@ -79,13 +79,13 @@ follows when a vendor ships in multiple formats:
 | **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
 | **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
-| **Bitwarden CLI** (`bw`) | npm via mise (separate from desktop app) | ❌ — `just upgrade-mise` | mise | `~/.local/share/mise/...` |
+| **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
+| **Bitwarden Desktop** | Snap (`bitwarden`) → `.deb` fallback if `snap` unavailable; gated by `installBitwarden=true` AND `profile=ubuntu_desktop` | ✅ via `snapd` background refresh (or `apt upgrade` for fallback `.deb`) | same role | `/snap/bitwarden/current/` |
 
 ### Manually managed (you installed these yourself, outside ansible)
 
 | App | Mechanism | Auto-update? | How it got there | How to upgrade |
 |---|---|---|---|---|
-| **Bitwarden Desktop** | Snap (publisher `bitwarden`) | ✅ background | `snap install bitwarden` (or App Center) | `snap refresh bitwarden` |
 | **Spotify** | Snap (publisher `Spotify**`) | ✅ background | Ubuntu App Center | `snap refresh spotify` |
 | **Firefox** | Snap (canonical default since Ubuntu 22.04) | ✅ background | preinstalled with the OS | `snap refresh firefox` |
 | **btop** | Snap (kz6fittycent) | ✅ background | manual | `snap refresh btop` |

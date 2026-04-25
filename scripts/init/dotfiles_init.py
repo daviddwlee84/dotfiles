@@ -172,10 +172,10 @@ PROMPTS: tuple[Prompt, ...] = (
 
     # --- System & apps ---------------------------------------------------
     Prompt("installBitwarden", "bool", "System & apps",
-           "Bitwarden CLI",
-           "@bitwarden/cli with SSH Agent integration and Zsh completion.",
+           "Bitwarden CLI + Desktop",
+           "@bitwarden/cli with SSH Agent integration and Zsh completion. On ubuntu_desktop / macOS profiles, also installs Bitwarden Desktop (snap or .deb fallback on Linux, Homebrew Cask on macOS).",
            default=False,
-           prompt_text="Install Bitwarden CLI (@bitwarden/cli) with SSH Agent integration and Zsh completion"),
+           prompt_text="Install Bitwarden CLI (and Desktop on ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent integration"),
     Prompt("installBrewApps", "bool", "System & apps",
            "Homebrew GUI apps",
            "Terminals, browsers, utilities via Brewfile (excl. AI desktop).",
