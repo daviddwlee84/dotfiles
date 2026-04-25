@@ -1,5 +1,7 @@
 # AppImage & AppImageLauncher on Ubuntu
 
+> AppImage is **one of five** GUI-app packaging mechanisms on Ubuntu (alongside `.deb`, Snap, Flatpak, and from-source). For the cross-mechanism comparison, the inventory of which app uses which, and the decision tree for picking a mechanism when adding a new GUI app to this repo's ansible role, see [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md). This page is the AppImage-specific deep dive.
+
 [AppImage](https://appimage.org/) is a single-file app format for Linux: download, `chmod +x`, run. No root, no install step, no dependencies beyond the host's `libc` and `libfuse2`. The format is how Cursor, Obsidian, Joplin, Bitwarden Desktop, and many AI / markdown / media tools ship their Linux builds.
 
 The gap is desktop integration: a bare `~/Applications/foo.AppImage` doesn't show up in the GNOME/KDE launcher, has no `.desktop` entry, and doesn't get picked up by `xdg-open`. That's where **[AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher)** comes in — a system daemon that watches a directory for AppImages and auto-integrates them (icon extraction, `.desktop` generation, optional move into a canonical location, optional update-via-delta).

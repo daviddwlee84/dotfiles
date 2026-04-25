@@ -109,6 +109,7 @@ nav:
   - Home: index.md
   - Playbooks:
     - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
+    - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
   - Tools:
     - tools/aicapture.md
     - tmux:
@@ -118,6 +119,7 @@ nav:
       - Vim integration: tools/tmux/vim.md
     - Shell & terminal:
       - Ghostty: tools/ghostty.md
+      - Warp: tools/warp.md
       - Starship: tools/starship.md
       - Clipboard: tools/clipboard.md
       - XDG: tools/xdg.md
