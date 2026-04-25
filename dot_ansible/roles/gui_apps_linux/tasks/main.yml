@@ -438,32 +438,48 @@
           docs/tools/appimage.md for the full recipe.
 
 # =============================================================================
-# Discord — .deb from discord.com
+# Discord — channel selectable via discord_channel ansible var (default: flatpak)
 #
-# Mirrors the Cursor pattern: the download API returns a redirect to the
-# latest stable .deb. Discord only ships an amd64 build — no official
-# aarch64 / armhf package — so this block is x86_64-only. aarch64 users
-# can install via Flatpak (`flatpak install flathub com.discordapp.Discord`)
-# or a community build like Vesktop; see discord.com for the official stance.
+# Values (set by .discordChannel chezmoi prompt, plumbed via
+# .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl):
+#   - flatpak: Flathub com.discordapp.Discord; auto-updates via `flatpak update`.
+#              The recommended path — Discord .deb does NOT ship an apt-source
+#              postinst, so .deb installs require manual re-deploy on every
+#              release (the in-app updater pops a download modal but cannot
+#              actually run dpkg). Flatpak side-steps that pain.
+#   - deb:     Fetch the official .deb; only re-fetches when dpkg -s discord
+#              fails. Keep this path for users who already standardized on the
+#              .deb and don't want a Flatpak runtime on disk.
+#   - none:    Skip — install Discord some other way (Vesktop, web app, etc.).
 #
-# Discord auto-updates itself in-app on every launch, so this block is a
-# bootstrap-only install — `upgrade_tools.sh` does not need a Discord entry.
+# Discord upstream only ships amd64 binaries; both .deb and Flathub follow.
+# armhf is not supported by either path. See
+# docs/playbooks/linux-gui-apps.md for the full decision tree.
 # =============================================================================
+
+- name: Set Discord channel default
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.set_fact:
+    discord_channel: "{{ discord_channel | default('flatpak') }}"
 
 - name: Warn Discord is amd64-only on Linux (aarch64)
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture == 'aarch64'
+    - discord_channel != 'none'
   ansible.builtin.debug:
     msg: >-
-      Discord does not publish an official aarch64 .deb. Skipping — install
-      via Flatpak (`flatpak install flathub com.discordapp.Discord`) or a
-      community build like Vesktop if you need it on ARM64.
+      Discord does not publish official aarch64 binaries (no .deb, no
+      Flatpak ARM build). Skipping. Use a community build like Vesktop on
+      ARM64 if you need Discord — see https://github.com/Vencord/Vesktop.
 
-- name: Check if Discord is installed
+# --- deb channel ----------------------------------------------------------
+
+- name: Check if Discord .deb is installed
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture == 'x86_64'
+    - discord_channel == 'deb'
   ansible.builtin.command: dpkg -s discord
   register: discord_check
   changed_when: false
@@ -473,6 +489,7 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
     - target_architecture == 'x86_64'
+    - discord_channel == 'deb'
     - not (gui_apps_linux_no_root | bool)
     - discord_check.rc != 0
   become: true
@@ -500,7 +517,48 @@
           Discord .deb install failed. Fall back to the official tarball at
           https://discord.com/api/download?platform=linux&format=tar.gz
           (extract to ~/Applications/Discord/ and wire up a .desktop entry),
-          or use Flatpak: `flatpak install flathub com.discordapp.Discord`.
+          or switch to Flatpak by setting discordChannel=flatpak in
+          ~/.config/chezmoi/chezmoi.toml.
+
+# --- flatpak channel ------------------------------------------------------
+
+- name: Install Discord via Flatpak (channel=flatpak)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - discord_channel == 'flatpak'
+    - not (gui_apps_linux_no_root | bool)
+  block:
+    - name: Ensure flatpak package is present
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        name: flatpak
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Flathub remote is configured (per-user)
+      community.general.flatpak_remote:
+        name: flathub
+        flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
+        method: user
+        state: present
+
+    - name: Install Discord from Flathub (per-user)
+      community.general.flatpak:
+        name: com.discordapp.Discord
+        state: present
+        method: user
+        remote: flathub
+  rescue:
+    - name: Warn Discord Flatpak install failed
+      ansible.builtin.debug:
+        msg: >-
+          Discord Flatpak install failed. Manual fallback —
+          `flatpak install flathub com.discordapp.Discord` from a shell,
+          or set discordChannel=deb in ~/.config/chezmoi/chezmoi.toml to
+          revert to the .deb path.
 
 # =============================================================================
 # Zen Browser — Firefox-based browser, shipped as an AppImage

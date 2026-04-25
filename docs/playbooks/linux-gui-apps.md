@@ -75,7 +75,7 @@ follows when a vendor ships in multiple formats:
 |---|---|---|---|---|
 | **Cursor** | `.deb` (auto-adds `/etc/apt/sources.list.d/cursor.sources`) | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
 | **VSCode** | `.deb` (auto-adds `vscode.sources`) | ✅ `apt upgrade code` | same role | `/usr/share/code/` |
-| **Discord** | `.deb` (no apt source — see "Discord auto-update" below) | ❌ | same role | `/usr/share/discord/` |
+| **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
 | **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
 | **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
@@ -158,11 +158,19 @@ Three ways out:
    self-update). Drift from official Discord; not recommended unless
    you're already running modded Discord.
 
-For **Discord pain specifically** the cheapest fix is option 1 — add a
-`just upgrade-discord` recipe (or fold it into `just upgrade-system`)
-that re-runs the ansible task. The ansible task already does the
-"latest version via API" resolution, so it's idempotent: nothing
-happens if you're already on the current release.
+**This repo's default is option 2 (Flatpak)** — controlled by the
+`discordChannel` chezmoi prompt (`flatpak | deb | none`, default `flatpak`).
+The role's flatpak path:
+
+1. apt-installs the `flatpak` package if missing (one-time, with sudo)
+2. adds the Flathub remote at user scope (no sudo)
+3. installs `com.discordapp.Discord` at user scope (no sudo)
+
+To switch from `.deb` to `flatpak` on an existing machine: set
+`discordChannel = "flatpak"` in `~/.config/chezmoi/chezmoi.toml` and run
+`chezmoi apply --tags gui_apps`. The two installs can coexist briefly
+(different `.desktop` entries); once you've validated the Flatpak version,
+`sudo apt remove discord` to clean up the old `.deb`.
 
 ## Snap (Ubuntu App Center) — what's actually happening
 

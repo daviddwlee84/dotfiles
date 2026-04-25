@@ -186,6 +186,12 @@ PROMPTS: tuple[Prompt, ...] = (
            "McBopomofo + RIME for zh-TW input.",
            default=False,
            prompt_text="Install Traditional Chinese input methods (McBopomofo, RIME)"),
+    Prompt("discordChannel", "choice", "System & apps",
+           "Discord install channel",
+           "Linux only — pick how Discord gets installed/upgraded. flatpak (recommended): Flathub auto-updates via `flatpak update`. deb: official .deb, manual re-deploy each release. none: skip.",
+           default="flatpak",
+           prompt_text="Discord install channel (flatpak|deb|none)",
+           choices=("flatpak", "deb", "none")),
     Prompt("installNetworkingTools", "bool", "System & apps",
            "Networking CLI tools",
            "nmap, mtr, httpie, gping, trippy.",
@@ -561,6 +567,15 @@ def build_chezmoi_argv(
             argv += ["--promptString", f"{by_key[key].prompt_text}={answers[key]}"]
     if "profile" in answers:
         argv += ["--promptChoice", f"{by_key['profile'].prompt_text}={answers['profile']}"]
+    # Non-basics choice prompts (e.g. discordChannel).
+    for p in PROMPTS:
+        if p.kind != "choice" or p.hidden:
+            continue
+        if p.darwin_only and not darwin:
+            continue
+        if p.key not in answers:
+            continue
+        argv += ["--promptChoice", f"{p.prompt_text}={answers[p.key]}"]
     # Bool prompts — skip darwin-only on linux (chezmoi never evaluates them there).
     for p in PROMPTS:
         if p.kind != "bool" or p.hidden:

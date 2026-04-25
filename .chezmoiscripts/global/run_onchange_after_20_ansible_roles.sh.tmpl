@@ -184,6 +184,15 @@ else
     EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
 fi
 {{ end -}}
+{{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+# Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
+{{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="discord_channel={{ $discordChannel }}"
+else
+    EXTRA_VARS="$EXTRA_VARS discord_channel={{ $discordChannel }}"
+fi
+{{ end -}}
 
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
 
