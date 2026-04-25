@@ -29,6 +29,44 @@ provides it. Snap and Flatpak are the auto-update fallbacks for vendors
 who don't ship `.deb` (or who want sandboxing). AppImage is the
 last-mile bridge for everyone else.
 
+## Priority order on Ubuntu
+
+The matrix above is *what each mechanism does*. The list below is *which
+to pick when you have a choice* — the explicit ordering this repo
+follows when a vendor ships in multiple formats:
+
+1. **`.deb` w/ auto apt-source** — `apt upgrade` keeps it current with zero
+   sandbox overhead and native startup speed. The right answer for
+   hot-path apps (editors, terminals, browsers, daily-driver tools).
+   Examples: Cursor, VSCode, Chrome, Signal, 1Password, Slack.
+2. **Flatpak (Flathub)** — clean sandbox, cross-distro friendly, faster
+   to launch than Snap, auto-update via `flatpak update`. Right when
+   `.deb` is missing or vendor only publishes on Flathub. Default
+   recommendation for community-packaged apps that need confinement.
+3. **Snap** — set-and-forget auto-refresh via `snapd` (4×/day, no user
+   action). Acceptable for non-hot-path apps where the extra ~1-3s
+   startup penalty is invisible (password manager, music player).
+   Avoid for hot-path apps; the daily startup cost adds up.
+4. **AppImage + AppImageLauncher** — when 1-3 are unavailable. No
+   auto-update unless the bundle ships `.zsync` AND AppImageLauncher's
+   update check is configured. Re-running our ansible task is the
+   typical refresh path.
+5. **Cargo / from-source / tarball** — last resort. Manual everything,
+   no apt/snap/flatpak update path. Only when upstream really only
+   ships source.
+
+> **Why not "always Snap"?** Snap looks similar to Homebrew Cask on
+> macOS but the comparison is misleading. Snap apps live in
+> `/snap/<app>/<rev>/` mounted as squashfs and bring up an AppArmor
+> sandbox on every launch — Firefox snap takes ~2-3s to boot on SSD
+> versus ~0.3s for the `.deb`. The sandbox also breaks subtle workflows
+> by default (snap Bitwarden can't read `~/.ssh` without `snap connect
+> bitwarden:password-manager-service`; many snaps can't see external
+> drives). For occasional-use apps these costs are invisible; for
+> daily drivers (browser, IDE, terminal) they're a real annoyance.
+> Snap is *fine* — it's just not the universal answer macOS users
+> sometimes assume from their Cask experience. Pick by row 1-3 above.
+
 ## Inventory of GUI apps on this machine
 
 ### Ansible-managed (this repo)
