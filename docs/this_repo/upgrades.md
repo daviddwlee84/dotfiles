@@ -20,7 +20,7 @@ Two side-effects worth knowing about:
 ## Entry points
 
 ```bash
-just upgrade-all          # externals → brew → mise → uv → npm → cargo → dotnet → gem → agents → plugins
+just upgrade-all          # externals → brew → mise → uv → npm → cargo → dotnet → gem → flatpak → agents → plugins
 just upgrade-dry-run      # same, but commands are printed, not executed
 just upgrade-<category>   # run one category in isolation
 ```
@@ -50,6 +50,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `cargo` | If absent, bootstraps the `cargo-update` crate, then `cargo install-update -a`. Covers pueue (Linux) plus any future entries in [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
 | `dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool (via the mise dotnet shim). Falls back to `dotnet tool list --global` if parsing finds nothing. |
 | `gem` | `gem update --system` + `gem update` via the mise ruby shim. |
+| `flatpak` | `flatpak update --user --noninteractive --assumeyes` for user-scope Flathub apps (Discord et al. when `discordChannel=flatpak` — see [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md)). Skipped when `flatpak` is absent OR when no user-scope apps are installed. System-scope (`flatpak update --system`) is intentionally NOT covered — it requires `sudo` and is rare in this repo's flow; run manually if needed. |
 | `agents` | Re-runs the official `curl \| bash` installers for **tools already present** only — Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. Bootstrap list mirrors [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml). |
 | `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → refresh installed `claude-hud` via [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
 
@@ -64,7 +65,8 @@ flowchart LR
     npm["npm<br/>(-g update)"] --> cargo
     cargo["cargo<br/>(install-update -a)"] --> dotnet
     dotnet["dotnet<br/>(tool update --global)"] --> gem
-    gem["gem<br/>(gem update)"] --> agents
+    gem["gem<br/>(gem update)"] --> flatpak
+    flatpak["flatpak<br/>(--user update)"] --> agents
     agents["agents<br/>(curl \| bash installers)"] --> plugins
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
 ```

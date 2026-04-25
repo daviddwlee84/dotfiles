@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem agents plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak agents plugins)
 
 usage() {
   cat <<EOF
@@ -137,7 +137,7 @@ while [[ $# -gt 0 ]]; do
       SELECTED=("${ALL_CATEGORIES[@]}")
       shift
       ;;
-    externals | brew | mise | uv | npm | cargo | dotnet | gem | agents | plugins)
+    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | agents | plugins)
       SELECTED+=("$1")
       shift
       ;;
@@ -535,6 +535,35 @@ cat_gem() {
 }
 
 # ============================================================================
+# Category: flatpak — `flatpak update` for user-scope Flathub apps
+# ============================================================================
+# We deliberately stick to user-scope (`--user`): no sudo required, and our
+# ansible role installs everything via `method: user`. System-scope flatpaks
+# need `sudo flatpak update --system`, which the user can run manually if
+# they have any (rare in this repo's flow).
+cat_flatpak() {
+  if ! command -v flatpak >/dev/null 2>&1; then
+    warn "flatpak not installed — skipping"
+    return $SKIP_RC
+  fi
+
+  # Skip silently when there's nothing user-scoped to update — avoids logging
+  # a "Nothing to do." into upgrade summaries on machines that have never set
+  # discordChannel=flatpak.
+  local n_user_apps
+  n_user_apps="$(flatpak list --app --user 2>/dev/null | wc -l)"
+  if [[ "$n_user_apps" -eq 0 ]]; then
+    info "No user-scope Flatpak apps installed — skipping"
+    return $SKIP_RC
+  fi
+
+  local any_fail=0
+  info "Upgrading user-scope Flatpak apps ($n_user_apps installed)"
+  _run flatpak update --user --noninteractive --assumeyes || any_fail=1
+  return "$any_fail"
+}
+
+# ============================================================================
 # Category: agents — re-run install.sh for curl-installed CLI tools
 # ============================================================================
 # Only re-runs when the binary is already present. The installers are (by
@@ -753,6 +782,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         cargo) run_category cargo cat_cargo ;;
         dotnet) run_category dotnet cat_dotnet ;;
         gem) run_category gem cat_gem ;;
+        flatpak) run_category flatpak cat_flatpak ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
       esac

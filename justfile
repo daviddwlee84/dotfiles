@@ -290,7 +290,7 @@ info:
 # run them when you actually want tools to advance.
 # See `## Upgrades` section in AGENTS.md for rationale + category matrix.
 
-# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, agents, plugins
+# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, flatpak, agents, plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
 
@@ -321,6 +321,10 @@ upgrade-dotnet:
 # rubygems + installed gems (via mise ruby shim)
 upgrade-gem:
     ./scripts/upgrade_tools.sh gem
+
+# `flatpak update --user` for Flathub apps (Discord etc. when discordChannel=flatpak)
+upgrade-flatpak:
+    ./scripts/upgrade_tools.sh flatpak
 
 # curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:
