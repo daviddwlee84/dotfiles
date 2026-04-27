@@ -24,11 +24,13 @@
   changed_when: false
   failed_when: false
 
-- name: Check for user-installed mise (Bitwarden fallback)
+# Prefer mise's npm: system npm on noRoot Linux hosts has prefix /usr/local
+# (unwritable without sudo). mise's user-managed prefix works without sudo on
+# both Linux and macOS.
+- name: Check for user-installed mise (Bitwarden)
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
   ansible.builtin.stat:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
   register: bitwarden_mise_user_bin
@@ -37,16 +39,14 @@
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
     - bitwarden_mise_user_bin.stat.exists | default(false)
   ansible.builtin.set_fact:
     bitwarden_mise_bin: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
 
-- name: Check for system mise (Bitwarden fallback)
+- name: Check for system mise (Bitwarden)
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
     - bitwarden_mise_bin is not defined
   ansible.builtin.command: mise --version
   register: bitwarden_mise_system_check
@@ -57,43 +57,27 @@
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
     - bitwarden_mise_bin is not defined
     - bitwarden_mise_system_check.rc == 0
   ansible.builtin.set_fact:
     bitwarden_mise_bin: mise
 
-- name: Fail when neither npm nor mise is available for Bitwarden install
+- name: Fail when neither mise nor npm is available for Bitwarden install
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
     - bitwarden_mise_bin is not defined
+    - bitwarden_npm_check.rc != 0
   ansible.builtin.fail:
     msg: >-
-      installBitwarden=true requires npm or mise (with npm runtime) to install
+      installBitwarden=true requires mise or npm (with npm runtime) to install
       {{ bitwarden_cli_npm_package }}. Ensure Node.js is installed (e.g. via mise)
       and re-run ansible.
 
-- name: Install Bitwarden CLI via npm
+- name: Install Bitwarden CLI via mise npm
   when:
     - ansible_facts["os_family"] in ["Darwin", "Debian"]
     - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc == 0
-  community.general.npm:
-    name: "{{ bitwarden_cli_npm_package }}"
-    global: true
-    state: present
-  register: bitwarden_npm_install
-  until: bitwarden_npm_install is succeeded
-  retries: 3
-  delay: 5
-
-- name: Install Bitwarden CLI via mise npm fallback
-  when:
-    - ansible_facts["os_family"] in ["Darwin", "Debian"]
-    - bitwarden_cli_check.rc != 0
-    - bitwarden_npm_check.rc != 0
     - bitwarden_mise_bin is defined
   ansible.builtin.shell: |
     {{ bitwarden_mise_bin }} exec -- npm install -g {{ bitwarden_cli_npm_package }}
@@ -104,6 +88,21 @@
   retries: 3
   delay: 5
   changed_when: true
+
+- name: Install Bitwarden CLI via system npm fallback
+  when:
+    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+    - bitwarden_cli_check.rc != 0
+    - bitwarden_mise_bin is not defined
+    - bitwarden_npm_check.rc == 0
+  community.general.npm:
+    name: "{{ bitwarden_cli_npm_package }}"
+    global: true
+    state: present
+  register: bitwarden_npm_install
+  until: bitwarden_npm_install is succeeded
+  retries: 3
+  delay: 5
 
 # =============================================================================
 # Desktop App Installation (for SSH agent support)
