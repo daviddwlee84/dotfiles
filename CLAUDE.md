@@ -86,8 +86,9 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 | Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
 | Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
 | Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+| zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `dot_zshrc.tmpl` to survive zsh-vi-mode's keybind wipe |
 
-Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta).
+Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 

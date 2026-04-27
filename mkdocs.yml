@@ -60,6 +60,7 @@ plugins:
           - index.md
         Tools:
           - tools/aicapture.md
+          - tools/zsh-inline-ai.md
           - tools/tmux/README.md
           - tools/sesh.md
           - tools/clipboard.md
@@ -112,6 +113,7 @@ nav:
     - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
   - Tools:
     - tools/aicapture.md
+    - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
     - tmux:
       - Overview: tools/tmux/README.md
       - Keybindings: tools/tmux/keybindings.md

@@ -29,6 +29,12 @@ plugins=(
 # so that Ctrl+R (history search), Ctrl+T (file search), Alt+C still work
 zvm_after_init() {
     [ -f "$ZSH_CONFIG_DIR/tools/10_fzf.zsh" ] && source "$ZSH_CONFIG_DIR/tools/10_fzf.zsh"
+    # aisuggest trigger (Alt+; default) — see dot_config/zsh/tools/05_aisuggest.zsh
+    if (( ${+widgets[aisuggest]} )); then
+        bindkey -M viins "${AISUGGEST_KEY:-^[;}" aisuggest
+        bindkey -M vicmd "${AISUGGEST_KEY:-^[;}" aisuggest
+        bindkey -M emacs "${AISUGGEST_KEY:-^[;}" aisuggest
+    fi
 }
 
 # Oh-My-Zsh path
