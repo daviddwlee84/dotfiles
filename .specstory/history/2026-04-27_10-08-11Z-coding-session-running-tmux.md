@@ -7712,7 +7712,7 @@ ps -axo pid,comm,args | awk '$2 == "node" {print $1, substr($0, index($0, $3))}'
 === node/bun processes with cursor in argv ===
  1042 /System/Library/ /System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService
  3998 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.1.17 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
-46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 81171 /Applications/Cu /Applications/Cursor.app/Contents/MacOS/Cursor
 81286 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.2.11 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
 81295 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Cursor Helper (GPU).app/Contents/MacOS/Cursor Helper (GPU) --type=gpu-process --disable-skia-graphite --user-data-dir=/Users/daviddwlee84/Library/Application Support/Cursor --gpu-preferences=SAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAAAQAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=1718379636,r,11627237234073399701,16195094820915680601,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708988185955192 --seatbelt-client=27
@@ -8229,12 +8229,12 @@ sed -n '7713,7717p' /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/
 ```
 
 ```text
-7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 ---
  1042 /System/Library/ /System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService
  3998 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.1.17 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
-46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 81171 /Applications/Cu /Applications/Cursor.app/Contents/MacOS/Cursor
 81286 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.2.11 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
 ```
@@ -8317,10 +8317,10 @@ grep -c "eyJhbGci" /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2
 ```
 
 ```text
-7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 8226:grep -n "cloud-token" /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md | head -3
-8232:7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+8232:7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8233:8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 ---verifying file is JWT-free---
 3
@@ -8489,5 +8489,144 @@ shfmt................................................(no files to check)Skipped
 11c8c48 agent-panes: tv channel + recon for live coding-agent pane discovery
 6799a61 codex: prefer uv over system python3 for modify_config.toml merge
 a591887 fleet-apply: classify drift from merged stdout, not empty stderr
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:05:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:06:01Z)**_
+
+是的 — 你 catch 到一個真的 bug。Brand-new Codex session 沒有自己的 rollout file，我的 cwd-based resolver 就會 fall back 到「同一個 cwd 最近的舊 session」，所以顯示舊 title。
+
+Claude 沒這問題（每個 PID 一個 sessions/{pid}.json 是 authoritative），但 Codex/OpenCode/Cursor 都會這樣。
+
+修法：用 codex process 的 start time 當 floor — 只接受 mtime 在 process 啟動之後的 session。如果沒 match（brand-new session 還沒打字），就顯示空 title 而不是亂猜舊的。
+
+_**Agent (claude-opus-4-7 2026-04-27 11:06:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:06:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:06:45Z)**_
+
+Now wire `since_ts` into the `_panes()` calls:
+
+_**Agent (claude-opus-4-7 2026-04-27 11:06:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify the since_ts fix discards stale OLD session titles
+
+```bash
+python3 -m py_compile /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py && echo "syntax OK"
+cp /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py ~/.config/television/agent-sessions.py
+chmod +x ~/.config/television/agent-sessions.py
+echo
+echo "=== panes after fix (cx row should now show empty title for fresh session) ==="
+~/.config/television/agent-sessions.py panes | awk -F'\t' '{printf "%-5s %-30s  title=[%s]\n", $1, $7, $5}'
+echo
+echo "=== _proc_start_ts sanity (codex pid; should be epoch seconds) ==="
+python3 -c "
+import sys; sys.path.insert(0, '$HOME/.config/television')
+import importlib.util
+spec = importlib.util.spec_from_file_location('a', '$HOME/.config/television/agent-sessions.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+import subprocess
+codex_pids = m._pgrep_x('codex')
+print(f'codex pids: {codex_pids}')
+for p in codex_pids:
+    print(f'  pid={p}  start_ts={m._proc_start_ts(p)}')
+"
+```
+
+```text
+syntax OK
+
+=== panes after fix (cx row should now show empty title for fresh session) ===
+[cc]  chezmoi:4.1                     title=[``` ❯ just fleet-apply ./scripts/fleet_apply.py log dir: logs/fleet-apply/20260427T100215Z fleet-apply ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━…]
+[cc]  chezmoi:1.1                     title=[discover-coding-agent-sessions]
+[cc]  vibe/agent-skills:4.1           title=[Base directory for this skill: /Users/daviddwlee84/.claude/skills/skill-author # Skill Author Helps you write **new agent skills** that fol…]
+[cc]  chezmoi:2.1                     title=[fix-nvm-lazy-loader-permission-request]
+[cc]  vibe/agent-skills:1.1           title=[我們目前的repo是否有不該commit & push的東西? 看看目前staged的commit 應該是被我們的redact secret給清了？ 不知道有沒有問題 還是說這只是demo print的(畢竟github也沒擋push)]
+[cc]  vibe/DockerCompose-V2Ray:1.1    title=[我發現當這個server跑久了 @legacy/compose/docker-compose.yml mount出來的logs (很容易塞滿) 有沒有什麼retention機制啥的可以解決這個問題 ``` david@V2Ray:~$ tmux couldn't create …]
+[cx]  chezmoi:7.1                     title=[]
+[oc]  chezmoi:6.1                     title=[]
+
+=== _proc_start_ts sanity (codex pid; should be epoch seconds) ===
+codex pids: [49788, 82277]
+  pid=49788  start_ts=1777287182.0
+  pid=82277  start_ts=1777274833.0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:17Z)**_
+
+Fix verified — `[cx]` and `[oc]` rows now show empty title (correct: brand-new sessions, no message typed yet) instead of inheriting an unrelated old session's title. Claude rows unchanged (Claude uses authoritative per-PID files). Let me commit the follow-up.
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the since_ts floor fix
+
+```bash
+FILE=/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md
+# Pre-emptive JWT scrub on the transcript before staging.
+python3 -c "
+import re, pathlib
+p = pathlib.Path('$FILE')
+s = p.read_text()
+s2 = re.sub(r'ey[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}', '<REDACTED-JWT>', s)
+p.write_text(s2)
+"
+git add dot_config/television/executable_agent-sessions.py "$FILE"
+git commit -m "$(cat <<'EOF'
+agent-panes: floor cwd-based session lookups at agent process start time
+
+Without this, a brand-new Codex/OpenCode/Cursor session in a cwd that
+has older session history would inherit the OLD session's title — the
+cwd-based reverse lookup picks the most-recent storage entry, which
+is unrelated to the just-spawned process. (Claude is unaffected: each
+process writes ~/.claude/sessions/{pid}.json with the authoritative
+session_id.)
+
+Fix: read each agent process's start time via `ps -o lstart=` and pass
+it as a `since_ts` floor into _opencode/_codex/_cursor_session_for_cwd.
+If the most-recent storage entry pre-dates the process, return empty
+— picker shows a blank title for fresh sessions (correct), and the
+row remains useful for jump-to-pane.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -10
+echo "---"
+git log --oneline -3
 ```
 </details></tool-use>

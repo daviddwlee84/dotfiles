@@ -968,6 +968,35 @@ def _pgrep_x(name: str) -> list[int]:
     return [int(p) for p in out.split() if p.isdigit()]
 
 
+def _proc_start_ts(pid: int) -> float:
+    """Return process start time as local epoch seconds, or 0.0 if unknown.
+
+    Used to filter cwd-based session lookups to "rollouts that exist after
+    this agent process began" — without this, a brand-new Codex/OpenCode/
+    Cursor session in a cwd that has older session history would show the
+    OLD session's title (the resolver picks the most-recent storage entry
+    in cwd, which is unrelated to the just-started process).
+    """
+    try:
+        out = subprocess.check_output(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return 0.0
+    if not out:
+        return 0.0
+    # `ps -o lstart=` format on macOS/BSD: "Mon Apr 27 10:05:56 2026".
+    # Linux outputs the same format under coreutils/procps when locale is C.
+    for fmt in ("%a %b %d %H:%M:%S %Y", "%a %b  %d %H:%M:%S %Y"):
+        try:
+            return datetime.strptime(out, fmt).timestamp()
+        except ValueError:
+            continue
+    return 0.0
+
+
 def _find_node_wrapped_pids(needle: str) -> list[int]:
     """Find PIDs of Node/Bun/Deno-wrapped CLIs by path-anchored argv match.
 
@@ -1005,8 +1034,13 @@ def _find_node_wrapped_pids(needle: str) -> list[int]:
 # session_id from its per-PID JSON, so it doesn't need this.
 
 
-def _opencode_session_for_cwd(cwd: str) -> tuple[str, float, str]:
-    """Most-recent OpenCode session with matching directory. (sid, mtime_s, title)."""
+def _opencode_session_for_cwd(cwd: str, since_ts: float = 0.0) -> tuple[str, float, str]:
+    """Most-recent OpenCode session matching cwd AND newer than `since_ts`.
+
+    Returns (sid, mtime_s, title). When `since_ts > 0` (agent process start
+    time), older sessions are skipped — prevents a brand-new agent in a cwd
+    with prior session history from showing the OLD session's title.
+    """
     db = HOME / ".local/share/opencode/opencode.db"
     if not db.exists() or not cwd:
         return ("", 0.0, "")
@@ -1027,26 +1061,34 @@ def _opencode_session_for_cwd(cwd: str) -> tuple[str, float, str]:
         if row:
             sid, title, tu = row
             ts = (tu / 1000.0) if tu and tu > 1e12 else float(tu or 0)
+            if since_ts and ts < since_ts:
+                # Most recent stored session pre-dates this process — must
+                # be a fresh session that hasn't been written yet.
+                return ("", 0.0, "")
             return (sid or "", ts, title or "")
     except sqlite3.Error:
         pass
     return ("", 0.0, "")
 
 
-def _codex_session_for_cwd(cwd: str) -> tuple[str, float, str]:
-    """Most-recent Codex rollout in the matching cwd. (sid, mtime_s, title)."""
+def _codex_session_for_cwd(cwd: str, since_ts: float = 0.0) -> tuple[str, float, str]:
+    """Most-recent Codex rollout in cwd AND newer than `since_ts`.
+
+    See _opencode_session_for_cwd for the `since_ts` rationale.
+    """
     root = HOME / ".codex/sessions"
     if not root.is_dir() or not cwd:
         return ("", 0.0, "")
     best: tuple[float, str, str] = (0.0, "", "")
     # Don't scan all of history — limit to last 7 days (one dir per day).
     cutoff = datetime.now().timestamp() - 7 * 86400
+    floor = max(cutoff, since_ts)
     for jsonl in root.rglob("rollout-*.jsonl"):
         try:
             mtime = jsonl.stat().st_mtime
         except OSError:
             continue
-        if mtime < cutoff or mtime <= best[0]:
+        if mtime < floor or mtime <= best[0]:
             continue
         sid, scwd, title = _codex_meta(jsonl)
         if scwd != cwd:
@@ -1061,8 +1103,8 @@ def _codex_session_for_cwd(cwd: str) -> tuple[str, float, str]:
     return (best[1], best[0], best[2])
 
 
-def _cursor_session_for_cwd(cwd: str) -> tuple[str, float, str]:
-    """Most-recent Cursor Agent CLI chat in matching cwd. (sid, mtime_s, '')."""
+def _cursor_session_for_cwd(cwd: str, since_ts: float = 0.0) -> tuple[str, float, str]:
+    """Most-recent Cursor Agent CLI chat in cwd AND newer than `since_ts`."""
     root = HOME / ".cursor/chats"
     if not root.is_dir() or not cwd:
         return ("", 0.0, "")
@@ -1072,7 +1114,7 @@ def _cursor_session_for_cwd(cwd: str) -> tuple[str, float, str]:
             mtime = db.stat().st_mtime
         except OSError:
             continue
-        if mtime <= best[0]:
+        if mtime <= best[0] or (since_ts and mtime < since_ts):
             continue
         ws_hash = db.parent.parent.name
         folder = _cursor_workspace_path(ws_hash)
@@ -1197,12 +1239,16 @@ def _panes() -> None:
             if pane is None:
                 continue
             cwd = pane["pane_cwd"]
+            # Floor cwd-based reverse-lookups at the agent process's start
+            # time. Without this, a brand-new session in a cwd that has
+            # older session history would inherit the OLD session's title.
+            since_ts = _proc_start_ts(agent_pid)
             if tag == "[oc]":
-                sid, ts, title = _opencode_session_for_cwd(cwd)
+                sid, ts, title = _opencode_session_for_cwd(cwd, since_ts)
             elif tag == "[cx]":
-                sid, ts, title = _codex_session_for_cwd(cwd)
+                sid, ts, title = _codex_session_for_cwd(cwd, since_ts)
             elif tag == "[cu]":
-                sid, ts, title = _cursor_session_for_cwd(cwd)
+                sid, ts, title = _cursor_session_for_cwd(cwd, since_ts)
             else:
                 sid, ts, title = ("", 0.0, "")
             # Dedupe by pane — a single pane may match multiple detectors
