@@ -135,6 +135,7 @@ nav:
     - Editor & agents:
       - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
       - Agent skills: tools/agent-skills.md
+      - Claude Code keybindings: tools/claude-code-keybindings.md
       - OpenCode: tools/opencode.md
       - specify-cli: tools/specify_cli.md
       - SpecStory: tools/specstory.md
@@ -163,6 +164,7 @@ nav:
     - chezmoi conventions:
       - chezmoi prefixes: tools/chezmoi-prefixes.md
       - chezmoi templating: tools/chezmoi-templating.md
+      - JSON Schema: tools/json-schema.md
       - Mirrors (Chinese CDN): tools/mirrors.md
   - Zsh:
     - Aliases & functions: zsh/aliases.md

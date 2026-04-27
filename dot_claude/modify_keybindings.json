@@ -1,0 +1,67 @@
+#!/bin/sh
+# chezmoi modify_ script: jq-based overlay for ~/.claude/keybindings.json.
+#
+# This file pairs with dot_claude/modify_settings.json (same shape, same jq
+# tooling). The keybindings file is conservatively managed: we deliberately
+# do NOT ship the full default keymap, because Claude Code can introduce new
+# bindings or rename existing actions in any release, and a fully managed
+# copy would silently diverge.
+#
+# What this overlay enforces today:
+#   - The two metadata fields ($schema, $docs) at the top of the file. They
+#     give editors / agents the right schema URL for autocomplete and the
+#     right docs URL for action-name lookups. See:
+#       Schema: https://www.schemastore.org/claude-code-keybindings.json
+#       Docs:   https://code.claude.com/docs/en/keybindings
+#
+# What this overlay deliberately does NOT enforce yet:
+#   - Any entries inside `.bindings` (the array of {context, bindings}
+#     objects). A naive `jq '. * $overlay'` merge replaces arrays wholesale,
+#     so dropping bindings overrides into this overlay's `.bindings` would
+#     clobber every default Claude Code ships. If you want to add personal
+#     binding overrides, extend the jq filter below to merge by `.context`
+#     (similar to how dot_claude/modify_settings.json appends hook entries
+#     by .hooks[0].command). Until that happens, treat the live file as the
+#     source of truth for actual bindings and only edit it in-place.
+#
+# Why `modify_` and not `create_`:
+#   - `create_` would seed once and then never enforce $schema/$docs; new
+#     machines could drift if the upstream URLs change.
+#   - `modify_` runs on every `chezmoi apply`, so the metadata stays
+#     synchronised with what we've checked in here.
+#
+# Bootstrap (fresh machine, no live file yet):
+#   - chezmoi pipes empty stdin into the script. We emit a minimal stub
+#     that contains only the metadata fields — no bindings. Claude Code on
+#     first launch falls back to its built-in defaults for any binding the
+#     file doesn't define, then may write the file back with concrete
+#     entries; a subsequent apply will merge $schema/$docs in.
+#
+# Requires: jq (installed by the `base` ansible role).
+#
+# See: docs/tools/claude-code-keybindings.md (user-facing rationale, action
+# namespaces, the chat:cycleMode-only mode-jump limitation).
+set -eu
+
+overlay=$(cat <<'JSON'
+{
+  "$schema": "https://www.schemastore.org/claude-code-keybindings.json",
+  "$docs": "https://code.claude.com/docs/en/keybindings"
+}
+JSON
+)
+
+base=$(cat)
+
+# Bootstrap path: live file does not exist yet. Emit just the overlay so
+# the file is well-formed when Claude Code reads it on its next launch.
+if [ -z "$base" ]; then
+  printf '%s\n' "$overlay"
+  exit 0
+fi
+
+# Steady-state path: deep-merge our metadata onto the live file. The live
+# .bindings array is preserved verbatim — `. * $overlay` replaces arrays
+# wholesale only at matching key paths, and our overlay has no .bindings
+# key, so the live array is left untouched.
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

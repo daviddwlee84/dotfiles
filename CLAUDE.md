@@ -87,6 +87,7 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 | Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
 | Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
 | zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `dot_zshrc.tmpl` to survive zsh-vi-mode's keybind wipe |
+| Claude Code (TUI) | `dot_claude/modify_keybindings.json` (overlay) + `~/.claude/keybindings.json` (live); see [docs/tools/claude-code-keybindings.md](docs/tools/claude-code-keybindings.md) | `Ctrl+R` (history:search — collides with atuin / zsh-history-substring at the prompt outside Claude), `Ctrl+T` (toggleTodos — Television's `Ctrl+T` is shadowed when Claude has focus), `Ctrl+G` (chat:externalEditor), `Ctrl+S` (chat:stash), `Shift+Tab` (chat:cycleMode — only known mode-switch action, no jump-to-plan) |
 
 Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
 

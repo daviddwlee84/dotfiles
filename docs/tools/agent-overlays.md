@@ -277,6 +277,8 @@ Test coverage in `tests/unit/agent_overlays.bats`:
 - `claude modify_settings: empty live file produces overlay-only output` — bootstrap on a fresh machine.
 - `claude modify_settings: non-hook deep-merge preserves siblings` — proves user-added plugins/marketplaces survive.
 
+> **Sibling overlay**: `~/.claude/keybindings.json` is managed by a separate, simpler `modify_` script — [`dot_claude/modify_keybindings.json`](../../dot_claude/modify_keybindings.json). It is NOT hook-aware (CodeIsland doesn't write to keybindings.json). See [Claude Code keybindings](claude-code-keybindings.md) for its design, the `chat:cycleMode`-only mode-jump limitation, and how to add personal binding overrides.
+
 ### Future work (deferred)
 
 - **Apprise-to-webhook expansion of `~/.claude/hooks/notify.sh`**: the script already calls `apprise --tag desktop` for local OS notifications. Could be extended to also fire `apprise --tag webhook` for remote chat-app delivery (Slack, Discord, Telegram, …) using URLs configured in `~/.config/apprise/apprise.yaml`. Open question: noise filtering — should webhook fire on every `Notification`/`Stop`, or only on permission-request and session-end? Likely needs an env-var gate (`CLAUDE_NOTIFY_WEBHOOK=1`) so each machine opts in. Track in a separate change.
