@@ -522,19 +522,25 @@ _DRIFT_RE = re.compile(
 )
 
 
-def _classify_drift(stderr_lines: list[str]) -> tuple[bool, list[str]]:
+def _classify_drift(diag_lines: list[str]) -> tuple[bool, list[str]]:
     """Return (is_pure_drift, [drift_paths]).
 
-    `is_pure_drift` is True iff every non-blank stderr line either matches
-    `_DRIFT_RE` or is a recognised drift-skip side-effect (e.g. the "has
-    changed since chezmoi last wrote it?" stdout/stderr probe). Used by
-    run_one()/run_one_local() to demote rc!=0 from `failed` to `drift`.
+    `is_pure_drift` is True iff every non-blank input line matches
+    `_DRIFT_RE`. Used by run_one()/run_one_local() to demote rc!=0 from
+    `failed` to `drift`.
 
-    Conservative on purpose: any unrecognised stderr line means we keep the
+    Callers feed the lines this should consider:
+      * run_one_local() passes real stderr lines (chezmoi runs directly).
+      * run_one() passes only `chezmoi:`-prefixed lines from the merged
+        stdout+stderr stream, since the remote wrapper does
+        `> >(tee -a $log) 2>&1` and we still want to ignore git-pull
+        progress, "Already up to date.", etc.
+
+    Conservative on purpose: any unrecognised line means we keep the
     `failed` classification so real errors are not silently swallowed.
     """
     drift_paths: list[str] = []
-    for raw in stderr_lines:
+    for raw in diag_lines:
         line = raw.strip()
         if not line:
             continue
@@ -814,7 +820,17 @@ async def run_one(
                 proc.stdin.write(stdin_text)
             proc.stdin.write_eof()
 
-            stderr_lines: list[str] = []
+            # The remote wrapper does `> >(tee -a $log) 2>&1`, so chezmoi's
+            # stderr is merged into stdout before asyncssh sees it — i.e.
+            # `proc.stderr` is effectively always empty here. To classify
+            # drift we collect chezmoi's own diagnostic lines (those
+            # prefixed with `chezmoi:`) from BOTH streams. Non-chezmoi
+            # output (git pull progress, "Already up to date.", etc.) is
+            # excluded so it doesn't trip _classify_drift's conservative
+            # "any unrecognised line → failed" rule. See pitfalls notes
+            # and CLAUDE.md "Process substitution + sentinel are
+            # load-bearing" — we cannot un-merge the streams.
+            diag_lines: list[str] = []
 
             async def _drain(stream, label: str) -> None:
                 async for line in stream:
@@ -822,8 +838,8 @@ async def run_one(
                     log_fp.write(f"[{label}] {text}\n")
                     if text.strip():
                         status.last_line = text[:120]
-                    if label == "err":
-                        stderr_lines.append(text)
+                    if text.lstrip().startswith("chezmoi:"):
+                        diag_lines.append(text)
 
             async with asyncio.timeout(command_timeout):
                 await asyncio.gather(
@@ -835,7 +851,7 @@ async def run_one(
             if status.rc == 0:
                 status.state = "done"
             else:
-                is_drift, paths = _classify_drift(stderr_lines)
+                is_drift, paths = _classify_drift(diag_lines)
                 if is_drift:
                     status.state = "drift"
                     status.drift_files = paths
