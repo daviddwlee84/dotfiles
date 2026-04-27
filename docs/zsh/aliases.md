@@ -443,7 +443,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## Session Management
 
-> Requires `sesh` + `tmux`. `tsesh` also requires the `try-cli` Ruby gem.
+> `sesh-*` requires `sesh` + `tmux`; `tsesh` also requires the `try-cli` Ruby gem. `mrun` / `tmrun` / `zjrun` only need tmux or zellij (whichever backend is selected) — no sesh dependency.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
@@ -453,6 +453,9 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `sesh-code` / `scode` | function / alias | `dot_config/zsh/tools/22_sesh.zsh` | Repo-scoped coding-agent layout: nvim 75% \| `specstory run [agent]` 25%, plus btop window. Session named `coding-agent/<repo>` (collision-safe). Refuses outside git repos. Flags: `--on-exit shell\|kill\|restart`, `--no-specstory` |
 | `sesh-vibe` / `svibe` | function / alias | `dot_config/zsh/tools/22_sesh.zsh` | Parametric multi-agent layout: `svibe [N] [CLI]` (homogeneous) or `svibe --agents claude,codex,opencode,…` (heterogeneous). N tiled agent panes + lazygit window + nvim window. Session named `vibe/<repo>`. Same `--on-exit` / `--no-specstory` flags as scode |
 | `try-sesh` / `tsesh` | function / alias | `dot_config/zsh/tools/32_try.zsh` | Open a `try` ephemeral workspace and immediately connect via sesh |
+| `mrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | Fire-and-forget: detached tmux/zellij session running CMD at `$PWD`, returns immediately. `mrun [-b tmux\|zellij] [-n NAME] [-d DIR] [-f] [--] CMD [ARGS...]`. Backend default tmux (override via `$MRUN_BACKEND`). Soft-warns on TUI commands. Prints attach hint to stderr |
+| `tmrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b tmux`. Detached tmux session running CMD; attach with `tmux attach -t NAME` |
+| `zjrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b zellij`. Generates ephemeral KDL under `$TMPDIR/mrun-layout-*`, spawns detached zellij session; attach with `zellij attach NAME` |
 
 ---
 
