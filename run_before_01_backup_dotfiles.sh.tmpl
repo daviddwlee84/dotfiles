@@ -1,16 +1,22 @@
 #!/bin/bash
-# Backup existing dotfiles before chezmoi overwrites them
-# Runs before every chezmoi apply, but only creates one backup per day
+# Backup existing dotfiles before chezmoi overwrites them.
+# Mode comes from .backupMode; legacy `.backupDotfiles` bool is auto-derived
+# for hosts that haven't re-init'd since the prompt was renamed.
+set -euo pipefail
 
-{{ if not .backupDotfiles -}}
-# Backup disabled by config
-exit 0
-{{ else -}}
+{{- $mode := "smart" -}}
+{{- if hasKey . "backupMode" -}}
+{{-   $mode = .backupMode -}}
+{{- else if hasKey . "backupDotfiles" -}}
+{{-   $mode = (ternary "full" "off" .backupDotfiles) -}}
+{{- end }}
+MODE='{{ $mode }}'
+
+[[ "$MODE" == "off" ]] && exit 0
 
 BACKUP_BASE="$HOME/.dotfiles_backup"
 TODAY=$(date +%Y%m%d)
-
-# Skip if a backup from today already exists
+# Daily dedup: skip if any backup from today already exists
 if ls -d "${BACKUP_BASE}/${TODAY}_"* &>/dev/null; then
     exit 0
 fi
@@ -18,48 +24,60 @@ fi
 BACKUP_DIR="${BACKUP_BASE}/$(date +%Y%m%d_%H%M%S)"
 BACKED_UP=0
 
-# Files to back up
-FILES=(
-    "$HOME/.zshrc"
-    "$HOME/.zshenv"
-    "$HOME/.gitconfig"
-    "$HOME/.tmux.conf"
-)
+copy_one() {
+    local src="$1"
+    [[ -e "$src" ]] || return 0
+    local rel="${src#$HOME/}"
+    mkdir -p "${BACKUP_DIR}/$(dirname "$rel")"
+    cp -a "$src" "${BACKUP_DIR}/${rel}"
+    BACKED_UP=$((BACKED_UP + 1))
+}
 
-# Directories to back up
-DIRS=(
-    "$HOME/.config/nvim"
-    "$HOME/.config/zsh"
-    "$HOME/.config/mise"
-    "$HOME/.config/alacritty"
-    "$HOME/.config/yazi"
-    "$HOME/.config/zellij"
-)
+case "$MODE" in
+    smart)
+        # `chezmoi status` lines: "<col1><col2> <relpath-from-$HOME>".
+        # col2 ∈ {M,D} ⇒ apply will overwrite/delete the on-disk file → back up.
+        # col2 = A ⇒ target does not exist yet (nothing to back up).
+        # col2 = ' ' ⇒ in sync (nothing to back up).
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            col2="${line:1:1}"
+            relpath="${line:3}"
+            case "$col2" in
+                M|D) copy_one "$HOME/$relpath" ;;
+            esac
+        done < <(chezmoi status 2>/dev/null || true)
+        ;;
+    full)
+        for f in \
+            "$HOME/.zshrc" \
+            "$HOME/.zshenv" \
+            "$HOME/.gitconfig" \
+            "$HOME/.tmux.conf"; do
+            copy_one "$f"
+        done
+        for d in \
+            "$HOME/.config/nvim" \
+            "$HOME/.config/zsh" \
+            "$HOME/.config/mise" \
+            "$HOME/.config/alacritty" \
+            "$HOME/.config/yazi" \
+            "$HOME/.config/zellij"; do
+            copy_one "$d"
+        done
+        ;;
+    *)
+        echo "[BACKUP] Unknown mode '$MODE' (expected smart|full|off); skipping." >&2
+        exit 0
+        ;;
+esac
 
-for f in "${FILES[@]}"; do
-    if [[ -f "$f" ]]; then
-        REL="${f#$HOME/}"
-        mkdir -p "${BACKUP_DIR}/$(dirname "$REL")"
-        cp -a "$f" "${BACKUP_DIR}/${REL}"
-        BACKED_UP=$((BACKED_UP + 1))
-    fi
-done
-
-for d in "${DIRS[@]}"; do
-    if [[ -d "$d" ]]; then
-        REL="${d#$HOME/}"
-        mkdir -p "${BACKUP_DIR}/$(dirname "$REL")"
-        cp -a "$d" "${BACKUP_DIR}/${REL}"
-        BACKED_UP=$((BACKED_UP + 1))
-    fi
-done
-
-# Remove empty backup dir if nothing was backed up (fresh machine)
+# Remove empty backup dir if nothing was backed up (clean host on smart mode,
+# or fresh machine on full mode)
 if [[ $BACKED_UP -eq 0 ]]; then
     rmdir "$BACKUP_DIR" 2>/dev/null || true
 else
-    echo "[BACKUP] Backed up $BACKED_UP items to $BACKUP_DIR"
+    echo "[BACKUP/$MODE] Backed up $BACKED_UP item(s) to $BACKUP_DIR"
 fi
 
 exit 0
-{{ end -}}

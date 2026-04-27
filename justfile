@@ -107,6 +107,38 @@ chezmoi-rerun-scripts:
     chezmoi --no-pager apply -v
 
 # ============================================================================
+# Dotfiles backup (~/.dotfiles_backup)
+# ============================================================================
+#
+# Pre-apply snapshots produced by `run_before_01_backup_dotfiles.sh.tmpl`.
+# `backupMode` ∈ {smart (default), full, off}; smart only captures files
+# `chezmoi apply` would overwrite/delete (per `chezmoi status` col 2 = M/D).
+
+# List backup snapshots with file count
+list-backups:
+    @if [ ! -d "$HOME/.dotfiles_backup" ]; then echo "No backups in ~/.dotfiles_backup"; exit 0; fi
+    @for d in "$HOME"/.dotfiles_backup/*/; do \
+        [ -d "$d" ] || continue; \
+        ts=$(basename "$d"); \
+        n=$(find "$d" -type f 2>/dev/null | wc -l | tr -d ' '); \
+        printf '%s  (%s file(s))\n' "$ts" "$n"; \
+    done
+
+# Diff a backup snapshot against current files in ~ (read-only inspection)
+diff-backup ts:
+    @snap="$HOME/.dotfiles_backup/{{ts}}"; \
+    if [ ! -d "$snap" ]; then echo "No such backup: {{ts}}" >&2; exit 1; fi; \
+    find "$snap" -type f | while read -r backed; do \
+        rel="${backed#$snap/}"; live="$HOME/$rel"; \
+        if [ ! -e "$live" ]; then \
+            printf '\n=== %s: in backup, missing from live ===\n' "$rel"; \
+        elif ! cmp -s "$backed" "$live"; then \
+            printf '\n=== %s ===\n' "$rel"; \
+            diff -u "$backed" "$live" || true; \
+        fi; \
+    done
+
+# ============================================================================
 # Ansible
 # ============================================================================
 

@@ -72,8 +72,12 @@ installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
 # 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
 noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
-# 在 chezmoi apply 之前備份現有的 dotfiles
-backupDotfiles = {{ promptBoolOnce . "backupDotfiles" "Backup existing dotfiles before chezmoi overwrites them" true }}
+# 在 chezmoi apply 之前備份現有的 dotfiles。
+# smart = 只備份 chezmoi 將要覆蓋/刪除的檔案（用 `chezmoi status` 偵測）
+# full  = 備份固定 allowlist（onboard 第一次最保險）
+# off   = 完全跳過（CI / Docker / 一次性環境用）
+# 舊版 `backupDotfiles` bool 在 run-script 內會 auto-derive: true→full, false→off
+backupMode = {{ promptChoiceOnce . "backupMode" "Backup mode for existing dotfiles (smart|full|off)" (list "smart" "full" "off") "smart" | quote }}
 # 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
 allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}
 

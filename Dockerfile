@@ -21,7 +21,7 @@ ARG CHEZMOI_DISCORD_CHANNEL=none
 ARG CHEZMOI_INSTALL_NETWORKING_TOOLS=false
 ARG CHEZMOI_INSTALL_IAC_TOOLS=false
 ARG CHEZMOI_NO_ROOT=false
-ARG CHEZMOI_BACKUP_DOTFILES=false
+ARG CHEZMOI_BACKUP_MODE=off
 ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
 ARG CHEZMOI_REPO=daviddwlee84
 
@@ -136,7 +136,7 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)=${CHEZMOI_INSTALL_NETWORKING_TOOLS}" \
     --promptBool "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)=${CHEZMOI_INSTALL_IAC_TOOLS}" \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
-    --promptBool "Backup existing dotfiles before chezmoi overwrites them=${CHEZMOI_BACKUP_DOTFILES}" \
+    --promptChoice "Backup mode for existing dotfiles (smart|full|off)=${CHEZMOI_BACKUP_MODE}" \
     --promptBool "Allow partial Ansible failures (continue installing other tools if one role fails)=${CHEZMOI_ALLOW_PARTIAL_FAILURE}"
 
 # Default to bash shell

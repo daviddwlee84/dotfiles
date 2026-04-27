@@ -208,11 +208,12 @@ PROMPTS: tuple[Prompt, ...] = (
            "Scan secrets even for repos without .pre-commit-config.yaml.",
            default=False,
            prompt_text="Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)"),
-    Prompt("backupDotfiles", "bool", "Preferences",
-           "Backup existing dotfiles",
-           "Snapshot target files before chezmoi overwrites them.",
-           default=True,
-           prompt_text="Backup existing dotfiles before chezmoi overwrites them"),
+    Prompt("backupMode", "choice", "Preferences",
+           "Backup mode for existing dotfiles",
+           "smart = only files chezmoi will overwrite (uses `chezmoi status`); full = hardcoded allowlist (onboarding mode); off = skip.",
+           default="smart",
+           prompt_text="Backup mode for existing dotfiles (smart|full|off)",
+           choices=("smart", "full", "off")),
     Prompt("allowPartialFailure", "bool", "Preferences",
            "Allow partial Ansible failures",
            "Continue other roles if one role fails.",
@@ -242,14 +243,14 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBitwarden": True,
         "installBrewApps": True,
         "installNetworkingTools": True,
-        "backupDotfiles": True,
+        "backupMode": "smart",
     },
     "work-mac": {
         "installCodingAgents": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
         "installBrewApps": True,
-        "backupDotfiles": True,
+        "backupMode": "smart",
         # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden
     },
     "server-linux": {
@@ -257,14 +258,14 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installPythonUvTools": True,
         "installJsCliTools": True,
         "installNetworkingTools": True,
-        "backupDotfiles": True,
+        "backupMode": "smart",
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
     },
     "minimal": {
         # Dotfiles only — every installX forced off so `chezmoi apply` in CI /
         # Docker does the minimum work possible. Note this overrides the
         # prompt-level defaults (which have coding-agents / python-uv /
-        # js-cli / backupDotfiles turned ON for fresh personal machines).
+        # js-cli turned ON for fresh personal machines, and backupMode=smart).
         "installCodingAgents": False,
         "installLlmTools": False,
         "installAiDesktopApps": False,
@@ -278,7 +279,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNetworkingTools": False,
         "useChineseMirror": False,
         "gitleaksAllRepos": False,
-        "backupDotfiles": False,
+        "backupMode": "off",
         "allowPartialFailure": False,
         "noRoot": False,
     },
