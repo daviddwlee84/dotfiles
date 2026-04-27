@@ -3891,14 +3891,19 @@ File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/.claude/p
 ```
 </details></tool-use>
 
-_**Agent (claude-opus-4-7 2026-04-27 10:19:34Z)**_
+_**Agent (claude-opus-4-7 2026-04-27 10:24:31Z)**_
 
 <tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
 <summary>Tool use: **ExitPlanMode**</summary>
 
-**Input:**
+```text
+User has approved your plan. You can now start coding. Start with updating your todo list if applicable
 
-- plan: `# Discover running coding-agent sessions across tmux panes
+Your plan has been saved to: /Users/daviddwlee84/.local/share/chezmoi/.claude/plans/coding-session-running-tmux-session-win-jolly-liskov.md
+You can refer back to it if needed during implementation.
+
+## Approved Plan:
+# Discover running coding-agent sessions across tmux panes
 
 ## Context
 
@@ -4192,7 +4197,2792 @@ Run these end-to-end after implementation, in this order:
   need fleet-apply integration; out of scope for v1.
 - **Auto-launch from picker** ("if no Claude is running here, start one") —
   the existing `scode` layout already covers this; don't duplicate.
-`
-- planFilePath: `/Users/daviddwlee84/.local/share/chezmoi/.claude/plans/coding-session-running-tmux-session-win-jolly-liskov.md`
+```
+</details></tool-use>
 
+_**Agent (claude-opus-4-7 2026-04-27 10:24:41Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:41Z)**_
+
+Plan approved. I'll start by setting up task tracking and reading the key files I'll need to modify in parallel.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:43Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Implement _mode_panes() that walks `tmux list-panes -aF`, filters on agent commands, resolves PID→session_id per agent, emits TSV with pane_target column
+
+```text
+Task #1 created successfully: Add panes mode to agent-sessions.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:45Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+New TV channel sibling of agent-sessions.toml with Enter→switch-pane, Alt+K→kill-pane, Ctrl+Y→copy target, Alt+P→copy dir, capture-pane preview
+
+```text
+Task #2 created successfully: Create agent-panes.toml TV channel
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:47Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Bind prefix+a to display-popup -E with `tv agent-panes`, near the prefix+T/U cluster
+
+```text
+Task #3 created successfully: Add prefix+a binding in keybindings.conf
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:48Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Add tier-0 row in executable_menu.sh; create executable_menu-agents.sh for recon + tv agent-panes
+
+```text
+Task #4 created successfully: Add menu row + Agents submenu
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:50Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Add cargo install --git task with creates: guard for ~/.cargo/bin/recon (install-only invariant)
+
+```text
+Task #5 created successfully: Install recon via ansible devtools role
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:51Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+User-facing doc covering tv agent-panes + recon, keybinds, troubleshooting, cross-links
+
+```text
+Task #6 created successfully: Write docs/tools/agent-panes-discovery.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:53Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+All cross-file maintenance updates: mkdocs nav, README tools section, CLAUDE.md keybindings table, docs/tools/tmux/keybindings.md row, backlog annotation
+
+```text
+Task #7 created successfully: Update mkdocs.yml + README + CLAUDE.md + tmux keybindings.md + backlog
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:54Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Static checks (py_compile, mkdocs build --strict), then live smoke test with running agent panes
+
+```text
+Task #8 created successfully: Verify: py_compile + mkdocs strict + manual smoke test
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:55Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/executable_agent-sessions.py`
+
+```text
+120	    if p.startswith(_HOME_STR + "/"):
+121	        return "~" + p[len(_HOME_STR):]
+122	    return p
+123	
+124	
+125	# ---------------------------------------------------------------------------
+126	# SpecStory reverse-lookup: session id -> .specstory/history/*.md path.
+127	#
+128	# Every file written by SpecStory embeds a line of the form
+129	#   <!-- <Provider-display-name> Session <uuid> (YYYY-MM-DD HH:MM:SSZ) -->
+130	# on line 5. The UUID matches the agent's own session id, so we can grep
+131	# the first handful of lines of every .md and build a {sid -> path} cache.
+132	# Details: docs/tools/specstory-internals.md.
+133	# ---------------------------------------------------------------------------
+134	_SS_COMMENT_RE = re.compile(
+135	    r"Session ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+136	    re.IGNORECASE,
+137	)
+138	_SPECSTORY_DEFAULT = HOME / ".local/share/chezmoi/.specstory/history"
+139	_SPECSTORY_MAP: Optional[dict[str, str]] = None
+140	
+141	
+142	def _specstory_history_dirs() -> list[Path]:
+143	    """Directories to scan for `.specstory/history/*.md` files.
+144	
+145	    Override via `SPECSTORY_HISTORY_DIRS` (colon-separated). Default is
+146	    just this repo's checkout, which is where the user's SpecStory is
+147	    currently configured to write.
+148	    """
+149	    raw = os.environ.get("SPECSTORY_HISTORY_DIRS", "")
+150	    if raw:
+151	        out: list[Path] = []
+152	        for p in raw.split(":"):
+153	            p = p.strip()
+154	            if not p:
+155	                continue
+156	            out.append(Path(os.path.expanduser(p)))
+157	        return out
+158	    if _SPECSTORY_DEFAULT.is_dir():
+159	        return [_SPECSTORY_DEFAULT]
+160	    return []
+161	
+162	
+163	def _load_specstory_map() -> dict[str, str]:
+164	    global _SPECSTORY_MAP
+165	    if _SPECSTORY_MAP is not None:
+166	        return _SPECSTORY_MAP
+167	    m: dict[str, str] = dict()
+168	    for d in _specstory_history_dirs():
+169	        try:
+170	            md_files = list(d.glob("*.md"))
+171	        except OSError:
+172	            continue
+173	        for md in md_files:
+174	            try:
+175	                with md.open("r", encoding="utf-8", errors="replace") as f:
+176	                    for i, line in enumerate(f):
+177	                        if i >= 10:
+178	                            break
+179	                        match = _SS_COMMENT_RE.search(line)
+180	                        if match:
+181	                            # First win is fine — duplicates (same sid, two
+182	                            # .md files) are undocumented edge cases.
+183	                            m.setdefault(match.group(1).lower(), str(md))
+184	                            break
+185	            except OSError:
+186	                continue
+187	    _SPECSTORY_MAP = m
+188	    return m
+189	
+190	
+191	def _specstory_path(sid: str) -> str:
+192	    if not sid:
+193	        return ""
+194	    return _load_specstory_map().get(sid.lower(), "")
+195	
+196	
+197	# ---------------------------------------------------------------------------
+198	# Emission buffer. `all` mode collects into _COLLECT so we can sort globally
+199	# by mtime DESC across agents — each handler still sorts locally but the
+200	# block ordering between agents was previously source-order (random-feel).
+201	# ---------------------------------------------------------------------------
+202	_COLLECT: Optional[list] = None
+203	
+204	
+205	def _emit(agent: str, when: str, sid: str, cwd: str, title: str, ts: float = 0.0) -> None:
+206	    title = _truncate(title or "(no title)")
+207	    cwd = _compress_home(cwd or "?")
+208	    ss = _specstory_path(sid)
+209	    if _COLLECT is not None:
+210	        _COLLECT.append((ts, agent, when, sid, cwd, title, ss))
+211	        return
+212	    print(f"{agent}\t{when}\t{sid}\t{cwd}\t{title}\t{ss}")
+213	
+214	
+215	# ---------------------------------------------------------------------------
+216	# OpenCode (SQLite)
+217	# ---------------------------------------------------------------------------
+218	def _opencode() -> Iterator[None]:
+219	    db = HOME / ".local/share/opencode/opencode.db"
+220	    if not db.exists():
+221	        return
+222	    try:
+223	        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+224	        con.row_factory = sqlite3.Row
+225	        cur = con.execute(
+226	            """
+227	            SELECT id, directory, title, time_updated
+228	            FROM session
+229	            WHERE time_archived IS NULL
+230	            ORDER BY time_updated DESC
+231	            """
+232	        )
+233	        for row in cur:
+234	            tu = row["time_updated"] or 0
+235	            ts_s = (tu / 1000.0) if tu > 1e12 else float(tu)
+236	            _emit(
+237	                "[oc]",
+238	                _fmt_when(tu),
+239	                row["id"],
+240	                row["directory"] or "?",
+241	                row["title"] or "",
+242	                ts=ts_s,
+243	            )
+244	        con.close()
+245	    except sqlite3.Error:
+246	        pass
+247	    yield  # generator marker
+248	
+249	
+250	# ---------------------------------------------------------------------------
+251	# Claude Code (JSONL per session under ~/.claude/projects/<flat-cwd>/)
+252	# ---------------------------------------------------------------------------
+253	def _claude_first_user_msg(path: Path) -> tuple[str, str]:
+254	    """Return (cwd, first-non-system-user-message)."""
+255	    cwd = ""
+256	    title = ""
+257	    try:
+258	        with path.open("r", encoding="utf-8", errors="replace") as f:
+259	            for i, line in enumerate(f):
+260	                if i >= MAX_LINES_SCAN:
+261	                    break
+262	                try:
+263	                    d = json.loads(line)
+264	                except json.JSONDecodeError:
+265	                    continue
+266	                if not cwd and d.get("cwd"):
+267	                    cwd = d["cwd"]
+268	                if title:
+269	                    continue
+270	                if d.get("type") != "user":
+271	                    continue
+272	                msg = d.get("message")
+273	                if not isinstance(msg, dict):
+274	                    continue
+275	                content = msg.get("content")
+276	                text = ""
+277	                if isinstance(content, str):
+278	                    text = content
+279	                elif isinstance(content, list):
+280	                    for part in content:
+281	                        if isinstance(part, dict) and part.get("type") == "text":
+282	                            text = part.get("text", "")
+283	                            break
+284	                if text and not _is_system_prepend(text):
+285	                    title = text
+286	    except OSError:
+287	        pass
+288	    return cwd, title
+289	
+290	
+291	def _claude() -> None:
+292	    root = HOME / ".claude/projects"
+293	    if not root.is_dir():
+294	        return
+295	    rows: list[tuple[float, str, str, str, str]] = []
+296	    for jsonl in root.rglob("*.jsonl"):
+297	        # Skip subagent traces — they aren't resumable as standalone sessions.
+298	        if "/subagents/" in str(jsonl):
+299	            continue
+300	        try:
+301	            mtime = jsonl.stat().st_mtime
+302	        except OSError:
+303	            continue
+304	        sid = jsonl.stem  # filename is the sessionId UUID
+305	        cwd, title = _claude_first_user_msg(jsonl)
+306	        rows.append((mtime, sid, cwd, title, _fmt_when(mtime)))
+307	    rows.sort(key=lambda r: r[0], reverse=True)
+308	    for mtime, sid, cwd, title, when in rows:
+309	        _emit("[cc]", when, sid, cwd, title, ts=mtime)
+310	
+311	
+312	# ---------------------------------------------------------------------------
+313	# Codex (~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl)
+314	# ---------------------------------------------------------------------------
+315	def _codex_meta(path: Path) -> tuple[str, str, str]:
+316	    """Return (sid, cwd, title-or-first-user-msg)."""
+317	    sid = ""
+318	    cwd = ""
+319	    thread_name = ""
+320	    title = ""
+321	    try:
+322	        with path.open("r", encoding="utf-8", errors="replace") as f:
+323	            for i, line in enumerate(f):
+324	                if i >= MAX_LINES_SCAN:
+325	                    break
+326	                try:
+327	                    d = json.loads(line)
+328	                except json.JSONDecodeError:
+329	                    continue
+330	                t = d.get("type")
+331	                payload = d.get("payload") or {}
+332	                if t == "session_meta":
+333	                    if not sid:
+334	                        sid = payload.get("id", "")
+335	                    if not cwd:
+336	                        cwd = payload.get("cwd", "")
+337	                    if not thread_name:
+338	                        thread_name = payload.get("thread_name", "") or ""
+339	                elif t == "response_item" and not title:
+340	                    if payload.get("type") == "message" and payload.get("role") == "user":
+341	                        for c in payload.get("content", []):
+342	                            if isinstance(c, dict) and c.get("type") in ("input_text", "text"):
+343	                                txt = c.get("text", "")
+344	                                if txt and not _is_system_prepend(txt):
+345	                                    title = txt
+346	                                    break
+347	    except OSError:
+348	        pass
+349	    return sid, cwd, thread_name or title
+350	
+351	
+352	def _codex() -> None:
+353	    root = HOME / ".codex/sessions"
+354	    if not root.is_dir():
+355	        return
+356	    # Build thread_name lookup from session_index.jsonl (newer Codex writes this).
+357	    index_titles: dict[str, str] = {}
+358	    idx = HOME / ".codex/session_index.jsonl"
+359	    if idx.is_file():
+360	        try:
+361	            with idx.open("r", encoding="utf-8", errors="replace") as f:
+362	                for line in f:
+363	                    try:
+364	                        d = json.loads(line)
+365	                    except json.JSONDecodeError:
+366	                        continue
+367	                    if d.get("id") and d.get("thread_name"):
+368	                        index_titles[d["id"]] = d["thread_name"]
+369	        except OSError:
+370	            pass
+371	
+372	    rows: list[tuple[float, str, str, str, str]] = []
+373	    for jsonl in root.rglob("rollout-*.jsonl"):
+374	        try:
+375	            mtime = jsonl.stat().st_mtime
+376	        except OSError:
+377	            continue
+378	        sid, cwd, title = _codex_meta(jsonl)
+379	        if not sid:
+380	            # Fallback: extract UUID from filename.
+381	            m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", jsonl.name)
+382	            sid = m.group(1) if m else jsonl.stem
+383	        if sid in index_titles:
+384	            title = index_titles[sid]
+385	        rows.append((mtime, sid, cwd, title, _fmt_when(mtime)))
+386	    rows.sort(key=lambda r: r[0], reverse=True)
+387	    for mtime, sid, cwd, title, when in rows:
+388	        _emit("[cx]", when, sid, cwd, title, ts=mtime)
+389	
+390	
+391	# ---------------------------------------------------------------------------
+392	# Cursor (~/.cursor/chats/<wsHash>/<chatId>/store.db)
+393	#
+394	# store.db schema is { blobs(id, data BLOB), meta(key, value) } — chat content
+395	# lives in opaque binary blobs, so we cannot extract titles. We surface
+396	# wsHash/chatId + mtime; resume via `cursor-agent --resume <chatId>`.
+397	# ---------------------------------------------------------------------------
+398	def _cursor_workspace_path(ws_hash: str) -> Optional[str]:
+399	    """Try to map a Cursor wsHash -> workspace folder via VSCode-style state."""
+400	    # Cursor's workspaceStorage is at ~/Library/Application Support/Cursor/User/...
+401	    candidates = [
+402	        HOME / "Library/Application Support/Cursor/User/workspaceStorage" / ws_hash / "workspace.json",
+403	        HOME / ".config/Cursor/User/workspaceStorage" / ws_hash / "workspace.json",
+404	    ]
+405	    for c in candidates:
+406	        if c.is_file():
+407	            try:
+408	                d = json.loads(c.read_text(encoding="utf-8", errors="replace"))
+409	                folder = d.get("folder") or d.get("workspace") or ""
+410	                if folder.startswith("file://"):
+411	                    folder = folder[7:]
+412	                return folder or None
+413	            except (OSError, json.JSONDecodeError):
+414	                continue
+415	    return None
+416	
+417	
+418	def _cursor_chat_meta(db_path: Path) -> tuple[str, str]:
+419	    """Return (chat_name, latest_root_blob_id) by reading meta table."""
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:24:56Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/tmux/executable_menu.sh`
+
+```text
+1	#!/usr/bin/env bash
+2	# Top-level tmux popup menu — invoked by `prefix + Space`.
+3	#
+4	# Why a script (not inline `display-menu` in keybindings.conf):
+5	#   1. tmux's command parser stops at literal `;`, `{`, `}` even inside
+6	#      nested quotes. With ~50 menu rows full of fzf binds and shell
+7	#      one-liners, escaping became fragile and broke silently.
+8	#   2. tmux `display-menu` does not paginate. If the menu is taller than
+9	#      the terminal, the entire popup is suppressed with no error. By
+10	#      generating the menu here we can read $TMUX client_height and
+11	#      auto-trim low-frequency rows when small.
+12	#   3. Submenus are normal `tmux display-menu` invocations from rows;
+13	#      they don't share quoting context with the parent menu.
+14	#
+15	# Submenus live in sibling scripts:
+16	#   menu-layouts.sh, menu-session.sh, menu-sesh.sh,
+17	#   menu-popups.sh, menu-theme.sh, menu-system.sh
+18	#
+19	# See: pitfalls/tmux-display-menu-silent-parse-failure.md
+20	
+21	set -euo pipefail
+22	
+23	H=$(tmux display-message -p '#{client_height}')
+24	DIR=~/.config/tmux
+25	
+26	# Tier 0: ALWAYS shown (highest frequency, ~7 rows + 2 separators)
+27	declare -a tier0=(
+28	  "Last window"  Tab "last-window"
+29	  "Last pane"    P   "last-pane"
+30	  ""             ""  ""
+31	  "Choose win"   w   "choose-tree -Zw"
+32	  "Choose sess"  s   "choose-tree -Zs"
+33	  "Pane #s"      q   "display-panes -d 0"
+34	  ""             ""  ""
+35	  "Sesh picker"  g   "run-shell '$DIR/sesh-picker.sh'"
+36	  "Lazygit"      G   "display-popup -E -w 90% -h 90% -d '#{pane_current_path}' -T ' lazygit ' 'lazygit'"
+37	)
+38	
+39	# Tier 1: shown when height >= 22 (adds new-window/split/zoom)
+40	declare -a tier1=(
+41	  ""             ""  ""
+42	  "New window"   c   "new-window -c '#{pane_current_path}'"
+43	  "Split |"      "|" "split-window -h -c '#{pane_current_path}'"
+44	  "Split -"      "-" "split-window -v -c '#{pane_current_path}'"
+45	  "Zoom"         z   "resize-pane -Z"
+46	)
+47	
+48	# Tier 2: submenus + cheatsheet (always shown if Tier 1 is shown)
+49	declare -a tier2=(
+50	  ""             ""  ""
+51	  "→ Layouts"    L   "run-shell '$DIR/menu-layouts.sh'"
+52	  "→ Session"    S   "run-shell '$DIR/menu-session.sh'"
+53	  "→ Sesh+"      E   "run-shell '$DIR/menu-sesh.sh'"
+54	  "→ Popups"     o   "run-shell '$DIR/menu-popups.sh'"
+55	  "→ Theme"      T   "run-shell '$DIR/menu-theme.sh'"
+56	  "→ System"     Y   "run-shell '$DIR/menu-system.sh'"
+57	  ""             ""  ""
+58	  "Cheatsheet"   "?" "display-popup -E -w 80% -h 80% -T ' tmux cheatsheet ' 'glow -p $DIR/cheatsheet.md 2>/dev/null || less $DIR/cheatsheet.md'"
+59	  "Search keys"  "/" "run-shell -b ~/.tmux/plugins/tmux-fzf/scripts/keybinding.sh"
+60	)
+61	
+62	rows=("${tier0[@]}")
+63	if [ "$H" -ge 22 ]; then
+64	  rows+=("${tier1[@]}" "${tier2[@]}")
+65	elif [ "$H" -ge 14 ]; then
+66	  rows+=("${tier2[@]}")
+67	fi
+68	
+69	exec tmux display-menu -T "#[align=centre,bold]tmux (h=$H)" -x R -y P "${rows[@]}"
+70
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:06Z)**_
+
+Let me read the rest of agent-sessions.py to find the dispatch entry and tail patterns I'll extend, plus check key configs I haven't loaded yet.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:09Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/executable_agent-sessions.py`
+
+```text
+760	    db = HOME / ".local/share/opencode/opencode.db"
+761	    if not db.exists():
+762	        print("(~/.local/share/opencode/opencode.db not found)")
+763	        return
+764	    print(f"# OpenCode session  `{sid}`")
+765	    print()
+766	    print(f"*db*: `{db}`")
+767	    print()
+768	    print("---")
+769	    print()
+770	    try:
+771	        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+772	        cur = con.execute(
+773	            """
+774	            SELECT m.data, p.data, p.time_created
+775	            FROM part p JOIN message m ON p.message_id = m.id
+776	            WHERE p.session_id = ?
+777	              AND json_extract(p.data, '$.type') = 'text'
+778	            ORDER BY p.time_created ASC
+779	            """,
+780	            (sid,),
+781	        )
+782	        had_row = False
+783	        for m_data, p_data, tc in cur:
+784	            had_row = True
+785	            try:
+786	                m = json.loads(m_data)
+787	            except (json.JSONDecodeError, TypeError):
+788	                m = dict()
+789	            try:
+790	                p = json.loads(p_data)
+791	            except (json.JSONDecodeError, TypeError):
+792	                p = dict()
+793	            role = m.get("role")
+794	            if role not in ("user", "assistant"):
+795	                continue
+796	            text = p.get("text") or ""
+797	            if not text:
+798	                continue
+799	            if role == "user" and _is_system_prepend(text):
+800	                continue
+801	            ts = _fmt_when(tc) if tc else ""
+802	            _render_turn("User" if role == "user" else "Agent", text, ts=ts)
+803	        con.close()
+804	        if not had_row:
+805	            print(f"(no parts found for session `{sid}`)")
+806	    except sqlite3.Error as e:
+807	        print(f"(opencode SQL error: {e})")
+808	
+809	
+810	def _transcript(tag: str, sid: str) -> None:
+811	    # Prefer SpecStory's pre-rendered markdown when available — matches what
+812	    # the user sees on disk and handles providers we can't re-render locally.
+813	    ss = _specstory_path(sid)
+814	    if ss:
+815	        try:
+816	            sys.stdout.write(Path(ss).read_text(encoding="utf-8", errors="replace"))
+817	            return
+818	        except OSError:
+819	            # Fall through to raw-source rendering.
+820	            pass
+821	    if tag in ("cc", "[cc]"):
+822	        _transcript_claude(sid)
+823	    elif tag in ("cx", "[cx]"):
+824	        _transcript_codex(sid)
+825	    elif tag in ("oc", "[oc]"):
+826	        _transcript_opencode(sid)
+827	    else:
+828	        print(f"# session `{sid}`")
+829	        print()
+830	        print(
+831	            f"_Transcript rendering is not yet supported for agent tag `{tag}`_"
+832	            " — see the legacy preview cycle (`Ctrl+F`) for first-5 user"
+833	            " messages, or `Alt+E` to open the raw source."
+834	        )
+835	
+836	
+837	# ---------------------------------------------------------------------------
+838	# Dispatcher
+839	# ---------------------------------------------------------------------------
+840	def main() -> int:
+841	    mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+842	
+843	    if mode == "transcript":
+844	        if len(sys.argv) < 4:
+845	            print(
+846	                "usage: agent-sessions.py transcript <cc|cx|oc> <sid>",
+847	                file=sys.stderr,
+848	            )
+849	            return 2
+850	        _transcript(sys.argv[2], sys.argv[3])
+851	        return 0
+852	
+853	    handlers = {
+854	        "opencode": [_opencode],
+855	        "claude": [_claude],
+856	        "codex": [_codex],
+857	        "cursor": [_cursor],
+858	        "cursor-ide": [_cursor_ide],
+859	        "all": [_opencode, _claude, _codex, _cursor, _cursor_ide],
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get exact line count for agent-sessions.py
+
+`wc -l /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py`
+
+```text
+     892 /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Survey devtools ansible role for cargo install pattern
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/ 2>/dev/null; echo "---"; grep -n "cargo\|rust\|recon\|tmux" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml 2>/dev/null | head -40`
+
+```text
+ main.yml
+---
+3:# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
+34:      - tmux
+1884:# --- tmux ---
+1885:# The dotfiles tmux config uses features (display-menu positioning clamping,
+1886:# popup-style options, etc.) that require tmux >= 3.3. Ubuntu 22.04 apt ships
+1890:#   3. upgrade via Linuxbrew (preferred) or tmux-appimage (user-level) if too old.
+1891:- name: Install tmux (Debian/Ubuntu, apt baseline)
+1897:      # Baseline tmux; may be upgraded below via Linuxbrew/tmux-appimage when
+1898:      # the apt version is older than tmux_min_version (3.3).
+1899:      - tmux
+1900:      # Extended terminfo database: provides entries for tmux-256color,
+1902:      # Without this, `tmux attach` from a fresh shell where $TERM points at
+1908:- name: Detect current tmux version (Debian/Ubuntu)
+1911:    if command -v tmux >/dev/null 2>&1; then
+1912:      tmux -V | awk '{print $2}' | sed 's/[^0-9.]//g'
+1918:  register: tmux_version_probe
+1922:- name: Decide whether to upgrade tmux (Debian/Ubuntu)
+1925:    tmux_min_version: "3.3"
+1926:    tmux_current_version: "{{ tmux_version_probe.stdout | default('') | trim }}"
+1927:    tmux_upgrade_needed: >-
+1929:        (tmux_version_probe.stdout | default('') | trim == '')
+1930:        or (tmux_version_probe.stdout | default('') | trim is version('3.3', '<'))
+1933:- name: Detect Linuxbrew for tmux upgrade (Debian/Ubuntu)
+1936:    - tmux_upgrade_needed | bool
+1940:  register: tmux_brew_probe
+1943:- name: Upgrade tmux via Linuxbrew (Debian/Ubuntu, tmux < 3.3, brew available)
+1946:    - tmux_upgrade_needed | bool
+1947:    - tmux_brew_probe is defined
+1948:    - tmux_brew_probe.stdout | default('') | trim != ''
+1950:    name: tmux
+1953:- name: Upgrade tmux via tmux-appimage (Debian/Ubuntu, user-level, x86_64, no brew)
+1956:    - tmux_upgrade_needed | bool
+1958:    - (tmux_brew_probe is not defined) or (tmux_brew_probe.stdout | default('') | trim == '')
+1960:    - name: Ensure ~/.local/bin exists (tmux-appimage)
+1966:    - name: Ensure tmux-appimage install dir exists
+1968:        path: "{{ ansible_facts['env']['HOME'] }}/.local/share/tmux-appimage"
+1972:    - name: Get latest tmux-appimage release
+1974:        url: https://api.github.com/repos/nelsonenzo/tmux-appimage/releases/latest
+1976:      register: tmux_appimage_release
+1978:    - name: Set tmux-appimage download URL
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:12Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/agent-sessions.toml`
+
+```text
+80	  #
+81	  # IMPORTANT: do NOT embed Python/awk/JSON literals inline here — any bare
+82	  # `{...}` in this string (outside TV's own `{split:...}`/`{strip_ansi}`
+83	  # placeholders) silently breaks ALL placeholder substitution in the same
+84	  # command. See pitfalls/tv-channel-bare-braces-break-substitution.md.
+85	  # Keep the rich logic in the helper; this block is just shell glue.
+86	  '''
+87	  agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'; ss='{split:\t:5}'
+88	  printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
+89	  printf '\033[2mcwd:\033[0m       %s\n' "$dir"
+90	  if [ -n "$ss" ]; then
+91	    printf '\033[2mspecstory:\033[0m %s\n' "$ss"
+92	  fi
+93	  case "$agent" in
+94	    "[oc]")
+95	      sqlite3 "$HOME/.local/share/opencode/opencode.db" \
+96	        "SELECT 'title=    ' || title || char(10) || 'version=  ' || version FROM session WHERE id = '$sid';" 2>/dev/null
+97	      ;;
+98	    "[cc]")
+99	      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+100	      [ -n "$f" ] && printf 'file:      %s\n' "$f"
+101	      ;;
+102	    "[cx]")
+103	      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}*.jsonl" 2>/dev/null | head -1)
+104	      [ -n "$f" ] && printf 'file:      %s\n' "$f"
+105	      ;;
+106	  esac
+107	  printf '\n'
+108	  case "$agent" in
+109	    "[cc]") tag=cc ;;
+110	    "[cx]") tag=cx ;;
+111	    "[oc]") tag=oc ;;
+112	    *) tag="" ;;
+113	  esac
+114	  if [ -z "$tag" ]; then
+115	    printf '\033[2m(transcript rendering deferred for %s — press Ctrl+F to cycle to the legacy first-5 view.)\033[0m\n' "$agent"
+116	    exit 0
+117	  fi
+118	  if command -v glow >/dev/null 2>&1; then
+119	    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+120	      | glow --style auto - 2>/dev/null \
+121	      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+122	  else
+123	    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+124	      | bat -l md --color=always --plain --paging=never 2>/dev/null \
+125	      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+126	  fi
+127	  ''',
+128	  # Preview 2 (legacy): metadata + first 5 user messages — kept because
+129	  # content-searching sessions by "did I talk about X?" is faster here
+130	  # than scrolling a full transcript.
+131	  '''
+132	  agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'; when='{split:\t:1}'
+133	  printf '\033[1m%s\033[0m  %s\n' "$sid" "$when"
+134	  printf '\033[2mcwd:\033[0m %s\n\n' "$dir"
+135	  case "$agent" in
+136	    "[oc]")
+137	      sqlite3 "$HOME/.local/share/opencode/opencode.db" \
+138	        "SELECT 'title=' || title || char(10) || 'version=' || version || char(10) || 'project_id=' || project_id || char(10) || coalesce('share=' || share_url, '') FROM session WHERE id = '$sid';" 2>/dev/null
+139	      printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+140	      sqlite3 "$HOME/.local/share/opencode/opencode.db" "
+141	        SELECT '  ' || substr(replace(replace(json_extract(p.data, '\$.text'), char(10), ' '), '  ', ' '), 1, 280)
+142	        FROM part p JOIN message m ON p.message_id = m.id
+143	        WHERE p.session_id = '$sid'
+144	          AND m.data LIKE '%\"role\":\"user\"%'
+145	          AND p.data LIKE '%\"type\":\"text\"%'
+146	          AND p.data NOT LIKE '%\"synthetic\":true%'
+147	        ORDER BY p.time_created ASC
+148	        LIMIT 5;" 2>/dev/null
+149	      ;;
+150	    "[cc]")
+151	      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+152	      if [ -n "$f" ]; then
+153	        printf 'file: %s\n\n' "$f"
+154	        printf '\033[1mFirst 5 user messages:\033[0m\n'
+155	        head -200 "$f" | python3 -c "
+156	import sys, json, re
+157	n=0
+158	for line in sys.stdin:
+159	  try: d=json.loads(line)
+160	  except: continue
+161	  if d.get('type') != 'user': continue
+162	  m=d.get('message') or dict()
+163	  c=m.get('content')
+164	  txt=''
+165	  if isinstance(c,str): txt=c
+166	  elif isinstance(c,list):
+167	    for p in c:
+168	      if isinstance(p,dict) and p.get('type')=='text': txt=p.get('text',''); break
+169	  if not txt or txt.lstrip().startswith(('<','#')): continue
+170	  txt=re.sub(r'\s+',' ',txt).strip()[:300]
+171	  print('  ' + txt)
+172	  n+=1
+173	  if n>=5: break
+174	" 2>/dev/null
+175	      else
+176	        echo "(jsonl not found for $sid)"
+177	      fi
+178	      ;;
+179	    "[cx]")
+180	      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1)
+181	      if [ -n "$f" ]; then
+182	        printf 'file: %s\n\n' "$f"
+183	        printf '\033[1mFirst 5 user messages:\033[0m\n'
+184	        head -200 "$f" | python3 -c "
+185	import sys, json, re
+186	n=0
+187	for line in sys.stdin:
+188	  try: d=json.loads(line)
+189	  except: continue
+190	  if d.get('type')!='response_item': continue
+191	  p=d.get('payload') or dict()
+192	  if p.get('type')!='message' or p.get('role')!='user': continue
+193	  for c in p.get('content',[]):
+194	    if isinstance(c,dict) and c.get('type') in ('input_text','text'):
+195	      txt=c.get('text','')
+196	      if not txt or txt.lstrip().startswith('<'): continue
+197	      txt=re.sub(r'\s+',' ',txt).strip()[:300]
+198	      print('  ' + txt)
+199	      n+=1
+200	      break
+201	  if n>=5: break
+202	" 2>/dev/null
+203	      else
+204	        echo "(rollout not found for $sid)"
+205	      fi
+206	      ;;
+207	    "[cu]")
+208	      db=$(find "$HOME/.cursor/chats" -path "*/${sid}/store.db" 2>/dev/null | head -1)
+209	      if [ -n "$db" ]; then
+210	        printf 'db: %s\n\n' "$db"
+211	        # meta value is hex-encoded JSON; decode and pretty-print
+212	        sqlite3 "$db" "SELECT value FROM meta LIMIT 1;" 2>/dev/null \
+213	          | python3 -c "
+214	import sys, json
+215	raw = sys.stdin.read().strip()
+216	try: text = bytes.fromhex(raw).decode('utf-8','replace')
+217	except ValueError: text = raw
+218	try:
+219	    d = json.loads(text)
+220	    for k in ('name','mode','lastUsedModel','agentId','createdAt','latestRootBlobId'):
+221	        if k in d:
+222	            v = d[k]
+223	            print('  ' + k + ': ' + str(v))
+224	except Exception:
+225	    print(text[:500])
+226	" 2>/dev/null
+227	        printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+228	        # Read blobs directly via python sqlite3 (avoids CLI binary/newline issues)
+229	        python3 -c "
+230	import sqlite3, json, re, sys
+231	con = sqlite3.connect('file:$db?mode=ro', uri=True)
+232	n = 0
+233	for (data,) in con.execute('SELECT data FROM blobs'):
+234	  if isinstance(data, (bytes, bytearray)):
+235	    try: text = bytes(data).decode('utf-8','replace')
+236	    except Exception: continue
+237	  else:
+238	    text = str(data)
+239	  try: d = json.loads(text)
+240	  except Exception: continue
+241	  if not isinstance(d, dict): continue
+242	  if d.get('role') != 'user': continue
+243	  c = d.get('content')
+244	  txt = ''
+245	  if isinstance(c, str): txt = c
+246	  elif isinstance(c, list):
+247	    for p in c:
+248	      if isinstance(p, dict) and p.get('type') == 'text':
+249	        txt = p.get('text',''); break
+250	  if not txt: continue
+251	  s = txt.lstrip()
+252	  if s.startswith(('<user_info>','<system_reminder>','<attached_files>','<environment_context>','<local-command-','<system-reminder>','# AGENTS','Caveat:')):
+253	    continue
+254	  txt = re.sub(r'\s+',' ', txt).strip()[:280]
+255	  print('  ' + txt)
+256	  n += 1
+257	  if n >= 5: break
+258	con.close()
+259	if n == 0:
+260	  print('  (no user-role blobs found; chat may use a different schema)')
+261	" 2>/dev/null
+262	        printf '\n'
+263	        sqlite3 "$db" "SELECT count(*) || ' blob(s)' FROM blobs;" 2>/dev/null
+264	      else
+265	        echo "(store.db not found for $sid)"
+266	      fi
+267	      ;;
+268	    "[ci]")
+269	      gdb="$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+270	      [ -f "$gdb" ] || gdb="$HOME/.config/Cursor/User/globalStorage/state.vscdb"
+271	      if [ ! -f "$gdb" ]; then
+272	        echo "(Cursor IDE state.vscdb not found)"
+273	      else
+274	        printf 'db: %s\n\n' "$gdb"
+275	        # Composer metadata
+276	        sqlite3 "$gdb" "SELECT value FROM cursorDiskKV WHERE key='composerData:$sid';" 2>/dev/null \
+277	          | python3 -c "
+278	import sys, json
+279	raw = sys.stdin.read().strip()
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/agent-sessions.toml`
+
+```text
+370	
+371	[keybindings]
+372	enter = "actions:print_resume"
+373	alt-t = "actions:resume"
+374	ctrl-y = "actions:copy_id"
+375	alt-p = "actions:copy_dir"
+376	alt-r = "actions:copy_resume"
+377	alt-s = "actions:copy_specstory"
+378	alt-e = "actions:edit_jsonl"
+379	
+380	# ---------------------------------------------------------------------------
+381	# Helper: assemble the agent-specific resume invocation.
+382	# Each action sources `_resume_cmd` to keep the per-agent mapping in one place.
+383	# ---------------------------------------------------------------------------
+384	[actions.print_resume]
+385	description = "Print 'cd <dir> && <agent> --resume <id>' to stdout"
+386	command = '''
+387	agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+388	case "$agent" in
+389	  "[oc]") cmd="opencode --session $sid" ;;
+390	  "[cc]") cmd="claude --resume $sid" ;;
+391	  "[cx]") cmd="codex resume $sid" ;;
+392	  "[cu]") cmd="cursor-agent --resume $sid" ;;
+393	  "[ci]") cmd="cursor   # IDE composer $sid (open from sidebar)" ;;
+394	esac
+395	case "$dir" in
+396	  /*) printf 'cd %q && %s\n' "$dir" "$cmd" ;;
+397	  vscode-remote://*) printf '%s   # remote: %s\n' "$cmd" "$dir" ;;
+398	  *)  printf '%s   # cwd: %s\n' "$cmd" "$dir" ;;
+399	esac
+400	'''
+401	mode = "execute"
+402	
+403	[actions.resume]
+404	description = "cd to session dir and resume agent (in current terminal)"
+405	command = '''
+406	agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+407	case "$dir" in /*) cd "$dir" 2>/dev/null || { echo "cd failed: $dir"; echo "[Press Enter]"; read -r _; exit 1; } ;; esac
+408	case "$agent" in
+409	  "[oc]") exec opencode --session "$sid" ;;
+410	  "[cc]") exec claude --resume "$sid" ;;
+411	  "[cx]") exec codex resume "$sid" ;;
+412	  "[cu]") exec cursor-agent --resume "$sid" ;;
+413	  "[ci]")
+414	    case "$dir" in
+415	      /*) exec cursor "$dir" ;;
+416	      vscode-remote://*) echo "Remote workspace: $dir"; echo "Composer ID: $sid"; echo "Open Cursor and pick this chat from the sidebar."; echo "[Press Enter]"; read -r _; exit 0 ;;
+417	      *) echo "Unknown workspace: $dir"; echo "Composer ID: $sid"; echo "[Press Enter]"; read -r _; exit 0 ;;
+418	    esac
+419	    ;;
+420	esac
+421	'''
+422	mode = "execute"
+423	
+424	[actions.copy_id]
+425	description = "Copy session ID to clipboard"
+426	command = '''
+427	d='{split:\t:2}'
+428	[ -z "$d" ] && exit 0
+429	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+430	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+431	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+432	else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+433	fi
+434	'''
+435	mode = "fork"
+436	
+437	[actions.copy_dir]
+438	description = "Copy directory path to clipboard"
+439	command = '''
+440	d='{split:\t:3}'
+441	[ -z "$d" ] && exit 0
+442	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+443	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+444	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+445	else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+446	fi
+447	'''
+448	mode = "fork"
+449	
+450	[actions.copy_specstory]
+451	description = "Copy .specstory/history/*.md path to clipboard (SpecStory reverse-lookup)"
+452	command = '''
+453	d='{split:\t:5}'
+454	[ -z "$d" ] && exit 0
+455	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+456	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+457	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+458	else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+459	fi
+460	'''
+461	mode = "fork"
+462	
+463	[actions.copy_resume]
+464	description = "Copy 'cd <dir> && <agent> --resume <id>' to clipboard"
+465	command = '''
+466	agent='{split:\t:0}'; sid='{split:\t:2}'; dir='{split:\t:3}'
+467	case "$agent" in
+468	  "[oc]") cmd="opencode --session $sid" ;;
+469	  "[cc]") cmd="claude --resume $sid" ;;
+470	  "[cx]") cmd="codex resume $sid" ;;
+471	  "[cu]") cmd="cursor-agent --resume $sid" ;;
+472	  "[ci]") cmd="cursor $dir" ;;
+473	esac
+474	case "$dir" in
+475	  /*) [ "$agent" = "[ci]" ] && line="$cmd" || line=$(printf 'cd %q && %s' "$dir" "$cmd") ;;
+476	  *)  line="$cmd" ;;
+477	esac
+478	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$line" | pbcopy
+479	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$line" | wl-copy
+480	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$line" | xclip -selection clipboard
+481	else printf '\033]52;c;%s\007' "$(printf '%s' "$line" | base64 | tr -d '\n')" > /dev/tty
+482	fi
+483	'''
+484	mode = "fork"
+485	
+486	[actions.edit_jsonl]
+487	description = "Open raw session file in $EDITOR (claude/codex only)"
+488	command = '''
+489	agent='{split:\t:0}'; sid='{split:\t:2}'
+490	case "$agent" in
+491	  "[cc]") f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1) ;;
+492	  "[cx]") f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1) ;;
+493	  "[oc]") echo "OpenCode sessions live in SQLite — use 'opencode export $sid' instead."; echo "[Press Enter]"; read -r _; exit 0 ;;
+494	  "[cu]") echo "Cursor sessions live in opaque BLOBs — no plaintext to edit."; echo "[Press Enter]"; read -r _; exit 0 ;;
+495	  "[ci]") echo "Cursor IDE chats live in state.vscdb (cursorDiskKV table) — no plaintext to edit."; echo "Composer ID: $sid"; echo "[Press Enter]"; read -r _; exit 0 ;;
+496	esac
+497	if [ -z "$f" ] || [ ! -f "$f" ]; then
+498	  echo "Session file not found for $sid"; echo "[Press Enter]"; read -r _; exit 0
+499	fi
+500	"${EDITOR:-vi}" "$f"
+501	'''
+502	mode = "execute"
+503
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:21Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/executable_agent-sessions.py`
+
+```text
+855	        "claude": [_claude],
+856	        "codex": [_codex],
+857	        "cursor": [_cursor],
+858	        "cursor-ide": [_cursor_ide],
+859	        "all": [_opencode, _claude, _codex, _cursor, _cursor_ide],
+860	    }
+861	    if mode not in handlers:
+862	        print(f"unknown mode: {mode}", file=sys.stderr)
+863	        return 2
+864	
+865	    global _COLLECT
+866	    collect = mode == "all"
+867	    if collect:
+868	        _COLLECT = []
+869	
+870	    for fn in handlers[mode]:
+871	        try:
+872	            result = fn()
+873	            # _opencode is a generator; consume it.
+874	            if result is not None:
+875	                for _ in result:
+876	                    pass
+877	        except Exception as e:
+878	            # Never crash the channel.
+879	            print(f"(error in {fn.__name__}: {e})", file=sys.stderr)
+880	
+881	    if collect and _COLLECT is not None:
+882	        buffer = _COLLECT
+883	        _COLLECT = None  # restore normal emit path for any stragglers
+884	        buffer.sort(key=lambda r: r[0], reverse=True)
+885	        for _ts, agent, when, sid, cwd, title, ss in buffer:
+886	            print(f"{agent}\t{when}\t{sid}\t{cwd}\t{title}\t{ss}")
+887	
+888	    return 0
+889	
+890	
+891	if __name__ == "__main__":
+892	    sys.exit(main())
+893
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find existing cargo install task pattern in devtools
+
+`grep -n "cargo install\|cargo_bin\|cargo:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml | head -20`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find any cargo install patterns or rustup references in ansible
+
+`grep -rn "cargo install\|rustup\|cargo:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/ 2>/dev/null | head -30; echo "---"; grep -n "tmux\|bat\|btop" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/llm_tools/tasks/main.yml:84:  ansible.builtin.command: cargo install modelsdev
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:230:  # Search standard PATH dirs INCLUDING ~/.cargo/bin (cargo install target)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:347:      cargo install tree-sitter-cli
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:350:      echo "Install manually: cargo install tree-sitter-cli"
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml:29:- name: Install Cargo CLI tools via cargo install
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml:30:  ansible.builtin.command: cargo install {{ item.name }}
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml:55:  ansible.builtin.command: cargo install pueue --locked
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/tasks/main.yml:88:  ansible.builtin.command: cargo install alacritty
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/defaults/main.yml:2:# Cargo CLI tools installed via cargo install
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/defaults/main.yml:23:#   rustup install nightly
+---
+3:# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
+19:      - bat
+20:      - bats-core
+34:      - tmux
+38:      - btop
+349:# --- bat ---
+350:- name: Install bat (Debian/Ubuntu)
+355:    name: bat
+358:- name: Create bat symlink on Debian/Ubuntu
+363:    src: /usr/bin/batcat
+364:    dest: /usr/bin/bat
+368:# --- bat (user-level fallback) ---
+369:- name: Re-check if bat is installed
+371:  ansible.builtin.shell: command -v bat
+372:  register: bat_recheck
+376:- name: Install bat from GitHub releases (user-level, no sudo)
+379:    - bat_recheck.rc != 0
+381:    - name: Ensure ~/.local/bin exists (bat)
+387:    - name: Get latest bat release
+389:        url: https://api.github.com/repos/sharkdp/bat/releases/latest
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find rust install path
+
+`grep -rn "rustup\|rust-toolchain\|cargo install" /Users/daviddwlee84/.local/share/chezmoi/Brewfile /Users/daviddwlee84/.local/share/chezmoi/scripts/install_*.sh 2>/dev/null | head -20; echo "---"; grep -rn "rustup\|cargo " /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/ 2>/dev/null | head -10`
+
+```text
+---
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl:82:# (community.general.homebrew, mise, rustup, gem) inherit them. Without
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl:91:export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl:92:export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:38Z)**_
+
+Excellent — the right place for recon is `dot_ansible/roles/rust_cargo_tools/`, which has a dedicated cargo-install pattern. Let me examine that.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:39Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/rust_cargo_tools/tasks/main.yml`
+
+```text
+1	---
+2	# Cargo CLI tools installation
+3	# Rust is installed via mise
+4	
+5	# =============================================================================
+6	# Ensure Rust is installed via mise
+7	# =============================================================================
+8	
+9	- name: Check for user-installed mise
+10	  ansible.builtin.stat:
+11	    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise"
+12	  register: mise_user_install
+13	
+14	- name: Set mise binary path
+15	  ansible.builtin.set_fact:
+16	    mise_bin: "{{ mise_user_install.stat.exists | ternary(ansible_facts['env']['HOME'] + '/.local/bin/mise', '/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' else '/usr/local/bin/mise') }}"
+17	
+18	- name: Install Rust via mise
+19	  ansible.builtin.command: "{{ mise_bin }} install rust@latest"
+20	  args:
+21	    creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/rust"
+22	  environment:
+23	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+24	
+25	# =============================================================================
+26	# Install cargo tools (all platforms)
+27	# =============================================================================
+28	
+29	- name: Install Cargo CLI tools via cargo install
+30	  ansible.builtin.command: cargo install {{ item.name }}
+31	  args:
+32	    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/{{ item.binary }}"
+33	  loop: "{{ cargo_tools }}"
+34	  loop_control:
+35	    label: "{{ item.name }}"
+36	  environment:
+37	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+38	
+39	# =============================================================================
+40	# Pueue - macOS (via Homebrew)
+41	# =============================================================================
+42	
+43	- name: Install pueue via Homebrew (macOS)
+44	  when: ansible_facts["os_family"] == "Darwin"
+45	  community.general.homebrew:
+46	    name: pueue
+47	    state: present
+48	
+49	# =============================================================================
+50	# Pueue - Linux (via cargo + systemd)
+51	# =============================================================================
+52	
+53	- name: Install pueue via cargo (Debian/Ubuntu)
+54	  when: ansible_facts["os_family"] == "Debian"
+55	  ansible.builtin.command: cargo install pueue --locked
+56	  args:
+57	    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/pueue"
+58	  environment:
+59	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+60	
+61	# =============================================================================
+62	# Pueue version checks (warn by default, optional strict enforcement)
+63	# =============================================================================
+64	
+65	- name: Check installed pueue version
+66	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+67	  ansible.builtin.shell: pueue --version 2>/dev/null | awk '{print $2}'
+68	  args:
+69	    executable: /bin/bash
+70	  register: pueue_version_raw
+71	  changed_when: false
+72	  failed_when: false
+73	
+74	- name: Check installed pueued version
+75	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+76	  ansible.builtin.shell: pueued --version 2>/dev/null | awk '{print $2}'
+77	  args:
+78	    executable: /bin/bash
+79	  register: pueued_version_raw
+80	  changed_when: false
+81	  failed_when: false
+82	
+83	- name: Parse installed pueue versions
+84	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+85	  ansible.builtin.set_fact:
+86	    pueue_version_installed: "{{ (pueue_version_raw.stdout | trim | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+')) | default('0.0.0', true) }}"
+87	    pueued_version_installed: "{{ (pueued_version_raw.stdout | trim | regex_search('[0-9]+\\.[0-9]+\\.[0-9]+')) | default('0.0.0', true) }}"
+88	
+89	- name: Display installed pueue versions
+90	  when: ansible_facts["os_family"] in ["Darwin", "Debian"]
+91	  ansible.builtin.debug:
+92	    msg: "Installed pueue versions: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }} (required: >= {{ pueue_min_version }}, enforce={{ pueue_version_enforce | bool }})"
+93	
+94	- name: Warn if pueue versions are below minimum (non-enforcing mode)
+95	  when:
+96	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+97	    - not (pueue_version_enforce | bool)
+98	    - pueue_version_installed is version(pueue_min_version, '<') or pueued_version_installed is version(pueue_min_version, '<')
+99	  ansible.builtin.debug:
+100	    msg: "WARNING: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }} are below required {{ pueue_min_version }}. Set pueue_version_enforce=true to fail on this condition."
+101	
+102	- name: Enforce minimum pueue versions
+103	  when:
+104	    - ansible_facts["os_family"] in ["Darwin", "Debian"]
+105	    - pueue_version_enforce | bool
+106	  ansible.builtin.assert:
+107	    that:
+108	      - pueue_version_installed is version(pueue_min_version, '>=')
+109	      - pueued_version_installed is version(pueue_min_version, '>=')
+110	    fail_msg: "pueue version requirement failed: required >= {{ pueue_min_version }}, found pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }}"
+111	    success_msg: "pueue version requirement satisfied: pueue={{ pueue_version_installed }}, pueued={{ pueued_version_installed }}"
+112	
+113	- name: Create systemd user directory
+114	  when: ansible_facts["os_family"] == "Debian"
+115	  ansible.builtin.file:
+116	    path: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user"
+117	    state: directory
+118	    mode: '0755'
+119	
+120	- name: Install pueued systemd user service
+121	  when: ansible_facts["os_family"] == "Debian"
+122	  ansible.builtin.copy:
+123	    dest: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user/pueued.service"
+124	    mode: '0644'
+125	    content: |
+126	      [Unit]
+127	      Description=Pueue Daemon - CLI Process Queue
+128	      Documentation=https://github.com/Nukesor/pueue
+129	
+130	      [Service]
+131	      ExecStart=%h/.cargo/bin/pueued --verbose
+132	      Restart=on-failure
+133	      RestartSec=5
+134	
+135	      [Install]
+136	      WantedBy=default.target
+137	
+138	- name: Enable and start pueued service
+139	  when: ansible_facts["os_family"] == "Debian"
+140	  ansible.builtin.systemd:
+141	    name: pueued
+142	    scope: user
+143	    enabled: true
+144	    state: started
+145	    daemon_reload: true
+146	  ignore_errors: true  # May fail in containers without systemd
+147
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:39Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/rust_cargo_tools/defaults/main.yml`
+
+```text
+1	---
+2	# Cargo CLI tools installed via cargo install
+3	# pueue handled separately per platform
+4	# Add tools here as needed, e.g.:
+5	#   - name: ripgrep
+6	#     binary: rg
+7	
+8	cargo_tools: []
+9	
+10	# Minimum supported pueue version for pqsum-compatible JSON structure.
+11	pueue_min_version: "4.0.0"
+12	
+13	# If true, fail ansible run when pueue/pueued are below pueue_min_version.
+14	pueue_version_enforce: false
+15	
+16	# =============================================================================
+17	# Optional tools (not in cargo_tools list, install manually if needed)
+18	# =============================================================================
+19	#
+20	# clashctl - Clash proxy controller CLI
+21	# Requires nightly toolchain and takes a long time to compile (~10+ mins)
+22	# Install manually:
+23	#   rustup install nightly
+24	#   cargo +nightly install --git https://github.com/George-Miao/clashctl.git
+25
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:50Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:55Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="WebFetch"><details>
+<summary>Tool use: **WebFetch**</summary>
+ `https://crates.io/api/v1/crates/recon`
+
+```text
+Yes, there is a Rust crate named "recon" on crates.io.
+
+**Latest Version:** 0.1.0
+
+**Description:** The crate is described as "A library to help for tasks as a precursor to Vulnerability Assessment and Penetration Testing."
+
+**Note:** This is a different "recon" project—not related to gavraz's tmux Claude dashboard. It's a security-focused reconnaissance library published by srikwit in July 2019, licensed under MIT.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:25:53Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/agent-sessions.toml`
+
+```text
+280	if not raw:
+281	  print('  (composer not found)')
+282	else:
+283	  try:
+284	    d = json.loads(raw)
+285	    for k in ('name','subtitle','unifiedMode','forceMode','status','contextUsagePercent'):
+286	      if k in d and d[k] not in (None, ''):
+287	        print('  ' + k + ': ' + str(d[k])[:200])
+288	    heads = d.get('fullConversationHeadersOnly') or list()
+289	    print('  bubbles: ' + str(len(heads)) + ' (user: ' + str(sum(1 for h in heads if h.get('type')==1)) + ', assistant: ' + str(sum(1 for h in heads if h.get('type')==2)) + ')')
+290	  except Exception as e:
+291	    print('  (parse error: ' + str(e) + ')')
+292	" 2>/dev/null
+293	        printf '\n\033[1mFirst 5 user messages:\033[0m\n'
+294	        python3 -c "
+295	import sqlite3, json, re
+296	con = sqlite3.connect('file:$gdb?mode=ro', uri=True)
+297	row = con.execute(\"SELECT value FROM cursorDiskKV WHERE key='composerData:$sid'\").fetchone()
+298	if not row or not row[0]:
+299	  print('  (composer not found)')
+300	else:
+301	  d = json.loads(row[0])
+302	  heads = d.get('fullConversationHeadersOnly') or list()
+303	  n = 0
+304	  for h in heads:
+305	    if h.get('type') != 1: continue
+306	    bid = h.get('bubbleId')
+307	    if not bid: continue
+308	    brow = con.execute('SELECT value FROM cursorDiskKV WHERE key = ?', ('bubbleId:$sid:' + bid,)).fetchone()
+309	    if not brow or not brow[0]: continue
+310	    try: bd = json.loads(brow[0])
+311	    except Exception: continue
+312	    txt = bd.get('text') or ''
+313	    if not txt: continue
+314	    s = txt.lstrip()
+315	    if s.startswith(('<user_info>','<system_reminder>','<attached_files>','<environment_context>','<local-command-','<system-reminder>','# AGENTS','Caveat:')):
+316	      continue
+317	    txt = re.sub(r'\s+',' ', txt).strip()[:280]
+318	    print('  ' + txt)
+319	    n += 1
+320	    if n >= 5: break
+321	  if n == 0:
+322	    print('  (no user-role bubbles found)')
+323	con.close()
+324	" 2>/dev/null
+325	      fi
+326	      ;;
+327	  esac
+328	  ''',
+329	  # Preview 2: raw record dump.
+330	  '''
+331	  agent='{split:\t:0}'; sid='{split:\t:2}'
+332	  case "$agent" in
+333	    "[oc]")
+334	      sqlite3 -header -column "$HOME/.local/share/opencode/opencode.db" \
+335	        "SELECT id, title, directory, version, datetime(time_created/1000,'unixepoch','localtime') AS created FROM session WHERE id='$sid';" 2>/dev/null
+336	      ;;
+337	    "[cc]")
+338	      f=$(find "$HOME/.claude/projects" -name "${sid}.jsonl" -not -path "*/subagents/*" 2>/dev/null | head -1)
+339	      [ -n "$f" ] && head -200 "$f" | bat --color=always -l json --plain --paging=never 2>/dev/null \
+340	        || [ -n "$f" ] && head -200 "$f" \
+341	        || echo "(jsonl not found)"
+342	      ;;
+343	    "[cx]")
+344	      f=$(find "$HOME/.codex/sessions" -name "rollout-*${sid}.jsonl" 2>/dev/null | head -1)
+345	      [ -n "$f" ] && head -200 "$f" | bat --color=always -l json --plain --paging=never 2>/dev/null \
+346	        || [ -n "$f" ] && head -200 "$f" \
+347	        || echo "(rollout not found)"
+348	      ;;
+349	    "[cu]")
+350	      db=$(find "$HOME/.cursor/chats" -path "*/${sid}/store.db" 2>/dev/null | head -1)
+351	      [ -n "$db" ] && sqlite3 "$db" ".schema" 2>/dev/null
+352	      ;;
+353	    "[ci]")
+354	      gdb="$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+355	      [ -f "$gdb" ] || gdb="$HOME/.config/Cursor/User/globalStorage/state.vscdb"
+356	      [ -f "$gdb" ] && sqlite3 "$gdb" "SELECT value FROM cursorDiskKV WHERE key='composerData:$sid';" 2>/dev/null \
+357	        | python3 -m json.tool 2>/dev/null | bat --color=always -l json --plain --paging=never 2>/dev/null \
+358	        || echo "(composer not found)"
+359	      ;;
+360	  esac
+361	  ''',
+362	]
+363	header = "{split:\t:0}  {split:\t:2}  ({split:\t:3})"
+364	
+365	[ui]
+366	input_header = "Agent Sessions"
+367	
+368	[ui.preview_panel]
+369	size = 60
+370	
+371	[keybindings]
+372	enter = "actions:print_resume"
+373	alt-t = "actions:resume"
+374	ctrl-y = "actions:copy_id"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:26:53Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:26:54Z)**_
+
+Let me verify Claude's actual PID-tracking behavior on this system before coding the resolver.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:26:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if Claude writes ~/.claude/sessions/{PID}.json files on this system
+
+`ls -la ~/.claude/sessions/ 2>/dev/null | head -20; echo "---"; find ~/.claude/sessions -name "*.json" 2>/dev/null | head -5 | xargs -I{} sh -c 'echo "=== {} ==="; head -c 500 {}; echo'`
+
+```text
+.rw-r--r--@ 299 daviddwlee84 24 Apr 19:39  5388.json
+.rw-r--r--@ 307 daviddwlee84 24 Apr 18:37  35609.json
+.rw-r--r--@ 297 daviddwlee84 27 Apr 18:26  43849.json
+.rw-r--r--@ 300 daviddwlee84 27 Apr 16:57  47748.json
+.rw-r--r--@ 337 daviddwlee84 27 Apr 18:24  49159.json
+.rw-r--r--@ 345 daviddwlee84 27 Apr 16:32  76228.json
+---
+=== /Users/daviddwlee84/.claude/sessions/35609.json ===
+{"pid":35609,"sessionId":"6cfefa93-3366-4d98-99c1-2d90fc063664","cwd":"/Volumes/Data/Program/Personal/DockerCompose-V2Ray","startedAt":1777025494679,"procStart":"Fri Apr 24 10:11:30 2026","version":"2.1.119","peerProtocol":1,"kind":"interactive","entrypoint":"cli","status":"idle","updatedAt":1777027057925}
+=== /Users/daviddwlee84/.claude/sessions/49159.json ===
+{"pid":49159,"sessionId":"5a422733-a13c-401e-b95a-4387d099d8df","cwd":"/Users/daviddwlee84/.local/share/chezmoi","startedAt":1777284359291,"procStart":"Mon Apr 27 10:05:56 2026","version":"2.1.119","peerProtocol":1,"kind":"interactive","entrypoint":"cli","status":"busy","updatedAt":1777285474003,"name":"discover-coding-agent-sessions"}
+=== /Users/daviddwlee84/.claude/sessions/43849.json ===
+{"pid":43849,"sessionId":"e0cb2fa3-3d55-4cdf-b535-b834b975fb52","cwd":"/Users/daviddwlee84/.local/share/chezmoi","startedAt":1777284213687,"procStart":"Mon Apr 27 10:03:31 2026","version":"2.1.119","peerProtocol":1,"kind":"interactive","entrypoint":"cli","status":"idle","updatedAt":1777285572170}
+=== /Users/daviddwlee84/.claude/sessions/76228.json ===
+{"pid":76228,"sessionId":"4ede0cd6-d5a7-4d02-a937-d2c9c09a1651","cwd":"/Users/daviddwlee84/.local/share/chezmoi","startedAt":1777258443358,"procStart":"Mon Apr 27 02:54:00 2026","version":"2.1.119","peerProtocol":1,"kind":"interactive","entrypoint":"cli","status":"busy","updatedAt":1777278734121,"name":"fix-nvm-lazy-loader-permission-request"}
+=== /Users/daviddwlee84/.claude/sessions/5388.json ===
+{"pid":5388,"sessionId":"1ef287dd-19d3-43be-bd23-c5e3911b5804","cwd":"/Volumes/Data/Program/Personal/agent-skills","startedAt":1777030077884,"procStart":"Fri Apr 24 11:27:55 2026","version":"2.1.119","peerProtocol":1,"kind":"interactive","entrypoint":"cli","status":"idle","updatedAt":1777030793798}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:26:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Snapshot all current tmux panes to test against
+
+`tmux list-panes -aF '#{session_name}|#{window_index}|#{window_name}|#{pane_index}|#{pane_id}|#{pane_pid}|#{pane_current_command}|#{pane_current_path}|#{pane_active}' 2>/dev/null | head -30; echo "--- counts ---"; tmux list-panes -aF '#{pane_current_command}' 2>/dev/null | sort | uniq -c | sort -rn`
+
+```text
+chezmoi|1|specstory|1|%250|95892|specstory|/Users/daviddwlee84/.local/share/chezmoi|1
+chezmoi|2|specstory|1|%252|71057|specstory|/Users/daviddwlee84/.local/share/chezmoi|1
+chezmoi|3|nvim|1|%254|87939|nvim|/Users/daviddwlee84/.local/share/chezmoi|1
+chezmoi|4|specstory|1|%255|38868|specstory|/Users/daviddwlee84/.local/share/chezmoi|1
+chezmoi|5|zsh|1|%256|55484|zsh|/Users/daviddwlee84/.local/share/chezmoi|1
+vibe/DockerCompose-V2Ray|1|agents|1|%237|34241|zsh|/Volumes/Data/Program/Personal/DockerCompose-V2Ray|1
+vibe/DockerCompose-V2Ray|2|git|1|%239|34251|tv|/Volumes/Data/Program/Personal/DockerCompose-V2Ray|1
+vibe/DockerCompose-V2Ray|3|edit|1|%240|34256|zsh|/Volumes/Data/Program/Personal/DockerCompose-V2Ray|1
+vibe/agent-skills|1|agents|1|%152|87901|specstory|/Volumes/Data/Program/Personal/agent-skills|1
+vibe/agent-skills|1|agents|2|%153|87908|zsh|/Volumes/Data/Program/Personal/agent-skills|0
+vibe/agent-skills|2|git|1|%154|87913|zsh|/Volumes/Data/Program/Personal/agent-skills|1
+vibe/agent-skills|3|edit|1|%155|87917|zsh|/Volumes/Data/Program/Personal/agent-skills|1
+vibe/agent-skills|4|specstory|1|%249|94904|specstory|/Volumes/Data/Program/Personal/agent-skills|1
+vibe/agent-skills|5|zsh|1|%253|27055|zsh|/Volumes/Data/Program/Personal/agent-skills|1
+--- counts ---
+   7 zsh
+   5 specstory
+   1 tv
+   1 nvim
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:27:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:27:48Z)**_
+
+I have the definitive picture now. Claude writes `~/.claude/sessions/{claude_pid}.json` with `sessionId`, `cwd`, `status`, **and** an optional `name` field — so I have authoritative session data without parsing transcripts. The Claude PID is NOT the tmux pane_pid (panes here run `specstory` wrappers), so I need to walk parent chains. Let me start coding.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:27:49Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ToolSearch"><details>
+<summary>Tool use: **ToolSearch**</summary>
+
+**Input:**
+
+- max_results: `1`
+- query: `select:TaskUpdate`
+
+**Result:**
+
+```
+
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:27:53Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #1 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:27:55Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/executable_agent-sessions.py`
+
+```text
+42	"""
+43	
+44	from __future__ import annotations
+45	
+46	import json
+47	import os
+48	import re
+49	import sqlite3
+50	import sys
+51	from datetime import datetime
+52	from pathlib import Path
+53	from typing import Iterator, Optional
+54	
+55	HOME = Path.home()
+56	SNIPPET_LEN = 140
+57	MAX_LINES_SCAN = 80  # per JSONL file when hunting first user message
+58	
+59	_SYSTEM_PREFIXES = (
+60	    "<local-command-caveat>",
+61	    "<local-command-stdout>",
+62	    "<local-command-stderr>",
+63	    "<system-reminder>",
+64	    "<command-name>",
+65	    "<command-message>",
+66	    "<command-args>",
+67	    "<environment_context>",
+68	    "<user_instructions>",
+69	    "<INSTRUCTIONS>",
+70	    "# AGENTS.md",
+71	    "# AGENTS instructions",
+72	    "Caveat:",
+73	)
+74	
+75	
+76	def _fmt_when(epoch_ms_or_s: float) -> str:
+77	    """Format epoch (ms or s) as local YYYY-MM-DD HH:MM."""
+78	    if epoch_ms_or_s > 1e12:  # ms
+79	        epoch_ms_or_s /= 1000.0
+80	    try:
+81	        return datetime.fromtimestamp(epoch_ms_or_s).strftime("%Y-%m-%d %H:%M")
+82	    except (OSError, ValueError):
+83	        return "?"
+84	
+85	
+86	def _fmt_iso(s: str) -> str:
+87	    """Format ISO-8601 string as local YYYY-MM-DD HH:MM."""
+88	    try:
+89	        # Handle trailing Z
+90	        s = s.replace("Z", "+00:00")
+91	        dt = datetime.fromisoformat(s)
+92	        return dt.astimezone().strftime("%Y-%m-%d %H:%M")
+93	    except ValueError:
+94	        return s[:16] if s else "?"
+95	
+96	
+97	def _truncate(text: str, n: int = SNIPPET_LEN) -> str:
+98	    """Collapse whitespace and truncate."""
+99	    text = re.sub(r"\s+", " ", text).strip()
+100	    if len(text) <= n:
+101	        return text
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:28:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:28:01Z)**_
+
+Now I'll add the `panes` mode. I'll insert a new section before the Dispatcher block.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:28:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:28:08Z)**_
+
+Now I'll add the `panes` mode section right before the dispatcher.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:03Z)**_
+
+Now wire the `panes` mode into the dispatcher.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:10Z)**_
+
+Now syntax-check and run it live to verify.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check the modified script
+
+`python3 -m py_compile dot_config/television/executable_agent-sessions.py && echo "OK syntax"`
+
+```text
+OK syntax
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run the new panes mode against the live tmux server
+
+`python3 /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py panes`
+
+```text
+[cc]	2026-04-24 18:37	6cfefa93-3366-4d98-99c1-2d90fc063664	/Volumes/Data/Program/Personal/DockerCompose-V2Ray	我發現當這個server跑久了 @legacy/compose/docker-compose.yml mount出來的logs (很容易塞滿) 有沒有什麼retention機制啥的可以解決這個問題 ``` david@V2Ray:~$ tmux couldn't create …		vibe/DockerCompose-V2Ray:1.1	34241	idle
+[cc]	2026-04-27 18:24	5a422733-a13c-401e-b95a-4387d099d8df	~/.local/share/chezmoi	discover-coding-agent-sessions	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md	chezmoi:1.1	95892	busy
+[cc]	2026-04-27 18:26	e0cb2fa3-3d55-4cdf-b535-b834b975fb52	~/.local/share/chezmoi	``` ❯ just fleet-apply ./scripts/fleet_apply.py log dir: logs/fleet-apply/20260427T100215Z fleet-apply ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━…	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-04-04Z-just-fleet-apply-scripts.md	chezmoi:4.1	38868	idle
+[cc]	2026-04-27 16:32	4ede0cd6-d5a7-4d02-a937-d2c9c09a1651	~/.local/share/chezmoi	fix-nvm-lazy-loader-permission-request	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_02-54-08Z-allowed-by-permissionrequest-hook.md	chezmoi:2.1	71057	busy
+[cc]	2026-04-24 19:39	1ef287dd-19d3-43be-bd23-c5e3911b5804	/Volumes/Data/Program/Personal/agent-skills	我們目前的repo是否有不該commit & push的東西? 看看目前staged的commit 應該是被我們的redact secret給清了？ 不知道有沒有問題 還是說這只是demo print的(畢竟github也沒擋push)		vibe/agent-skills:1.1	87901	idle
+[cc]	2026-04-27 16:57	e118eaab-65a3-405e-9e8f-de888ec72ccf	/Volumes/Data/Program/Personal/agent-skills	Base directory for this skill: /Users/daviddwlee84/.claude/skills/skill-author # Skill Author Helps you write **new agent skills** that fol…		vibe/agent-skills:4.1	94904	idle
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:29Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:29:30Z)**_
+
+Output works — 6 Claude sessions detected with correct pane targets, status, and session names. Let me sort by recency (currently glob-order) for a better default UX, then move on.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify panes mode runs and is sorted
+
+`python3 /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py panes 2>&1 | head -10; echo "--- exit=$? ---"; python3 -m py_compile /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py && echo "OK syntax"`
+
+```text
+[cc]	2026-04-27 18:29	e0cb2fa3-3d55-4cdf-b535-b834b975fb52	~/.local/share/chezmoi	``` ❯ just fleet-apply ./scripts/fleet_apply.py log dir: logs/fleet-apply/20260427T100215Z fleet-apply ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━…	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-04-04Z-just-fleet-apply-scripts.md	chezmoi:4.1	38868	busy
+[cc]	2026-04-27 18:24	5a422733-a13c-401e-b95a-4387d099d8df	~/.local/share/chezmoi	discover-coding-agent-sessions	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md	chezmoi:1.1	95892	busy
+[cc]	2026-04-27 16:57	e118eaab-65a3-405e-9e8f-de888ec72ccf	/Volumes/Data/Program/Personal/agent-skills	Base directory for this skill: /Users/daviddwlee84/.claude/skills/skill-author # Skill Author Helps you write **new agent skills** that fol…		vibe/agent-skills:4.1	94904	idle
+[cc]	2026-04-27 16:32	4ede0cd6-d5a7-4d02-a937-d2c9c09a1651	~/.local/share/chezmoi	fix-nvm-lazy-loader-permission-request	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_02-54-08Z-allowed-by-permissionrequest-hook.md	chezmoi:2.1	71057	busy
+[cc]	2026-04-24 19:39	1ef287dd-19d3-43be-bd23-c5e3911b5804	/Volumes/Data/Program/Personal/agent-skills	我們目前的repo是否有不該commit & push的東西? 看看目前staged的commit 應該是被我們的redact secret給清了？ 不知道有沒有問題 還是說這只是demo print的(畢竟github也沒擋push)		vibe/agent-skills:1.1	87901	idle
+[cc]	2026-04-24 18:37	6cfefa93-3366-4d98-99c1-2d90fc063664	/Volumes/Data/Program/Personal/DockerCompose-V2Ray	我發現當這個server跑久了 @legacy/compose/docker-compose.yml mount出來的logs (很容易塞滿) 有沒有什麼retention機制啥的可以解決這個問題 ``` david@V2Ray:~$ tmux couldn't create …		vibe/DockerCompose-V2Ray:1.1	34241	idle
+--- exit=0 ---
+OK syntax
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:25Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:26Z)**_
+
+Task #1 complete. Now task #2 — the TV channel.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:27Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #1 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:30:27Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #2 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:11Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```toml
+# Live agent panes cable channel for television (tv)
+#
+# Discovers coding-agent sessions currently running inside any tmux pane and
+# lets you jump straight to them. Companion to `agent-sessions.toml` (which
+# browses STORED sessions). Backed by `agent-sessions.py panes`.
+#
+# Usage:
+#   tv agent-panes
+#   prefix + a (inside tmux)
+#
+# Source: 9-col TSV from `agent-sessions.py panes`:
+#   0. agent tag       ([cc] / [cx] / [oc] / [cu])
+#   1. when            (YYYY-MM-DD HH:MM, last activity)
+#   2. session id      (full id; empty for non-Claude when no cwd match)
+#   3. directory       (cwd of the pane; "?" when unknown)
+#   4. title/snippet   (Claude session name, or first non-system user msg)
+#   5. specstory_path  (matching .specstory/history/*.md, when present)
+#   6. pane target     (session:win.pane — passed to tmux switch-client)
+#   7. pane pid        (tmux pane_pid; for diagnostics)
+#   8. status          (Claude only: "busy" / "idle"; empty for others)
+#
+# Keybindings:
+#   Enter      Switch tmux focus to that pane (session, window, pane)
+#   Alt+T      Same as Enter (T for "take over" — mirrors agent-sessions.toml)
+#   Alt+K      Kill the pane (confirm prompt)
+#   Ctrl+Y     Copy pane target (session:win.pane) to clipboard
+#   Alt+P      Copy directory path to clipboard
+#   Alt+R      Copy session id to clipboard
+#   Alt+S      Copy matched .specstory/history/*.md path to clipboard
+#
+# Preview cycling (Ctrl+F):
+#   1. Live tmux capture-pane snapshot (last ~80 lines of the pane).
+#   2. Stored transcript (delegates to agent-sessions.py transcript mode).
+
+[metadata]
+name = "agent-panes"
+description = "Live coding-agent panes across tmux — jump to a running claude/codex/opencode/cursor session"
+requirements = ["tmux", "python3"]
+
+[source]
+command = "~/.config/television/agent-sessions.py panes"
+# Display: agent + status glyph + pane target │ snippet │ short cwd
+# Status glyphs use single-cell unicode so widths stay aligned in fzf list.
+display = "{split:\t:0} {split:\t:8|s/busy/●/|s/idle/○/} {split:\t:6}  │  {split:\t:4}  │  {split:\t:3|split:/:-1}"
+output = "{split:\t:6}"
+
+[preview]
+command = [
+  # Preview 1 (default): live capture-pane snapshot.
+  # Shows what's actually on screen in that pane RIGHT NOW — the most useful
+  # thing when you're about to jump to it.
+  '''
+  target='{split:\t:6}'; agent='{split:\t:0}'; sid='{split:\t:2}'; status='{split:\t:8}'; pid='{split:\t:7}'
+  printf '\033[1m%s\033[0m  pane=%s  pid=%s  %s\n' "$agent" "$target" "$pid" "$status"
+  printf '\033[2msession:\033[0m  %s\n' "$sid"
+  printf '\033[2mcwd:\033[0m      %s\n' '{split:\t:3}'
+  printf '\n\033[1m─── live pane (capture-pane -ep) ───\033[0m\n'
+  tmux capture-pane -ep -t "$target" 2>/dev/null | tail -n 80 \
+    || echo "(pane $target no longer exists — picker is stale; press Ctrl+R to reload)"
+  ''',
+  # Preview 2: stored transcript (markdown-rendered).
+  '''
+  agent='{split:\t:0}'; sid='{split:\t:2}'
+  case "$agent" in
+    "[cc]") tag=cc ;;
+    "[cx]") tag=cx ;;
+    "[oc]") tag=oc ;;
+    *) tag="" ;;
+  esac
+  if [ -z "$tag" ] || [ -z "$sid" ]; then
+    printf '\033[2m(no stored transcript for %s — use preview 1 for live pane content.)\033[0m\n' "$agent"
+    exit 0
+  fi
+  if command -v glow >/dev/null 2>&1; then
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | glow --style auto - 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  else
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | bat -l md --color=always --plain --paging=never 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  fi
+  ''',
+]
+header = "{split:\t:0}  {split:\t:6}  ({split:\t:3|split:/:-1})"
+
+[ui]
+input_header = "Live Agent Panes"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:switch_pane"
+alt-t = "actions:switch_pane"
+alt-k = "actions:kill_pane"
+ctrl-y = "actions:copy_target"
+alt-p = "actions:copy_dir"
+alt-r = "actions:copy_id"
+alt-s = "actions:copy_specstory"
+
+# ---------------------------------------------------------------------------
+# Actions — keep shell glue minimal; any bare `{` would silently break TV's
+# own placeholder substitution. See agent-sessions.toml line ~80.
+# ---------------------------------------------------------------------------
+
+[actions.switch_pane]
+description = "Switch tmux focus to that session/window/pane"
+command = '''
+target='{split:\t:6}'
+[ -z "$target" ] && exit 0
+session="${target%%:*}"
+winpane="${target#*:}"
+window="${winpane%.*}"
+pane="${winpane#*.}"
+# switch-client moves the attached client to the target session; select-window
+# and select-pane scope down. We run as three steps so a missing pane (stale
+# row) doesn't leave focus mid-jump.
+tmux switch-client -t "$session" 2>/dev/null \
+  && tmux select-window -t "$session:$window" 2>/dev/null \
+  && tmux select-pane -t "$target" 2>/dev/null \
+  || tmux display-message "agent-panes: pane $target no longer exists (stale row)"
+'''
+mode = "fork"
+
+[actions.kill_pane]
+description = "Kill the pane (confirm prompt)"
+command = '''
+target='{split:\t:6}'
+[ -z "$target" ] && exit 0
+printf 'Kill pane %s? [y/N] ' "$target"
+read -r ans
+case "$ans" in
+  y|Y|yes|YES)
+    tmux kill-pane -t "$target" 2>/dev/null \
+      && echo "killed $target" \
+      || echo "failed to kill $target (already gone?)"
+    ;;
+  *) echo "aborted" ;;
+esac
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.copy_target]
+description = "Copy pane target (session:win.pane) to clipboard"
+command = '''
+d='{split:\t:6}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_id]
+description = "Copy session ID to clipboard"
+command = '''
+d='{split:\t:2}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy directory path to clipboard"
+command = '''
+d='{split:\t:3}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_specstory]
+description = "Copy .specstory/history/*.md path to clipboard"
+command = '''
+d='{split:\t:5}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/agent-panes.toml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:21Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tv CLI and discover its channel-list command
+
+`which tv; tv --version 2>&1 | head -3; echo "---"; tv list-channels 2>&1 | head -20 || tv --list-channels 2>&1 | head -20 || tv channels 2>&1 | head -20`
+
+```text
+/opt/homebrew/bin/tv
+television 0.15.6
+---
+agent-sessions
+alias
+aliases
+ansible
+azure
+bash-history
+brew-packages
+cargo-commands
+cargo-crates
+channels
+clash
+clash-api
+crontab
+dirs
+diskutil
+docker-compose
+docker-containers
+docker-images
+docker-networks
+docker-volumes
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage the new TV channel and verify it loads
+
+`cp /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/agent-panes.toml ~/.config/television/cable/agent-panes.toml && tv list-channels 2>&1 | grep -E "agent-panes|agent-sessions"`
+
+```text
+agent-panes
+agent-sessions
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify the script symlink and panes mode runs from installed location
+
+`ls -la ~/.config/television/agent-sessions.py 2>&1; echo "---"; ~/.config/television/agent-sessions.py panes 2>&1 | head -5`
+
+```text
+.rwxr-xr-x@ 33k daviddwlee84 24 Apr 18:09  /Users/daviddwlee84/.config/television/agent-sessions.py
+---
+unknown mode: panes
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:50Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Sync the modified script and re-test panes mode
+
+`cp /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/executable_agent-sessions.py ~/.config/television/agent-sessions.py && chmod +x ~/.config/television/agent-sessions.py && ~/.config/television/agent-sessions.py panes 2>&1 | head -3`
+
+```text
+[cc]	2026-04-27 18:29	e0cb2fa3-3d55-4cdf-b535-b834b975fb52	~/.local/share/chezmoi	``` ❯ just fleet-apply ./scripts/fleet_apply.py log dir: logs/fleet-apply/20260427T100215Z fleet-apply ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━…	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-04-04Z-just-fleet-apply-scripts.md	chezmoi:4.1	38868	busy
+[cc]	2026-04-27 18:24	5a422733-a13c-401e-b95a-4387d099d8df	~/.local/share/chezmoi	discover-coding-agent-sessions	/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md	chezmoi:1.1	95892	busy
+[cc]	2026-04-27 16:57	e118eaab-65a3-405e-9e8f-de888ec72ccf	/Volumes/Data/Program/Personal/agent-skills	Base directory for this skill: /Users/daviddwlee84/.claude/skills/skill-author # Skill Author Helps you write **new agent skills** that fol…		vibe/agent-skills:4.1	94904	idle
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:58Z)**_
+
+Channel + script both working. Task #2 complete. Moving on to keybinding + menu.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:59Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #2 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:31:59Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #3 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/tmux/keybindings.conf`
+
+```text
+355	bind -N "sesh-root for current dir (lightweight)" 0 \
+356	  run-shell -b "~/.config/tmux/sesh-root-here.sh '#{pane_current_path}'"
+357	
+358	# prefix + T: sesh picker via television (tv) in a tmux popup
+359	bind-key "T" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Sesh (tv) ' "tv sesh"
+360	
+361	# prefix + O: sesh built-in picker in a tmux popup
+362	bind-key "O" display-popup -h 90% -w 50% -E "sesh picker -i"
+363	
+364	# prefix + U: CLI tools picker via television (tv tools)
+365	bind-key "U" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' CLI Tools (tv) ' "tv tools"
+366	
+367	# (prefix + W is now bound earlier in this file as `kill-window`. The previous
+368	# `sesh window` binding was removed because `sesh` has no `window` subcommand;
+369	# pressing it printed sesh's help to a popup. See git history.)
+370	
+371	# =============================================================================
+372	# Popup tools (display-popup -E -d '#{pane_current_path}')
+373	# =============================================================================
+374	# Floating scratch pane (tmux-floax) is on prefix + F (toggleable, persistent
+375	# session named `float`). The bindings below are one-shot popups that close
+376	# when the inner command exits — handy for "do one thing without disrupting
+377	# the layout" workflows.
+378	
+379	# prefix + G: lazygit popup at current pane path
+380	bind-key "G" display-popup -E -w 90% -h 90% -d '#{pane_current_path}' -T ' lazygit ' "lazygit"
+381	
+382	# prefix + ` (backtick): one-shot popup shell at current pane path.
+383	# Closes when the inner shell exits (`exit` or Ctrl-D). Each invocation gets
+384	# a fresh shell — no state preserved. For a persistent scratchpad with
+385	# history, use floax (prefix + F) instead.
+386	bind-key '`' display-popup -E -w 80% -h 80% -d '#{pane_current_path}' -T ' shell '
+387	
+388	# =============================================================================
+389	# Help / cheatsheet
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:12Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #3 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:13Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #4 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:13Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/tmux/executable_menu-popups.sh`
+
+```text
+1	#!/usr/bin/env bash
+2	# Popup launcher submenu
+3	set -euo pipefail
+4	exec tmux display-menu -T " Popups " -x R -y P \
+5	  "Lazygit"           g "display-popup -E -w 90% -h 90% -d '#{pane_current_path}' -T ' lazygit ' 'lazygit'" \
+6	  "Shell"             s "display-popup -E -w 80% -h 80% -d '#{pane_current_path}' -T ' shell '" \
+7	  "Floax scratchpad"  f "run-shell '~/.tmux/plugins/tmux-floax/scripts/floax.sh'"
+8
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+#!/usr/bin/env bash
+# Coding-agent submenu — discovery + management of live agent sessions.
+#
+# Reached from the top popup menu (prefix + Space → → Agents). The two `tv`
+# entries are the primary surfaces; recon is offered only when installed.
+#
+# See: docs/tools/agent-panes-discovery.md
+set -euo pipefail
+
+declare -a rows=(
+  "Live agent panes (tv)"     a "display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Live agent panes ' 'tv agent-panes'"
+  "Stored sessions (tv)"      s "display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Agent sessions ' 'tv agent-sessions'"
+)
+
+# recon is Claude-only and optional (cargo install). Probe before adding the
+# row so the menu doesn't show a dead entry on hosts that haven't installed it.
+if command -v recon >/dev/null 2>&1; then
+  rows+=(
+    ""                        ""  ""
+    "Claude dashboard (recon)" r  "display-popup -E -w 80% -h 60% -T ' recon (Claude) ' 'recon'"
+  )
+fi
+
+exec tmux display-menu -T " Agents " -x R -y P "${rows[@]}"
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_menu-agents.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:35Z)**_
+
+Now wire the submenu into the top-level menu.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_menu.sh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:32:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_menu.sh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:14Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:14Z)**_
+
+Let me verify the menu submenu script has valid syntax.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check the menu scripts
+
+`bash -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_menu-agents.sh && echo "menu-agents.sh OK"; bash -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_menu.sh && echo "menu.sh OK"`
+
+```text
+menu-agents.sh OK
+menu.sh OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:21Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #4 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #5 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:29Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+YAML syntax check for the modified ansible task
+
+`python3 -c "import yaml; yaml.safe_load_all(open('/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml'))" && echo "YAML OK"`
+
+```text
+Exit code 1
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load_all(open('/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml'))
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+YAML syntax check via uv ephemeral env
+
+`uv run --with pyyaml --no-project python3 -c "import yaml,sys; list(yaml.safe_load_all(open('/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/rust_cargo_tools/tasks/main.yml'))); print('YAML OK')"`
+
+```text
+YAML OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:47Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #5 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:48Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #6 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Survey docs/tools structure and mkdocs.yml nav format
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/docs/tools/ | head -30; echo "---"; grep -A2 "Tools" /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml | head -40`
+
+```text
+ **tmux
+ agent-overlays.md
+ agent-skills.md
+ aicapture.md
+ appimage.md
+ chezmoi-prefixes.md
+ chezmoi-templating.md
+ claude-code-keybindings.md
+ clipboard.md
+ codexbar.md
+ container-config-map.md
+ containers.md
+ direnv.md
+ dotnet-tools.md
+ fzf.md
+ ghostty.md
+ git_diff_workflow.md
+ infrastructure-as-code.md
+ json-schema.md
+ llm.md
+ log-tools.md
+ mirrors.md
+ networking.md
+ opencode.md
+ pqsum.md
+ pre-commit.md
+ services.md
+ sesh.md
+ sms.md
+ specify_cli.md
+---
+        Tools:
+          - tools/aicapture.md
+          - tools/zsh-inline-ai.md
+--
+  - Tools:
+    - tools/aicapture.md
+    - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get all tools nav entries to find alphabetical insert point
+
+`grep -n "tools/" /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml | head -50`
+
+```text
+17:    # existing stale section-anchor links in tools/worktrunk.md, tools/sesh.md,
+18:    # zsh/aliases.md, tools/tmux/README.md, tools/pre-commit.md are fixed.
+62:          - tools/aicapture.md
+63:          - tools/zsh-inline-ai.md
+64:          - tools/tmux/README.md
+65:          - tools/sesh.md
+66:          - tools/clipboard.md
+67:          - tools/agent-overlays.md
+115:    - tools/aicapture.md
+116:    - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
+118:      - Overview: tools/tmux/README.md
+119:      - Keybindings: tools/tmux/keybindings.md
+120:      - Themes: tools/tmux/themes.md
+121:      - Vim integration: tools/tmux/vim.md
+123:      - Ghostty: tools/ghostty.md
+124:      - Warp: tools/warp.md
+125:      - Starship: tools/starship.md
+126:      - Clipboard: tools/clipboard.md
+127:      - XDG: tools/xdg.md
+128:      - Fzf: tools/fzf.md
+129:      - Television (tv): tools/tv.md
+130:      - TV vs fzf: tools/tv-vs-fzf.md
+132:      - Sesh: tools/sesh.md
+133:      - Worktrunk: tools/worktrunk.md
+134:      - SSH agent: tools/ssh-agent.md
+136:      - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+137:      - Agent skills: tools/agent-skills.md
+138:      - Claude Code keybindings: tools/claude-code-keybindings.md
+139:      - OpenCode: tools/opencode.md
+140:      - specify-cli: tools/specify_cli.md
+141:      - SpecStory: tools/specstory.md
+142:      - SpecStory internals: tools/specstory-internals.md
+143:      - Codexbar: tools/codexbar.md
+144:      - LLM: tools/llm.md
+146:      - git diff workflow: tools/git_diff_workflow.md
+147:      - pre-commit: tools/pre-commit.md
+148:      - Infrastructure-as-Code: tools/infrastructure-as-code.md
+149:      - Containers: tools/containers.md
+150:      - Container config map: tools/container-config-map.md
+151:      - AppImage: tools/appimage.md
+152:      - Networking: tools/networking.md
+153:      - Services: tools/services.md
+154:      - Tailscale: tools/Tailscale.md
+155:      - dotnet tools: tools/dotnet-tools.md
+157:      - td / sidecar: tools/td_sidecar.md
+158:      - Super Productivity: tools/super-productivity.md
+159:      - Web reader: tools/web-reader.md
+160:      - Log tools: tools/log-tools.md
+161:      - SMS (Huawei router): tools/sms.md
+162:      - pqsum: tools/pqsum.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:33:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./mkdocs.yml`
+
+```text
+110	  - Home: index.md
+111	  - Playbooks:
+112	    - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
+113	    - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
+114	  - Tools:
+115	    - tools/aicapture.md
+116	    - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
+117	    - tmux:
+118	      - Overview: tools/tmux/README.md
+119	      - Keybindings: tools/tmux/keybindings.md
+120	      - Themes: tools/tmux/themes.md
+121	      - Vim integration: tools/tmux/vim.md
+122	    - Shell & terminal:
+123	      - Ghostty: tools/ghostty.md
+124	      - Warp: tools/warp.md
+125	      - Starship: tools/starship.md
+126	      - Clipboard: tools/clipboard.md
+127	      - XDG: tools/xdg.md
+128	      - Fzf: tools/fzf.md
+129	      - Television (tv): tools/tv.md
+130	      - TV vs fzf: tools/tv-vs-fzf.md
+131	    - Sessions & worktrees:
+132	      - Sesh: tools/sesh.md
+133	      - Worktrunk: tools/worktrunk.md
+134	      - SSH agent: tools/ssh-agent.md
+135	    - Editor & agents:
+136	      - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+137	      - Agent skills: tools/agent-skills.md
+138	      - Claude Code keybindings: tools/claude-code-keybindings.md
+139	      - OpenCode: tools/opencode.md
+140	      - specify-cli: tools/specify_cli.md
+141	      - SpecStory: tools/specstory.md
+142	      - SpecStory internals: tools/specstory-internals.md
+143	      - Codexbar: tools/codexbar.md
+144	      - LLM: tools/llm.md
+145	    - Git & DevOps:
+146	      - git diff workflow: tools/git_diff_workflow.md
+147	      - pre-commit: tools/pre-commit.md
+148	      - Infrastructure-as-Code: tools/infrastructure-as-code.md
+149	      - Containers: tools/containers.md
+150	      - Container config map: tools/container-config-map.md
+151	      - AppImage: tools/appimage.md
+152	      - Networking: tools/networking.md
+153	      - Services: tools/services.md
+154	      - Tailscale: tools/Tailscale.md
+155	      - dotnet tools: tools/dotnet-tools.md
+156	    - Productivity:
+157	      - td / sidecar: tools/td_sidecar.md
+158	      - Super Productivity: tools/super-productivity.md
+159	      - Web reader: tools/web-reader.md
+160	      - Log tools: tools/log-tools.md
+161	      - SMS (Huawei router): tools/sms.md
+162	      - pqsum: tools/pqsum.md
+163	      - direnv: tools/direnv.md
+164	    - chezmoi conventions:
+165	      - chezmoi prefixes: tools/chezmoi-prefixes.md
+166	      - chezmoi templating: tools/chezmoi-templating.md
+167	      - JSON Schema: tools/json-schema.md
+168	      - Mirrors (Chinese CDN): tools/mirrors.md
+169	  - Zsh:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:34:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:34:11Z)**_
+
+Now I'll write the docs file.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Agent pane discovery
+
+Find — and jump to — coding-agent sessions (`claude`, `cursor-agent`, `codex`,
+`opencode`) that are currently running in *any* tmux pane on this host.
+
+The pain this solves: you start `claude` in pane A on session `chezmoi`, hop
+into pane B in another window for a quick test, drift over to a `vibe/foo`
+session for a Codex task, and three windows later you can't remember which
+pane has the agent you wanted to nudge. CodeIsland (macOS) tells you which
+**terminal app** is running an agent, but not the specific tmux pane —
+useless once you have more than one agent inside one terminal.
+
+Two complementary surfaces ship in this repo, both backed by tmux:
+
+| Tool | Scope | Best at |
+|---|---|---|
+| `tv agent-panes` | All four agents (Claude / Codex / OpenCode / Cursor) | "Where am I running stuff?" cross-agent overview, jump-to-pane |
+| `recon` (optional) | Claude-only, with live status (Working / Idle / Waiting) parsed from pane capture | "Which Claude needs my attention?" — recon's live status detection is richer than what we replicate in tv |
+
+## `tv agent-panes` (primary)
+
+Open the picker with `prefix + a` inside tmux, or via the popup menu
+(`prefix + Space → → Agents → Live agent panes (tv)`), or from any shell
+with `tv agent-panes`.
+
+Each row is one running agent pane. The status column shows ● (busy) or
+○ (idle) for Claude (read from `~/.claude/sessions/{pid}.json`); blank for
+others.
+
+\```
+[cc] ● chezmoi:1.1     │  discover-coding-agent-sessions          │  chezmoi
+[cc] ○ chezmoi:2.1     │  fix-nvm-lazy-loader-permission-request  │  chezmoi
+[cc] ●  vibe/foo:4.1   │  refactor auth module                    │  foo
+[oc]   vibe/bar:0.0    │  Generate migration script               │  bar
+\```
+
+### Keybindings (in the picker)
+
+| Key | Action |
+|---|---|
+| `Enter` / `Alt+T` | Switch tmux focus to that session/window/pane |
+| `Alt+K` | Kill the pane (with `[y/N]` confirm) |
+| `Ctrl+Y` | Copy the pane target (`session:win.pane`) to clipboard |
+| `Alt+P` | Copy directory path |
+| `Alt+R` | Copy session ID |
+| `Alt+S` | Copy matched `.specstory/history/*.md` path |
+| `Ctrl+F` | Cycle preview: live `tmux capture-pane` snapshot ↔ stored transcript |
+| `Esc` | Close the picker |
+
+### How resolution works
+
+- **Claude** — Claude Code writes a per-process file at
+  `~/.claude/sessions/{claude_pid}.json` containing `sessionId`, `cwd`,
+  `status`, and (when set) a friendly `name`. The discovery walker reads
+  these directly — *zero heuristics* for Claude. It then walks each
+  `claude_pid`'s parent chain via `ps -o ppid=` until it finds a tmux
+  `pane_pid`, which gives the pane target.
+- **Codex / OpenCode / Cursor** — `pgrep -x <bin>` finds running agent
+  PIDs, parent-chain walked the same way. Session ID is best-effort: the
+  walker queries each agent's storage (`opencode.db`, `~/.codex/sessions`,
+  `~/.cursor/chats`) for the most-recent matching session whose `cwd`
+  equals the pane's `pane_current_path`. If multiple sessions share a
+  cwd, the most recently updated wins. The pane is still listed even if
+  no session ID matches — the row is useful for jump-to-pane regardless.
+
+## `recon` (Claude-only fast popup, optional)
+
+[`gavraz/recon`](https://github.com/gavraz/recon) is a Rust TUI dashboard
+that focuses on Claude Code only but pays attention to live agent status by
+parsing the Claude TUI status bar via `tmux capture-pane`. Worth keeping
+around when you're juggling several Claude sessions and want
+"who's blocked on me?" at a glance.
+
+### Install
+
+Installed automatically via the `rust_cargo_tools` ansible role on
+`chezmoi apply`:
+
+\```bash
+cargo install --git https://github.com/gavraz/recon --locked
+\```
+
+Upgrades flow through the standard cargo path:
+
+\```bash
+just upgrade-cargo   # or scripts/upgrade_tools.sh cargo
+\```
+
+### Use
+
+Open it from the popup menu: `prefix + Space → → Agents → Claude
+dashboard (recon)`. There's no top-level keybind by default — `prefix + g`
+(recon's upstream default) is taken by the sesh picker on this repo.
+Promote it to a top-level binding in `dot_config/tmux/keybindings.conf` if
+you find yourself reaching for it often.
+
+The `→ Agents` submenu only shows the recon row when `recon` is on `PATH`,
+so it disappears cleanly on hosts that haven't installed it.
+
+## Troubleshooting
+
+### "I don't see my running Claude"
+
+Stale `~/.claude/sessions/{pid}.json` files are skipped automatically — if
+the PID isn't a descendant of any tmux pane, the row is omitted. If you
+expect to see a session that isn't there:
+
+\```bash
+~/.config/television/agent-sessions.py panes        # raw TSV, see what it finds
+ls -lt ~/.claude/sessions/                          # what files exist
+ps -p <pid_from_filename>                           # is the process alive?
+tmux list-panes -aF '#{pane_id} #{pane_pid} #{pane_current_command}'
+\```
+
+If the claude PID is alive but `_find_pane_for_pid` doesn't reach a tmux
+pane (e.g., claude was launched outside tmux), the row is correctly
+omitted — `tv agent-panes` only shows panes you can `switch-client` to.
+
+### "Codex/OpenCode/Cursor row has no session ID"
+
+The cwd-based reverse lookup couldn't find a stored session whose
+`directory` matches the pane's `pane_current_path`. Common causes: agent
+was started with `--cd` to a path that doesn't match storage; storage
+was migrated. The pane still shows up — Enter still jumps to it; you just
+won't get an automatic "resume this exact session" handle.
+
+### "I jumped to a pane and tmux says it doesn't exist"
+
+The picker is a snapshot. If a pane closes between snapshot and switch,
+the action falls back to a `tmux display-message` warning and stays put.
+Re-open the picker (`prefix + a`) to refresh.
+
+### "Recon doesn't appear in the Agents submenu"
+
+`menu-agents.sh` probes `command -v recon` and only adds the row when the
+binary is on `PATH`. If you've just installed it, your tmux server may
+need a fresh shell environment — `tmux source ~/.tmux.conf` is enough; no
+restart required.
+
+## Related
+
+- [tmux popup menu](tmux/README.md#popup-menu) — the parent `prefix + Space`
+  surface that hosts `→ Agents`.
+- [Agent sessions browser](agent-overlays.md) — sister channel
+  `tv agent-sessions` that browses **stored** session history (resume an old
+  session vs. jump to a running one).
+- [SpecStory internals](specstory-internals.md) — explains the
+  `<!-- Provider Session UUID -->` reverse-lookup that lets the picker
+  surface the matching `.specstory/history/*.md` for each row.
+- Sibling deferred work: per-pane working/idle status glyph in the tmux
+  window list itself (Option C of
+  [`backlog/tmux-window-status-indicators.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/tmux-window-status-indicators.md)).
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/docs/tools/agent-panes-discovery.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:07Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #6 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:09Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #7 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:15Z)**_
+
+Now CLAUDE.md keybindings table:
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the keybindings cross-tool table
+
+`grep -n "Free Alt slots\|zsh ZLE widgets\|Alt+T/R/P" /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md | head -10`
+
+```text
+89:| zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `dot_zshrc.tmpl` to survive zsh-vi-mode's keybind wipe |
+92:Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:21Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./CLAUDE.md`
+
+```text
+82	| Tool | Config file | Conflict risk |
+83	|------|-------------|---------------|
+84	| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+85	| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+86	| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
+87	| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+88	| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+89	| zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `dot_zshrc.tmpl` to survive zsh-vi-mode's keybind wipe |
+90	| Claude Code (TUI) | `dot_claude/modify_keybindings.json` (overlay) + `~/.claude/keybindings.json` (live); see [docs/tools/claude-code-keybindings.md](docs/tools/claude-code-keybindings.md) | `Ctrl+R` (history:search — collides with atuin / zsh-history-substring at the prompt outside Claude), `Ctrl+T` (toggleTodos — Television's `Ctrl+T` is shadowed when Claude has focus), `Ctrl+G` (chat:externalEditor), `Ctrl+S` (chat:stash), `Shift+Tab` (chat:cycleMode — only known mode-switch action, no jump-to-plan) |
+91	
+92	Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
+93	
+94	**Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
+95	
+96	### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
+```
 </details></tool-use>

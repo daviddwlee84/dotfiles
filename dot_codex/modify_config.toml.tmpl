@@ -25,9 +25,11 @@
 #      verbatim so per-project trust survives an overlay churn.
 #
 # To manage an additional key: edit .chezmoitemplates/agents/codex.config.overlay.toml
-# Requires: Python 3.11+ with built-in tomllib (macOS via mise/uv, Debian
-# via base ansible role). Falls back to passing the live file through
-# untouched if Python is too old or missing.
+# Python runtime: prefer `uv` (Linuxbrew/cargo-installed in the base ansible
+# role; standard on macOS), which fetches a managed Python ≥ 3.11 if the host
+# system python is older — guaranteeing built-in `tomllib`. Falls back to
+# system `python3`, then to a no-op pass-through, so a fresh-bootstrap host
+# without uv yet doesn't fail this modify_ script.
 set -eu
 
 overlay=$(cat <<'TOML'
@@ -37,8 +39,17 @@ TOML
 
 base=$(cat)
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "modify_config.toml: python3 not found; skipping merge" >&2
+# Pick the python invocation. uv guarantees ≥3.11 → tomllib always
+# importable; system python3 may be older but the script's own ImportError
+# handler passes the live file through untouched if so. `--no-project`
+# stops uv from picking up the dotfiles repo's pyproject.toml. `--quiet`
+# silences "Installed X" log noise on first run.
+if command -v uv >/dev/null 2>&1; then
+  set -- uv run --no-project --quiet --python '>=3.11' python -
+elif command -v python3 >/dev/null 2>&1; then
+  set -- python3 -
+else
+  echo "modify_config.toml: neither uv nor python3 found; skipping merge" >&2
   printf '%s' "$base"
   exit 0
 fi
@@ -46,7 +57,7 @@ fi
 # Pass live file + overlay via env vars; emit merged TOML on stdout. If
 # anything goes wrong (tomllib missing on Python <3.11, malformed live file),
 # Python prints to stderr and exits non-zero -> chezmoi skips the file.
-CODEX_LIVE="$base" CODEX_OVERLAY="$overlay" python3 - <<'PYEOF'
+CODEX_LIVE="$base" CODEX_OVERLAY="$overlay" "$@" <<'PYEOF'
 import os
 import sys
 
