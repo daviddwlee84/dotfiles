@@ -7712,7 +7712,7 @@ ps -axo pid,comm,args | awk '$2 == "node" {print $1, substr($0, index($0, $3))}'
 === node/bun processes with cursor in argv ===
  1042 /System/Library/ /System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService
  3998 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.1.17 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
-46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 81171 /Applications/Cu /Applications/Cursor.app/Contents/MacOS/Cursor
 81286 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.2.11 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
 81295 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Cursor Helper (GPU).app/Contents/MacOS/Cursor Helper (GPU) --type=gpu-process --disable-skia-graphite --user-data-dir=/Users/daviddwlee84/Library/Application Support/Cursor --gpu-preferences=SAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAAAQAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=1718379636,r,11627237234073399701,16195094820915680601,262144 --enable-features=DocumentPolicyIncludeJSCallStacksInCrashReports,PdfUseShowSaveFilePicker,ScreenCaptureKitPickerScreen,ScreenCaptureKitStreamPickerSonoma --disable-features=CalculateNativeWinOcclusion,LocalNetworkAccessChecks,MacWebContentsOcclusion,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TimeoutHangingVideoCaptureStarts,TraceSiteInstanceGetProcessCreation --variations-seed-version --trace-process-track-uuid=3190708988185955192 --seatbelt-client=27
@@ -8229,12 +8229,12 @@ sed -n '7713,7717p' /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/
 ```
 
 ```text
-7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 ---
  1042 /System/Library/ /System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService
  3998 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.1.17 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
-46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 81171 /Applications/Cu /Applications/Cursor.app/Contents/MacOS/Cursor
 81286 /Applications/Cu /Applications/Cursor.app/Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler --no-rate-limit --monitor-self-annotation=ptype=crashpad-handler --database=/Users/daviddwlee84/Library/Application Support/Cursor/Crashpad --url=https://f.a.k/e --annotation=_productName=Cursor --annotation=_version=3.2.11 --annotation=plat=OS X --annotation=prod=Electron --annotation=ver=39.8.1 --handshake-fd=21
 ```
@@ -8317,10 +8317,10 @@ grep -c "eyJhbGci" /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2
 ```
 
 ```text
-7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 8226:grep -n "cloud-token" /Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md | head -3
-8232:7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token <REDACTED-JWT> --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
+8232:7715:46692 /Users/daviddwle /Users/daviddwlee84/.cursor/extensions/specstory.specstory-vscode-1.0.6-universal/bin/specstory_darwin_arm64 watch --no-version-check --json --cloud-url https://cloud.specstory.com --cloud-token eyJ...WXA --config-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc/cli --output-dir /var/folders/g3/gsbp4bsx1gs51t1805r34ztw0000gn/T/specstory-93256f82d38cf0bc --project-path /home/ldw/src/tries/2026-03-23-RL-Investigation --git-origin git@gitlab.com:daviddwlee84/AShare_T0_RL.git
 8233:8182:Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
 ---verifying file is JWT-free---
 3
@@ -8590,7 +8590,7 @@ _**Agent (claude-opus-4-7 2026-04-27 11:07:17Z)**_
 
 Fix verified — `[cx]` and `[oc]` rows now show empty title (correct: brand-new sessions, no message typed yet) instead of inheriting an unrelated old session's title. Claude rows unchanged (Claude uses authoritative per-PID files). Let me commit the follow-up.
 
-_**Agent (claude-opus-4-7 2026-04-27 11:07:28Z)**_
+_**Agent (claude-opus-4-7 2026-04-27 11:07:29Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -8629,4 +8629,732 @@ EOF
 echo "---"
 git log --oneline -3
 ```
+
+```text
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 99ac7f4] agent-panes: floor cwd-based session lookups at agent process start time
+ 2 files changed, 201 insertions(+), 16 deletions(-)
+---
+99ac7f4 agent-panes: floor cwd-based session lookups at agent process start time
+ce493b7 agent-panes: tv channel + recon for live coding-agent pane discovery
+6799a61 codex: prefer uv over system python3 for modify_config.toml merge
+```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:07:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit history is clean
+
+`git log --oneline -5; echo "---"; git rev-parse 11c8c48 2>&1 | head -1; git rev-parse ce493b7 2>&1 | head -1`
+
+```text
+99ac7f4 agent-panes: floor cwd-based session lookups at agent process start time
+ce493b7 agent-panes: tv channel + recon for live coding-agent pane discovery
+6799a61 codex: prefer uv over system python3 for modify_config.toml merge
+a591887 fleet-apply: classify drift from merged stdout, not empty stderr
+dd3a75d skills: add `just upgrade-skills` recipe (npx skills update --global -y)
+---
+11c8c482e44034cd1845c7ebf2a9a6bf78cf02fc
+ce493b7c9ba1d644ecc6bc8c82301def5779257c
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:08:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:08:15Z)**_
+
+對 — 這正是 root cause。Pre-commit 的 stash → redact → restore 流程要工作得好的前提是「在 commit 期間沒有別的東西在 append 那個檔案」，但 SpecStory 是 continuous writer，又剛好捕到我跑 `ps -axo args` 時的 process list（裡面 specstory 自己的 background daemon 把 cloud-token 印出來），所以每次 redact 都被新的 capture 蓋過去。最後我用「sed 不印 match → 立刻 git add → 立刻 git commit」的三行 atomic sequence 才繞過。
+
+兩個 commit 都已落地：
+- `ce493b7` — 主 feature (tv agent-panes + recon)
+- `99ac7f4` — 你發現的 fresh-session 顯示舊 title 的 fix（用 `ps -o lstart=` 當 floor）
+
+這個 JWT loop 算是符合 pitfall 收錄標準（>15 分鐘 debug、非 google-able、silent failure mode）。要不要我順手加進 `pitfalls/`？大概一個檔案，標題建議 `pitfalls/specstory-pre-commit-redact-loop.md`，內容就是 symptom（"redact-secrets says successfully redacted but gitleaks still fails"）+ 觸發條件（concurrent specstory writer + ps output 含 daemon args）+ 解法（atomic redact-add-commit pipeline，避免 grep/print match）。
+
+---
+
+_**User (2026-04-27 11:08:37Z)**_
+
+也可以加一下
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-27 11:08:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:08:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check pitfalls dir + sample existing pitfall format
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/pitfalls/ | head -20; echo "---"; head -50 /Users/daviddwlee84/.local/share/chezmoi/pitfalls/sudo-shared-setsid-macos.md 2>/dev/null`
+
+```text
+ ansible-js-cli-tools-old-system-node.md
+ ansible-missing-sudo-tag.md
+ brew-cask-slow-github-release-assets.md
+ claude-code-permission-mode-resets-after-interactive-prompt.md
+ codeisland-auto-approves-permissionrequest.md
+ mkdocs-copy-to-llm-custom-css-no-trailing-newline.md
+ npm-postinstall-github-releases-hang.md
+ nvim-fs-find-enoent-stale-cwd.md
+ raycast-library-files-not-portable-across-machines.md
+󰂺 README.md
+ sudo-shared-setsid-macos.md
+ tmux-display-menu-silent-fail.md
+ tmux-join-pane-numeric-target-pane-not-window.md
+ tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper.md
+ tmux-resurrect-agents.md
+ tmux-scrollback-tui-repaint-ghosting.md
+ tmux-submenu-flash-and-bottom-right.md
+ tmux2k-bandwidth-uint64-underflow.md
+ tmuxp-append-ignores-session-start-directory.md
+ tree-sitter-cli-empty-native-binary.md
+---
+# Shared sudo session re-prompts once per run-script on macOS (`setsid` missing)
+
+**Symptoms** (grep this section):
+- On macOS, `chezmoi apply` (or `chezmoi update --init`) prompts three times
+  in a row — once per run-script — despite the "entered once, reused for this
+  chezmoi apply" wording:
+  ```
+  [bootstrap] sudo password for <user> (entered once, reused for this chezmoi apply):
+  …
+  [ansible]   sudo password for <user> (entered once, reused for this chezmoi apply):
+  …
+  [brew]      sudo password for <user> (entered once, reused for this chezmoi apply):
+  ```
+- `which setsid` on macOS: `setsid not found`
+- `man 2 setsid` exists (libc system call), but `setsid(1)` does not ship in
+  base macOS
+- Between prompts, `$TMPDIR/chezmoi-sudo-$UID/` exists with valid `sudo.pass`
+  / `ansible-become.yml` / `keepalive.pid`, but the PID in `keepalive.pid` is
+  dead: `kill -0 $(cat …/keepalive.pid)` returns non-zero, `ps -p <pid>`
+  returns no row
+- Linux hosts (Ubuntu, Debian) are unaffected — util-linux ships `setsid(1)`
+- No `setsid: command not found` error is visible to the user because the
+  failing command is backgrounded with `>/dev/null 2>&1 &`
+
+**First seen**: 2026-04 on `Da-Weis-Mac-mini` (macOS 26.2 arm64, chezmoi 2.69.4)
+**Affects**: any macOS host running `scripts/lib/sudo_shared.sh` without
+util-linux installed from Homebrew. Introduced when the shared-sudo helper
+landed.
+**Status**: fixed in `scripts/lib/sudo_shared.sh` (`_sudo_spawn_watchdog`
+falls back to `nohup` when `setsid` is unavailable).
+
+## Symptom
+
+The helper's contract is "prompt once at the start of `chezmoi apply`,
+downstream run-scripts reuse the cached credential silently" (see
+[CLAUDE.md → Sudo session is shared across all run-scripts](../CLAUDE.md)).
+On macOS the prompt fires three separate times — once for `bootstrap`, once
+for `ansible`, once for `brew` — with the state dir being wiped and rebuilt
+between each.
+
+The state on disk during the second prompt looks "valid":
+
+```
+$ ls -la "$TMPDIR/chezmoi-sudo-$(id -u)"
+.rw-------@ 36 daviddwlee84 25 Apr 03:59  ansible-become.yml
+.rw-------@  6 daviddwlee84 25 Apr 03:59  chezmoi.pid
+.rw-------@  6 daviddwlee84 25 Apr 03:59  keepalive.pid
+.rw-------@  9 daviddwlee84 25 Apr 03:59  sudo.pass
+
+$ PID=$(cat "$TMPDIR/chezmoi-sudo-$(id -u)/keepalive.pid")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:08:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:09:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# `redact-secrets` keeps "redacting" the same JWT but `gitleaks` still fails
+
+**Symptoms** (grep this section):
+- `git commit` of a SpecStory transcript fails repeatedly. Pre-commit
+  output says the secret was redacted, but the next hook (gitleaks) still
+  finds it:
+  \```
+  Auto-redact secrets in agent artifacts...................................Failed
+  - hook id: redact-agent-secrets
+  - files were modified by this hook
+  …
+  Successfully redacted 1 file(s)
+
+  Detect hardcoded secrets.................................................Failed
+  - hook id: gitleaks-system
+  Finding:     ...y.com --cloud-token REDACTED --config-dir /var/f...
+  Secret:      REDACTED
+  RuleID:      jwt
+  \```
+- Re-running `git add file && git commit` (which usually clears the loop —
+  pre-commit's auto-fix flow is "stash unstaged → fix staged → restore
+  unstaged → re-stage manually") doesn't help. The redacted version on
+  disk reverts to the original after each commit attempt.
+- `grep -c "eyJhbGci" file` keeps returning a non-zero count even right
+  after `just redact-secrets`. The count tends to *increase* over commit
+  attempts, not stay flat.
+- `just add-and-redact` reports "Successfully redacted N file(s)" but the
+  next `grep` shows the same N back, plus a few new occurrences.
+- The leaked secret is something the user *did not type* — typically a JWT
+  pulled from `ps -axo args` output of an unrelated background daemon
+  (e.g. SpecStory's own `--cloud-token …` flag in its `specstory_darwin_*
+  watch` process).
+
+**First seen**: 2026-04 while committing `agent-panes` feature on
+`Da-Weis-Mac-mini` (macOS 26.2). Triggered by running `ps -axo pid,comm,args`
+in the chat to debug Cursor Agent CLI detection — the `ps` output included
+SpecStory's own daemon process line with a JWT in argv.
+**Affects**: any session where (a) SpecStory is actively writing the
+transcript, AND (b) the chat captures `ps`/`pgrep -fl`/`top -ax`-style
+output containing another process's secrets in argv.
+**Status**: no permanent fix yet — workaround is the atomic
+"redact-without-print → stage → commit" pipeline below. A real fix would
+need either a SpecStory pause/resume API or pre-commit running the redact
+hook in a transactional way that survives concurrent writes.
+
+## Why it loops
+
+SpecStory's `specstory_darwin_arm64 watch` daemon tails the agent's
+input/output and appends to `.specstory/history/<session>.md` continuously.
+Pre-commit's auto-fix flow assumes the file is **quiescent during the
+commit**:
+
+1. `git commit` invokes pre-commit.
+2. Pre-commit stashes unstaged worktree changes.
+3. The `redact-agent-secrets` hook (`scripts/redact_secrets.py --fix`)
+   scans the *staged* version, finds the JWT, redacts it. Both the index
+   and the worktree now hold the redacted version.
+4. Some downstream hook (or pre-commit's restore step) puts the unstaged
+   stash back on top of the worktree — but that stash captured the
+   *original, unredacted* file because the user hadn't `git add`-ed it
+   between the redact and the restore. Worktree is back to unredacted.
+5. `gitleaks-system` then runs on the *staged* version (which IS redacted)
+   and *should* pass — but if any new specstory write happened mid-flight
+   that re-introduced the JWT into the staged content (rare), or if the
+   user re-runs `git add` between attempts, the loop re-enters.
+
+The kicker: **every diagnostic command makes it worse.** `grep
+"cloud-token"` on the file prints the JWT to the chat → SpecStory captures
+the chat → the literal JWT lands at a *new* line in the transcript.
+`just redact-secrets` then needs to redact two copies; by the time you
+re-stage, a third copy has been appended.
+
+## Fix (the atomic pipeline)
+
+Do the redaction without ever printing the matched bytes, then stage and
+commit in **one** bash command so SpecStory has no window to write a new
+copy:
+
+\```bash
+FILE=.specstory/history/<active-session>.md
+
+# 1. Redact in place. NEVER use grep/awk/sed in a way that prints the match.
+python3 -c "
+import re, pathlib
+p = pathlib.Path('$FILE')
+s = p.read_text()
+s2 = re.sub(r'ey[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}',
+            '<REDACTED-JWT>', s)
+p.write_text(s2)
+"
+
+# 2. Stage the redacted snapshot. From this moment, the index is frozen —
+# any later specstory write only affects the worktree, not the commit.
+git add "$FILE"
+
+# 3. Commit. Pre-commit will stash any post-stage worktree drift, run on
+# the staged (redacted) version, find nothing, and commit cleanly.
+git commit -m "..."
+\```
+
+The redaction regex above (`ey[A-Za-z0-9_-]{8,}\.{10,}\.{10,}`) is
+JWT-shaped (3 base64url segments separated by dots) and catches the common
+case. Adjust per the actual leak class.
+
+## Don't do these (they re-introduce the leak)
+
+- `grep "<secret-substring>" file` — prints the secret to chat, SpecStory
+  appends it back into the transcript on the next chat turn.
+- `cat file | head -n NNNN | tail -n M` to inspect the secret line — same
+  problem.
+- `sed -n '<line>p' file` — same.
+- `git diff` of the leaked file — same. Use `git diff --stat` to see
+  scope without payload.
+- `pre-commit run --files <file>` in a fresh terminal expecting it to
+  "just work" — it has the same race with SpecStory.
+- `git stash` mid-attempt — the stash captures the unredacted worktree;
+  popping later restores the leak.
+
+## When the loop does NOT happen (sanity check)
+
+The standard pre-commit auto-fix flow IS supposed to work — the loop
+shows up only when *something else is actively writing the file*. If you
+hit this with no concurrent agent running, the cause is different (likely
+a regex-vs-leak mismatch in `scripts/redact_secrets.py` or `gitleaks.toml`).
+
+Quick diagnostic: `lsof <transcript-file>` — if SpecStory's
+`specstory_darwin_*` is in the writers, you're in this trap. Otherwise
+look elsewhere.
+
+## Adjacent
+
+- [CLAUDE.md → Agent artifact redaction](../CLAUDE.md) — the four
+  auto-scanned prefixes (`.specstory/history/`, `.claude/plans/`,
+  `.cursor/plans/`, `.opencode/plans/`) and the gitleaks pipeline.
+- [`scripts/redact_secrets.py`](../scripts/redact_secrets.py) — the
+  `--fix` implementation. Loop-handling improvements (e.g. an
+  `lsof`-aware "wait until quiescent" mode) would land here.
+- [`agent-history-hygiene` skill](https://github.com/daviddwlee84/agent-skills)
+  — the skill that prescribes the standard `commit chat transcripts
+  alongside the feature` workflow assumes no concurrent writers.
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/pitfalls/redact-secrets-loop-with-active-specstory-writer.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:09:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:09:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect the agent-history-hygiene skill
+
+`ls /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/ 2>&1; echo "---"; head -60 /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md 2>/dev/null`
+
+```text
+ **assets
+ **references
+ **scripts
+ **tests
+ SKILL.md
+---
+---
+name: agent-history-hygiene
+description: Commit SpecStory chat transcripts (`.specstory/history/*.md`), Claude Code plan files (`.claude/plans/*.md`, `plansDirectory`), and other coding-agent artifacts (`.cursor/plans/`, `.cursor/rules/`, `.opencode/plans/`, `.specify/`, `.codex/`) alongside the feature diff they produced — without leaking `.env` contents, API keys, or private-key PEM blocks into git history. Use when the user says "commit my chat", "save this specstory session", "stage the plan file", "scrub the transcript", "my .env leaked in chat", "bootstrap pre-commit for this project", or when you notice untracked `.specstory/history/*.md` or `.claude/plans/*.md` files while running `git status`. Also use after an accidental push of a secret to enforce rotate-first, rewrite-last remediation instead of reflexive `git push --force`.
+---
+
+# agent-history-hygiene
+
+Keep agent chat transcripts and plan files committed together with the
+code they produced, without leaking secrets. Pairs with the
+`redact-agent-secrets` + `gitleaks` pre-commit hooks the skill installs.
+
+Three surfaces, separated by purpose:
+
+| Surface                          | Question it answers                                          |
+|----------------------------------|--------------------------------------------------------------|
+| `find-session.sh`                | "Which transcript / plan file is *my* current session?"      |
+| `stage-agent-artifacts.sh`       | "Which agent files belong in the next commit?"               |
+| `bootstrap-project.sh`           | "How do I get pre-commit + gitleaks + redactor into a repo?" |
+| `scan-staged.sh`                 | "Is there a leaked secret in what I'm about to commit?"      |
+| `references/remediation.md`      | "I already pushed a secret — now what?"                      |
+
+## Core invariants
+
+1. **Agent transcripts and plan files are committed alongside the diff
+   that produced them.** Never add them to `.gitignore`. An agent that
+   drops these from a commit has broken the user's review trail.
+2. **Rotate at the provider before any git rewrite.** The only act
+   that revokes a leaked credential is rotation. History rewriting
+   scrubs bytes on one clone and leaves them on every other.
+3. **`git push --force` against a shared branch is never the fix for a
+   leak.** At best it's useless; at worst it destroys teammate work and
+   silently re-introduces the secret when someone merges their old
+   history back.
+
+## When to use this skill
+
+Use it when the user (or you) surface any of:
+
+- "Commit my chat" / "save the specstory session" / "include the plan
+  file in this commit" / "把 plan 跟 specstory 一起 commit 進去".
+- You see dirty `.specstory/history/*.md`, `.claude/plans/*.md`,
+  `.cursor/plans/*.md`, or any other configured agent artifact during
+  `git status` and you're about to commit a feature.
+- "Scrub this transcript" / "redact my key" / "gitleaks flagged my
+  chat history".
+- "Set up pre-commit for this repo" / "I'm starting a new project — how
+  do I get the hook stack?" / "bootstrap secret scanning here".
+- "I pushed a `.env`" / "a secret went to main" / "do I need to force
+  push?" — the agent must steer to `references/remediation.md` and
+  stop the user from force-pushing reflexively.
+
+## When NOT to use
+
+- The user explicitly wants agent transcripts **excluded** from the
+  repo. Respect that; suggest a one-liner `.gitignore` addition and
+  skip this skill entirely.
+- The leak is already on a shared `main`/release branch. Do **not**
+  offer to rewrite history — jump to `references/remediation.md` §5.
+- The project genuinely has no agent session (no `.specstory/`, no
+  `.claude/plans/`, etc.). Nothing to stage.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Skill TOC to find insert point
+
+```bash
+wc -l /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md
+echo "---"
+grep -n "^## \|^### " /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md
+```
+
+```text
+     277 /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md
+---
+22:## Core invariants
+35:## When to use this skill
+52:## When NOT to use
+64:## Integration with existing infrastructure
+93:## Workflow A: commit-time hygiene
+121:## Workflow B: bootstrap a new project
+151:## Workflow C: post-leak remediation
+163:## Gotchas
+197:## Available scripts
+222:## Bundled assets
+239:## Reference files
+252:## Tests
+272:## Related skills
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:26Z)**_
+
+There's already a `Gotchas` section. Let me read it and add the new one.
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:26Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md`
+
+```text
+163	## Gotchas
+164	
+165	- **`plansDirectory` project-level sometimes ignored.** Claude Code
+166	  issue [#19537](https://github.com/anthropics/claude-code/issues/19537)
+167	  reports project-level `plansDirectory` being ignored in some
+168	  versions. After running a `/plan`, verify the file actually landed
+169	  where you expected before relying on `stage-agent-artifacts.sh`
+170	  picking it up. User-level config (`~/.claude/settings.json` with
+171	  `"plansDirectory": "./.claude/plans"`) is the recommended default.
+172	- **`gitleaks protect` is deprecated.** Since v8.19.0 use
+173	  `gitleaks git --staged --redact` (pre-commit) and
+174	  `gitleaks dir <path>` (working directory). The older commands still
+175	  work but emit a deprecation notice. This skill uses the modern
+176	  syntax everywhere.
+177	- **`pre-commit install` is per-clone.** Each teammate must run
+178	  `pre-commit install` in their own clone for hooks to fire. CI cannot
+179	  be trusted as the single gate — it's second-chance, not last-chance.
+180	- **Transcript files can be huge.** A long SpecStory session can exceed
+181	  2 MB. The template bumps `check-added-large-files` to `--maxkb=2048`
+182	  to avoid false positives, but a very long session can still overflow.
+183	  If you hit the limit, rotate sessions (`specstory run claude`
+184	  creates a fresh file) instead of raising the cap further.
+185	- **Session-UUID divergence between SpecStory CLI and VS Code
+186	  extension.** The extension autosaves into `.specstory/history/`
+187	  continuously; the CLI (`specstory run claude`) creates one file per
+188	  invocation. If both are active you can end up with two transcripts
+189	  for what feels like "one session" — mtime-newest wins in
+190	  `find-session.sh`.
+191	- **Global `core.hooksPath` means bare repos aren't protected.** The
+192	  chezmoi setup's global hook runs `.pre-commit-config.yaml` IF it
+193	  exists — so a repo without `.pre-commit-config.yaml` has no
+194	  protection. Run `bootstrap-project.sh` before the first commit with
+195	  agent artifacts, not after.
+196	
+197	## Available scripts
+198	
+199	- **`scripts/find-session.sh [--format=specstory|claude|both] [--json]`**
+200	  Discover the current agent session files for `$PWD`. TSV default,
+201	  `--json` for structured callers. Never exits non-zero (always 0,
+202	  empty fields signal absence).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:35Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:10:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Volumes/Data/Program/Personal/agent-skills/skills/local/agent-history-hygiene/SKILL.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:04Z)**_
+
+Now commit the new pitfall and the skill update separately (different repos).
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit pitfall to chezmoi repo
+
+```bash
+FILE=/Users/daviddwlee84/.local/share/chezmoi/.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md
+python3 -c "
+import re, pathlib
+p = pathlib.Path('$FILE')
+s = p.read_text()
+s2 = re.sub(r'ey[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}', '<REDACTED-JWT>', s)
+p.write_text(s2)
+"
+git -C /Users/daviddwlee84/.local/share/chezmoi add pitfalls/redact-secrets-loop-with-active-specstory-writer.md "$FILE"
+git -C /Users/daviddwlee84/.local/share/chezmoi commit -m "$(cat <<'EOF'
+pitfalls: redact-secrets loop when SpecStory writer is active
+
+The standard pre-commit auto-fix flow (stash unstaged → fix staged →
+restore unstaged → re-stage) assumes the file is quiescent. With a live
+SpecStory writer plus a chat that captured `ps -axo args` output of an
+unrelated daemon (its --cloud-token flag in argv), every diagnostic
+command echoes the secret back into the transcript and the redact loop
+never converges. Captures the symptom (≥15 min debug last week landing
+the agent-panes feature), why it loops, the atomic
+redact-without-print-then-stage-then-commit workaround, and the
+print/grep/diff anti-patterns.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -10
+echo "--- chezmoi log ---"
+git -C /Users/daviddwlee84/.local/share/chezmoi log --oneline -3
+```
+
+```text
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+--- chezmoi log ---
+99ac7f4 agent-panes: floor cwd-based session lookups at agent process start time
+ce493b7 agent-panes: tv channel + recon for live coding-agent pane discovery
+6799a61 codex: prefer uv over system python3 for modify_config.toml merge
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:20Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-check log + status
+
+`git -C /Users/daviddwlee84/.local/share/chezmoi log --oneline -5; echo "---"; git -C /Users/daviddwlee84/.local/share/chezmoi status --short`
+
+```text
+99ac7f4 agent-panes: floor cwd-based session lookups at agent process start time
+ce493b7 agent-panes: tv channel + recon for live coding-agent pane discovery
+6799a61 codex: prefer uv over system python3 for modify_config.toml merge
+a591887 fleet-apply: classify drift from merged stdout, not empty stderr
+dd3a75d skills: add `just upgrade-skills` recipe (npx skills update --global -y)
+---
+MM .specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md
+A  pitfalls/redact-secrets-loop-with-active-specstory-writer.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:28Z)**_
+
+Commit failed silently. Let me re-run and capture full output.
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit with full output capture
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+FILE=.specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md
+python3 -c "
+import re, pathlib
+p = pathlib.Path('$FILE')
+s = p.read_text()
+s2 = re.sub(r'ey[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}', '<REDACTED-JWT>', s)
+p.write_text(s2)
+"
+git add pitfalls/redact-secrets-loop-with-active-specstory-writer.md "$FILE"
+git commit -m "$(cat <<'EOF'
+pitfalls: redact-secrets loop when SpecStory writer is active
+
+Captures the symptom (~15 min debug landing the agent-panes feature),
+why it loops (pre-commit auto-fix flow assumes file is quiescent;
+SpecStory's daemon tails it continuously), the atomic
+redact-without-print + stage + commit workaround, and the
+print/grep/diff anti-patterns that re-introduce the leak.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1
+echo "---exit=$?---"
+git log --oneline -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 2445e38] pitfalls: redact-secrets loop when SpecStory writer is active
+ 2 files changed, 740 insertions(+), 1 deletion(-)
+ create mode 100644 pitfalls/redact-secrets-loop-with-active-specstory-writer.md
+---exit=0---
+2445e38 pitfalls: redact-secrets loop when SpecStory writer is active
+99ac7f4 agent-panes: floor cwd-based session lookups at agent process start time
+ce493b7 agent-panes: tv channel + recon for live coding-agent pane discovery
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:52Z)**_
+
+Pitfall committed (`2445e38`). Now the agent-skills update.
+
+_**Agent (claude-opus-4-7 2026-04-27 11:11:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Survey agent-skills repo state + commit style
+
+```bash
+cd /Volumes/Data/Program/Personal/agent-skills
+git status --short skills/local/agent-history-hygiene/SKILL.md
+echo "---"
+git diff --stat skills/local/agent-history-hygiene/SKILL.md
+echo "---recent commits style---"
+git log --oneline -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+ M skills/local/agent-history-hygiene/SKILL.md
+---
+ skills/local/agent-history-hygiene/SKILL.md | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+---recent commits style---
+15a657f pueue-job-queue: --isolated-group, cleanup.sh, QUERY DSL recipes
+bac1248 Slim pueue-job-queue stderr noise; auto-warn DAG width vs group parallelism
+8c177fd Add pueue-job-queue local skill with docs and tests
+Shell cwd was reset to /Users/daviddwlee84/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:12:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit skill update
+
+```bash
+cd /Volumes/Data/Program/Personal/agent-skills && git add skills/local/agent-history-hygiene/SKILL.md && git commit -m "$(cat <<'EOF'
+agent-history-hygiene: document active-writer redact loop trap
+
+Pre-commit's auto-fix flow assumes the agent transcript is quiescent
+during the commit. SpecStory's daemon tails it continuously, so a chat
+that captured `ps -axo args` containing an unrelated daemon's secret
+(e.g. SpecStory's own --cloud-token in argv) gets stuck in a loop:
+redact succeeds, gitleaks fails, every diagnostic command echoes the
+secret back into the transcript, redact-then-restage never converges.
+
+Adds a Gotchas bullet covering the symptom, the atomic
+redact-without-print + stage + commit workaround, the print/grep/diff
+anti-patterns, and an `lsof` diagnostic. Cross-links to the upstream
+chezmoi pitfall file with the full debugging trail.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -5
+echo "---"
+cd /Volumes/Data/Program/Personal/agent-skills && git log --oneline -3
+```
+
+```text
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+[main fd37f97] agent-history-hygiene: document active-writer redact loop trap
+ 1 file changed, 21 insertions(+)
+---
+fd37f97 agent-history-hygiene: document active-writer redact loop trap
+15a657f pueue-job-queue: --isolated-group, cleanup.sh, QUERY DSL recipes
+bac1248 Slim pueue-job-queue stderr noise; auto-warn DAG width vs group parallelism
+Shell cwd was reset to /Users/daviddwlee84/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 11:12:30Z)**_
+
+Both commits landed:
+- `chezmoi 2445e38` — `pitfalls/redact-secrets-loop-with-active-specstory-writer.md` (full debugging trail)
+- `agent-skills fd37f97` — Gotchas bullet in `agent-history-hygiene/SKILL.md` cross-linking the chezmoi pitfall
+
+The skill update is the higher-leverage one — every future invocation of `agent-history-hygiene` (which fires on "commit my chat" / "scrub the transcript") now warns the agent about this trap before it tries the standard `git add → commit → restage` recovery dance.
+
+Want me to `/schedule` an agent for ~2 weeks out to check whether the `agent-panes` channel actually got used, and tidy up if a known follow-up emerged (e.g., the OpenCode capture-pane preview being mostly empty when idle)?
