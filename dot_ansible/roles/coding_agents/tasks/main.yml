@@ -130,20 +130,38 @@
   failed_when: false
 
 - name: Check if GitHub Copilot CLI is installed
-  when: npm_check.rc == 0
   ansible.builtin.command: which github-copilot-cli
   register: copilot_check
   changed_when: false
   failed_when: false
 
-- name: Install GitHub Copilot CLI (npm)
+- name: Install GitHub Copilot CLI (npm - macOS)
   when:
+    - ansible_facts["os_family"] == "Darwin"
     - npm_check.rc == 0
     - copilot_check.rc != 0
   community.general.npm:
     name: "@githubnext/github-copilot-cli"
     global: true
     state: present
+  ignore_errors: true
+
+- name: Install GitHub Copilot CLI via mise npm (Linux, user-level no-sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - copilot_check.rc != 0
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @githubnext/github-copilot-cli
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm install -g @githubnext/github-copilot-cli
+    else
+      echo "mise not found, skipping GitHub Copilot CLI install" >&2
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
   ignore_errors: true
 
 # === OpenAI Codex CLI ===
@@ -176,24 +194,42 @@
   register: codex_macos_bin_stat
   failed_when: not codex_macos_bin_stat.stat.exists
 
-- name: Check if OpenAI Codex CLI is installed via npm (Linux)
+- name: Check if OpenAI Codex CLI is installed (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - npm_check.rc == 0
-  ansible.builtin.command: npm list -g --depth=0 @openai/codex
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm list -g --depth=0 @openai/codex >/dev/null 2>&1
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm list -g --depth=0 @openai/codex >/dev/null 2>&1
+    elif command -v npm >/dev/null 2>&1; then
+      npm list -g --depth=0 @openai/codex >/dev/null 2>&1
+    else
+      exit 1
+    fi
+  args:
+    executable: /bin/bash
   register: codex_linux_npm_check
   changed_when: false
   failed_when: false
 
-- name: Install OpenAI Codex CLI (npm - Linux fallback)
+- name: Install OpenAI Codex CLI via mise npm (Linux fallback, user-level no-sudo)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - npm_check.rc == 0
     - codex_linux_npm_check.rc != 0
-  community.general.npm:
-    name: "@openai/codex"
-    global: true
-    state: present
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @openai/codex
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm install -g @openai/codex
+    else
+      echo "mise not found, skipping OpenAI Codex CLI install" >&2
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+  ignore_errors: true
 
 # === Gemini CLI ===
 
@@ -235,21 +271,27 @@
 - name: Check if Gemini CLI is installed (Linux)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - npm_check.rc == 0
   ansible.builtin.command: which gemini
   register: gemini_check
   changed_when: false
   failed_when: false
 
-- name: Install Gemini CLI (npm - Linux)
+- name: Install Gemini CLI via mise npm (Linux, user-level no-sudo)
   when:
     - ansible_facts["os_family"] == "Debian"
-    - npm_check.rc == 0
     - gemini_check.rc != 0
-  community.general.npm:
-    name: "@google/gemini-cli"
-    global: true
-    state: present
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @google/gemini-cli
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm install -g @google/gemini-cli
+    else
+      echo "mise not found, skipping Gemini CLI install" >&2
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
   ignore_errors: true
 
 # === RTK ===
@@ -1084,20 +1126,38 @@
 # === OpenChamber ===
 
 - name: Check if OpenChamber is installed
-  when: npm_check.rc == 0
   ansible.builtin.command: which openchamber
   register: openchamber_check
   changed_when: false
   failed_when: false
 
-- name: Install OpenChamber (npm)
+- name: Install OpenChamber (npm - macOS)
   when:
+    - ansible_facts["os_family"] == "Darwin"
     - npm_check.rc == 0
     - openchamber_check.rc != 0
   community.general.npm:
     name: "@openchamber/web"
     global: true
     state: present
+  ignore_errors: true
+
+- name: Install OpenChamber via mise npm (Linux, user-level no-sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - openchamber_check.rc != 0
+  ansible.builtin.shell: |
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
+      {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @openchamber/web
+    elif command -v mise >/dev/null 2>&1; then
+      mise exec -- npm install -g @openchamber/web
+    else
+      echo "mise not found, skipping OpenChamber install" >&2
+      exit 0
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
   ignore_errors: true
 
 # === Claude HUD Plugin ===
