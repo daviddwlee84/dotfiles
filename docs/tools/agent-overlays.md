@@ -218,6 +218,8 @@ cask "codeisland"
 
 CodeIsland's settings panel calls itself "Auto hook install" with "auto-repair and version tracking" — meaning the **app actively writes and re-writes** hook entries into each detected CLI's config on every launch. Two coexistence patterns:
 
+> **Note (2026-04-25)**: CodeIsland v1.0.23 dropped `ExitPlanMode` from the default `HookServer.autoApproveTools` whitelist — plan-mode exit now prompts a real confirm dialog, and Settings → Behavior → "Auto-approve Tools" lets users toggle individual tools. See [`pitfalls/codeisland-auto-approves-permissionrequest.md`](../../pitfalls/codeisland-auto-approves-permissionrequest.md). Our merger continues to *additively* preserve every CodeIsland hook entry — no subtractive logic was added, because the upstream fix is the right path and the `PermissionRequest` hook is now a legitimate input source for the notch popup, not a bypass mechanism.
+
 #### Pattern A — Sidecar files (always-ignored)
 
 CLIs whose hooks live in a dedicated sidecar (containing nothing but CodeIsland hooks) are simply unmanaged by chezmoi. Concretely:

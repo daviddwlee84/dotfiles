@@ -342,6 +342,14 @@ upgrade-plugins:
 upgrade-externals:
     ./scripts/upgrade_tools.sh externals
 
+# Update already-installed global agent skills (refresh upstream content via
+# content-hash compare). Does NOT backfill missing entries from
+# ~/.agents/.skill-lock.json — that's `chezmoi apply`'s restore loop. Standalone
+# for now (not wired into upgrade-all / upgrade_tools.sh; see TODO.md).
+# See docs/tools/agent-skills.md.
+upgrade-skills:
+    npx -y skills@latest update --global -y
+
 # Preview what `just upgrade-all` would do, without running anything
 upgrade-dry-run:
     ./scripts/upgrade_tools.sh --dry-run all

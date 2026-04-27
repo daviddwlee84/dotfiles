@@ -14,8 +14,8 @@
 - `~/.claude/settings.json` contains a `hooks.PermissionRequest` entry pointing at `~/.codeisland/codeisland-hook.sh` with `"timeout": 86400` (24 h).
 
 **First seen**: 2026-04
-**Affects**: macOS hosts where [CodeIsland](https://github.com/wxtsky/CodeIsland) is installed (the macOS notch HUD; brew cask `wxtsky/tap/codeisland`). Independent of Claude Code version.
-**Status**: workaround documented — **disable auto-approve from inside the CodeIsland HUD app** (no in-repo enforcement; see [Workaround](#workaround) and [Repo-enforced removal — deliberately not implemented](#repo-enforced-removal--deliberately-not-implemented)).
+**Affects**: macOS hosts running CodeIsland (brew cask [`wxtsky/tap/codeisland`](https://github.com/wxtsky/CodeIsland)) **< v1.0.23**. Independent of Claude Code version.
+**Status**: **upstream-fixed in CodeIsland v1.0.23** (released 2026-04-25, [PR #126](https://github.com/wxtsky/CodeIsland/pull/126), tracking issue [#128](https://github.com/wxtsky/CodeIsland/issues/128)). On affected hosts: `brew upgrade --cask wxtsky/tap/codeisland`, then quit + relaunch the HUD. Repo-side subtractive removal of the hook stays [deliberately not implemented](#repo-enforced-removal--deliberately-not-implemented) — stripping the hook would also kill the legitimate notch-popup confirm dialog, and the upstream fix is the correct path.
 
 ## Symptom
 
@@ -63,7 +63,26 @@ What we **do** know:
 
 ## Workaround
 
-**Recommended — toggle off auto-approve in the CodeIsland HUD app.**
+**Recommended (since 2026-04-25) — upgrade to CodeIsland v1.0.23+.**
+
+[PR #126 — _feat: make auto-approve tools configurable in settings_](https://github.com/wxtsky/CodeIsland/pull/126) (merged 2026-04-25) makes the hardcoded `HookServer.autoApproveTools` whitelist user-configurable AND removes `ExitPlanMode` from the default auto-approve set. After upgrading:
+
+```bash
+brew upgrade --cask wxtsky/tap/codeisland
+osascript -e 'tell application "CodeIsland" to quit' || true
+sleep 1
+open -a CodeIsland
+defaults read /Applications/CodeIsland.app/Contents/Info.plist CFBundleShortVersionString
+# Expected: 1.0.23 or later
+```
+
+Plan-mode exit now prompts a real confirm dialog (notch popup) by default. The new **Settings → Behavior → "Auto-approve Tools"** section lets you flip individual tools on/off if you want to re-enable specific ones (e.g. `Bash` for trusted hosts).
+
+The `hooks.PermissionRequest` entry stays in `~/.claude/settings.json` after the upgrade — that's correct now: it powers the legitimate notch-popup confirm dialog. Do not strip it.
+
+### Fallback for hosts on CodeIsland < v1.0.23 (legacy)
+
+If you can't upgrade — or the brew tap is lagging behind the GitHub release (the cask is normally bumped within a day of a tag, but it sometimes lags) — toggle off auto-approve from inside the running HUD:
 
 1. Open the CodeIsland menu-bar / notch HUD.
 2. Look for an "auto-approve" / "trust" / "permission" / "skip confirmation" toggle in the app's settings panel and disable it.
@@ -86,7 +105,7 @@ jq 'del(.hooks.PermissionRequest)' ~/.claude/settings.json > /tmp/s.json && \
 
 ### Repo-enforced removal — deliberately not implemented
 
-A repo-managed solution exists in design but is **not wired up** (per user decision 2026-04-27 — preferred to surface this as documentation only, since it interacts with a third-party app whose behaviour may change). For future-us:
+A repo-managed solution exists in design but is **still not wired up** (decision reaffirmed 2026-04-27 after the v1.0.23 upstream fix landed). The upstream change is the right path: stripping the `PermissionRequest` hook entirely would also disable the legitimate notch-popup confirm dialog, which post-v1.0.23 is what we *want*. The jq-filter sketch below is preserved for the unlikely future case where we need to subtractively remove a different bad-actor hook (some other tool that auto-approves without a configurable opt-out).
 
 The hook-aware merger in [`dot_claude/modify_settings.json`](../dot_claude/modify_settings.json) already does *additive* merging by command-string match. The mirror operation — *subtractive* removal — would extend the same jq filter with a "blocklist" pass:
 
