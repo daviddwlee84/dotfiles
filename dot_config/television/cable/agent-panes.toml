@@ -1,0 +1,206 @@
+# Live agent panes cable channel for television (tv)
+#
+# Discovers coding-agent sessions currently running inside any tmux pane and
+# lets you jump straight to them. Companion to `agent-sessions.toml` (which
+# browses STORED sessions). Backed by `agent-sessions.py panes`.
+#
+# Usage:
+#   tv agent-panes
+#   prefix + a (inside tmux)
+#
+# Source: 9-col TSV from `agent-sessions.py panes`:
+#   0. agent tag       ([cc] / [cx] / [oc] / [cu])
+#   1. when            (YYYY-MM-DD HH:MM, last activity)
+#   2. session id      (full id; empty for non-Claude when no cwd match)
+#   3. directory       (cwd of the pane; "?" when unknown)
+#   4. title/snippet   (Claude session name, or first non-system user msg)
+#   5. specstory_path  (matching .specstory/history/*.md, when present)
+#   6. pane target     (session:win.pane — passed to tmux switch-client)
+#   7. pane pid        (tmux pane_pid; for diagnostics)
+#   8. status glyph    (●=busy / ○=idle for Claude; empty otherwise — pre-
+#                       rendered in Python because TV's display template
+#                       does not support per-column substitution)
+#
+# Keybindings:
+#   Enter      Switch tmux focus to that pane (session, window, pane)
+#   Alt+T      Same as Enter (T for "take over" — mirrors agent-sessions.toml)
+#   Alt+K      Kill the pane (confirm prompt)
+#   Ctrl+Y     Copy pane target (session:win.pane) to clipboard
+#   Alt+P      Copy directory path to clipboard
+#   Alt+R      Copy session id to clipboard
+#   Alt+S      Copy matched .specstory/history/*.md path to clipboard
+#
+# Preview cycling (Ctrl+F):
+#   1. Live tmux capture-pane snapshot (last ~80 lines of the pane).
+#   2. Stored transcript (delegates to agent-sessions.py transcript mode).
+
+[metadata]
+name = "agent-panes"
+description = "Live coding-agent panes across tmux — jump to a running claude/codex/opencode/cursor session"
+requirements = ["tmux", "python3"]
+
+[source]
+command = "~/.config/television/agent-sessions.py panes"
+# Display: agent + status glyph + pane target │ snippet │ short cwd
+# Glyph (col 8) is pre-rendered in Python — see comment in agent-sessions.py
+# `_build_pane_row`. TV silently breaks ALL `{split:}` substitutions in the
+# same string when it sees unrecognised syntax (e.g. `s/busy/●/`).
+display = "{split:\t:0} {split:\t:8} {split:\t:6}  │  {split:\t:4}  │  {split:\t:3|split:/:-1}"
+output = "{split:\t:6}"
+
+[preview]
+command = [
+  # Preview 1 (default): live capture-pane snapshot.
+  # Shows what's actually on screen in that pane RIGHT NOW — the most useful
+  # thing when you're about to jump to it.
+  '''
+  target='{split:\t:6}'; agent='{split:\t:0}'; sid='{split:\t:2}'; pane_status='{split:\t:8}'; pid='{split:\t:7}'
+  # NB: `status` is read-only in zsh ($? alias) — DO NOT rename `pane_status` back to `status`.
+  printf '\033[1m%s\033[0m  pane=%s  pid=%s  %s\n' "$agent" "$target" "$pid" "$pane_status"
+  printf '\033[2msession:\033[0m  %s\n' "$sid"
+  printf '\033[2mcwd:\033[0m      %s\n' '{split:\t:3}'
+  printf '\n\033[1m─── live pane (capture-pane -ep) ───\033[0m\n'
+  tmux capture-pane -ep -t "$target" 2>/dev/null | tail -n 80 \
+    || echo "(pane $target no longer exists — picker is stale; press Ctrl+R to reload)"
+  ''',
+  # Preview 2: stored transcript (markdown-rendered).
+  # `glow --style auto` degrades to plain when stdout is a pipe (which is
+  # always true in TV's preview pane); force `--style dark` to keep ANSI.
+  # Width is taken from $TV_PREVIEW_WIDTH if TV exports it, else COLUMNS.
+  '''
+  agent='{split:\t:0}'; sid='{split:\t:2}'
+  case "$agent" in
+    "[cc]") tag=cc ;;
+    "[cx]") tag=cx ;;
+    "[oc]") tag=oc ;;
+    *) tag="" ;;
+  esac
+  if [ -z "$tag" ] || [ -z "$sid" ]; then
+    printf '\033[2m(no stored transcript for %s — use preview 1 for live pane content.)\033[0m\n' "$agent"
+    exit 0
+  fi
+  W="${TV_PREVIEW_WIDTH:-${COLUMNS:-100}}"
+  if command -v glow >/dev/null 2>&1; then
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | glow --style dark -w "$W" - 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+        | bat -l md --color=always --paging=never --style=plain 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  else
+    "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null \
+      | bat -l md --color=always --paging=never --style=plain 2>/dev/null \
+      || "$HOME/.config/television/agent-sessions.py" transcript "$tag" "$sid" 2>/dev/null
+  fi
+  ''',
+]
+header = "{split:\t:0}  {split:\t:6}  ({split:\t:3|split:/:-1})"
+
+[ui]
+input_header = "Live Agent Panes"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:switch_pane"
+alt-t = "actions:switch_pane"
+alt-k = "actions:kill_pane"
+ctrl-y = "actions:copy_target"
+alt-p = "actions:copy_dir"
+alt-r = "actions:copy_id"
+alt-s = "actions:copy_specstory"
+
+# ---------------------------------------------------------------------------
+# Actions — keep shell glue minimal; any bare `{` would silently break TV's
+# own placeholder substitution. See agent-sessions.toml line ~80.
+# ---------------------------------------------------------------------------
+
+[actions.switch_pane]
+description = "Switch tmux focus to that session/window/pane"
+command = '''
+target='{split:\t:6}'
+[ -z "$target" ] && exit 0
+session="${target%%:*}"
+winpane="${target#*:}"
+window="${winpane%.*}"
+pane="${winpane#*.}"
+# switch-client moves the attached client to the target session; select-window
+# and select-pane scope down. We run as three steps so a missing pane (stale
+# row) doesn't leave focus mid-jump.
+tmux switch-client -t "$session" 2>/dev/null \
+  && tmux select-window -t "$session:$window" 2>/dev/null \
+  && tmux select-pane -t "$target" 2>/dev/null \
+  || tmux display-message "agent-panes: pane $target no longer exists (stale row)"
+'''
+mode = "fork"
+
+[actions.kill_pane]
+description = "Kill the pane (confirm prompt)"
+command = '''
+target='{split:\t:6}'
+[ -z "$target" ] && exit 0
+printf 'Kill pane %s? [y/N] ' "$target"
+read -r ans
+case "$ans" in
+  y|Y|yes|YES)
+    tmux kill-pane -t "$target" 2>/dev/null \
+      && echo "killed $target" \
+      || echo "failed to kill $target (already gone?)"
+    ;;
+  *) echo "aborted" ;;
+esac
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.copy_target]
+description = "Copy pane target (session:win.pane) to clipboard"
+command = '''
+d='{split:\t:6}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_id]
+description = "Copy session ID to clipboard"
+command = '''
+d='{split:\t:2}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy directory path to clipboard"
+command = '''
+d='{split:\t:3}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_specstory]
+description = "Copy .specstory/history/*.md path to clipboard"
+command = '''
+d='{split:\t:5}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"

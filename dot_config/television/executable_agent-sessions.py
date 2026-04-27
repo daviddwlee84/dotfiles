@@ -47,6 +47,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -835,6 +836,391 @@ def _transcript(tag: str, sid: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Live tmux pane discovery (`panes` mode)
+#
+# Cross-references `tmux list-panes -aF` with running agent processes:
+#
+#   1. Claude — read `~/.claude/sessions/{claude_pid}.json` for each file
+#      Claude writes per process. The JSON has `sessionId`, `cwd`, `status`
+#      ("busy"/"idle"), and an optional `name` — authoritative. Walk parent
+#      chain from claude_pid to find the owning tmux pane (claude usually
+#      runs as a grandchild of the pane shell, e.g. via specstory wrapper).
+#
+#   2. Codex/OpenCode/Cursor-Agent — `pgrep -x <bin>` to find running
+#      processes; walk parent chain to map to a pane. Cross-reference cwd
+#      against storage (opencode.db / .codex/sessions / .cursor/chats)
+#      for the most recent matching session — best-effort, may be wrong if
+#      multiple sessions share a cwd, but the row is still useful for
+#      jump-to-pane.
+#
+# Output: 9-col TSV (extends the 6-col schema with pane_target / pane_pid /
+# status). Consumed by `cable/agent-panes.toml`.
+# ---------------------------------------------------------------------------
+
+# Per-agent detection.
+# - "binary":      `pgrep -x <name>` — process is a standalone executable.
+# - "node-wrapped": some agents ship as Node/Bun scripts; `comm` shows as
+#                  `node`/`bun`/`deno`. We scan argv for `/<package-name>`
+#                  to anchor it as a path component (avoids matching
+#                  `vim cursor-agent.md`-style false positives).
+# Aider / goose intentionally omitted for v1 — easy to add later.
+_AGENT_DETECTORS = (
+    # (mode, needle, tag)
+    ("binary", "claude", "[cc]"),  # informational — Claude is fully resolved
+                                   # earlier via ~/.claude/sessions/*.json
+    ("binary", "codex", "[cx]"),
+    ("binary", "opencode", "[oc]"),
+    ("binary", "cursor-agent", "[cu]"),
+    ("node-wrapped", "cursor-agent", "[cu]"),  # Cursor Agent CLI is shipped
+                                               # as a Node script in practice.
+    ("node-wrapped", "opencode", "[oc]"),      # belt-and-braces; OpenCode
+                                               # ships native today but the
+                                               # extra cost is one ps call.
+)
+
+_PANE_FORMAT = "\t".join(
+    [
+        "#{session_name}",
+        "#{window_index}",
+        "#{window_name}",
+        "#{pane_index}",
+        "#{pane_id}",
+        "#{pane_pid}",
+        "#{pane_current_command}",
+        "#{pane_current_path}",
+        "#{pane_active}",
+    ]
+)
+
+
+def _list_tmux_panes() -> list[dict]:
+    """Snapshot all tmux panes across all sessions. Empty list if no server."""
+    try:
+        out = subprocess.check_output(
+            ["tmux", "list-panes", "-aF", _PANE_FORMAT],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    panes: list[dict] = []
+    for line in out.splitlines():
+        cols = line.split("\t")
+        if len(cols) != 9:
+            continue
+        try:
+            pid = int(cols[5])
+        except ValueError:
+            continue
+        panes.append(
+            {
+                "session": cols[0],
+                "window_index": cols[1],
+                "window_name": cols[2],
+                "pane_index": cols[3],
+                "pane_id": cols[4],
+                "pane_pid": pid,
+                "pane_cmd": cols[6],
+                "pane_cwd": cols[7],
+                "pane_active": cols[8] == "1",
+                "target": f"{cols[0]}:{cols[1]}.{cols[3]}",
+            }
+        )
+    return panes
+
+
+def _get_ppid(pid: int) -> Optional[int]:
+    """Return parent PID of `pid`, or None if process gone / lookup failed."""
+    try:
+        out = subprocess.check_output(
+            ["ps", "-o", "ppid=", "-p", str(pid)],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return int(out) if out else None
+    except (subprocess.CalledProcessError, ValueError):
+        return None
+
+
+def _find_pane_for_pid(pid: int, pane_pids: dict[int, dict]) -> Optional[dict]:
+    """Walk parent chain from `pid` until we hit a tmux pane_pid. None if root."""
+    cur = pid
+    for _ in range(20):  # cap chain depth to avoid pathological loops
+        if cur in pane_pids:
+            return pane_pids[cur]
+        ppid = _get_ppid(cur)
+        if ppid is None or ppid <= 1 or ppid == cur:
+            return None
+        cur = ppid
+    return None
+
+
+def _pgrep_x(name: str) -> list[int]:
+    """Return PIDs whose process name (comm) exactly matches `name`."""
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-x", name],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    return [int(p) for p in out.split() if p.isdigit()]
+
+
+def _find_node_wrapped_pids(needle: str) -> list[int]:
+    """Find PIDs of Node/Bun/Deno-wrapped CLIs by path-anchored argv match.
+
+    `needle` should be the CLI's package name (e.g. "cursor-agent"); we
+    search for `/<needle>` in argv to anchor it as a path component, so
+    `vim cursor-agent.md` doesn't false-positive.
+    """
+    try:
+        out = subprocess.check_output(
+            ["ps", "-axo", "pid=,comm=,args="],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    pids: list[int] = []
+    anchor = "/" + needle
+    for line in out.splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        comm = parts[1]
+        args = parts[2]
+        if comm in ("node", "bun", "deno") and anchor in args:
+            pids.append(pid)
+    return pids
+
+
+# --- Storage cross-reference: best-effort cwd-based session lookup ---
+# Used for codex / opencode / cursor — Claude already gives us authoritative
+# session_id from its per-PID JSON, so it doesn't need this.
+
+
+def _opencode_session_for_cwd(cwd: str) -> tuple[str, float, str]:
+    """Most-recent OpenCode session with matching directory. (sid, mtime_s, title)."""
+    db = HOME / ".local/share/opencode/opencode.db"
+    if not db.exists() or not cwd:
+        return ("", 0.0, "")
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        cur = con.execute(
+            """
+            SELECT id, title, time_updated
+            FROM session
+            WHERE directory = ? AND time_archived IS NULL
+            ORDER BY time_updated DESC
+            LIMIT 1
+            """,
+            (cwd,),
+        )
+        row = cur.fetchone()
+        con.close()
+        if row:
+            sid, title, tu = row
+            ts = (tu / 1000.0) if tu and tu > 1e12 else float(tu or 0)
+            return (sid or "", ts, title or "")
+    except sqlite3.Error:
+        pass
+    return ("", 0.0, "")
+
+
+def _codex_session_for_cwd(cwd: str) -> tuple[str, float, str]:
+    """Most-recent Codex rollout in the matching cwd. (sid, mtime_s, title)."""
+    root = HOME / ".codex/sessions"
+    if not root.is_dir() or not cwd:
+        return ("", 0.0, "")
+    best: tuple[float, str, str] = (0.0, "", "")
+    # Don't scan all of history — limit to last 7 days (one dir per day).
+    cutoff = datetime.now().timestamp() - 7 * 86400
+    for jsonl in root.rglob("rollout-*.jsonl"):
+        try:
+            mtime = jsonl.stat().st_mtime
+        except OSError:
+            continue
+        if mtime < cutoff or mtime <= best[0]:
+            continue
+        sid, scwd, title = _codex_meta(jsonl)
+        if scwd != cwd:
+            continue
+        if not sid:
+            m = re.search(
+                r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+                jsonl.name,
+            )
+            sid = m.group(1) if m else jsonl.stem
+        best = (mtime, sid, title)
+    return (best[1], best[0], best[2])
+
+
+def _cursor_session_for_cwd(cwd: str) -> tuple[str, float, str]:
+    """Most-recent Cursor Agent CLI chat in matching cwd. (sid, mtime_s, '')."""
+    root = HOME / ".cursor/chats"
+    if not root.is_dir() or not cwd:
+        return ("", 0.0, "")
+    best: tuple[float, str] = (0.0, "")
+    for db in root.glob("*/*/store.db"):
+        try:
+            mtime = db.stat().st_mtime
+        except OSError:
+            continue
+        if mtime <= best[0]:
+            continue
+        ws_hash = db.parent.parent.name
+        folder = _cursor_workspace_path(ws_hash)
+        if folder and folder == cwd:
+            best = (mtime, db.parent.name)  # chat_id = parent dir name
+    return (best[1], best[0], "")
+
+
+_STATUS_GLYPH = {"busy": "●", "idle": "○"}
+
+# Group rows by agent type in the picker (Claude → Codex → OpenCode → Cursor).
+# Within each group rows are sorted most-recent-first. The visual grouping
+# helps the eye when there are many panes; the prefix glyph is also
+# meaningful only inside the [cc] block (Claude exposes status; others don't).
+_AGENT_SORT_PRIORITY = {"[cc]": 0, "[cx]": 1, "[oc]": 2, "[cu]": 3}
+
+
+def _build_pane_row(
+    agent: str,
+    sid: str,
+    pane: dict,
+    when_ts: float,
+    title: str,
+    status: str,
+) -> tuple[int, float, str]:
+    """Return (agent_priority, neg_when_ts, tsv_line) for the 9-col schema.
+
+    Column 8 is the pre-rendered status glyph (●/○/empty) — TV's display
+    template can't do per-column substitution, and any unrecognised syntax
+    silently breaks all `{split:}` placeholders in the same string. So we
+    map status here.
+
+    The sort key bundles agent priority + negative timestamp so a plain
+    `rows.sort()` gives "Claude block (newest first), then Codex, then
+    OpenCode, then Cursor".
+    """
+    cwd = _compress_home(pane["pane_cwd"] or "?")
+    title = _truncate(title or "")
+    ss = _specstory_path(sid) if sid else ""
+    when = _fmt_when(when_ts) if when_ts else ""
+    label = f"{pane['session']}:{pane['window_index']}.{pane['pane_index']}"
+    glyph = _STATUS_GLYPH.get(status, "")
+    line = (
+        f"{agent}\t{when}\t{sid}\t{cwd}\t{title}\t{ss}"
+        f"\t{label}\t{pane['pane_pid']}\t{glyph}"
+    )
+    priority = _AGENT_SORT_PRIORITY.get(agent, 99)
+    return (priority, -when_ts, line)
+
+
+def _panes() -> None:
+    """Enumerate live tmux panes that have a coding-agent process inside."""
+    panes = _list_tmux_panes()
+    if not panes:
+        return
+    pane_pids: dict[int, dict] = {p["pane_pid"]: p for p in panes}
+
+    rows: list[tuple[float, str]] = []
+    # Dedupe: one pane_id should not emit twice even if multiple agent
+    # processes (e.g. worker children) live inside it.
+    seen: set[str] = set()
+
+    # ---- Claude: authoritative per-PID JSON files ----
+    cc_dir = HOME / ".claude/sessions"
+    if cc_dir.is_dir():
+        for f in cc_dir.glob("*.json"):
+            try:
+                claude_pid = int(f.stem)
+            except ValueError:
+                continue
+            try:
+                data = json.loads(f.read_text(encoding="utf-8", errors="replace"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            pane = _find_pane_for_pid(claude_pid, pane_pids)
+            if pane is None:
+                # Stale PID file (process gone) or claude running outside tmux.
+                continue
+            sid = str(data.get("sessionId") or "")
+            key = f"{pane['pane_id']}|cc|{sid}"
+            if key in seen:
+                continue
+            seen.add(key)
+            name = str(data.get("name") or "")
+            status = str(data.get("status") or "")
+            updated = data.get("updatedAt") or data.get("startedAt") or 0
+            try:
+                when_ts = (
+                    float(updated) / 1000.0
+                    if updated and updated > 1e12
+                    else float(updated or 0)
+                )
+            except (TypeError, ValueError):
+                when_ts = 0.0
+            # Prefer Claude's own session name; fall back to first user message.
+            title = name
+            if not title and sid:
+                jsonl = next(
+                    (HOME / ".claude/projects").rglob(f"{sid}.jsonl"), None
+                )
+                if jsonl:
+                    _, title = _claude_first_user_msg(jsonl)
+            rows.append(_build_pane_row("[cc]", sid, pane, when_ts, title, status))
+
+    # ---- Other agents: pgrep / argv scan + storage cross-reference ----
+    # Claude is already resolved above via authoritative ~/.claude/sessions
+    # files; the [cc] entry in _AGENT_DETECTORS is informational only and
+    # gets short-circuited here so we don't double-count.
+    for mode, needle, tag in _AGENT_DETECTORS:
+        if tag == "[cc]":
+            continue
+        if mode == "binary":
+            agent_pids = _pgrep_x(needle)
+        elif mode == "node-wrapped":
+            agent_pids = _find_node_wrapped_pids(needle)
+        else:
+            agent_pids = []
+        for agent_pid in agent_pids:
+            pane = _find_pane_for_pid(agent_pid, pane_pids)
+            if pane is None:
+                continue
+            cwd = pane["pane_cwd"]
+            if tag == "[oc]":
+                sid, ts, title = _opencode_session_for_cwd(cwd)
+            elif tag == "[cx]":
+                sid, ts, title = _codex_session_for_cwd(cwd)
+            elif tag == "[cu]":
+                sid, ts, title = _cursor_session_for_cwd(cwd)
+            else:
+                sid, ts, title = ("", 0.0, "")
+            # Dedupe by pane — a single pane may match multiple detectors
+            # (e.g. cursor-agent matches both binary and node-wrapped probes
+            # on hosts that have a thin native shim wrapping the Node app).
+            key = f"{pane['pane_id']}|{tag[1:3]}"
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(_build_pane_row(tag, sid, pane, ts, title, ""))
+
+    # Group by agent (cc → cx → oc → cu), most-recent-first within each group.
+    rows.sort()
+    for _priority, _neg_ts, line in rows:
+        print(line)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 def main() -> int:
@@ -857,6 +1243,7 @@ def main() -> int:
         "cursor": [_cursor],
         "cursor-ide": [_cursor_ide],
         "all": [_opencode, _claude, _codex, _cursor, _cursor_ide],
+        "panes": [_panes],
     }
     if mode not in handlers:
         print(f"unknown mode: {mode}", file=sys.stderr)

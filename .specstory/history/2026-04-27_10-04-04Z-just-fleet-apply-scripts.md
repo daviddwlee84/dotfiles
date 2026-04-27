@@ -2363,3 +2363,109 @@ dd3a75d skills: add `just upgrade-skills` recipe (npx skills update --global -y)
 a101b7e chezmoi: gate discordChannel prompt on ubuntu_desktop profile
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:09Z)**_
+
+There are other unrelated WIP changes in the tree (rust_cargo, tmux, TV agent panes) that aren't mine — I'll only stage the codex script and the two specstory transcripts that captured this conversation.
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage codex script + transcripts and commit
+
+```bash
+git add dot_codex/modify_config.toml.tmpl .specstory/history/2026-04-27_10-04-04Z-just-fleet-apply-scripts.md .specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md && git commit -m "$(cat <<'EOF'
+codex: prefer uv over system python3 for modify_config.toml merge
+
+`modify_config.toml.tmpl` needs `tomllib` (Python 3.11+) to merge our
+codex overlay into ~/.codex/config.toml. On hosts whose system
+`python3` is older (e.g. jingle207, ~3.10), tomllib import fails and
+the script's graceful fallback passes the live file through unchanged
+— so the codex overlay is silently never applied there, with this
+warning on every fleet-apply:
+
+  modify_config.toml: tomllib unavailable (need Python 3.11+ or
+  `pip install tomli`); skipping merge
+
+Switch the python invocation to `uv run --no-project --quiet --python
+'>=3.11' python -` when `uv` is available. uv fetches a managed
+Python ≥ 3.11 if the system has none, guaranteeing tomllib is
+importable. Fall back to system `python3` (which keeps the existing
+ImportError-based pass-through), and finally to a no-op if neither is
+present — so a fresh-bootstrap host that hasn't installed uv yet
+doesn't fail this modify_ script.
+
+`--no-project` stops uv from picking up the dotfiles repo's own
+pyproject.toml; `--quiet` silences "Installed X" log noise on first
+cache miss.
+
+Verified end-to-end on this host: with uv on PATH, overlay is applied
+and machine-local [projects.*] / [marketplaces.*] subtrees survive.
+With PATH=/usr/bin:/bin (uv hidden, /usr/bin/python3 = 3.9 on macOS),
+falls through to existing pass-through path with the same warning.
+
+Sweep for similar issues: only this file affected. editor/modify.sh
+uses Python stdlib only (sys, re); TV preview/source scripts use
+json/urllib stdlib; fleet_apply.py and TV clash-parse.py are already
+PEP 723 uv-scripts.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1777286125-8047.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777286125-8047.
+[main 6799a61] codex: prefer uv over system python3 for modify_config.toml merge
+ 3 files changed, 3751 insertions(+), 11 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm commit and show remaining WIP
+
+`git status --short && echo "---" && git log --oneline -3`
+
+```text
+ M .specstory/history/2026-04-27_10-04-04Z-just-fleet-apply-scripts.md
+ M .specstory/history/2026-04-27_10-08-11Z-coding-session-running-tmux.md
+ M CLAUDE.md
+ M dot_ansible/roles/rust_cargo_tools/tasks/main.yml
+ M dot_config/television/executable_agent-sessions.py
+ M dot_config/tmux/executable_menu.sh
+ M dot_config/tmux/keybindings.conf
+ M mkdocs.yml
+?? docs/tools/agent-panes-discovery.md
+?? dot_config/television/cable/agent-panes.toml
+?? dot_config/tmux/executable_menu-agents.sh
+---
+6799a61 codex: prefer uv over system python3 for modify_config.toml merge
+a591887 fleet-apply: classify drift from merged stdout, not empty stderr
+dd3a75d skills: add `just upgrade-skills` recipe (npx skills update --global -y)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-27 10:35:35Z)**_
+
+Committed as `6799a61`, now 2 ahead of `origin/main`. The other modified files (rust_cargo, tmux/menu, television/agent-sessions, agent-panes WIP, etc.) are your in-flight work and stayed unstaged as intended.

@@ -81,7 +81,7 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 
 | Tool | Config file | Conflict risk |
 |------|-------------|---------------|
-| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch) |
+| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch); `prefix + a` (live agent panes picker — `tv agent-panes`, see [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)) |
 | Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
 | Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
 | Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |

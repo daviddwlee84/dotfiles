@@ -134,6 +134,7 @@ nav:
       - SSH agent: tools/ssh-agent.md
     - Editor & agents:
       - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+      - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
       - Agent skills: tools/agent-skills.md
       - Claude Code keybindings: tools/claude-code-keybindings.md
       - OpenCode: tools/opencode.md

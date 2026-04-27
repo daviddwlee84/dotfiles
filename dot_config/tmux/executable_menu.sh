@@ -14,7 +14,7 @@
 #
 # Submenus live in sibling scripts:
 #   menu-layouts.sh, menu-session.sh, menu-sesh.sh,
-#   menu-popups.sh, menu-theme.sh, menu-system.sh
+#   menu-popups.sh, menu-theme.sh, menu-system.sh, menu-agents.sh
 #
 # See: pitfalls/tmux-display-menu-silent-parse-failure.md
 
@@ -51,6 +51,7 @@ declare -a tier2=(
   "→ Layouts"    L   "run-shell '$DIR/menu-layouts.sh'"
   "→ Session"    S   "run-shell '$DIR/menu-session.sh'"
   "→ Sesh+"      E   "run-shell '$DIR/menu-sesh.sh'"
+  "→ Agents"     A   "run-shell '$DIR/menu-agents.sh'"
   "→ Popups"     o   "run-shell '$DIR/menu-popups.sh'"
   "→ Theme"      T   "run-shell '$DIR/menu-theme.sh'"
   "→ System"     Y   "run-shell '$DIR/menu-system.sh'"

@@ -37,6 +37,20 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # =============================================================================
+# recon — tmux-native dashboard for managing live Claude Code sessions
+# https://github.com/gavraz/recon  (no crates.io release; install from git)
+# Used by the `Agents` tmux popup submenu (dot_config/tmux/menu-agents.sh).
+# Companion to `tv agent-panes` for the multi-agent overview.
+# =============================================================================
+
+- name: Install recon (Claude Code tmux dashboard) via cargo install --git
+  ansible.builtin.command: cargo install --git https://github.com/gavraz/recon --locked
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/recon"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# =============================================================================
 # Pueue - macOS (via Homebrew)
 # =============================================================================
 

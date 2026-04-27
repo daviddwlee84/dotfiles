@@ -95,6 +95,7 @@ These open `display-popup -E` at `#{pane_current_path}`; the popup closes when t
 | `prefix + O` | sesh built-in picker |
 | `prefix + U` | CLI tools picker (`tv tools`) |
 | `prefix + u` | URL picker (tmux-fzf-url) |
+| `prefix + a` | Live coding-agent panes picker (`tv agent-panes`) — see [agent pane discovery](../agent-panes-discovery.md) |
 
 When to use which:
 
