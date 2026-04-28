@@ -26,9 +26,13 @@ function _mrun_sanitize() {
 }
 
 function _mrun_default_name() {
-    local base
+    # $RANDOM must be consumed in the *caller's* shell (passed as $1).
+    # Reading $RANDOM inside a $(_mrun_default_name) subshell yields the same
+    # value on every consecutive call because the parent's RANDOM sequence
+    # never advances — the subshell forks from a frozen seed each time.
+    local base seed="$1"
     base=$(_mrun_sanitize "$(basename "$PWD")")
-    printf 'run-%s-%04x' "$base" $((RANDOM % 65536))
+    printf 'run-%s-%04x' "$base" "$seed"
 }
 
 # Detach a backgrounded command from the current shell. Mirrors
@@ -178,7 +182,14 @@ EOF
         return 2
     fi
 
-    [[ -z "$name" ]] && name=$(_mrun_default_name)
+    if [[ -z "$name" ]]; then
+        # Bind to a local *first* so $RANDOM is read in this shell. Inlining
+        # `$((RANDOM…))` directly inside `$(_mrun_default_name …)` evaluates
+        # the arithmetic inside the command-substitution subshell, where the
+        # parent's RANDOM sequence never advances → identical seeds.
+        local _seed=$((RANDOM % 65536))
+        name=$(_mrun_default_name "$_seed")
+    fi
     name=$(_mrun_sanitize "$name")
 
     _mrun_warn_if_tui "$1"
