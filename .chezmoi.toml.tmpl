@@ -76,7 +76,6 @@ noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system pac
 # smart = 只備份 chezmoi 將要覆蓋/刪除的檔案（用 `chezmoi status` 偵測）
 # full  = 備份固定 allowlist（onboard 第一次最保險）
 # off   = 完全跳過（CI / Docker / 一次性環境用）
-# 舊版 `backupDotfiles` bool 在 run-script 內會 auto-derive: true→full, false→off
 backupMode = {{ promptChoiceOnce . "backupMode" "Backup mode for existing dotfiles (smart|full|off)" (list "smart" "full" "off") "smart" | quote }}
 # 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
 allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}

@@ -27,7 +27,7 @@ Four `run_*before_*` scripts deliberately stayed at the repo root:
 | Script | Phase | Why not moved |
 |---|---|---|
 | `run_once_before_00_bootstrap.sh.tmpl` | once, before | sudo session init + locale fix; `run_once_*` is path-keyed in chezmoi state, so moving forces a re-run on every machine |
-| `run_before_01_backup_dotfiles.sh.tmpl` | every, before | Backs up dotfiles before chezmoi overwrites. Three modes via `backupMode`: `smart` (default; uses `chezmoi status` to back up only files apply would modify/delete — clean host produces no backup), `full` (hardcoded allowlist, onboarding mode), `off`. Honors legacy `backupDotfiles` bool (`true`→`full`, `false`→`off`). Inspect via `just list-backups` / `just diff-backup <TS>`. |
+| `run_before_01_backup_dotfiles.sh.tmpl` | every, before | Backs up dotfiles before chezmoi overwrites. Three modes via `backupMode`: `smart` (default; uses `chezmoi status` to back up only files apply would modify/delete — clean host produces no backup), `full` (hardcoded allowlist, onboarding mode), `off`. Inspect via `just list-backups` / `just diff-backup <TS>`. |
 | `run_once_before_02_fix_intel_homebrew.sh.tmpl` | once, before | Intel Mac brew prefix migration; same `run_once_*` state-tracking concern as `00` |
 | `run_once_before_50_opencode_migrate.sh.tmpl` | once, before | One-shot opencode CLI config migration; would re-run if path changes |
 

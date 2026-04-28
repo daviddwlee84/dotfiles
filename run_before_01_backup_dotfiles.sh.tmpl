@@ -1,16 +1,9 @@
 #!/bin/bash
 # Backup existing dotfiles before chezmoi overwrites them.
-# Mode comes from .backupMode; legacy `.backupDotfiles` bool is auto-derived
-# for hosts that haven't re-init'd since the prompt was renamed.
+# Mode comes from .backupMode (smart|full|off).
 set -euo pipefail
 
-{{- $mode := "smart" -}}
-{{- if hasKey . "backupMode" -}}
-{{-   $mode = .backupMode -}}
-{{- else if hasKey . "backupDotfiles" -}}
-{{-   $mode = (ternary "full" "off" .backupDotfiles) -}}
-{{- end }}
-MODE='{{ $mode }}'
+MODE='{{ .backupMode | default "smart" }}'
 
 [[ "$MODE" == "off" ]] && exit 0
 
