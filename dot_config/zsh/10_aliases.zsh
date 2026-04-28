@@ -182,15 +182,40 @@ brew-mirror() {
 # /plan files land in ./.claude/plans/ (kept inside the repo) instead of the
 # user-global plansDirectory. Pairs well with the agent-history-hygiene skill,
 # which can then redact + commit the plan files alongside the diff.
-# Usage: claude-plans-here [-f]
-#   -f   non-interactive: skip the y/N prompt when settings.json exists
+#
+# Also offers to import "orphan" plans — plans previously written under the
+# global ~/.claude/plans/ that belong to this project. Detection: scan
+# ~/.claude/projects/<encoded-cwd>/*.jsonl (where Claude Code logs sessions
+# per cwd; encoding maps '/' and '.' to '-') for Write/Edit tool_use entries
+# whose file_path points into ~/.claude/plans/. This avoids false positives
+# from sessions that merely *mentioned* a plan path in conversation.
+#
+# Usage: claude-plans-here [-f] [-y]
+#   -f   auto-yes the settings.json merge prompt
+#   -y   auto-yes the orphan-plan copy prompt
 claude-plans-here() {
   emulate -L zsh
-  local force=0
-  [[ "$1" == "-f" ]] && force=1
-  local target=".claude/settings.json"
+  local force_settings=0 force_orphans=0
+  while (( $# > 0 )); do
+    case "$1" in
+      -f) force_settings=1 ;;
+      -y) force_orphans=1 ;;
+      -h|--help)
+        echo "Usage: claude-plans-here [-f] [-y]"
+        echo "  -f   auto-yes the settings.json merge prompt"
+        echo "  -y   auto-yes the orphan-plan copy prompt"
+        return 0
+        ;;
+      *)
+        echo "claude-plans-here: unknown flag '$1'" >&2
+        return 1
+        ;;
+    esac
+    shift
+  done
 
-  mkdir -p .claude
+  local target=".claude/settings.json"
+  mkdir -p .claude/plans
 
   if [[ ! -e "$target" ]]; then
     cat >"$target" <<'EOF'
@@ -199,28 +224,109 @@ claude-plans-here() {
 }
 EOF
     echo "Wrote $PWD/$target"
-    return 0
+  else
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "claude-plans-here: jq required to merge into existing $target" >&2
+      return 1
+    fi
+
+    local ans=y
+    if (( ! force_settings )); then
+      read -q "ans?$target exists. Merge plansDirectory into it? [y/N] " || { echo; ans=n; }
+      echo
+    fi
+
+    if [[ "$ans" == [yY] ]]; then
+      local tmp
+      tmp="$(mktemp)" || return 1
+      if jq --arg p "./.claude/plans" '. + {plansDirectory: $p}' "$target" >"$tmp"; then
+        mv "$tmp" "$target"
+        echo "Merged plansDirectory into $PWD/$target"
+      else
+        rm -f "$tmp"
+        echo "claude-plans-here: jq failed; $target unchanged" >&2
+        return 1
+      fi
+    fi
   fi
 
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "claude-plans-here: jq required to merge into existing $target" >&2
-    return 1
+  _claude_plans_here_import_orphans "$force_orphans"
+}
+
+# Internal: scan ~/.claude/projects/<encoded-cwd|encoded-git-root>/*.jsonl
+# for Write/Edit tool_use entries that wrote into ~/.claude/plans/, list the
+# ones still living in the global dir and not yet copied locally, prompt y/N.
+_claude_plans_here_import_orphans() {
+  emulate -L zsh
+  setopt local_options null_glob
+  local force="$1"
+  local global_plans="$HOME/.claude/plans"
+  [[ -d "$global_plans" ]] || return 0
+
+  # Claude Code projects/ encoding: replace each '/' and '.' with '-'.
+  local enc_cwd="${PWD//\//-}"
+  enc_cwd="${enc_cwd//./-}"
+  local groot="" enc_root=""
+  if command -v git >/dev/null 2>&1 && groot="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    if [[ -n "$groot" && "$groot" != "$PWD" ]]; then
+      enc_root="${groot//\//-}"
+      enc_root="${enc_root//./-}"
+    fi
   fi
 
+  local -a proj_dirs
+  [[ -d "$HOME/.claude/projects/$enc_cwd" ]] && proj_dirs+=("$HOME/.claude/projects/$enc_cwd")
+  [[ -n "$enc_root" && -d "$HOME/.claude/projects/$enc_root" ]] && proj_dirs+=("$HOME/.claude/projects/$enc_root")
+  (( ${#proj_dirs} == 0 )) && return 0
+
+  local -a jsonl_files
+  local d
+  for d in "${proj_dirs[@]}"; do
+    jsonl_files+=("$d"/*.jsonl)
+  done
+  (( ${#jsonl_files} == 0 )) && return 0
+
+  # Two-stage filter: only lines containing a Write/Edit tool_use, then
+  # extract any plan-path within them. Authoritative — avoids matching plan
+  # paths that merely appeared in user/assistant text.
+  local re_prefix="${global_plans//./\\.}"
+  local -a matches
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && matches+=("$line")
+  done < <(
+    grep -hE '"name":"(Write|Edit)"' "${jsonl_files[@]}" 2>/dev/null \
+      | grep -oE "${re_prefix}/[A-Za-z0-9_.+-]+\.md" \
+      | sort -u
+  )
+  (( ${#matches} == 0 )) && return 0
+
+  local -a candidates
+  local m base
+  for m in "${matches[@]}"; do
+    [[ -f "$m" ]] || continue
+    base="${m:t}"
+    [[ -e ".claude/plans/$base" ]] && continue
+    candidates+=("$m")
+  done
+  (( ${#candidates} == 0 )) && return 0
+
+  echo
+  echo "Found ${#candidates} orphan plan(s) in ~/.claude/plans/ linked to this project:"
+  for m in "${candidates[@]}"; do
+    echo "  - ${m/#$HOME/~}"
+  done
+
+  local ans=y
   if (( ! force )); then
-    local ans
-    read -q "ans?$target exists. Merge plansDirectory into it? [y/N] " || { echo; return 1; }
+    read -q "ans?Copy them into ./.claude/plans/ (originals kept)? [y/N] " || { echo; ans=n; }
     echo
   fi
+  [[ "$ans" == [yY] ]] || return 0
 
-  local tmp
-  tmp="$(mktemp)" || return 1
-  if jq --arg p "./.claude/plans" '. + {plansDirectory: $p}' "$target" >"$tmp"; then
-    mv "$tmp" "$target"
-    echo "Merged plansDirectory into $PWD/$target"
-  else
-    rm -f "$tmp"
-    echo "claude-plans-here: jq failed; $target unchanged" >&2
-    return 1
-  fi
+  local copied=0
+  for m in "${candidates[@]}"; do
+    cp -n "$m" .claude/plans/ && copied=$((copied + 1))
+  done
+  echo "Copied $copied plan(s) into $PWD/.claude/plans/"
 }
