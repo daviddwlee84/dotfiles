@@ -23,6 +23,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
+- [Claude Code](#claude-code)
 - [Package Managers & Runtime](#package-managers--runtime)
 
 ---
@@ -596,6 +597,16 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
 | `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
 | `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
+
+---
+
+## Claude Code
+
+> Project-local Claude Code config helpers. Requires `jq` only for the merge path (when the target file already exists).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `claude-plans-here [-f]` | function | `dot_config/zsh/10_aliases.zsh` | Scaffold/update `./.claude/settings.json` so Claude Code's `/plan` files land in `./.claude/plans/` (in-repo) instead of the user-global plansDirectory. New file: write directly. Existing file: `jq`-merge the `plansDirectory` key (preserves hooks/permissions/model). Prompts `y/N` unless `-f` is given |
 
 ---
 

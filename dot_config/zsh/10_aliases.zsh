@@ -177,3 +177,50 @@ brew-mirror() {
   echo "brew-mirror: switched to $mirror"
   echo "  Run 'brew update' to re-sync indexes."
 }
+
+# Scaffold or update project-local .claude/settings.json so Claude Code's
+# /plan files land in ./.claude/plans/ (kept inside the repo) instead of the
+# user-global plansDirectory. Pairs well with the agent-history-hygiene skill,
+# which can then redact + commit the plan files alongside the diff.
+# Usage: claude-plans-here [-f]
+#   -f   non-interactive: skip the y/N prompt when settings.json exists
+claude-plans-here() {
+  emulate -L zsh
+  local force=0
+  [[ "$1" == "-f" ]] && force=1
+  local target=".claude/settings.json"
+
+  mkdir -p .claude
+
+  if [[ ! -e "$target" ]]; then
+    cat >"$target" <<'EOF'
+{
+  "plansDirectory": "./.claude/plans"
+}
+EOF
+    echo "Wrote $PWD/$target"
+    return 0
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "claude-plans-here: jq required to merge into existing $target" >&2
+    return 1
+  fi
+
+  if (( ! force )); then
+    local ans
+    read -q "ans?$target exists. Merge plansDirectory into it? [y/N] " || { echo; return 1; }
+    echo
+  fi
+
+  local tmp
+  tmp="$(mktemp)" || return 1
+  if jq --arg p "./.claude/plans" '. + {plansDirectory: $p}' "$target" >"$tmp"; then
+    mv "$tmp" "$target"
+    echo "Merged plansDirectory into $PWD/$target"
+  else
+    rm -f "$tmp"
+    echo "claude-plans-here: jq failed; $target unchanged" >&2
+    return 1
+  fi
+}
