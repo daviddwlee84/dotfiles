@@ -137,6 +137,7 @@ nav:
       - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
       - Agent skills: tools/agent-skills.md
       - Claude Code keybindings: tools/claude-code-keybindings.md
+      - Language servers (LSP): tools/lsp.md
       - OpenCode: tools/opencode.md
       - specify-cli: tools/specify_cli.md
       - SpecStory: tools/specstory.md
