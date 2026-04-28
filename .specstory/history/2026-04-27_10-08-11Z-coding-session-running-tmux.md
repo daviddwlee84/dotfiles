@@ -9358,3 +9358,70 @@ Both commits landed:
 The skill update is the higher-leverage one — every future invocation of `agent-history-hygiene` (which fires on "commit my chat" / "scrub the transcript") now warns the agent about this trap before it tries the standard `git add → commit → restage` recovery dance.
 
 Want me to `/schedule` an agent for ~2 weeks out to check whether the `agent-panes` channel actually got used, and tidy up if a known follow-up emerged (e.g., the OpenCode capture-pane preview being mostly empty when idle)?
+
+---
+
+_**User (2026-04-28 00:28:24Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/5a422733-a13c-401e-b95a-4387d099d8df/6.png]
+
+_**User (2026-04-28 00:28:24Z)**_
+
+[Image #6]  Claude Code 的這個busy狀態是會同步的嗎？ 還是怎麽刷新的？
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-28 00:28:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-28 00:29:10Z)**_
+
+不會自動同步 — 它是 snapshot。Data flow：
+
+1. **Claude 那端是 real-time** — Claude Code 每次進入 working/idle 狀態時就 rewrite `~/.claude/sessions/{pid}.json`（你看到 `updatedAt` 跟 `status` 都會跟著變）。檔案系統層面是即時的。
+
+2. **`tv agent-panes` 那端是 one-shot** — TV 在打開 channel 時跑一次 source command (`agent-sessions.py panes`)，把那一瞬間的 snapshot 餵進 fzf list。之後就停在那。所以你看到的 `●` / `○` 是「打開 picker 那瞬間」的狀態，picker 開著的期間 Claude busy↔idle 切換你不會看到。
+
+3. **手動 refresh** — TV 內建 `Ctrl+R` 重跑 source。再按一次就能拿到新 snapshot。
+
+如果想要 auto-poll 有幾種做法（按 trade-off 排）：
+
+| 做法 | 怎麼做 | 代價 |
+|---|---|---|
+| 維持現狀 + Ctrl+R | 開 picker 時看一眼，手動刷 | 0；最簡單 |
+| 在 TUI 裡輪詢 | TV 0.15 沒有 `reload_interval`，要看新版有沒有；不然 wrap 成 `watch -n 1 tv agent-panes` 之類，但 TV interactive 不能那樣 wrap | 中；要等 TV 支援 |
+| Background poller + 寫狀態檔 | Cron/launchd 每 N 秒跑 `agent-sessions.py panes --emit-state`，寫到一個 cache 檔；TV 從 cache 讀。順便就能 feed tmux statusline (Option C from `backlog/tmux-window-status-indicators.md`) | 高；但解決了一個 deferred backlog item |
+
+老實說 day-to-day 我覺得 Ctrl+R 已經夠用 — picker 通常開幾秒就決定要跳哪 pane 了。如果你發現自己會盯著 picker 看狀態變化，那 Option 3 就值得做（順便 activate 那個 deferred backlog）。
+
+---
+
+_**User (2026-04-28 00:35:48Z)**_
+
+其他agent的話就沒有這種機制嘛？
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-28 00:36:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-28 00:36:25Z)**_
+
+對，Claude 在這方面是異類 — 它特別 export 一個給 tooling 用的 per-PID status file。其他三個都沒有對應機制：
+
+| Agent | 寫什麼 | 有 status field？ | 可推 busy/idle？ |
+|---|---|---|---|
+| **Claude** | `~/.claude/sessions/{pid}.json` | ✅ `status: "busy"\|"idle"` + `updatedAt` + `name` | ✅ 直接讀 |
+| **Codex** | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (transcript only) | ❌ | ⚠️ mtime 推測 |
+| **OpenCode** | `~/.local/share/opencode/opencode.db` (SQLite — sessions/parts/messages) | ❌ 有 `time_updated` 但沒 status | ⚠️ mtime / row 活動推測 |
+| **Cursor Agent CLI** | `~/.cursor/chats/<wsHash>/<chatId>/store.db` (opaque BLOBs) | ❌ 連內容都讀不出 | ⚠️ 只剩 mtime |
+
+如果要硬補 status，現實的選項：
+
+1. **mtime polling** — 看 transcript file 在過去 X 秒內有沒有寫入。優點：簡單、跨 agent。缺點：agent 在 streaming reasoning（不寫盤）時會誤判 idle，反過來 long-poll context window 時也可能誤判 busy。
+2. **`tmux capture-pane` text matching** — recon 給 Claude 用的招數，但同樣可以套到任何 TUI agent。掃 pane 內容找：
+   - OpenCode：`Working` / `Generating` / `Tool` 之類字樣
+   - Codex：`Thinking…` / `Working…`
+   - Cursor Agent：`Generating` / `Plan, search, build` 之類
+   - 優點：跟 Claude 的 status 一樣語意明確。缺點：每個 agent 每次升版改 TUI 字串就要對應更新，跨 agent 維護成本累加。
+3. **Process CPU/state 看** — 大致沒用（agent 主要是 IO bound 等 LLM）。
+
+如果要做的話我會建議 **mtime + 一個 short grace window**（e.g., file 在過去 10 秒內被寫過 → busy；不然 → idle），先不上 capture-pane match 那條。簡單一致，誤判可以接受。要不要等實際用一陣子 `tv agent-panes` 之後再看有沒有強烈需要再補？目前 Claude 的 ●/○ 對你最有用 case 應該已經 cover 了。

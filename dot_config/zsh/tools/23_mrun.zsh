@@ -5,7 +5,9 @@
 # immediately, prints an attach hint to stderr.
 #
 # Public API:
-#   mrun [-b tmux|zellij] [-n NAME] [-d DIR] [-f|--force] [--no-detach] [--] CMD [ARGS...]
+#   mrun [-b tmux|zellij] [-n NAME] [-d DIR] [-f|--force]
+#        [--on-exit shell|kill|restart] [-k|--kill] [--no-detach] [--]
+#        CMD [ARGS...]
 #   tmrun ...   # mrun -b tmux
 #   zjrun ...   # mrun -b zellij
 #
@@ -65,8 +67,51 @@ function _mrun_warn_if_tui() {
     esac
 }
 
+# Wrap CMD with on-exit behaviour. Patterned after _sesh_on_exit_wrap in
+# 22_sesh.zsh:130 (inlined here to avoid the sesh-installed gate).
+#
+# Args: $1=inner cmd string, $2=mode (shell|kill|restart), $3=backend, $4=session
+# Stdout: a single shell command suitable for `sh -c <out>`.
+#
+# trap '' INT — the wrapper shell ignores SIGINT so the inner command's
+# Ctrl+C exit doesn't take the wrapper down before it can drop to shell or
+# print the hint. (Tools with their own SIGINT handler — btop, htop, less —
+# are the visible failure case.)
+function _mrun_on_exit_wrap() {
+    local inner="$1" mode="$2" backend="$3" session="$4"
+    local guard="trap '' INT;"
+    case "$mode" in
+        kill)
+            if [[ "$backend" == "zellij" ]]; then
+                # Zellij keeps sessions "active" even after the pane's
+                # foreground command exits — `delete-session` without `-f`
+                # refuses with "session is active". The backgrounded killer
+                # also has to outlive the pane's process group (which dies
+                # when sh exits), so detach via setsid/nohup. Note `kill`
+                # does NOT take `-f`, but `delete-session -f` is the
+                # documented way to remove an active session.
+                local _detach
+                if command -v setsid >/dev/null 2>&1; then _detach=setsid; else _detach=nohup; fi
+                print -r -- "$inner; ($_detach sh -c 'sleep 0.3; zellij delete-session --force ${(q)session} >/dev/null 2>&1' </dev/null >/dev/null 2>&1 &)"
+            else
+                print -r -- "$inner"
+            fi
+            ;;
+        restart)
+            # `|| true` so a non-zero exit on `set -e` shells doesn't break the loop.
+            print -r -- "$guard while true; do $inner || true; printf '\\n\\033[33m[mrun: exited — respawning in 1s; Ctrl+C twice to break]\\033[0m\\n'; sleep 1; done; exec \$SHELL -l"
+            ;;
+        shell|*)
+            # Default. Drop to a login shell after CMD exits, with the rerun
+            # hint pre-typable from history (Up arrow). Yellow tmux-color
+            # codes also work in zellij and most terminals.
+            print -r -- "$guard $inner; ec=\$?; printf '\\n\\033[33m[mrun: exited (rc=%d) — drop to shell. Re-run from history (Up): \\033[1m%s\\033[0;33m]\\033[0m\\n' \"\$ec\" ${(q)inner}; exec \$SHELL -l"
+            ;;
+    esac
+}
+
 function _mrun_tmux() {
-    local session="$1" workdir="$2" force="$3" no_detach="$4"; shift 4
+    local session="$1" workdir="$2" force="$3" no_detach="$4" mode="$5"; shift 5
     if tmux has-session -t "=$session" 2>/dev/null; then
         if (( force )); then
             tmux kill-session -t "=$session" 2>/dev/null
@@ -75,14 +120,15 @@ function _mrun_tmux() {
             return 1
         fi
     fi
-    local cmd
-    cmd=$(printf '%s ' "$@")
-    cmd="${cmd% }"
-    tmux new-session -d -s "$session" -c "$workdir" -n run sh -c "$cmd" || return 1
+    local raw wrapped
+    raw=$(printf '%s ' "$@")
+    raw="${raw% }"
+    wrapped=$(_mrun_on_exit_wrap "$raw" "$mode" tmux "$session")
+    tmux new-session -d -s "$session" -c "$workdir" -n run sh -c "$wrapped" || return 1
     if [[ -n "$TMUX" ]]; then
-        echo "mrun[tmux]: started '$session'. Attach: tmux switch-client -t $session" >&2
+        echo "mrun[tmux]: started '$session' (--on-exit $mode). Attach: tmux switch-client -t $session" >&2
     else
-        echo "mrun[tmux]: started '$session'. Attach: tmux attach -t $session" >&2
+        echo "mrun[tmux]: started '$session' (--on-exit $mode). Attach: tmux attach -t $session" >&2
     fi
     if (( no_detach )); then
         if [[ -n "$TMUX" ]]; then
@@ -94,7 +140,7 @@ function _mrun_tmux() {
 }
 
 function _mrun_zellij() {
-    local session="$1" workdir="$2" force="$3" no_detach="$4"; shift 4
+    local session="$1" workdir="$2" force="$3" no_detach="$4" mode="$5"; shift 5
     if zellij list-sessions --no-formatting --short 2>/dev/null | grep -qx "$session"; then
         if (( force )); then
             zellij delete-session --force "$session" >/dev/null 2>&1
@@ -104,15 +150,29 @@ function _mrun_zellij() {
         fi
     fi
 
-    local cmd esc_cmd esc_dir layout
-    cmd=$(printf '%s ' "$@")
-    cmd="${cmd% }"
-    esc_cmd=$(_mrun_kdl_escape "$cmd")
+    local raw wrapped esc_cmd esc_dir layout
+    raw=$(printf '%s ' "$@")
+    raw="${raw% }"
+    wrapped=$(_mrun_on_exit_wrap "$raw" "$mode" zellij "$session")
+    esc_cmd=$(_mrun_kdl_escape "$wrapped")
     esc_dir=$(_mrun_kdl_escape "$workdir")
 
     layout=$(mktemp "${TMPDIR:-/tmp}/mrun-layout-XXXXXX") || return 1
+    # default_tab_template restores zellij's normal tab-bar + status-bar
+    # plugins (Ctrl+G hint, mode indicator, keybinding strip) — without it
+    # the generated session looks "feature-stripped" because zellij omits
+    # those plugins when no template is declared.
     cat >"$layout" <<EOF
 layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+        pane size=2 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
     tab name="run" {
         pane cwd="$esc_dir" {
             command "sh"
@@ -122,7 +182,7 @@ layout {
 }
 EOF
     # Layout file is intentionally NOT deleted: zellij re-reads it on session
-    # resurrection. ~200B leak per invocation; /tmp GC handles it.
+    # resurrection. ~400B leak per invocation; /tmp GC handles it.
 
     if [[ -n "$ZELLIJ" ]]; then
         echo "mrun[zellij]: warning — already inside zellij session '$ZELLIJ'." >&2
@@ -133,19 +193,21 @@ EOF
         zellij --layout "$layout" attach --create "$session"
     else
         _mrun_spawn_detached zellij --layout "$layout" attach --create "$session"
-        echo "mrun[zellij]: started '$session'. Attach: zellij attach $session" >&2
+        echo "mrun[zellij]: started '$session' (--on-exit $mode). Attach: zellij attach $session" >&2
     fi
 }
 
 function mrun() {
     local backend="${MRUN_BACKEND:-tmux}" name="" workdir="$PWD"
-    local force=0 no_detach=0
+    local force=0 no_detach=0 mode="shell"
     while (( $# > 0 )); do
         case "$1" in
             -b|--backend)   backend="$2"; shift 2 ;;
             -n|--name)      name="$2"; shift 2 ;;
             -d|--dir)       workdir="$2"; shift 2 ;;
             -f|--force)     force=1; shift ;;
+            --on-exit)      mode="$2"; shift 2 ;;
+            -k|--kill)      mode="kill"; shift ;;
             --no-detach)    no_detach=1; shift ;;
             --)             shift; break ;;
             -h|--help)
@@ -153,7 +215,8 @@ function mrun() {
 mrun — fire a command into a detached tmux/zellij session
 
 Usage:
-  mrun [-b tmux|zellij] [-n NAME] [-d DIR] [-f] [--no-detach] [--] CMD [ARGS...]
+  mrun [-b tmux|zellij] [-n NAME] [-d DIR] [-f]
+       [--on-exit shell|kill|restart] [-k] [--no-detach] [--] CMD [ARGS...]
   tmrun ...   # forces -b tmux
   zjrun ...   # forces -b zellij
 
@@ -162,19 +225,31 @@ Options:
   -n NAME       session name (default: run-<dir>-<rand>).
   -d DIR        working directory for the inner command (default: $PWD).
   -f, --force   kill an existing session of the same name before creating.
+  --on-exit MODE  what to do when CMD exits:
+                shell  (default) — drop to a login shell; session stays alive
+                                   for inspection. Re-run from history (Up).
+                kill   — let session vanish (tmux) or auto-delete (zellij).
+                restart — loop forever; respawn CMD on exit.
+  -k, --kill    shorthand for --on-exit kill.
   --no-detach   attach immediately after creating (debug aid).
   --            explicit end of mrun flags; everything after is the command.
 
 For an interactive shell session at $PWD use shere (sesh-here) instead.
-Note: with default tmux config, sessions vanish when CMD exits — that's the
-point of fire-and-forget. Use `--no-detach` or `tmux set -g remain-on-exit on`
-to debug a command that exits unexpectedly.
+
+Default behaviour change (vs older mrun): sessions now stick around after
+CMD exits so you can attach in and inspect output. Pass -k for the old
+fire-and-forget semantics where the session vanishes when CMD finishes.
 EOF
                 return 0 ;;
             -*) echo "mrun: unknown flag '$1' (try --help)" >&2; return 2 ;;
             *)  break ;;
         esac
     done
+
+    case "$mode" in
+        shell|kill|restart) ;;
+        *) echo "mrun: invalid --on-exit '$mode' (expected shell|kill|restart)" >&2; return 2 ;;
+    esac
 
     if (( $# == 0 )); then
         echo "mrun: no command given. Try: mrun -- echo hi" >&2
@@ -198,12 +273,12 @@ EOF
         tmux)
             command -v tmux >/dev/null 2>&1 \
                 || { echo "mrun: tmux not installed." >&2; return 1; }
-            _mrun_tmux "$name" "$workdir" "$force" "$no_detach" "$@"
+            _mrun_tmux "$name" "$workdir" "$force" "$no_detach" "$mode" "$@"
             ;;
         zellij)
             command -v zellij >/dev/null 2>&1 \
                 || { echo "mrun: zellij not installed." >&2; return 1; }
-            _mrun_zellij "$name" "$workdir" "$force" "$no_detach" "$@"
+            _mrun_zellij "$name" "$workdir" "$force" "$no_detach" "$mode" "$@"
             ;;
         *)
             echo "mrun: unknown backend '$backend' (expected tmux or zellij)." >&2
