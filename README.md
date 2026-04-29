@@ -118,6 +118,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux) |
 | `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
 | `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
+| `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
 
@@ -226,6 +227,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
 - **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
 - **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
+- **Media / AV tools** (optional, `installMediaTools=true`): [ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md). Plus three zsh helpers (`compress-video`, `extract-audio`, `to-wav16k`) at [`dot_config/zsh/tools/29_media.zsh`](dot_config/zsh/tools/29_media.zsh). Also satisfies `vhs`'s runtime ffmpeg dep.
 - **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager), [`recon`](https://github.com/gavraz/recon) (Claude Code tmux dashboard — see [agent pane discovery](docs/tools/agent-panes-discovery.md))

@@ -1,0 +1,42 @@
+---
+# Media / AV CLI tools role
+# Tools: ffmpeg, ImageMagick, exiftool, libvips
+# ffmpeg is also vhs's runtime dependency — see dot_ansible/roles/devtools/
+# tasks/main.yml `# --- vhs ---` block.
+#
+# noRoot=true on Linux: the upstream run_onchange script injects
+# `--skip-tags sudo`, which strips the apt block below (it carries
+# `tags: [sudo]`). No extra in-role guard needed; user-level fallbacks
+# would be impractical for these packages (ffmpeg / imagemagick / libvips
+# all want C compilers + system codecs).
+
+# =============================================================================
+# macOS — all via Homebrew
+# =============================================================================
+
+- name: Install media/AV tools (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name:
+      - ffmpeg        # provides ffmpeg, ffprobe, ffplay
+      - imagemagick   # v7 unified `magick` binary (also ships `convert` shim)
+      - exiftool
+      - vips          # provides vips, vipsthumbnail, vipsedit
+    state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu) — apt
+# =============================================================================
+
+- name: Install media/AV tools from apt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - ffmpeg                       # ffmpeg + ffprobe + ffplay
+      - imagemagick                  # Ubuntu 24.04 ships v6 → /usr/bin/convert
+      - libimage-exiftool-perl       # provides /usr/bin/exiftool
+      - libvips-tools                # vips, vipsthumbnail, vipsedit
+    state: present
+    update_cache: true

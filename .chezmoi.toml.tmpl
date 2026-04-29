@@ -68,6 +68,9 @@ installInputMethod = {{ promptBoolOnce . "installInputMethod" "Install Tradition
 installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
 # 是否安裝 Infrastructure-as-Code 工具 (Azure CLI, Terraform, OpenTofu)
 installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)" false }}
+# 是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)
+# ffmpeg 也是 vhs 的 runtime 依賴；裝了影音包之後 vhs 才能真正錄製。詳見 docs/tools/ffmpeg.md
+installMediaTools = {{ promptBoolOnce . "installMediaTools" "Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)" false }}
 # 是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
 # 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)

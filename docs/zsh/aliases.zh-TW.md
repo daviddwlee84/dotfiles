@@ -25,6 +25,7 @@
 - [Task Queue](#task-queue)
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
+- [Media / AV](#media--av)
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
@@ -565,6 +566,18 @@
 | `logtail` | function | `dot_config/zsh/tools/29_log_tools.zsh` | 即時 tailspin 高亮的 `tail -f`（優先 `tspin --follow`，退回 `tail -F \| tspin --print`） |
 | `svclog` | function | `dot_config/zsh/tools/29_log_tools.zsh` | 跨平台服務 log 跟隨器 —— Linux 用 `journalctl -fu`、macOS 用 `tail -F StdoutPath` / `log stream --predicate`，皆透過 tailspin 管線。接受 `--user` 用於使用者範圍。用法：`svclog [--user] <service>`。見 [services.md](../tools/services.md) |
 | `svcstat` | function | `dot_config/zsh/tools/29_log_tools.zsh` | 跨平台服務狀態 —— Linux 用 `systemctl status`、macOS 用 `launchctl print DOMAIN/LABEL`。接受 `--user`。用法：`svcstat [--user] <service>` |
+
+---
+
+## Media / AV
+
+> 由 `ffmpeg` 提供。只有在 `installMediaTools=true`（或 `ffmpeg` 已在 `$PATH`）時才會載入這些 function。底層工具見 [docs/tools/ffmpeg.md](../tools/ffmpeg.md)。
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 用 x264 CRF 28 重編碼 → `<name>_compressed.mp4`（更小；想換畫質直接改 CRF） |
+| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 去掉影像、複製音訊 stream → `<name>.m4a`（不重新編碼） |
+| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample 成 16 kHz 單聲道 WAV → `<name>_16k.wav`（Whisper / faster-whisper 輸入格式） |
 
 ---
 

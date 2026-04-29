@@ -20,6 +20,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Task Queue](#task-queue)
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
+- [Media / AV](#media--av)
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
@@ -560,6 +561,18 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `logtail` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
 | `svclog` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
 | `svcstat` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
+
+---
+
+## Media / AV
+
+> Provided by `ffmpeg`. Functions only loaded when `installMediaTools=true` (or `ffmpeg` is otherwise on `$PATH`). See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) for the underlying tool.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
 
 ---
 

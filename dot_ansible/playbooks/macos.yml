@@ -75,6 +75,9 @@
     - role: iac_tools
       tags: [iac_tools]
 
+    - role: media_tools
+      tags: [media_tools]
+
     - role: dotnet_tools
       tags: [dotnet_tools]
 

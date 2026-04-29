@@ -35,6 +35,7 @@
 # networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
 # iac_tools tasks: {{ include "dot_ansible/roles/iac_tools/tasks/main.yml" | sha256sum }}
 # iac_tools defaults: {{ include "dot_ansible/roles/iac_tools/defaults/main.yml" | sha256sum }}
+# media_tools: {{ include "dot_ansible/roles/media_tools/tasks/main.yml" | sha256sum }}
 # dotnet_tools tasks: {{ include "dot_ansible/roles/dotnet_tools/tasks/main.yml" | sha256sum }}
 # dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
 # gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
@@ -165,6 +166,10 @@ TAGS="${TAGS},networking_tools"
 {{ $installIacTools := false }}{{ if hasKey . "installIacTools" }}{{ $installIacTools = .installIacTools }}{{ end -}}
 {{ if $installIacTools -}}
 TAGS="${TAGS},iac_tools"
+{{ end -}}
+{{ $installMediaTools := false }}{{ if hasKey . "installMediaTools" }}{{ $installMediaTools = .installMediaTools }}{{ end -}}
+{{ if $installMediaTools -}}
+TAGS="${TAGS},media_tools"
 {{ end -}}
 {{ $installDotnetTools := false }}{{ if hasKey . "installDotnetTools" }}{{ $installDotnetTools = .installDotnetTools }}{{ end -}}
 {{ if $installDotnetTools -}}

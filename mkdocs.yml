@@ -90,6 +90,10 @@ plugins:
             Gum (shell prompts): Gum (shell prompt 工具箱)
             VHS (terminal demo recorder): VHS (終端機示範錄影器)
             Freeze (code → image): Freeze (程式碼 → 圖片)
+            ffmpeg (audio / video toolkit): ffmpeg (音訊 / 影片工具箱)
+            ImageMagick (image swiss army knife): ImageMagick (圖片瑞士刀)
+            ExifTool (image / video metadata): ExifTool (圖片 / 影片 metadata)
+            libvips (high-throughput image processing): libvips (高吞吐圖片處理)
             SSH agent: SSH agent
             Agent overlays (Claude/OpenCode/Codex/Cursor): Agent overlays (Claude/OpenCode/Codex/Cursor)
             Agent pane discovery (tv agent-panes + recon): Agent pane 探索 (tv agent-panes + recon)
@@ -227,6 +231,10 @@ nav:
           - Gum (shell prompts): tools/gum.md
           - VHS (terminal demo recorder): tools/vhs.md
           - Freeze (code → image): tools/freeze.md
+          - ffmpeg (audio / video toolkit): tools/ffmpeg.md
+          - ImageMagick (image swiss army knife): tools/imagemagick.md
+          - ExifTool (image / video metadata): tools/exiftool.md
+          - libvips (high-throughput image processing): tools/libvips.md
       - Sessions & worktrees:
           - Sesh: tools/sesh.md
           - Worktrunk: tools/worktrunk.md

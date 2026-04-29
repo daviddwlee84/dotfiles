@@ -1447,8 +1447,13 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # --- vhs (Charm) ---
-# Note: vhs requires `ttyd` and `ffmpeg` at runtime to record. Those are NOT
-# auto-installed here (heavy and opt-in). See docs/tools/vhs.md.
+# Note: vhs requires `ttyd` and `ffmpeg` at runtime to record. Neither is
+# installed by this devtools role — they're heavy and opt-in:
+#   - ffmpeg ships with the `installMediaTools=true` bundle (which also pulls
+#     ImageMagick / exiftool / libvips). See docs/tools/ffmpeg.md.
+#   - ttyd is currently user-installed (Homebrew on macOS; manual on Linux).
+# Without both, vhs binary installs but `vhs <tape>` will fail at record time.
+# See docs/tools/vhs.md.
 - name: Check if vhs is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: vhs --version

@@ -169,6 +169,11 @@ PROMPTS: tuple[Prompt, ...] = (
            "Azure CLI, Terraform, OpenTofu.",
            default=False,
            prompt_text="Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)"),
+    Prompt("installMediaTools", "bool", "Dev tooling",
+           "Media / AV CLI tools",
+           "ffmpeg, ImageMagick, exiftool, libvips. ffmpeg is also vhs's runtime dep.",
+           default=False,
+           prompt_text="Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)"),
 
     # --- System & apps ---------------------------------------------------
     Prompt("installBitwarden", "bool", "System & apps",
@@ -243,6 +248,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBitwarden": True,
         "installBrewApps": True,
         "installNetworkingTools": True,
+        "installMediaTools": True,
         "backupMode": "smart",
     },
     "work-mac": {
@@ -277,6 +283,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBrewApps": False,
         "installInputMethod": False,
         "installNetworkingTools": False,
+        "installMediaTools": False,
         "useChineseMirror": False,
         "gitleaksAllRepos": False,
         "backupMode": "off",
