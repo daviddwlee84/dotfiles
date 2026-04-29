@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -26,6 +26,9 @@
       - eza
       - tlrc
       - glow
+      - gum
+      - vhs
+      - freeze
       - thefuck
       - zoxide
       - direnv
@@ -1317,6 +1320,374 @@
 - name: Verify glow is available
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.command: glow --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# --- gum (Charm) ---
+- name: Check if gum is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: gum --version
+  register: gum_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set gum release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gum_check.rc != 0
+  ansible.builtin.set_fact:
+    gum_release_arch: >-
+      {{
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armv6l', 'arm']
+        else ''
+      }}
+
+- name: Skip gum on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gum_check.rc != 0
+    - gum_release_arch == ''
+  ansible.builtin.debug:
+    msg: "gum skipped: no release for {{ target_architecture }}"
+
+- name: Install gum from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - gum_check.rc != 0
+    - gum_release_arch != ''
+  block:
+    - name: Ensure ~/.local/bin exists (gum)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest gum release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/charmbracelet/gum/releases/latest
+        return_content: true
+      register: gum_release
+
+    - name: Set gum version facts
+      ansible.builtin.set_fact:
+        gum_version: "{{ gum_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download gum tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/charmbracelet/gum/releases/download/{{ gum_release.json.tag_name }}/gum_{{ gum_version }}_Linux_{{ gum_release_arch }}.tar.gz"
+        dest: /tmp/gum.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create gum temp directory
+      ansible.builtin.file:
+        path: /tmp/gum
+        state: directory
+        mode: '0755'
+
+    - name: Extract gum
+      ansible.builtin.unarchive:
+        src: /tmp/gum.tar.gz
+        dest: /tmp/gum
+        remote_src: true
+
+    - name: Find gum binary
+      ansible.builtin.find:
+        paths: /tmp/gum
+        patterns: gum
+        file_type: file
+        recurse: true
+      register: gum_find
+
+    - name: Fail if gum binary was not found in extracted archive
+      when: gum_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "gum binary was not found under /tmp/gum after extraction"
+
+    - name: Install gum to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ gum_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/gum"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up gum temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gum.tar.gz
+        - /tmp/gum
+
+  rescue:
+    - name: Warn gum installation failed
+      ansible.builtin.debug:
+        msg: "gum installation failed (likely network timeout) - skipping"
+
+    - name: Clean up gum temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/gum.tar.gz
+        - /tmp/gum
+
+- name: Verify gum is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: gum --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# --- vhs (Charm) ---
+# Note: vhs requires `ttyd` and `ffmpeg` at runtime to record. Those are NOT
+# auto-installed here (heavy and opt-in). See docs/tools/vhs.md.
+- name: Check if vhs is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: vhs --version
+  register: vhs_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set vhs release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - vhs_check.rc != 0
+  ansible.builtin.set_fact:
+    vhs_release_arch: >-
+      {{
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armv6l', 'arm']
+        else ''
+      }}
+
+- name: Skip vhs on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - vhs_check.rc != 0
+    - vhs_release_arch == ''
+  ansible.builtin.debug:
+    msg: "vhs skipped: no release for {{ target_architecture }}"
+
+- name: Install vhs from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - vhs_check.rc != 0
+    - vhs_release_arch != ''
+  block:
+    - name: Ensure ~/.local/bin exists (vhs)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest vhs release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/charmbracelet/vhs/releases/latest
+        return_content: true
+      register: vhs_release
+
+    - name: Set vhs version facts
+      ansible.builtin.set_fact:
+        vhs_version: "{{ vhs_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download vhs tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/charmbracelet/vhs/releases/download/{{ vhs_release.json.tag_name }}/vhs_{{ vhs_version }}_Linux_{{ vhs_release_arch }}.tar.gz"
+        dest: /tmp/vhs.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create vhs temp directory
+      ansible.builtin.file:
+        path: /tmp/vhs
+        state: directory
+        mode: '0755'
+
+    - name: Extract vhs
+      ansible.builtin.unarchive:
+        src: /tmp/vhs.tar.gz
+        dest: /tmp/vhs
+        remote_src: true
+
+    - name: Find vhs binary
+      ansible.builtin.find:
+        paths: /tmp/vhs
+        patterns: vhs
+        file_type: file
+        recurse: true
+      register: vhs_find
+
+    - name: Fail if vhs binary was not found in extracted archive
+      when: vhs_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "vhs binary was not found under /tmp/vhs after extraction"
+
+    - name: Install vhs to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ vhs_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/vhs"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up vhs temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/vhs.tar.gz
+        - /tmp/vhs
+
+  rescue:
+    - name: Warn vhs installation failed
+      ansible.builtin.debug:
+        msg: "vhs installation failed (likely network timeout) - skipping"
+
+    - name: Clean up vhs temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/vhs.tar.gz
+        - /tmp/vhs
+
+- name: Verify vhs is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: vhs --version
+  changed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# --- freeze (Charm) ---
+- name: Check if freeze is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: freeze --version
+  register: freeze_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set freeze release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - freeze_check.rc != 0
+  ansible.builtin.set_fact:
+    freeze_release_arch: >-
+      {{
+        'x86_64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else 'arm' if target_architecture in ['armv7l', 'armv6l', 'arm']
+        else ''
+      }}
+
+- name: Skip freeze on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - freeze_check.rc != 0
+    - freeze_release_arch == ''
+  ansible.builtin.debug:
+    msg: "freeze skipped: no release for {{ target_architecture }}"
+
+- name: Install freeze from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - freeze_check.rc != 0
+    - freeze_release_arch != ''
+  block:
+    - name: Ensure ~/.local/bin exists (freeze)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest freeze release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/charmbracelet/freeze/releases/latest
+        return_content: true
+      register: freeze_release
+
+    - name: Set freeze version facts
+      ansible.builtin.set_fact:
+        freeze_version: "{{ freeze_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download freeze tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/charmbracelet/freeze/releases/download/{{ freeze_release.json.tag_name }}/freeze_{{ freeze_version }}_Linux_{{ freeze_release_arch }}.tar.gz"
+        dest: /tmp/freeze.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create freeze temp directory
+      ansible.builtin.file:
+        path: /tmp/freeze
+        state: directory
+        mode: '0755'
+
+    - name: Extract freeze
+      ansible.builtin.unarchive:
+        src: /tmp/freeze.tar.gz
+        dest: /tmp/freeze
+        remote_src: true
+
+    - name: Find freeze binary
+      ansible.builtin.find:
+        paths: /tmp/freeze
+        patterns: freeze
+        file_type: file
+        recurse: true
+      register: freeze_find
+
+    - name: Fail if freeze binary was not found in extracted archive
+      when: freeze_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "freeze binary was not found under /tmp/freeze after extraction"
+
+    - name: Install freeze to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ freeze_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/freeze"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up freeze temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/freeze.tar.gz
+        - /tmp/freeze
+
+  rescue:
+    - name: Warn freeze installation failed
+      ansible.builtin.debug:
+        msg: "freeze installation failed (likely network timeout) - skipping"
+
+    - name: Clean up freeze temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/freeze.tar.gz
+        - /tmp/freeze
+
+- name: Verify freeze is available
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: freeze --version
   changed_when: false
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"

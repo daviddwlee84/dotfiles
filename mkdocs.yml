@@ -86,6 +86,10 @@ plugins:
             Clipboard: 剪貼簿
             Television (tv): Television (tv)
             TV vs fzf: TV vs fzf
+            Glow (markdown reader): Glow (Markdown 閱讀器)
+            Gum (shell prompts): Gum (shell prompt 工具箱)
+            VHS (terminal demo recorder): VHS (終端機示範錄影器)
+            Freeze (code → image): Freeze (程式碼 → 圖片)
             SSH agent: SSH agent
             Agent overlays (Claude/OpenCode/Codex/Cursor): Agent overlays (Claude/OpenCode/Codex/Cursor)
             Agent pane discovery (tv agent-panes + recon): Agent pane 探索 (tv agent-panes + recon)
@@ -219,6 +223,10 @@ nav:
           - Fzf: tools/fzf.md
           - Television (tv): tools/tv.md
           - TV vs fzf: tools/tv-vs-fzf.md
+          - Glow (markdown reader): tools/glow.md
+          - Gum (shell prompts): tools/gum.md
+          - VHS (terminal demo recorder): tools/vhs.md
+          - Freeze (code → image): tools/freeze.md
       - Sessions & worktrees:
           - Sesh: tools/sesh.md
           - Worktrunk: tools/worktrunk.md

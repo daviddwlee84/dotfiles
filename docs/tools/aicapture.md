@@ -4,6 +4,8 @@ Capture a past shell command's block from tmux scrollback, pipe it to a coding-a
 
 Built on [OSC 133 semantic prompts](https://gitlab.freedesktop.org/Per_Bothner/specifications/blob/master/proposals/semantic-prompts.md) — the shell emits `A`/`C`/`D` line-attribute markers, tmux stores them, our helpers navigate by them. For background on how this compares to `thefuck`, Warp, `wut`, `tmuxai`, `atuin`, etc., see [instant-llm-fix-prior-art.md](../this_repo/instant-llm-fix-prior-art.md).
 
+> **Why not Charm [`mods`](https://github.com/charmbracelet/mods)?** `mods` is a generic CLI LLM client. We deliberately route through the existing agent CLIs (Claude Code / OpenCode / Codex / Cursor Agent) instead, because they own the per-tool model selection, system prompts, tool permissions, and project context that `aifix` / `aiexplain` rely on. `aicapture` is a tmux-scrollback capture layer, not a model-routing layer; the agent CLIs already handle the routing. Auto-detection chain lives in `dot_config/zsh/tools/04_ai_capture.zsh`.
+
 ## Quick start
 
 ```sh

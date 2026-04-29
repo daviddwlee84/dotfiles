@@ -16,6 +16,8 @@
 
 覆寫內容 (overlay payloads) 位於 [`.chezmoitemplates/agents/`](../../.chezmoitemplates/agents/) 之下，並透過 `{{ template ... }}` include 引入，讓合併邏輯可以獨立於覆寫內容進行測試。
 
+> **為什麼不用 Charm [`crush`](https://github.com/charmbracelet/crush)？** `crush` 是 Charm 自家的 agentic coding CLI。要加進來會多出第五份 overlay（binary + auth + 每專案信任 + marketplace 狀態），而每個 agent overlay 的維運成本不低 — 任何在執行期重寫自身設定檔的 CLI 都需要一個感知 hook 的合併器、TOML/JSON round-tripper 與 `.chezmoiignore.tmpl` 的存在性 gating。現有三組（Cursor / OpenCode / Codex，加上透過 `dot_claude/modify_settings.json` 管理的 Claude Code）已涵蓋實務上的 agent CLI 設計空間。如要評估 `crush`，加第五個 CLI 的模式是：在 `dot_ansible/roles/coding_agents/tasks/main.yml` 安裝、新增 `dot_crush/modify_<config>` 與 `.chezmoitemplates/agents/crush.overlay.<json|toml>`、選擇性接到 `04_ai_capture.zsh` 的 agent 偵測鏈。
+
 ## 為什麼用 `modify_` 而非完整檔案管理
 
 這三個 CLI 都會**在執行期重寫自己的設定檔**，以記錄機器本地狀態：認證 token、telemetry ID、每專案信任授權、含絕對路徑的 marketplace 註冊、外掛 (plugin) 快取雜湊、最後使用的 provider 提示等。若將整個檔案視為受管內容，會：

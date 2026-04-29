@@ -11,6 +11,8 @@ This repo manages the *global* config files of three coding-agent CLIs via chezm
 
 Overlay payloads live under [`.chezmoitemplates/agents/`](../../.chezmoitemplates/agents/) and are sourced via `{{ template ... }}` includes so the merge logic can be tested independently of overlay contents.
 
+> **Why not Charm [`crush`](https://github.com/charmbracelet/crush)?** `crush` is Charm's own agentic coding CLI. Adding it would mean a fifth overlay (binary + auth + per-project trust + marketplace state), and the cost-of-ownership of each agent overlay is non-trivial — every CLI that rewrites its own config file at runtime needs a hook-aware merger, TOML/JSON round-tripper, and presence-gating in `.chezmoiignore.tmpl`. The existing trio (Cursor / OpenCode / Codex, plus Claude Code via `dot_claude/modify_settings.json`) already covers the practical agent-CLI design space. If you want to evaluate `crush`, the add-a-fifth-CLI pattern is: install in `dot_ansible/roles/coding_agents/tasks/main.yml`, add `dot_crush/modify_<config>` plus `.chezmoitemplates/agents/crush.overlay.<json|toml>`, then optionally wire into the `04_ai_capture.zsh` agent-detection chain.
+
 ## Why `modify_` and not full file management
 
 All three CLIs **rewrite their config file at runtime** to record machine-local state: auth tokens, telemetry IDs, per-project trust grants, marketplace registrations with absolute paths, plugin-cache hashes, last-used provider hints, etc. Tracking the whole file as managed content would:

@@ -9,6 +9,8 @@
 
 底層基於 [OSC 133 semantic prompts](https://gitlab.freedesktop.org/Per_Bothner/specifications/blob/master/proposals/semantic-prompts.md)——shell 發出 `A`/`C`/`D` 行屬性標記 (line-attribute markers)，tmux 將其儲存，我們的輔助腳本依其導航。關於與 `thefuck`、Warp、`wut`、`tmuxai`、`atuin` 等工具的比較背景，請見 [instant-llm-fix-prior-art.md](../this_repo/instant-llm-fix-prior-art.md)。
 
+> **為什麼不用 Charm [`mods`](https://github.com/charmbracelet/mods)？** `mods` 是一個通用的 CLI LLM 客戶端 (client)。我們刻意走既有的 agent CLI（Claude Code / OpenCode / Codex / Cursor Agent），是因為它們各自掌握 `aifix` / `aiexplain` 仰賴的：每個工具的 model 選擇、system prompt、工具權限、專案 context。`aicapture` 是一層 tmux 捲動歷史擷取層，不是 model 路由層；agent CLI 已處理路由。自動偵測鏈位於 `dot_config/zsh/tools/04_ai_capture.zsh`。
+
 ## 快速開始
 
 ```sh
