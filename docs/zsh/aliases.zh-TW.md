@@ -571,13 +571,16 @@
 
 ## Media / AV
 
-> 由 `ffmpeg` 提供。只有在 `installMediaTools=true`（或 `ffmpeg` 已在 `$PATH`）時才會載入這些 function。底層工具見 [docs/tools/ffmpeg.md](../tools/ffmpeg.md)。
+> 影音由 `ffmpeg` 提供、圖片由 `ImageMagick` 提供。只要任何一個媒體工具在 `$PATH` 上就會載入（通常透過 `installMediaTools=true`）。每個 function 自行檢查需要的工具。底層工具見 [docs/tools/ffmpeg.md](../tools/ffmpeg.md) 與 [docs/tools/imagemagick.md](../tools/imagemagick.md)。
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 用 x264 CRF 28 重編碼 → `<name>_compressed.mp4`（更小；想換畫質直接改 CRF） |
 | `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 去掉影像、複製音訊 stream → `<name>.m4a`（不重新編碼） |
 | `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample 成 16 kHz 單聲道 WAV → `<name>_16k.wav`（Whisper / faster-whisper 輸入格式） |
+| `compress-image <input> [<mb>=1]` | function | `dot_config/zsh/tools/29_media.zsh` | 重編碼成體積在目標 MB 以下的 JPEG → `<name>_<mb>mb.jpg`；使用 ImageMagick `-define jpeg:extent=NMB`（內部自動迭代品質，不用手動二分搜）。Alpha 會被攤平成白色。 |
+| `resize-image <input> <width_px>` | function | `dot_config/zsh/tools/29_media.zsh` | 縮放到寬度 = `<width_px>`，保持比例 → `<name>_<width>w.<ext>`；輸出延用原本格式 |
+| `media-pick` | function | `dot_config/zsh/tools/29_media.zsh` | 互動式入口：[gum](../tools/gum.md) `file` 選檔 → 動作選單 →（必要時）參數輸入。把上面所有 helper 串起來；只有在 `gum` 已在 `$PATH` 時才載入。 |
 
 ---
 

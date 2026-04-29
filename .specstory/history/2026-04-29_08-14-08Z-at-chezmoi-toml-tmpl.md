@@ -15572,3 +15572,625 @@ b4114e4 Update agent skills
 33efae8 Extend claude-plans-here to also copy existing plans here
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:29Z)**_
+
+Recent commit style uses `tools:` for tool-bundle adds. Drafting an analogous message and committing now — staging files explicitly (no `-A`).
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage explicit files and commit
+
+```bash
+git add \
+  .chezmoi.toml.tmpl \
+  .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl \
+  Dockerfile \
+  README.md \
+  docs/zsh/aliases.md \
+  docs/zsh/aliases.zh-TW.md \
+  dot_ansible/playbooks/linux.yml \
+  dot_ansible/playbooks/macos.yml \
+  dot_ansible/roles/devtools/tasks/main.yml \
+  mkdocs.yml \
+  scripts/init/dotfiles_init.py \
+  .claude/plans/chezmoi-toml-tmpl-init-smooth-snowglobe.md \
+  .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md \
+  docs/tools/exiftool.md docs/tools/exiftool.zh-TW.md \
+  docs/tools/ffmpeg.md docs/tools/ffmpeg.zh-TW.md \
+  docs/tools/imagemagick.md docs/tools/imagemagick.zh-TW.md \
+  docs/tools/libvips.md docs/tools/libvips.zh-TW.md \
+  dot_ansible/roles/media_tools/ \
+  dot_config/zsh/tools/29_media.zsh \
+  && git commit -m "$(cat <<'EOF'
+tools: add installMediaTools (ffmpeg/imagemagick/exiftool/libvips)
+
+New chezmoi init prompt that bundles four media/AV CLIs under one
+opt-in toggle. Closes the documented gap where vhs needs ffmpeg at
+runtime but the install was manual on every host.
+
+Wires through the established install* pattern with parity across
+.chezmoi.toml.tmpl, Dockerfile, scripts/init/dotfiles_init.py
+(verified by `doctor`), a new dot_ansible/roles/media_tools role
+with macOS Homebrew + Linux apt blocks, and the run_onchange tag
+injector. Three zsh helper functions (compress-video, extract-audio,
+to-wav16k) ship at dot_config/zsh/tools/29_media.zsh, plus four
+bilingual docs pages under docs/tools/.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1777452398-99390.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777452398-99390.
+[main fa846b4] tools: add installMediaTools (ffmpeg/imagemagick/exiftool/libvips)
+ 23 files changed, 17297 insertions(+), 2 deletions(-)
+ create mode 100644 .claude/plans/chezmoi-toml-tmpl-init-smooth-snowglobe.md
+ create mode 100644 .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md
+ create mode 100644 docs/tools/exiftool.md
+ create mode 100644 docs/tools/exiftool.zh-TW.md
+ create mode 100644 docs/tools/ffmpeg.md
+ create mode 100644 docs/tools/ffmpeg.zh-TW.md
+ create mode 100644 docs/tools/imagemagick.md
+ create mode 100644 docs/tools/imagemagick.zh-TW.md
+ create mode 100644 docs/tools/libvips.md
+ create mode 100644 docs/tools/libvips.zh-TW.md
+ create mode 100644 dot_ansible/roles/media_tools/tasks/main.yml
+ create mode 100644 dot_config/zsh/tools/29_media.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit success
+
+`git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:51Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:46:52Z)**_
+
+Committed as `fa846b4`. All pre-commit hooks passed (including agent-artifact redaction). The remaining unstaged change to the SpecStory transcript is normal — it appended content as the conversation continued past the commit moment.
+
+Branch is now 2 commits ahead of `origin/main`; no push unless you ask.
+
+---
+
+_**User (2026-04-29 08:48:10Z)**_
+
+@dot_config/zsh/tools/29_media.zsh 也許可以添加一些常用的alias 比如把圖片壓縮到 1MB以下 或是縮放到特定size
+有需要的話可以結合 https://github.com/charmbracelet/gum 一起使用
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-29 08:49:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:49:43Z)**_
+
+Good idea — both common workflows. I'll add `compress-image` (under target MB, single-shot via ImageMagick's `-define jpeg:extent`), `resize-image`, and a `media-pick` interactive launcher gated on `gum`. Then mirror the new rows into both alias docs.
+
+_**Agent (claude-opus-4-7 2026-04-29 08:49:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/29_media.zsh`
+
+```text
+1	# 29_media.zsh - ffmpeg helper functions (compress / extract / 16k-mono)
+2	
+3	# Only load when ffmpeg is on PATH (installMediaTools=true, or hand-installed).
+4	command -v ffmpeg &>/dev/null || return 0
+5	
+6	# Compress an MP4 with x264 CRF 28 (smaller; tweak CRF inline for quality).
+7	# Output: <name>_compressed.mp4 next to the input.
+8	compress-video() {
+9	    emulate -L zsh
+10	    [[ -f "$1" ]] || { echo "usage: compress-video <input>" >&2; return 2 }
+11	    ffmpeg -i "$1" -c:v libx264 -crf 28 -preset slow -c:a aac -b:a 128k "${1:r}_compressed.mp4"
+12	}
+13	
+14	# Extract audio without re-encoding. Output is .m4a (AAC sources keep AAC).
+15	extract-audio() {
+16	    emulate -L zsh
+17	    [[ -f "$1" ]] || { echo "usage: extract-audio <input>" >&2; return 2 }
+18	    ffmpeg -i "$1" -vn -c:a copy "${1:r}.m4a"
+19	}
+20	
+21	# Re-encode to 16 kHz mono WAV — Whisper / faster-whisper / wav2vec input format.
+22	to-wav16k() {
+23	    emulate -L zsh
+24	    [[ -f "$1" ]] || { echo "usage: to-wav16k <input>" >&2; return 2 }
+25	    ffmpeg -i "$1" -ar 16000 -ac 1 "${1:r}_16k.wav"
+26	}
+27
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```zsh
+# 29_media.zsh - ffmpeg + ImageMagick helpers (compress / extract / resize)
+
+# Load if any media tool is on PATH (installMediaTools=true, or hand-installed).
+# Each function self-checks for its specific dep so partial installs work.
+command -v ffmpeg &>/dev/null \
+    || command -v magick &>/dev/null \
+    || command -v convert &>/dev/null \
+    || return 0
+
+# === ffmpeg helpers (video / audio) =========================================
+
+# Compress an MP4 with x264 CRF 28 (smaller; tweak CRF inline for quality).
+# Output: <name>_compressed.mp4 next to the input.
+compress-video() {
+    emulate -L zsh
+    [[ -f "$1" ]] || { echo "usage: compress-video <input>" >&2; return 2 }
+    ffmpeg -i "$1" -c:v libx264 -crf 28 -preset slow -c:a aac -b:a 128k "${1:r}_compressed.mp4"
+}
+
+# Extract audio without re-encoding. Output is .m4a (AAC sources keep AAC).
+extract-audio() {
+    emulate -L zsh
+    [[ -f "$1" ]] || { echo "usage: extract-audio <input>" >&2; return 2 }
+    ffmpeg -i "$1" -vn -c:a copy "${1:r}.m4a"
+}
+
+# Re-encode to 16 kHz mono WAV — Whisper / faster-whisper / wav2vec input format.
+to-wav16k() {
+    emulate -L zsh
+    [[ -f "$1" ]] || { echo "usage: to-wav16k <input>" >&2; return 2 }
+    ffmpeg -i "$1" -ar 16000 -ac 1 "${1:r}_16k.wav"
+}
+
+# === ImageMagick helpers (image) ============================================
+
+# Resolve `magick` (v7) or `convert` (v6) into $REPLY. Returns 1 if neither.
+_29_media_im() {
+    REPLY=$(command -v magick) && return 0
+    REPLY=$(command -v convert) && return 0
+    echo "ImageMagick not found (install via installMediaTools=true)" >&2
+    return 1
+}
+
+# compress-image <input> [<target_mb=1>]
+# Re-encode to JPEG under <target_mb> MB. Uses ImageMagick's
+# `-define jpeg:extent=NMB`, which iterates quality internally — single shot,
+# no manual binary search. Alpha is flattened to white (PNG/WebP screenshots).
+# Output: <name>_<mb>mb.jpg
+compress-image() {
+    emulate -L zsh
+    [[ -f "$1" ]] || { echo "usage: compress-image <input> [<target_mb=1>]" >&2; return 2 }
+    local IM; _29_media_im || return 1; IM=$REPLY
+    local mb="${2:-1}"
+    local out="${1:r}_${mb}mb.jpg"
+    "$IM" "$1" -auto-orient -strip -background white -alpha remove -alpha off \
+        -define "jpeg:extent=${mb}MB" "$out"
+    [[ -f "$out" ]] && echo "→ $out ($(du -h "$out" | cut -f1))"
+}
+
+# resize-image <input> <width_px>
+# Resize so width = <width_px> (preserves aspect). Output keeps source format.
+# Output: <name>_<width>w.<ext>
+resize-image() {
+    emulate -L zsh
+    [[ -f "$1" && -n "$2" ]] || { echo "usage: resize-image <input> <width_px>" >&2; return 2 }
+    local IM; _29_media_im || return 1; IM=$REPLY
+    local out="${1:r}_${2}w.${1:e}"
+    "$IM" "$1" -auto-orient -resize "${2}x" "$out"
+    [[ -f "$out" ]] && echo "→ $out ($(du -h "$out" | cut -f1))"
+}
+
+# === gum-driven interactive launcher ========================================
+
+if command -v gum &>/dev/null; then
+    # media-pick: gum file picker → action chooser → (optional) param input.
+    # No-args entrypoint that wires every helper above for non-CLI users.
+    media-pick() {
+        emulate -L zsh
+        local file action
+        file=$(gum file --no-permissions) || return 0
+        [[ -f "$file" ]] || { echo "not a file: $file" >&2; return 2 }
+        action=$(gum choose \
+            "compress-video" \
+            "compress-image (1 MB)" \
+            "compress-image (custom MB)" \
+            "resize-image (custom width)" \
+            "extract-audio" \
+            "to-wav16k") || return 0
+        case "$action" in
+            "compress-video")            compress-video "$file" ;;
+            "compress-image (1 MB)")     compress-image "$file" 1 ;;
+            "compress-image (custom MB)")
+                local mb
+                mb=$(gum input --placeholder "target MB (e.g. 2)" --value 2) || return 0
+                compress-image "$file" "$mb"
+                ;;
+            "resize-image (custom width)")
+                local w
+                w=$(gum input --placeholder "max width px (e.g. 1280)" --value 1280) || return 0
+                resize-image "$file" "$w"
+                ;;
+            "extract-audio")             extract-audio "$file" ;;
+            "to-wav16k")                 to-wav16k "$file" ;;
+        esac
+    }
+fi
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_media.zsh has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:12Z)**_
+
+Sanity-check the zsh parses cleanly.
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+zsh syntax check
+
+`zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/29_media.zsh && echo OK`
+
+```text
+OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:16Z)**_
+
+Now mirror the new helpers into both alias docs.
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: ## Media / AV
+
+> Provided by ffmpeg. Functions only loaded when `installMediaTools=true` (or `ffmpeg` is otherwise on `$PATH`). See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) for the underlying tool.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+(note: Edit also tried swapping \uXXXX escapes and their characters; neither form matched, so the mismatch is likely elsewhere in old_string. Re-read the file and copy the exact surrounding text.)</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:35Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate Media section in aliases.md
+
+`grep -n "## Media / AV\|29_media\.zsh" /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md`
+
+```text
+567:## Media / AV
+573:| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+574:| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+575:| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/zsh/aliases.md`
+
+```text
+567	## Media / AV
+568	
+569	> Provided by `ffmpeg`. Functions only loaded when `installMediaTools=true` (or `ffmpeg` is otherwise on `$PATH`). See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) for the underlying tool.
+570	
+571	| Command | Type | Source File | Description |
+572	|---------|------|-------------|-------------|
+573	| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+574	| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+575	| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+576	
+577	---
+578
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:50:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:05Z)**_
+
+Now the zh-TW counterpart.
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate Media section in zh-TW aliases
+
+`grep -n "## Media / AV\|29_media\.zsh" /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.zh-TW.md`
+
+```text
+572:## Media / AV
+578:| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 用 x264 CRF 28 重編碼 → `<name>_compressed.mp4`（更小；想換畫質直接改 CRF） |
+579:| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 去掉影像、複製音訊 stream → `<name>.m4a`（不重新編碼） |
+580:| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample 成 16 kHz 單聲道 WAV → `<name>_16k.wav`（Whisper / faster-whisper 輸入格式） |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:12Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/zsh/aliases.zh-TW.md`
+
+```text
+572	## Media / AV
+573	
+574	> 由 `ffmpeg` 提供。只有在 `installMediaTools=true`（或 `ffmpeg` 已在 `$PATH`）時才會載入這些 function。底層工具見 [docs/tools/ffmpeg.md](../tools/ffmpeg.md)。
+575	
+576	| Command | Type | Source File | Description |
+577	|---------|------|-------------|-------------|
+578	| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 用 x264 CRF 28 重編碼 → `<name>_compressed.mp4`（更小；想換畫質直接改 CRF） |
+579	| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | 去掉影像、複製音訊 stream → `<name>.m4a`（不重新編碼） |
+580	| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample 成 16 kHz 單聲道 WAV → `<name>_16k.wav`（Whisper / faster-whisper 輸入格式） |
+581	
+582	---
+583
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/aliases.zh-TW.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:33Z)**_
+
+Verify mkdocs strict and the gum doc anchor exists.
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm gum docs exist for cross-link
+
+`test -f /Users/daviddwlee84/.local/share/chezmoi/docs/tools/gum.md && echo "gum.md exists"; test -f /Users/daviddwlee84/.local/share/chezmoi/docs/tools/gum.zh-TW.md && echo "gum.zh-TW.md exists"`
+
+```text
+gum.md exists
+gum.zh-TW.md exists
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+mkdocs strict check filtered for media-related lines
+
+`uv run mkdocs build --strict 2>&1 | grep -E "media|29_media|gum\." | head -20`
+
+```text
+INFO    -  Doc file 'tools/ffmpeg.md' contains a link '../../dot_config/zsh/tools/29_media.zsh', but the target '../dot_config/zsh/tools/29_media.zsh' is not found among documentation files.
+INFO    -  Doc file 'tools/ffmpeg.zh-TW.md' contains a link '../../dot_config/zsh/tools/29_media.zsh', but the target '../dot_config/zsh/tools/29_media.zsh' is not found among documentation files.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:51:55Z)**_
+
+Done. Added three new helpers + interactive launcher; mkdocs strict shows no new drift.
+
+**`dot_config/zsh/tools/29_media.zsh`** — 3 additions, file-level gate widened to "any media tool":
+
+- `compress-image <input> [<mb>=1]` — uses ImageMagick's `-define jpeg:extent=NMB`, which iterates JPEG quality internally so it's a single shot, no manual binary search. Alpha auto-flattened to white for PNG/WebP screenshots. Output: `<name>_<mb>mb.jpg`.
+- `resize-image <input> <width_px>` — preserves aspect, output keeps source format. Output: `<name>_<width>w.<ext>`.
+- `media-pick` — gum-driven launcher (only loaded when `gum` is on `$PATH`): `gum file` picker → `gum choose` action menu → `gum input` for params (target MB / width). Wires every video + audio + image helper.
+
+Both functions auto-detect `magick` (v7) vs `convert` (v6) so they work on macOS Homebrew and Ubuntu 24.04 apt.
+
+Mirror updates:
+- `docs/zsh/aliases.md` + `aliases.zh-TW.md` — section preamble updated (now mentions ffmpeg + ImageMagick), three new rows added.
+
+Usage examples:
+
+```bash
+compress-image photo.heic           # → photo_1mb.jpg
+compress-image photo.png 2          # → photo_2mb.jpg
+resize-image diagram.png 1280       # → diagram_1280w.png
+media-pick                          # interactive flow
+```
+
+Want me to commit this?
+
+---
+
+_**User (2026-04-29 08:55:39Z)**_
+
+sure
+
+---
+
+_**Agent (claude-opus-4-7 2026-04-29 08:55:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-04-29 08:55:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show working tree status
+
+`git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md
+	modified:   docs/zsh/aliases.md
+	modified:   docs/zsh/aliases.zh-TW.md
+	modified:   dot_config/zsh/tools/29_media.zsh
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:55:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Diff stats
+
+`git diff --stat`
+
+```text
+ .../2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md   | 498 +++++++++++++++++++++
+ docs/zsh/aliases.md                                |   5 +-
+ docs/zsh/aliases.zh-TW.md                          |   5 +-
+ dot_config/zsh/tools/29_media.zsh                  |  86 +++-
+ 4 files changed, 589 insertions(+), 5 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:55:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Recent commit style
+
+`git log -3 --oneline`
+
+```text
+fa846b4 tools: add installMediaTools (ffmpeg/imagemagick/exiftool/libvips)
+fa2e192 tools: add gum/vhs/freeze (Charm CLIs) + glow docs page
+212bbe0 Backup chat history and update skill version
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:55:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage explicit files, commit, verify
+
+```bash
+git add \
+  dot_config/zsh/tools/29_media.zsh \
+  docs/zsh/aliases.md \
+  docs/zsh/aliases.zh-TW.md \
+  .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md \
+  && git commit -m "$(cat <<'EOF'
+tools: extend 29_media.zsh with image helpers + gum launcher
+
+Adds compress-image (target-MB JPEG via ImageMagick's
+`-define jpeg:extent=NMB`, single-shot), resize-image (width-pinned,
+preserves aspect), and a gum-driven media-pick launcher that wires
+every helper for non-CLI users. File-level gate widened to "any
+media tool on PATH" so partial installs still load the helpers
+their tools support.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" && git status
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1777452958-15659.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1777452958-15659.
+[main 6d0267c] tools: extend 29_media.zsh with image helpers + gum launcher
+ 4 files changed, 650 insertions(+), 5 deletions(-)
+On branch main
+Your branch is ahead of 'origin/main' by 3 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-29_08-14-08Z-at-chezmoi-toml-tmpl.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-04-29 08:56:03Z)**_
+
+Committed as `6d0267c`. All pre-commit hooks passed. Branch is 3 commits ahead of `origin/main`. The remaining unstaged transcript change is normal — SpecStory keeps appending as the chat continues past the commit.

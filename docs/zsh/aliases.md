@@ -566,13 +566,16 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## Media / AV
 
-> Provided by `ffmpeg`. Functions only loaded when `installMediaTools=true` (or `ffmpeg` is otherwise on `$PATH`). See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) for the underlying tool.
+> Powered by `ffmpeg` (video / audio) and `ImageMagick` (image). Loaded when any media tool is on `$PATH` — typically via `installMediaTools=true`. Each function self-checks for its specific dep. See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) and [docs/tools/imagemagick.md](../tools/imagemagick.md) for the underlying tools.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
 | `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
 | `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+| `compress-image <input> [<mb>=1]` | function | `dot_config/zsh/tools/29_media.zsh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
+| `resize-image <input> <width_px>` | function | `dot_config/zsh/tools/29_media.zsh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
+| `media-pick` | function | `dot_config/zsh/tools/29_media.zsh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
 
 ---
 
