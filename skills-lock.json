@@ -11,7 +11,7 @@
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/mkdocs-site-bootstrap/SKILL.md",
-      "computedHash": "d420a5da186be38926efd2e81bd20702b38e3802dea58af4ea55ce778d093db0"
+      "computedHash": "26b072fc44ca9e4f67326cfa1230c5f33c98290db1882729592f854245083746"
     },
     "project-knowledge-harness": {
       "source": "daviddwlee84/agent-skills",
