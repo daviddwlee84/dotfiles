@@ -9,3 +9,8 @@ mkdocs_site_bootstrap:
   existing_docs_decision: wrapped
   pages_deployed: true
   pages_enabled_at: "2026-04-24"
+  languages:
+    - en
+    - zh-TW
+  keep_english_terms: true
+  i18n_structure: suffix

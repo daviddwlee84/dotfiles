@@ -4,7 +4,6 @@ site_url: https://daviddwlee84.github.io/dotfiles/
 repo_url: https://github.com/daviddwlee84/dotfiles
 repo_name: daviddwlee84/dotfiles
 edit_uri: edit/main/docs/
-
 # Docs under `docs/` often link to sibling *source* files in the repo
 # (dot_config/..., pitfalls/..., backlog/...) with relative `../../..` paths.
 # Those render correctly on GitHub but MkDocs can't resolve them into site
@@ -17,7 +16,6 @@ validation:
     # existing stale section-anchor links in tools/worktrunk.md, tools/sesh.md,
     # zsh/aliases.md, tools/tmux/README.md, tools/pre-commit.md are fixed.
     anchors: info
-
 theme:
   name: material
   palette:
@@ -34,8 +32,6 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.instant
-    - navigation.instant.progress
     - navigation.sections
     - navigation.expand
     - navigation.top
@@ -46,15 +42,25 @@ theme:
     - content.code.copy
     - content.code.annotate
     - toc.follow
-
+  language: en
 plugins:
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+        - locale: zh-TW
+          name: 繁體中文 (zh-TW)
   - search
   - llmstxt:
       full_output: llms-full.txt
       markdown_description: >
-        Cross-platform dotfiles (chezmoi + ansible) tuned for coding-agent
-        workflows on macOS / Ubuntu. Covers tmux, zsh, OSC 133 shell
-        integration, aicapture (aifix / aiexplain / aiblock), sesh, fleet-apply.
+        Cross-platform dotfiles (chezmoi + ansible) tuned for coding-agent workflows on macOS / Ubuntu. Covers tmux, zsh, OSC 133 shell integration, aicapture (aifix / aiexplain / aiblock), sesh, fleet-apply.
+
       sections:
         Landing:
           - index.md
@@ -75,14 +81,11 @@ plugins:
       repo_url: "https://daviddwlee84.github.io/dotfiles/"
       button_hover_color: "var(--md-primary-fg-color)"
       toast_bg_color: "var(--md-primary-fg-color)"
-
 extra_css:
   - assets/copy-to-llm/copy-to-llm.css
   - assets/copy-to-llm/copy-to-llm-custom.css
-
 extra_javascript:
   - assets/copy-to-llm/copy-to-llm.js
-
 markdown_extensions:
   - admonition
   - attr_list
@@ -105,114 +108,111 @@ markdown_extensions:
       check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
-
 nav:
   - Home: index.md
   - Playbooks:
-    - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
-    - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
+      - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
+      - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
   - Tools:
-    - tools/aicapture.md
-    - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
-    - tmux:
-      - Overview: tools/tmux/README.md
-      - Keybindings: tools/tmux/keybindings.md
-      - Themes: tools/tmux/themes.md
-      - Vim integration: tools/tmux/vim.md
-    - Shell & terminal:
-      - Ghostty: tools/ghostty.md
-      - Warp: tools/warp.md
-      - Starship: tools/starship.md
-      - Clipboard: tools/clipboard.md
-      - XDG: tools/xdg.md
-      - Fzf: tools/fzf.md
-      - Television (tv): tools/tv.md
-      - TV vs fzf: tools/tv-vs-fzf.md
-    - Sessions & worktrees:
-      - Sesh: tools/sesh.md
-      - Worktrunk: tools/worktrunk.md
-      - SSH agent: tools/ssh-agent.md
-    - Editor & agents:
-      - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
-      - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
-      - Agent skills: tools/agent-skills.md
-      - Claude Code keybindings: tools/claude-code-keybindings.md
-      - Language servers (LSP): tools/lsp.md
-      - OpenCode: tools/opencode.md
-      - specify-cli: tools/specify_cli.md
-      - SpecStory: tools/specstory.md
-      - SpecStory internals: tools/specstory-internals.md
-      - Codexbar: tools/codexbar.md
-      - LLM: tools/llm.md
-    - Git & DevOps:
-      - git diff workflow: tools/git_diff_workflow.md
-      - pre-commit: tools/pre-commit.md
-      - Infrastructure-as-Code: tools/infrastructure-as-code.md
-      - Containers: tools/containers.md
-      - Container config map: tools/container-config-map.md
-      - AppImage: tools/appimage.md
-      - Networking: tools/networking.md
-      - Services: tools/services.md
-      - Tailscale: tools/Tailscale.md
-      - dotnet tools: tools/dotnet-tools.md
-    - Productivity:
-      - td / sidecar: tools/td_sidecar.md
-      - Super Productivity: tools/super-productivity.md
-      - Web reader: tools/web-reader.md
-      - Log tools: tools/log-tools.md
-      - SMS (Huawei router): tools/sms.md
-      - pqsum: tools/pqsum.md
-      - direnv: tools/direnv.md
-    - chezmoi conventions:
-      - chezmoi prefixes: tools/chezmoi-prefixes.md
-      - chezmoi templating: tools/chezmoi-templating.md
-      - JSON Schema: tools/json-schema.md
-      - Mirrors (Chinese CDN): tools/mirrors.md
+      - tools/aicapture.md
+      - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
+      - tmux:
+          - Overview: tools/tmux/README.md
+          - Keybindings: tools/tmux/keybindings.md
+          - Themes: tools/tmux/themes.md
+          - Vim integration: tools/tmux/vim.md
+      - Shell & terminal:
+          - Ghostty: tools/ghostty.md
+          - Warp: tools/warp.md
+          - Starship: tools/starship.md
+          - Clipboard: tools/clipboard.md
+          - XDG: tools/xdg.md
+          - Fzf: tools/fzf.md
+          - Television (tv): tools/tv.md
+          - TV vs fzf: tools/tv-vs-fzf.md
+      - Sessions & worktrees:
+          - Sesh: tools/sesh.md
+          - Worktrunk: tools/worktrunk.md
+          - SSH agent: tools/ssh-agent.md
+      - Editor & agents:
+          - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+          - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
+          - Agent skills: tools/agent-skills.md
+          - Claude Code keybindings: tools/claude-code-keybindings.md
+          - Language servers (LSP): tools/lsp.md
+          - OpenCode: tools/opencode.md
+          - specify-cli: tools/specify_cli.md
+          - SpecStory: tools/specstory.md
+          - SpecStory internals: tools/specstory-internals.md
+          - Codexbar: tools/codexbar.md
+          - LLM: tools/llm.md
+      - Git & DevOps:
+          - git diff workflow: tools/git_diff_workflow.md
+          - pre-commit: tools/pre-commit.md
+          - Infrastructure-as-Code: tools/infrastructure-as-code.md
+          - Containers: tools/containers.md
+          - Container config map: tools/container-config-map.md
+          - AppImage: tools/appimage.md
+          - Networking: tools/networking.md
+          - Services: tools/services.md
+          - Tailscale: tools/Tailscale.md
+          - dotnet tools: tools/dotnet-tools.md
+      - Productivity:
+          - td / sidecar: tools/td_sidecar.md
+          - Super Productivity: tools/super-productivity.md
+          - Web reader: tools/web-reader.md
+          - Log tools: tools/log-tools.md
+          - SMS (Huawei router): tools/sms.md
+          - pqsum: tools/pqsum.md
+          - direnv: tools/direnv.md
+      - chezmoi conventions:
+          - chezmoi prefixes: tools/chezmoi-prefixes.md
+          - chezmoi templating: tools/chezmoi-templating.md
+          - JSON Schema: tools/json-schema.md
+          - Mirrors (Chinese CDN): tools/mirrors.md
   - Zsh:
-    - Aliases & functions: zsh/aliases.md
-    - Completions: zsh/zsh-completions.md
+      - Aliases & functions: zsh/aliases.md
+      - Completions: zsh/zsh-completions.md
   - Neovim:
-    - Floating TUI: neovim/floating-tui.md
+      - Floating TUI: neovim/floating-tui.md
   - Repo Internals:
-    - Architecture: this_repo/architecture.md
-    - Cheatsheet: this_repo/cheatsheet.md
-    - Bootstrap (curl|sh): this_repo/bootstrap.md
-    - Ansible customization: this_repo/ansible_customization.md
-    - Upgrades: this_repo/upgrades.md
-    - Testing: this_repo/testing.md
-    - Sudo session: this_repo/sudo-session.md
-    - Fleet apply: this_repo/fleet-apply.md
-    - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
-    - chezmoiscripts layout: this_repo/chezmoiscripts-layout.md
-    - Instant-LLM-fix prior art: this_repo/instant-llm-fix-prior-art.md
-    - Initial setup:
-      - Manual setup record: this_repo/initial_setup/0_ManualSetupRecord.md
-      - Apply to new machine: this_repo/initial_setup/1_ApplyToNewMachine.md
-    - Scripts:
-      - import_ssh_to_bw.sh: this_repo/scripts/import_ssh_to_bw.sh.md
+      - Architecture: this_repo/architecture.md
+      - Cheatsheet: this_repo/cheatsheet.md
+      - Bootstrap (curl|sh): this_repo/bootstrap.md
+      - Ansible customization: this_repo/ansible_customization.md
+      - Upgrades: this_repo/upgrades.md
+      - Testing: this_repo/testing.md
+      - Sudo session: this_repo/sudo-session.md
+      - Fleet apply: this_repo/fleet-apply.md
+      - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
+      - chezmoiscripts layout: this_repo/chezmoiscripts-layout.md
+      - Instant-LLM-fix prior art: this_repo/instant-llm-fix-prior-art.md
+      - Initial setup:
+          - Manual setup record: this_repo/initial_setup/0_ManualSetupRecord.md
+          - Apply to new machine: this_repo/initial_setup/1_ApplyToNewMachine.md
+      - Scripts:
+          - import_ssh_to_bw.sh: this_repo/scripts/import_ssh_to_bw.sh.md
   - Infrastructure:
-    - Overview: infra/README.md
-    - Virtualization: infra/virtualization.md
-    - Compute scheduling: infra/compute-scheduling.md
-    - Shared storage: infra/shared-storage.md
-    - Shared home / identity: infra/shared-home-identity.md
+      - Overview: infra/README.md
+      - Virtualization: infra/virtualization.md
+      - Compute scheduling: infra/compute-scheduling.md
+      - Shared storage: infra/shared-storage.md
+      - Shared home / identity: infra/shared-home-identity.md
   - Tutorials:
-    - Bitwarden SSH agent: tutorials/bitwarden_ssh_agent.md
-    - Setup SSH key on remote: tutorials/setup_ssh_key_on_remote.md
+      - Bitwarden SSH agent: tutorials/bitwarden_ssh_agent.md
+      - Setup SSH key on remote: tutorials/setup_ssh_key_on_remote.md
   - Input methods:
-    - Overview: input_methods/README.md
-    - macOS system switching: input_methods/macos-system-switching.md
+      - Overview: input_methods/README.md
+      - macOS system switching: input_methods/macos-system-switching.md
   - Misc:
-    - Keyboard shortcuts (global): keyboard-shortcuts.md
-    - Linux package sources: linux-package-sources.md
-    - Locale: locale.md
+      - Keyboard shortcuts (global): keyboard-shortcuts.md
+      - Linux package sources: linux-package-sources.md
+      - Locale: locale.md
   - For Maintainers: for-maintainers.md
-
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/daviddwlee84/dotfiles
-
 # `_snippets/` are meant to be included via pymdownx.snippets, never
 # rendered as their own page. `not_in_nav` suppresses the INFO warning.
 not_in_nav: |
