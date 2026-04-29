@@ -5,7 +5,36 @@
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
     （如 `embedding`、`tokenizer`）。代碼、API 名、CLI flag、套件名、檔名一律不翻。
 
-!!! warning "Translation pending"
-    這個頁面尚未翻譯。請使用語言切換器（右上角 / language switcher）查看 English 原文。
+`specify-cli` 是 GitHub Spec Kit 的 CLI，用於規格驅動 (spec-driven) 開發流程。
 
-<!-- Translators: replace this body with the zh-TW translation. Keep the terminology admonition above. -->
+## 在本 dotfiles 倉庫中的安裝方式
+
+`specify-cli` 由 `coding_agents` ansible 角色透過 `uv` 自動安裝。
+
+角色使用的安裝指令：
+
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+```
+
+## 手動安裝 / 升級
+
+```bash
+# 安裝
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+
+# 升級
+uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
+```
+
+## 驗證與快速開始
+
+```bash
+specify check
+specify init . --ai claude
+```
+
+## 參考資料
+
+- [Spec Kit repository](https://github.com/github/spec-kit)
+- [Spec Kit documentation](https://github.github.io/spec-kit/)

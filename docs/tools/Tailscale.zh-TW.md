@@ -5,7 +5,10 @@
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文
     （如 `embedding`、`tokenizer`）。代碼、API 名、CLI flag、套件名、檔名一律不翻。
 
-!!! warning "Translation pending"
-    這個頁面尚未翻譯。請使用語言切換器（右上角 / language switcher）查看 English 原文。
+- [Download | Tailscale](https://tailscale.com/download/mac)
+  - [tailscale-app — Homebrew Formulae](https://formulae.brew.sh/cask/tailscale-app) - 桌面應用程式（獨立版 Standalone）
+    - [Tailscale Packages - stable track](https://pkgs.tailscale.com/stable/#macos)
+  - [tailscale — Homebrew Formulae](https://formulae.brew.sh/formula/tailscale) - CLI
+  - [Tailscale App - App Store](https://apps.apple.com/ca/app/tailscale/id1475387142)
 
-<!-- Translators: replace this body with the zh-TW translation. Keep the terminology admonition above. -->
+> 獨立版 (Standalone) > App Store
