@@ -46,7 +46,11 @@ repos:
         args: [--markdown-linebreak-ext=md]
         exclude: ^\.specstory/
       - id: check-yaml
-        args: [--allow-multiple-documents]
+        # `--unsafe` permits custom Python tags used by mkdocs.yml
+        # (`!!python/object/apply:pymdownx.slugs.slugify`) — the structure
+        # check still runs across the file; only the *typed* loader phase
+        # is relaxed for the Python-specific tags MkDocs accepts.
+        args: [--allow-multiple-documents, --unsafe]
         exclude: ^\.specstory/
       - id: check-toml
         # chezmoi .tmpl files contain `{{ ... }}` go-template tokens that

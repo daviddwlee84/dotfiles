@@ -38,7 +38,44 @@ Temporarily set `validation.links.anchors: info` in `mkdocs.yml` so the first de
 
 **Defer** — ship first deploy with `anchors: info`. Open a dedicated cleanup session later (safer when fewer other agents are actively editing docs files). Once fixed, raise back to `warn` or `error` in `mkdocs.yml`.
 
+## 2026-04 update — zh-TW i18n added, cross-page anchor drift expanded
+
+After translating all 82 docs pages to zh-TW (commit `38af46b`) and switching
+the toc plugin to `pymdownx.slugs.slugify` for Unicode-friendly heading IDs,
+in-page (TOC self-link) drifts in zh-TW pages were fixed automatically (e.g.,
+`worktrunk.zh-TW.md` TOC anchors `#冷啟動消除`, `#合併與清理流程`, etc., now
+resolve to the translated heading IDs).
+
+The residual ~46 zh-TW INFO entries are **cross-page** links: a zh-TW page
+links to another zh-TW page using the original *English* anchor name, but the
+destination has translated headings whose Unicode-slugified IDs don't match.
+
+Examples (sampled from `mkdocs build` output):
+
+- `playbooks/workflow.zh-TW.md` → `tools/worktrunk.zh-TW.md#per-worktree-claude--opencode` (target: `#每個-worktree-一個-claudeopencode`)
+- `infra/README.zh-TW.md` → `infra/virtualization.zh-TW.md#desktop-vm-managers` (target: `#桌面-vm-管理員` or similar)
+- `infra/compute-scheduling.zh-TW.md` → `infra/virtualization.zh-TW.md#cloud-native-vms-on-top-of-kubernetes`
+- `tools/agent-overlays.zh-TW.md` → `tools/opencode.zh-TW.md#claude-opus-stream-stall-on-github-copilot`
+- `this_repo/fleet-apply.zh-TW.md` self-anchors `#conflict-handling---force-vs---keep-going`, `#per-machine-git-overrides-gitconfiglocal`
+- `this_repo/upgrades.zh-TW.md` self-anchors `#run-order`, `#category-matrix`
+
+**Two cleanup approaches** (decide at fix time):
+
+1. **Update each linker** to use the Chinese anchor — preserves readable URLs
+   but breaks any external bookmark someone may have made to the original
+   English anchor (low risk: site is recent).
+2. **Add explicit `{#english-anchor}` attribute to translated headings** via
+   `attr_list` (already enabled) — preserves English deep-link compatibility.
+   Example: `## 桌面 VM 管理員 {#desktop-vm-managers}`.
+
+Approach (2) is more robust for a frequently-cited destination; (1) is fine
+for one-off cross-references. Mix and match.
+
+All 46 are INFO-level and tolerated by `validation.links.not_found: info`,
+so no blocker — defer to a focused cleanup pass.
+
 ## References
 
 - MkDocs validation config: <https://www.mkdocs.org/user-guide/configuration/#validation>
 - Current `mkdocs.yml` has inline TODO comment pointing here.
+- `pymdownx.slugs.slugify` configuration in `markdown_extensions.toc` (added 2026-04 with the zh-TW i18n).

@@ -55,6 +55,90 @@ plugins:
           default: true
         - locale: zh-TW
           name: 繁體中文 (zh-TW)
+          nav_translations:
+            # Top-level sections
+            Home: 首頁
+            Playbooks: 工作流程
+            Tools: 工具
+            Repo Internals: 本 Repo 內部
+            Infrastructure: 基礎建設
+            Tutorials: 教學
+            Input methods: 輸入法
+            Misc: 雜項
+            For Maintainers: 給維護者
+            # Tools subsections
+            "Shell & terminal": Shell 與終端機
+            "Sessions & worktrees": Session 與 worktree
+            "Editor & agents": 編輯器與 agent
+            "Git & DevOps": Git 與 DevOps
+            Productivity: 生產力
+            chezmoi conventions: chezmoi 慣例
+            # Repo Internals subsections
+            Initial setup: 初次設定
+            # Tools / leaf entries (titles defined in nav)
+            Workflow (sesh + worktrunk + tmux): 開發工作流程 (sesh + worktrunk + tmux)
+            Linux GUI apps (.deb / Snap / AppImage): Linux GUI 應用程式 (.deb / Snap / AppImage)
+            Inline AI suggestions (aisuggest): 行內 AI 建議 (aisuggest)
+            Overview: 概觀
+            Keybindings: 鍵位
+            Themes: 主題
+            Vim integration: Vim 整合
+            Clipboard: 剪貼簿
+            Television (tv): Television (tv)
+            TV vs fzf: TV vs fzf
+            SSH agent: SSH agent
+            Agent overlays (Claude/OpenCode/Codex/Cursor): Agent overlays (Claude/OpenCode/Codex/Cursor)
+            Agent pane discovery (tv agent-panes + recon): Agent pane 探索 (tv agent-panes + recon)
+            Agent skills: Agent skills
+            Claude Code keybindings: Claude Code 鍵位
+            Language servers (LSP): 語言伺服器 (LSP)
+            SpecStory internals: SpecStory 內部運作
+            git diff workflow: git diff 工作流程
+            Infrastructure-as-Code: Infrastructure-as-Code
+            Containers: 容器
+            Container config map: 容器設定對應
+            Networking: 網路
+            Services: 服務
+            dotnet tools: dotnet 工具
+            td / sidecar: td / sidecar
+            Web reader: 網頁讀取器
+            Log tools: Log 工具
+            SMS (Huawei router): 簡訊 (Huawei 路由器)
+            chezmoi prefixes: chezmoi prefixes
+            chezmoi templating: chezmoi templating
+            Mirrors (Chinese CDN): 鏡像 (中國 CDN)
+            # Zsh / Neovim leaves
+            "Aliases & functions": 別名與函式
+            Completions: 補全
+            Floating TUI: 浮動 TUI
+            # Repo Internals leaves
+            Architecture: 架構
+            Cheatsheet: 備忘錄
+            Bootstrap (curl|sh): Bootstrap (curl|sh)
+            Ansible customization: Ansible 客製化
+            Upgrades: 升級
+            Testing: 測試
+            Sudo session: Sudo session
+            Fleet apply: Fleet apply
+            fleet-apply vs fabric: fleet-apply vs fabric
+            chezmoiscripts layout: chezmoiscripts 佈局
+            Instant-LLM-fix prior art: Instant-LLM-fix 前作
+            Manual setup record: 手動設定紀錄
+            Apply to new machine: 套用到新機器
+            # Infrastructure leaves
+            Virtualization: 虛擬化
+            Compute scheduling: 運算排程
+            Shared storage: 共享儲存
+            Shared home / identity: 共享 home / 身份
+            # Tutorials leaves
+            Bitwarden SSH agent: Bitwarden SSH agent
+            Setup SSH key on remote: 在遠端設定 SSH 金鑰
+            # Input methods leaves
+            macOS system switching: macOS 系統層切換
+            # Misc leaves
+            Keyboard shortcuts (global): 鍵盤快捷鍵 (全域)
+            Linux package sources: Linux 套件來源
+            Locale: Locale
   - search
   - llmstxt:
       full_output: llms-full.txt
@@ -95,6 +179,11 @@ markdown_extensions:
   - md_in_html
   - toc:
       permalink: true
+      # Preserve Unicode in heading slugs so zh-TW headings get readable
+      # anchors like `#冷啟動消除` instead of `_7` / `_8` numeric fallbacks.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.highlight:
