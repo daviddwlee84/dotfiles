@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -52,6 +52,7 @@
       - dasel
       - yq
       - jnv
+      - witr
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -3590,3 +3591,54 @@
       loop:
         - /tmp/jnv.tar.xz
         - /tmp/jnv-extract
+
+# --- witr (Why Is This Running? — process ancestry / supervision tracer) ---
+- name: Re-check if witr is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v witr
+  register: witr_check
+  changed_when: false
+  failed_when: false
+
+- name: Set witr release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - witr_check.rc != 0
+  ansible.builtin.set_fact:
+    witr_arch: >-
+      {{
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'arm64' if target_architecture in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Install witr from GitHub releases (user-level, no sudo)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - witr_check.rc != 0
+    - witr_arch | default('') != ''
+  block:
+    - name: Ensure ~/.local/bin exists (witr)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download witr binary
+      ansible.builtin.get_url:
+        url: "https://github.com/pranshuparmar/witr/releases/latest/download/witr-linux-{{ witr_arch }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/witr"
+        mode: '0755'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+  rescue:
+    - name: Warn witr installation failed
+      ansible.builtin.debug:
+        msg: "witr installation failed (likely network timeout or unsupported arch) - skipping"
+
+    - name: Clean up witr temp files after failure
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/witr"
+        state: absent
