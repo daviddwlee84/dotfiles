@@ -66,11 +66,20 @@ RUN yum install -y epel-release \
         python3 \
         jq \
         glibc-common \
+        glibc-locale-source \
     && yum clean all
 
-# Force ansible (and shell pipelines) to a UTF-8 locale; the centos:7 base
-# image leaves LANG unset which the bootstrap's locale-fix branch only
-# catches on `cannot set` errors, not on missing locale entirely.
+# Generate the en_US.UTF-8 locale. The centos:7 minimal image strips locale
+# data (override-glibc-locale-source) so even after `yum install
+# glibc-common` the locale is missing — `locale -a | grep en_US.UTF-8`
+# returns nothing and ansible bails out with "Ansible could not initialize
+# the preferred locale: unsupported locale setting". `localedef` writes
+# the entry into /usr/lib/locale/locale-archive.
+RUN localedef -i en_US -f UTF-8 en_US.UTF-8
+
+# Pin LANG/LC_ALL so chezmoi/ansible inherit a working locale unconditionally.
+# The bootstrap's locale-fix branch only triggers on `cannot set` errors
+# from `locale`, which the centos:7 image doesn't emit (LANG simply absent).
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
