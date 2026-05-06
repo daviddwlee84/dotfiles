@@ -1,0 +1,161 @@
+# ~/.bashrc - Interactive bash configuration. Managed by chezmoi.
+#
+# Init order (load-bearing — see docs/shells/bash.md):
+#   1.  Early-return guard (non-interactive shells)
+#   2.  /etc/bashrc source (RHEL families)
+#   3.  ble.sh --attach=none   ← BEFORE bash-preexec / starship
+#   4.  XDG dirs + Homebrew shellenv (mac)
+#   5.  Bash-specific config files (history / completion / vi-mode / aliases)
+#   6.  oh-my-bash source (after ble.sh so OMB's bash-preexec install no-ops)
+#   7.  Shared modular layer (starship / mise / zoxide / direnv / thefuck)
+#   8.  Bash-only modular layer (any post-attach ble-bind tweaks)
+#   9.  atuin init bash --disable-up-arrow (ble.sh handles up-arrow history)
+#   10. Secrets
+#   11. ble-attach   ← absorbs all precmd/preexec stacks accumulated above
+#   12. .bashrc.adhoc tail
+#
+# The ble.sh / oh-my-bash / atuin steps are presence-gated and no-op
+# silently when the artefact isn't installed (e.g. fresh host before
+# `chezmoi apply` finishes the externals + run-onchange-after_install).
+# Plain bash without ble.sh + OMB still gets a fully working starship
+# prompt + the shared layer + bash-completion v2.
+
+# 1. ============================================================
+# Non-interactive shells (SSH commands, cron, scp) bail out here.
+# Anything below this guard runs only in interactive bash.
+# Mirrors /etc/skel/.bashrc convention on Debian/Ubuntu.
+case $- in
+    *i*) ;;
+      *) return ;;
+esac
+
+# 2. ============================================================
+# /etc/bashrc on RHEL families carries the protective `rm -i`
+# aliases, the Modules system init, and umask defaults. Source it
+# first so we don't lose those — and so anything we set below can
+# override (we set HISTSIZE etc. larger than RHEL's defaults).
+# Debian/Ubuntu has no /etc/bashrc, so this is a no-op there.
+[ -r /etc/bashrc ] && . /etc/bashrc
+
+# 3. ============================================================
+# ble.sh --attach=none lets us chain starship/atuin between this
+# point and `ble-attach` at the end. Sourcing ble.sh AFTER
+# bash-preexec (which starship installs) is the #1 ble.sh footgun
+# documented at https://github.com/akinomyoga/ble.sh/wiki/
+# So we source it FIRST, with --attach=none, then call ble-attach
+# only at the very end. Presence-gated for hosts where
+# .chezmoiscripts/global/run_onchange_after_NN_install_blesh.sh
+# hasn't completed yet.
+if [[ $- == *i* ]] && [ -r "$HOME/.local/share/blesh/ble.sh" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.local/share/blesh/ble.sh" --attach=none --noattach
+fi
+
+# 4. ============================================================
+# XDG Base Directory Specification (mirrors dot_zshrc.tmpl)
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# Modular config directories
+export BASH_CONFIG_DIR="$XDG_CONFIG_HOME/bash"
+
+{{ if eq .chezmoi.os "darwin" -}}
+# Homebrew (macOS) — must run before shared layer so bash-completion v2's
+# $HOMEBREW_PREFIX detection works.
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ end -}}
+
+# 5. ============================================================
+# Modular Configuration Loader (sister of dot_zshrc.tmpl's loader,
+# shares the same name + signature). Globs $dir/*.<ext> and sources
+# each file in alphabetical order.
+load_modular_dir() {
+    local dir="$1"
+    local ext="${2:-bash}"
+    [[ -d "$dir" ]] || return 0
+    local _had_nullglob; _had_nullglob=$(shopt -p nullglob)
+    shopt -s nullglob
+    local f
+    for f in "$dir"/*."$ext"; do
+        [[ -r "$f" ]] && source "$f"
+    done
+    eval "$_had_nullglob"
+}
+
+# Bash-specific config (history / completion / vi-mode / aliases).
+# Loaded BEFORE oh-my-bash so ~/.config/bash/01_omb_plugins.bash can
+# set the `plugins=()` array that oh-my-bash.sh then consumes.
+load_modular_dir "$BASH_CONFIG_DIR" bash
+
+# 6. ============================================================
+# oh-my-bash. Theme MUST be empty so starship owns the prompt.
+# OMB's autosuggestions / syntax-highlighting / history-substring-search
+# plugins are excluded in dot_config/bash/01_omb_plugins.bash because
+# ble.sh provides better native versions.
+# Presence-gated so plain-bash (no OMB installed) still works.
+if [ -r "$HOME/.oh-my-bash/oh-my-bash.sh" ]; then
+    export OSH="$HOME/.oh-my-bash"
+    : "${OSH_THEME:=""}"  # empty = no OMB theme; starship takes over
+    # shellcheck disable=SC1091
+    source "$OSH/oh-my-bash.sh"
+fi
+
+# 7. ============================================================
+# Shared POSIX layer — env vars (PATH, GFW mirrors, GOPATH, BUN_INSTALL,
+# PNPM_HOME), tool init wrappers (starship/mise/zoxide/direnv/thefuck),
+# POSIX aliases. Same dir is sourced by ~/.zshrc.
+# starship init bash is here, AFTER ble.sh source but BEFORE ble-attach.
+load_modular_dir "$XDG_CONFIG_HOME/shell" sh
+
+# 8. ============================================================
+# atuin (history sync) — `--disable-up-arrow` is mandatory when
+# ble.sh is loaded; ble.sh's history navigation owns the up arrow.
+# Ctrl+R still opens atuin's TUI (no conflict).
+if command -v atuin >/dev/null 2>&1; then
+    eval "$(atuin init bash --disable-up-arrow)"
+fi
+
+# 9. ============================================================
+# Load secrets (not tracked by chezmoi). Mirrors zsh's secrets pattern.
+[ -r "$BASH_CONFIG_DIR/secrets.sh" ] && . "$BASH_CONFIG_DIR/secrets.sh"
+
+# 10. ===========================================================
+# ble-attach: now that bash-preexec / starship / atuin / OMB have all
+# registered their precmd / preexec hooks, hand control over to ble.sh.
+# Presence-gated to match the source guard above.
+if [[ -n $BLE_VERSION ]]; then
+    ble-attach
+fi
+
+# 11. ===========================================================
+# Adhoc Configuration (not tracked by chezmoi)
+if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
+    cat > "$HOME/.bashrc.adhoc" << 'ADHOC_EOF'
+# ~/.bashrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+#
+# Use this file for:
+#   - Quick experiments with new aliases/functions
+#   - Machine-specific configurations
+#   - Temporary PATH modifications
+#   - Testing before adding to chezmoi-managed configs
+#
+# This file is sourced at the end of ~/.bashrc (AFTER ble-attach),
+# so ble-bind / readline `bind -x` calls here will take effect.
+# Changes here apply to new shell sessions (or run: source ~/.bashrc.adhoc)
+
+# Example:
+# alias myalias='echo "Hello from adhoc!"'
+# export MY_VAR="my_value"
+
+# To enable ble.sh's pacman-style auto-suggestion mode:
+# bleopt complete_auto_complete=1
+ADHOC_EOF
+fi
+
+# Source adhoc config
+[ -r "$HOME/.bashrc.adhoc" ] && . "$HOME/.bashrc.adhoc"

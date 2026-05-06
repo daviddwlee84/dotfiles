@@ -26,9 +26,11 @@ plugins=(
 )
 
 # zsh-vi-mode overrides all keybindings on init; re-source fzf bindings afterward
-# so that Ctrl+R (history search), Ctrl+T (file search), Alt+C still work
+# so that Ctrl+R (history search), Ctrl+T (file search), Alt+C still work.
+# fzf config moved to dot_config/shell/10_fzf.sh (shared with bash) — re-source
+# from the new path; the zsh path here matches what load_modular_dir sees.
 zvm_after_init() {
-    [ -f "$ZSH_CONFIG_DIR/tools/10_fzf.zsh" ] && source "$ZSH_CONFIG_DIR/tools/10_fzf.zsh"
+    [ -f "$XDG_CONFIG_HOME/shell/10_fzf.sh" ] && source "$XDG_CONFIG_HOME/shell/10_fzf.sh"
     # aisuggest trigger (Alt+; default) — see dot_config/zsh/tools/05_aisuggest.zsh
     if (( ${+widgets[aisuggest]} )); then
         bindkey -M viins "${AISUGGEST_KEY:-^[;}" aisuggest

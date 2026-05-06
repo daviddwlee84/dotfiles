@@ -22,7 +22,13 @@ fi
 # =============================================================================
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 [[ -d "$BUN_INSTALL/bin" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
-[[ -s "$BUN_INSTALL/_bun" ]] && source "$BUN_INSTALL/_bun"
+# bun's ~/.bun/_bun is a ZSH-only completion file (uses zsh glob qualifiers
+# like `(N)` and the `_alternative` builtin) that errors loudly when sourced
+# in bash. Gate to zsh; bash gets bun completion via bash-completion v2 if
+# bun installed it under $HB_PREFIX/etc/bash_completion.d/ instead.
+if [ -n "$ZSH_VERSION" ] && [ -s "$BUN_INSTALL/_bun" ]; then
+    source "$BUN_INSTALL/_bun"
+fi
 
 # =============================================================================
 # pnpm (package manager)

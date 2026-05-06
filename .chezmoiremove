@@ -16,3 +16,4 @@ PATH/env on every shell start.
 .config/zsh/tools/20_zoxide.zsh
 .config/zsh/tools/27_thefuck.zsh
 .config/zsh/tools/30_direnv.zsh
+.config/zsh/tools/10_fzf.zsh

@@ -1,0 +1,35 @@
+# ~/.bash_profile - Login shell entry. Managed by chezmoi.
+#
+# Bash login-shell PROFILE search order (per `man bash` INVOCATION):
+#   ~/.bash_profile > ~/.bash_login > ~/.profile  (first found wins)
+#
+# We manage ~/.bash_profile so login shells go through our config
+# regardless of distro defaults. macOS Terminal/Ghostty launches bash
+# as a login shell by default, so this is the canonical entry on mac.
+# On Linux, login-shell sessions (SSH, console TTYs) hit this too.
+#
+# Pattern: source the system /etc/profile chain first (PATH from
+# /etc/profile.d), then ~/.profile if present (Ubuntu defaults), then
+# our ~/.bashrc for the interactive setup.
+
+# Source /etc/profile if not already (sets PATH from /etc/profile.d)
+# Bash login shells already source /etc/profile before reading user
+# profiles, so we DON'T re-source it here — would duplicate PATH entries.
+# Listing it for documentation only.
+
+# Source ~/.profile if it exists (Debian/Ubuntu default; carries
+# user-level PATH additions like ~/.local/bin via /etc/skel/.profile).
+# Some distros' ~/.profile already sources ~/.bashrc — guard so we
+# don't double-source.
+if [ -r "$HOME/.profile" ] && ! grep -q '\.bashrc' "$HOME/.profile" 2>/dev/null; then
+    # shellcheck disable=SC1091
+    . "$HOME/.profile"
+fi
+
+# Source ~/.bashrc for interactive setup (starship, ble.sh, OMB,
+# shared layer, etc.). This is the standard "login shell sources
+# bashrc" pattern from /etc/skel/.bash_profile.
+if [ -n "$BASH_VERSION" ] && [ -r "$HOME/.bashrc" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.bashrc"
+fi

@@ -76,6 +76,16 @@ pyrightconfig.json
 # Zsh adhoc file (personal experiments - never track)
 .zshrc.adhoc
 
+# Bash secrets file (API keys, tokens, proxy - never track).
+# Mirror of zsh/secrets.zsh; sourced by dot_bashrc.tmpl.
+.config/bash/secrets.sh
+
+# Bash adhoc file (personal experiments - never track).
+# Mirror of .zshrc.adhoc; sourced at the tail of dot_bashrc.tmpl
+# AFTER ble-attach so ble-bind / readline `bind -x` calls in it
+# take effect.
+.bashrc.adhoc
+
 # Per-machine git overrides (host-specific [safe], [credential],
 # [http.proxy], etc.). Same self-managed pattern as .zshrc.adhoc:
 # silently included by ~/.gitconfig (`[include] path = ~/.gitconfig.local`)
