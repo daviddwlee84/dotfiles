@@ -27,6 +27,7 @@ ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_MODE=off
 ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
 ARG CHEZMOI_MOTD_STYLE=figlet
+ARG CHEZMOI_PRIMARY_SHELL=zsh
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -156,7 +157,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
     --promptChoice "Backup mode for existing dotfiles (smart|full|off)=${CHEZMOI_BACKUP_MODE}" \
     --promptBool "Allow partial Ansible failures (continue installing other tools if one role fails)=${CHEZMOI_ALLOW_PARTIAL_FAILURE}" \
-    --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}"
+    --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}" \
+    --promptChoice "Primary interactive shell (zsh|bash)=${CHEZMOI_PRIMARY_SHELL}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

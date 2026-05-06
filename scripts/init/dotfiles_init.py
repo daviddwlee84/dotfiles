@@ -235,6 +235,12 @@ PROMPTS: tuple[Prompt, ...] = (
            default="figlet",
            prompt_text="SSH login banner style (figlet|fastfetch-slim|fastfetch-full)",
            choices=("figlet", "fastfetch-slim", "fastfetch-full")),
+    Prompt("primaryShell", "choice", "Preferences",
+           "Primary interactive shell",
+           "Decides which shell `chsh` switches to. Both ~/.zshrc and ~/.bashrc are deployed regardless (so the other shell still works ad-hoc). Bash side ships with oh-my-bash + ble.sh for UX close to zsh; on macOS the bash role brew-installs bash 5.x when bash is selected. See docs/shells/bash.md.",
+           default="zsh",
+           prompt_text="Primary interactive shell (zsh|bash)",
+           choices=("zsh", "bash")),
 )
 
 

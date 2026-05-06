@@ -88,6 +88,13 @@ allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial A
 #   - fastfetch-full: fastfetch 完整輸出含 distro logo（~22 行，~150ms）
 # Runtime override: 在 ~/.zshrc.adhoc 設 MOTD_STYLE=... 可即時切換無需 chezmoi init --force
 motdStyle = {{ promptChoiceOnce . "motdStyle" "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)" (list "figlet" "fastfetch-slim" "fastfetch-full") "figlet" | quote }}
+# Primary interactive shell — decides which shell `chsh` switches to as the
+# login shell. Both ~/.zshrc and ~/.bashrc are deployed regardless (so the
+# other shell still works ad-hoc); only the login-shell switch is gated.
+# Bash side ships with oh-my-bash + ble.sh for a UX close to zsh; on macOS
+# the bash role also brew-installs bash 5.x (system bash 3.2 is too old for
+# OMB plugins) when bash is selected. See docs/shells/bash.md.
+primaryShell = {{ promptChoiceOnce . "primaryShell" "Primary interactive shell (zsh|bash)" (list "zsh" "bash") "zsh" | quote }}
 
 # https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]
