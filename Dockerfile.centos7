@@ -1,11 +1,22 @@
-# Dotfiles test/devbox container
-# Build: docker build -t dotfiles .
-# Run:   docker run -it dotfiles
+# Dotfiles test/devbox container — CentOS 7 (legacy glibc-2.17 corporate target)
+# Build: docker build -f Dockerfile.centos7 -t dotfiles:centos7 .
+# Run:   docker run -it dotfiles:centos7
+#
+# Closest reproduction of the real-world centos_server target — corporate
+# data-center boxes still on CentOS Linux 7.9, often noRoot. Validates the
+# user-level GitHub-release fallback paths documented in
+# pitfalls/centos7-noroot.md (gate broadening: os_family in
+# ["Debian", "RedHat"]) and the bootstrap's `uv tool install --python 3.13
+# ansible-core` Python pin (CentOS 7 ships Python 3.6.8 system-wide).
+#
+# CentOS 7 EOL'd 2024-06-30. The base image's default repos point at
+# mirror.centos.org which now returns 404. Redirect to vault.centos.org
+# at the very top of the RUN chain — BEFORE any `yum install`.
 
-FROM ubuntu:24.04
+FROM centos:7
 
 # Build arguments for chezmoi configuration
-ARG CHEZMOI_PROFILE=ubuntu_server
+ARG CHEZMOI_PROFILE=centos_server
 ARG CHEZMOI_EMAIL=docker@example.com
 ARG CHEZMOI_NAME="Docker User"
 ARG CHEZMOI_USE_CHINESE_MIRROR=false
@@ -25,75 +36,28 @@ ARG CHEZMOI_INSTALL_MEDIA_TOOLS=false
 ARG CHEZMOI_INSTALL_DOTNET_TOOLS=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_MODE=off
-ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
+ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=true
 ARG CHEZMOI_MOTD_STYLE=figlet
 ARG CHEZMOI_REPO=daviddwlee84
 
-# Avoid interactive prompts during apt install
-ENV DEBIAN_FRONTEND=noninteractive
+# Redirect default repos to vault.centos.org (post-EOL archive). Must run
+# before the first yum invocation; otherwise mirrorlist.centos.org returns
+# 404 and the layer collapses immediately.
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo \
+    && sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
 
-# Configure HTTP mirror BEFORE installing ca-certificates (if in China)
-# This solves the chicken-and-egg problem: HTTPS mirrors need ca-certificates,
-# but installing ca-certificates from default repos fails under GFW
-# Uses HTTP (not HTTPS) since ca-certificates isn't installed yet
-RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
-        ARCH=$(dpkg --print-architecture) && \
-        if [ "$ARCH" = "amd64" ]; then \
-            MIRROR_URL="http://repo.huaweicloud.com/ubuntu"; \
-        else \
-            MIRROR_URL="http://repo.huaweicloud.com/ubuntu-ports"; \
-        fi && \
-        printf '%s\n' \
-            "Types: deb" \
-            "URIs: ${MIRROR_URL}" \
-            "Suites: noble noble-updates noble-backports" \
-            "Components: main restricted universe multiverse" \
-            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
-            "" \
-            "Types: deb" \
-            "URIs: ${MIRROR_URL}" \
-            "Suites: noble-security" \
-            "Components: main restricted universe multiverse" \
-            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
-            > /etc/apt/sources.list.d/ubuntu.sources; \
-    fi
-
-# Install ca-certificates (now using HTTP mirror if in China, default repos otherwise)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Upgrade to HTTPS mirror after ca-certificates is installed (if in China)
-# HTTPS is more secure for subsequent package installations
-RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
-        ARCH=$(dpkg --print-architecture) && \
-        if [ "$ARCH" = "amd64" ]; then \
-            MIRROR_URL="https://repo.huaweicloud.com/ubuntu"; \
-        else \
-            MIRROR_URL="https://repo.huaweicloud.com/ubuntu-ports"; \
-        fi && \
-        printf '%s\n' \
-            "Types: deb" \
-            "URIs: ${MIRROR_URL}" \
-            "Suites: noble noble-updates noble-backports" \
-            "Components: main restricted universe multiverse" \
-            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
-            "" \
-            "Types: deb" \
-            "URIs: ${MIRROR_URL}" \
-            "Suites: noble-security" \
-            "Components: main restricted universe multiverse" \
-            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
-            > /etc/apt/sources.list.d/ubuntu.sources; \
-    fi
-
-# Install minimal dependencies
-# python3 is required for ansible to run modules on localhost
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    sudo \
-    git \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
+# Install minimal dependencies.
+# python3 here is CentOS 7's 3.6.8; chezmoi bootstrap pins ansible to
+# Python 3.13 via uv (auto-fetched python-build-standalone, glibc-2.17
+# compatible) — see pitfalls/centos7-noroot.md and
+# run_once_before_00_bootstrap.sh.tmpl:299-302.
+RUN yum install -y \
+        ca-certificates \
+        curl \
+        sudo \
+        git \
+        python3 \
+    && yum clean all
 
 # Create non-root user with sudo access
 RUN useradd -m -s /bin/bash devuser \
@@ -109,7 +73,7 @@ USER devuser
 WORKDIR /home/devuser
 
 # Install chezmoi binary
-# Retry up to 3 times to handle network issues (especially behind GFW)
+# Retry up to 3 times to handle network issues
 RUN for i in 1 2 3; do \
         echo "Attempt $i: Installing chezmoi to ~/.local/bin..." && \
         sh -c "$(curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io/lb)" && \
@@ -117,11 +81,11 @@ RUN for i in 1 2 3; do \
         { echo "Attempt $i failed, retrying..."; sleep 10; }; \
     done
 
-# Initialize and apply dotfiles with prompt values passed via flags
-# This avoids interactive prompts during Docker build
-# Set PATH to include ~/.local/bin so run_once scripts can find uv tools (ansible)
-# Use local source instead of cloning from GitHub to test local changes
-# Note: installBrewApps=false and installAiDesktopApps=false by default
+# Initialize and apply dotfiles with prompt values passed via flags.
+# Keep this flag list IDENTICAL to Dockerfile and Dockerfile.rocky9 — the
+# CLAUDE.md "Dockerfile + dotfiles_init wrapper" invariant requires
+# parity with .chezmoi.toml.tmpl prompts (verify with
+# `uv run --script scripts/init/dotfiles_init.py doctor`).
 RUN export PATH="$HOME/.local/bin:$PATH" && \
     ~/.local/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
     --promptString "profile (ubuntu_server|ubuntu_desktop|macos|centos_server)=${CHEZMOI_PROFILE}" \

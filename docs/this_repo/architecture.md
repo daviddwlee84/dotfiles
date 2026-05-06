@@ -152,6 +152,19 @@ Per [CLAUDE.md](https://github.com/daviddwlee84/dotfiles/blob/main/CLAUDE.md) th
 - Inside ansible roles, `ansible_os_family` (Debian / RedHat) does the package-manager disambiguation independently. The chezmoi profile picks **playbook + tag set**; ansible facts pick **package manager**. The two layers don't fight.
 - The carve-out is narrow: package-manager *family* is load-bearing for which roles can run. Future RedHat-family additions (Fedora, Alma, Rocky) all reuse `centos_server` — no new profile per distro.
 
+#### Local install-test for `centos_server`
+
+Two Dockerfiles cover the two RedHat-family install paths reproducibly, in lockstep with the existing Ubuntu `Dockerfile`:
+
+| Recipe | Image | What it tests |
+|---|---|---|
+| `just docker-test-centos7` | `Dockerfile.centos7` (`FROM centos:7`, vault.centos.org redirect for post-EOL repos) | User-level GitHub-release fallbacks under glibc 2.17 + Python 3.6.8 system. The bootstrap's `uv tool install --python 3.13 ansible-core` pin makes ansible itself work; the `os_family in ["Debian", "RedHat"]` gate broadening makes user-level installs fire. |
+| `just docker-test-rocky9` | `Dockerfile.rocky9` (`FROM rockylinux:9`) | Modern dnf-native path with glibc 2.34. Confirms the gate broadening works on dnf, not just yum-on-CentOS-7. |
+| `just docker-run-centos7-noroot` | (interactive) | Closest reproduction of the actual corporate target. |
+| `just docker-run-centos7` (sudo flavor) | (interactive) | Surfaces missing yum/dnf branches in Debian-only roles (`devtools`, `lazyvim_deps`, `docker`, `neovim`, `iac_tools`). Configured with `allowPartialFailure=true` so the apply finishes and you get a complete failure list rather than an early abort. |
+
+Both base images are gated behind compose profiles (`centos`, `rocky`) so default `docker compose up` still only builds the Ubuntu devbox.
+
 ## No-root mode (Linux)
 
 For Linux servers without sudo/root access, enable `noRoot = true` during `chezmoi init`:

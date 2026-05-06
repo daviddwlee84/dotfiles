@@ -340,6 +340,7 @@ Two layers, both opt-in — this is a personal dotfiles repo, tests only cover p
 
 - **`just bats`** — fast unit tests (no Docker, no network). Covers proxy helpers (`tests/unit/zsh_proxy.bats`), `ghget` URL parsing (`tests/unit/ghget.bats`), and `lan-scan.sh` pure helpers (`tests/unit/lan_scan.bats`).
 - **`just docker-test`** — smoke tests in a clean Ubuntu container: re-apply idempotency, zsh config parses, `oh-my-zsh` plugins present, core CLI tools on PATH, nested unit tests pass under Ubuntu zsh (`tests/smoke/docker_install.bats`).
+- **`just docker-test-centos7` / `just docker-test-rocky9`** — same smoke suite under the `centos_server` profile. CentOS 7 covers the legacy glibc-2.17 noRoot corporate target (see [`pitfalls/centos7-noroot.md`](pitfalls/centos7-noroot.md)); Rocky 9 covers the modern dnf-native RHEL-family path. `just docker-test-centos-all` runs both.
 - **`just check-all`** — everything: ansible syntax + pre-commit + `bats` + `docker-test`.
 
 `shellcheck` and `shfmt` run via pre-commit on `scripts/*.sh` (see `.pre-commit-config.yaml`).
@@ -356,6 +357,15 @@ just docker-run
 # Build specific profiles
 just docker-desktop    # Ubuntu desktop profile
 just docker-china      # China mirror profile
+
+# CentOS-family (centos_server profile) — covers RHEL-family install paths.
+# Each base image has two flavors (sudo and noRoot) to match the actual
+# corporate target (CentOS 7 + noRoot=true) and the modern dnf path.
+just docker-run-centos7-noroot   # CentOS 7 + noRoot=true (corporate scenario)
+just docker-run-rocky9           # Rocky Linux 9, sudo path
+just docker-test-centos7         # bats smoke suite on CentOS 7
+just docker-test-rocky9          # bats smoke suite on Rocky 9
+just docker-build-centos-all     # build all four CentOS-family images
 ```
 
 ## Development with justfile

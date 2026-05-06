@@ -168,6 +168,37 @@ glibc-2.17 caveat goes away. The `yum:` blocks added to `base`,
 `zsh`, `ruby_gem_tools` continue to work — `yum:` is an alias for
 `dnf:` on RHEL 8+ via the ansible compatibility shim.
 
+## How to repro locally (Docker)
+
+Two `docker-compose` images mirror the corporate CentOS 7 box and a
+modern Rocky 9 sister target:
+
+```bash
+# Closest reproduction of the actual box (CentOS 7 + noRoot=true)
+just docker-run-centos7-noroot
+# Inside container, the user-level fallbacks should have populated
+# ~/.local/bin: command -v rg fd jq starship zsh just bats
+
+# Modern dnf-native sister case (Rocky Linux 9, glibc 2.34)
+just docker-run-rocky9-noroot
+
+# Bats smoke suite under both
+just docker-test-centos-all
+```
+
+The CentOS 7 Dockerfile (`Dockerfile.centos7`) redirects
+`/etc/yum.repos.d/CentOS-*.repo` to `vault.centos.org` since CentOS 7
+EOL'd 2024-06-30 and the default `mirrorlist.centos.org` returns 404.
+The user's actual corporate box may still be on an internal mirror;
+the vault redirect only matters for the Docker reproduction.
+
+Use the sudo flavor (`just docker-run-centos7`) when you need to
+exercise the `yum:` task branches in `base`/`zsh`/`ruby_gem_tools` —
+just be aware that Debian-only roles (`devtools`, `lazyvim_deps`,
+`docker`, etc.) still lack yum branches and will fail; those services
+are configured with `allowPartialFailure=true` so the apply finishes
+and you get a complete failure list.
+
 ## Related
 
 - `dot_ansible/roles/base/tasks/main.yml` — canonical
@@ -176,6 +207,8 @@ glibc-2.17 caveat goes away. The `yum:` blocks added to `base`,
 - `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`
   — `centos_server` profile branch + `--skip-tags sudo` on
   `noRoot=true`.
+- `Dockerfile.centos7` / `Dockerfile.rocky9` + `docker-compose.yml`
+  `centos7*` / `rocky9*` services — local install-test infrastructure.
 - `pitfalls/ansible-missing-sudo-tag.md` — sibling pitfall: the
   inverse of this one (sudo task without the `[sudo]` tag, fails on
   noRoot).

@@ -5,6 +5,14 @@
 #   docker compose --profile desktop up -d
 #   docker compose --profile china up -d
 #   docker compose run --rm test
+#   docker compose --profile centos up -d centos7 && docker compose exec centos7 bash
+#   docker compose --profile rocky  up -d rocky9  && docker compose exec rocky9  bash
+#
+# CentOS-family services exist in two flavors each (regular + -noroot) to
+# cover both the actual corporate target (CentOS 7 + noRoot=true, see
+# pitfalls/centos7-noroot.md) and the modern dnf-native path (Rocky 9).
+# Default `docker compose up` still only builds the Ubuntu devbox; CentOS
+# services are gated behind --profile flags.
 
 services:
   # Default devbox with ubuntu_server profile
@@ -88,6 +96,107 @@ services:
     # The full repo was COPY'd to /tmp/dotfiles-source by the Dockerfile, so
     # the bats suites live there too. Smoke tests assert post-install state;
     # TAP output makes failures easy to read in `just docker-test` logs.
+    command: ["bats", "/tmp/dotfiles-source/tests/smoke"]
+    profiles:
+      - test
+
+  # CentOS 7 (legacy glibc-2.17 corporate target) — sudo path.
+  # allowPartialFailure=true because Debian-only ansible roles (devtools,
+  # lazyvim_deps, docker, neovim, etc.) currently lack yum branches and
+  # would otherwise abort the apply. See pitfalls/centos7-noroot.md.
+  centos7:
+    build:
+      context: .
+      dockerfile: Dockerfile.centos7
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "false"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "true"
+    image: dotfiles:centos7
+    container_name: dotfiles-centos7
+    stdin_open: true
+    tty: true
+    profiles:
+      - centos
+
+  # CentOS 7 + noRoot=true — closest reproduction of the actual corporate
+  # box (yzhang-idc-server104). Validates user-level GitHub-release
+  # fallbacks documented in pitfalls/centos7-noroot.md.
+  centos7-noroot:
+    build:
+      context: .
+      dockerfile: Dockerfile.centos7
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "true"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "false"
+    image: dotfiles:centos7-noroot
+    container_name: dotfiles-centos7-noroot
+    stdin_open: true
+    tty: true
+    profiles:
+      - centos
+
+  # Rocky Linux 9 — modern dnf-native RHEL-family, sudo path.
+  rocky9:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocky9
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "false"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "true"
+    image: dotfiles:rocky9
+    container_name: dotfiles-rocky9
+    stdin_open: true
+    tty: true
+    profiles:
+      - rocky
+
+  # Rocky Linux 9 + noRoot=true — modern glibc (2.34) noRoot path.
+  # Verifies user-level fallbacks aren't accidentally pinned to glibc-2.17
+  # musl variants when modern glibc is available.
+  rocky9-noroot:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocky9
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "true"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "false"
+    image: dotfiles:rocky9-noroot
+    container_name: dotfiles-rocky9-noroot
+    stdin_open: true
+    tty: true
+    profiles:
+      - rocky
+
+  # Smoke-test variants for the CentOS-family images. Run the same bats
+  # suite as the Ubuntu `test` service (all 8 tests are platform-agnostic).
+  test-centos7:
+    build:
+      context: .
+      dockerfile: Dockerfile.centos7
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "true"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "false"
+    image: dotfiles:test-centos7
+    container_name: dotfiles-test-centos7
+    command: ["bats", "/tmp/dotfiles-source/tests/smoke"]
+    profiles:
+      - test
+
+  test-rocky9:
+    build:
+      context: .
+      dockerfile: Dockerfile.rocky9
+      args:
+        CHEZMOI_PROFILE: centos_server
+        CHEZMOI_NO_ROOT: "true"
+        CHEZMOI_ALLOW_PARTIAL_FAILURE: "false"
+    image: dotfiles:test-rocky9
+    container_name: dotfiles-test-rocky9
     command: ["bats", "/tmp/dotfiles-source/tests/smoke"]
     profiles:
       - test

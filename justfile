@@ -19,6 +19,19 @@ docker-build-all:
     docker compose --profile desktop build
     docker compose --profile china build
 
+# Build all CentOS-family images (centos7, centos7-noroot, rocky9, rocky9-noroot)
+docker-build-centos-all:
+    docker compose --profile centos build
+    docker compose --profile rocky build
+
+# Build CentOS 7 images (sudo + noRoot flavors)
+docker-build-centos7:
+    docker compose --profile centos build centos7 centos7-noroot
+
+# Build Rocky 9 images (sudo + noRoot flavors)
+docker-build-rocky9:
+    docker compose --profile rocky build rocky9 rocky9-noroot
+
 # Run interactive devbox shell
 docker-run:
     docker compose up -d devbox && docker compose exec devbox bash
@@ -35,6 +48,17 @@ docker-down:
 docker-test:
     docker compose run --build --rm test
 
+# Run smoke tests against CentOS 7 image (noRoot path — corporate scenario)
+docker-test-centos7:
+    docker compose --profile test run --build --rm test-centos7
+
+# Run smoke tests against Rocky 9 image (modern dnf-native RHEL-family)
+docker-test-rocky9:
+    docker compose --profile test run --build --rm test-rocky9
+
+# Run smoke tests against all CentOS-family images
+docker-test-centos-all: docker-test-centos7 docker-test-rocky9
+
 # Build and run desktop profile
 docker-desktop:
     docker compose --profile desktop up -d desktop && docker compose exec desktop bash
@@ -43,10 +67,29 @@ docker-desktop:
 docker-china:
     docker compose --profile china up -d china && docker compose exec china bash
 
+# Build and run CentOS 7 (sudo path) interactively
+docker-run-centos7:
+    docker compose --profile centos up -d centos7 && docker compose exec centos7 bash
+
+# Build and run CentOS 7 (noRoot path — closest to corporate scenario) interactively
+docker-run-centos7-noroot:
+    docker compose --profile centos up -d centos7-noroot && docker compose exec centos7-noroot bash
+
+# Build and run Rocky 9 (sudo path) interactively
+docker-run-rocky9:
+    docker compose --profile rocky up -d rocky9 && docker compose exec rocky9 bash
+
+# Build and run Rocky 9 (noRoot path) interactively
+docker-run-rocky9-noroot:
+    docker compose --profile rocky up -d rocky9-noroot && docker compose exec rocky9-noroot bash
+
 # Remove all dotfiles containers and images
 docker-clean:
     docker compose down -v --rmi all 2>/dev/null || true
+    docker compose --profile centos --profile rocky --profile test --profile desktop --profile china down -v --rmi all 2>/dev/null || true
     docker image rm dotfiles:server dotfiles:desktop dotfiles:china dotfiles:test 2>/dev/null || true
+    docker image rm dotfiles:centos7 dotfiles:centos7-noroot dotfiles:rocky9 dotfiles:rocky9-noroot 2>/dev/null || true
+    docker image rm dotfiles:test-centos7 dotfiles:test-rocky9 2>/dev/null || true
 
 # ============================================================================
 # Chezmoi
