@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -56,6 +56,7 @@
       - figlet
       - toilet
       - lolcat
+      - fastfetch
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -3661,3 +3662,91 @@
       - toilet
       - lolcat
     state: present
+
+# =============================================================================
+# fastfetch — system info CLI (replaces deprecated neofetch)
+# =============================================================================
+# - Ubuntu 24.04+ / Debian 13+: in apt → ansible.builtin.apt picks it up
+# - Ubuntu 22.04 / Debian 12: not in apt → fall through to GitHub .deb
+# - .zlogin's fastfetch-slim/full styles depend on this; falls back to plain
+#   figlet metadata if fastfetch is missing.
+- name: Try installing fastfetch via apt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: fastfetch
+    state: present
+  failed_when: false
+  register: fastfetch_apt
+
+- name: Re-check if fastfetch is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v fastfetch
+  register: fastfetch_recheck
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Set fastfetch release architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - fastfetch_recheck.rc != 0
+  ansible.builtin.set_fact:
+    fastfetch_release_arch: >-
+      {{
+        'amd64' if target_architecture in ['x86_64', 'amd64']
+        else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+        else ''
+      }}
+
+- name: Skip fastfetch on unsupported architecture
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - fastfetch_recheck.rc != 0
+    - fastfetch_release_arch == ''
+  ansible.builtin.debug:
+    msg: "fastfetch skipped: no release for {{ target_architecture }}"
+
+- name: Install fastfetch from GitHub releases (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - fastfetch_recheck.rc != 0
+    - fastfetch_release_arch | default('') != ''
+  become: true
+  tags: [sudo]
+  block:
+    - name: Get latest fastfetch release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest
+        return_content: true
+      register: fastfetch_release
+
+    - name: Download fastfetch .deb package
+      ansible.builtin.get_url:
+        url: "https://github.com/fastfetch-cli/fastfetch/releases/download/{{ fastfetch_release.json.tag_name }}/fastfetch-linux-{{ fastfetch_release_arch }}.deb"
+        dest: /tmp/fastfetch.deb
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Install fastfetch .deb package
+      ansible.builtin.apt:
+        deb: /tmp/fastfetch.deb
+
+    - name: Clean up fastfetch .deb
+      ansible.builtin.file:
+        path: /tmp/fastfetch.deb
+        state: absent
+
+  rescue:
+    - name: Warn fastfetch installation failed
+      ansible.builtin.debug:
+        msg: "fastfetch installation failed (likely network timeout or unsupported version) - skipping"
+
+    - name: Clean up fastfetch temp files after failure
+      ansible.builtin.file:
+        path: /tmp/fastfetch.deb
+        state: absent

@@ -82,6 +82,12 @@ noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system pac
 backupMode = {{ promptChoiceOnce . "backupMode" "Backup mode for existing dotfiles (smart|full|off)" (list "smart" "full" "off") "smart" | quote }}
 # 允許 Ansible 部分失敗（逐 tag 執行，單一 role 失敗不影響其餘）
 allowPartialFailure = {{ promptBoolOnce . "allowPartialFailure" "Allow partial Ansible failures (continue installing other tools if one role fails)" false }}
+# SSH login banner (~/.zlogin) 樣式 — 詳見 docs/zsh/motd.md
+#   - figlet:         單行 figlet hostname + metadata（~6 行，~5ms，預設）
+#   - fastfetch-slim: figlet hostname + fastfetch 精簡版（~10 行，~80ms）
+#   - fastfetch-full: fastfetch 完整輸出含 distro logo（~22 行，~150ms）
+# Runtime override: 在 ~/.zshrc.adhoc 設 MOTD_STYLE=... 可即時切換無需 chezmoi init --force
+motdStyle = {{ promptChoiceOnce . "motdStyle" "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)" (list "figlet" "fastfetch-slim" "fastfetch-full") "figlet" | quote }}
 
 # https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]

@@ -24,6 +24,7 @@ ARG CHEZMOI_INSTALL_MEDIA_TOOLS=false
 ARG CHEZMOI_NO_ROOT=false
 ARG CHEZMOI_BACKUP_MODE=off
 ARG CHEZMOI_ALLOW_PARTIAL_FAILURE=false
+ARG CHEZMOI_MOTD_STYLE=figlet
 ARG CHEZMOI_REPO=daviddwlee84
 
 # Avoid interactive prompts during apt install
@@ -139,7 +140,8 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptBool "Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)=${CHEZMOI_INSTALL_MEDIA_TOOLS}" \
     --promptBool "No sudo/root access - skip all system package installations=${CHEZMOI_NO_ROOT}" \
     --promptChoice "Backup mode for existing dotfiles (smart|full|off)=${CHEZMOI_BACKUP_MODE}" \
-    --promptBool "Allow partial Ansible failures (continue installing other tools if one role fails)=${CHEZMOI_ALLOW_PARTIAL_FAILURE}"
+    --promptBool "Allow partial Ansible failures (continue installing other tools if one role fails)=${CHEZMOI_ALLOW_PARTIAL_FAILURE}" \
+    --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}"
 
 # Default to bash shell
 CMD ["/bin/bash"]

@@ -229,6 +229,12 @@ PROMPTS: tuple[Prompt, ...] = (
            "Skip all system package installations (user-level tools only).",
            default=False,
            prompt_text="No sudo/root access - skip all system package installations"),
+    Prompt("motdStyle", "choice", "Preferences",
+           "SSH login banner style",
+           "figlet (~6 lines, ~5ms) | fastfetch-slim (figlet + fastfetch slim, ~10 lines, ~80ms) | fastfetch-full (full distro logo + everything, ~22 lines, ~150ms). Runtime override: MOTD_STYLE in ~/.zshrc.adhoc.",
+           default="figlet",
+           prompt_text="SSH login banner style (figlet|fastfetch-slim|fastfetch-full)",
+           choices=("figlet", "fastfetch-slim", "fastfetch-full")),
 )
 
 

@@ -121,6 +121,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
+| `motdStyle` | `figlet` | SSH login banner style: `figlet` (~6 lines, default), `fastfetch-slim` (figlet + fastfetch w/o logo, ~10 lines), `fastfetch-full` (full distro logo + everything, ~22 lines). Runtime override: `MOTD_STYLE=...` in `~/.zshrc.adhoc`. See [docs/zsh/motd.md](docs/zsh/motd.md). |
 
 To change options later: `chezmoi init --force`
 
@@ -185,7 +186,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/zsh/tools/32_try.zsh` - `try-cli` shell integration, with default `TRY_PATH` and graduate-friendly `TRY_PROJECTS`
 - `~/.config/zsh/tools/94_ssh_agent.zsh` - SSH agent with Bitwarden-first fallback to persistent `ssh-agent` (auto-loads keys)
 - `~/.config/zsh/tools/95_bitwarden.zsh` - Bitwarden CLI zsh completion
-- `~/.zlogin` - SSH-gated MOTD banner: prints `figlet $(hostname -s)` + profile/OS/uptime/IP only when you SSH into a host. Silent for local terminals, scp/rsync/fleet-apply, and tmux panes. Set `MOTD_DISABLE=1` in `~/.zshrc.adhoc` to suppress ([docs](docs/zsh/motd.md))
+- `~/.zlogin` - SSH-gated MOTD banner with 3 styles selectable via the `motdStyle` chezmoi prompt: `figlet` (default, ~6 lines), `fastfetch-slim` (~10 lines), or `fastfetch-full` (full distro logo). Silent for local terminals, scp/rsync/fleet-apply, and tmux panes. Runtime override `MOTD_STYLE=...` or full opt-out `MOTD_DISABLE=1` in `~/.zshrc.adhoc` ([docs](docs/zsh/motd.md))
 - `~/.ssh/config` - SSH main config skeleton (create-only: `Include ~/.ssh/config.d/*` + conservative `Host *` defaults)
 - `~/.ssh/config.d/00-defaults` - SSH global defaults stub (commented examples only)
 - `~/.ssh/config.d/git` - SSH host entries for `github.com` and `gitlab.com` with commented multi-account/Bitwarden examples
@@ -239,7 +240,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **Homebrew** (macOS): Package manager for macOS
 - **uv**: Python package manager for ansible
 - **mise**: Runtime manager for Node.js and Rust (pins versions from `~/.config/mise/config.toml`; upgrade with `just upgrade-mise`, see [Keeping tools up-to-date](#keeping-tools-up-to-date))
-- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, [glow](docs/tools/glow.md), [gum](docs/tools/gum.md), [vhs](docs/tools/vhs.md), [freeze](docs/tools/freeze.md), thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, worktrunk ([workflow playbook](docs/tools/worktrunk.md)), zellij, btop, htop, taplo, television, pandoc, witr, figlet, toilet, lolcat ([SSH login banner](docs/zsh/motd.md))
+- **Dev tools**: bat, bats, gh, glab, diffnav, git-delta, git-graph, eza, tldr, [glow](docs/tools/glow.md), [gum](docs/tools/gum.md), [vhs](docs/tools/vhs.md), [freeze](docs/tools/freeze.md), thefuck, zoxide, direnv, yazi, superfile, tmux+tpm, sesh, worktrunk ([workflow playbook](docs/tools/worktrunk.md)), zellij, btop, htop, taplo, television, pandoc, witr, figlet, toilet, lolcat, [fastfetch](https://github.com/fastfetch-cli/fastfetch) ([SSH login banner](docs/zsh/motd.md))
 - **Log viewers**: tailspin (`tspin`), lnav, grc, ccze (Linux only — no Homebrew formula) — plus `catl`/`lessl`/`logtail` zsh wrappers and a `tv logs` Television channel ([docs](docs/tools/log-tools.md))
 - **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), Discord (`.deb`, x86_64-only — aarch64 gets a Flatpak hint), Zen Browser (AppImage + `.desktop` entry for launcher search), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl) (Arc + Discord casks there). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
 - **Starship**: Cross-shell prompt (replaces oh-my-zsh theme)
