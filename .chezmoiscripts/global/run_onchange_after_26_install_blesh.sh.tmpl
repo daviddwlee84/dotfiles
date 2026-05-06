@@ -38,6 +38,18 @@ if ! command -v make >/dev/null 2>&1; then
     exit 0
 fi
 
+# ble.sh's Makefile requires GNU awk specifically (not BSD awk on macOS,
+# not mawk on minimal Ubuntu containers). The bash ansible role installs
+# `gawk` on every OS; if this script runs before the role (first apply
+# bootstrap), gracefully no-op so the rest of the apply continues.
+if ! command -v gawk >/dev/null 2>&1; then
+    warn "gawk not found; cannot compile ble.sh (Makefile hard-requires GNU awk)."
+    warn "On Linux: apt-get install gawk / yum install gawk."
+    warn "On macOS: brew install gawk."
+    warn "Re-run \`chezmoi apply\` after gawk is available."
+    exit 0
+fi
+
 # Bash 4.0+ check — ble.sh refuses to attach on bash 3.2 (macOS system bash).
 # On a zsh-primary mac without `brew install bash`, the bash role's brew bash
 # install is gated on primaryShell == "bash", so the system bash 3.2 stays

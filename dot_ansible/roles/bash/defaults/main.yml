@@ -8,10 +8,17 @@
 # rather than here.
 #
 # This role's responsibilities:
-#   1. macOS only: brew-install bash 5.x when primary_shell == "bash"
+#   1. ALL OSes (unconditional): install `gawk` — ble.sh's Makefile
+#      hard-requires GNU awk (not BSD awk on macOS, not mawk on minimal
+#      Ubuntu containers). Without gawk the runtime artefact at
+#      ~/.local/share/blesh/ble.sh never gets built, so bash falls back
+#      to plain readline + starship. Tiny package (~50KB), worth shipping
+#      everywhere so ad-hoc bash on zsh-primary hosts also gets the full
+#      ble.sh experience.
+#   2. macOS only: brew-install bash 5.x when primary_shell == "bash"
 #      (system bash 3.2 is too old for OMB plugins and ble.sh).
-#   2. macOS only: append the brew bash to /etc/shells so chsh accepts it.
-#   3. chsh to bash when primary_shell == "bash" (all OSes).
+#   3. macOS only: append the brew bash to /etc/shells so chsh accepts it.
+#   4. chsh to bash when primary_shell == "bash" (all OSes).
 #
 # The bash PACKAGE itself is always present on Linux (every distro ships
 # bash) and is also already on macOS as /bin/bash 3.2 — both adequate for

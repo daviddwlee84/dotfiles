@@ -3,6 +3,39 @@
 # it in /etc/shells, and switch login shell to bash. All gated on
 # `primary_shell == "bash"`. See dot_ansible/roles/bash/defaults/main.yml
 # for the rationale.
+#
+# Also installs `gawk` UNCONDITIONALLY (not gated on primary_shell): ble.sh's
+# Makefile errors out without GNU awk (`Sorry, gawk could not be found`),
+# leaving ~/.local/share/blesh/ble.sh unbuilt. Since ble.sh is cloned on
+# every host (so ad-hoc bash gets autosuggest/syntax-highlight), gawk
+# needs to be present on every host too. ~50KB; worth the parity.
+
+# ---------------------------------------------------------------------------
+# gawk install (all OSes; ble.sh runtime dep)
+# ---------------------------------------------------------------------------
+
+- name: Install gawk (Debian/Ubuntu) — required by ble.sh Makefile
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: gawk
+    state: present
+
+- name: Install gawk (RedHat/CentOS) — required by ble.sh Makefile
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name: gawk
+    state: present
+  ignore_errors: true
+
+- name: Install gawk (macOS) — required by ble.sh Makefile
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: gawk
+    state: present
 
 # ---------------------------------------------------------------------------
 # macOS bash 5.x install (only when primary_shell == "bash"). Linux distros
