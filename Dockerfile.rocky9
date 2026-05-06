@@ -37,13 +37,17 @@ ARG CHEZMOI_REPO=daviddwlee84
 # Install minimal dependencies.
 # --allowerasing resolves the curl-minimal vs curl conflict that ships in
 # the rockylinux:9 base layer; without it dnf aborts on package conflict.
-# python3 is required for ansible to run modules on localhost.
+# - python3: required for ansible to run modules on localhost
+# - jq:      required by modify_ chezmoi scripts (e.g.
+#            dot_agents/modify_dot_skill-lock.json.tmpl) which run during
+#            `chezmoi apply` BEFORE the ansible base role installs jq.
 RUN dnf install -y --allowerasing \
         ca-certificates \
         curl \
         sudo \
         git \
         python3 \
+        jq \
     && dnf clean all
 
 # Create non-root user with sudo access

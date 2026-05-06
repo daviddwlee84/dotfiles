@@ -47,17 +47,32 @@ RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo \
     && sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
 
 # Install minimal dependencies.
-# python3 here is CentOS 7's 3.6.8; chezmoi bootstrap pins ansible to
-# Python 3.13 via uv (auto-fetched python-build-standalone, glibc-2.17
-# compatible) — see pitfalls/centos7-noroot.md and
-# run_once_before_00_bootstrap.sh.tmpl:299-302.
-RUN yum install -y \
+# - python3: CentOS 7's 3.6.8; chezmoi bootstrap pins ansible to Python 3.13
+#   via uv (auto-fetched python-build-standalone, glibc-2.17 compatible) —
+#   see pitfalls/centos7-noroot.md and run_once_before_00_bootstrap.sh.tmpl:299-302.
+# - jq:           required by modify_ chezmoi scripts (e.g.
+#                 dot_agents/modify_dot_skill-lock.json.tmpl) which run during
+#                 `chezmoi apply` BEFORE the ansible base role installs jq.
+# - epel-release: required for jq (CentOS 7 jq lives in EPEL, not base).
+# - glibc-common: provides the en_US.UTF-8 locale archive — the centos:7
+#                 minimal image has C/POSIX only, ansible-galaxy errors with
+#                 "Ansible requires the locale encoding to be UTF-8; Detected None."
+RUN yum install -y epel-release \
+    && yum install -y \
         ca-certificates \
         curl \
         sudo \
         git \
         python3 \
+        jq \
+        glibc-common \
     && yum clean all
+
+# Force ansible (and shell pipelines) to a UTF-8 locale; the centos:7 base
+# image leaves LANG unset which the bootstrap's locale-fix branch only
+# catches on `cannot set` errors, not on missing locale entirely.
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Create non-root user with sudo access
 RUN useradd -m -s /bin/bash devuser \

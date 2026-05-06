@@ -87,12 +87,17 @@ RUN if [ "${CHEZMOI_USE_CHINESE_MIRROR}" = "true" ]; then \
     fi
 
 # Install minimal dependencies
-# python3 is required for ansible to run modules on localhost
+# - python3: required for ansible to run modules on localhost
+# - jq:      required by modify_ chezmoi scripts (e.g. dot_agents/modify_dot_skill-lock.json.tmpl)
+#            which run during `chezmoi apply` BEFORE the ansible base role
+#            installs jq system-wide. Without it chezmoi exits with
+#            `.agents/.skill-lock.json: exit status 127` (jq: command not found).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     sudo \
     git \
     python3 \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user with sudo access
