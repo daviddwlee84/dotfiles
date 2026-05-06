@@ -124,7 +124,7 @@ RUN for i in 1 2 3; do \
 # Note: installBrewApps=false and installAiDesktopApps=false by default
 RUN export PATH="$HOME/.local/bin:$PATH" && \
     ~/.local/bin/chezmoi init --apply --source=/tmp/dotfiles-source \
-    --promptString "profile (ubuntu_server|ubuntu_desktop|macos|centos_server)=${CHEZMOI_PROFILE}" \
+    --promptChoice "Which profile=${CHEZMOI_PROFILE}" \
     --promptString "What is your email address=${CHEZMOI_EMAIL}" \
     --promptString "What is your full name=${CHEZMOI_NAME}" \
     --promptBool "Are you in China (behind GFW) and need to use mirrors=${CHEZMOI_USE_CHINESE_MIRROR}" \
