@@ -278,10 +278,27 @@ else
     info "mise is already installed"
 fi
 
-# 4. Install ansible if missing
+# 4. Install ansible if missing (or refresh if running on stale Python <3.10)
+#
+# `uv tool install` defaults to the system Python. On CentOS 7 / RHEL 7 the
+# system is Python 3.6.8 — uv would resolve `ansible-core` to 2.11.12 (last
+# version supporting Py3.6, August 2021) which predates Galaxy NG and crashes
+# on `ansible-galaxy collection install community.general` with a KeyError on
+# the `/api/v3/plugin/ansible/content/...` URL. Pin to Python 3.13 so uv
+# auto-fetches a python-build-standalone interpreter (statically linked,
+# glibc-2.17 compatible) and pulls a modern ansible-core (2.18+) that speaks
+# Galaxy NG. Mirrors the `uv tool install --python 3.13 pre-commit` pattern
+# in dot_ansible/roles/security_tools/tasks/main.yml.
+NEED_ANSIBLE_INSTALL=0
 if ! command -v ansible-playbook &> /dev/null; then
-    info "Installing ansible via uv..."
-    uv tool install ansible-core
+    NEED_ANSIBLE_INSTALL=1
+elif ansible-playbook --version 2>/dev/null | grep -qE 'python version = 3\.(6|7|8|9)\.'; then
+    info "Detected ansible on stale Python (<3.10); will reinstall on Python 3.13"
+    NEED_ANSIBLE_INSTALL=1
+fi
+if [[ "$NEED_ANSIBLE_INSTALL" == "1" ]]; then
+    info "Installing ansible via uv (Python 3.13)..."
+    uv tool install --force --python 3.13 ansible-core
     success "ansible installed successfully"
 else
     info "ansible is already installed"

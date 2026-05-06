@@ -77,6 +77,54 @@ with:
 ./tool: /lib64/libc.so.6: version `GLIBC_2.29' not found (required by ./tool)
 ```
 
+### CentOS 7 also ships Python 3.6.8 — bootstrap pins ansible to Python 3.13
+
+Symptom on a fresh CentOS 7 box:
+
+```
+[INFO] Installing ansible via uv...
+Resolved 10 packages in 4m 29s
+Installed 10 packages …
+ + ansible-core==2.11.12          ← suspicious: latest is 2.18+
+…
+[INFO] Installing ansible-galaxy collections...
+[WARNING]: Skipping Galaxy server https://galaxy.ansible.com/api/. Got an
+unexpected error when getting available versions of collection community.general:
+'/api/v3/plugin/ansible/content/published/collections/index/community/general/versions/'
+ERROR! Unexpected Exception, this is probably a bug:
+'/api/v3/plugin/ansible/content/published/collections/index/community/general/versions/'
+[ERROR] Failed to install community.general collection.
+chezmoi: 00_bootstrap.sh: exit status 1
+```
+
+Two compounding issues:
+
+1. **`uv tool install` defaults to system Python.** On CentOS 7 that's
+   Python 3.6.8. uv resolves `ansible-core` to **2.11.12** — the last
+   version with Py3.6 support, released August 2021.
+2. **2.11.12 predates Galaxy NG.** `galaxy.ansible.com` was migrated to
+   the Pulp/Galaxy-NG backend; ansible-core 2.11 hits the new
+   `/api/v3/plugin/ansible/content/published/...` endpoint and throws
+   `KeyError(<that URL string>)` because it expects the legacy v2
+   shape. Output makes it look like a network/proxy error — it's not.
+   The proxy hint in the bootstrap script's error message is a red
+   herring on CentOS 7.
+
+**Fix (already in `run_once_before_00_bootstrap.sh.tmpl`):** install
+ansible with `uv tool install --force --python 3.13 ansible-core`. uv
+auto-fetches a python-build-standalone interpreter (statically linked,
+glibc-2.17 compatible) and pulls modern ansible-core (2.18+) that
+speaks Galaxy NG. Same pattern as `pre-commit` in
+`dot_ansible/roles/security_tools/tasks/main.yml`.
+
+The bootstrap also detects an existing ansible install on Python <3.10
+and force-reinstalls — so a box that previously bootstrapped with the
+old line auto-heals on the next `chezmoi apply`. If you want to nuke
+manually: `uv tool uninstall ansible-core && rm -rf
+~/.local/share/uv/tools/ansible-core`.
+
+
+
 The user-level fallbacks in `base/tasks/main.yml` already prefer
 **musl** assets where upstream offers them — `ripgrep`, `fd`, `lnav`
 all ship `*-unknown-linux-musl.tar.gz` variants that are statically
