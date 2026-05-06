@@ -406,6 +406,12 @@ bootstrap-skills:
 fleet-apply *ARGS:
     ./scripts/fleet_apply.py {{ARGS}}
 
+# Apply chezmoi update to all configured hosts in parallel
+fleet-edit:
+    # TODO: use EDITOR
+    nvim ~/.config/fleet/machines.toml
+
+
 # Preview only: runs `chezmoi diff` on every host (no changes applied)
 fleet-apply-dry-run *ARGS:
     ./scripts/fleet_apply.py --dry-run {{ARGS}}
