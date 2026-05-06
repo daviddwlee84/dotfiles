@@ -66,9 +66,13 @@
         classic: true
         state: present
 
+# Architecture fact applies to both Debian-family and RedHat-family
+# Linux paths (system-level on Debian; user-level on either when noRoot or
+# when the system package version is too old). Pure data, no package
+# manager involved — broadened per pitfalls/centos7-noroot.md gate pattern.
 - name: Set Neovim tarball architecture (system)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.set_fact:
     nvim_sys_arch: >-
       {{
@@ -152,15 +156,19 @@
 
 - name: Warn about Neovim on unsupported architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - nvim_current_version is version(neovim_min_version, '<')
     - nvim_sys_arch | default('') == ''
   ansible.builtin.debug:
-    msg: "Neovim GitHub release not available for {{ target_architecture }} — keeping apt version or install manually"
+    msg: "Neovim GitHub release not available for {{ target_architecture }} — keeping system version or install manually"
 
+# User-level fallback fires when:
+#   - Debian noRoot box: apt_neovim is undefined (sudo tasks were skipped).
+#   - RedHat-family (any noRoot or sudo): no apt branch ran at all, so
+#     apt_neovim is also undefined. Gate broadened per pitfalls/centos7-noroot.md.
 - name: Install Neovim tarball (user-level, no sudo required)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - nvim_current_version is version(neovim_min_version, '<')
     - apt_neovim is not defined  # sudo tasks were skipped
     - nvim_sys_arch | default('') != ''
