@@ -113,6 +113,12 @@ COPY --chown=devuser:devuser . /tmp/dotfiles-source
 USER devuser
 WORKDIR /home/devuser
 
+# Make ~/.local/bin available to all subsequent CMDs (bats, chezmoi, mise,
+# uv, just, fd, etc. all live there after ansible's user-level installs).
+# Docker's CMD doesn't load ~/.bashrc, so without this the test service's
+# `command: ["bats", ...]` exits 127 even though bats is installed.
+ENV PATH="/home/devuser/.local/bin:${PATH}"
+
 # Install chezmoi binary
 # Retry up to 3 times to handle network issues (especially behind GFW)
 RUN for i in 1 2 3; do \

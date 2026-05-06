@@ -450,8 +450,11 @@
     state: present
 
 # --- bats (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — the user-level
+# install (curl GitHub release tarball, run install.sh) has no apt-specific
+# behaviour and works on any glibc-2.17+ system.
 - name: Re-check if bats is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v bats
   register: bats_recheck
   changed_when: false
@@ -461,7 +464,7 @@
 
 - name: Install bats-core from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - bats_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (bats)

@@ -45,9 +45,19 @@ set -e
 export PATH="$HOME/.local/bin:$PATH"
 
 # Override locale to a safe default so ansible can start even before locale
-# packages are installed (e.g. en_US.UTF-8 not yet generated on a fresh machine).
-export LC_ALL=C.UTF-8
-export LANG=C.UTF-8
+# packages are installed. Prefer C.UTF-8 (universal since glibc 2.35) but
+# fall back to en_US.UTF-8 on CentOS 7 (glibc 2.17) where C.UTF-8 is
+# missing and `LC_ALL=C.UTF-8` triggers
+# `Ansible could not initialize the preferred locale: unsupported locale
+# setting`. Fall through silently if neither is available — the parent
+# shell's LANG/LC_ALL (e.g. set via ENV in Dockerfile.centos7) wins.
+if locale -a 2>/dev/null | grep -qiE '^C\.utf-?8$'; then
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+elif locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$'; then
+    export LC_ALL=en_US.UTF-8
+    export LANG=en_US.UTF-8
+fi
 
 # --- Shared sudo session (see scripts/lib/sudo_shared.sh for full docs)
 # Inlined at template-render time so this script carries the helper body.
