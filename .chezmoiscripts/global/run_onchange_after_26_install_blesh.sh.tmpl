@@ -1,0 +1,69 @@
+#!/bin/bash
+# Compile + install ble.sh into ~/.local/share/blesh after the chezmoi
+# external clones the source tree (and on subsequent weekly refreshes
+# whose pull moves HEAD).
+#
+# Trigger: change in the cloned repo's HEAD (commit-hash bump). chezmoi's
+# `include` template function reads the file at template-render time; we
+# hash the blesh-source HEAD file. NOTE: must be a stable path inside
+# the repo clone — if the path changes, this script becomes a no-op
+# until manual `chezmoi apply --refresh-externals`.
+#
+# blesh source HEAD: {{ $bleshHead := joinPath .chezmoi.homeDir ".local/share/blesh/.git/HEAD" -}}
+# {{ if stat $bleshHead -}}{{ include $bleshHead | sha256sum }}{{ else }}absent{{ end }}
+#
+# The `make install` target compiles the runtime ble.sh artefact
+# (~/.local/share/blesh/ble.sh) — distinct from the source tree at
+# ~/.local/share/blesh/. dot_bashrc.tmpl sources the runtime artefact;
+# without this script, the source clone exists but the runtime doesn't,
+# and bashrc's presence-gate skips ble.sh init.
+
+set -e
+export PATH="$HOME/.local/bin:$PATH"
+
+info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+
+BLESH_SRC="$HOME/.local/share/blesh"
+
+if [[ ! -d "$BLESH_SRC" ]]; then
+    info "ble.sh source not cloned yet (skip — chezmoi external may be in-flight)"
+    exit 0
+fi
+
+if ! command -v make >/dev/null 2>&1; then
+    warn "make not found; cannot compile ble.sh. Bash will fall back to plain readline."
+    warn "Install make (apt-get install build-essential / xcode-select --install) and re-apply."
+    exit 0
+fi
+
+# Bash 4.0+ check — ble.sh refuses to attach on bash 3.2 (macOS system bash).
+# On a zsh-primary mac without `brew install bash`, the bash role's brew bash
+# install is gated on primaryShell == "bash", so the system bash 3.2 stays
+# active. ble.sh's compile step itself works fine on 3.2 (it's a Makefile),
+# but the runtime won't attach. We still compile so the artefact exists for
+# any user who later switches to brew bash or runs bash 5+ ad-hoc.
+{{ if eq .chezmoi.os "darwin" -}}
+if [[ -x /opt/homebrew/bin/bash ]]; then
+    BASH_BIN=/opt/homebrew/bin/bash
+elif [[ -x /usr/local/bin/bash ]]; then
+    BASH_BIN=/usr/local/bin/bash
+else
+    BASH_BIN=$(command -v bash)
+fi
+{{ else -}}
+BASH_BIN=$(command -v bash)
+{{ end -}}
+
+info "Compiling ble.sh (PREFIX=\$HOME/.local; bash=$BASH_BIN)"
+if make -C "$BLESH_SRC" install PREFIX="$HOME/.local" \
+        BASH="$BASH_BIN" \
+        >/tmp/blesh-install.log 2>&1; then
+    success "ble.sh installed to ~/.local/share/blesh/ble.sh"
+    rm -f /tmp/blesh-install.log
+else
+    warn "ble.sh make install failed — see /tmp/blesh-install.log"
+    warn "Bash will fall back to plain readline (bashrc presence-gate)."
+    exit 0
+fi
