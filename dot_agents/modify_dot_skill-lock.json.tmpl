@@ -19,7 +19,8 @@
 # matching the schema chezmoi found when first running `npx skills add … -g`
 # (run `cat ~/.agents/.skill-lock.json` after a fresh install for reference).
 #
-# Requires: jq (installed by the `base` ansible role).
+# Requires: jq 1.4+ (1.4+ for `index/1`, NOT 1.6+ — keep this script
+# compatible with CentOS 7's EPEL jq 1.5 since `IN/1` was added in 1.6).
 # See: docs/tools/agent-skills.md
 set -eu
 
@@ -70,7 +71,7 @@ printf '%s' "$base" | jq --argjson managed "$managed" '
                 key: .key,
                 value: (
                   ($live_skills[.key] // {})
-                  + (.value | with_entries(select(.key | IN("source","sourceType","sourceUrl","skillPath"))))
+                  + (.value | with_entries(select(.key as $k | ["source","sourceType","sourceUrl","skillPath"] | index($k))))
                 )
               })
             | from_entries
