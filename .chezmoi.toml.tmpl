@@ -17,7 +17,7 @@ umask = 0o022
 # Profile only encodes user-role choices that can't be auto-detected
 # (desktop vs server). OS/arch facts come from .chezmoi.os / .chezmoi.arch;
 # see docs/tools/chezmoi-templating.md for the full rule.
-{{- $profileChoices := list "macos" "ubuntu_desktop" "ubuntu_server" }}
+{{- $profileChoices := list "macos" "ubuntu_desktop" "ubuntu_server" "centos_server" }}
 {{- $defaultProfile := "ubuntu_server" }}
 {{- if eq .chezmoi.os "darwin" }}{{ $defaultProfile = "macos" }}{{ end }}
 {{- $profile := promptChoiceOnce . "profile" "Which profile" $profileChoices $defaultProfile }}

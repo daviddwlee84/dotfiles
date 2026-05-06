@@ -131,6 +131,15 @@ TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_t
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)
 TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+{{ else if eq .profile "centos_server" -}}
+PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+# CentOS Server: same playbook + tag set as Ubuntu Server. Ansible roles
+# disambiguate apt vs yum via ansible_os_family ("Debian" vs "RedHat").
+# On a noRoot CentOS box every [sudo]-tagged task is skipped; what
+# actually runs are the user-level GitHub-release / cargo / mise
+# fallbacks — see pitfalls/centos7-noroot.md for the gate-broadening
+# fix that lets those fire on RedHat too.
+TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
 {{ else -}}
 warn "Unknown profile: {{ .profile }}"
 exit 0

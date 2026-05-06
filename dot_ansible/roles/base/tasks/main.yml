@@ -45,9 +45,31 @@
     state: link
   ignore_errors: true
 
+# RedHat (CentOS/Rocky/Alma) base packages. ripgrep + fd skipped here:
+# they're EPEL-only on CentOS 7 and the GitHub-release fallback below
+# handles them more reliably (musl tarballs ignore glibc 2.17). Skipped
+# entirely on noRoot (tags: [sudo] → --skip-tags sudo).
+- name: Install base packages (RedHat/CentOS)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name:
+      - git
+      - git-lfs
+      - curl
+      - wget
+      - jq
+      - tree
+      - gcc
+      - gcc-c++
+      - make
+    state: present
+  ignore_errors: true
+
 # --- ripgrep (user-level fallback) ---
 - name: Re-check if ripgrep is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v rg
   register: rg_recheck
   changed_when: false
@@ -55,7 +77,7 @@
 
 - name: Install ripgrep from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - rg_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (ripgrep)
@@ -130,7 +152,7 @@
 
 # --- fd (user-level fallback) ---
 - name: Re-check if fd is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v fd
   register: fd_recheck
   changed_when: false
@@ -138,7 +160,7 @@
 
 - name: Install fd from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - fd_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (fd)
@@ -217,7 +239,7 @@
 
 # --- jq (user-level fallback) ---
 - name: Re-check if jq is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v jq
   register: jq_recheck
   changed_when: false
@@ -225,7 +247,7 @@
 
 - name: Install jq from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - jq_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (jq)
@@ -255,7 +277,7 @@
 
 # --- git-lfs (user-level fallback) ---
 - name: Re-check if git-lfs is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v git-lfs
   register: git_lfs_recheck
   changed_when: false
@@ -265,7 +287,7 @@
 
 - name: Set git-lfs release architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - git_lfs_recheck.rc != 0
   ansible.builtin.set_fact:
     git_lfs_arch: >-
@@ -278,7 +300,7 @@
 
 - name: Install git-lfs from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - git_lfs_recheck.rc != 0
     - git_lfs_arch | default('') != ''
   block:
@@ -338,7 +360,7 @@
 
 # --- just ---
 - name: Check if just is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: just --version
   register: just_check
   changed_when: false
@@ -357,7 +379,7 @@
 
 # --- just (user-level fallback) ---
 - name: Re-check if just is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: just --version
   register: just_recheck
   changed_when: false
@@ -365,7 +387,7 @@
 
 - name: Install just via official installer (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - just_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (just)

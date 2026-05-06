@@ -17,6 +17,15 @@
     name: zsh
     state: present
 
+- name: Install zsh (RedHat/CentOS)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name: zsh
+    state: present
+  ignore_errors: true
+
 # oh-my-zsh core + custom plugins are managed via .chezmoiexternal.toml.tmpl
 # (repo root). chezmoi auto-refreshes them weekly; to force a pull run
 # `chezmoi apply --refresh-externals`. Nothing to do here.

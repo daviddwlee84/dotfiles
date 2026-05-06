@@ -133,6 +133,7 @@ Full customization guide: [ansible_customization.md](ansible_customization.md).
 | `macos` | macOS | homebrew, base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools (alacritty via Brewfile cask) |
 | `ubuntu_desktop` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, nerdfonts, security_tools, rust_cargo_tools, ruby_gem_tools, gui_apps |
 | `ubuntu_server` | Ubuntu | base, zsh, starship, neovim, lazyvim_deps, devtools, docker, security_tools, rust_cargo_tools, ruby_gem_tools |
+| `centos_server` | CentOS 7+ / Rocky / Alma (RedHat family) | Same tag set as `ubuntu_server`. **`noRoot=true` is the expected default**: most corporate CentOS boxes lack sudo, so the user-level GitHub-release / cargo / mise fallback paths are what actually run. See [pitfalls/centos7-noroot.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-noroot.md) for the gate-broadening that lets those fallbacks fire on RedHat. |
 
 **Tag categories:**
 
@@ -141,7 +142,15 @@ Full customization guide: [ansible_customization.md](ansible_customization.md).
 - **macOS only**: homebrew
 - **Optional** (via chezmoi config): coding_agents, bitwarden, python_uv_tools, js_cli_tools, llm_tools, input_method (desktop only), networking_tools, iac_tools
 
-`ubuntu_server` excludes `nerdfonts` (no GUI needed).
+`ubuntu_server` and `centos_server` exclude `nerdfonts` (no GUI needed).
+
+### Why `centos_server` is its own profile (and not auto-detected)
+
+Per [CLAUDE.md](https://github.com/daviddwlee84/dotfiles/blob/main/CLAUDE.md) the rule is *profile is for user-role choices, OS/arch facts go through `.chezmoi.os` / `.chezmoi.arch`*. CentOS-vs-Ubuntu looks like an OS fact at first glance — chezmoi exposes `.chezmoi.osRelease.id` natively, so we *could* split `ubuntu_server` behaviour by sniffing the distro. We deliberately don't:
+
+- Profile names are the existing UX surface — the ansible router script in `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl` already branches on `.profile`, so adding `centos_server` keeps the divergent role behaviour discoverable in one place.
+- Inside ansible roles, `ansible_os_family` (Debian / RedHat) does the package-manager disambiguation independently. The chezmoi profile picks **playbook + tag set**; ansible facts pick **package manager**. The two layers don't fight.
+- The carve-out is narrow: package-manager *family* is load-bearing for which roles can run. Future RedHat-family additions (Fedora, Alma, Rocky) all reuse `centos_server` — no new profile per distro.
 
 ## No-root mode (Linux)
 

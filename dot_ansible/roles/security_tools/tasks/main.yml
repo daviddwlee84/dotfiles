@@ -39,7 +39,7 @@
     state: present
 
 - name: Check if gitleaks is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: gitleaks version
   register: gitleaks_check
   changed_when: false
@@ -47,7 +47,7 @@
 
 - name: Get latest gitleaks version
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gitleaks_check.rc != 0
   ansible.builtin.uri:
     url: https://api.github.com/repos/gitleaks/gitleaks/releases/latest
@@ -126,7 +126,7 @@
 
 # --- gitleaks (user-level fallback) ---
 - name: Re-check if gitleaks is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v gitleaks
   register: gitleaks_recheck
   changed_when: false
@@ -134,7 +134,7 @@
 
 - name: Install gitleaks from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gitleaks_recheck.rc != 0
     - gitleaks_arch_user | default('') | trim != ''
   block:

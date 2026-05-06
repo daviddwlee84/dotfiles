@@ -118,7 +118,7 @@ PROMPTS: tuple[Prompt, ...] = (
     Prompt("profile", "choice", "Basics", "Profile",
            "Which profile this machine should use.",
            default="", prompt_text="Which profile",
-           choices=("macos", "ubuntu_desktop", "ubuntu_server"),
+           choices=("macos", "ubuntu_desktop", "ubuntu_server", "centos_server"),
            hidden=True),
     Prompt("email", "string", "Basics", "Git email",
            "Your email address, used by Git and chezmoi templates.",

@@ -1,0 +1,133 @@
+# `centos_server` profile on a noRoot CentOS 7 box installs nothing
+
+## Symptom
+
+Run `chezmoi apply` on a CentOS Linux 7.9 box where the user has no
+`sudo` (typical corporate/data-center development server):
+
+```
+$ sudo -v
+sudo: PAM account management error: Permission denied
+sudo: a password is required
+```
+
+`chezmoi apply` completes cleanly, ansible reports `0 failed`, configs
+deploy under `~/.config/`, but `command -v rg fd jq nvim starship`
+returns nothing. The dotfiles-deployed `~/.zshrc` references binaries
+that don't exist; opening a new shell prints `command not found` for
+half the prompt.
+
+## Root cause
+
+The Linux ansible roles have two parallel install paths for each tool:
+
+1. **System-level** (`apt:` / `yum:`) — gated by `become: true, tags:
+   [sudo]`. Skipped on `noRoot=true` via `--skip-tags sudo`. Correct.
+2. **User-level fallback** — downloads pre-built binaries from GitHub
+   releases into `~/.local/bin/`, no sudo required.
+
+The user-level fallback is the one that's *supposed* to fire on a
+noRoot box. It was historically gated on
+`when: ansible_facts["os_family"] == "Debian"` — which made sense when
+the only Linux profiles were `ubuntu_*`, but is wrong as soon as a
+RedHat-family box (CentOS, Rocky, Alma) shows up. The user-level path
+has no apt-specific behaviour — it's `curl | tar | install`. There's
+no reason for it to be gated on the package-manager family.
+
+So on CentOS 7 with `noRoot=true`, both paths are gated out:
+
+- system-level: skipped by `--skip-tags sudo`
+- user-level: skipped by `os_family == "Debian"` predicate
+
+The role is a no-op and the user gets a working `~/.zshrc` pointing at
+binaries that were never installed.
+
+## Fix
+
+Broaden the user-level (non-sudo-tagged) `when:` predicates from:
+
+```yaml
+when: ansible_facts["os_family"] == "Debian"
+```
+
+to:
+
+```yaml
+when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+```
+
+Applied across `dot_ansible/roles/{base,starship,security_tools,rust_cargo_tools}/tasks/main.yml`
+when the `centos_server` profile was introduced. The
+`Re-check if X is installed` + `Install X from GitHub releases
+(user-level, no sudo)` block pattern is the canonical shape — every
+file that has it needs the broadening.
+
+**Don't** broaden the sudo-tagged `apt:` blocks the same way — those
+have `become: true, tags: [sudo]` and use `ansible.builtin.apt:` which
+fails on RedHat. Either leave them alone (skipped under `--skip-tags
+sudo` anyway) or add a parallel `RedHat` block with `ansible.builtin.yum:`.
+
+## CentOS 7-specific notes (glibc 2.17)
+
+CentOS 7 ships glibc 2.17 (released 2012). Many modern GitHub-release
+binaries are built on Ubuntu 22.04 or 24.04 (glibc 2.35+) and crash
+with:
+
+```
+./tool: /lib64/libc.so.6: version `GLIBC_2.29' not found (required by ./tool)
+```
+
+The user-level fallbacks in `base/tasks/main.yml` already prefer
+**musl** assets where upstream offers them — `ripgrep`, `fd`, `lnav`
+all ship `*-unknown-linux-musl.tar.gz` variants that are statically
+linked and ignore glibc version. Those are fine on CentOS 7.
+
+Tools that ship glibc-only binaries (some Go releases, some Rust
+releases without musl variants) will fail. Workarounds, in order of
+preference:
+
+1. **Cargo source build** — `cargo install <crate>` works on CentOS 7
+   via the user's mise/cargo toolchain (`rust_cargo_tools` role
+   already sets this up).
+2. **Older release pin** — find a release built before the upstream
+   project moved to a newer Ubuntu CI, pin to it.
+3. **Skip on CentOS 7** — for tools that aren't critical, gate the
+   block on `ansible_distribution_major_version != "7"` and live
+   without it.
+
+If the box gets rebuilt as Rocky/Alma 8 or 9 (glibc 2.28 / 2.34), most
+of these go away — the gate-broadening fix above is still correct on
+those.
+
+## Required preconditions on a noRoot CentOS box
+
+The dotfiles can't install **everything** without sudo. On
+`centos_server` + `noRoot=true`, verify before running `chezmoi apply`:
+
+- `command -v zsh` resolves — `zsh` package install needs sudo. Most
+  corporate CentOS 7 boxes ship zsh; if not, ask the admin to
+  `yum install zsh`.
+- `command -v git` resolves — same story.
+- `chsh -s "$(command -v zsh)"` — depends on the box's chsh policy
+  (usually no sudo needed but `/etc/shells` must list zsh's path).
+
+## Migration note
+
+If/when this CentOS 7 box gets rebuilt as Rocky/Alma 8 or 9 (or any
+modern RedHat-family distro), the gate-broadening change in this fix
+remains correct (`os_family == "RedHat"` still matches). The
+glibc-2.17 caveat goes away. The `yum:` blocks added to `base`,
+`zsh`, `ruby_gem_tools` continue to work — `yum:` is an alias for
+`dnf:` on RHEL 8+ via the ansible compatibility shim.
+
+## Related
+
+- `dot_ansible/roles/base/tasks/main.yml` — canonical
+  `Re-check if X / Install X from GitHub releases (user-level)`
+  pattern.
+- `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`
+  — `centos_server` profile branch + `--skip-tags sudo` on
+  `noRoot=true`.
+- `pitfalls/ansible-missing-sudo-tag.md` — sibling pitfall: the
+  inverse of this one (sudo task without the `[sudo]` tag, fails on
+  noRoot).

@@ -18,6 +18,17 @@
     update_cache: true
     cache_valid_time: 3600
 
+- name: Install Ruby compile dependencies (RedHat/CentOS)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name:
+      - libffi-devel
+      - libyaml-devel
+    state: present
+  ignore_errors: true
+
 # =============================================================================
 # Ensure Ruby is installed via mise
 # =============================================================================
