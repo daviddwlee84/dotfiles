@@ -30,7 +30,7 @@ Each wrapper is guarded on the underlying binary so it's safe on fresh machines:
 | `lessl file.log` | `ccze -A < file.log \| less -RSFX` | Classic pager with ANSI colors. Accepts stdin if no arg (`tail -f app.log \| lessl`). |
 | `logtail file.log` | `tspin --follow file.log` (or `tail -F … \| tspin --print` on older tailspin) | Live follow with highlighting — the `tail -f` replacement. |
 
-Registered in [`docs/zsh/aliases.md`](../zsh/aliases.md) under "Log Viewers".
+Registered in [`docs/shells/aliases.md`](../shells/aliases.md) under "Log Viewers".
 
 ## `tailspin` (`tspin`)
 
@@ -166,4 +166,4 @@ See [`docs/tools/tv.md`](tv.md) for the full list of Television channels.
 - [lnav user manual](https://docs.lnav.org/) — formats, SQL, keybindings
 - [grc on GitHub](https://github.com/garabik/grc) — syntax for `conf.*` files
 - [ccze on GitHub](https://github.com/cornet/ccze) — legacy but handy
-- [Our aliases reference](../zsh/aliases.md#log-viewers) for `catl`/`lessl`/`logtail`
+- [Our aliases reference](../shells/aliases.md#log-viewers) for `catl`/`lessl`/`logtail`

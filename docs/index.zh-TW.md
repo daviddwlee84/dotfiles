@@ -18,7 +18,7 @@
 | 把 shell 捲動歷史 (scrollback) 餵給 Claude / OpenCode / Codex | [**aicapture**](tools/aicapture.md) |
 | 理解 tmux 設定（popup menu、OSC 133、copy-mode） | [tmux](tools/tmux/README.md) |
 | 一眼掃過 tmux 鍵位 (keybindings) | [tmux keybindings](tools/tmux/keybindings.md) |
-| 看完所有自訂的 zsh alias / function | [zsh aliases](zsh/aliases.md) |
+| 看完所有自訂的 zsh alias / function | [zsh aliases](shells/aliases.md) |
 | Sesh 工作階段 (session) 工作流程（shere / sroot / scode / svibe） | [sesh](tools/sesh.md) · [workflow playbook](playbooks/workflow.md) |
 | 設定 agent CLI（claude / opencode / codex / cursor） | [agent overlays](tools/agent-overlays.md) |
 | 透過 SSH 共用剪貼簿 (clipboard over SSH)（OSC 52、`x copy`、Neovim 整合） | [clipboard](tools/clipboard.md) |

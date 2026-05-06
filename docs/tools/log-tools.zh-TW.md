@@ -42,7 +42,7 @@
 | `lessl file.log` | `ccze -A < file.log \| less -RSFX` | 經典 pager 加 ANSI 顏色。沒給參數時接受 stdin（`tail -f app.log \| lessl`）。 |
 | `logtail file.log` | `tspin --follow file.log`（或在較舊 tailspin 上 `tail -F … \| tspin --print`） | 即時跟隨並 highlight — `tail -f` 的取代品。 |
 
-已登記在 [`docs/zsh/aliases.md`](../zsh/aliases.md) 的 "Log Viewers" 區塊。
+已登記在 [`docs/shells/aliases.md`](../shells/aliases.md) 的 "Log Viewers" 區塊。
 
 ## `tailspin`（`tspin`）
 
@@ -202,4 +202,4 @@ tail -f /var/log/syslog | lessl
 - [lnav user manual](https://docs.lnav.org/) — 格式、SQL、keybindings
 - [grc on GitHub](https://github.com/garabik/grc) — `conf.*` 檔案語法
 - [ccze on GitHub](https://github.com/cornet/ccze) — 老但好用
-- [我們的 aliases 參考](../zsh/aliases.md#log-viewers) — `catl`/`lessl`/`logtail`
+- [我們的 aliases 參考](../shells/aliases.md#log-viewers) — `catl`/`lessl`/`logtail`

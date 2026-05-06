@@ -11,7 +11,7 @@
   - macOS — Homebrew (`brew install ffmpeg`)，由 `dot_ansible/roles/media_tools/tasks/main.yml` 在 `installMediaTools=true` 時管理。
   - Linux — apt (`sudo apt install ffmpeg`)，同 role / 同 flag。`noRoot=true` 時自動跳過（apt 區塊掛 `tags: [sudo]`）。
 - **驗證**：`ffmpeg -version | head -1` 與 `ffprobe -version | head -1`。
-- **目前在這個 repo 的狀態**：透過 `installMediaTools=true` opt-in。三個 zsh helper（`compress-video`、`extract-audio`、`to-wav16k`）放在 [`dot_config/zsh/tools/29_media.zsh`](../../dot_config/zsh/tools/29_media.zsh) — 詳 [docs/zsh/aliases.md → Media / AV](../zsh/aliases.md#media--av)。同時也順便補上 [`vhs`](vhs.md) 錄製時必須的 runtime 依賴。
+- **目前在這個 repo 的狀態**：透過 `installMediaTools=true` opt-in。三個 zsh helper（`compress-video`、`extract-audio`、`to-wav16k`）放在 [`dot_config/zsh/tools/29_media.zsh`](../../dot_config/zsh/tools/29_media.zsh) — 詳 [docs/shells/aliases.md → Media / AV](../shells/aliases.md#media--av)。同時也順便補上 [`vhs`](vhs.md) 錄製時必須的 runtime 依賴。
 
 ---
 
@@ -61,7 +61,7 @@ ffmpeg -i input.flac output.m4a
 ffmpeg -i input.m4a -ar 16000 -ac 1 output_16k.wav
 ```
 
-最後兩個 pattern 由 [`extract-audio`](../zsh/aliases.md#media--av) 與 [`to-wav16k`](../zsh/aliases.md#media--av) 包好。
+最後兩個 pattern 由 [`extract-audio`](../shells/aliases.md#media--av) 與 [`to-wav16k`](../shells/aliases.md#media--av) 包好。
 
 ---
 
@@ -156,5 +156,5 @@ Soft 字幕體積小、可編輯；hard 字幕在會剝掉字幕軌道的平台�
 - [ImageMagick](imagemagick.md) — 兄弟工具，處理**靜態圖**（單張影像變換）
 - [ExifTool](exiftool.md) — 把這裡產出的影片去掉 metadata
 - [libvips](libvips.md) — 批次圖片處理量超過 ImageMagick 能負荷時
-- [docs/zsh/aliases.md → Media / AV](../zsh/aliases.md#media--av) — 隨包提供的三個 helper function
+- [docs/shells/aliases.md → Media / AV](../shells/aliases.md#media--av) — 隨包提供的三個 helper function
 - 上游 cheatsheet：<https://trac.ffmpeg.org/wiki>

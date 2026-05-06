@@ -6,7 +6,7 @@
   - macOS — Homebrew (`brew install ffmpeg`), managed by `dot_ansible/roles/media_tools/tasks/main.yml` when `installMediaTools=true`.
   - Linux — apt (`sudo apt install ffmpeg`), same role / same flag. Skipped automatically when `noRoot=true` (the apt block carries `tags: [sudo]`).
 - **Verify**: `ffmpeg -version | head -1` and `ffprobe -version | head -1`.
-- **Status in this repo**: opt-in via `installMediaTools=true`. Three zsh helpers (`compress-video`, `extract-audio`, `to-wav16k`) ship at [`dot_config/zsh/tools/29_media.zsh`](../../dot_config/zsh/tools/29_media.zsh) — see [docs/zsh/aliases.md → Media / AV](../zsh/aliases.md#media--av). Also satisfies the runtime dep that [`vhs`](vhs.md) needs to record.
+- **Status in this repo**: opt-in via `installMediaTools=true`. Three zsh helpers (`compress-video`, `extract-audio`, `to-wav16k`) ship at [`dot_config/zsh/tools/29_media.zsh`](../../dot_config/zsh/tools/29_media.zsh) — see [docs/shells/aliases.md → Media / AV](../shells/aliases.md#media--av). Also satisfies the runtime dep that [`vhs`](vhs.md) needs to record.
 
 ---
 
@@ -56,7 +56,7 @@ ffmpeg -i input.flac output.m4a
 ffmpeg -i input.m4a -ar 16000 -ac 1 output_16k.wav
 ```
 
-The last two patterns are wrapped by [`extract-audio`](../zsh/aliases.md#media--av) and [`to-wav16k`](../zsh/aliases.md#media--av).
+The last two patterns are wrapped by [`extract-audio`](../shells/aliases.md#media--av) and [`to-wav16k`](../shells/aliases.md#media--av).
 
 ---
 
@@ -151,5 +151,5 @@ Soft subs are smaller and editable; hard subs survive platforms that strip subti
 - [ImageMagick](imagemagick.md) — sibling tool for **stills** (single-image transforms)
 - [ExifTool](exiftool.md) — strip metadata from the videos you produce here
 - [libvips](libvips.md) — when batch image work outgrows ImageMagick
-- [docs/zsh/aliases.md → Media / AV](../zsh/aliases.md#media--av) — the three shipped helper functions
+- [docs/shells/aliases.md → Media / AV](../shells/aliases.md#media--av) — the three shipped helper functions
 - Upstream cheatsheet: <https://trac.ffmpeg.org/wiki>

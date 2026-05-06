@@ -275,8 +275,10 @@ nav:
           - chezmoi templating: tools/chezmoi-templating.md
           - JSON Schema: tools/json-schema.md
           - Mirrors (Chinese CDN): tools/mirrors.md
+  - Shells:
+      - Aliases & functions (zsh/bash): shells/aliases.md
+      - Bash bootstrap (oh-my-bash + ble.sh): shells/bash.md
   - Zsh:
-      - Aliases & functions: zsh/aliases.md
       - Completions: zsh/zsh-completions.md
       - SSH login banner (MOTD): zsh/motd.md
   - Neovim:

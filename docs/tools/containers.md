@@ -391,5 +391,5 @@ chezmoi diff ~/.docker/config.json ~/.config/docker/daemon.json
 
 - [docs/tools/container-config-map.md](container-config-map.md) — reference map for every container config file (who reads it, rootful vs rootless, native vs compat).
 - [docs/tools/web-reader.md](web-reader.md) — the `$LOCAL_PROXY_URL` convention and shell proxy helpers shared with this setup.
-- [docs/zsh/aliases.md](../zsh/aliases.md) — `proxy-on` / `proxy-off` / `withproxy` / `try_direct_then_proxy` quick reference.
+- [docs/shells/aliases.md](../shells/aliases.md) — `proxy-on` / `proxy-off` / `withproxy` / `try_direct_then_proxy` quick reference.
 - [docs/linux-package-sources.md](../linux-package-sources.md) — broader Linux package policy (apt vs snap vs brew vs GitHub binaries) if you're deciding whether to install Docker via apt or Linuxbrew.

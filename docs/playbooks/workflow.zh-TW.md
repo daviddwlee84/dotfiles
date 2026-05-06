@@ -133,7 +133,7 @@ Am I wrapping up?
 - [`docs/tools/sesh.md`](../tools/sesh.md) —— sesh 設定、helpers、sesh.toml 萬用模式、tmuxp + tmuxinator layouts
 - [`docs/tools/worktrunk.md`](../tools/worktrunk.md) —— worktree 工作流程、`wt cc` 平行 agent、hooks、`hash_port` 每個 worktree 的開發伺服器
 - [`docs/tools/tmux/`](../tools/tmux/) —— tmux 設定、popup menu、OSC 52 剪貼簿、主題切換
-- [`docs/zsh/aliases.md`](../zsh/aliases.md) —— 所有別名 (alias) 與函式都已收錄
+- [`docs/shells/aliases.md`](../shells/aliases.md) —— 所有別名 (alias) 與函式都已收錄
 - [`dot_config/tmux/executable_smart-picker.sh`](../../dot_config/tmux/executable_smart-picker.sh) —— picker 腳本本身（短小、註解完整）
 - [`dot_config/sesh/sesh.toml`](../../dot_config/sesh/sesh.toml) —— 命名 session 與萬用模式
 

@@ -243,7 +243,7 @@ Adding a new command: append a row to the appropriate section of `dot_config/doc
 | Menu Label | `git some-command --flag` | `gsf` | Short description | destructive |
 ```
 
-Columns are `Menu | Command | Alias | Description | Notes`. Leave the alias column blank (`| |`) if there's no oh-my-zsh alias; prefix with `*` if you're adding a custom function that lives in `dot_config/zsh/10_aliases.zsh`. See `docs/zsh/aliases.md` for the full OMZ alias reference.
+Columns are `Menu | Command | Alias | Description | Notes`. Leave the alias column blank (`| |`) if there's no oh-my-zsh alias; prefix with `*` if you're adding a custom function that lives in `dot_config/zsh/10_aliases.zsh`. See `docs/shells/aliases.md` for the full OMZ alias reference.
 
 Re-run `chezmoi apply` (md is deployed to `~/.config/docs/tools/`); no channel reload needed — it's parsed at runtime.
 

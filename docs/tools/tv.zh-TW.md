@@ -248,7 +248,7 @@ tv update-channels
 | Menu Label | `git some-command --flag` | `gsf` | Short description | destructive |
 ```
 
-欄位為 `Menu | Command | Alias | Description | Notes`。若沒有 oh-my-zsh alias，alias 欄留空（`| |`）；若是新增住在 `dot_config/zsh/10_aliases.zsh` 的自訂 function，前綴用 `*`。完整 OMZ alias 參考見 `docs/zsh/aliases.md`。
+欄位為 `Menu | Command | Alias | Description | Notes`。若沒有 oh-my-zsh alias，alias 欄留空（`| |`）；若是新增住在 `dot_config/zsh/10_aliases.zsh` 的自訂 function，前綴用 `*`。完整 OMZ alias 參考見 `docs/shells/aliases.md`。
 
 重新跑 `chezmoi apply`（md 部署到 `~/.config/docs/tools/`）；不需 reload 頻道 — 它在執行期解析。
 

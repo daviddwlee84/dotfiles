@@ -396,5 +396,5 @@ chezmoi diff ~/.docker/config.json ~/.config/docker/daemon.json
 
 - [docs/tools/container-config-map.md](container-config-map.md) —— 每個容器設定檔的對照地圖（誰在讀它、有根 vs 無根、原生 vs 相容層）。
 - [docs/tools/web-reader.md](web-reader.md) —— 與本設定共用的 `$LOCAL_PROXY_URL` 慣例與 shell 代理輔助函式。
-- [docs/zsh/aliases.md](../zsh/aliases.md) —— `proxy-on` / `proxy-off` / `withproxy` / `try_direct_then_proxy` 速查。
+- [docs/shells/aliases.md](../shells/aliases.md) —— `proxy-on` / `proxy-off` / `withproxy` / `try_direct_then_proxy` 速查。
 - [docs/linux-package-sources.md](../linux-package-sources.md) —— 更廣的 Linux 套件政策（apt vs snap vs brew vs GitHub binaries），如果你在決定要透過 apt 還是 Linuxbrew 安裝 Docker。

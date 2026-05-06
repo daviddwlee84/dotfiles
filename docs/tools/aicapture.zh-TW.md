@@ -261,4 +261,4 @@ type aiblock      # 應顯示 fc-dump 邏輯
 - [`docs/tools/tmux/README.md`](tmux/README.md) — tmux 設定、OSC 133 協定深入解析、copy-mode 鍵綁定（`prefix + M-y` / `M-i` / `{` / `}` / `M-[` / `M-]`）
 - [`docs/this_repo/instant-llm-fix-prior-art.md`](../this_repo/instant-llm-fix-prior-art.md) — 此層與 `thefuck`（規則式、會漂移）、`shell_gpt`/`aichat`/`ai-shell`（NL→指令，並非同一個問題）、`wut`/`tmuxai`（tmux 同類）、`butterfish`/Warp（PTY proxy）、`atuin`（歷史資料庫）以及 OSC 133 終端機（Ghostty/WezTerm/Kitty/iTerm2）的比較
 - [`pitfalls/zsh-osc133-precmd-printf-a-not-stored.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/zsh-osc133-precmd-printf-a-not-stored.md) — 強迫採用 `$PROMPT` 嵌入式 A 標記繞過方案的 ZLE 計時陷阱
-- [`docs/zsh/aliases.md`](../zsh/aliases.md) — 本 repo 完整的自訂別名 (alias) 索引（cpcmd/cpout/cpblock/aifix/aiexplain/aiblock 列於「Tmux Integration」與「AI Capture」）
+- [`docs/shells/aliases.md`](../shells/aliases.md) — 本 repo 完整的自訂別名 (alias) 索引（cpcmd/cpout/cpblock/aifix/aiexplain/aiblock 列於「Tmux Integration」與「AI Capture」）

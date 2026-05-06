@@ -38,7 +38,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `v` | alias | `dot_config/zsh/10_aliases.zsh` | 開啟 Neovim (`nvim`) |
+| `v` | alias | `dot_config/shell/10_aliases.sh` | 開啟 Neovim (`nvim`) |
 
 ---
 
@@ -62,7 +62,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cd` | alias | `dot_config/zsh/tools/20_zoxide.zsh` | 透過 zoxide (`z`) 智慧 `cd`，採用 frecency 配對 |
+| `cd` | alias | `dot_config/shell/20_zoxide.sh` | 透過 zoxide (`z`) 智慧 `cd`，採用 frecency 配對 |
 
 ---
 
@@ -72,8 +72,8 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `gcam-amend` | function | `dot_config/zsh/10_aliases.zsh` | `git commit --amend -m "<msg>"`（取代訊息） |
-| `gundo` | function | `dot_config/zsh/10_aliases.zsh` | 還原最後一次 commit → 回到 staged；印出已還原的 commit 訊息 |
+| `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"`（取代訊息） |
+| `gundo` | function | `dot_config/shell/10_aliases.sh` | 還原最後一次 commit → 回到 staged；印出已還原的 commit 訊息 |
 | `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | 開啟 lazygit TUI |
 
 ### oh-my-zsh git 外掛
@@ -589,7 +589,7 @@
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | 對 zsh 啟動時間做效能剖析 (`ZSH_PROF=1 zsh -i -c exit`) |
-| `ghostty-ssh-terminfo` | function | `dot_config/zsh/10_aliases.zsh` | 透過 SSH 在遠端主機上安裝 `xterm-ghostty` terminfo（無需特權） |
+| `ghostty-ssh-terminfo` | function | `dot_config/shell/10_aliases.sh` | 透過 SSH 在遠端主機上安裝 `xterm-ghostty` terminfo（無需特權） |
 | `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | 帶語言退回的 `tldr`：zh_TW → zh → en *(需要 tldr)* |
 
 ---
@@ -627,7 +627,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `claude-plans-here [-f] [-y]` | function | `dot_config/zsh/10_aliases.zsh` | 建構/更新 `./.claude/settings.json`，使 Claude Code 的 `/plan` 檔案落在 `./.claude/plans/`（在 repo 內）。同時 `mkdir -p .claude/plans/` 並提供匯入「孤兒」(orphan) plans 的選項 —— 也就是先前寫在全域 `~/.claude/plans/` 中、屬於本 cwd 或 git-root 的 plans（透過掃描 `~/.claude/projects/<encoded-path>/*.jsonl` 中的 `Write`/`Edit` `tool_use` 條目來偵測 —— 只算權威性寫入，不含聊天提及）。`-f` 自動同意 settings 合併提示；`-y` 自動同意孤兒複製提示。`~/.claude/plans/` 中的原始檔案會保留 |
+| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | 建構/更新 `./.claude/settings.json`，使 Claude Code 的 `/plan` 檔案落在 `./.claude/plans/`（在 repo 內）。同時 `mkdir -p .claude/plans/` 並提供匯入「孤兒」(orphan) plans 的選項 —— 也就是先前寫在全域 `~/.claude/plans/` 中、屬於本 cwd 或 git-root 的 plans（透過掃描 `~/.claude/projects/<encoded-path>/*.jsonl` 中的 `Write`/`Edit` `tool_use` 條目來偵測 —— 只算權威性寫入，不含聊天提及）。`-f` 自動同意 settings 合併提示；`-y` 自動同意孤兒複製提示。`~/.claude/plans/` 中的原始檔案會保留 |
 
 ---
 
@@ -635,6 +635,6 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `load-nvm` | alias | `dot_config/zsh/10_aliases.zsh` | 將 NVM 延遲載入 (lazy-load) 到當前 session（啟動時通常會略過） |
-| `bw-update-completion` | alias | `dot_config/zsh/10_aliases.zsh` | 重新產生快取的 Bitwarden zsh 補全檔案 |
-| `brew-mirror` | function | `dot_config/zsh/10_aliases.zsh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {aliyun\|ustc\|bfsu\|tuna}`。更新環境變數 + 改寫既有的 clone origin；無參數時印出當前 endpoints。預設基準為 Aliyun（在 `00_exports.zsh.tmpl` 中設定） |
+| `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | 將 NVM 延遲載入 (lazy-load) 到當前 session（啟動時通常會略過） |
+| `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | 重新產生快取的 Bitwarden zsh 補全檔案 |
+| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {aliyun\|ustc\|bfsu\|tuna}`。更新環境變數 + 改寫既有的 clone origin；無參數時印出當前 endpoints。預設基準為 Aliyun（在 `dot_config/shell/00_exports.sh.tmpl` 中設定） |

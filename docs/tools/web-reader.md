@@ -160,7 +160,7 @@ Each reader checks its dependencies at call time and prints a one-line install h
 
 ## Related
 
-- `docs/zsh/aliases.md` — the single-line reference table for all shell shortcuts.
+- `docs/shells/aliases.md` — the single-line reference table for all shell shortcuts.
 - `docs/tools/networking.md` — the broader networking-CLI doc (nmap, doggo, bandwhich, etc.).
 - `dot_config/zsh/tools/50_networking.zsh` — proxy helper implementation.
 - `dot_config/zsh/tools/55_web_reader.zsh` — reader function implementation.

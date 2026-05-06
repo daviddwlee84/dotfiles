@@ -158,7 +158,7 @@ layout for git repos so you never have to type `scode` for the common case.
   `wt cc` parallel agents, hooks, `hash_port` per-worktree dev servers
 - [`docs/tools/tmux/`](../tools/tmux/) — tmux config, popup menu, OSC 52
   clipboard, theme switching
-- [`docs/zsh/aliases.md`](../zsh/aliases.md) — every alias and function
+- [`docs/shells/aliases.md`](../shells/aliases.md) — every alias and function
   catalogued
 - [`dot_config/tmux/executable_smart-picker.sh`](../../dot_config/tmux/executable_smart-picker.sh)
   — the picker script itself (short, well-commented)

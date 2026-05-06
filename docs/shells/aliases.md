@@ -1,8 +1,12 @@
 # Custom Aliases & Shell Functions
 
-Quick reference for custom aliases and shell functions defined in this dotfiles repo.
+Quick reference for custom aliases and shell functions defined in this dotfiles repo. Available in zsh, bash, or both — the source file path tells you which:
 
-> **Maintenance rule** (mirrored in `CLAUDE.md`): whenever you add, modify, or remove a custom alias or shell function, update this table — include the type (`alias` or `function`), source file (relative to repo root), and a one-line description.
+- `dot_config/shell/*.sh` — POSIX layer, sourced by **both** `~/.zshrc` and `~/.bashrc`.
+- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — **zsh-only**.
+- `dot_config/bash/*.bash` — **bash-only**.
+
+> **Maintenance rule** (mirrored in `CLAUDE.md`): whenever you add, modify, or remove a custom alias or shell function in `dot_config/{shell,zsh,bash}/`, update this table — include the type (`alias` or `function`), source file (relative to repo root), and a one-line description. Place new helpers in the right tier per the [CLAUDE.md three-tier rule](../../CLAUDE.md#custom-aliases--shell-functions--docsshellsaliasesmd).
 
 ---
 
@@ -33,7 +37,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `v` | alias | `dot_config/zsh/10_aliases.zsh` | Open Neovim (`nvim`) |
+| `v` | alias | `dot_config/shell/10_aliases.sh` | Open Neovim (`nvim`) |
 
 ---
 
@@ -57,7 +61,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cd` | alias | `dot_config/zsh/tools/20_zoxide.zsh` | Smart `cd` via zoxide (`z`) with frecency-based matching |
+| `cd` | alias | `dot_config/shell/20_zoxide.sh` | Smart `cd` via zoxide (`z`) with frecency-based matching |
 
 ---
 
@@ -67,8 +71,8 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `gcam-amend` | function | `dot_config/zsh/10_aliases.zsh` | `git commit --amend -m "<msg>"` (replace message) |
-| `gundo` | function | `dot_config/zsh/10_aliases.zsh` | Undo last commit → back to staged; prints undone commit message |
+| `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"` (replace message) |
+| `gundo` | function | `dot_config/shell/10_aliases.sh` | Undo last commit → back to staged; prints undone commit message |
 | `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | Open lazygit TUI |
 
 ### oh-my-zsh git plugin
@@ -584,7 +588,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | Profile zsh startup time (`ZSH_PROF=1 zsh -i -c exit`) |
-| `ghostty-ssh-terminfo` | function | `dot_config/zsh/10_aliases.zsh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
+| `ghostty-ssh-terminfo` | function | `dot_config/shell/10_aliases.sh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
 | `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
 
 ---
@@ -622,7 +626,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `claude-plans-here [-f] [-y]` | function | `dot_config/zsh/10_aliases.zsh` | Scaffold/update `./.claude/settings.json` so Claude Code's `/plan` files land in `./.claude/plans/` (in-repo). Also `mkdir -p .claude/plans/` and offers to import "orphan" plans previously written under the global `~/.claude/plans/` that belong to this cwd or git-root (detected by scanning `~/.claude/projects/<encoded-path>/*.jsonl` for `Write`/`Edit` `tool_use` entries — only authoritative writes, not chat mentions). `-f` auto-yes the settings merge prompt; `-y` auto-yes the orphan copy prompt. Originals in `~/.claude/plans/` are kept |
+| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | Scaffold/update `./.claude/settings.json` so Claude Code's `/plan` files land in `./.claude/plans/` (in-repo). Also `mkdir -p .claude/plans/` and offers to import "orphan" plans previously written under the global `~/.claude/plans/` that belong to this cwd or git-root (detected by scanning `~/.claude/projects/<encoded-path>/*.jsonl` for `Write`/`Edit` `tool_use` entries — only authoritative writes, not chat mentions). `-f` auto-yes the settings merge prompt; `-y` auto-yes the orphan copy prompt. Originals in `~/.claude/plans/` are kept |
 
 ---
 
@@ -630,6 +634,6 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `load-nvm` | alias | `dot_config/zsh/10_aliases.zsh` | Lazy-load NVM into current session (normally skipped at startup) |
-| `bw-update-completion` | alias | `dot_config/zsh/10_aliases.zsh` | Regenerate cached Bitwarden zsh completion file |
-| `brew-mirror` | function | `dot_config/zsh/10_aliases.zsh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `00_exports.zsh.tmpl`) |
+| `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | Lazy-load NVM into current session (normally skipped at startup) |
+| `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | Regenerate cached Bitwarden zsh completion file |
+| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `dot_config/shell/00_exports.sh.tmpl`) |

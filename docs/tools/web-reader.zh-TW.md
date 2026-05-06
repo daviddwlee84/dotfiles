@@ -188,7 +188,7 @@ export LOCAL_PROXY_AUTO_ACTIVATE=1
 
 ## 相關
 
-- `docs/zsh/aliases.md` — 所有 shell 捷徑的單行參考表。
+- `docs/shells/aliases.md` — 所有 shell 捷徑的單行參考表。
 - `docs/tools/networking.md` — 更廣泛的網路 (networking) CLI 文件（nmap、doggo、bandwhich 等）。
 - `dot_config/zsh/tools/50_networking.zsh` — proxy helper 實作。
 - `dot_config/zsh/tools/55_web_reader.zsh` — 讀取器函式 (function) 實作。

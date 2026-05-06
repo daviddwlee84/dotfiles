@@ -42,9 +42,17 @@ The `.claude/skills/mkdocs-site-bootstrap/scripts/add-docs-page.sh` helper can c
 
 All four categories are **referenced** from [`docs/for-maintainers.md`](docs/for-maintainers.md) via absolute GitHub URLs — do not add them to `mkdocs.yml` nav or include them via `pymdownx.snippets`. The "reference yes, copy no" rule avoids drift between the site and the live repo root.
 
-### Custom aliases & shell functions → `docs/zsh/aliases.md`
+### Custom aliases & shell functions → `docs/shells/aliases.md`
 
-When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/` file, update [`docs/zsh/aliases.md`](docs/zsh/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), and a one-line description.
+When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/`, `dot_config/bash/`, or `dot_config/shell/` file, update [`docs/shells/aliases.md`](docs/shells/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), shell scope (`zsh`/`bash`/`both`), and a one-line description.
+
+**Place new helpers in the right tier:**
+
+- `dot_config/shell/*.sh` (or `*.sh.tmpl`) — POSIX-portable env / PATH / aliases / functions usable by **both** zsh and bash. Source-time shell detection via `$ZSH_VERSION` / `$BASH_VERSION` is OK; zsh-only constructs (ZLE widgets, `read -q`, `${m:t}`, glob qualifiers, `setopt`, `compdef`) are NOT — keep them out so bash doesn't error on source.
+- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — zsh-only. ZLE widgets (aisuggest, tools_picker, television, sesh-sessions), `compdef`-driven completions, anything calling `bindkey`, `zsh-vi-mode` hooks.
+- `dot_config/bash/*.bash` — bash-only. `bind -x` / `ble-bind`-driven keybindings, oh-my-bash plugin / completion / alias arrays, bash-specific `shopt`s.
+
+When porting a zsh-only helper to bash via ble.sh's `ble-bind`, prefer extracting the shell-agnostic backend (the function that produces the shell command string) into `dot_config/shell/` and keeping each shell's widget binding in its own dir.
 
 ### `gui_apps_linux` ansible role → `docs/playbooks/linux-gui-apps.md`
 
@@ -87,6 +95,7 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 | Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
 | Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
 | zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `dot_zshrc.tmpl` to survive zsh-vi-mode's keybind wipe |
+| bash + ble.sh | `dot_config/bash/04_blesh.bash` + `~/.bashrc.adhoc` | ble.sh provides zsh-style autosuggest / syntax-highlight / vi-mode but NO ZLE-widget ports yet — aisuggest / tools_picker / television / sesh widgets are zsh-only on bash. CLI fallbacks work (`tv <channel>`, `sesh-connect`, `aisuggest "<text>"`). Custom `ble-bind` calls go in `~/.bashrc.adhoc` (sourced AFTER `ble-attach`). atuin's `--disable-up-arrow` is mandatory because ble.sh owns up-arrow for history navigation |
 | Claude Code (TUI) | `dot_claude/modify_keybindings.json` (overlay) + `~/.claude/keybindings.json` (live); see [docs/tools/claude-code-keybindings.md](docs/tools/claude-code-keybindings.md) | `Ctrl+R` (history:search — collides with atuin / zsh-history-substring at the prompt outside Claude), `Ctrl+T` (toggleTodos — Television's `Ctrl+T` is shadowed when Claude has focus), `Ctrl+G` (chat:externalEditor), `Ctrl+S` (chat:stash), `Shift+Tab` (chat:cycleMode — only known mode-switch action, no jump-to-plan) |
 
 Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
@@ -148,6 +157,27 @@ Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_s
 Full decision table, before/after examples, and the `macos_intel` migration snippet: [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
 
 ## Hard repo invariants
+
+### `primaryShell` choice gates `chsh` only — both shells always deploy
+
+The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) **only governs which shell `chsh` switches to as the login shell**. Both `~/.zshrc` and `~/.bashrc` (plus `~/.config/zsh/`, `~/.config/bash/`, `~/.config/shell/`) deploy on every host regardless of choice. This is intentional: users routinely drop into the other shell ad-hoc (`bash` for a quirky script, `zsh` for `.zshrc` debugging on a bash-primary box), and having both work is cheap.
+
+**Hard rules**:
+
+- Do **not** add `{{ if eq .primaryShell "zsh" }}` / `{{ if eq .primaryShell "bash" }}` gates around `dot_zshrc.tmpl`, `dot_bashrc.tmpl`, or any `dot_config/{shell,zsh,bash}/**` file. The other shell needs to keep working.
+- Do **not** gate the zsh / bash ansible roles' **package install** task on `primary_shell`. Both shells' packages install everywhere; only the **chsh** task is gated. Reason: even on bash-primary mac, `zsh` ad-hoc must work — and vice versa.
+- Do **not** rely on `$SHELL` to detect the running shell — it reflects the login shell from `/etc/passwd`, which can disagree with the actual interactive shell after `chsh` until next login. Use `$ZSH_VERSION` / `$BASH_VERSION` instead (source-time detection in shared `dot_config/shell/*.sh.tmpl` files).
+- macOS bash 5.x install (via the `bash` ansible role's `community.general.homebrew: name=bash`) and `/etc/shells` whitelist are gated on `primary_shell == "bash"` — zsh-primary mac users get zero extra brew formula. The same gate covers the `chsh` to brew bash.
+
+**Three-tier file placement** when adding a shell helper (see "Custom aliases & shell functions" rule above for the cross-file update obligation):
+
+| Tier | Dir | When |
+|---|---|---|
+| Shared | `dot_config/shell/` | POSIX subset; both shells source. Use `$ZSH_VERSION` / `$BASH_VERSION` for source-time dispatch when needed. |
+| Zsh-only | `dot_config/zsh/` | ZLE widgets, `compdef`, `bindkey`, `setopt`, `read -q`, `${m:t}`, glob qualifiers. |
+| Bash-only | `dot_config/bash/` | `bind -x` / `ble-bind`, OMB plugin arrays, bash-specific `shopt`s. |
+
+ble.sh + oh-my-bash on bash side: see [docs/shells/bash.md](docs/shells/bash.md) for the load-bearing 12-step init order in `dot_bashrc.tmpl`. Key invariants — `ble.sh --attach=none` MUST source before bash-preexec/starship; `ble-attach` MUST be the last call before secrets/adhoc; OMB's `autosuggestions` / `syntax-highlighting` / `history-substring-search` plugins MUST be excluded (ble.sh provides better natives, double-init causes flicker).
 
 ### Install vs upgrade is split on purpose
 

@@ -98,10 +98,11 @@ This automatically:
 
 ### After install
 
-- `~/.local/bin` is auto-appended to `~/.bashrc` so `chezmoi`, `uv`, and `mise` stay reachable from bash.
-- On sudo-enabled machines, the ansible `zsh` role switches your login shell to zsh automatically. Log out / back in to pick it up, or run `exec zsh` now.
-- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER`.
-- Open a new shell (or `source ~/.bashrc`) after install so PATH changes take effect.
+- `~/.local/bin` and the rest of the shared layer (mise/uv/cargo/bun PATH) are exported via `~/.config/shell/00_exports.sh`, sourced by both the chezmoi-managed `~/.bashrc` and `~/.zshrc`.
+- On sudo-enabled machines, the ansible role for your `primaryShell` choice switches your login shell automatically (`zsh` role for `primaryShell=zsh`, `bash` role for `primaryShell=bash`). Log out / back in to pick it up, or run `exec zsh` / `exec bash` now.
+- `primaryShell=bash` on macOS additionally installs Homebrew bash 5.x and adds it to `/etc/shells` (system bash 3.2 is too old for oh-my-bash plugins + ble.sh). zsh-primary mac users see no extra brew install.
+- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` / `exec bash` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER` (or `bash`).
+- Open a new shell after install so PATH changes take effect. Both `~/.bashrc` and `~/.zshrc` are deployed regardless of `primaryShell` choice, so the other shell still works ad-hoc.
 
 ### Optional Components
 
@@ -122,6 +123,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
 | `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
 | `motdStyle` | `figlet` | SSH login banner style: `figlet` (~6 lines, default), `fastfetch-slim` (figlet + fastfetch w/o logo, ~10 lines), `fastfetch-full` (full distro logo + everything, ~22 lines). Runtime override: `MOTD_STYLE=...` in `~/.zshrc.adhoc`. See [docs/zsh/motd.md](docs/zsh/motd.md). |
+| `primaryShell` | `zsh` | Primary interactive shell: `zsh` (default, full-featured) or `bash` (oh-my-bash + ble.sh, close-to-zsh UX). Both `~/.zshrc` and `~/.bashrc` deploy on every host; this only governs which shell `chsh` switches to as the login shell. See [docs/shells/bash.md](docs/shells/bash.md) for the bash side's known gaps and tradeoffs. |
 
 To change options later: `chezmoi init --force`
 
