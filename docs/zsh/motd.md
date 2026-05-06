@@ -90,29 +90,53 @@ The MOTD uses only ANSI escapes (cyan + dim) so it stays deterministic over flak
 
 ## Switching styles
 
-### At install time
+Three paths, in increasing order of "how persistent / how heavy":
 
-When you run `chezmoi init` (or `chezmoi init --force` on an existing host), one of the prompts is:
+### 1. Per-session (no persistence)
 
+Just prefix the SSH command:
+
+```sh
+MOTD_STYLE=fastfetch-full ssh host       # one shot
+MOTD_DISABLE=1 ssh host                  # silent for this connection
 ```
-SSH login banner style (figlet|fastfetch-slim|fastfetch-full)?
-```
 
-Answer once and the choice is baked into `~/.config/chezmoi/chezmoi.toml`.
+Nothing on disk changes. Useful for "let me see the full info just this once".
 
-The choice ripples through the chezmoi template engine into `~/.zlogin` at apply time — `{{ .motdStyle }}` resolves to your answer.
+### 2. Persistent runtime override (no `chezmoi apply` needed)
 
-### At runtime (no re-init)
-
-Add to `~/.zshrc.adhoc` (auto-created by [`dot_zshrc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_zshrc.tmpl), not chezmoi-managed):
+Add to `~/.zshrc.adhoc` (auto-created by [`dot_zshrc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_zshrc.tmpl), **not chezmoi-managed**):
 
 ```sh
 export MOTD_STYLE=fastfetch-slim   # one of: figlet | fastfetch-slim | fastfetch-full
 ```
 
-`MOTD_STYLE` overrides `{{ .motdStyle }}` for that machine without touching chezmoi state. Useful when fleet defaults are wrong for one box, or when you want to A/B test styles for a few sessions.
+`MOTD_STYLE` env var beats `{{ .motdStyle }}` baked into `~/.zlogin`. No re-render, no re-init — survives reboots and SSH reconnects. The intended path for "this one box wants a different style than the fleet default".
 
-You can even pin it per session: `MOTD_STYLE=fastfetch-full ssh laptop`.
+### 3. Edit the chezmoi source (fleet-wide / canonical default)
+
+This is the path that changes the actual baked value in `~/.zlogin`. Two equivalent ways to update the source:
+
+```sh
+chezmoi init --force                            # re-run all prompts (heavier; you'll re-answer everything)
+# OR
+$EDITOR ~/.config/chezmoi/chezmoi.toml          # edit just the motdStyle line directly
+```
+
+> **⚠️ Gotcha**: editing `~/.config/chezmoi/chezmoi.toml` alone **does nothing**. The file is just the source data — `~/.zlogin` is a **generated artifact** that's only refreshed during `chezmoi apply`. So you must follow up with:
+>
+> ```sh
+> chezmoi apply ~/.zlogin
+> ```
+>
+> Verify it took:
+>
+> ```sh
+> grep '_motd_style=' ~/.zlogin
+> # Expected: _motd_style="${MOTD_STYLE:-fastfetch-slim}"
+> ```
+
+The chezmoi mental model: `chezmoi.toml` (source) → `dot_zlogin.tmpl` (template) → `~/.zlogin` (target, regenerated only by apply). Path 2 above sidesteps this entirely by reading the env var at runtime, which is why it doesn't need an apply.
 
 ## Opt out completely
 

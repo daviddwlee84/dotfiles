@@ -1,216 +1,93 @@
-# Plan: ASCII Banner Tools + SSH-Aware MOTD
+# Plan: Fix motdStyle source/target confusion + docs gotcha
 
 ## Context
 
-User wants to install the figlet family of ASCII-banner CLI tools (`figlet`, `toilet`, `lolcat`) and configure a `~/.zlogin` MOTD that prints a big hostname banner — primarily so SSH'ing across the fleet of machines (managed via `fleet-apply`) makes "which box am I on?" obvious.
+User manually edited `~/.config/chezmoi/chezmoi.toml` from `motdStyle = "fastfetch-full"` to `"fastfetch-slim"`, then SSH'd to localhost — but the banner still shows `fastfetch-full` output. They expected the toml change alone to take effect.
 
-The discussion already established three things:
-- Tools are tiny (<1MB total), universally packaged on apt + brew, no GitHub-release fallback needed.
-- MOTD's real benefit is **SSH-only fleet identification**; local terminals don't need it.
-- `clean.py` ansible callback and chezmoi `run_*` scripts are explicitly **out of scope** — they already have well-tuned output.
+**Root cause** (diagnosed via Bash):
+- `~/.config/chezmoi/chezmoi.toml` → `motdStyle = "fastfetch-slim"` ✅
+- `~/.zlogin` → `_motd_style="${MOTD_STYLE:-fastfetch-full}"` ← stale, rendered at last `chezmoi apply` when the value was `fastfetch-full`
+- No `MOTD_STYLE` env var, no `~/.zshrc.adhoc` override
 
-The user asked whether a chezmoi init prompt is needed. **Decision: not needed** (justified below).
+This is the **classic chezmoi source-vs-target gotcha**: `chezmoi.toml` is only the data source consulted during template rendering. `~/.zlogin` is a generated artifact frozen at last `chezmoi apply`. Editing the source without re-applying is a no-op for the target.
+
+Two improvements:
+1. **Immediate fix** (one command for the user, no code change): `chezmoi apply ~/.zlogin`
+2. **Docs fix** (prevents future-you and other fleet operators from re-discovering this): add a clear "How to switch styles" section to `docs/zsh/motd.md` that distinguishes the three update paths and explicitly calls out the apply requirement.
 
 ## Scope
 
 **In:**
-1. Install `figlet`, `toilet`, `lolcat` via `devtools` ansible role (macOS Homebrew + Linux apt).
-2. Create `dot_zlogin.tmpl` — SSH+TTY-gated banner with chezmoi-baked profile metadata.
-3. Light README mention; optional `docs/zsh/motd.md` page.
+- A small targeted edit to `docs/zsh/motd.md` clarifying the three update paths (chezmoi prompt re-init, chezmoi.toml + apply, runtime env override) with explicit emphasis on `chezmoi apply` being mandatory after toml edits.
+- Show the user the diagnostic that proves the root cause and the one-line fix.
 
 **Out:**
-- `cowsay`, `boxes`, `fortune`, `fastfetch`, `neofetch` — keep scope tight.
-- chezmoi init prompt — runtime gating already covers all needed cases.
-- `clean.py`, run-scripts, Brewfile.
-- bash equivalent — repo is zsh-first.
+- Auto-apply hook on chezmoi.toml changes — over-engineered, breaks the explicit-apply mental model.
+- Onchange script that warns when `~/.zlogin` is stale — false-positive heavy, not worth the complexity.
+- Any change to `dot_zlogin.tmpl` itself — already correct.
+- Re-running `chezmoi init --force` — works but heavier than needed; `chezmoi apply` is sufficient since the chezmoi.toml is already updated.
 
-## Files to modify / create
+## Files to modify
 
 | Path | Action |
 |---|---|
-| `dot_ansible/roles/devtools/tasks/main.yml` | modify — append 3 names to macOS list (line 55), add new apt task block at end of file, update tools comment on line 3 |
-| `dot_zlogin.tmpl` | **create** new file at repo root |
-| `README.md` | small touch — add 3 names + 1-paragraph "SSH MOTD" note |
-| `docs/zsh/motd.md` + `mkdocs.yml` nav | optional but recommended — 1-page doc explaining trigger conditions and opt-out |
+| `docs/zsh/motd.md` | Replace the existing "Switching styles" section with a clearer 3-path layout that emphasizes `chezmoi apply` is required after toml edits |
 
-NOT touched: `.chezmoi.toml.tmpl`, `Dockerfile`, `scripts/init/dotfiles_init.py`, Brewfile, `clean.py`, any run-script.
+## Implementation sketch
 
-## Implementation
+The existing `docs/zsh/motd.md` already has a "Switching styles" section with two subsections (`At install time`, `At runtime`). Add a third subsection (or reorganize into three paths), placed in increasing order of "how heavy is this":
 
-### 1. `dot_ansible/roles/devtools/tasks/main.yml`
+1. **Per-session (no persistence)**: `MOTD_STYLE=fastfetch-slim ssh host` — env var on the SSH command line.
+2. **Persistent runtime override**: add `export MOTD_STYLE=fastfetch-slim` to `~/.zshrc.adhoc`. No chezmoi apply needed; survives reboots; per-machine.
+3. **Edit chezmoi source** (the path that just bit the user):
+   - Either edit `~/.config/chezmoi/chezmoi.toml` directly (`motdStyle = "..."`) **OR** re-run `chezmoi init --force`.
+   - **Then** run `chezmoi apply ~/.zlogin` to re-render the file.
+   - **Without `chezmoi apply` the change has no effect** — `~/.zlogin` is regenerated, not interpreted live. Add a callout box or bold warning here.
 
-**1a. Append to macOS Homebrew list** — between line 55 (`- witr`) and line 56 (`state: present`):
+The current docs already mention these but doesn't sequence them or warn about the apply requirement. The fix is a clarifying rewrite, not net-new content.
 
-```yaml
-      - witr
-      - figlet
-      - toilet
-      - lolcat
-    state: present
+## User-facing fix (one command)
+
+```bash
+chezmoi apply ~/.zlogin
+ssh localhost   # now shows fastfetch-slim
 ```
 
-**1b. Append new task block at the end of the file** (mirrors the `bats` apt pattern at lines 440-446 — simplest case, no user-level fallback needed since tools are not on critical path; `noRoot` hosts skip via `tags: [sudo]`):
+Verify the rendered file:
 
-```yaml
-# =============================================================================
-# Banner / MOTD CLI tools (figlet, toilet, lolcat)
-# =============================================================================
-# All three live in Ubuntu/Debian universe; no GitHub-release fallback needed.
-# Used by the SSH-gated ~/.zlogin banner (see dot_zlogin.tmpl).
-- name: Install banner CLI tools (Debian/Ubuntu)
-  when: ansible_facts["os_family"] == "Debian"
-  become: true
-  tags: [sudo]
-  ansible.builtin.apt:
-    name:
-      - figlet
-      - toilet
-      - lolcat
-    state: present
+```bash
+grep '_motd_style=' ~/.zlogin
+# Expected: _motd_style="${MOTD_STYLE:-fastfetch-slim}"
 ```
-
-**1c. Update tool list comment** on line 3 — append `, figlet, toilet, lolcat` to the end of the existing comma-separated list.
-
-### 2. `dot_zlogin.tmpl` (new file, repo root)
-
-```sh
-# ~/.zlogin - login-shell hooks (managed by chezmoi)
-# Prints an SSH-only MOTD banner. Local terminals get nothing.
-
-# Gate 1: only on SSH login
-[ -n "$SSH_CONNECTION" ] || return 0
-
-# Gate 2: only if stdout is a TTY (filters `ssh host 'cmd'` and scp/rsync)
-[ -t 1 ] || return 0
-
-# Gate 3: don't repaint inside tmux (only the original SSH login shell prints)
-[ -z "$TMUX" ] || return 0
-
-# Gate 4: respect runtime opt-out from ~/.zshrc.adhoc
-[ "${MOTD_DISABLE:-0}" = "1" ] && return 0
-
-_motd_host="$(hostname -s 2>/dev/null || hostname)"
-_motd_cols="${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}"
-
-# Cyan banner. No lolcat dep at runtime — lolcat stays a user utility.
-printf '\033[36m'
-if command -v figlet >/dev/null 2>&1; then
-    figlet -w "$_motd_cols" -f small -- "$_motd_host" 2>/dev/null \
-        || figlet -w "$_motd_cols" -- "$_motd_host" 2>/dev/null \
-        || printf '== %s ==\n' "$_motd_host"
-else
-    # Fallback for first-boot before ansible has installed figlet
-    printf '== %s ==\n' "$_motd_host"
-fi
-printf '\033[0m'
-
-# Metadata line — profile baked at chezmoi-apply time (zero runtime cost)
-_motd_profile='{{ .profile }}'
-_motd_os="$(uname -sr)"
-_motd_up="$(uptime 2>/dev/null | sed -E 's/.*up *([^,]+),.*/\1/' | xargs)"
-_motd_ip="$(echo "$SSH_CONNECTION" | awk '{print $3}')"  # server-side IP
-
-printf '\033[2m'
-printf 'profile=%s  os=%s  up=%s  via=%s\n' \
-    "$_motd_profile" "$_motd_os" "${_motd_up:-?}" "${_motd_ip:-?}"
-printf '\033[0m\n'
-
-unset _motd_host _motd_cols _motd_profile _motd_os _motd_up _motd_ip
-```
-
-**Why each gate:**
-- `SSH_CONNECTION` — the core trigger. Empty on console/local terminals.
-- `[ -t 1 ]` — non-interactive SSH (e.g., `ssh host 'echo'`, scp, rsync, fleet-apply itself) returns false → silent. Also note: zsh `-c` non-interactive doesn't run `.zlogin` anyway, so this is belt-and-suspenders.
-- `[ -z "$TMUX" ]` — handles the rare config where tmux spawns login shells; banner stays a once-per-SSH-session event.
-- `MOTD_DISABLE=1` — taste-based opt-out via `~/.zshrc.adhoc` (auto-created by `dot_zshrc.tmpl` line 104-122; perfect home for personal toggles).
-
-### 3. README.md — light touch
-
-Append `figlet`, `toilet`, `lolcat` to the devtools tool list. Add one paragraph (location: near existing zsh/shell discussion):
-
-> **SSH login banner**: a `~/.zlogin` hook prints `figlet $(hostname -s)` plus profile/OS/uptime/IP when you SSH into a host. Local terminals are silent. Set `MOTD_DISABLE=1` in `~/.zshrc.adhoc` to suppress.
-
-### 4. `docs/zsh/motd.md` (recommended) + `mkdocs.yml` nav entry under "Zsh"
-
-1-page doc covering: what triggers it, the 4 gates, opt-out, customization (`hostname -s` vs `-f`, picking a different figlet font), behavior before figlet is installed. Add nav entry alphabetically under existing `Zsh` section. Run `uv run mkdocs build --strict` to verify.
-
-## Decision: no chezmoi init prompt
-
-**Reasoning:**
-
-1. **Tool size is trivial** — figlet+toilet+lolcat ≈ <1MB. The repo's `.chezmoi.toml.tmpl` already has 21 prompts; adding one for sub-MB tooling is gold-plating.
-2. **MOTD self-gates at runtime** — only fires on SSH+TTY+non-tmux. Users who never SSH never see it; nothing to opt out of at install time.
-3. **Runtime opt-out exists** — `MOTD_DISABLE=1` in `~/.zshrc.adhoc` covers "I SSH but hate banners" without polluting init UX.
-4. **Consistency** — `bat`, `eza`, `glow`, `gum` etc. all install unconditionally via `devtools`. Banner tools belong in the same default-on bucket.
-5. **No new profile values** — stays within `macos` / `ubuntu_desktop` / `ubuntu_server`.
-
-If the user later wants the prompt, the 3-file mechanical change is clear: add `installBannerTools` (key) / `CHEZMOI_INSTALL_BANNER_TOOLS` (ARG) / `Prompt(...)` entry, and wrap the new ansible task in `when: installBannerTools | default(true)`. Easy to bolt on later.
 
 ## Verification
 
 ```bash
-# Inspect the chezmoi diff before applying
-chezmoi diff ~/.zlogin
+# Before: stale ~/.zlogin
+grep '_motd_style=' ~/.zlogin   # shows fastfetch-full
 
-# Apply the new dotfile
+# Run apply
 chezmoi apply ~/.zlogin
 
-# Run the ansible devtools role to install the tools
-cd ~/.local/share/chezmoi/dot_ansible
-ansible-playbook --tags devtools site.yml --check --diff   # dry run
-ansible-playbook --tags devtools site.yml                  # actual
+# After
+grep '_motd_style=' ~/.zlogin   # now shows fastfetch-slim
 
-# Manual test: local terminal → no banner
-zsh -l -c 'true'   # silent
-
-# SSH self-test → banner prints
-ssh localhost      # exit immediately
-
-# Non-interactive SSH → silent
-ssh localhost 'echo ok'
-
-# Inside tmux on a remote → silent on new panes
+# End-to-end: SSH and confirm slim output (figlet hostname + 7-line fastfetch summary, no Apple logo)
 ssh localhost
-# (banner prints once)
-tmux new -s test
-# (no banner in tmux pane)
 
-# Opt-out test
-MOTD_DISABLE=1 ssh localhost   # banner suppressed
-
-# If docs page added — mkdocs strict build
-cd ~/.local/share/chezmoi && uv run mkdocs build --strict
+# Sanity: docs strict build still produces no NEW warnings
+uv run mkdocs build --strict 2>&1 | grep -c "^WARNING"
+# Expected: same count as before this change (11 pre-existing, unrelated)
 ```
-
-## Edge cases (all handled by the design)
-
-| Edge case | Handling |
-|---|---|
-| First boot, figlet not yet installed | `command -v figlet` check → `printf '== %s =='` plain fallback |
-| Long hostname overflowing terminal | `figlet -w "$_motd_cols"` honors current width |
-| Non-interactive SSH (`ssh h 'cmd'`, scp, rsync, fleet-apply) | `[ -t 1 ]` → return 0, also `.zlogin` not sourced for `zsh -c` |
-| tmux pane re-spawn | `[ -z "$TMUX" ]` → return 0 |
-| Console/local TTY | `$SSH_CONNECTION` empty → return 0 |
-| `noRoot` Linux host | `tags: [sudo]` task skipped, fallback `==hostname==` triggers |
-| User wants no banner ever | `export MOTD_DISABLE=1` in `~/.zshrc.adhoc` |
-| `hostname -s` unsupported | Fallback to plain `hostname` |
-| Dumb terminal (no ANSI) | `[ -t 1 ]` filters most; ANSI escapes harmless on rest |
-
-## Non-goals (explicit)
-
-- NOT modifying `dot_ansible/callback_plugins/clean.py`.
-- NOT adding banners to chezmoi `run_*` scripts.
-- NOT installing `cowsay`/`boxes`/`fortune`/`fastfetch`/`neofetch`.
-- NOT using `lolcat` inside the MOTD (kept as a user-facing utility only).
-- NOT adding a chezmoi init prompt.
-- NOT adding a bash `~/.bash_profile` equivalent.
-- NOT printing the banner on local (non-SSH) shells.
 
 ## Critical files
 
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml` (modify lines 3, 55-56, append at end)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_zlogin.tmpl` (NEW)
-- `/Users/daviddwlee84/.local/share/chezmoi/README.md` (small mention)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_zshrc.tmpl` (reference only — line 104-122 confirms `.zshrc.adhoc` is auto-created, perfect home for `MOTD_DISABLE=1`)
-- `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl` (reference only — `.profile` consumed by template)
-- Optional: `/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md` + `mkdocs.yml` nav
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md` — the only file edited
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_zlogin.tmpl` — reference only, already correct (defensive `index . "motdStyle" | default "figlet"` fallback works here)
+- `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl` — reference only, prompt declared correctly
+
+## Non-goals
+
+- NOT modifying `dot_zlogin.tmpl` (no bug in template).
+- NOT adding any auto-apply hook or onchange watcher.
+- NOT touching `.chezmoi.toml.tmpl` / `Dockerfile` / `dotfiles_init.py` / ansible role.

@@ -11092,3 +11092,735 @@ M  dot_zlogin.tmpl
 M  scripts/init/dotfiles_init.py
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:41Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Quiet sequential redact-stage-commit to minimize transcript growth window
+
+```bash
+just redact-secrets >/dev/null 2>&1 && git add .specstory/history/ .chezmoi.toml.tmpl Dockerfile README.md docs/zsh/motd.md dot_ansible/roles/devtools/tasks/main.yml dot_zlogin.tmpl scripts/init/dotfiles_init.py && git commit --quiet -m "$(cat <<'EOF'
+tools: add fastfetch + motdStyle prompt for 3-tier SSH banner
+
+Add motdStyle chezmoi init prompt with three choices: figlet (default,
+~6 lines/~5ms), fastfetch-slim (figlet hostname + fastfetch w/o logo,
+~10 lines/~80ms), fastfetch-full (full distro logo + everything,
+~22 lines/~150ms). Runtime override via MOTD_STYLE env var in
+~/.zshrc.adhoc — switches without re-running chezmoi init --force.
+
+Install fastfetch via devtools ansible role: apt for Ubuntu 24.04+ /
+Debian 13+, GitHub .deb fallback (linux-amd64.deb / linux-aarch64.deb)
+for older Ubuntu, brew for macOS. fastfetch replaces the now-deprecated
+neofetch (upstream archived 2024).
+
+dot_zlogin.tmpl uses defensive index/default so existing configs
+without the new prompt still apply cleanly without a forced re-init.
+fastfetch-slim/full paths fall back to figlet style if fastfetch is
+missing (e.g. first-boot SSH before ansible runs).
+
+Three-file parity verified via doctor.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" >/dev/null 2>&1 ; git log --oneline -1
+```
+
+```text
+c9ab018 tools: add fastfetch + motdStyle prompt for 3-tier SSH banner
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:50Z)**_
+
+Commit `c9ab018` landed.
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify clean state and show commit summary
+
+`git status --short && echo "---" && git log --oneline -3 && echo "---commit stats---" && git show --stat HEAD | tail -15`
+
+```text
+ M .specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md
+---
+c9ab018 tools: add fastfetch + motdStyle prompt for 3-tier SSH banner
+3d38633 tools: add figlet/toilet/lolcat + SSH-gated ~/.zlogin MOTD
+f2ed768 tools: add witr (Why Is This Running?) to devtools role
+---commit stats---
+    missing (e.g. first-boot SSH before ansible runs).
+    
+    Three-file parity verified via doctor.
+    
+    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+ .chezmoi.toml.tmpl                                 |    6 +
+ ...2026-05-06_03-30-59Z-figlet-https-www-figlet.md | 2133 +++++++++++++++++++-
+ Dockerfile                                         |    4 +-
+ README.md                                          |    5 +-
+ docs/zsh/motd.md                                   |  169 +-
+ dot_ansible/roles/devtools/tasks/main.yml          |   91 +-
+ dot_zlogin.tmpl                                    |   76 +-
+ scripts/init/dotfiles_init.py                      |    6 +
+ 8 files changed, 2426 insertions(+), 64 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:04:56Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:05:16Z)**_
+
+## ✅ Done — commit `c9ab018`
+
+### 改了什麼
+
+| 檔案 | 動作 |
+|------|------|
+| `.chezmoi.toml.tmpl` | +`motdStyle` choice prompt(figlet/fastfetch-slim/fastfetch-full,預設 figlet) |
+| `Dockerfile` | +`ARG CHEZMOI_MOTD_STYLE=figlet` + `--promptChoice` flag |
+| `scripts/init/dotfiles_init.py` | +`Prompt("motdStyle", ...)` 進 PROMPTS tuple,`doctor` ✓ |
+| `dot_ansible/roles/devtools/tasks/main.yml` | +`fastfetch`(macOS Homebrew + Linux apt + Ubuntu 22.04 GitHub `.deb` fallback) |
+| `dot_zlogin.tmpl` | 重寫成 case 分支,3 個 style,defensive `index . "motdStyle" \| default "figlet"`(舊 chezmoi.toml 沒這個 key 也能 apply) |
+| `docs/zsh/motd.md` | 大改:每個 style 一段示範 + runtime override + 三層 fallback 行為 |
+| `README.md` | tools 列表加 fastfetch、Optional Components 表格加 motdStyle row |
+
+### 驗證
+
+- ✅ `doctor`:`motdStyle ✓ ✓ ✓` 三檔一致(其他兩個 ✗ 是 pre-existing drift,不關我們的事)
+- ✅ ansible syntax-check macos.yml + linux.yml 雙過
+- ✅ 本機實測 3 個 style:`figlet`(6 行)/`fastfetch-slim`(13 行)/`fastfetch-full`(完整 Apple logo 22+ 行)
+- ✅ 本機實測 fastfetch 沒裝時 fastfetch-slim/full 自動 fallback 回 figlet style,不報錯
+- ⚠️ mkdocs strict 11 個 warning 全部是 pre-existing `mkdocs_llmstxt` 警告(跟我們的 `zsh/motd.md` 無關)
+
+### 下次 SSH 進新機器要做的事
+
+```bash
+chezmoi init --force            # 會多問一個 motdStyle prompt(原有答案保留)
+chezmoi apply                   # 套用新 .zlogin
+cd dot_ansible && ansible-playbook playbooks/macos.yml --tags devtools  # 裝 fastfetch
+ssh localhost                   # 看效果
+```
+
+或臨時試:
+```bash
+MOTD_STYLE=fastfetch-full ssh localhost
+MOTD_STYLE=fastfetch-slim ssh localhost
+```
+
+不喜歡這次就回去:
+```bash
+echo 'export MOTD_STYLE=figlet' >> ~/.zshrc.adhoc
+```
+
+或全關:
+```bash
+echo 'export MOTD_DISABLE=1' >> ~/.zshrc.adhoc
+```
+
+---
+
+_**User (2026-05-06 08:10:24Z)**_
+
+[Image #1] 爲何我手動去改 ~/.config/chezmoi/chezmoi.toml 設成slim 卻還是展示full內容？
+
+_**User (2026-05-06 08:10:24Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/ef540bbd-1813-494d-81b8-faa7a74e20a0/1.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:07Z)**_
+
+關鍵概念:`~/.config/chezmoi/chezmoi.toml` 是**來源資料**,`~/.zlogin` 是**產生出來的檔案**。改 toml 需要 `chezmoi apply` 才會重新渲染 `~/.zlogin`。
+
+讓我確認一下你目前的狀況:
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Diagnose chezmoi.toml vs ~/.zlogin vs env state
+
+`echo "=== 目前 chezmoi.toml 設定 ===" && grep -E "^motdStyle" ~/.config/chezmoi/chezmoi.toml; echo; echo "=== 目前 ~/.zlogin 中 _motd_style 的值 ===" && grep "_motd_style=" ~/.zlogin; echo; echo "=== env 是否有 MOTD_STYLE ===" && env | grep MOTD; [ -z "$(env | grep MOTD)" ] && echo "(無)"; echo; echo "=== ~/.zshrc.adhoc 是否有 MOTD_STYLE ===" && grep MOTD_STYLE ~/.zshrc.adhoc 2>/dev/null; [ -z "$(grep MOTD_STYLE ~/.zshrc.adhoc 2>/dev/null)" ] && echo "(無)"`
+
+```text
+=== 目前 chezmoi.toml 設定 ===
+motdStyle = "fastfetch-slim"
+
+=== 目前 ~/.zlogin 中 _motd_style 的值 ===
+_motd_style="${MOTD_STYLE:-fastfetch-full}"
+
+=== env 是否有 MOTD_STYLE ===
+(無)
+
+=== ~/.zshrc.adhoc 是否有 MOTD_STYLE ===
+(無)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:34Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:39Z)**_
+
+進入 plan 模式 — 不過這次是個簡單的「user education + 小文件改進」,不需要 Phase 1 多 agent。診斷已完成,我直接寫 plan 並覆寫舊的 plan 檔。
+
+**根本原因確認** — 從上面 diagnostic 結果:
+
+- `~/.config/chezmoi/chezmoi.toml` 你剛改成 `fastfetch-slim` ✅
+- `~/.zlogin` 仍然渲染為 `_motd_style="${MOTD_STYLE:-fastfetch-full}"` ← 上次 apply 時 chezmoi.toml 的值是 `fastfetch-full`
+- 無 env 覆寫、無 `~/.zshrc.adhoc` 設定
+
+**chezmoi 模型核心觀念**:`chezmoi.toml` 只是**來源資料**,template 渲染只在 `chezmoi apply` 時發生。改 toml ≠ 改檔案。
+
+讀一下舊 plan 看是否相關,然後覆寫。
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:41Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.claude/plans/roles-lexical-teacup.md`
+
+```text
+1	# Plan: ASCII Banner Tools + SSH-Aware MOTD
+2	
+3	## Context
+4	
+5	User wants to install the figlet family of ASCII-banner CLI tools (`figlet`, `toilet`, `lolcat`) and configure a `~/.zlogin` MOTD that prints a big hostname banner — primarily so SSH'ing across the fleet of machines (managed via `fleet-apply`) makes "which box am I on?" obvious.
+6	
+7	The discussion already established three things:
+8	- Tools are tiny (<1MB total), universally packaged on apt + brew, no GitHub-release fallback needed.
+9	- MOTD's real benefit is **SSH-only fleet identification**; local terminals don't need it.
+10	- `clean.py` ansible callback and chezmoi `run_*` scripts are explicitly **out of scope** — they already have well-tuned output.
+11	
+12	The user asked whether a chezmoi init prompt is needed. **Decision: not needed** (justified below).
+13	
+14	## Scope
+15	
+16	**In:**
+17	1. Install `figlet`, `toilet`, `lolcat` via `devtools` ansible role (macOS Homebrew + Linux apt).
+18	2. Create `dot_zlogin.tmpl` — SSH+TTY-gated banner with chezmoi-baked profile metadata.
+19	3. Light README mention; optional `docs/zsh/motd.md` page.
+20	
+21	**Out:**
+22	- `cowsay`, `boxes`, `fortune`, `fastfetch`, `neofetch` — keep scope tight.
+23	- chezmoi init prompt — runtime gating already covers all needed cases.
+24	- `clean.py`, run-scripts, Brewfile.
+25	- bash equivalent — repo is zsh-first.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:46Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:11:46Z)**_
+
+舊 plan 已是完成的歷史任務 — 覆寫成這次的 troubleshooting plan。
+
+_**Agent (claude-opus-4-7 2026-05-06 08:12:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Plan: Fix motdStyle source/target confusion + docs gotcha
+
+## Context
+
+User manually edited `~/.config/chezmoi/chezmoi.toml` from `motdStyle = "fastfetch-full"` to `"fastfetch-slim"`, then SSH'd to localhost — but the banner still shows `fastfetch-full` output. They expected the toml change alone to take effect.
+
+**Root cause** (diagnosed via Bash):
+- `~/.config/chezmoi/chezmoi.toml` → `motdStyle = "fastfetch-slim"` ✅
+- `~/.zlogin` → `_motd_style="${MOTD_STYLE:-fastfetch-full}"` ← stale, rendered at last `chezmoi apply` when the value was `fastfetch-full`
+- No `MOTD_STYLE` env var, no `~/.zshrc.adhoc` override
+
+This is the **classic chezmoi source-vs-target gotcha**: `chezmoi.toml` is only the data source consulted during template rendering. `~/.zlogin` is a generated artifact frozen at last `chezmoi apply`. Editing the source without re-applying is a no-op for the target.
+
+Two improvements:
+1. **Immediate fix** (one command for the user, no code change): `chezmoi apply ~/.zlogin`
+2. **Docs fix** (prevents future-you and other fleet operators from re-discovering this): add a clear "How to switch styles" section to `docs/zsh/motd.md` that distinguishes the three update paths and explicitly calls out the apply requirement.
+
+## Scope
+
+**In:**
+- A small targeted edit to `docs/zsh/motd.md` clarifying the three update paths (chezmoi prompt re-init, chezmoi.toml + apply, runtime env override) with explicit emphasis on `chezmoi apply` being mandatory after toml edits.
+- Show the user the diagnostic that proves the root cause and the one-line fix.
+
+**Out:**
+- Auto-apply hook on chezmoi.toml changes — over-engineered, breaks the explicit-apply mental model.
+- Onchange script that warns when `~/.zlogin` is stale — false-positive heavy, not worth the complexity.
+- Any change to `dot_zlogin.tmpl` itself — already correct.
+- Re-running `chezmoi init --force` — works but heavier than needed; `chezmoi apply` is sufficient since the chezmoi.toml is already updated.
+
+## Files to modify
+
+| Path | Action |
+|---|---|
+| `docs/zsh/motd.md` | Replace the existing "Switching styles" section with a clearer 3-path layout that emphasizes `chezmoi apply` is required after toml edits |
+
+## Implementation sketch
+
+The existing `docs/zsh/motd.md` already has a "Switching styles" section with two subsections (`At install time`, `At runtime`). Add a third subsection (or reorganize into three paths), placed in increasing order of "how heavy is this":
+
+1. **Per-session (no persistence)**: `MOTD_STYLE=fastfetch-slim ssh host` — env var on the SSH command line.
+2. **Persistent runtime override**: add `export MOTD_STYLE=fastfetch-slim` to `~/.zshrc.adhoc`. No chezmoi apply needed; survives reboots; per-machine.
+3. **Edit chezmoi source** (the path that just bit the user):
+   - Either edit `~/.config/chezmoi/chezmoi.toml` directly (`motdStyle = "..."`) **OR** re-run `chezmoi init --force`.
+   - **Then** run `chezmoi apply ~/.zlogin` to re-render the file.
+   - **Without `chezmoi apply` the change has no effect** — `~/.zlogin` is regenerated, not interpreted live. Add a callout box or bold warning here.
+
+The current docs already mention these but doesn't sequence them or warn about the apply requirement. The fix is a clarifying rewrite, not net-new content.
+
+## User-facing fix (one command)
+
+\```bash
+chezmoi apply ~/.zlogin
+ssh localhost   # now shows fastfetch-slim
+\```
+
+Verify the rendered file:
+
+\```bash
+grep '_motd_style=' ~/.zlogin
+# Expected: _motd_style="${MOTD_STYLE:-fastfetch-slim}"
+\```
+
+## Verification
+
+\```bash
+# Before: stale ~/.zlogin
+grep '_motd_style=' ~/.zlogin   # shows fastfetch-full
+
+# Run apply
+chezmoi apply ~/.zlogin
+
+# After
+grep '_motd_style=' ~/.zlogin   # now shows fastfetch-slim
+
+# End-to-end: SSH and confirm slim output (figlet hostname + 7-line fastfetch summary, no Apple logo)
+ssh localhost
+
+# Sanity: docs strict build still produces no NEW warnings
+uv run mkdocs build --strict 2>&1 | grep -c "^WARNING"
+# Expected: same count as before this change (11 pre-existing, unrelated)
+\```
+
+## Critical files
+
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md` — the only file edited
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_zlogin.tmpl` — reference only, already correct (defensive `index . "motdStyle" | default "figlet"` fallback works here)
+- `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl` — reference only, prompt declared correctly
+
+## Non-goals
+
+- NOT modifying `dot_zlogin.tmpl` (no bug in template).
+- NOT adding any auto-apply hook or onchange watcher.
+- NOT touching `.chezmoi.toml.tmpl` / `Dockerfile` / `dotfiles_init.py` / ansible role.
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.claude/plans/roles-lexical-teacup.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:14:58Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="ExitPlanMode"><details>
+<summary>Tool use: **ExitPlanMode**</summary>
+
+```text
+User has approved your plan. You can now start coding. Start with updating your todo list if applicable
+
+Your plan has been saved to: /Users/daviddwlee84/.local/share/chezmoi/.claude/plans/roles-lexical-teacup.md
+You can refer back to it if needed during implementation.
+
+## Approved Plan:
+# Plan: Fix motdStyle source/target confusion + docs gotcha
+
+## Context
+
+User manually edited `~/.config/chezmoi/chezmoi.toml` from `motdStyle = "fastfetch-full"` to `"fastfetch-slim"`, then SSH'd to localhost — but the banner still shows `fastfetch-full` output. They expected the toml change alone to take effect.
+
+**Root cause** (diagnosed via Bash):
+- `~/.config/chezmoi/chezmoi.toml` → `motdStyle = "fastfetch-slim"` ✅
+- `~/.zlogin` → `_motd_style="${MOTD_STYLE:-fastfetch-full}"` ← stale, rendered at last `chezmoi apply` when the value was `fastfetch-full`
+- No `MOTD_STYLE` env var, no `~/.zshrc.adhoc` override
+
+This is the **classic chezmoi source-vs-target gotcha**: `chezmoi.toml` is only the data source consulted during template rendering. `~/.zlogin` is a generated artifact frozen at last `chezmoi apply`. Editing the source without re-applying is a no-op for the target.
+
+Two improvements:
+1. **Immediate fix** (one command for the user, no code change): `chezmoi apply ~/.zlogin`
+2. **Docs fix** (prevents future-you and other fleet operators from re-discovering this): add a clear "How to switch styles" section to `docs/zsh/motd.md` that distinguishes the three update paths and explicitly calls out the apply requirement.
+
+## Scope
+
+**In:**
+- A small targeted edit to `docs/zsh/motd.md` clarifying the three update paths (chezmoi prompt re-init, chezmoi.toml + apply, runtime env override) with explicit emphasis on `chezmoi apply` being mandatory after toml edits.
+- Show the user the diagnostic that proves the root cause and the one-line fix.
+
+**Out:**
+- Auto-apply hook on chezmoi.toml changes — over-engineered, breaks the explicit-apply mental model.
+- Onchange script that warns when `~/.zlogin` is stale — false-positive heavy, not worth the complexity.
+- Any change to `dot_zlogin.tmpl` itself — already correct.
+- Re-running `chezmoi init --force` — works but heavier than needed; `chezmoi apply` is sufficient since the chezmoi.toml is already updated.
+
+## Files to modify
+
+| Path | Action |
+|---|---|
+| `docs/zsh/motd.md` | Replace the existing "Switching styles" section with a clearer 3-path layout that emphasizes `chezmoi apply` is required after toml edits |
+
+## Implementation sketch
+
+The existing `docs/zsh/motd.md` already has a "Switching styles" section with two subsections (`At install time`, `At runtime`). Add a third subsection (or reorganize into three paths), placed in increasing order of "how heavy is this":
+
+1. **Per-session (no persistence)**: `MOTD_STYLE=fastfetch-slim ssh host` — env var on the SSH command line.
+2. **Persistent runtime override**: add `export MOTD_STYLE=fastfetch-slim` to `~/.zshrc.adhoc`. No chezmoi apply needed; survives reboots; per-machine.
+3. **Edit chezmoi source** (the path that just bit the user):
+   - Either edit `~/.config/chezmoi/chezmoi.toml` directly (`motdStyle = "..."`) **OR** re-run `chezmoi init --force`.
+   - **Then** run `chezmoi apply ~/.zlogin` to re-render the file.
+   - **Without `chezmoi apply` the change has no effect** — `~/.zlogin` is regenerated, not interpreted live. Add a callout box or bold warning here.
+
+The current docs already mention these but doesn't sequence them or warn about the apply requirement. The fix is a clarifying rewrite, not net-new content.
+
+## User-facing fix (one command)
+
+```bash
+chezmoi apply ~/.zlogin
+ssh localhost   # now shows fastfetch-slim
+```
+
+Verify the rendered file:
+
+```bash
+grep '_motd_style=' ~/.zlogin
+# Expected: _motd_style="${MOTD_STYLE:-fastfetch-slim}"
+```
+
+## Verification
+
+```bash
+# Before: stale ~/.zlogin
+grep '_motd_style=' ~/.zlogin   # shows fastfetch-full
+
+# Run apply
+chezmoi apply ~/.zlogin
+
+# After
+grep '_motd_style=' ~/.zlogin   # now shows fastfetch-slim
+
+# End-to-end: SSH and confirm slim output (figlet hostname + 7-line fastfetch summary, no Apple logo)
+ssh localhost
+
+# Sanity: docs strict build still produces no NEW warnings
+uv run mkdocs build --strict 2>&1 | grep -c "^WARNING"
+# Expected: same count as before this change (11 pre-existing, unrelated)
+```
+
+## Critical files
+
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md` — the only file edited
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_zlogin.tmpl` — reference only, already correct (defensive `index . "motdStyle" | default "figlet"` fallback works here)
+- `/Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl` — reference only, prompt declared correctly
+
+## Non-goals
+
+- NOT modifying `dot_zlogin.tmpl` (no bug in template).
+- NOT adding any auto-apply hook or onchange watcher.
+- NOT touching `.chezmoi.toml.tmpl` / `Dockerfile` / `dotfiles_init.py` / ansible role.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:09Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:09Z)**_
+
+Reading current docs section to know what to edit:
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate the section to rewrite
+
+`grep -n "## Switching\|### At\|### Runtime\|^## Opt out" /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md`
+
+```text
+91:## Switching styles
+93:### At install time
+105:### At runtime (no re-init)
+117:## Opt out completely
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:18Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/zsh/motd.md`
+
+```text
+91	## Switching styles
+92	
+93	### At install time
+94	
+95	When you run `chezmoi init` (or `chezmoi init --force` on an existing host), one of the prompts is:
+96	
+97	```
+98	SSH login banner style (figlet|fastfetch-slim|fastfetch-full)?
+99	```
+100	
+101	Answer once and the choice is baked into `~/.config/chezmoi/chezmoi.toml`.
+102	
+103	The choice ripples through the chezmoi template engine into `~/.zlogin` at apply time — `{{ .motdStyle }}` resolves to your answer.
+104	
+105	### At runtime (no re-init)
+106	
+107	Add to `~/.zshrc.adhoc` (auto-created by [`dot_zshrc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_zshrc.tmpl), not chezmoi-managed):
+108	
+109	```sh
+110	export MOTD_STYLE=fastfetch-slim   # one of: figlet | fastfetch-slim | fastfetch-full
+111	```
+112	
+113	`MOTD_STYLE` overrides `{{ .motdStyle }}` for that machine without touching chezmoi state. Useful when fleet defaults are wrong for one box, or when you want to A/B test styles for a few sessions.
+114	
+115	You can even pin it per session: `MOTD_STYLE=fastfetch-full ssh laptop`.
+116	
+117	## Opt out completely
+118	
+119	```sh
+120	export MOTD_DISABLE=1   # in ~/.zshrc.adhoc
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:23Z)**_
+
+Now rewriting the section with a clearer 3-path layout in increasing heaviness, with the gotcha boldly called out:
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/zsh/motd.md has been updated successfully.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm strict warning count unchanged after docs edit
+
+`uv run mkdocs build --strict 2>&1 | grep -cE "^WARNING"`
+
+```text
+12
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:15:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if my edit introduced new warnings
+
+`uv run mkdocs build --strict 2>&1 | grep -E "^WARNING|motd\.md" | head -20`
+
+```text
+WARNING -  A reference to 'this_repo/scripts/import_ssh_to_bw.sh.md' is included in the 'nav' configuration, which is not found in the documentation files.
+WARNING -  mkdocs_llmstxt: Page URI 'index.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/aicapture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/zsh-inline-ai.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/tmux/README.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/sesh.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/clipboard.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/agent-overlays.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'playbooks/workflow.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/architecture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/fleet-apply.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:14Z)**_
+
+Strict count went 11→12 but the new warning is **also pre-existing drift** (a stale `import_ssh_to_bw.sh.md` ref in nav, unrelated to my edit). My motd.md change introduces zero warnings.
+
+## 解釋 + 修復
+
+**為什麼會這樣**:`chezmoi.toml` 只是**來源**,`~/.zlogin` 是 `chezmoi apply` 渲染出來的**產物**。你之前 apply 時 toml 寫的是 `fastfetch-full` → `~/.zlogin` 被燒進 `_motd_style="${MOTD_STYLE:-fastfetch-full}"`。後來改 toml 沒重新 apply → 產物保持舊值。
+
+**一行修復**(請你執行):
+
+```bash
+chezmoi apply ~/.zlogin
+```
+
+驗證:
+
+```bash
+grep '_motd_style=' ~/.zlogin
+# 應該看到: _motd_style="${MOTD_STYLE:-fastfetch-slim}"
+ssh localhost   # 改成 slim 樣式
+```
+
+## 順手把這個 gotcha 寫進文件
+
+我已經改好 `docs/zsh/motd.md` 的「Switching styles」章節,改成 3 條路徑(由輕到重),並把這個地雷用 ⚠️ callout 框起來,讓未來踩到的人(包括未來的你)直接看到 `chezmoi apply` 是必須的。
+
+現在 commit 這個 docs 修補:
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Status before commit
+
+`git status --short`
+
+```text
+ M .claude/plans/roles-lexical-teacup.md
+ M .specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md
+ M docs/zsh/motd.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit docs fix
+
+```bash
+just redact-secrets >/dev/null 2>&1 && git add .specstory/history/ .claude/plans/ docs/zsh/motd.md && git commit --quiet -m "$(cat <<'EOF'
+docs(motd): clarify chezmoi apply requirement after toml edits
+
+Restructure docs/zsh/motd.md "Switching styles" section into three
+paths in increasing-heaviness order: (1) per-session env, (2) persistent
+runtime override via ~/.zshrc.adhoc, (3) edit chezmoi source + apply.
+Highlight the source/target distinction with a ⚠️ callout — editing
+~/.config/chezmoi/chezmoi.toml alone is a no-op without `chezmoi apply
+~/.zlogin` to re-render the target file.
+
+Triggered by hitting this exact confusion: edited motdStyle from
+fastfetch-full to fastfetch-slim in chezmoi.toml, SSH still showed full
+output because ~/.zlogin had the old value baked in from the prior
+apply.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" >/dev/null 2>&1 ; git log --oneline -1
+```
+
+```text
+c9ab018 tools: add fastfetch + motdStyle prompt for 3-tier SSH banner
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check git state after commit attempt
+
+`git status --short && echo "---" && git log --oneline -2`
+
+```text
+M  .claude/plans/roles-lexical-teacup.md
+MM .specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md
+M  docs/zsh/motd.md
+---
+c9ab018 tools: add fastfetch + motdStyle prompt for 3-tier SSH banner
+3d38633 tools: add figlet/toilet/lolcat + SSH-gated ~/.zlogin MOTD
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:38Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Retry commit with visible output
+
+```bash
+just redact-secrets >/dev/null 2>&1; git add .specstory/history/ .claude/plans/ docs/zsh/motd.md; git commit -m "docs(motd): clarify chezmoi apply requirement after toml edits
+
+Restructure docs/zsh/motd.md Switching styles section into three paths
+in increasing heaviness order: per-session env, persistent runtime
+override, edit chezmoi source + apply. Highlight source/target
+distinction with a callout — editing chezmoi.toml alone is a no-op
+without chezmoi apply to re-render the target file.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>" 2>&1 | tail -8
+```
+
+```text
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main e80e875] docs(motd): clarify chezmoi apply requirement after toml edits
+ 3 files changed, 753 insertions(+), 187 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-06 08:16:53Z)**_
+
+Commit `e80e875` 落地。
+
+## 總結
+
+**你的問題的真正答案,簡單講**:
+
+> `~/.config/chezmoi/chezmoi.toml` ≠ `~/.zlogin`
+>
+> 前者是**配方**,後者是**做出來的菜**。改配方不會讓盤子裡的菜自動變。要重新煮(`chezmoi apply`)。
+
+**修復(請執行)**:
+
+```bash
+chezmoi apply ~/.zlogin
+ssh localhost   # 看到 fastfetch-slim 樣式
+```
+
+**已落地的 commit**:
+
+```
+e80e875 docs(motd): clarify chezmoi apply requirement after toml edits
+```
+
+`docs/zsh/motd.md` 的「Switching styles」章節現在是三條路徑,**每條都有正確的更新方法**:
+
+| 路徑 | 改什麼 | 要 `chezmoi apply` 嗎 |
+|------|--------|---------------------|
+| 1. 一次性 | `MOTD_STYLE=... ssh host` | ❌ |
+| 2. 持久 runtime override | `~/.zshrc.adhoc` 加 `export MOTD_STYLE=...` | ❌ |
+| 3. 改 chezmoi 來源 | 編輯 `chezmoi.toml` 或 `chezmoi init --force` | ✅ **必要** |
+
+對未來想換 style 的場景,**路徑 2 通常是最對的選擇** — 不用碰 chezmoi 也不會踩到這次的地雷,且每台機器都可以獨立設定。**路徑 3 才是改「fleet 預設」的方式**。
