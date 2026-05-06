@@ -1,0 +1,121 @@
+---
+# Bash role - (conditionally) install Homebrew bash 5.x on macOS, whitelist
+# it in /etc/shells, and switch login shell to bash. All gated on
+# `primary_shell == "bash"`. See dot_ansible/roles/bash/defaults/main.yml
+# for the rationale.
+
+# ---------------------------------------------------------------------------
+# macOS bash 5.x install (only when primary_shell == "bash"). Linux distros
+# ship a recent bash already; nothing to do there. The chsh task below is
+# OS-agnostic and runs on Linux unconditionally when primary_shell == "bash".
+# ---------------------------------------------------------------------------
+
+- name: Install Homebrew bash 5.x (macOS, primary_shell == "bash")
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - (primary_shell | default('zsh')) == 'bash'
+  community.general.homebrew:
+    name: bash
+    state: present
+
+# /etc/shells whitelisting — chsh refuses any path not listed there with
+# "non-standard shell". Idempotent grep guard keeps re-applies clean.
+- name: Locate Homebrew bash binary (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - (primary_shell | default('zsh')) == 'bash'
+  ansible.builtin.shell: |
+    if [ -x /opt/homebrew/bin/bash ]; then
+      echo /opt/homebrew/bin/bash
+    elif [ -x /usr/local/bin/bash ]; then
+      echo /usr/local/bin/bash
+    fi
+  register: brew_bash_path
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Add Homebrew bash to /etc/shells (macOS)
+  become: true
+  tags: [sudo]
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - (primary_shell | default('zsh')) == 'bash'
+    - brew_bash_path.stdout | default('') | length > 0
+  ansible.builtin.lineinfile:
+    path: /etc/shells
+    line: "{{ brew_bash_path.stdout }}"
+    state: present
+    create: false
+
+# ---------------------------------------------------------------------------
+# Login-shell switch (all OSes, gated on primary_shell == "bash").
+# Mirrors the structure of dot_ansible/roles/zsh/tasks/main.yml so future
+# refactors keep the two roles in lockstep.
+# ---------------------------------------------------------------------------
+
+- name: Locate bash binary
+  when: (primary_shell | default('zsh')) == 'bash'
+  ansible.builtin.shell: |
+    {% if ansible_facts["os_family"] == "Darwin" %}
+    if [ -x /opt/homebrew/bin/bash ]; then
+      echo /opt/homebrew/bin/bash
+    elif [ -x /usr/local/bin/bash ]; then
+      echo /usr/local/bin/bash
+    else
+      command -v bash
+    fi
+    {% else %}
+    command -v bash
+    {% endif %}
+  register: bash_path
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Get current login shell (macOS)
+  when:
+    - (primary_shell | default('zsh')) == 'bash'
+    - ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command:
+    cmd: "dscl . -read /Users/{{ ansible_facts['user_id'] }} UserShell"
+  register: current_shell_macos
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Get current login shell (Linux)
+  when:
+    - (primary_shell | default('zsh')) == 'bash'
+    - ansible_facts["os_family"] != "Darwin"
+  ansible.builtin.command:
+    cmd: "getent passwd {{ ansible_facts['user_id'] }}"
+  register: current_shell_linux
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Set current shell fact
+  when: (primary_shell | default('zsh')) == 'bash'
+  ansible.builtin.set_fact:
+    current_login_shell: >-
+      {{ (current_shell_macos.stdout | default('')).split()[-1]
+         if ansible_facts["os_family"] == "Darwin"
+         else (current_shell_linux.stdout | default('')).split(':')[-1] }}
+
+# `bash_login_shell_match` accepts either a system bash (`/bin/bash`,
+# `/usr/bin/bash`) OR a Homebrew bash. We only re-chsh when the current
+# login shell isn't ANY bash. This avoids re-applying on a host that's
+# already on system bash but doesn't yet have brew bash installed (the
+# /etc/shells whitelist + brew install fires above before this step).
+- name: Change login shell to bash
+  become: true
+  tags: [sudo]
+  ansible.builtin.user:
+    name: "{{ ansible_facts['user_id'] }}"
+    shell: "{{ bash_path.stdout }}"
+  when:
+    - (primary_shell | default('zsh')) == 'bash'
+    - bash_path.rc == 0
+    - bash_path.stdout | length > 0
+    - not current_login_shell.endswith('/bash')

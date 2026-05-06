@@ -1,0 +1,19 @@
+---
+# bash role defaults
+#
+# oh-my-bash and ble.sh are managed declaratively via chezmoi externals at
+# the repo root: `.chezmoiexternal.toml.tmpl`. ble.sh is then compiled by
+# `.chezmoiscripts/global/run_onchange_after_NN_install_blesh.sh.tmpl`
+# (`make install` to ~/.local). Add new bash plugins / overlays there
+# rather than here.
+#
+# This role's responsibilities:
+#   1. macOS only: brew-install bash 5.x when primary_shell == "bash"
+#      (system bash 3.2 is too old for OMB plugins and ble.sh).
+#   2. macOS only: append the brew bash to /etc/shells so chsh accepts it.
+#   3. chsh to bash when primary_shell == "bash" (all OSes).
+#
+# The bash PACKAGE itself is always present on Linux (every distro ships
+# bash) and is also already on macOS as /bin/bash 3.2 — both adequate for
+# ad-hoc use even on zsh-primary hosts. We only NEED bash 5.x when the
+# user has selected bash as primary, hence the gate.

@@ -1,6 +1,12 @@
 ---
-# Zsh role - install zsh package + switch login shell.
+# Zsh role - install zsh package + (conditionally) switch login shell.
 # oh-my-zsh core and plugin clones are handled by .chezmoiexternal.toml.tmpl.
+#
+# Login-shell switch is gated on `primary_shell == "zsh"` (default). The
+# zsh PACKAGE is always installed regardless — even on bash-primary hosts
+# we want zsh available so the deployed ~/.zshrc still works when the
+# user runs `zsh` ad-hoc. See .chezmoi.toml.tmpl primaryShell prompt and
+# the sister bash role.
 
 # Install zsh package
 - name: Install zsh (macOS)
@@ -70,6 +76,7 @@
     name: "{{ ansible_facts['user_id'] }}"
     shell: "{{ zsh_path.stdout }}"
   when:
+    - (primary_shell | default('zsh')) == 'zsh'
     - zsh_path.rc == 0
     - zsh_path.stdout | length > 0
     - not current_login_shell.endswith('/zsh')

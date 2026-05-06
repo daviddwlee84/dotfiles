@@ -8,6 +8,8 @@
 # base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
 # zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
 # zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+# bash tasks: {{ include "dot_ansible/roles/bash/tasks/main.yml" | sha256sum }}
+# bash defaults: {{ include "dot_ansible/roles/bash/defaults/main.yml" | sha256sum }}
 # neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
 # neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
 # lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
@@ -129,18 +131,18 @@ command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found";
 {{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
-TAGS="homebrew,base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
 {{ else if eq .profile "ubuntu_desktop" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Desktop: full desktop experience (no homebrew).
 # gui_apps bundles alacritty + AppImageLauncher + VSCode + Cursor (see
 # dot_ansible/roles/gui_apps_linux/tasks/main.yml); libfuse2 comes with it
 # so AppImage-based editors work out of the box on Ubuntu 22.04+.
-TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
 {{ else if eq .profile "ubuntu_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)
-TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
 {{ else if eq .profile "centos_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # CentOS Server: same playbook + tag set as Ubuntu Server. Ansible roles
@@ -149,7 +151,7 @@ PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # actually runs are the user-level GitHub-release / cargo / mise
 # fallbacks — see pitfalls/centos7-noroot.md for the gate-broadening
 # fix that lets those fire on RedHat too.
-TAGS="base,zsh,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
 {{ else -}}
 warn "Unknown profile: {{ .profile }}"
 exit 0
@@ -196,10 +198,15 @@ TAGS="${TAGS},dotnet_tools"
 {{ end -}}
 
 # Extra vars for role-level configuration
-EXTRA_VARS=""
+# primary_shell is read by both the zsh role (gates chsh-to-zsh) and the
+# bash role (gates brew-install bash 5.x on macOS, /etc/shells whitelist,
+# and chsh-to-bash). Default "zsh" so existing bashes (apply on a host
+# from before this prompt existed) keep zsh as login shell.
+{{ $primaryShell := "zsh" }}{{ if hasKey . "primaryShell" }}{{ $primaryShell = .primaryShell }}{{ end -}}
+EXTRA_VARS="primary_shell={{ $primaryShell }}"
 {{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles
-EXTRA_VARS="bitwarden_install_desktop=true"
+EXTRA_VARS="$EXTRA_VARS bitwarden_install_desktop=true"
 {{ end -}}
 {{ if $installLlmTools -}}
 if [[ -z "$EXTRA_VARS" ]]; then
