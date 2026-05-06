@@ -1,0 +1,41 @@
+# ~/.zlogin - login-shell hooks (managed by chezmoi)
+# Prints an SSH-only MOTD banner. Local terminals get nothing.
+#
+# Trigger conditions (all 4 must hold):
+#   1. $SSH_CONNECTION non-empty (i.e. you SSH'd in)
+#   2. stdout is a TTY (filters `ssh host 'cmd'`, scp, rsync, fleet-apply)
+#   3. not inside tmux (banner is once-per-SSH-session, not per-pane)
+#   4. MOTD_DISABLE != 1 (taste-based opt-out via ~/.zshrc.adhoc)
+#
+# Tools: figlet (apt + brew, installed by ansible devtools role).
+# Falls back to plain `== hostname ==` on first boot before figlet exists.
+
+[ -n "$SSH_CONNECTION" ] || return 0
+[ -t 1 ] || return 0
+[ -z "$TMUX" ] || return 0
+[ "${MOTD_DISABLE:-0}" = "1" ] && return 0
+
+_motd_host="$(hostname -s 2>/dev/null || hostname)"
+_motd_cols="${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}"
+
+printf '\033[36m'
+if command -v figlet >/dev/null 2>&1; then
+    figlet -w "$_motd_cols" -f small -- "$_motd_host" 2>/dev/null \
+        || figlet -w "$_motd_cols" -- "$_motd_host" 2>/dev/null \
+        || printf '== %s ==\n' "$_motd_host"
+else
+    printf '== %s ==\n' "$_motd_host"
+fi
+printf '\033[0m'
+
+_motd_profile='{{ .profile }}'
+_motd_os="$(uname -sr)"
+_motd_up="$(uptime 2>/dev/null | sed -E 's/.*up *([^,]+),.*/\1/' | xargs)"
+_motd_ip="$(echo "$SSH_CONNECTION" | awk '{print $3}')"
+
+printf '\033[2m'
+printf 'profile=%s  os=%s  up=%s  via=%s\n' \
+    "$_motd_profile" "$_motd_os" "${_motd_up:-?}" "${_motd_ip:-?}"
+printf '\033[0m\n'
+
+unset _motd_host _motd_cols _motd_profile _motd_os _motd_up _motd_ip

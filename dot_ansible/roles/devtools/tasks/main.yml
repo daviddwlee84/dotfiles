@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -53,6 +53,9 @@
       - yq
       - jnv
       - witr
+      - figlet
+      - toilet
+      - lolcat
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -3642,3 +3645,19 @@
       ansible.builtin.file:
         path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/witr"
         state: absent
+
+# =============================================================================
+# Banner / MOTD CLI tools (figlet, toilet, lolcat)
+# =============================================================================
+# All three live in Ubuntu/Debian universe; no GitHub-release fallback needed.
+# Used by the SSH-gated ~/.zlogin banner (see dot_zlogin.tmpl).
+- name: Install banner CLI tools (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - figlet
+      - toilet
+      - lolcat
+    state: present

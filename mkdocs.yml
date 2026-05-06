@@ -278,6 +278,7 @@ nav:
   - Zsh:
       - Aliases & functions: zsh/aliases.md
       - Completions: zsh/zsh-completions.md
+      - SSH login banner (MOTD): zsh/motd.md
   - Neovim:
       - Floating TUI: neovim/floating-tui.md
   - Repo Internals:
