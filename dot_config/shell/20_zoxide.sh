@@ -1,7 +1,8 @@
-# 20_zoxide.zsh - zoxide configuration
+# 20_zoxide.sh - smart cd replacement (shell-detecting).
+# Sourced by both ~/.zshrc and ~/.bashrc via load_modular_dir.
+# https://github.com/ajeetdsouza/zoxide
 
-# Check if zoxide is installed
-command -v zoxide &>/dev/null || return 0
+command -v zoxide >/dev/null 2>&1 || return 0
 
 # Resolve symlinks before recording, so that paths like
 #   ~/Documents/Program -> /Volumes/Data/Program
@@ -14,7 +15,11 @@ command -v zoxide &>/dev/null || return 0
 export _ZO_RESOLVE_SYMLINKS=1
 
 # Initialize zoxide
-eval "$(zoxide init zsh)"
+if [ -n "$ZSH_VERSION" ]; then
+    eval "$(zoxide init zsh)"
+elif [ -n "$BASH_VERSION" ]; then
+    eval "$(zoxide init bash)"
+fi
 
 # Replace cd with z for smarter directory navigation
 alias cd="z"

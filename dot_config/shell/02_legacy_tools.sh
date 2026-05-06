@@ -1,6 +1,7 @@
-# 02_legacy.zsh - Legacy tools and PATH configurations
-# These are tools that existed before chezmoi management
-# Kept for backwards compatibility with existing installations
+# 02_legacy_tools.sh - Legacy tools and PATH configurations (POSIX subset).
+# Sourced by both ~/.zshrc and ~/.bashrc via load_modular_dir
+# "$XDG_CONFIG_HOME/shell" sh. Tools that existed before chezmoi management;
+# kept for backwards compatibility with existing installations.
 
 # =============================================================================
 # Go (Golang)

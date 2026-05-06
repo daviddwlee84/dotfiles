@@ -1,0 +1,18 @@
+{{- /*
+.chezmoiremove — paths to delete from $HOME on each `chezmoi apply`.
+Templated; re-evaluated every apply (idempotent — chezmoi only acts
+when the path actually exists). One pattern per line.
+
+Currently used to clean up the zsh-side copies of files that were
+moved into the shared dot_config/shell/ POSIX layer (see commit
+adding `dot_config/shell/`). Without this, the orphan ~/.config/zsh/
+files would still get sourced by load_modular_dir and double-load
+PATH/env on every shell start.
+*/ -}}
+.config/zsh/00_exports.zsh
+.config/zsh/02_legacy_tools.zsh
+.config/zsh/tools/01_starship.zsh
+.config/zsh/tools/05_mise.zsh
+.config/zsh/tools/20_zoxide.zsh
+.config/zsh/tools/27_thefuck.zsh
+.config/zsh/tools/30_direnv.zsh

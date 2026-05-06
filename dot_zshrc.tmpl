@@ -78,20 +78,28 @@ fi
 # Modular Configuration Loader
 # =============================================================================
 
-# Load all .zsh files from a directory (sorted by filename)
-load_zsh_dir() {
+# Load all files matching $extension from $dir (sorted by filename).
+# Used for the shared POSIX layer (.sh) and the zsh-only layer (.zsh).
+# The sister bash equivalent (load_modular_dir in dot_bashrc.tmpl) shares
+# the same name + signature so dot_config/shell/*.sh are sourced uniformly.
+load_modular_dir() {
     local dir="$1"
+    local ext="${2:-zsh}"
     [[ -d "$dir" ]] || return 0
     setopt local_options null_glob
     local f
-    for f in "$dir"/*.zsh; do
+    for f in "$dir"/*."$ext"; do
         [[ -r "$f" ]] && source "$f"
     done
 }
 
-# Load modular configs
-load_zsh_dir "$ZSH_CONFIG_DIR"
-load_zsh_dir "$ZSH_CONFIG_DIR/tools"
+# Load modular configs.
+# Shared POSIX layer first — env/PATH/Homebrew shellenv, tool init wrappers
+# (starship/mise/zoxide/direnv/thefuck), POSIX aliases. Both ~/.zshrc and
+# ~/.bashrc source this dir so env stays consistent across shells.
+load_modular_dir "$XDG_CONFIG_HOME/shell" sh
+load_modular_dir "$ZSH_CONFIG_DIR" zsh
+load_modular_dir "$ZSH_CONFIG_DIR/tools" zsh
 
 # Load secrets (not tracked by chezmoi)
 [[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh" || true
