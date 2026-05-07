@@ -19181,3 +19181,240 @@ node --version
 ```
 
 要不要我把「helix 安裝 + LazyVim 簡化建議」寫進 `docs/infra/linux-toolchain-baseline.md` 的 escape hatch 章節？還是留作個人選擇 case-by-case？
+
+---
+
+_**User (2026-05-07 12:15:55Z)**_
+
+可以 先寫notes吧
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 12:16:12Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 12:16:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Doc structure
+
+`grep -n "^##\|^###" /Users/daviddwlee84/.local/share/chezmoi/docs/infra/linux-toolchain-baseline.md | head -25`
+
+```text
+15:## The four numbers that decide what runs
+32:## Distro release ↔ baseline matrix (x86_64)
+57:## What modern software actually requires
+63:### Node.js (binary tarballs from nodejs.org/dist/)
+89:### Python wheels (manylinux baseline)
+103:### libstdc++ / GCC C++ ABI
+128:### Rust (rustup)
+147:## Why you can't (easily) upgrade glibc on a running system
+181:## Workarounds, in order of preference
+186:### 1. micromamba / conda-forge (no sudo, no glibc upgrade)
+194:#### Modern Python + scientific stack
+210:#### Modern Node + npm-based CLIs (Copilot/Codex/Gemini)
+244:#### Limitations
+255:### 2. Apptainer / Singularity / Podman (rootless container)
+272:### 3. SCL devtoolset (modern gcc on EL7, RPM)
+287:### 4. Static / musl binaries
+296:### 5. Source build with an older toolchain
+307:## Decision tree
+323:## How this repo treats EL7
+346:## References
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:16:23Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/infra/linux-toolchain-baseline.md`
+
+```text
+296	### 5. Source build with an older toolchain
+297	
+298	Last resort. Build the offending package from source, pinning to a
+299	version that still supports your glibc.
+300	
+301	- **Node**: NodeSource Node 16 (above) — EOL but works.
+302	- **numpy**: pin to 1.26.4 — last manylinux_2_17 release.
+303	- **pyarrow**: pin to 13.x — same boundary.
+304	- **mlflow**: avoid; needs sqlalchemy → greenlet which compiles modern
+305	  C++. See [`pitfalls/centos7-numpy-pandas-source-build.md`](../../pitfalls/centos7-numpy-pandas-source-build.md).
+306	
+307	## Decision tree
+308	
+309	When you hit a `GLIBC_*` / `GLIBCXX_*` / `CXXABI_*` not-found error:
+310	
+311	1. **Is the binary a CLI you can swap?** Look for a musl variant
+312	   (ripgrep, fd, etc.) or use the system-package equivalent.
+313	2. **Is it Python?** Use micromamba + conda-forge. Skip pip.
+314	3. **Is it Node?** Use NodeSource Node 16 (EL7) or upgrade OS.
+315	4. **Is it C++?** Try a SCL devtoolset to rebuild from source. If the
+316	   project pins a specific C++ stdlib feature you can't get on EL7,
+317	   wrap it in Apptainer.
+318	5. **Is it production-critical and you'll keep using EL7 for ≥1 year?**
+319	   Get IT to schedule the OS migration. A 6-year-old glibc has been
+320	   accumulating CVEs since 2018 — security alone justifies the
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:17:20Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/infra/linux-toolchain-baseline.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:17:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify doc renders without new errors
+
+`uv run mkdocs build --strict 2>&1 | grep -E "linux-toolchain" | head -10 || echo "no new errors"`
+
+```text
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-noroot.md', but the target '../pitfalls/centos7-noroot.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-noroot.md', but the target '../pitfalls/centos7-noroot.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-zsh-too-old.md', but the target '../pitfalls/centos7-zsh-too-old.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-ansible-yum-dnf-backend.md', but the target '../pitfalls/centos7-ansible-yum-dnf-backend.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md', but the target '../pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/tuna-nodejs-mirror-aggressive-gc.md', but the target '../pitfalls/tuna-nodejs-mirror-aggressive-gc.md' is not found among documentation files.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:17:45Z)**_
+
+All INFO-level (intentional pitfalls/ external links). Commit:
+
+_**Agent (claude-opus-4-7 2026-05-07 12:17:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit editor escape-hatches doc section
+
+```bash
+git add docs/infra/linux-toolchain-baseline.md && git commit -m "$(cat <<'EOF'
+docs/infra: add editor escape-hatches section to linux-toolchain-baseline
+
+LazyVim / nvim modern stack hits multiple EL7 walls:
+- Mason wants Node 18+ for many LSP installers
+- nvim-treesitter cargo path fails on libclang ABI mismatch
+- npm-installed formatters need modern Node
+
+Three documented paths, in order of effort:
+
+1. Helix (hx) — single Rust binary, built-in LSP + tree-sitter, zero
+   Node, ~5 min setup. Loses nvim plugin culture.
+2. Neovim AppImage + slimmed-down LazyVim — disable Mason, install
+   LSP servers via micromamba/cargo/AppImage manually, use prebuilt
+   tree-sitter parsers. ~30 min setup, keeps the LazyVim UX.
+3. VSCode Remote SSH — vscode-server runs with bundled glibc-compat,
+   handles all LSP/format/TS work locally on the laptop UI. Lowest
+   friction for daily work but requires VSCode locally.
+
+Decision matrix at the end picks per use case (daily work →
+VSCode Remote, SSH quick-edit → Helix, LazyVim parity → Neovim slim).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" && git log --oneline -2
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778156274-9272.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778156274-9272.
+[main 8494e18] docs/infra: add editor escape-hatches section to linux-toolchain-baseline
+ 1 file changed, 161 insertions(+)
+8494e18 docs/infra: add editor escape-hatches section to linux-toolchain-baseline
+6aca445 zsh: 04_conda_mamba lazy-loads micromamba alongside full-distro conda
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:18:34Z)**_
+
+Committed `8494e18`.
+
+## Server 端 push 後
+
+```bash
+cd ~/.local/share/chezmoi
+git pull   # 拿到 8494e18 + 6aca445
+
+# tmux 配置之前已換成 extended-keys on，但你 server 上 tmux server 還沒重啟
+tmux ls          # 看現有 sessions（先存好工作）
+tmux kill-server # 重啟 — 才會吃新 config
+tmux             # 開新 session，paste 多行測試應該乾淨
+
+# 04_conda_mamba.zsh 重新生效（micromamba 變 lazy-load）
+exec zsh
+which conda mamba micromamba   # 都應該印 "function"
+
+# 之前的 micromamba node22 env 已建好，現在能直接用：
+micromamba activate node22
+node --version    # v22.x
+npm install -g @google/gemini-cli   # 試試 npm-based agent CLI
+```
+
+Doc 看 https://daviddwlee84.github.io/dotfiles/infra/linux-toolchain-baseline/ 會有完整的 editor escape-hatches 章節（Helix / nvim AppImage slim / VSCode Remote SSH 三條路 + decision matrix）。
+
+我這邊的串一下今天的 commit list（從早到晚）：
+
+```
+8494e18  docs/infra: editor escape-hatches (helix, nvim slim, vscode remote)
+6aca445  zsh: 04_conda_mamba lazy-loads micromamba
+3a85599  mirrors+ansible: Node mirror Aliyun, ansible_pkg_mgr→os_family fix
+c0b4bd8  docs+mise+blesh: Linux toolchain baseline doc + EL7-aware mise pins
+49796ad  tmux: extended-keys always → on (fix ble.sh paste corruption)
+d0c3f2c  ansible: broaden 4 more roles to RedHat (llm/nerdfonts/networking/lazyvim)
+5e2d93c  ansible: mlflow needs_modern_gcc + broaden coding_agents to RedHat
+28c2ac3  zsh build: --with-tcsetpgrp fix
+e6a7579  ansible: 3 CentOS 7 patches (claude-hud python, numpy/pandas, zsh build)
+ab7bdbe  ansible_roles: auto-override target python_interpreter on CentOS 7
+8f287f4  ble.sh: bind Ctrl+Enter / Alt+Enter accept-line
+ea24c9b  ansible_roles: skip ansible run with manual fallback msg
+[before today]
+```
+
+12 個 commit，全部源自這次 CentOS 7 bringup。pitfall 累積：
+- `bootstrap-no-tty-sudo-prompt-skipped.md`
+- `centos7-ansible-yum-dnf-backend.md`
+- `centos7-numpy-pandas-source-build.md`
+- `centos7-zsh-too-old.md`
+- `tmux-extended-keys-always-paste.md`
+- `tuna-nodejs-mirror-aggressive-gc.md`
+
+加上一個跨領域的綜合 doc `docs/infra/linux-toolchain-baseline.md`。
+
+整個 repo 的 EL7 / glibc-old 處理現在 **大半都自動了**：
+- Bootstrap 偵測 glibc → 走 mise musl
+- ansible_roles 偵測 Python < 3.7 → uv Python override
+- python_uv_tools 偵測 gcc < 9 → skip numpy-needing tools
+- mise/config.toml 偵測 EL7 → skip broken tool pins
+- zsh role 偵測 zsh < 5.3 → source build 5.9
+
+剩下的決策點（micromamba 安裝、editor 選擇、要不要升 OS）都是 **使用者層** 的選擇，doc 裡有寫但不自動化。這條界線拿捏得我覺得還行。
+
+下一輪測試結果再貼，特別是 tmux paste 跟 micromamba node22 → npm install agent CLI 那段。

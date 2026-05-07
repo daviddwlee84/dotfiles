@@ -304,6 +304,167 @@ version that still supports your glibc.
 - **mlflow**: avoid; needs sqlalchemy → greenlet which compiles modern
   C++. See [`pitfalls/centos7-numpy-pandas-source-build.md`](../../pitfalls/centos7-numpy-pandas-source-build.md).
 
+## Editor stack on EL7 (LazyVim / nvim escape hatches)
+
+Modern terminal-editor stacks pull lots of moving parts that hit the
+EL7 walls described above:
+
+- **Neovim 0.11+**: works via AppImage (statically linked) — the
+  binary itself is fine on glibc 2.17.
+- **LazyVim plugin manager**: assumes `node` ≥ 18 for many LSP servers
+  via Mason, plus modern Rust for tree-sitter-cli source builds.
+- **Mason** (LSP installer): downloads npm/pip/cargo packages that may
+  themselves need GCC ≥ 9.
+- **nvim-treesitter parser builds**: use `tree-sitter-cli`, which on
+  EL7 fails the cargo path (libclang ABI mismatch — see
+  [`pitfalls/centos7-numpy-pandas-source-build.md`](../../pitfalls/centos7-numpy-pandas-source-build.md)
+  for the same bindgen+EL7 trap). The npm install path needs Node 18+.
+
+Three tiers of escape hatches, by how much you want to keep:
+
+### A. Helix — zero Node, single binary, lowest friction
+
+Helix (`hx`) is a Rust modal editor with **built-in LSP and tree-sitter**
+support. Pre-built parsers ship in the release tarball; LSP support is
+a one-line config that runs whatever LSP binary you point it at. No
+plugin language, no Node, no Mason.
+
+```bash
+# Install (no sudo, single binary)
+curl -fsSL https://github.com/helix-editor/helix/releases/latest/download/helix-25.07-x86_64-linux.tar.xz \
+  | tar -xJ -C /tmp
+mkdir -p ~/.local/share/helix
+cp -r /tmp/helix-*/runtime ~/.local/share/helix/
+cp /tmp/helix-*/hx ~/.local/bin/hx
+hx --version
+hx --health    # check which languages have LSP/parser support out of the box
+```
+
+Most languages "just work" — Go, Rust, Python (pyright/ruff), TypeScript,
+Lua, Shell, Markdown, YAML, TOML are all bundled. For LSPs not bundled
+(some niche languages), install via cargo / micromamba and add to
+`~/.config/helix/languages.toml`:
+
+```toml
+[language-server.pyright]
+command = "/home/user/.local/share/mamba/envs/modern/bin/pyright-langserver"
+args = ["--stdio"]
+```
+
+When this works for your languages, this is **the cleanest path on
+EL7** — no Node, no Mason, no glibc juggling. Loses: VimL plugin
+ecosystem, telescope, dap, the whole nvim plugin culture.
+
+### B. Neovim AppImage + slimmed-down config (closest to LazyVim UX)
+
+If you want the LazyVim-style experience but without the Mason/npm
+parts that break on EL7:
+
+```bash
+# Statically-linked Neovim AppImage — runs on glibc 2.17
+curl -fsSL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.appimage \
+  -o ~/.local/bin/nvim
+chmod +x ~/.local/bin/nvim
+nvim --version    # 0.11+
+
+# AppImageLauncher / fuse2 not needed if you extract:
+~/.local/bin/nvim --appimage-extract -o /tmp/nvim-extract
+ln -sf /tmp/nvim-extract/usr/bin/nvim ~/.local/bin/nvim
+```
+
+Then **disable Mason** in your LazyVim config and install LSP servers
+via the toolchain that works on EL7:
+
+```lua
+-- lua/plugins/disable-mason.lua
+return {
+  { "williamboman/mason.nvim", enabled = false },
+  { "williamboman/mason-lspconfig.nvim", enabled = false },
+  { "WhoIsSethDaniel/mason-tool-installer.nvim", enabled = false },
+}
+```
+
+Install LSP servers manually:
+
+| LSP | EL7 install |
+|-----|-------------|
+| `pyright` | `micromamba create -n lsp -c conda-forge pyright` |
+| `lua-language-server` | musl AppImage from [LuaLS releases](https://github.com/LuaLS/lua-language-server/releases) |
+| `bash-language-server` | needs Node 18+ — install via micromamba node22 env |
+| `gopls` | `go install golang.org/x/tools/gopls@latest` (Go 1.21+ from official tarball, glibc 2.17 OK) |
+| `rust-analyzer` | bundled with rustup; `rustup component add rust-analyzer` |
+| `taplo` (TOML) | `cargo install taplo-cli --locked` |
+| `marksman` (Markdown) | musl binary from [marksman releases](https://github.com/artempyanykh/marksman/releases) |
+
+For tree-sitter parsers, **skip the source-build path entirely** and
+use prebuilt parsers that ship with `nvim-treesitter`:
+
+```lua
+-- lua/plugins/treesitter-prebuilt.lua
+return {
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts = {
+      -- Use prebuilt parsers (downloaded by nvim-treesitter from upstream
+      -- releases) instead of compiling locally via tree-sitter-cli.
+      -- Requires nvim-treesitter v0.10+ which has the prebuilt-parser flow.
+      auto_install = false,
+      ensure_installed = {
+        "lua", "vim", "vimdoc", "query",
+        "python", "rust", "go", "typescript", "tsx", "json", "yaml", "toml",
+        "bash", "markdown", "markdown_inline",
+      },
+    },
+  },
+}
+```
+
+Loses vs. full LazyVim: tools that **must** install via Mason (some
+formatters, debuggers). Add these manually as needed.
+
+### C. VSCode Remote SSH — most pragmatic for daily work
+
+If your laptop runs VSCode, this is **the lowest-effort path** for
+day-to-day editing on EL7:
+
+- VSCode pushes a `vscode-server` to the remote. The server is built
+  with bundled glibc-compat layers — works on EL7's glibc 2.17.
+- All LSP / formatters / TypeScript servers run inside `vscode-server`
+  on the remote. You don't install them yourself.
+- Local laptop UI handles syntax highlighting, IntelliSense, diff
+  view, source control, debugging.
+- The EL7 server only does file IO + runs your build commands.
+
+Install on EL7: nothing — VSCode auto-installs `vscode-server` to
+`~/.vscode-server/` on first connect. If your IT firewalls VSCode's
+direct download, set `Remote.SSH: Server Download URL Template` to a
+mirror.
+
+Trade-off: requires VSCode (Electron app, ~500MB) on your laptop —
+not a CLI-only solution. Some users dislike the latency for fast key
+operations, but for "edit some files, run some commands, check git
+diff" it's usually fine.
+
+This is **what most engineers use on remote EL7 dev hosts in 2026**.
+Helix and slimmed-down Neovim are alternatives if you want a
+terminal-native editor for SSH-only sessions or fast remote tweaks
+where opening VSCode is overkill.
+
+### Decision matrix
+
+| Editor | Setup time on EL7 | LSP coverage | Works in pure SSH | Familiar from nvim |
+|--------|-------------------|--------------|-------------------|---------------------|
+| Helix | ~5 min | Most languages bundled | ✅ | Half (modal, no plugin lang) |
+| Neovim AppImage + slim | ~30 min (Mason replacement work) | Manual setup per language | ✅ | Yes (full LazyVim UX) |
+| VSCode Remote SSH | ~2 min | All (handled by VSCode) | ❌ (needs VSCode UI) | No |
+
+My recommendation for "I have a CentOS 7 dev box and use macOS locally":
+
+- **Daily work**: VSCode Remote SSH. Cleanest, no friction.
+- **Quick edits in SSH-only session** (no VSCode handy): Helix (`hx`).
+- **You really want LazyVim parity**: Neovim AppImage + slim, accept
+  ~30min one-time setup.
+
 ## Decision tree
 
 When you hit a `GLIBC_*` / `GLIBCXX_*` / `CXXABI_*` not-found error:
