@@ -89,11 +89,17 @@ repos:
         files: '^scripts/[^/]+\.sh$'
         args: [--shell=bash, --severity=warning]
 
-  # shfmt - format check for bash scripts. Diff mode (-d) fails but does not
-  # rewrite; run `shfmt -w scripts/*.sh` manually to apply fixes.
+  # shfmt - auto-format bash scripts in place. Same UX as
+  # trailing-whitespace / end-of-file-fixer / redact-agent-secrets:
+  # if the hook rewrites a file, pre-commit reports "files were
+  # modified by this hook" and the user must `git add` + re-commit.
+  # Previously used `-d` (diff-only, no write) which printed the
+  # would-be diff but left working tree untouched, forcing a manual
+  # `shfmt -i 2 -ci -bn -w scripts/*.sh` round-trip — easy to mis-run
+  # with system shfmt defaults (tabs instead of 2-space).
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.10.0-2
     hooks:
       - id: shfmt
         files: '^scripts/[^/]+\.sh$'
-        args: [-i, "2", -ci, -bn, -d]
+        args: [-i, "2", -ci, -bn, -w]
