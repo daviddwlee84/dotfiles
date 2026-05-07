@@ -242,6 +242,10 @@ TAGS="${TAGS},input_method"
 {{ if $installNetworkingTools -}}
 TAGS="${TAGS},networking_tools"
 {{ end -}}
+{{ $installTunnelTools := false }}{{ if hasKey . "installTunnelTools" }}{{ $installTunnelTools = .installTunnelTools }}{{ end -}}
+{{ if $installTunnelTools -}}
+TAGS="${TAGS},tunnel_tools"
+{{ end -}}
 {{ $installIacTools := false }}{{ if hasKey . "installIacTools" }}{{ $installIacTools = .installIacTools }}{{ end -}}
 {{ if $installIacTools -}}
 TAGS="${TAGS},iac_tools"

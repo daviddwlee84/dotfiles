@@ -668,3 +668,333 @@
       args:
         executable: /bin/bash
       changed_when: false
+
+# =============================================================================
+# Tunnel tools — ngrok + cloudflared
+# Tags: tunnel_tools (gated by installTunnelTools chezmoi flag)
+# =============================================================================
+
+# --- ngrok ---
+
+- name: Install ngrok (macOS)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "Darwin"
+  block:
+    - name: Tap ngrok/ngrok
+      ansible.builtin.command: brew tap ngrok/ngrok
+      changed_when: false
+
+    - name: Install ngrok via Homebrew
+      community.general.homebrew:
+        name: ngrok/ngrok/ngrok
+        state: present
+
+- name: Install ngrok (Debian/Ubuntu)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "Debian"
+  block:
+    - name: Check if ngrok is installed
+      ansible.builtin.command: ngrok version
+      register: ngrok_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install ngrok via official apt repo (Debian/Ubuntu)
+      when: ngrok_check.rc != 0
+      become: true
+      tags: [sudo]
+      block:
+        - name: Download ngrok apt GPG key
+          ansible.builtin.get_url:
+            url: https://ngrok-agent.s3.amazonaws.com/ngrok.asc
+            dest: /tmp/ngrok.asc
+            timeout: 60
+
+        - name: Install ngrok GPG key
+          ansible.builtin.shell: |
+            gpg --dearmor < /tmp/ngrok.asc > /etc/apt/keyrings/ngrok.gpg
+            chmod 0644 /etc/apt/keyrings/ngrok.gpg
+          args:
+            creates: /etc/apt/keyrings/ngrok.gpg
+
+        - name: Add ngrok apt source
+          ansible.builtin.copy:
+            content: "deb [signed-by=/etc/apt/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main\n"
+            dest: /etc/apt/sources.list.d/ngrok.list
+            mode: '0644'
+
+        - name: Install ngrok from apt
+          ansible.builtin.apt:
+            name: ngrok
+            update_cache: true
+            state: present
+
+    - name: Re-check ngrok after apt install
+      ansible.builtin.command: ngrok version
+      register: ngrok_recheck
+      changed_when: false
+      failed_when: false
+
+    - name: Install ngrok from tgz (user-level fallback)
+      when: ngrok_recheck.rc != 0
+      block:
+        - name: Set ngrok tgz architecture
+          ansible.builtin.set_fact:
+            ngrok_tgz_arch: >-
+              {{ 'amd64' if target_architecture in ['x86_64', 'amd64']
+                 else 'arm64' if target_architecture in ['aarch64', 'arm64']
+                 else '' }}
+
+        - name: Ensure ~/.local/bin exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+            state: directory
+            mode: '0755'
+
+        - name: Download ngrok tgz (user-level)
+          ansible.builtin.get_url:
+            url: "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-{{ ngrok_tgz_arch }}.tgz"
+            dest: /tmp/ngrok.tgz
+            timeout: 120
+          when: ngrok_tgz_arch != ''
+
+        - name: Extract and install ngrok (user-level)
+          ansible.builtin.shell: |
+            set -e
+            tar -xzf /tmp/ngrok.tgz -C /tmp/
+            install -m 0755 /tmp/ngrok "{{ ansible_facts['env']['HOME'] }}/.local/bin/ngrok"
+          args:
+            executable: /bin/bash
+            creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/ngrok"
+          changed_when: true
+
+        - name: Clean up ngrok tgz
+          ansible.builtin.file:
+            path: /tmp/ngrok.tgz
+            state: absent
+
+  rescue:
+    - name: Warn ngrok installation failed
+      ansible.builtin.debug:
+        msg: "ngrok installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up ngrok temp files (rescue)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ngrok.tgz
+        - /tmp/ngrok
+        - /tmp/ngrok.asc
+
+- name: Install ngrok (RedHat/CentOS — tgz user-level)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "RedHat"
+  block:
+    - name: Check if ngrok is installed (RedHat)
+      ansible.builtin.command: ngrok version
+      register: ngrok_rh_check
+      changed_when: false
+      failed_when: false
+
+    - name: Set ngrok tgz architecture (RedHat)
+      when: ngrok_rh_check.rc != 0
+      ansible.builtin.set_fact:
+        ngrok_rh_arch: >-
+          {{ 'amd64' if target_architecture in ['x86_64', 'amd64']
+             else 'arm64' if target_architecture in ['aarch64', 'arm64']
+             else '' }}
+
+    - name: Ensure ~/.local/bin exists (RedHat)
+      when: ngrok_rh_check.rc != 0 and ngrok_rh_arch | default('') != ''
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Download and install ngrok tgz (RedHat)
+      when: ngrok_rh_check.rc != 0 and ngrok_rh_arch | default('') != ''
+      ansible.builtin.shell: |
+        set -e
+        curl -fsSL "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-{{ ngrok_rh_arch }}.tgz" -o /tmp/ngrok.tgz
+        tar -xzf /tmp/ngrok.tgz -C /tmp/
+        install -m 0755 /tmp/ngrok "{{ ansible_facts['env']['HOME'] }}/.local/bin/ngrok"
+        rm -f /tmp/ngrok.tgz /tmp/ngrok
+      args:
+        executable: /bin/bash
+        creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/ngrok"
+      changed_when: true
+
+  rescue:
+    - name: Warn ngrok installation failed (RedHat)
+      ansible.builtin.debug:
+        msg: "ngrok installation failed on RedHat — skipping."
+
+    - name: Clean up ngrok temp files (RedHat rescue)
+      ansible.builtin.shell: rm -f /tmp/ngrok.tgz /tmp/ngrok
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+# --- cloudflared ---
+
+- name: Install cloudflared (macOS)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: cloudflared
+    state: present
+
+- name: Install cloudflared (Debian/Ubuntu)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "Debian"
+  block:
+    - name: Check if cloudflared is installed
+      ansible.builtin.command: cloudflared version
+      register: cf_check
+      changed_when: false
+      failed_when: false
+
+    - name: Set cloudflared deb architecture
+      when: cf_check.rc != 0
+      ansible.builtin.set_fact:
+        cf_deb_arch: >-
+          {{ 'amd64' if target_architecture in ['x86_64', 'amd64']
+             else 'arm64' if target_architecture in ['aarch64', 'arm64']
+             else 'arm' if target_architecture in ['armv7l', 'armhf']
+             else '' }}
+
+    - name: Install cloudflared .deb (system-level)
+      when: cf_check.rc != 0 and cf_deb_arch | default('') != ''
+      become: true
+      tags: [sudo]
+      block:
+        - name: Get latest cloudflared release info
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/cloudflare/cloudflared/releases/latest
+            return_content: true
+            timeout: 30
+          register: cf_release
+          retries: 3
+          delay: 5
+          until: cf_release is succeeded
+
+        - name: Download cloudflared .deb
+          ansible.builtin.get_url:
+            url: "https://github.com/cloudflare/cloudflared/releases/download/{{ cf_release.json.tag_name }}/cloudflared-linux-{{ cf_deb_arch }}.deb"
+            dest: /tmp/cloudflared.deb
+            timeout: 120
+
+        - name: Install cloudflared .deb
+          ansible.builtin.apt:
+            deb: /tmp/cloudflared.deb
+            state: present
+
+        - name: Clean up cloudflared .deb
+          ansible.builtin.file:
+            path: /tmp/cloudflared.deb
+            state: absent
+
+    - name: Re-check cloudflared after deb install
+      ansible.builtin.command: cloudflared version
+      register: cf_recheck
+      changed_when: false
+      failed_when: false
+
+    - name: Install cloudflared binary (user-level fallback)
+      when: cf_recheck.rc != 0 and cf_deb_arch | default('') != ''
+      block:
+        - name: Ensure ~/.local/bin exists
+          ansible.builtin.file:
+            path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+            state: directory
+            mode: '0755'
+
+        - name: Get latest cloudflared release info (fallback)
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/cloudflare/cloudflared/releases/latest
+            return_content: true
+            timeout: 30
+          register: cf_release_fb
+          retries: 3
+          delay: 5
+          until: cf_release_fb is succeeded
+
+        - name: Download cloudflared binary (user-level)
+          ansible.builtin.get_url:
+            url: "https://github.com/cloudflare/cloudflared/releases/download/{{ cf_release_fb.json.tag_name }}/cloudflared-linux-{{ cf_deb_arch }}"
+            dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/cloudflared"
+            mode: '0755'
+            timeout: 120
+
+  rescue:
+    - name: Warn cloudflared installation failed
+      ansible.builtin.debug:
+        msg: "cloudflared installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+
+    - name: Clean up cloudflared temp files (rescue)
+      ansible.builtin.file:
+        path: /tmp/cloudflared.deb
+        state: absent
+
+- name: Install cloudflared (RedHat/CentOS — rpm)
+  tags: [tunnel_tools]
+  when: ansible_facts["os_family"] == "RedHat"
+  block:
+    - name: Check if cloudflared is installed (RedHat)
+      ansible.builtin.command: cloudflared version
+      register: cf_rh_check
+      changed_when: false
+      failed_when: false
+
+    - name: Set cloudflared rpm architecture (RedHat)
+      when: cf_rh_check.rc != 0
+      ansible.builtin.set_fact:
+        cf_rpm_arch: >-
+          {{ 'x86_64' if target_architecture in ['x86_64', 'amd64']
+             else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+             else '' }}
+
+    - name: Get latest cloudflared release info (RedHat)
+      when: cf_rh_check.rc != 0 and cf_rpm_arch | default('') != ''
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/cloudflare/cloudflared/releases/latest
+        return_content: true
+        timeout: 30
+      register: cf_rh_release
+      retries: 3
+      delay: 5
+      until: cf_rh_release is succeeded
+
+    - name: Install cloudflared .rpm (system-level)
+      when: cf_rh_check.rc != 0 and cf_rpm_arch | default('') != ''
+      become: true
+      tags: [sudo]
+      block:
+        - name: Download cloudflared .rpm
+          ansible.builtin.get_url:
+            url: "https://github.com/cloudflare/cloudflared/releases/download/{{ cf_rh_release.json.tag_name }}/cloudflared-linux-{{ cf_rpm_arch }}.rpm"
+            dest: /tmp/cloudflared.rpm
+            timeout: 120
+
+        - name: Install cloudflared .rpm
+          ansible.builtin.shell: |
+            rpm -i --force /tmp/cloudflared.rpm
+          args:
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Clean up cloudflared .rpm
+          ansible.builtin.file:
+            path: /tmp/cloudflared.rpm
+            state: absent
+
+  rescue:
+    - name: Warn cloudflared installation failed (RedHat)
+      ansible.builtin.debug:
+        msg: "cloudflared installation failed on RedHat — skipping."
+
+    - name: Clean up cloudflared temp files (RedHat rescue)
+      ansible.builtin.file:
+        path: /tmp/cloudflared.rpm
+        state: absent

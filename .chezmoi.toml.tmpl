@@ -66,6 +66,8 @@ discordChannel = "none"
 installInputMethod = {{ promptBoolOnce . "installInputMethod" "Install Traditional Chinese input methods (McBopomofo, RIME)" false }}
 # 是否安裝網路診斷工具 (nmap, mtr, httpie, gping, trippy, etc.)
 installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
+# 是否安裝 tunnel 工具 (ngrok, cloudflared) — expose localhost / SSH reverse tunnel
+installTunnelTools = {{ promptBoolOnce . "installTunnelTools" "Install tunnel tools (ngrok, cloudflared — expose localhost, SSH tunnels)" false }}
 # 是否安裝 Infrastructure-as-Code 工具 (Azure CLI, Terraform, OpenTofu)
 installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)" false }}
 # 是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)

@@ -107,6 +107,7 @@ plugins:
             Container config map: 容器設定對應
             Networking: 網路
             Services: 服務
+            "Tunnels (ngrok / cloudflared)": Tunnels（ngrok / cloudflared）
             dotnet tools: dotnet 工具
             td / sidecar: td / sidecar
             Web reader: 網頁讀取器
@@ -261,6 +262,7 @@ nav:
           - Networking: tools/networking.md
           - Services: tools/services.md
           - Tailscale: tools/Tailscale.md
+          - Tunnels (ngrok / cloudflared): tools/tunnels.md
           - dotnet tools: tools/dotnet-tools.md
       - Productivity:
           - td / sidecar: tools/td_sidecar.md
