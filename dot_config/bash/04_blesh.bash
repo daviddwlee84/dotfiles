@@ -22,3 +22,29 @@ bleopt prompt_eol_mark=
 # (e.g., `ble-bind -x 'C-r' 'atuin-search-bash'`) when porting zsh
 # widgets to bash; reminder: anything that was `bindkey -M viins` in zsh
 # is `ble-bind -m vi_imap -x` in ble.sh.
+
+# === Multi-line submit: Ctrl+Enter ===
+#
+# Default ble.sh + vi-mode behaviour: when the buffer contains a newline
+# (multi-line paste, multi-line typed input, here-doc etc.), the shell
+# enters MULTILINE mode and plain RET / Ctrl-M re-binds to "insert
+# newline" rather than "submit" — meaning Enter alone won't run the
+# command. The official escape is Ctrl-J (linefeed = accept-line), but
+# tmux's vim-tmux-navigator already eats `C-j` for pane navigation
+# (dot_config/tmux/keybindings.conf:183), so it never reaches ble.sh.
+#
+# Ctrl+Enter is the cleanest free key on this stack:
+#   - tmux extended-keys + xterm:extkeys are enabled, so Ctrl+Enter
+#     sends a distinct CSI-u sequence (\e[13;5u) which tmux forwards
+#     intact (no collision with C-j).
+#   - ble.sh sees `C-RET` as a separate keysym when extended-keys flow
+#     through, and binds it independently from `RET` / `C-m`.
+#   - Plain RET still does the safe-multiline-newline thing — useful for
+#     intentionally building multi-line commands.
+#
+# If your terminal can't emit Ctrl+Enter as CSI-u (some minimal SSH
+# clients), Alt+Enter (`M-RET` below) is a portable fallback.
+ble-bind -m vi_imap -f 'C-RET' accept-line
+ble-bind -m vi_nmap -f 'C-RET' accept-line
+ble-bind -m vi_imap -f 'M-RET' accept-line
+ble-bind -m vi_nmap -f 'M-RET' accept-line
