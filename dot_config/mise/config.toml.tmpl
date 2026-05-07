@@ -1,4 +1,23 @@
 {{- $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+{{- /* Detect CentOS/RHEL 7 — glibc 2.17 + libstdc++ from gcc 4.8.5. Modern
+       Node (18+) / Bun musl / .NET 6+ binaries refuse to load against this
+       baseline, and mise's rustup channel is gated on a TUNA mirror that
+       garbage-collects old versions. We skip those tools on this host class
+       and document the manual fallbacks (NodeSource RPM, direct rustup,
+       skip dotnet) in docs/infra/linux-toolchain-baseline.md. */ -}}
+{{- $oldEL := false -}}
+{{- if eq .chezmoi.os "linux" -}}
+  {{- $rel := .chezmoi.osRelease | default dict -}}
+  {{- $id := "" -}}
+  {{- if hasKey $rel "id" -}}{{ $id = $rel.id }}{{- end -}}
+  {{- $idLike := "" -}}
+  {{- if hasKey $rel "idLike" -}}{{ $idLike = $rel.idLike }}{{- end -}}
+  {{- $verID := "" -}}
+  {{- if hasKey $rel "versionID" -}}{{ $verID = $rel.versionID }}{{- end -}}
+  {{- if and (or (eq $id "centos") (eq $id "rhel") (eq $id "scientific") (contains "rhel" $idLike)) (eq $verID "7") -}}
+    {{- $oldEL = true -}}
+  {{- end -}}
+{{- end -}}
 # mise global configuration
 # https://mise.jdx.dev/configuration.html
 
@@ -8,6 +27,21 @@
 ruby.compile = false
 
 [tools]
+{{ if $oldEL -}}
+# CentOS/RHEL 7 detected (glibc 2.17). Modern toolchain prebuilds refuse to
+# run on this baseline, so most mise core tools are skipped. Manual fallbacks:
+#   - Node.js: install via NodeSource (Node 16 last EL7-compatible LTS):
+#       curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
+#       sudo yum install -y nodejs
+#   - Rust: install via rustup directly (avoids mise's TUNA mirror gap):
+#       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#   - Bun: skipped — musl binary fails to start; not worth chasing
+#   - .NET: skipped — needs GLIBCXX_3.4.20 (gcc 5+); requires SCL devtoolset
+#   - Ruby: precompiled binary works
+# See docs/infra/linux-toolchain-baseline.md for the full glibc/libstdc++
+# version matrix and why these decisions are structural, not transient.
+ruby = "3"
+{{ else -}}
 # Node.js LTS for LazyVim LSP servers and tree-sitter-cli
 node = "lts"
 # Bun for bunx CLI tools
@@ -21,4 +55,5 @@ dotnet = "latest"
 ruby = "3"
 {{ else -}}
 # Ruby skipped in noRoot mode: ruby-build requires libffi-dev (needs sudo)
+{{ end -}}
 {{ end -}}

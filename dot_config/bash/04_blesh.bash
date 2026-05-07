@@ -48,3 +48,18 @@ ble-bind -m vi_imap -f 'C-RET' accept-line
 ble-bind -m vi_nmap -f 'C-RET' accept-line
 ble-bind -m vi_imap -f 'M-RET' accept-line
 ble-bind -m vi_nmap -f 'M-RET' accept-line
+
+# === Suppress mouse keyseq warnings ===
+#
+# When ble.sh runs OUTSIDE tmux (e.g. directly in Ghostty / Alacritty), the
+# terminal forwards mouse-tracking sequences (`ESC[<...M`) into the shell.
+# ble.sh by default doesn't have a binding for them and warns
+# `unbind keyseq: mouse` on every mouse click, which cluters the prompt.
+# Inside tmux mouse events stay in tmux's own copy-mode handler, so the
+# warning never appears.
+#
+# Bind every mouse keyseq variant to `nop` (no-op) — ble.sh swallows the
+# event silently. Both `xterm` (modern SGR-style) and the legacy `mouse`
+# pseudo-keysym are covered.
+ble-bind -f 'mouse' nop 2>/dev/null
+ble-bind -f 'mouse_xterm' nop 2>/dev/null

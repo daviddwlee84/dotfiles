@@ -304,6 +304,7 @@ nav:
           - import_ssh_to_bw.sh: this_repo/scripts/import_ssh_to_bw.sh.md
   - Infrastructure:
       - Overview: infra/README.md
+      - Linux toolchain baseline (glibc / libstdc++ / kernel / gcc): infra/linux-toolchain-baseline.md
       - Virtualization: infra/virtualization.md
       - Compute scheduling: infra/compute-scheduling.md
       - Shared storage: infra/shared-storage.md
