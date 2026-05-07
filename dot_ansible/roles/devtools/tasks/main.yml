@@ -3086,15 +3086,16 @@
 
 - name: Check tv channel version sentinel
   when: tv_final_probe.rc == 0
-  ansible.builtin.slurp:
-    src: "{{ ansible_facts['env']['HOME'] }}/.config/television/.cable-version"
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.config/television/.cable-version"
   register: tv_cable_sentinel
-  ignore_errors: true
 
 - name: Update television channel prototypes
   when:
     - tv_final_probe.rc == 0
-    - tv_cable_sentinel is failed or (tv_cable_sentinel.content | b64decode | trim) != (tv_version_current.stdout | trim)
+    - >-
+      not tv_cable_sentinel.stat.exists or
+      (lookup('file', ansible_facts['env']['HOME'] + '/.config/television/.cable-version') | trim) != (tv_version_current.stdout | trim)
   ansible.builtin.command: tv update-channels
   register: tv_update_channels
   changed_when: true
