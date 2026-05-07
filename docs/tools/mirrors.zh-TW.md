@@ -38,7 +38,6 @@ chezmoi apply
 | **Rustup**(dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` 環境變數 | `goproxy.cn`（Qiniu；TUNA 沒有 Go proxy） | — |
-| **Codex CLI transport** | `~/.codex/config.toml`，透過 `modify_config.toml.tmpl` | 不是鏡像；縮短 OpenAI WebSocket retry（`1`、`3000ms`）後更快進入 HTTPS fallback | — |
 | **Docker Hub**（Linux 上的 rootless Docker） | `~/.config/docker/daemon.json`，透過 `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu / azk8s（fallback chain） | — |
 | **Ubuntu apt**（僅 Docker image） | `Dockerfile` | 華為雲 (Huawei Cloud) | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
 

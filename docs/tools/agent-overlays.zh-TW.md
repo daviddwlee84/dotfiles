@@ -125,15 +125,7 @@ enabled = true
 - `[features]` — 啟用此使用者一律想開啟的實驗性 flag。
 - `[plugins."<id>".enabled]` — 精選的外掛集；使用者自行安裝的外掛會以自己的 `[plugins."..."]` 區塊出現，並在深層合併中被保留。
 
-當 `useChineseMirror=true` 時，`dot_codex/modify_config.toml.tmpl` 也會追加：
-
-```toml
-[model_providers.openai]
-stream_max_retries = 1
-websocket_connect_timeout_ms = 3000
-```
-
-這會保留 WebSocket，但降低 WebSocket 失敗 retry 成本，讓 Codex 更快 fallback 到 HTTPS/SSE。若之後關掉此 flag，modify 腳本只會移除這組精確受管 retry 值，保留使用者自己的 provider 覆寫。
+這個覆寫層刻意**不**持久化 `[model_providers.openai]` 覆寫。Codex CLI 允許用一次性的 `-c` 傳入這些 knob，但會拒絕在 `config.toml` 中覆寫 `openai` 這類保留的 built-in provider ID。modify 腳本會移除早期實驗留下的 `[model_providers.openai]` stale table，同時保留 `[model_providers.openai-gfw]` 這類自訂 provider ID。
 
 ## 刻意不管理的內容
 

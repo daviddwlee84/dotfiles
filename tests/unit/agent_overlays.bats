@@ -179,7 +179,7 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   echo "$output" | yq -p toml -e '.features.steer == true' >/dev/null
 }
 
-@test "codex modify_config.toml: useChineseMirror enables short OpenAI websocket retry" {
+@test "codex modify_config.toml: useChineseMirror does not persist reserved OpenAI provider override" {
   _have_chezmoi || skip "chezmoi not installed"
   command -v yq >/dev/null 2>&1 || skip "yq not installed"
   yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
@@ -189,41 +189,33 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
   run bash -c "printf '' | '$script'"
   [ "$status" -eq 0 ]
-  echo "$output" | yq -p toml -e '.model_providers.openai.stream_max_retries == 1' >/dev/null
-  echo "$output" | yq -p toml -e '.model_providers.openai.websocket_connect_timeout_ms == 3000' >/dev/null
+  echo "$output" | yq -p toml -e '. | has("model_providers") | not' >/dev/null
 }
 
-@test "codex modify_config.toml: useChineseMirror=false prunes stale managed websocket retry only" {
+@test "codex modify_config.toml: prunes invalid built-in OpenAI provider but preserves custom providers" {
   _have_chezmoi || skip "chezmoi not installed"
   command -v yq >/dev/null 2>&1 || skip "yq not installed"
   yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
 
-  local script="$RENDER_DIR/codex-no-gfw.sh"
-  _render_with_data "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script" '{"useChineseMirror":false}'
+  local script="$RENDER_DIR/codex-prune-reserved.sh"
+  _render_with_data "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script" '{"useChineseMirror":true}'
 
   local stale_live='[model_providers.openai]
 stream_max_retries = 1
 websocket_connect_timeout_ms = 3000
 supports_websockets = false
 request_max_retries = 7
-'
 
-  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$stale_live"
-  [ "$status" -eq 0 ]
-  echo "$output" | yq -p toml -e '.model_providers.openai | has("stream_max_retries") | not' >/dev/null
-  echo "$output" | yq -p toml -e '.model_providers.openai | has("websocket_connect_timeout_ms") | not' >/dev/null
-  echo "$output" | yq -p toml -e '.model_providers.openai.supports_websockets == false' >/dev/null
-  echo "$output" | yq -p toml -e '.model_providers.openai.request_max_retries == 7' >/dev/null
-
-  local custom_live='[model_providers.openai]
+[model_providers.openai-gfw]
 stream_max_retries = 2
 websocket_connect_timeout_ms = 5000
 '
 
-  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$custom_live"
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$stale_live"
   [ "$status" -eq 0 ]
-  echo "$output" | yq -p toml -e '.model_providers.openai.stream_max_retries == 2' >/dev/null
-  echo "$output" | yq -p toml -e '.model_providers.openai.websocket_connect_timeout_ms == 5000' >/dev/null
+  echo "$output" | yq -p toml -e '.model_providers | has("openai") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.model_providers["openai-gfw"].stream_max_retries == 2' >/dev/null
+  echo "$output" | yq -p toml -e '.model_providers["openai-gfw"].websocket_connect_timeout_ms == 5000' >/dev/null
 }
 
 @test "opencode migrate: legacy config.json renamed when modern absent" {

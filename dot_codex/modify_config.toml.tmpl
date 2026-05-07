@@ -6,8 +6,7 @@
 # (`[marketplaces.<id>]`) that are machine-specific. Tracking the whole file
 # would create constant diff and bake one machine's paths into another's apply.
 # We enforce only stable preferences (model, personality, [features],
-# [model_providers.openai] GFW transport tuning, [plugins.*]) and round-trip
-# the live machine state untouched.
+# [plugins.*]) and round-trip the live machine state untouched.
 #
 # How: chezmoi pipes the current target file into stdin; this script prints
 # the new contents on stdout. The merge runs in a small Python program because:
@@ -35,12 +34,6 @@ set -eu
 
 overlay=$(cat <<'TOML'
 {{ template "agents/codex.config.overlay.toml" . }}
-{{- if .useChineseMirror }}
-
-[model_providers.openai]
-stream_max_retries = 1
-websocket_connect_timeout_ms = 3000
-{{- end }}
 TOML
 )
 
@@ -102,45 +95,19 @@ def deep_merge(base: dict, overlay: dict) -> dict:
     return out
 
 
-MANAGED_GFW_OPENAI_TRANSPORT = {
-    "stream_max_retries": 1,
-    "websocket_connect_timeout_ms": 3000,
-}
+def prune_reserved_builtin_providers(live: dict) -> None:
+    """Remove invalid overrides for Codex built-in provider IDs.
 
-
-def overlay_manages_gfw_transport(overlay: dict) -> bool:
-    providers = overlay.get("model_providers")
-    if not isinstance(providers, dict):
-        return False
-    provider = providers.get("openai")
-    return isinstance(provider, dict) and any(
-        key in provider for key in MANAGED_GFW_OPENAI_TRANSPORT
-    )
-
-
-def prune_stale_gfw_transport(live: dict, overlay: dict) -> None:
-    """Remove exact repo-managed GFW retry knobs after useChineseMirror=false.
-
-    modify_ scripts are merges, so omitted overlay keys would otherwise remain
-    forever. Only prune the exact values this repo writes; user choices such as
-    supports_websockets=false or custom retry values survive.
+    Codex accepts `model_providers.openai.*` via one-off `-c` CLI overrides but
+    rejects persisted config.toml files that override the reserved built-in
+    `openai` provider. Removing the whole table repairs configs produced by
+    the previous GFW retry experiment and any equivalent manual override.
+    Custom provider IDs such as `openai-gfw` are left untouched.
     """
-    if overlay_manages_gfw_transport(overlay):
-        return
-
     providers = live.get("model_providers")
     if not isinstance(providers, dict):
         return
-    openai = providers.get("openai")
-    if not isinstance(openai, dict):
-        return
-
-    for key, managed_value in MANAGED_GFW_OPENAI_TRANSPORT.items():
-        if openai.get(key) == managed_value:
-            del openai[key]
-
-    if not openai:
-        del providers["openai"]
+    providers.pop("openai", None)
     if not providers:
         del live["model_providers"]
 
@@ -189,7 +156,7 @@ def quote_key(k: str) -> str:
 
 live = parse(os.environ.get("CODEX_LIVE", ""))
 overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
-prune_stale_gfw_transport(live, overlay)
+prune_reserved_builtin_providers(live)
 
 # Pull machine-local subtrees out before merge; re-attach last so they win.
 state = {}

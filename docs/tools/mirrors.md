@@ -38,7 +38,6 @@ chezmoi apply
 | **Rustup** (dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` env vars | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` env vars | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` env var | `goproxy.cn` (Qiniu; TUNA has no Go proxy) | — |
-| **Codex CLI transport** | `~/.codex/config.toml` via `modify_config.toml.tmpl` | No mirror; short OpenAI WebSocket retry (`1`, `3000ms`) before HTTPS fallback | — |
 | **Docker Hub** (rootless Docker on Linux) | `~/.config/docker/daemon.json` via `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu / azk8s (fallback chain) | — |
 | **Ubuntu apt** (Docker image only) | `Dockerfile` | Huawei Cloud | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
 
