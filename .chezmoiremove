@@ -5,9 +5,17 @@ when the path actually exists). One pattern per line.
 
 Currently used to clean up the zsh-side copies of files that were
 moved into the shared dot_config/shell/ POSIX layer (see commit
-adding `dot_config/shell/`). Without this, the orphan ~/.config/zsh/
-files would still get sourced by load_modular_dir and double-load
-PATH/env on every shell start.
+9bb56c2 "shell: extract POSIX layer..." 2026-05). Without this, the
+orphan ~/.config/zsh/ files would still get sourced by
+load_modular_dir and double-load PATH/env on every shell start.
+
+Pruning policy: leave entries forever unless the file grows large
+(>50 lines). `stat()` on each non-existent path is a few µs per
+apply — negligible cost vs the safety of cleaning up any host that
+hasn't applied since the migration commit. After ~6-12 months on
+the fleet, individual entries can be pruned in a follow-up commit
+if the maintainer is confident every host has applied at least
+once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 */ -}}
 .config/zsh/00_exports.zsh
 .config/zsh/02_legacy_tools.zsh

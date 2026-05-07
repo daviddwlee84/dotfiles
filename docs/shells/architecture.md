@@ -140,7 +140,19 @@ autosuggestions/zsh-syntax-highlighting) intact.
 `/etc/bashrc` on RHEL families (CentOS / Rocky / Alma) is sourced
 explicitly by step 2 of dot_bashrc.tmpl, preserving the protective
 `rm -i` / `cp -i` aliases, the Modules system init, and the
-distribution's umask defaults.
+distribution's umask defaults. The RHEL-specific `~/.bashrc.d/*`
+loop convention (analogous to Debian's `~/.bash_aliases`) is also
+preserved by step 11 — anything users dropped into that dir keeps
+working.
+
+RHEL family `/etc/skel/.bashrc` carries less than Debian's:
+
+| Block                                                         | Action       | Why |
+| ------------------------------------------------------------- | ------------ | --- |
+| `if [ -f /etc/bashrc ]; then . /etc/bashrc; fi`               | Preserve     | dot_bashrc.tmpl step 2 |
+| `PATH="$HOME/.local/bin:$HOME/bin:$PATH"`                     | Preserve     | Same export in dot_config/shell/00_exports.sh.tmpl |
+| `for rc in ~/.bashrc.d/*; do . "$rc"; done`                   | Preserve     | dot_bashrc.tmpl step 11 |
+| (no PS1, no aliases, no shopts in skel)                       | N/A          | RHEL leaves prompt + aliases to /etc/bashrc + user dotfiles |
 
 ## Future shell extension
 
