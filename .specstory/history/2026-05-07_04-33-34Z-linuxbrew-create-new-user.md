@@ -18736,3 +18736,448 @@ npm install -g @github/copilot
 跑完就有了。如果需要持久化 auto-activate，也在 doc 裡（`~/.bashrc.adhoc` snippet）。
 
 要不要我直接把 micromamba auto-install 加進 ansible 的 `noModernGcc` 條件分支（EL7 自動裝 micromamba + node22 env）？還是這個太 invasive 你想自己手動跑？
+
+---
+
+_**User (2026-05-07 12:10:02Z)**_
+
+```
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ micromamba activate node22
+
+'micromamba' is running as a subprocess and can't modify the parent shell.
+Thus you must initialize your shell before using activate and deactivate.
+
+To initialize the current bash shell, run:
+    $ eval "$(micromamba shell hook --shell bash)"
+and then activate or deactivate with:
+    $ micromamba activate
+To automatically initialize all future (bash) shells, run:
+    $ micromamba shell init --shell bash --root-prefix=~/.local/share/mamba
+If your shell was already initialized, reinitialize your shell with:
+    $ micromamba shell reinit --shell bash
+Otherwise, this may be an issue. In the meantime you can run commands. See:
+    $ micromamba run --help
+
+Supported shells are {bash, zsh, csh, posix, xonsh, cmd.exe, powershell, fish, nu}.
+critical libmamba Shell not initialized
+[ble: exit 1]
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ eval "$(micromamba shell hook --shell bash)"
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ micromamba activate node22
+critical libmamba Cannot activate, prefix does not exist at: '/home/yczhang/.local/share/mamba/envs/node22'
+[ble: exit 1]
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ micromamba create -n node22 -c conda-forge -y nodejs=22
+⚠ Shard Index for conda-forge/linux-64 not available, falling back to flat repodata
+Using Flat Repodata for conda-forge/linux-64                                              ✔ Done (3.2 sec)
+⚠ Shard Index for conda-forge/noarch not available, falling back to flat repodata
+Using Flat Repodata for conda-forge/noarch                                                ✔ Done (1.3 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/linux-64 not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/li...     ✔ Done (0.2 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/noarch not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/no...     ✔ Done (0.0 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r/linux-64 not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r/linux-64     ✔ Done (0.0 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r/noarch not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r/noarch       ✔ Done (0.0 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2/linux-64 not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2/l...     ✔ Done (0.0 sec)
+⚠ Shard Index for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2/noarch not available, falling back to flat repodata
+Using Flat Repodata for https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2/n...     ✔ Done (0.0 sec)
+```
+
+[Image #631] micromamba @dot_config/zsh/tools/04_conda_mamba.zsh 會被這個觀測管理到嗎？
+根據我的理解 走這個是爲了解決原本理論上應該由mise的問題？(那感覺做爲ansible可能並不合適？)
+
+(然後ble貼上有還是有怪符號 這邊是空格)
+
+如果針對老系統不fix的話 (放棄nvim?) 還有沒有啥選擇？
+
+_**User (2026-05-07 12:10:02Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/597394df-4100-4c60-9f68-3668520c653c/631.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 12:10:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 12:10:35Z)**_
+
+四個問題分頭回答 + 一個 patch。
+
+## 1. `04_conda_mamba.zsh` **不會** 自動偵測 micromamba
+
+現在它只認 `~/miniforge3`, `~/miniconda3`, `~/anaconda3` 那幾個固定路徑。micromamba 是 single binary 裝在 `~/.local/bin/micromamba`，env root 在 `$MAMBA_ROOT_PREFIX`（預設 `~/.local/share/mamba` 或 `~/micromamba`）。完全不同的安裝結構。
+
+**該擴展**。同樣的 lazy-load pattern 套上去：
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_conda_mamba.zsh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+zsh syntax check
+
+`zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/04_conda_mamba.zsh 2>&1 && echo "syntax OK"`
+
+```text
+syntax OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check aliases doc
+
+`grep -n "conda\|mamba" /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md 2>/dev/null | head -10`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify aliases.md state
+
+`test -f /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md && grep "04_conda_mamba\|conda\|mamba" /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md | head -5 || echo "aliases.md does not exist or no conda mention"`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check shells docs dir
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/docs/shells/ 2>/dev/null`
+
+```text
+ aliases.md
+ aliases.zh-TW.md
+ architecture.md
+ bash.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+find existing conda/mamba mention
+
+`grep -n "conda\|mamba\|04_conda" /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md | head -5`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See aliases doc structure
+
+`head -25 /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md`
+
+```text
+# Custom Aliases & Shell Functions
+
+Quick reference for custom aliases and shell functions defined in this dotfiles repo. Available in zsh, bash, or both — the source file path tells you which:
+
+- `dot_config/shell/*.sh` — POSIX layer, sourced by **both** `~/.zshrc` and `~/.bashrc`.
+- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — **zsh-only**.
+- `dot_config/bash/*.bash` — **bash-only**.
+
+> **Maintenance rule** (mirrored in `CLAUDE.md`): whenever you add, modify, or remove a custom alias or shell function in `dot_config/{shell,zsh,bash}/`, update this table — include the type (`alias` or `function`), source file (relative to repo root), and a one-line description. Place new helpers in the right tier per the [CLAUDE.md three-tier rule](../../CLAUDE.md#custom-aliases--shell-functions--docsshellsaliasesmd).
+
+---
+
+## Table of Contents
+
+- [Editor](#editor)
+- [File Listing](#file-listing)
+- [Navigation](#navigation)
+- [Git](#git)
+- [Tools Picker](#tools-picker)
+- [Session Management](#session-management)
+- [Worktree Management](#worktree-management)
+- [GitHub / GitLab](#github--gitlab)
+- [AI Usage Tracking](#ai-usage-tracking)
+- [Task Queue](#task-queue)
+- [Networking](#networking)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:11:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+All section headers in aliases.md
+
+`grep -n "^## " /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md | head -30`
+
+```text
+13:## Table of Contents
+36:## Editor
+44:## File Listing
+58:## Navigation
+68:## Git
+431:## Tools Picker
+450:## Session Management
+468:## Worktree Management
+481:## GitHub / GitLab
+491:## AI Usage Tracking
+504:## Task Queue
+514:## Networking
+557:## Log Viewers
+571:## Media / AV
+586:## Shell Utilities
+596:## Tmux Integration
+608:## AI Capture
+623:## Claude Code
+633:## Package Managers & Runtime
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:12:01Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/shells/aliases.md`
+
+```text
+633	## Package Managers & Runtime
+634	
+635	| Command | Type | Source File | Description |
+636	|---------|------|-------------|-------------|
+637	| `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | Lazy-load NVM into current session (normally skipped at startup) |
+638	| `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | Regenerate cached Bitwarden zsh completion file |
+639	| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `dot_config/shell/00_exports.sh.tmpl`) |
+640
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:12:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:12:26Z)**_
+
+Commit:
+
+_**Agent (claude-opus-4-7 2026-05-07 12:12:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit micromamba lazy-load
+
+```bash
+git add dot_config/zsh/tools/04_conda_mamba.zsh docs/shells/aliases.md && git commit -m "$(cat <<'EOF'
+zsh: 04_conda_mamba lazy-loads micromamba alongside full-distro conda
+
+The existing module only autodetected `~/miniforge3` / `~/miniconda3` /
+`~/anaconda3` (full distros with `etc/profile.d/conda.sh`). Add a
+parallel `~/.local/bin/micromamba` detection path that runs
+`micromamba shell hook --shell zsh` instead — micromamba is the
+single-binary variant common on noRoot / EL7 / corporate compute nodes
+where a full conda install is overkill.
+
+Both hooks coexist (full-distro + micromamba) when both are present;
+micromamba's hook is idempotent re: an existing `$CONDA_PREFIX`. Also
+respects `$MAMBA_ROOT_PREFIX` if set, else autodetects
+`~/.local/share/mamba` / `~/micromamba`.
+
+Required for the EL7 escape hatch documented in
+docs/infra/linux-toolchain-baseline.md (modern Node via
+`micromamba create -c conda-forge nodejs=22`) — without this the user
+has to manually `eval "$(micromamba shell hook --shell zsh)"` every
+session before `micromamba activate` works.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" && git log --oneline -3
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778155953-94475.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778155953-94475.
+[main ea10666] zsh: 04_conda_mamba lazy-loads micromamba alongside full-distro conda
+ 2 files changed, 78 insertions(+), 26 deletions(-)
+ea10666 zsh: 04_conda_mamba lazy-loads micromamba alongside full-distro conda
+6d74102 mirrors+ansible: switch Node mirror to Aliyun, fix ansible_pkg_mgr undefined
+c0b4bd8 docs+mise+blesh: Linux toolchain baseline doc + EL7-aware mise pins
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 12:13:24Z)**_
+
+Committed `ea10666`.
+
+---
+
+## 2. micromamba 該不該做 ansible？— **不該**
+
+你直覺對。三個原因：
+
+1. **太 platform-specific**：只有 EL7 / glibc < 2.28 的 box 才需要這個 escape hatch。Rocky 9 / Ubuntu 22+ 直接用 mise 就好。
+2. **是 user choice，不是 system requirement**：使用者可能想要 helix/kakoune 取代 nvim、或根本不需要 npm-based agent CLI。Ansible 自動裝 micromamba env 太 invasive。
+3. **conda env 體積大**（每個 200MB-1GB）：自動裝會吃掉用戶 quota，而且如果 `~/.local/share/mamba` 已經有東西不應該被覆蓋。
+
+**正確邊界**：
+- ✅ Ansible：偵測「跑不起來」並 skip（已做：mise tools、numpy/pandas、tree-sitter）
+- ✅ Doc：把 micromamba escape hatch 寫成 manual workaround（已做）
+- ❌ Ansible：自動裝 micromamba + create env
+
+剛剛做的 `04_conda_mamba.zsh` lazy-load 是 **shell integration 層**（讓使用者**裝完之後**用得順），這個合理。安裝動作仍然手動。
+
+## 3. ble 還是出怪符號 — tmux 還沒 pickup 新 config
+
+你 tmux 還在舊 server，沒吃到 `extended-keys on`。**必須 kill-server**（reload 不夠）：
+
+```bash
+# 先存好你的 tmux session 工作（如果有的話）
+tmux ls    # 看你有哪些 session
+
+# 殺 tmux server（會關掉所有 panes — 確認沒 unsaved work 再做）
+tmux kill-server
+
+# 開新 tmux，paste 多行測試
+tmux
+# 試 paste：
+#   uname -r
+#   ldd --version
+#   gcc --version
+# 應該乾淨換行，沒 ^[[106;5u
+```
+
+驗證 tmux extended-keys 設定生效：
+
+```bash
+tmux show-options -sv extended-keys   # 應該印 'on' 而不是 'always'
+```
+
+## 4. 老系統不 fix → 還能用什麼？（不要走 nvim 的話）
+
+EL7 上 LazyVim/nvim 確實可以**繼續用**（nvim AppImage 靜態 link、不依賴 system glibc），但 LSP server / treesitter parser / Mason 那套 ecosystem 大量假設 modern Node + Rust toolchain。會撞牆但能修一個算一個。
+
+如果想完全跳過 Node-heavy editor stack：
+
+| 編輯器 | EL7 相容性 | 是不是 nvim/LazyVim 替代 | 備註 |
+|---|---|---|---|
+| **helix** (`hx`) | ✅ Single binary, glibc 2.17 OK (musl variant) | 半個 — modal editing, built-in LSP, no plugin language | 最現代的「不需要 Node」選擇 |
+| **kakoune** | ✅ source build OK | 部分 — multi-cursor, modal | plugin ecosystem 較弱 |
+| **micro** | ✅ Go-static binary | ❌ 不是 modal editor | 對「想離開 vim style」的人 |
+| **vim 7.4** (yum) | ✅ system 自帶 | 同 nvim 但功能少很多 | 沒 LSP, 老 plugin manager |
+| **vim 9** (build from source) | ✅ source build OK | 接近 nvim 但沒 lua | gcc 4.8.5 編得起 vim 9 |
+| **emacs** (yum) | ✅ system 自帶 | 完全不同範式 | tmux + magit + lsp-mode 一條龍 |
+| **VSCode Remote SSH** | ✅ 老 EL7 也支援 | ❌ 不是 terminal editor | 讓 macOS/Windows 端跑 modern stack，server 只當文件存放 |
+
+**個人推薦**（針對你這種「要在 EL7 上做開發但不想升 OS」的場景）：
+
+### 路徑 A：helix（純 terminal、零 Node）
+
+```bash
+curl -fsSL https://github.com/helix-editor/helix/releases/latest/download/helix-25.07-x86_64-linux.tar.xz | tar -xJ -C /tmp
+mkdir -p ~/.local/share/helix
+cp -r /tmp/helix-*/runtime ~/.local/share/helix/
+ln -sf /tmp/helix-*/hx ~/.local/bin/hx
+hx --version
+```
+
+helix 內建的 LSP / treesitter parser 是預編譯的（不需要 Node 也不需要 Rust toolchain on host）。`hx --health` 看支援哪些語言。Go/Rust/Python/TS/Lua/Shell 都自帶。
+
+### 路徑 B：nvim AppImage + 最小化 LazyVim
+
+```bash
+# nvim AppImage 是靜態 link，不吃 glibc
+curl -fsSL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.appimage -o ~/.local/bin/nvim
+chmod +x ~/.local/bin/nvim
+nvim --version    # v0.11+
+
+# 然後 LazyVim 部分手動禁用會撞 Node 的：
+# - Mason（裝 LSP server 要 Node/Bun）
+# - 各種 npm-installed formatter (prettier, etc.)
+# 改用：
+# - 系統裝的 LSP server（rust-analyzer 用 rustup 的、pyright 用 micromamba 的、lua-ls binary）
+# - cargo-installed formatter (stylua, taplo)
+```
+
+### 路徑 C：VSCode Remote SSH（最務實）
+
+如果你 macOS/Windows 端有 VSCode，**這是最省力的方案**：
+
+- VSCode SSH 把 `vscode-server` push 到 EL7，這個 server 是 glibc-shim 過的
+- 所有 LSP / Prettier / TypeScript 都在 SSH 對端跑（macOS/Windows）
+- EL7 server 只處理 IO + 跑命令
+- 沒 nvim 的 plugin friction
+
+**個人最推薦**：路徑 C 給日常工作 + 路徑 A (helix) 當 backup CLI editor 給快速編輯/SSH-only 場景。
+
+## 你 server 端要做的
+
+```bash
+cd ~/.local/share/chezmoi
+git pull   # 拿到 ea10666 (micromamba lazy-load)
+
+# tmux 必須 kill-server 才會吃 extended-keys on
+tmux kill-server
+tmux                       # 開新 server
+# 測試 paste 多行 — 應該 clean
+
+# 04_conda_mamba.zsh 重新 source（reload zsh 也行）
+exec zsh
+which conda mamba micromamba   # 應該都印 "function"
+
+# 然後接著裝 node22 env：
+micromamba activate node22   # 應該 work（前面 create -n node22 已成功）
+node --version
+```
+
+要不要我把「helix 安裝 + LazyVim 簡化建議」寫進 `docs/infra/linux-toolchain-baseline.md` 的 escape hatch 章節？還是留作個人選擇 case-by-case？
