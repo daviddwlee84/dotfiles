@@ -122,6 +122,58 @@ INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
 
 command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
 
+# === Target Python interpreter override (CentOS 7 + similar) ===
+#
+# ansible-core 2.18+ modules wrap themselves in `from __future__ import
+# annotations` (Py3.7+ syntax). When ansible runs against a target whose
+# auto-discovered `/usr/bin/python3` is older (CentOS 7 ships 3.6.8),
+# every task fails at the Gathering Facts stage with:
+#   SyntaxError: future feature annotations is not defined
+#
+# Detect the auto-discovered python's version; if < 3.7, fall back to
+# uv's managed python (already pulled into ~/.local/share/uv/python/...
+# by `uv tool install ansible-core` in bootstrap) and pass it via
+# -e ansible_python_interpreter. This is forward-compatible: on Rocky 9
+# (Py 3.9+) the override is unnecessary and the if-branch is skipped.
+#
+# See pitfalls/centos7-noroot.md → "controller Python pin" for the
+# matching controller-side fix; this is the target-side companion.
+ANSIBLE_PY_INTERP=""
+detect_target_python() {
+    local sys_py="${1:-/usr/bin/python3}"
+    if ! [[ -x "$sys_py" ]]; then
+        return 1
+    fi
+    local sys_ver
+    sys_ver="$("$sys_py" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)" || return 1
+    # Pure-bash version comparison: Python is fine if >= 3.7
+    awk -v v="$sys_ver" 'BEGIN { split(v, a, "."); exit !(a[1]>3 || (a[1]==3 && a[2]>=7)) }'
+}
+if ! detect_target_python; then
+    # Find a Python 3.10+ via uv (controller used --python 3.13 by bootstrap).
+    # Search uv's managed python dir + falls back to `uv python find` if uv is on PATH.
+    UV_PY_CANDIDATE=""
+    for cand in "$HOME"/.local/share/uv/python/cpython-3.13.*-linux-*/bin/python3 \
+                "$HOME"/.local/share/uv/python/cpython-3.12.*-linux-*/bin/python3 \
+                "$HOME"/.local/share/uv/python/cpython-3.11.*-linux-*/bin/python3 \
+                "$HOME"/.local/share/uv/python/cpython-3.10.*-linux-*/bin/python3; do
+        if [[ -x "$cand" ]]; then
+            UV_PY_CANDIDATE="$cand"
+            break
+        fi
+    done
+    if [[ -z "$UV_PY_CANDIDATE" ]] && command -v uv &> /dev/null; then
+        UV_PY_CANDIDATE="$(uv python find 3.13 2>/dev/null || uv python find 3.12 2>/dev/null || uv python find 3.11 2>/dev/null || uv python find 3.10 2>/dev/null)"
+    fi
+    if [[ -n "$UV_PY_CANDIDATE" && -x "$UV_PY_CANDIDATE" ]]; then
+        ANSIBLE_PY_INTERP="$UV_PY_CANDIDATE"
+        info "System python3 < 3.7; using uv-managed Python at $ANSIBLE_PY_INTERP"
+    else
+        warn "System python3 < 3.7 and no uv-managed python found; ansible Gathering Facts may fail"
+        warn "Manual fallback: \`uv python install 3.13 && chezmoi apply\`"
+    fi
+fi
+
 # === Profile-based tag selection ===
 # Profile: {{ .profile }}
 #
@@ -316,9 +368,16 @@ if ! sudo_session_init "ansible"; then
     warn "Non-interactive mode without passwordless sudo and no /dev/tty access"
     warn "Skipping ansible run. To complete setup, run manually:"
     warn ""
-    warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \\"
-    warn "    $PLAYBOOK \\"
-    warn "    --tags '$TAGS' --ask-become-pass"
+    if [[ -n "$ANSIBLE_PY_INTERP" ]]; then
+        warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \\"
+        warn "    $PLAYBOOK \\"
+        warn "    --tags '$TAGS' --ask-become-pass \\"
+        warn "    -e ansible_python_interpreter=$ANSIBLE_PY_INTERP"
+    else
+        warn "  cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \\"
+        warn "    $PLAYBOOK \\"
+        warn "    --tags '$TAGS' --ask-become-pass"
+    fi
     warn ""
     warn "Or grant passwordless sudo:"
     warn "  echo '$USER ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/$USER"
@@ -350,6 +409,12 @@ info "Profile: {{ .profile }}"
 info "Re-running ansible with tags: $TAGS"
 EXTRA_VARS_ARGS=()
 [[ -n "$EXTRA_VARS" ]] && EXTRA_VARS_ARGS=(--extra-vars "$EXTRA_VARS")
+# When the system Python is too old for ansible-core 2.18+ modules
+# (CentOS 7 etc.), prepend an explicit ansible_python_interpreter override
+# so all role tasks use uv's managed Python instead of /usr/bin/python3.
+if [[ -n "$ANSIBLE_PY_INTERP" ]]; then
+    EXTRA_VARS_ARGS+=(--extra-vars "ansible_python_interpreter=$ANSIBLE_PY_INTERP")
+fi
 
 {{ $allowPartialFailure := false }}{{ if hasKey . "allowPartialFailure" }}{{ $allowPartialFailure = .allowPartialFailure }}{{ end -}}
 {{ if $allowPartialFailure -}}
