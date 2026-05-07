@@ -54,6 +54,8 @@ When adding/modifying/removing a custom alias or shell function in any `dot_conf
 
 When porting a zsh-only helper to bash via ble.sh's `ble-bind`, prefer extracting the shell-agnostic backend (the function that produces the shell command string) into `dot_config/shell/` and keeping each shell's widget binding in its own dir.
 
+For broader context on the conventions this repo uses (XDG vs `.d/` drop-ins vs hybrid loaders, override layers via `*.local` / `*.adhoc` / skel files, chezmoi prefixes, login vs interactive shell loading) see [`docs/this_repo/config-conventions.md`](docs/this_repo/config-conventions.md). New contributors / agents adding non-shell config files should skim that page first to know which convention applies.
+
 ### `gui_apps_linux` ansible role → `docs/playbooks/linux-gui-apps.md`
 
 When adding/modifying/removing a Linux GUI app in [`dot_ansible/roles/gui_apps_linux/tasks/main.yml`](dot_ansible/roles/gui_apps_linux/tasks/main.yml), update the **Inventory** table in [`docs/playbooks/linux-gui-apps.md`](docs/playbooks/linux-gui-apps.md). The playbook is the single source of truth for the per-app mechanism / auto-update story, and is the first thing a maintainer (or agent) should read before adding a new app — it contains the `.deb` / Snap / Flatpak / AppImage decision tree and the concrete copy-paste patterns. Read it first; update it in the same commit.

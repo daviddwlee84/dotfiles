@@ -21115,3 +21115,2333 @@ OMB default無上限應該也沒關係？（也佔不了多少容量？）
 然後我們是否有關於我們所有bash相關的這些的docs記錄（如果內容比較多可能分多檔介紹）沒有的話把這個補上
 
 以及後面假設我們也想兼容fish, powershell等等 是否可行
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 01:30:55Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:30:59Z)**_
+
+三個都好建議。讓我一個個處理：
+
+## 1. `~/.bash_aliases` 向後相容 — 必加
+
+Ubuntu / Debian skel 的慣例：`if [ -f ~/.bash_aliases ]; then . ~/.bash_aliases; fi`。沒接的話，使用者過去在 `~/.bash_aliases` 累積的 alias 一裝我們就消失，難 debug。
+
+我加進 `dot_bashrc.tmpl` 的 step 12（跟 `.bashrc.adhoc` 並列，AFTER `ble-attach` 所以 ble-bind / bind -x 也能用）：
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_bashrc.tmpl`
+
+```text
+125	[ -r "$BASH_CONFIG_DIR/secrets.sh" ] && . "$BASH_CONFIG_DIR/secrets.sh"
+126	
+127	# 10. ===========================================================
+128	# ble-attach: now that bash-preexec / starship / atuin / OMB have all
+129	# registered their precmd / preexec hooks, hand control over to ble.sh.
+130	# Presence-gated to match the source guard above.
+131	if [[ -n $BLE_VERSION ]]; then
+132	    ble-attach
+133	fi
+134	
+135	# 11. ===========================================================
+136	# Adhoc Configuration (not tracked by chezmoi)
+137	if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
+138	    cat > "$HOME/.bashrc.adhoc" << 'ADHOC_EOF'
+139	# ~/.bashrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+140	#
+141	# Use this file for:
+142	#   - Quick experiments with new aliases/functions
+143	#   - Machine-specific configurations
+144	#   - Temporary PATH modifications
+145	#   - Testing before adding to chezmoi-managed configs
+146	#
+147	# This file is sourced at the end of ~/.bashrc (AFTER ble-attach),
+148	# so ble-bind / readline `bind -x` calls here will take effect.
+149	# Changes here apply to new shell sessions (or run: source ~/.bashrc.adhoc)
+150	
+151	# Example:
+152	# alias myalias='echo "Hello from adhoc!"'
+153	# export MY_VAR="my_value"
+154	
+155	# To enable ble.sh's pacman-style auto-suggestion mode:
+156	# bleopt complete_auto_complete=1
+157	ADHOC_EOF
+158	fi
+159
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/dot_bashrc.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:18Z)**_
+
+Wait — I got the priority backwards. `.bashrc.adhoc` should win over `.bash_aliases`, which means `.bash_aliases` must source FIRST. Fixing:
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:19Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_bashrc.tmpl`
+
+```text
+130	# Presence-gated to match the source guard above.
+131	if [[ -n $BLE_VERSION ]]; then
+132	    ble-attach
+133	fi
+134	
+135	# 11. ===========================================================
+136	# Adhoc Configuration (not tracked by chezmoi)
+137	if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
+138	    cat > "$HOME/.bashrc.adhoc" << 'ADHOC_EOF'
+139	# ~/.bashrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+140	#
+141	# Use this file for:
+142	#   - Quick experiments with new aliases/functions
+143	#   - Machine-specific configurations
+144	#   - Temporary PATH modifications
+145	#   - Testing before adding to chezmoi-managed configs
+146	#
+147	# This file is sourced at the end of ~/.bashrc (AFTER ble-attach),
+148	# so ble-bind / readline `bind -x` calls here will take effect.
+149	# Changes here apply to new shell sessions (or run: source ~/.bashrc.adhoc)
+150	
+151	# Example:
+152	# alias myalias='echo "Hello from adhoc!"'
+153	# export MY_VAR="my_value"
+154	
+155	# To enable ble.sh's pacman-style auto-suggestion mode:
+156	# bleopt complete_auto_complete=1
+157	ADHOC_EOF
+158	fi
+159	
+160	# Source adhoc config
+161	[ -r "$HOME/.bashrc.adhoc" ] && . "$HOME/.bashrc.adhoc"
+162	
+163	# 12. ===========================================================
+164	# Backward-compat with the Ubuntu/Debian `~/.bash_aliases` convention.
+165	# /etc/skel/.bashrc on those distros sources this file unconditionally,
+166	# so users (or other dotfiles repos they cloned previously) routinely
+167	# accumulate aliases here. Without this, our managed bashrc would
+168	# silently strip those on first apply — hard to debug, hostile UX.
+169	#
+170	# Sourced AFTER ble-attach so any `bind -x` / `ble-bind -x` calls in it
+171	# take effect. Sourced AFTER `.bashrc.adhoc` so that file (the chezmoi-
+172	# aware override) wins on conflict — consistent with how chezmoi treats
+173	# the adhoc tail as the highest-priority user override.
+174	[ -r "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
+175
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/dot_bashrc.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_bashrc.tmpl`
+
+```text
+1	# ~/.bashrc - Interactive bash configuration. Managed by chezmoi.
+2	#
+3	# Init order (load-bearing — see docs/shells/bash.md):
+4	#   1.  Early-return guard (non-interactive shells)
+5	#   2.  /etc/bashrc source (RHEL families)
+6	#   3.  ble.sh --attach=none   ← BEFORE bash-preexec / starship
+7	#   4.  XDG dirs + Homebrew shellenv (mac)
+8	#   5.  Bash-specific config files (history / completion / vi-mode / aliases)
+9	#   6.  oh-my-bash source (after ble.sh so OMB's bash-preexec install no-ops)
+10	#   7.  Shared modular layer (starship / mise / zoxide / direnv / thefuck)
+11	#   8.  Bash-only modular layer (any post-attach ble-bind tweaks)
+12	#   9.  atuin init bash --disable-up-arrow (ble.sh handles up-arrow history)
+13	#   10. Secrets
+14	#   11. ble-attach   ← absorbs all precmd/preexec stacks accumulated above
+15	#   12. .bashrc.adhoc tail
+16	#
+17	# The ble.sh / oh-my-bash / atuin steps are presence-gated and no-op
+18	# silently when the artefact isn't installed (e.g. fresh host before
+19	# `chezmoi apply` finishes the externals + run-onchange-after_install).
+20	# Plain bash without ble.sh + OMB still gets a fully working starship
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:31:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/dot_bashrc.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:32:20Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:32:21Z)**_
+
+Now adding the architecture docs and the fish/powershell feasibility analysis. Creating a new `docs/shells/architecture.md`:
+
+_**Agent (claude-opus-4-7 2026-05-07 01:33:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Shell architecture
+
+This page explains the three-tier shell config layout in this repo, the
+migration that landed alongside the `primaryShell` prompt, and the
+feasibility of extending the same model to fish / PowerShell.
+
+For practical bash-side detail (init order, footguns, ble.sh + OMB
+integration) see [`bash.md`](bash.md). For the alias / function
+inventory across shells see [`aliases.md`](aliases.md).
+
+## The three tiers
+
+\```
+~/.config/shell/      — POSIX-portable; sourced by BOTH zsh & bash
+  ├── 00_exports.sh.tmpl       PATH, EDITOR, XDG dirs, Homebrew shellenv,
+  │                             GFW mirror env vars, GOPATH/BUN/PNPM_HOME
+  ├── 01_starship.sh           starship init <shell> dispatched by
+  │                             $ZSH_VERSION / $BASH_VERSION
+  ├── 02_legacy_tools.sh       Go / Bun / pnpm / Foundry / NVM / .NET PATH
+  ├── 05_mise.sh               mise activate <shell>
+  ├── 10_aliases.sh            v=nvim, chezmoi-cd, gcam-amend, gundo,
+  │                             glop, load-nvm, brew-mirror, ghostty-ssh-
+  │                             terminfo, claude-plans-here, ...
+  ├── 10_fzf.sh                fzf shell integration with --zsh / --bash
+  │                             dispatch + apt-fzf fallback paths
+  ├── 20_zoxide.sh             zoxide init + cd→z alias
+  ├── 27_thefuck.sh            thefuck (auto-detects shell)
+  └── 30_direnv.sh             direnv hook
+
+~/.config/zsh/        — zsh-only (ZLE widgets, compdef, bindkey, setopt)
+  ├── 10_aliases.zsh           Just `zsh-profile` alias now (the rest
+  │                             moved into shell/10_aliases.sh).
+  └── tools/
+      ├── 02_shell_integration.zsh   OSC 133 markers via add-zsh-hook
+      ├── 04_ai_capture.zsh          aifix / aiexplain / aiblock
+      ├── 05_aisuggest.zsh           Inline AI ghost-text (Alt+;) ZLE widget
+      ├── 11_tools_picker.zsh        Alt+T tools picker
+      ├── 12_television.zsh          Alt+R/P/G/E/A/I tv channel widgets
+      ├── 22_sesh.zsh                Alt+S sesh-sessions widget
+      └── ... (ZLE widgets, completions)
+
+~/.config/bash/       — bash-only (bind -x / ble-bind, OMB plugin arrays,
+                       bash-specific shopts)
+  ├── 01_omb_plugins.bash      `plugins=(git sudo bashmarks)`,
+  │                             `aliases=(general)`, `completions=(...)`.
+  │                             Sourced BEFORE OMB.
+  ├── 02_history.bash          HISTSIZE / HISTCONTROL / shopt
+  ├── 03_completion.bash       bash-completion v2 with dynamic Homebrew prefix
+  ├── 04_blesh.bash            bleopt tweaks (sourced after ble-attach)
+  ├── 05_vi_mode.bash          set -o vi (ble.sh auto-detects + upgrades)
+  └── 10_aliases.bash          bash-only aliases (bash-profile, reload)
+\```
+
+`~/.zshrc` and `~/.bashrc` both source `~/.config/shell/` first (via
+`load_modular_dir "$XDG_CONFIG_HOME/shell" sh`), then their respective
+shell-specific dirs. Single source of truth for env vars / PATH /
+trivial aliases; per-shell escape hatch for anything that isn't POSIX.
+
+## Why three tiers, not two
+
+A simpler design might have just `~/.config/zsh/` and `~/.config/bash/`
+with each duplicating PATH exports, alias definitions, tool init lines,
+GFW mirror env vars. We didn't, because:
+
+1. **Drift.** Aliases / env vars in two files diverge over time. The
+   shared layer eliminates the entire drift surface for ~600 LOC of
+   POSIX content.
+2. **Tool init wrappers.** `eval "$(starship init zsh)"` and
+   `eval "$(starship init bash)"` differ only in one flag. A
+   shell-detecting wrapper is one extra `if`; two parallel files are
+   double the maintenance.
+3. **Future shells.** Adding fish / PowerShell would mean re-writing
+   the env layer once per shell. If env lives in the shared POSIX
+   layer, fish needs translation (since fish isn't POSIX); but if env
+   were already duplicated zsh/bash, fish would be a *third* parallel
+   tree. See [Future shell extension](#future-shell-extension) below.
+
+The cost is the discipline: anything in `dot_config/shell/` MUST be
+POSIX-portable. No `setopt`, no `read -q`, no `${var:t}`, no glob
+qualifiers, no zsh-vi-mode hooks, no `bind -x`. The
+[`CLAUDE.md` three-tier rule](../../CLAUDE.md#custom-aliases--shell-functions--docsshellsaliasesmd)
+codifies this — agents writing new helpers need to pick the right
+tier first.
+
+## Migration story (for existing zsh users)
+
+The `primaryShell` prompt and bash bootstrap landed across 7 commits:
+
+1. `init: add primaryShell prompt for zsh/bash login-shell choice`
+2. `ansible: gate zsh chsh on primaryShell + add bash role for chsh-to-bash`
+3. `shell: extract POSIX layer to dot_config/shell/ for zsh/bash sharing`
+4. `bash: ship dot_bashrc.tmpl + dot_bash_profile.tmpl + dot_config/bash/`
+5. `bash: add oh-my-bash + ble.sh externals and plugin glue`
+6. `docs: cross-file updates for primaryShell + bash bootstrap`
+7. `bash: install gawk unconditionally — ble.sh Makefile hard-requires it`
+
+For an existing `chezmoi apply`-managed host on the previous zsh-only
+config, the `chezmoi apply` after pulling these commits will:
+
+- **Move 7 files** out of `~/.config/zsh/` into `~/.config/shell/`
+  (00_exports, 02_legacy_tools, 01_starship, 05_mise, 20_zoxide,
+  27_thefuck, 30_direnv, 10_fzf). The old paths are listed in
+  [`.chezmoiremove`](../../.chezmoiremove) so chezmoi deletes the
+  orphans on apply (otherwise both old + new would get sourced and
+  PATH would double).
+- **Strip `~/.config/zsh/10_aliases.zsh`** down to just the
+  `zsh-profile` alias. Everything else moved to
+  `~/.config/shell/10_aliases.sh`.
+- **Deploy `~/.bashrc` + `~/.bash_profile`** even on zsh-primary
+  hosts. Existing system `~/.bashrc` (Ubuntu / Debian skel) gets
+  backed up via chezmoi's `backupMode` (`smart` by default). After
+  the apply, `~/.bashrc.adhoc` is auto-created if missing — sister of
+  `~/.zshrc.adhoc`. **Pre-existing `~/.bash_aliases` is preserved**:
+  the new bashrc explicitly sources it (step 11), so any aliases the
+  user accumulated there over the years keep working.
+- **Run `chsh`** to zsh (default `primaryShell=zsh`) only if not
+  already on zsh. No change for users already on zsh — they're
+  unaffected.
+
+Verified post-apply: zsh `precmd_functions` array byte-identical, all
+PATH entries preserved, all hooks (starship/mise/direnv/zvm/omz/zsh-
+autosuggestions/zsh-syntax-highlighting) intact.
+
+## What's preserved vs. replaced from system bashrc
+
+`/etc/skel/.bashrc` on Debian / Ubuntu:
+
+| Block                                          | Action      | Why |
+| ---------------------------------------------- | ----------- | --- |
+| `[[ $- != *i* ]] && return` early-return guard | Preserve    | Same pattern in dot_bashrc.tmpl step 1 |
+| `shopt -s checkwinsize histappend cmdhist`     | Preserve    | Harmless + useful (02_history.bash) |
+| `shopt -s globstar` (commented in skel)        | Enable      | `**` recursive glob, useful default |
+| `HISTSIZE=1000` / `HISTFILESIZE=2000`          | Replace     | We set 10000/20000; OMB then sets unlimited |
+| `HISTCONTROL=ignoreboth`                       | Preserve    | Standard sane default |
+| `debian_chroot` PS1 fragment                   | Replace     | starship owns the prompt |
+| `ls --color=auto` / `grep --color=auto` aliases | Replace     | eza / bat take over |
+| `~/.bash_aliases` source                       | Preserve    | dot_bashrc.tmpl step 11 |
+| bash-completion v2 source                      | Preserve    | dot_config/bash/03_completion.bash |
+
+`/etc/bashrc` on RHEL families (CentOS / Rocky / Alma) is sourced
+explicitly by step 2 of dot_bashrc.tmpl, preserving the protective
+`rm -i` / `cp -i` aliases, the Modules system init, and the
+distribution's umask defaults.
+
+## Future shell extension
+
+The `primaryShell` prompt is currently `["zsh", "bash"]`. Extending to
+fish / PowerShell is feasible but each comes with its own cost.
+
+### fish 3.x
+
+**Feasibility: Medium effort, mostly mechanical.**
+
+- Tool init wrappers: starship / zoxide / mise / direnv / atuin all
+  have `init fish` (or `mise activate fish`) flags. Trivial
+  one-liners.
+- Env exports: fish doesn't use `export VAR=val` syntax. Needs
+  translation: `set -gx VAR val`. ~30 LOC of mechanical conversion
+  for the current `00_exports.sh.tmpl`.
+- Aliases: fish syntax is `alias v 'nvim'` (note space, single-quote).
+  ~10 LOC of conversion.
+- Functions: fish uses `function name; ...; end`. The current
+  `~/.config/shell/10_aliases.sh` has 8 functions. Each would need
+  a fish rewrite. Some (`gundo`, `gcam-amend`) are trivial; others
+  (`claude-plans-here`, `ghostty-ssh-terminfo`) are substantial.
+- Plugin manager: oh-my-fish (OMF) is the typical choice. Plugin
+  parity with OMZ/OMB git aliases is 80%-good — close enough.
+- vi-mode: fish has built-in `fish_vi_key_bindings` (better than
+  zsh-vi-mode and ble.sh's). Less to wire up.
+- Autosuggestions / syntax highlighting: fish has these BUILT IN.
+  No ble.sh-equivalent dependency.
+
+The shared POSIX layer can't be sourced by fish (different syntax),
+so fish would need a parallel `dot_config/fish/conf.d/` tree. Suggest:
+
+\```
+~/.config/fish/conf.d/
+  ├── 00_exports.fish        translated from shell/00_exports.sh.tmpl
+  ├── 01_starship.fish       starship init fish | source
+  ├── 10_aliases.fish        translated from shell/10_aliases.sh
+  ├── 20_zoxide.fish         zoxide init fish | source
+  └── ...
+\```
+
+Estimate: ~400 LOC translation + a fish ansible role (chsh logic
+identical to bash role) + one new prompt value. Probably one
+afternoon of focused work. Tracked in
+[`TODO.md`](../../TODO.md) as `[P3/L]` for now.
+
+### PowerShell Core 7+ (`pwsh`)
+
+**Feasibility: Higher effort, more disjoint.**
+
+- Profile location: `~/.config/powershell/Microsoft.PowerShell_profile.ps1`
+  on Linux/macOS; very different from bash/zsh `.rc` model.
+- Tool inits: starship / zoxide / mise have `init powershell` flags
+  (mise uses `mise activate pwsh`). atuin has pwsh support via the
+  community plugin. fzf needs PSFzf module.
+- Env exports: `$env:VAR = "value"` (no `export`).
+- Aliases: `Set-Alias v nvim` (no shell-function-style; pwsh aliases
+  can't take arguments — for those, you write a function).
+- Functions: completely different syntax (`function Verb-Noun
+  { param([string]$Name) ... }`).
+- vi-mode: PSReadLine has it (`Set-PSReadLineOption -EditMode Vi`).
+- Autosuggest / syntax highlight: PSReadLine has both (the equivalent
+  of ble.sh).
+- Plugin ecosystem: oh-my-posh is the common prompt (works with
+  bash / zsh / pwsh — competes with starship), but pwsh-specific
+  plugins live in PowerShell Gallery (`Install-Module`).
+
+The shared POSIX layer can't be reused at all. PowerShell pipelines
+are object-streams, not text-streams; aliases / functions need a
+fundamentally different mental model.
+
+Estimate: ~1-2 days for a working profile that mirrors the bash UX
+(starship + zoxide + PSReadLine vi-mode + a small set of aliases),
+plus a new ansible role to install pwsh (apt deb on Ubuntu, brew
+cask on macOS, scoop on Windows if we ever go there). Tracked in
+[`TODO.md`](../../TODO.md) as `[P?/L]`.
+
+### nushell, elvish, xonsh
+
+Even more disjoint than fish (nushell is structured-data first;
+elvish has its own scripting language; xonsh is Python-first). Out
+of scope for the foreseeable future. If a user picks one, they
+should set `primaryShell=zsh` (or `bash`) for the chsh-managed
+login shell and source their alternative shell from `~/.zshrc.adhoc`
+or via a wrapper terminal profile.
+
+## Why we didn't go fish / PowerShell first
+
+Three reasons (in priority order):
+
+1. **Bash is universal**: every Linux distro and macOS ship it. Adding
+   bash brought "better support for hosts where you can't easily
+   install zsh" (locked-down corporate, minimal containers, recovery
+   shells), which was the stated need.
+2. **POSIX shared layer pays off**: ~600 LOC of zsh code became
+   ~600 LOC of POSIX code shared with bash. The fish / PowerShell
+   versions would be a 3rd / 4th tree of similar size each. Diminishing
+   returns once bash is in.
+3. **No specific user signal**: nobody asked for fish or PowerShell
+   yet. We added them as `[P3/L]` and `[P?/L]` items in the backlog;
+   we'll build them when the first concrete need shows up.
+
+## See also
+
+- [`bash.md`](bash.md) — bash-side practical guide (init order,
+  footguns, plain-bash fallback)
+- [`aliases.md`](aliases.md) — alias / function inventory across all
+  three tiers
+- [`CLAUDE.md` → "primaryShell choice gates chsh only"](../../CLAUDE.md#primaryshell-choice-gates-chsh-only--both-shells-always-deploy)
+  — the hard invariant for agents adding new shell helpers
+- [`TODO.md`](../../TODO.md) — the deferred bash UX gaps (aisuggest /
+  tv / sesh ZLE → ble-bind ports) and future-shell items
+
+```
+
+```text
+File created successfully at: /Users/zhouhanru/.local/share/chezmoi/docs/shells/architecture.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check TODO.md for existing fish/powershell entries
+
+`grep -n 'fish\|powershell\|pwsh\|primaryShell' /Users/zhouhanru/.local/share/chezmoi/TODO.md | head -10`
+
+```text
+82:- [ ] **[P3/S] Add `fish` as a third primaryShell choice** — would need `dot_config/fish/`, oh-my-fish question, `dot_config/shell/*.sh.tmpl` POSIX-strict audit (`# shellcheck shell=sh`). Wait until first user actually wants fish.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:08Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+80	- [ ] **[P3/M] Port tools_picker / television / sesh ZLE widgets to ble.sh `ble-bind`** — each ~100-200 LOC of `LBUFFER` manipulation. ble.sh's `_ble_edit_str` + `ble/widget/insert-string` provide the equivalent surface. Files: `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh}.zsh`. Bash users currently get plain CLI commands (`tv <channel>`, `sesh-connect`).
+81	- [ ] **[P3/S] Port `02_shell_integration.zsh` OSC 133 markers to bash** — uses `add-zsh-hook` for prompt/preexec markers. Bash needs `PROMPT_COMMAND` for prompt and ble.sh's `preexec_functions` (or bash-preexec) for command. Currently bash users miss tmux output navigation by prompt boundary.
+82	- [ ] **[P3/S] Add `fish` as a third primaryShell choice** — would need `dot_config/fish/`, oh-my-fish question, `dot_config/shell/*.sh.tmpl` POSIX-strict audit (`# shellcheck shell=sh`). Wait until first user actually wants fish.
+83	- [ ] **[P?/S] Pre-commit hook to enforce shell-tier placement** — fail CI when a new `dot_config/zsh/` file lands without a matching shared/bash counterpart (or vice versa), enforcing the "both shells stay viable" invariant programmatically. Mostly relevant if the codebase grows more shell helpers; currently the manual review catches it.
+84	- [ ] **[?/L] svibe: multi-window spillover when panes would fall below min-width** — width-aware single-window layout shipped 2026-04; deferred follow-up is to overflow explicit `svibe N` into `agents-1` / `agents-2` / ... windows (each a wide `even-horizontal` layout at `min_width`) instead of cramming everything into one tiled window. Needs design on window naming (shifts `git` / `edit` indices), `--on-exit restart` routing across windows, focus-on-attach rules, and a `--spill` / `SVIBE_SPILL` gate. Wait for first "svibe > 6" signal before building. → [research](backlog/svibe-multi-window-spillover.md)
+85	- [ ] **[?/M] `swt` — per-feature worktree + editor/agent split on a hotkey** — Sidecar-style flow that stitches `wt add <branch>` + new tmux window + `nvim` ‖ `specstory run <agent>` split into one motion. Reuses worktrunk's worktree machinery and `_sesh_wrap_agent` / `_sesh_on_exit_wrap` helpers from `22_sesh.zsh`. Open design calls: key binding (menu row vs `prefix + W`), branch-name source (fzf over existing branches + auto-named `wip/YYYY-MM-DD-hhmm` fallback), whether to recommend `scode`-style 75/25 layout or something else. Rejected alternative: N standby worktrees ("agent pool") — pre-commits to N idle agents, degenerates back to regular `svibe` when branches aren't actually parallel. → [research](backlog/svibe-worktree-per-feature.md)
+86	
+87	---
+88	
+89	## Done (recent, kept for context — older items pruned)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/TODO.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:31Z)**_
+
+Now wire the new architecture doc into mkdocs nav and bash.md cross-link:
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:34Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/mkdocs.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/docs/shells/bash.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify new architecture.md doesn't introduce broken links
+
+`uv run mkdocs build 2>&1 | grep -iE 'shells/|architecture' | head -10`
+
+```text
+INFO    -  Doc file 'shells/aliases.md' contains a link '../../CLAUDE.md#custom-aliases--shell-functions--docsshellsaliasesmd', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'shells/aliases.md' contains a link '../../dot_config/zsh/tools/02_shell_integration.zsh', but the target '../dot_config/zsh/tools/02_shell_integration.zsh' is not found among documentation files.
+INFO    -  Doc file 'shells/architecture.md' contains a link '../../CLAUDE.md#custom-aliases--shell-functions--docsshellsaliasesmd', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'shells/architecture.md' contains an unrecognized relative link '../../.chezmoiremove', it was left as is.
+INFO    -  Doc file 'shells/architecture.md' contains a link '../../TODO.md', but the target '../TODO.md' is not found among documentation files.
+INFO    -  Doc file 'shells/architecture.md' contains a link '../../TODO.md', but the target '../TODO.md' is not found among documentation files.
+INFO    -  Doc file 'shells/architecture.md' contains a link '../../CLAUDE.md#primaryshell-choice-gates-chsh-only--both-shells-always-deploy', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'shells/architecture.md' contains a link '../../TODO.md', but the target '../TODO.md' is not found among documentation files.
+INFO    -  Doc file 'this_repo/architecture.md' contains a link '../tools/chezmoi-prefixes.md#companion-file-chezmoiexternalformat', but the doc 'tools/chezmoi-prefixes.md' does not contain an anchor '#companion-file-chezmoiexternalformat'.
+INFO    -  Doc file 'shells/aliases.zh-TW.md' contains a link '../../dot_config/zsh/tools/02_shell_integration.zsh', but the target '../dot_config/zsh/tools/02_shell_integration.zsh' is not found among documentation files.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:58Z)**_
+
+Let me also apply the bashrc change to my live home (to verify it works) and commit Stage 7:
+
+_**Agent (claude-opus-4-7 2026-05-07 01:34:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify rendered bashrc parses
+
+`_ZO_DOCTOR=0 chezmoi cat ~/.bashrc 2>&1 | bash -n - && echo bashrc OK`
+
+```text
+bashrc OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:35:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage 7 staging status
+
+`git status --short | grep -v '^??'`
+
+```text
+ M .specstory/history/2026-05-06_13-52-50Z-centos-docker.md
+ M .specstory/history/2026-05-06_14-13-12Z-zsh-option-bash-at.md
+ M TODO.md
+ M docs/shells/bash.md
+ M dot_bashrc.tmpl
+ M mkdocs.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:35:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage Stage 7 files (excluding specstory history)
+
+`git add dot_bashrc.tmpl docs/shells/architecture.md docs/shells/bash.md mkdocs.yml TODO.md && git status --short | grep -v '^??'`
+
+```text
+ M .specstory/history/2026-05-06_13-52-50Z-centos-docker.md
+ M .specstory/history/2026-05-06_14-13-12Z-zsh-option-bash-at.md
+M  TODO.md
+A  docs/shells/architecture.md
+M  docs/shells/bash.md
+M  dot_bashrc.tmpl
+M  mkdocs.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:35:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Stage 7
+
+```bash
+git commit -m "$(cat <<'EOF'
+bash: source ~/.bash_aliases for backward-compat + add architecture docs
+
+Two Stage 4-5 follow-ups raised by post-deploy review:
+
+(1) Preserve user's pre-existing ~/.bash_aliases on first apply.
+Ubuntu/Debian /etc/skel/.bashrc has sourced ~/.bash_aliases
+unconditionally for years; users (and other dotfiles repos they
+cloned previously) routinely accumulate aliases there. Without an
+explicit source in our managed bashrc, those silently disappear
+after first chezmoi apply — hostile UX. Now sourced at step 11,
+AFTER ble-attach so any `bind -x` / `ble-bind -x` calls in it take
+effect, and BEFORE `.bashrc.adhoc` so the chezmoi-aware adhoc tail
+remains the highest-priority user override on conflict.
+
+Init-order header in dot_bashrc.tmpl re-numbered: collapsed
+duplicate "8. Bash-only modular layer" entry (the bash-only modular
+load is part of step 5, not a separate step). New 11/12 split:
+  11. ~/.bash_aliases (backward-compat with skel convention)
+  12. .bashrc.adhoc tail (chezmoi-ignored highest-priority override)
+
+(2) NEW docs/shells/architecture.md (~9 KB) covering:
+  - The three-tier shell layout rationale (shared/zsh/bash) — why
+    the POSIX shared layer exists, what each tier MUST and MUST
+    NOT contain, and the cost (~600 LOC) we eliminated by going
+    three-tier instead of two-tier-with-duplication.
+  - Migration story for existing zsh users — the 7 commits, what
+    moved, what .chezmoiremove cleans up, what stays in
+    dot_config/zsh/, what gets backed up by chezmoi.
+  - "What's preserved vs replaced from /etc/skel/.bashrc" matrix —
+    explicit decisions for each block (early-return, shopts,
+    HISTSIZE, debian_chroot PS1, color ls aliases, bash_aliases
+    source, bash-completion v2).
+  - Future-shell extension feasibility:
+      • fish 3.x: medium effort, ~400 LOC mostly mechanical
+        translation. Built-in vi-mode + autosuggest + syntax
+        highlight (no ble.sh-equivalent dep). Tracked as [P3/L].
+      • PowerShell 7+: higher effort, ~1-2 days. POSIX shared
+        layer cannot be reused (object pipelines, $env: syntax,
+        Set-Alias model). Tracked as [P?/L].
+      • nushell / elvish / xonsh: explicitly out of scope; users
+        run alternative shells from ~/.zshrc.adhoc / wrapper
+        terminal profile.
+  - "Why we didn't go fish/powershell first" — bash is universal,
+    POSIX shared layer pays off, no specific user signal yet.
+
+Wired into mkdocs nav as the first Shells entry (above bash.md
+and aliases.md). bash.md gets a "Related docs" cross-link.
+
+TODO.md upgraded:
+  - fish entry: bumped from [P3/S] to [P3/L] with concrete scoping
+    (translation cost, fish's built-in features that obviate ble.sh,
+    cross-link to the new architecture doc).
+  - NEW [P?/L] powershell entry — pwsh's profile location, env var
+    syntax, PSReadLine equivalence to ble.sh, cross-link to docs.
+
+`uv run mkdocs build` produces only INFO-level relative-link
+warnings (same kind already tolerated by validation.links.not_found:
+info). No new strict-mode regressions.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/zhouhanru/.cache/pre-commit/patch1778117734-98436.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/zhouhanru/.cache/pre-commit/patch1778117734-98436.
+[main 733b534] bash: source ~/.bash_aliases for backward-compat + add architecture docs
+ 5 files changed, 287 insertions(+), 9 deletions(-)
+ create mode 100644 docs/shells/architecture.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:36:05Z)**_
+
+Stage 7 committed.
+
+---
+
+## 回答你的問題（總結）
+
+### 1. `~/.bash_aliases` 向後相容
+✅ **已加**（`dot_bashrc.tmpl` step 11，AFTER ble-attach AFTER `.bashrc.adhoc`）。使用者既有的 alias 在第一次 `chezmoi apply` 後不會消失。優先順序：
+
+```
+shared layer (10_aliases.sh) ← 最先
+  ↓
+~/.bash_aliases               ← 中間（保留你過去累積的）
+  ↓
+~/.bashrc.adhoc               ← 最後贏（chezmoi-ignored，machine-local）
+```
+
+### 2. OMB 的 unlimited HISTSIZE
+✅ **接受**，不改。OMB 把 HISTSIZE 設成 `2147450879`（INT_MAX 級），即使每行平均 100 chars，10 億行也才 ~100 GB；現代 SSD 上完全無感。我的 `HISTSIZE=10000` cap 純屬冗餘。
+
+### 3. 完整的 bash docs
+✅ **補上了**。現在 `docs/shells/` 有三份：
+
+| 檔案 | 內容 |
+|---|---|
+| `bash.md` | 實作面：12-step init order、parity table、stock-bashrc collision、macOS bash 5.x、ble.sh + OMB footguns |
+| `architecture.md` （新） | 設計面：三層架構（shell/zsh/bash）的為什麼、migration 故事（7 個 commit + 什麼被搬了 + .chezmoiremove）、「保留 vs 替換 /etc/skel/.bashrc」對照表、**未來 fish/PowerShell 可行性評估** |
+| `aliases.md` | 函式 / alias 索引（兩種 shell 都列） |
+
+並進了 mkdocs nav。
+
+### 4. fish / PowerShell 可行性
+
+我在 `architecture.md` 寫了詳細評估，TL;DR：
+
+**fish 3.x — `[P3/L]`，中等工程量**（~400 LOC，半天）
+- 不能 source POSIX shared layer，要翻譯到 `dot_config/fish/conf.d/`（`set -gx` vs `export`、`function...end`、`alias v 'nvim'`）
+- 但 fish **內建** vi-mode、autosuggest、syntax highlight — **不需要 ble.sh-等價物**，反而比 bash 容易
+- starship/zoxide/mise/direnv/atuin 全部有 `init fish`
+- oh-my-fish 對應 OMZ/OMB
+
+**PowerShell 7+ — `[P?/L]`，較高工程量**（~1-2 天）
+- 完全不同 paradigm（pipeline 是 object 不是 text、`$env:VAR`、`Set-Alias`）
+- POSIX shared layer 完全不能重用
+- 但 cross-platform（macOS/Linux/Windows），PSReadLine 提供 ble.sh 等價物
+- starship/zoxide/mise/atuin 都有 pwsh 支援
+
+**nushell / elvish / xonsh** — 明確 out of scope；建議使用者用 `primaryShell=zsh` 並從 `~/.zshrc.adhoc` 啟動 alt shell。
+
+兩者都已在 `TODO.md` 記錄。等真的有人需要再做。
+
+---
+
+最終 commit list（共 8 個）：
+
+```
+733b534 bash: source ~/.bash_aliases for backward-compat + add architecture docs
+4930c6e bash: install gawk unconditionally — ble.sh Makefile hard-requires it
+e45b593 docs: cross-file updates for primaryShell + bash bootstrap
+9cf8b19 bash: add oh-my-bash + ble.sh externals and plugin glue
+96c73bb bash: ship dot_bashrc.tmpl + dot_bash_profile.tmpl + dot_config/bash/
+9bb56c2 shell: extract POSIX layer to dot_config/shell/ for zsh/bash sharing
+a49bc20 ansible: gate zsh chsh on primaryShell + add bash role for chsh-to-bash
+67cbfd8 init: add primaryShell prompt for zsh/bash login-shell choice
+```
+
+---
+
+_**User (2026-05-07 01:38:45Z)**_
+
+最後確認一下 關於bash那部分override 是否會被我們smart自動backup機制保留到
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 01:38:53Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:38:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find backup mode implementation
+
+`grep -rln 'backupMode\|backup_mode\|BACKUP_MODE\|smart\|full.*off' .chezmoiscripts/ scripts/ 2>/dev/null | head -10`
+
+```text
+scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find backup logic in chezmoiscripts
+
+`grep -rln 'backup\|chezmoi status\|backupMode' .chezmoiscripts/ 2>/dev/null | head -10`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find any run_once scripts and backup-related files
+
+`grep -rln 'backup\|backupMode' .chezmoiscripts/ scripts/ 2>/dev/null; echo '---'; find . -name 'run_once_before_*' -o -name 'run_once_after_*' 2>/dev/null | head`
+
+```text
+scripts/init/Dockerfile.test
+scripts/init/dotfiles_init.py
+---
+./run_once_before_02_fix_intel_homebrew.sh.tmpl
+./run_once_before_00_bootstrap.sh.tmpl
+./run_once_before_50_opencode_migrate.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect bootstrap script for backup logic
+
+`grep -nE 'backup|bashrc|bash_profile|bash_aliases' run_once_before_00_bootstrap.sh.tmpl | head -30`
+
+```text
+337:BASHRC="$HOME/.bashrc"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:16Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+320	fi
+321	
+322	# 6. Install mise global tools (Node.js) if mise config exists
+323	MISE_BIN="${HOME}/.local/bin/mise"
+324	[[ ! -x "$MISE_BIN" ]] && MISE_BIN="$(command -v mise 2>/dev/null || true)"
+325	if [[ -x "$MISE_BIN" ]] && [[ -f "$HOME/.config/mise/config.toml" ]]; then
+326	    info "Installing mise global tools..."
+327	    if "$MISE_BIN" install --yes; then
+328	        success "mise tools installed"
+329	    else
+330	        warn "mise install had errors (some tools may have failed to build). Continuing..."
+331	    fi
+332	fi
+333	
+334	# 7. Ensure ~/.local/bin is on PATH for bash sessions (idempotent)
+335	# chezmoi, uv, mise all live in ~/.local/bin. Dotfiles only wire this up in
+336	# zsh; until the user switches shells, bash needs help finding them.
+337	BASHRC="$HOME/.bashrc"
+338	LOCAL_BIN_LINE='export PATH="$HOME/.local/bin:$PATH"'
+339	if [[ -f "$BASHRC" ]] || [[ "${SHELL##*/}" == "bash" ]]; then
+340	    touch "$BASHRC"
+341	    if ! grep -qF "$LOCAL_BIN_LINE" "$BASHRC"; then
+342	        {
+343	            echo ""
+344	            echo "# Added by chezmoi bootstrap - ~/.local/bin for uv, mise, chezmoi"
+345	            echo "$LOCAL_BIN_LINE"
+346	        } >> "$BASHRC"
+347	        info "Added ~/.local/bin to PATH in $BASHRC"
+348	    fi
+349	fi
+350	
+351	success "Bootstrap complete!"
+352
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:20Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Search for actual backup invocation
+
+`grep -rln 'backup\|\.backup\|cp.*~/.[a-z]*rc' run_once_before_00_bootstrap.sh.tmpl scripts/ 2>/dev/null; echo '---'; grep -nE 'backup|backupMode' /Users/zhouhanru/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl | head`
+
+```text
+scripts/init/Dockerfile.test
+scripts/init/dotfiles_init.py
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check dotfiles_init.py for backup implementation
+
+`grep -nE 'backup|backupMode' /Users/zhouhanru/.local/share/chezmoi/scripts/init/dotfiles_init.py | head -20`
+
+```text
+216:    Prompt("backupMode", "choice", "Preferences",
+264:        "backupMode": "smart",
+271:        "backupMode": "smart",
+279:        "backupMode": "smart",
+286:        # js-cli turned ON for fresh personal machines, and backupMode=smart).
+301:        "backupMode": "off",
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Search for actual backup implementation by-name
+
+`grep -rln 'BACKUP_DIR\|chezmoi status\|cp -r.*\$HOME\|backup.*chezmoi\|smart.*backup\|--smart\|chezmoi-backup' . --include='*.tmpl' --include='*.sh' --include='*.py' 2>/dev/null | head -10`
+
+```text
+run_before_01_backup_dotfiles.sh.tmpl
+.chezmoiexternal.toml.tmpl
+.chezmoi.toml.tmpl
+scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:39:36Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_before_01_backup_dotfiles.sh.tmpl`
+
+```text
+1	#!/bin/bash
+2	# Backup existing dotfiles before chezmoi overwrites them.
+3	# Mode comes from .backupMode (smart|full|off).
+4	set -euo pipefail
+5	
+6	MODE='{{ .backupMode | default "smart" }}'
+7	
+8	[[ "$MODE" == "off" ]] && exit 0
+9	
+10	BACKUP_BASE="$HOME/.dotfiles_backup"
+11	TODAY=$(date +%Y%m%d)
+12	# Daily dedup: skip if any backup from today already exists
+13	if ls -d "${BACKUP_BASE}/${TODAY}_"* &>/dev/null; then
+14	    exit 0
+15	fi
+16	
+17	BACKUP_DIR="${BACKUP_BASE}/$(date +%Y%m%d_%H%M%S)"
+18	BACKED_UP=0
+19	
+20	copy_one() {
+21	    local src="$1"
+22	    [[ -e "$src" ]] || return 0
+23	    local rel="${src#$HOME/}"
+24	    mkdir -p "${BACKUP_DIR}/$(dirname "$rel")"
+25	    cp -a "$src" "${BACKUP_DIR}/${rel}"
+26	    BACKED_UP=$((BACKED_UP + 1))
+27	}
+28	
+29	case "$MODE" in
+30	    smart)
+31	        # `chezmoi status` lines: "<col1><col2> <relpath-from-$HOME>".
+32	        # col2 ∈ {M,D} ⇒ apply will overwrite/delete the on-disk file → back up.
+33	        # col2 = A ⇒ target does not exist yet (nothing to back up).
+34	        # col2 = ' ' ⇒ in sync (nothing to back up).
+35	        while IFS= read -r line; do
+36	            [[ -z "$line" ]] && continue
+37	            col2="${line:1:1}"
+38	            relpath="${line:3}"
+39	            case "$col2" in
+40	                M|D) copy_one "$HOME/$relpath" ;;
+41	            esac
+42	        done < <(chezmoi status 2>/dev/null || true)
+43	        ;;
+44	    full)
+45	        for f in \
+46	            "$HOME/.zshrc" \
+47	            "$HOME/.zshenv" \
+48	            "$HOME/.gitconfig" \
+49	            "$HOME/.tmux.conf"; do
+50	            copy_one "$f"
+51	        done
+52	        for d in \
+53	            "$HOME/.config/nvim" \
+54	            "$HOME/.config/zsh" \
+55	            "$HOME/.config/mise" \
+56	            "$HOME/.config/alacritty" \
+57	            "$HOME/.config/yazi" \
+58	            "$HOME/.config/zellij"; do
+59	            copy_one "$d"
+60	        done
+61	        ;;
+62	    *)
+63	        echo "[BACKUP] Unknown mode '$MODE' (expected smart|full|off); skipping." >&2
+64	        exit 0
+65	        ;;
+66	esac
+67	
+68	# Remove empty backup dir if nothing was backed up (clean host on smart mode,
+69	# or fresh machine on full mode)
+70	if [[ $BACKED_UP -eq 0 ]]; then
+71	    rmdir "$BACKUP_DIR" 2>/dev/null || true
+72	else
+73	    echo "[BACKUP/$MODE] Backed up $BACKED_UP item(s) to $BACKUP_DIR"
+74	fi
+75	
+76	exit 0
+77
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:05Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:06Z)**_
+
+Good question — let me trace through precisely what `backupMode=smart` and `=full` cover for the bash deployment.
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if bash_aliases or related is in chezmoiignore
+
+`grep -E 'bash' .chezmoiignore.tmpl 2>&1 | head -10`
+
+```text
+# `curl … | bash` is a simple one-liner, but it's tooling-for-init,
+# Mirror of zsh/secrets.zsh; sourced by dot_bashrc.tmpl.
+.config/bash/secrets.sh
+# Mirror of .zshrc.adhoc; sourced at the tail of dot_bashrc.tmpl
+.bashrc.adhoc
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:21Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:32Z)**_
+
+是的，**smart 模式對 bash 覆蓋有完整保護**。逐項追：
+
+```bash
+$ cat run_before_01_backup_dotfiles.sh.tmpl
+case "$MODE" in
+    smart)
+        # 解析 `chezmoi status` 第 2 欄：
+        # M = 會被修改  → 備份
+        # D = 會被刪除  → 備份
+        # A = 新增      → 不備份（沒東西可備份）
+        ...
+```
+
+對 bash 部署，`chezmoi status` 會這樣報：
+
+| 檔案 | chezmoi 行為 | smart 備份？ |
+|---|---|---|
+| `~/.bashrc`（系統 skel 那個 145-byte 檔） | **M** 覆蓋成 managed bashrc | ✅ 備份 |
+| `~/.bash_profile`（一般沒有） | A 新建 | ⚪ N/A（沒東西備份） |
+| `~/.bash_aliases`（user 的） | 完全不管 | ⚪ N/A（chezmoi 連看都不看） |
+| `~/.config/bash/*.bash`（新檔） | A 新建 | ⚪ N/A |
+| `~/.config/zsh/{00_exports,02_legacy_tools}.zsh` | **D** 刪除（`.chezmoiremove`） | ✅ 備份 |
+| `~/.config/zsh/tools/{01_starship,05_mise,20_zoxide,27_thefuck,30_direnv,10_fzf}.zsh` | **D** | ✅ 備份 |
+| `~/.config/zsh/10_aliases.zsh`（stripped） | **M** | ✅ 備份 |
+| `~/.zshrc`（zvm_after_init 路徑改） | **M** | ✅ 備份 |
+
+備份位置：`~/.dotfiles_backup/<YYYYMMDD_HHMMSS>/`，原 relpath 結構保留（例如 `~/.dotfiles_backup/.../config/zsh/00_exports.zsh`）。
+
+`~/.bash_aliases` 不在這個矩陣裡是因為**它根本不是 chezmoi-managed file** — 我們的 bashrc 只是 `source` 它而已，從來不部署它，所以 user 既有內容物理上不會被動。
+
+---
+
+## 但 `backupMode=full` 有缺口
+
+讓我看一下 full 模式的 hardcoded 清單：
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show full mode list
+
+`sed -n '44,61p' run_before_01_backup_dotfiles.sh.tmpl`
+
+```text
+    full)
+        for f in \
+            "$HOME/.zshrc" \
+            "$HOME/.zshenv" \
+            "$HOME/.gitconfig" \
+            "$HOME/.tmux.conf"; do
+            copy_one "$f"
+        done
+        for d in \
+            "$HOME/.config/nvim" \
+            "$HOME/.config/zsh" \
+            "$HOME/.config/mise" \
+            "$HOME/.config/alacritty" \
+            "$HOME/.config/yazi" \
+            "$HOME/.config/zellij"; do
+            copy_one "$d"
+        done
+        ;;
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:38Z)**_
+
+對 full 模式來說 **缺了 bash 和 shared layer**。修一下：
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/run_before_01_backup_dotfiles.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:40:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit full-mode backup list extension
+
+```bash
+git add run_before_01_backup_dotfiles.sh.tmpl && git commit -m "$(cat <<'EOF'
+backup: extend full-mode list with bash + shared shell paths
+
+`backupMode=smart` already covers the bash deployment correctly via
+`chezmoi status` parsing — it backs up any file with col2 ∈ {M, D},
+so the existing skel ~/.bashrc (M, will be overwritten by managed
+bashrc) and the 7 orphan ~/.config/zsh/ files (D, will be deleted
+via .chezmoiremove) all land in ~/.dotfiles_backup/<timestamp>/.
+
+`backupMode=full` was using a hardcoded allow-list and missed the
+new surfaces. Added:
+
+  Files: ~/.bashrc, ~/.bash_profile, ~/.bash_aliases
+  Dirs:  ~/.config/bash, ~/.config/shell
+
+~/.bash_aliases is included even though chezmoi doesn't manage it —
+under full mode the policy is "back up known dotfile surfaces in
+case of any cause", and the user's bash_aliases is a long-lived
+state surface worth preserving alongside .zshrc.
+
+smart-mode users already covered (no behavior change there). This
+commit only changes full-mode behavior, mostly relevant for first-
+time onboarding (`backupMode=full` is documented as "hardcoded
+allowlist (onboarding mode)" in .chezmoi.toml.tmpl).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/zhouhanru/.cache/pre-commit/patch1778118055-6405.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/zhouhanru/.cache/pre-commit/patch1778118055-6405.
+[main b31d1e1] backup: extend full-mode list with bash + shared shell paths
+ 1 file changed, 5 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 01:41:15Z)**_
+
+完成。最終答案：
+
+**`backupMode=smart`（預設）** ✅ 已自動覆蓋 bash override 場景
+
+備份觸發機制：`chezmoi status` 解析 → col2 是 `M` 或 `D` 就 copy 到 `~/.dotfiles_backup/<timestamp>/`：
+
+- 既有 `~/.bashrc` → `M` → ✅ 備份
+- 既有 `~/.zshrc` → `M`（zvm_after_init 路徑改）→ ✅ 備份
+- `~/.config/zsh/` 7 個移走的 orphan → `D`（`.chezmoiremove` 觸發）→ ✅ 備份
+- `~/.config/zsh/10_aliases.zsh`（被 strip 成只剩 `zsh-profile`）→ `M` → ✅ 備份
+- 新檔（`~/.bash_profile`、`~/.config/bash/*`）→ `A` → ⚪ 不備份（沒東西可備份）
+- `~/.bash_aliases` → chezmoi 完全不管 → ⚪ 物理上不會被動
+
+**`backupMode=full`** — 剛才修了一個缺口（commit `b31d1e1`）
+
+Full 是 hardcoded allowlist，原本沒列 bash 相關路徑。現在補上：
+- 加 files: `~/.bashrc` / `~/.bash_profile` / `~/.bash_aliases`
+- 加 dirs: `~/.config/bash` / `~/.config/shell`
+
+**`backupMode=off`** 仍不備份（這是有意的：CI / Docker / 一次性環境用）
+
+---
+
+最終 9 個 commit：
+
+```
+b31d1e1 backup: extend full-mode list with bash + shared shell paths
+733b534 bash: source ~/.bash_aliases for backward-compat + add architecture docs
+4930c6e bash: install gawk unconditionally — ble.sh Makefile hard-requires it
+e45b593 docs: cross-file updates for primaryShell + bash bootstrap
+9cf8b19 bash: add oh-my-bash + ble.sh externals and plugin glue
+96c73bb bash: ship dot_bashrc.tmpl + dot_bash_profile.tmpl + dot_config/bash/
+9bb56c2 shell: extract POSIX layer to dot_config/shell/ for zsh/bash sharing
+a49bc20 ansible: gate zsh chsh on primaryShell + add bash role for chsh-to-bash
+67cbfd8 init: add primaryShell prompt for zsh/bash login-shell choice
+```
+
+可以推了。
+
+---
+
+_**User (2026-05-07 02:11:44Z)**_
+
+另外 因爲我們也不只會用到Ubuntu 但CentOS的bashrc是否也有類似 skel 預設 （我用得不多 不確定）
+
+另外關於 @.chezmoiremove 這個反正就一直放著也沒關係嘛
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 02:12:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:12:17Z)**_
+
+兩題都答：
+
+## 1. CentOS / RHEL 家族的 skel bashrc
+
+跟 Ubuntu **行為差很多** — 不會踩雷，反而比 Ubuntu 更安全。
+
+**Ubuntu/Debian `/etc/skel/.bashrc`**：~150 行，藏一堆東西（PS1、shopts、HISTSIZE、color aliases、bash_completion source、debian_chroot 提示）。覆蓋有失去自訂的風險。
+
+**RHEL 家族（CentOS/Rocky/Alma）`/etc/skel/.bashrc`**：~10 行，幾乎只做一件事：
+
+```bash
+# .bashrc
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+    . /etc/bashrc
+fi
+# User specific aliases and functions
+```
+
+protectionful 的東西全在 `/etc/bashrc`（系統層、root 維護、`rm -i`/`cp -i` aliases、Modules 系統 init、umask 預設）。**我們的 managed bashrc step 2 就明確 source `/etc/bashrc`**，所以 RHEL 上完全沒功能損失。讓我用現有的 rocky9 容器驗證一下：
+
+_**Agent (claude-opus-4-7 2026-05-07 02:12:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect Rocky 9 skel bashrc + system /etc/bashrc
+
+`docker run --rm rockylinux:9 sh -c 'echo === /etc/skel/.bashrc ===; cat /etc/skel/.bashrc; echo; echo === /etc/bashrc head ===; head -40 /etc/bashrc' 2>&1 | head -60`
+
+```text
+=== /etc/skel/.bashrc ===
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# User specific environment
+if ! [[ "$PATH" =~ "$HOME/.local/bin:$HOME/bin:" ]]
+then
+    PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+fi
+export PATH
+
+# Uncomment the following line if you don't like systemctl's auto-paging feature:
+# export SYSTEMD_PAGER=
+
+# User specific aliases and functions
+if [ -d ~/.bashrc.d ]; then
+	for rc in ~/.bashrc.d/*; do
+		if [ -f "$rc" ]; then
+			. "$rc"
+		fi
+	done
+fi
+
+unset rc
+
+=== /etc/bashrc head ===
+# /etc/bashrc
+
+# System wide functions and aliases
+# Environment stuff goes in /etc/profile
+
+# It's NOT a good idea to change this file unless you know what you
+# are doing. It's much better to create a custom.sh shell script in
+# /etc/profile.d/ to make custom changes to your environment, as this
+# will prevent the need for merging in future updates.
+
+# Prevent doublesourcing
+if [ -z "$BASHRCSOURCED" ]; then
+  BASHRCSOURCED="Y"
+
+  # are we an interactive shell?
+  if [ "$PS1" ]; then
+    if [ -z "$PROMPT_COMMAND" ]; then
+      case $TERM in
+      xterm*|vte*)
+        if [ -e /etc/sysconfig/bash-prompt-xterm ]; then
+            PROMPT_COMMAND=/etc/sysconfig/bash-prompt-xterm
+        else
+            PROMPT_COMMAND='printf "\033]0;%s@%s:%s\007" "${USER}" "${HOSTNAME%%.*}" "${PWD/#$HOME/\~}"'
+        fi
+        ;;
+      screen*)
+        if [ -e /etc/sysconfig/bash-prompt-screen ]; then
+            PROMPT_COMMAND=/etc/sysconfig/bash-prompt-screen
+        else
+            PROMPT_COMMAND='printf "\033k%s@%s:%s\033\\" "${USER}" "${HOSTNAME%%.*}" "${PWD/#$HOME/\~}"'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:12:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:12:49Z)**_
+
+確認了 Rocky 9 的實際 skel：除了 source `/etc/bashrc` 之外還有 **`~/.bashrc.d/*` loader**（RHEL 家族專屬慣例，平行於 Ubuntu 的 `~/.bash_aliases`）。我目前 step 11 只接了 Ubuntu 那邊，RHEL 這邊也該補上：
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/dot_bashrc.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/dot_bashrc.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:10Z)**_
+
+Adding `~/.bashrc.d` to full-mode backup, and updating the architecture doc's "What's preserved" matrix:
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/run_before_01_backup_dotfiles.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:28Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/docs/shells/architecture.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:32Z)**_
+
+Now `.chezmoiremove` — adding an explanatory note about pruning policy + a TODO entry:
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiremove`
+
+```text
+1	{{- /*
+2	.chezmoiremove — paths to delete from $HOME on each `chezmoi apply`.
+3	Templated; re-evaluated every apply (idempotent — chezmoi only acts
+4	when the path actually exists). One pattern per line.
+5	
+6	Currently used to clean up the zsh-side copies of files that were
+7	moved into the shared dot_config/shell/ POSIX layer (see commit
+8	adding `dot_config/shell/`). Without this, the orphan ~/.config/zsh/
+9	files would still get sourced by load_modular_dir and double-load
+10	PATH/env on every shell start.
+11	*/ -}}
+12	.config/zsh/00_exports.zsh
+13	.config/zsh/02_legacy_tools.zsh
+14	.config/zsh/tools/01_starship.zsh
+15	.config/zsh/tools/05_mise.zsh
+16	.config/zsh/tools/20_zoxide.zsh
+17	.config/zsh/tools/27_thefuck.zsh
+18	.config/zsh/tools/30_direnv.zsh
+19	.config/zsh/tools/10_fzf.zsh
+20
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/.chezmoiremove has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/TODO.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:13:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify rendered bashrc parses + inspect new step 11
+
+`_ZO_DOCTOR=0 chezmoi cat ~/.bashrc 2>&1 | bash -n - && echo bashrc OK; _ZO_DOCTOR=0 chezmoi cat ~/.bashrc 2>&1 | sed -n '/bashrc.d/,+8p' | head -15`
+
+```text
+bashrc OK
+#   11. ~/.bash_aliases (Debian/Ubuntu) + ~/.bashrc.d/* (RHEL family)
+#       — backward-compat with distro skel conventions
+#   12. .bashrc.adhoc tail (chezmoi-ignored; highest-priority user override)
+#
+# The ble.sh / oh-my-bash / atuin steps are presence-gated and no-op
+# silently when the artefact isn't installed (e.g. fresh host before
+# `chezmoi apply` finishes the externals + run-onchange-after_install).
+# Plain bash without ble.sh + OMB still gets a fully working starship
+# prompt + the shared layer + bash-completion v2.
+#   - ~/.bashrc.d/*                 (RHEL/Rocky/Alma/Fedora skel loops
+#                                    over this dir — verified in Rocky 9)
+#
+# Without these sources, our managed bashrc would silently strip user
+# content that other dotfiles / distro defaults accumulated — hard to
+# debug, hostile UX.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:14:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit RHEL bashrc.d compat + .chezmoiremove pruning policy
+
+```bash
+git add dot_bashrc.tmpl run_before_01_backup_dotfiles.sh.tmpl docs/shells/architecture.md .chezmoiremove TODO.md && git commit -m "$(cat <<'EOF'
+bash: source ~/.bashrc.d/* on RHEL family + extend full backup
+
+Verified Rocky 9's /etc/skel/.bashrc has a `~/.bashrc.d/*` loop that
+serves the same role as Debian/Ubuntu's `~/.bash_aliases` — long-
+lived per-user customisation surface. Our managed bashrc was missing
+the equivalent source, so existing RHEL hosts with content under
+~/.bashrc.d/ would lose those customisations after first apply.
+
+dot_bashrc.tmpl step 11 (the backward-compat layer between ble-attach
+and ~/.bashrc.adhoc) now sources both:
+
+  [ -r "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
+  if [ -d "$HOME/.bashrc.d" ]; then
+      for _rc_file in "$HOME"/.bashrc.d/*; do
+          [ -r "$_rc_file" ] && . "$_rc_file"
+      done
+      unset _rc_file
+  fi
+
+Same priority semantics as before — these load AFTER ble-attach
+(so bind-x / ble-bind work) and BEFORE ~/.bashrc.adhoc (so adhoc
+remains the highest-priority override).
+
+Also extended `backupMode=full` (run_before_01_backup_dotfiles.sh
+.tmpl) to copy ~/.bashrc.d/ alongside the previously-added
+~/.config/{bash,shell}. backupMode=smart already covers it via
+chezmoi status (any M/D path lands in ~/.dotfiles_backup).
+
+docs/shells/architecture.md: added a RHEL skel matrix paralleling
+the existing Debian one, calling out the three substantive blocks
+(`/etc/bashrc` source, ~/.local/bin PATH prepend, ~/.bashrc.d loop)
+and the Action+Why for each.
+
+.chezmoiremove: added a "pruning policy" comment block explaining
+that entries can be left forever (microsecond cost per apply) but
+become dead weight after every fleet host has applied past commit
+9bb56c2. Tracked as [P3/S] in TODO.md; pruning isn't urgent and
+shouldn't happen until the maintainer is confident the migration
+has propagated.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/zhouhanru/.cache/pre-commit/patch1778120053-20886.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/zhouhanru/.cache/pre-commit/patch1778120053-20886.
+[main 12395e6] bash: source ~/.bashrc.d/* on RHEL family + extend full backup
+ 5 files changed, 48 insertions(+), 15 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:14:42Z)**_
+
+完成。兩題答案：
+
+## CentOS / Rocky / RHEL 家族
+
+實測 Rocky 9 的 `/etc/skel/.bashrc`（27 行，比 Ubuntu 的 ~150 行短很多）：
+
+```bash
+# Source global definitions
+if [ -f /etc/bashrc ]; then . /etc/bashrc; fi
+
+# User specific environment
+PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+export PATH
+
+# User specific aliases and functions
+if [ -d ~/.bashrc.d ]; then
+    for rc in ~/.bashrc.d/*; do
+        [ -f "$rc" ] && . "$rc"
+    done
+fi
+```
+
+三個 substantive 行為，**全部已被我們覆蓋**：
+
+| Block | 我們的處理 |
+|---|---|
+| source `/etc/bashrc` | ✅ `dot_bashrc.tmpl` step 2 顯式 source |
+| `~/.local/bin:~/bin` PATH prepend | ✅ `dot_config/shell/00_exports.sh.tmpl` 同樣 export |
+| `~/.bashrc.d/*` 迴圈 | ✅ **剛剛補上**（commit `12395e6`，step 11 跟 `~/.bash_aliases` 並列） |
+
+所以 RHEL 上既有的 `~/.bashrc.d/*.sh` 自訂（如有）一裝我們的不會掉。比 Ubuntu 那邊單純（沒有 PS1/PROMPT/HISTSIZE 之類藏在 skel 的東西要處理）。
+
+## `.chezmoiremove` 永久放著沒事
+
+對，**就放著**。技術上每次 `chezmoi apply` 對每條 entry 做一次 `stat()`，已經套用過的 host 上是「path 不存在 → no-op」，成本是微秒級，跟單一 git 操作的耗時相比可以忽略。
+
+唯一的缺點是 entries 變成「migration 歷史記錄」而不是「active 清理規則」，可能讓未來讀檔的人困惑。我加了 header comment 說明：
+- 為什麼存在（連到 commit `9bb56c2`）
+- 多久之後可以裁減（fleet 全部 host apply 過 ~6-12 個月後）
+- TODO 也記了一條 `[P3/S]` 不急著做
+
+到了真要裁的時候，刪掉 entries 的 PR 就一行 diff，順手。
+
+---
+
+最終 10 個 commit：
+
+```
+12395e6 bash: source ~/.bashrc.d/* on RHEL family + extend full backup
+b31d1e1 backup: extend full-mode list with bash + shared shell paths
+733b534 bash: source ~/.bash_aliases for backward-compat + add architecture docs
+4930c6e bash: install gawk unconditionally — ble.sh Makefile hard-requires it
+e45b593 docs: cross-file updates for primaryShell + bash bootstrap
+9cf8b19 bash: add oh-my-bash + ble.sh externals and plugin glue
+96c73bb bash: ship dot_bashrc.tmpl + dot_bash_profile.tmpl + dot_config/bash/
+9bb56c2 shell: extract POSIX layer to dot_config/shell/ for zsh/bash sharing
+a49bc20 ansible: gate zsh chsh on primaryShell + add bash role for chsh-to-bash
+67cbfd8 init: add primaryShell prompt for zsh/bash login-shell choice
+```
+
+可以推了。
+
+---
+
+_**User (2026-05-07 02:17:21Z)**_
+
+像他這個 ~/.bashrc.d/* 跟我們 @dot_ssh/private_config.d/ 也有點像？
+還有之前 @dot_config/shell/ ~/.config/zsh/... 這個？
+這是屬於XDG vs ? convension？ 嗎
+哪樣子更好點？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 02:18:14Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:18:50Z)**_
+
+好觀察 — 這其實是**三個不同 convention 的混搭**，各有歷史。
+
+## 三個 pattern 的譜系
+
+### 1. XDG Base Directory Spec — `~/.config/<tool>/`
+
+freedesktop.org [標準](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)，2003 年提出來解決「`$HOME` 被 `.foorc` 污染」。每個 app 在 `$XDG_CONFIG_HOME`（預設 `~/.config/`）擁有自己的子目錄，子目錄裡的結構由 app 自己決定。
+
+我們 repo 裡走 XDG 的：`dot_config/{nvim,git,mise,starship,zoxide,direnv,bat,eza,atuin,zellij,zsh,bash,shell}/...` — 大部分現代工具都吃 XDG。
+
+### 2. `<dotfile>.d/*` drop-in dir — sysadmin 老傳統
+
+來自 `/etc/cron.d/`、`/etc/sudoers.d/`、`/etc/profile.d/`、`/etc/apt/sources.list.d/` 那一脈。pattern：一個 canonical config 檔 + 一個 `.d/` 目錄 fragments 自動 loop。寫於 OpenSSH、systemd、apt 等系統工具的時代。
+
+User-side 的延伸：
+- `~/.ssh/config.d/*`（OpenSSH 7.3+ 支援，由 `~/.ssh/config` 的 `Include config.d/*` directive 拉進來）→ 我們的 `dot_ssh/private_config.d/` 走這個
+- `~/.bashrc.d/*`（RHEL 家族 skel 的慣例 — Rocky/Alma/Fedora 預設就有 `for rc in ~/.bashrc.d/*; do . "$rc"; done`）
+
+### 3. 我們的 hybrid — XDG 位置 + `.d`-style modular 內部
+
+`~/.config/zsh/`、`~/.config/bash/`、`~/.config/shell/` 形式上是 XDG（住在 `~/.config/`），但**裡面**用 `00_`/`01_`/`02_` prefix 排序、自寫 `load_modular_dir` 把所有 `*.sh` / `*.zsh` 抓出來 source。語意上是 `.d/` 模式，但 zsh/bash 不會自動掃，要靠我們在 `dot_zshrc.tmpl` / `dot_bashrc.tmpl` 寫 loader。
+
+## 對照表
+
+| 維度 | XDG `~/.config/<tool>/` | `<dotfile>.d/*` | 我們的 hybrid |
+|---|---|---|---|
+| 位置 | 標準 | `$HOME` 各自為政 | 標準 (XDG) |
+| 模組化 | tool 自己決定 | 是（glob loop） | 是（我們的 loader） |
+| Tool 原生支援 | 廣（modern 工具） | 看工具：ssh ✓、bash 部分 ✓ | 自寫 loader |
+| 排序 | tool 自己 | alphabetical | alphabetical（我們用 `NN_` 前綴） |
+| 新增/刪除 | tool 自己 | drop a file 即可 | drop a file 即可 |
+
+## 哪個比較好？看 use case
+
+- **「app 已經有 XDG 支援」**（nvim/git/mise/starship/...）→ 跟 XDG 走，**不要**加 `.d/`，維持工具自己的內部結構。
+- **「app 原生支援 `.d/`」**（OpenSSH 的 `Include config.d/*`、systemd 的 `*.conf.d/`）→ 跟 native `.d/` 走，不要硬塞 XDG。**SSH 之所以還住 `~/.ssh/`、不是 `~/.config/ssh/`，是 OpenSSH 沒擁抱 XDG 的歷史包袱**，但人家自己有 `.d/` 機制能用，我們配合就好。
+- **「shells (zsh/bash) 想要模組化」** → 我們的 hybrid 是合理選擇。**為什麼不直接全用 `~/.bashrc.d/`？** 因為 RHEL skel 的 `~/.bashrc` loop 是**在它自己的 bashrc 裡**做的，被我們 managed bashrc 覆蓋後 loop 就沒了。我們自己 source `~/.bashrc.d/*` 是放在 step 11（ble-attach 之後），那是「使用者的 backward-compat 區」，**不適合放我們的 managed configs**（它們需要在 step 5、OMB 之前跑）。所以管理用 XDG，相容用 `.d/`，分開。
+
+## 套到我們 repo 的具體分工
+
+| 用途 | Convention | 例子 |
+|---|---|---|
+| chezmoi-managed shell modular config | XDG hybrid | `dot_config/{shell,zsh,bash}/NN_*.{sh,zsh,bash}` |
+| chezmoi-managed SSH fragments | OpenSSH 原生 `.d/` | `dot_ssh/private_config.d/` |
+| chezmoi-managed git aliases / pager / etc | XDG（git 原生） | `dot_config/git/` |
+| **使用者 既有/手動** bash 客製 | distro skel 慣例 | `~/.bash_aliases`（Debian） / `~/.bashrc.d/*`（RHEL） |
+| **使用者 機器特定** override | 我們自己的慣例 | `~/.zshrc.adhoc`、`~/.bashrc.adhoc`（chezmoi-ignored） |
+
+兩個慣例同時存在不是亂，是各有分工：**managed = XDG 為主，modular 用我們的 loader；user-side = 跟著 distro 跑**。
+
+## 一個微妙的歷史問題：zsh ZDOTDIR
+
+zsh 自己其實**支援 XDG-ish 模式**：設 `ZDOTDIR=~/.config/zsh` 後，zsh 會去那邊找 `.zshrc`。我們**沒用**這條，因為：
+- 設 `ZDOTDIR` 要在 zsh 啟動前（透過 `~/.zshenv` 或 `/etc/zshenv`）— 雞生蛋蛋生雞
+- 用 OMZ 這類 framework 對 ZDOTDIR 的相容是各家不一
+- 我們 `~/.zshrc` 主檔小（130 行），剩下 modular load 進來就好
+
+bash 沒有 ZDOTDIR 等價物（`BASH_ENV` 是給非互動 shell 用的，`~/.bashrc` 路徑硬編碼）。所以 bash 一定得 `~/.bashrc` 在 `$HOME`。
+
+---
+
+簡單講：**我們 repo 是「能 XDG 就 XDG，能 `.d/` 就 `.d/`，shell 因為兩個都不夠所以自己合成 hybrid」**。沒「哪個更好」的全局答案，只有「對這個工具/這個用途哪個合適」。
+
+---
+
+_**User (2026-05-07 02:20:26Z)**_
+
+這類config file convension是否能做一個doc介紹一下 （如果有沒提到 但也很常用的也可以補充下）
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 02:21:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:21:05Z)**_
+
+好建議。我寫一份 `docs/this_repo/config-conventions.md`，把這個 repo 用到的 config 慣例整理出來（含我剛剛沒提的常用慣例）：
+
+_**Agent (claude-opus-4-7 2026-05-07 02:22:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Config file conventions
+
+A quick tour of the dotfile / config organisation patterns this repo
+uses, why each exists, and where to place new files.
+
+This is a **conventions reference**, not a chezmoi tutorial — for
+chezmoi mechanics see [`tools/chezmoi-templating.md`](../tools/chezmoi-templating.md)
+and [`tools/chezmoi-prefixes.md`](../tools/chezmoi-prefixes.md). For
+the shell-specific tier rule see
+[`shells/architecture.md`](../shells/architecture.md).
+
+---
+
+## A. Where configs live
+
+### A1. XDG Base Directory Specification
+
+[freedesktop.org spec](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html);
+the modern default. Four env vars carve up `$HOME` into purpose-tagged
+subtrees:
+
+| Env var             | Default                | What goes there |
+| ------------------- | ---------------------- | --------------- |
+| `$XDG_CONFIG_HOME`  | `~/.config/`           | User config (this is where 90% of modern tools land) |
+| `$XDG_DATA_HOME`    | `~/.local/share/`      | App data, tool installs (mise toolchains, oh-my-zsh, blesh, …) |
+| `$XDG_CACHE_HOME`   | `~/.cache/`            | Disposable caches (zsh history search cache, bat cache, …) |
+| `$XDG_STATE_HOME`   | `~/.local/state/`      | Runtime state (less critical than data; used less often) |
+| `$XDG_RUNTIME_DIR`  | `/run/user/$UID/`      | Volatile, sub-second-scope IPC sockets (Linux only) |
+
+Tools that follow XDG (most modern ones): nvim, git, mise, starship,
+zoxide, direnv, bat, eza, atuin, zellij, gh, fd, ripgrep.
+
+Tools that **don't** follow XDG (stuck for backwards-compat):
+- bash (`~/.bashrc`, `~/.bash_profile`)
+- zsh (`~/.zshrc` — but supports `ZDOTDIR` redirect)
+- ssh (`~/.ssh/`)
+- some older tools (`~/.tmux.conf`, `~/.gemrc`, `~/.npmrc`, `~/.curlrc`)
+
+In this repo: `dot_config/{nvim,git,mise,starship,zoxide,direnv,bat,
+eza,atuin,zellij,gh,fd,ripgrep,zsh,bash,shell}/` — XDG locations.
+
+### A2. Tool-specific dirs (pre-XDG)
+
+OpenSSH lives in `~/.ssh/` with strict 0700 perms. Bash insists on
+`~/.bashrc` / `~/.bash_profile` at `$HOME`. tmux defaults to
+`~/.tmux.conf` (newer versions also accept `~/.config/tmux/tmux.conf`).
+We follow each tool's actual lookup order rather than fighting it.
+
+In this repo: `dot_ssh/`, `dot_bashrc.tmpl`, `dot_zshrc.tmpl`,
+`dot_gitconfig.tmpl` (also at `$HOME` — git 2.13+ also reads
+`~/.config/git/config`, but `~/.gitconfig` is the classic canonical).
+
+### A3. Platform-specific dirs
+
+Some tools use OS-native dirs even on non-XDG:
+
+| OS       | Convention                                    |
+| -------- | --------------------------------------------- |
+| macOS    | `~/Library/Application Support/<App>/`        |
+| Windows  | `%APPDATA%\<App>\`                            |
+| Linux    | usually XDG; sometimes `~/.<app>/`            |
+
+In this repo: `Library/Application Support/{Code,Cursor,Antigravity}/`
+(macOS-only chezmoi templates; gated in `.chezmoiignore.tmpl` per OS
+to avoid creating phantom dirs on the other OS).
+
+---
+
+## B. How modular config is structured
+
+### B1. Single canonical file
+
+The simplest pattern: one rc file does everything.
+Examples: `~/.gitconfig`, `~/.tmux.conf`.
+
+Pros: easy to read top-to-bottom, no load-order surprises.
+Cons: grows unwieldy past ~500 lines; merge conflicts when multiple
+sources contribute.
+
+### B2. `.d/` drop-in fragments
+
+Old sysadmin pattern from `/etc/` (`/etc/cron.d/`, `/etc/sudoers.d/`,
+`/etc/profile.d/`, `/etc/apt/sources.list.d/`). One canonical file +
+a `.d/` directory; the tool loops over the dir and sources each
+fragment alphabetically.
+
+User-side examples:
+- `~/.ssh/config.d/*` (OpenSSH 7.3+; pulled in by `Include config.d/*`
+  directive in `~/.ssh/config`)
+- `~/.bashrc.d/*` (RHEL/Rocky/Alma/Fedora skel; their `~/.bashrc`
+  loops over this dir)
+- `~/.bash_completion.d/*` (less standard; some completion frameworks)
+
+Pros: drop a file → enabled. Each fragment is independent; a package
+can ship one without modifying the canonical config.
+Cons: order is glob-sort fragile (most use `NN_` prefixes). Tools
+that don't natively support `.d/` need a manual loader.
+
+In this repo: `dot_ssh/private_config.d/` → `~/.ssh/config.d/*`,
+included by `~/.ssh/config`. Plus `~/.bashrc.d/*` is sourced as a
+user backward-compat layer in `dot_bashrc.tmpl` step 11 (NOT where
+we place chezmoi-managed bash configs — see B3).
+
+### B3. Hybrid: XDG location + `.d`-style modular inside
+
+When a tool's canonical config doesn't natively support `.d/` but we
+want the modular benefits: put modular files at the XDG location and
+write our own loader.
+
+In this repo: `dot_config/{shell,zsh,bash}/NN_*.{sh,zsh,bash}` —
+sourced by a `load_modular_dir` function defined in
+`dot_zshrc.tmpl` / `dot_bashrc.tmpl` that globs `*.<ext>` and sources
+in alphabetical order. The `NN_` filename prefix controls load order.
+
+Why not just put these in `~/.bashrc.d/`? Because the skel's
+`~/.bashrc.d` loop (on RHEL) runs from inside the original `~/.bashrc`
+— after we replace that with our managed bashrc, that loop is gone.
+Our own bashrc sources `~/.bashrc.d/*` at step 11 (after ble-attach),
+which is too late for OMB plugin config or pre-init env. So managed
+configs live in `~/.config/{shell,bash}/` (loaded mid-bashrc), and
+`~/.bashrc.d/` is reserved for **user-dropped** files only.
+
+Full deep-dive: [`shells/architecture.md`](../shells/architecture.md).
+
+### B4. Plugin manager directories
+
+When a tool has a plugin manager (oh-my-zsh, oh-my-bash, tpm, lazy.nvim,
+direnvrc), plugins live in a dedicated dir managed by the framework:
+
+- `~/.oh-my-zsh/custom/plugins/<plugin>/` (OMZ; cloned via
+  `.chezmoiexternal.toml.tmpl`)
+- `~/.oh-my-bash/custom/plugins/<plugin>/` (OMB; same pattern)
+- `~/.tmux/plugins/<plugin>/` (TPM)
+- `~/.config/nvim/lazy-lock.json` + `~/.local/share/nvim/lazy/<plugin>/`
+  (lazy.nvim — config in XDG_CONFIG_HOME, payloads in XDG_DATA_HOME)
+
+We don't fight these — let the framework own its dir, and clone
+upstream plugins via `.chezmoiexternal.toml.tmpl` so chezmoi pulls
+them weekly.
+
+---
+
+## C. User customisation layers (override patterns)
+
+These are escape hatches — places where users can stash machine-
+local or experimental config without polluting chezmoi-managed files.
+
+### C1. `~/.foorc.local` include (the [include] directive pattern)
+
+Used when the canonical config supports an "include another file"
+directive. The managed file ends with a conditional include of
+`~/.foorc.local`; the local file is gitignored / chezmoi-ignored.
+
+Examples in this repo:
+- `dot_gitconfig.tmpl` includes `~/.gitconfig.local` (per-machine
+  `[safe]`, `[credential]`, `[http.proxy]`). Listed in
+  `.chezmoiignore.tmpl` so chezmoi never tracks it. Silently
+  no-ops when absent (git's `[include] path = ~/.gitconfig.local`
+  is forgiving).
+- `dot_ssh/dot_config` includes `~/.ssh/config.local` similarly.
+
+When to use: tool has native include directive AND the canonical
+config has stable structure that won't break on partial overrides.
+
+### C2. `~/.foorc.adhoc` self-sourced tail (our chezmoi-ignored pattern)
+
+Used when there's no native include directive — we hand-roll one at
+the end of the managed rc:
+
+\```bash
+# end of dot_zshrc.tmpl / dot_bashrc.tmpl
+[ -r "$HOME/.zshrc.adhoc" ] && . "$HOME/.zshrc.adhoc"
+\```
+
+Auto-created on first apply with a header comment. Listed in
+`.chezmoiignore.tmpl`. Sourced LAST so the user always wins on
+conflict.
+
+When to use: shell rc files where we want a per-machine override
+without forcing the user to learn chezmoi templates. See `dot_zshrc
+.tmpl` and `dot_bashrc.tmpl` for the canonical examples.
+
+### C3. distro skel conventions (`~/.bash_aliases`, `~/.bashrc.d/*`)
+
+Files / dirs that distro `/etc/skel/` configs tell users to populate.
+Not chezmoi-managed; we just source them for backward-compat so
+existing user content survives our managed rc taking over.
+
+Examples:
+- `~/.bash_aliases` — Debian / Ubuntu skel sources this; our managed
+  bashrc step 11 also sources it.
+- `~/.bashrc.d/*` — RHEL / Rocky / Alma / Fedora skel loops over it;
+  our managed bashrc step 11 also loops.
+- `~/.profile` / `~/.bash_profile` — login-shell entry; our
+  `dot_bash_profile.tmpl` checks for `~/.profile` and sources it
+  before `~/.bashrc` (with a `grep` guard against double-sourcing).
+
+When to use: only for **user-side** legacy compat. Our chezmoi-
+managed configs DON'T live here.
+
+### C4. Secrets files (gitignored / chezmoi-ignored)
+
+Per-machine API keys, tokens, proxy URLs — never tracked. Sourced
+by the managed rc, presence-gated:
+
+\```bash
+[ -r "$HOME/.config/zsh/secrets.zsh" ] && . "$HOME/.config/zsh/secrets.zsh"
+\```
+
+Listed in `.chezmoiignore.tmpl`. We also have a baseline-seed
+pattern via `create_99_local_proxy.zsh` (chezmoi creates it once,
+then never touches contents).
+
+When to use: anything that contains credentials. The
+[`secrets`](https://www.chezmoi.io/user-guide/encryption/age/) topic
+in chezmoi docs covers encrypted alternatives if "gitignored" isn't
+strong enough.
+
+---
+
+## D. Chezmoi-specific conventions (file prefixes & meta-files)
+
+For full mechanics see [`tools/chezmoi-templating.md`](../tools/chezmoi-templating.md)
+and [`tools/chezmoi-prefixes.md`](../tools/chezmoi-prefixes.md). The
+TL;DR:
+
+| Prefix / suffix     | Behaviour                                                   |
+| ------------------- | ----------------------------------------------------------- |
+| `dot_X`             | Deploys to `~/.X`                                            |
+| `private_X`         | Deploys with mode 0600                                       |
+| `executable_X`      | Deploys with mode 0755 (or +x bit set)                       |
+| `*.tmpl`            | Templated; rendered at apply time                            |
+| `modify_X`          | Script that takes current target on stdin, writes new on stdout (jq overlays, etc.) |
+| `create_X`          | Seed once; chezmoi never touches contents after creation     |
+| `run_once_before_*` | One-shot pre-apply scripts                                   |
+| `run_onchange_after_*` | Re-runs on hash change of inlined dependencies            |
+
+| Meta-file                         | Purpose                                       |
+| --------------------------------- | --------------------------------------------- |
+| `.chezmoi.toml.tmpl`              | User config (prompts → data values)            |
+| `.chezmoiignore.tmpl`             | Source files to skip / OS-conditional gates   |
+| `.chezmoiremove`                  | Paths to delete from `$HOME` on apply (migrations) |
+| `.chezmoiexternal.toml.tmpl`      | Upstream sources (git clones, file downloads) |
+| `.chezmoidata*`                   | Static data injected into all templates       |
+| `.chezmoiscripts/`                | Run-scripts not deployed as files             |
+
+---
+
+## E. Other related conventions worth knowing
+
+### E1. PATH directory conventions
+
+| Directory             | Convention | What lives there |
+| --------------------- | ---------- | ---------------- |
+| `~/bin/`              | Old POSIX  | User-written shell scripts (we have a few in `dot_bin/`) |
+| `~/.local/bin/`       | XDG-ish    | Auto-installed CLIs (uv, mise, chezmoi, just, fd, eza, …) |
+| `~/.cargo/bin/`       | Rust       | cargo-installed binaries |
+| `~/go/bin/`           | Go         | `go install` targets |
+| `~/.bun/bin/`         | Bun        | bun runtime + globally-installed JS CLIs |
+| `~/Library/pnpm/`     | macOS pnpm | pnpm global store |
+| `/opt/homebrew/bin/`  | macOS brew | Apple Silicon brew |
+| `/usr/local/bin/`     | macOS brew | Intel brew & legacy `/usr/local` |
+
+Order in our `dot_config/shell/00_exports.sh.tmpl` is deliberate:
+later prepends win, so `$HOME/bin` and `$HOME/.local/bin` end up at
+the front.
+
+### E2. Lock files
+
+Lock files pin transitive dep versions. Some are chezmoi-managed,
+some are gitignored, some are seed-once:
+
+| File                                      | Pattern              | Why |
+| ----------------------------------------- | -------------------- | --- |
+| `uv.lock`                                 | tracked              | reproducible Python tool installs |
+| `.chezmoi.toml`                           | gitignored           | output of `chezmoi init`, machine-local |
+| `~/.config/nvim/lazy-lock.json`           | `create_` (seed once) | chezmoi never touches after first apply |
+| `~/.agents/.skill-lock.json`              | `modify_` (jq merge) | chezmoi-managed AND mergeable |
+
+The choice of pattern depends on whether the file should be
+identical across machines, partly identical, or fully machine-local.
+
+### E3. Login vs interactive vs non-interactive shell loading
+
+Bash and zsh distinguish three shell modes; each reads different
+files:
+
+| Mode                  | Bash reads                                   | zsh reads                          |
+| --------------------- | -------------------------------------------- | ---------------------------------- |
+| Login (TTY/SSH login) | `/etc/profile`, then first of `~/.bash_profile`/`~/.bash_login`/`~/.profile` | `/etc/zprofile`, `~/.zprofile`, `/etc/zlogin`, `~/.zlogin` (and `.zshenv` always) |
+| Interactive non-login | `/etc/bash.bashrc`, `~/.bashrc`              | `~/.zshenv`, `~/.zshrc`            |
+| Non-interactive (scripts) | nothing (unless `BASH_ENV` set)         | `~/.zshenv` only                   |
+
+Implication: **env vars that need to be available to scripts** must
+go in `~/.zshenv` (zsh) or be exported via `~/.profile` (bash login
+chain) — not `~/.zshrc` / `~/.bashrc` (interactive only).
+
+In this repo: most env vars live in `dot_config/shell/00_exports.sh.tmpl`
+which gets sourced from BOTH `~/.bashrc` AND `~/.zshrc` — interactive
+shells only. Things that genuinely need non-interactive scope (PATH
+for `cron`, `ssh user@host cmd`) belong in `~/.profile` /
+`~/.zshenv` instead. We accept this tradeoff because: (a) most
+non-interactive scripts set their own PATH, (b) cron scripts should
+hardcode tool paths anyway for reproducibility.
+
+### E4. Filename-prefix ordering
+
+When a `.d/`-style or hybrid loader sorts files alphabetically,
+filename prefixes encode load order:
+
+\```
+dot_config/shell/
+├── 00_exports.sh.tmpl     ← runs first  (env / PATH)
+├── 01_starship.sh         ← prompt init (after env)
+├── 02_legacy_tools.sh     ← legacy PATH additions
+├── 05_mise.sh             ← runtime manager
+├── 10_aliases.sh          ← aliases (after env)
+├── 10_fzf.sh
+├── 20_zoxide.sh
+├── 27_thefuck.sh
+└── 30_direnv.sh           ← runs last
+\```
+
+Convention: `00–09` for env / PATH, `10–19` for prompt + tools that
+depend on env, `20–29` for navigation / utility tools, `30+` for
+late hooks (direnv, OSC 133, etc). Leave gaps for future inserts —
+prefer `15_` to inserting between `10_` and `11_`.
+
+### E5. Per-OS / per-profile gating in templates
+
+When the same source needs different behavior per OS or profile, two
+patterns:
+
+1. **chezmoi template `if`** at template-render time:
+   \```go
+   {{ if eq .chezmoi.os "darwin" -}}
+       eval "$(/opt/homebrew/bin/brew shellenv)"
+   {{ else -}}
+       # Linuxbrew path
+   {{ end -}}
+   \```
+
+2. **runtime detection** at source-time:
+   \```bash
+   if [ -n "$ZSH_VERSION" ]; then
+       eval "$(starship init zsh)"
+   elif [ -n "$BASH_VERSION" ]; then
+       eval "$(starship init bash)"
+   fi
+   \```
+
+When to use: chezmoi template if the diff is large (whole conditional
+blocks of config) or if the value is fixed at apply time. Runtime
+detection if the same file needs to work in different shells (our
+shared layer) or under different runtime conditions (presence of a
+binary).
+
+Don't double-gate: if a chezmoi template `if` already excludes a
+branch, the runtime check inside it is dead code. Pick one.
+
+---
+
+## F. Cross-references
+
+- [`tools/chezmoi-templating.md`](../tools/chezmoi-templating.md) —
+  the chezmoi template language, OS detection, when to use templates
+  vs static files.
+- [`tools/chezmoi-prefixes.md`](../tools/chezmoi-prefixes.md) — full
+  catalog of `dot_`, `private_`, `executable_`, `modify_`, `create_`
+  prefix semantics with case studies.
+- [`shells/architecture.md`](../shells/architecture.md) — three-tier
+  shell layout (`dot_config/shell/` vs `dot_config/zsh/` vs
+  `dot_config/bash/`), migration story, future-shell extension.
+- [`shells/aliases.md`](../shells/aliases.md) — alias / function
+  inventory keyed by source file.
+- [`tools/agent-overlays.md`](../tools/agent-overlays.md) — case
+  study of `modify_` prefix for jq-based config overlays.
+- [`CLAUDE.md`](../../CLAUDE.md) — agent-facing maintenance contract;
+  cross-file rules (`README.md`, `mkdocs.yml`, `docs/`,
+  `docs/shells/aliases.md` updates).
+
+```
+
+```text
+File created successfully at: /Users/zhouhanru/.local/share/chezmoi/docs/this_repo/config-conventions.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:01Z)**_
+
+Adding to mkdocs nav and CLAUDE.md cross-reference, then commit:
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:02Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./mkdocs.yml`
+
+```text
+285	  - Neovim:
+286	      - Floating TUI: neovim/floating-tui.md
+287	  - Repo Internals:
+288	      - Architecture: this_repo/architecture.md
+289	      - Cheatsheet: this_repo/cheatsheet.md
+290	      - Bootstrap (curl|sh): this_repo/bootstrap.md
+291	      - Ansible customization: this_repo/ansible_customization.md
+292	      - Upgrades: this_repo/upgrades.md
+293	      - Testing: this_repo/testing.md
+294	      - Sudo session: this_repo/sudo-session.md
+295	      - Fleet apply: this_repo/fleet-apply.md
+296	      - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
+297	      - chezmoiscripts layout: this_repo/chezmoiscripts-layout.md
+298	      - Instant-LLM-fix prior art: this_repo/instant-llm-fix-prior-art.md
+299	      - Initial setup:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/mkdocs.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:13Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./CLAUDE.md`
+
+```text
+45	### Custom aliases & shell functions → `docs/shells/aliases.md`
+46	
+47	When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/`, `dot_config/bash/`, or `dot_config/shell/` file, update [`docs/shells/aliases.md`](docs/shells/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), shell scope (`zsh`/`bash`/`both`), and a one-line description.
+48	
+49	**Place new helpers in the right tier:**
+50	
+51	- `dot_config/shell/*.sh` (or `*.sh.tmpl`) — POSIX-portable env / PATH / aliases / functions usable by **both** zsh and bash. Source-time shell detection via `$ZSH_VERSION` / `$BASH_VERSION` is OK; zsh-only constructs (ZLE widgets, `read -q`, `${m:t}`, glob qualifiers, `setopt`, `compdef`) are NOT — keep them out so bash doesn't error on source.
+52	- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — zsh-only. ZLE widgets (aisuggest, tools_picker, television, sesh-sessions), `compdef`-driven completions, anything calling `bindkey`, `zsh-vi-mode` hooks.
+53	- `dot_config/bash/*.bash` — bash-only. `bind -x` / `ble-bind`-driven keybindings, oh-my-bash plugin / completion / alias arrays, bash-specific `shopt`s.
+54	
+55	When porting a zsh-only helper to bash via ble.sh's `ble-bind`, prefer extracting the shell-agnostic backend (the function that produces the shell command string) into `dot_config/shell/` and keeping each shell's widget binding in its own dir.
+56	
+57	### `gui_apps_linux` ansible role → `docs/playbooks/linux-gui-apps.md`
+58	
+59	When adding/modifying/removing a Linux GUI app in [`dot_ansible/roles/gui_apps_linux/tasks/main.yml`](dot_ansible/roles/gui_apps_linux/tasks/main.yml), update the **Inventory** table in [`docs/playbooks/linux-gui-apps.md`](docs/playbooks/linux-gui-apps.md). The playbook is the single source of truth for the per-app mechanism / auto-update story, and is the first thing a maintainer (or agent) should read before adding a new app — it contains the `.deb` / Snap / Flatpak / AppImage decision tree and the concrete copy-paste patterns. Read it first; update it in the same commit.
+60	
+61	### Dockerfile + dotfiles_init wrapper
+62	
+63	When adding new chezmoi prompts in `.chezmoi.toml.tmpl`, three files must be updated in the same commit:
+64
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/zhouhanru/.local/share/chezmoi/CLAUDE.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify new doc renders + cross-links resolve
+
+`uv run mkdocs build 2>&1 | grep -iE 'config-conventions' | head -10`
+
+```text
+INFO    -  Doc file 'this_repo/config-conventions.md' contains a link '../../CLAUDE.md', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'this_repo/config-conventions.md' contains a link '../../CLAUDE.md', but the target '../CLAUDE.md' is not found among documentation files.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 02:23:37Z)**_
+
+Tolerated INFO-level cross-refs only. Committing:
+
+_**Agent (claude-opus-4-7 2026-05-07 02:24:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit config conventions doc
+
+```bash
+git add docs/this_repo/config-conventions.md mkdocs.yml CLAUDE.md && git commit -m "$(cat <<'EOF'
+docs: add config-file-conventions tour (XDG, .d/, hybrid, override layers)
+
+Consolidates the dotfile organisation patterns the repo uses (and a
+few common ones it doesn't) into a single reference page. Triggered
+by a real "are these the same convention?" question after noticing
+that ~/.bashrc.d/*, dot_ssh/private_config.d/, and ~/.config/{shell,
+zsh,bash}/ all look superficially similar but solve different
+problems.
+
+docs/this_repo/config-conventions.md (~10 KB) covers:
+
+  A. WHERE configs live
+     - XDG Base Directory Spec (the four env vars, which tools follow,
+       which don't and why)
+     - Tool-specific dirs (~/.ssh/, ~/.bashrc — backwards-compat
+       holdouts)
+     - Platform-specific dirs (~/Library/Application Support on
+       macOS, %APPDATA% on Windows)
+
+  B. HOW modular config is structured
+     - Single canonical file (~/.gitconfig, ~/.tmux.conf)
+     - .d/ drop-in fragments (sysadmin tradition; ~/.ssh/config.d/
+       and ~/.bashrc.d/ user-side instances)
+     - Hybrid (XDG location + own loader — our shell setup; explains
+       why we DON'T put managed configs in ~/.bashrc.d/)
+     - Plugin manager dirs (OMZ/OMB/TPM/lazy.nvim)
+
+  C. USER customisation layers (override patterns)
+     - ~/.foorc.local include directive (gitconfig, sshconfig)
+     - ~/.foorc.adhoc self-sourced tail (our chezmoi-ignored pattern)
+     - distro skel conventions (~/.bash_aliases, ~/.bashrc.d/*)
+     - Secrets files
+
+  D. CHEZMOI-specific (cross-link to existing chezmoi-templating /
+     chezmoi-prefixes docs; just a TL;DR table here)
+
+  E. OTHER worth-knowing
+     - PATH directory conventions (~/bin, ~/.local/bin, ~/.cargo/bin,
+       ~/go/bin, brew prefixes — and the ordering rationale in
+       dot_config/shell/00_exports.sh.tmpl)
+     - Lock file patterns (tracked / gitignored / `create_` seed-once
+       / `modify_` jq-merge — when to use which)
+     - Login vs interactive vs non-interactive shell loading
+       (~/.bash_profile vs ~/.bashrc, ~/.zshenv vs ~/.zshrc, and the
+       implication that env-vars-needed-by-scripts must NOT live in
+       interactive-only rc files)
+     - Filename-prefix ordering (00_ / 01_ / NN_ in modular dirs)
+     - Per-OS / per-profile gating (chezmoi template-time `if` vs
+       runtime detection — when to use which)
+
+  F. Cross-references to existing docs (chezmoi-templating,
+     chezmoi-prefixes, shells/architecture, shells/aliases,
+     agent-overlays, CLAUDE.md).
+
+Wired into mkdocs nav under "Repo Internals" right after architecture.
+CLAUDE.md's three-tier rule comment now points at this doc for the
+broader convention context.
+
+`uv run mkdocs build` produces only the existing INFO-level
+relative-link warnings to CLAUDE.md (tolerated by
+validation.links.not_found: info — same as other docs that link
+to repo-root meta-files).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/zhouhanru/.cache/pre-commit/patch1778120640-27882.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/zhouhanru/.cache/pre-commit/patch1778120640-27882.
+[main 0602823] docs: add config-file-conventions tour (XDG, .d/, hybrid, override layers)
+ 3 files changed, 383 insertions(+)
+ create mode 100644 docs/this_repo/config-conventions.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 02:24:26Z)**_
+
+完成。新文件 `docs/this_repo/config-conventions.md` 涵蓋六大塊：
+
+**A. 位置慣例** — XDG Base Dir Spec（四個 env vars + 哪些工具吃 / 哪些沒吃）、工具專屬（ssh/bash 沒擁抱 XDG 的歷史包袱）、平台特定（macOS Library/、Windows %APPDATA%）
+
+**B. 模組化結構** — 單檔、`.d/` drop-in、XDG hybrid（我們的）、plugin manager 目錄
+
+**C. 使用者覆蓋層** — `*.local` include directive、`*.adhoc` self-sourced（我們的）、skel 慣例（`~/.bash_aliases` / `~/.bashrc.d/*`）、secrets 檔
+
+**D. chezmoi 專屬** — 前綴/後綴速查表（連結到現有的 chezmoi-templating / chezmoi-prefixes deep-dive）
+
+**E. 你之前沒提到但常用的** —
+- **PATH 目錄慣例**（`~/bin` 古早 POSIX、`~/.local/bin` XDG 風、`~/.cargo/bin`、`~/go/bin`、`~/.bun/bin`、brew prefixes — 含我們 `00_exports.sh.tmpl` 的排序邏輯）
+- **Lock files** patterns（tracked / gitignored / `create_` seed-once / `modify_` jq-merge — 各自適用情境）
+- **Login vs interactive vs non-interactive shell** 的差別（`~/.bash_profile` vs `~/.bashrc`、`~/.zshenv` vs `~/.zshrc` — **「scripts 需要的 env vars 不能放 interactive-only rc」這個常見的踩雷點**）
+- **Filename-prefix ordering**（`NN_` 為什麼留間隙）
+- **Per-OS / per-profile gating** — chezmoi template `if` vs runtime detection 的選用準則
+
+**F. cross-references** — 串起現有 chezmoi-templating / chezmoi-prefixes / shells/architecture / shells/aliases / agent-overlays / CLAUDE.md。
+
+CLAUDE.md 的「三層 tier 規則」也加了一句指向這個 doc，未來 agent 加新 config 檔時知道先 skim 這頁。
+
+最終 12 個 commit：
+
+```
+0602823 docs: add config-file-conventions tour (XDG, .d/, hybrid, override layers)
+12395e6 bash: source ~/.bashrc.d/* on RHEL family + extend full backup
+b31d1e1 backup: extend full-mode list with bash + shared shell paths
+733b534 bash: source ~/.bash_aliases for backward-compat + add architecture docs
+4930c6e bash: install gawk unconditionally — ble.sh Makefile hard-requires it
+e45b593 docs: cross-file updates for primaryShell + bash bootstrap
+9cf8b19 bash: add oh-my-bash + ble.sh externals and plugin glue
+96c73bb bash: ship dot_bashrc.tmpl + dot_bash_profile.tmpl + dot_config/bash/
+9bb56c2 shell: extract POSIX layer to dot_config/shell/ for zsh/bash sharing
+a49bc20 ansible: gate zsh chsh on primaryShell + add bash role for chsh-to-bash
+67cbfd8 init: add primaryShell prompt for zsh/bash login-shell choice
+```

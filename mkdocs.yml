@@ -286,6 +286,7 @@ nav:
       - Floating TUI: neovim/floating-tui.md
   - Repo Internals:
       - Architecture: this_repo/architecture.md
+      - Config file conventions (XDG, .d/, override layers): this_repo/config-conventions.md
       - Cheatsheet: this_repo/cheatsheet.md
       - Bootstrap (curl|sh): this_repo/bootstrap.md
       - Ansible customization: this_repo/ansible_customization.md
