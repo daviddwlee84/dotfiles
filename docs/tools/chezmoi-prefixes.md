@@ -73,6 +73,38 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
 - **Alternative form**: put `chezmoi:modify-template` in the script body to switch it into template mode (the current contents arrive as `.chezmoi.stdin`). See [Manage part, but not all, of a file](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file).
 - **Typical use**: Claude Code `settings.json` (see the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq)), Docker `config.json` proxies, INI files with a mix of managed and runtime-written keys.
 
+#### Bootstrap-order contract: `modify_` scripts MUST tolerate missing tools
+
+`chezmoi apply` runs in three phases, in order:
+
+1. `run_once_before_*` scripts → `run_once_before_00_bootstrap.sh.tmpl` installs **uv, mise, ansible-core**, plus Linuxbrew (rooted Linux) or Homebrew (macOS). It assumes `curl`, `git`, `bash`/`sh`, and basic POSIX are already on the box.
+2. **File-application phase** — every `modify_*` script runs here.
+3. `run_onchange_after_*` scripts → `20_ansible_roles.sh.tmpl` runs the `base` ansible role, which installs **`jq`, `ripgrep`, `fd`, `python3`, `git-lfs`, `just`, `tree`, …**.
+
+So at the time a `modify_*` script executes, **only the bootstrap-set is guaranteed**. Anything from the ansible-set (`jq`, `python3`, `ripgrep`, `fd`, …) may not yet be installed on a fresh box. A bare `set -eu` script that hard-calls one of those tools will exit non-zero, and chezmoi will abort the entire apply — meaning the ansible role that *would have* installed the tool never runs, and the user is stuck.
+
+**Rule**: any `modify_*` script that invokes a tool from the post-bootstrap set MUST `command -v`-guard it and pass-through the live content if missing. The pass-through preserves the live file unchanged (chezmoi sees `stdout == stdin` → no-op for that target → apply continues), and the next `chezmoi apply` (after ansible has installed the missing tool) does the real work.
+
+Canonical guard, lifted from [`run_onchange_after_40_install_global_skills.sh.tmpl:32-35`](../../.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl):
+
+```sh
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_<file>: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+```
+
+For scripts needing a python3 (e.g. JSONC handling for VSCode/Cursor/Antigravity overlays), prefer the uv→system-python3 fallback chain — `uv` is bootstrap-guaranteed, so it's the cheap insurance against minimal Linux servers without `python3` pre-installed. See [`dot_codex/modify_config.toml.tmpl:47-55`](../../dot_codex/modify_config.toml.tmpl) and [`.chezmoitemplates/editor/modify.sh:48-66`](../../.chezmoitemplates/editor/modify.sh) for the pattern.
+
+Reference implementations (good citizens worth copying):
+
+- [`dot_codex/modify_config.toml.tmpl:47-55`](../../dot_codex/modify_config.toml.tmpl) — `uv` → `python3` → pass-through
+- [`dot_config/docker/modify_daemon.json.tmpl:28-31`](../../dot_config/docker/modify_daemon.json.tmpl) — minimal `jq` guard
+- [`dot_docker/modify_config.json.tmpl:19-21`](../../dot_docker/modify_config.json.tmpl) — minimal `jq` guard
+
+Failure mode if the rule is forgotten: see [`pitfalls/modify-script-jq-bootstrap-cycle.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/modify-script-jq-bootstrap-cycle.md) — `chezmoi update --init` aborts with `jq: command not found` after `[SUCCESS] Bootstrap complete!` and the user is stuck in a cycle (apply fails before phase 3 → ansible never runs → `jq` never installs → next apply fails the same way).
+
 ### `exact_` — directory is canonical (prune extras)
 
 - **Effect**: On apply, chezmoi **removes** any file inside the target directory that is not present in source. Directory-only prefix.

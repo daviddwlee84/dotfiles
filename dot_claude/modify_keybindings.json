@@ -37,7 +37,9 @@
 #     file doesn't define, then may write the file back with concrete
 #     entries; a subsequent apply will merge $schema/$docs in.
 #
-# Requires: jq (installed by the `base` ansible role).
+# Requires: jq (installed by the `base` ansible role). On a fresh-box first
+# apply, jq isn't yet installed; this script falls back to passing the live
+# file through unchanged. See pitfalls/modify-script-jq-bootstrap-cycle.md.
 #
 # See: docs/tools/claude-code-keybindings.md (user-facing rationale, action
 # namespaces, the chat:cycleMode-only mode-jump limitation).
@@ -57,6 +59,15 @@ base=$(cat)
 # the file is well-formed when Claude Code reads it on its next launch.
 if [ -z "$base" ]; then
   printf '%s\n' "$overlay"
+  exit 0
+fi
+
+# Cold-start fallback: jq is installed by the `base` ansible role, which
+# runs AFTER this file-apply phase. Pass the live file through unchanged
+# and warn — the next apply (after ansible) does the real merge.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_keybindings.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
   exit 0
 fi
 

@@ -14748,3 +14748,107 @@ The fix pins to `--python 3.13` (same pattern as `pre-commit` in `security_tools
 - **`zsh` and `git` must already be system-installed** — without sudo, ansible can't install them. `which zsh git` should resolve before you re-run apply; if zsh is missing, you'll need to ask the IDC admin or just live with bash.
 
 If the next bootstrap completes but a specific role still fails, send me the error and I'll patch.
+
+---
+
+_**User (2026-05-06 12:48:27Z)**_
+
+```
+[yzhang@idc-server104 ~]$ uv tool uninstall ansible-core
+Uninstalled 11 executables: ansible, ansible-config, ansible-connection, ansible-console, ansible-doc, ansible-galaxy, ansible-inventory, ansible-playbook, ansible-pull, ansible-test, ansible-vault
+[yzhang@idc-server104 ~]$ rm -rf ~/.local/share/uv/tools/ansible-core
+[yzhang@idc-server104 ~]$ cd ~/.local/share/chezmoi
+[yzhang@idc-server104 chezmoi]$ git pull
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 8 (delta 6), reused 8 (delta 6), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 16.76 KiB | 553.00 KiB/s, done.
+From https://github.com/daviddwlee84/dotfiles
+   d777100..c670650  main       -> origin/main
+Updating d777100..c670650
+Fast-forward
+ .specstory/history/2026-05-06_10-15-57Z-profile-centos-yzhang-at.md | 915 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ pitfalls/centos7-noroot.md                                          |  48 +++++++++
+ run_once_before_00_bootstrap.sh.tmpl                                |  23 ++++-
+ 3 files changed, 983 insertions(+), 3 deletions(-)
+[yzhang@idc-server104 chezmoi]$ chezmoi apply
+[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+[INFO] noRoot mode: Skipping Linuxbrew installation (requires sudo)
+[INFO] uv is already installed
+[INFO] Installing mise...
+[WARN] Removing non-functional mise binary (possible architecture mismatch)...
+mise: installing mise...
+############                                                              17.3%
+```
+
+目前運行中 順便問一下 現在那個CentOS系統沒有zsh的情況下 還有機會裝好嗎？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-06 12:48:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-06 12:49:21Z)**_
+
+可以 — 有三條路，從最乾淨往最 hacky 排：
+
+## A. `mise install zsh@latest`（推薦先試）
+
+mise 有 `zsh` plugin（asdf-zsh），會抓 source 用 `gcc` 編譯，丟到 `~/.local/share/mise/installs/zsh/<ver>/bin/zsh`。
+
+```bash
+mise install zsh@latest
+mise use -g zsh@latest
+which zsh   # 應該指到 ~/.local/share/mise/shims/zsh
+```
+
+**陷阱**：source build 需要 `ncurses-devel`。CentOS 7 corporate 機器常常**沒裝**。如果 `mise install` 報 `curses.h: No such file or directory` 就掛了 → 跳到 B。`gcc` / `make` 一般都有（你 bootstrap log 看到 `GCC 4.8.5`，OK）。
+
+## B. conda-forge（glibc 2.17 友善的 fallback）
+
+conda-forge 的 zsh 是**預編譯**的 — 故意對舊 glibc 編譯，不需要 ncurses-devel：
+
+```bash
+# Miniforge 是 conda-forge-only，不用註冊 Anaconda 商業條款
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
+~/miniforge3/bin/conda install -y -n base -c conda-forge zsh
+ln -sf ~/miniforge3/bin/zsh ~/.local/bin/zsh
+```
+
+從你之前 `bash: conda: command not found` 看，這台還沒裝。`-b -p` 是非互動 + 自定路徑，不會污染系統。
+
+## C. 手動 source build（最後手段）
+
+如果 A/B 都不行（譬如 conda-forge 也被擋）：自己抓 ncurses + zsh source 編到 `~/.local/`。耗時約 30 分鐘，這邊細節省略，需要再問。
+
+---
+
+## 共通陷阱：`chsh` 在 noRoot 機器上會失敗
+
+就算 zsh 裝好了，`chsh -s ~/.local/bin/zsh` 會被擋 — 因為 `/etc/shells` 沒列你的路徑（編輯需要 root），CentOS 7 的 chsh 預設只認 `/etc/shells` 裡的條目。
+
+**workaround**：在 `~/.bash_profile` 或 `~/.bashrc` 結尾加：
+
+```bash
+# Auto-launch zsh on interactive login (chsh blocked: /etc/shells locked)
+if [[ -z "$ZSH_VERSION" && $- == *i* && -x "$HOME/.local/bin/zsh" ]]; then
+    exec "$HOME/.local/bin/zsh" -l
+fi
+```
+
+每次 SSH 登入後 bash 會立刻 `exec` 換成 zsh，從外面看就跟 chsh 完了一樣。`exec` 是替換 process 不是 fork，沒有額外開銷。
+
+---
+
+## 但是 — 別過度投資
+
+dotfiles 本來就 **graceful degrade**。如果只是這一台 corporate box 偶爾 SSH 進去做事：
+
+- bash 留著也 OK，`~/.local/bin/{rg,fd,jq,fzf,starship,nvim}` 全部還是會裝起來、bash 直接用得到
+- 你損失的是 zsh 專屬的：`zsh-vi-mode`、`fzf-tab`、`sesh` hotkey、`Alt+;` aisuggest、starship 在 zsh 的完整 prompt
+- 可以在 `~/.bashrc` 手動加 `eval "$(starship init bash)"` 至少把 prompt 救回來
+
+如果這台會變成你**每天用**的開發機，走 A 或 B；如果只是偶爾跑 job，bash 留著最省事。
+
+bootstrap 跑完後再看 ansible 那邊有沒有新的炸點，再來處理。

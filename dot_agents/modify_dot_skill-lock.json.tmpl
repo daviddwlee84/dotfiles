@@ -19,8 +19,12 @@
 # matching the schema chezmoi found when first running `npx skills add … -g`
 # (run `cat ~/.agents/.skill-lock.json` after a fresh install for reference).
 #
-# Requires: jq 1.4+ (1.4+ for `index/1`, NOT 1.6+ — keep this script
-# compatible with CentOS 7's EPEL jq 1.5 since `IN/1` was added in 1.6).
+# Requires: jq 1.4+ (installed by the `base` ansible role). 1.4+ for
+# `index/1` — NOT 1.6+, since `IN/1` was added in 1.6 but CentOS 7's EPEL
+# ships jq 1.5. On a fresh-box first apply jq isn't yet installed (ansible
+# runs AFTER this file-apply phase); the script falls back to passing the
+# live file through unchanged and the next apply does the real merge. See
+# pitfalls/modify-script-jq-bootstrap-cycle.md.
 # See: docs/tools/agent-skills.md
 set -eu
 
@@ -47,6 +51,17 @@ JSON
 
 base=$(cat)
 [ -z "$base" ] && base='{"version":3,"skills":{}}'
+
+# Cold-start fallback: jq is installed by the `base` ansible role, which
+# runs AFTER this file-apply phase. On the first `chezmoi apply` of a fresh
+# box, pass the live (or empty-seeded) file through unchanged and warn — the
+# next apply (after ansible installs jq) will perform the real merge. See
+# pitfalls/modify-script-jq-bootstrap-cycle.md for the audit + rationale.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
 
 # Merge strategy:
 #   - .version: take the higher of the two (forward-compatible with skills CLI bumps)

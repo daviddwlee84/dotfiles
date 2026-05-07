@@ -12,7 +12,9 @@
 # statsigBootstrap, version, hasChangedDefaultModel, ...) are preserved.
 #
 # To manage an additional key: edit .chezmoitemplates/agents/cursor.cli-config.overlay.json
-# Requires: jq (installed by the `base` ansible role).
+# Requires: jq (installed by the `base` ansible role). On a fresh-box first
+# apply, jq isn't yet installed; this script falls back to passing the live
+# file through unchanged. See pitfalls/modify-script-jq-bootstrap-cycle.md.
 set -eu
 
 overlay=$(cat <<'JSON'
@@ -22,5 +24,14 @@ JSON
 
 base=$(cat)
 [ -z "$base" ] && base='{}'
+
+# Cold-start fallback: jq is installed by the `base` ansible role, which
+# runs AFTER this file-apply phase. Pass the live file through unchanged
+# and warn — the next apply (after ansible) does the real merge.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_cli-config.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
 
 printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

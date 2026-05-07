@@ -30,7 +30,11 @@
 # broken live file is left untouched.
 #
 # Requires: jq + python3 (both installed by the `base` ansible role; system
-# python3 is also pre-installed on macOS).
+# python3 is also pre-installed on macOS). On a fresh-box first apply
+# neither is guaranteed yet (ansible runs AFTER the file-apply phase), so
+# this script falls back to passing the live file through unchanged when
+# either dependency is missing — the next apply does the real merge. See
+# pitfalls/modify-script-jq-bootstrap-cycle.md.
 set -eu
 
 overlay=$(cat <<'JSON'
@@ -41,7 +45,27 @@ JSON
 base=$(cat)
 [ -z "$base" ] && base='{}'
 
-printf '%s' "$base" | python3 -c 'import sys, re
+# Cold-start fallback: pick a python (system python3 first, else uv-managed
+# python ≥3.11 which bootstrap installs). The JSONC stripper needs only
+# `sys` + `re` from stdlib — any python3 works. `set --` (positional args)
+# is used so the multi-arg `uv run …` form survives `set -u` + word-split.
+if command -v python3 >/dev/null 2>&1; then
+  set -- python3 -c
+elif command -v uv >/dev/null 2>&1; then
+  set -- uv run --no-project --quiet --python '>=3.11' python -c
+else
+  printf '%s\n' "editor/modify.sh: neither python3 nor uv found; passing live file through unchanged. Re-run \`chezmoi apply\` after ansible bootstrap." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "editor/modify.sh: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+printf '%s' "$base" | "$@" 'import sys, re
 data = sys.stdin.read()
 if not data.strip():
     data = "{}"
