@@ -680,20 +680,9 @@
   tags: [tunnel_tools]
   when: ansible_facts["os_family"] == "Darwin"
   block:
-    - name: Install git-lfs (required by ngrok tap)
-      community.general.homebrew:
-        name: git-lfs
-        state: present
-
-    - name: Tap ngrok/ngrok
-      ansible.builtin.command: brew tap ngrok/ngrok
-      register: ngrok_tap
-      changed_when: "'Already tapped' not in ngrok_tap.stdout"
-      failed_when: ngrok_tap.rc != 0 and 'Already tapped' not in ngrok_tap.stdout
-
     - name: Install ngrok via Homebrew
       community.general.homebrew:
-        name: ngrok/ngrok/ngrok
+        name: ngrok
         state: present
 
   rescue:
