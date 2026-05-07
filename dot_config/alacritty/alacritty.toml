@@ -15,6 +15,11 @@ key = "Slash"
 mods = "Control"
 chars = "\u001f"
 
+[[keyboard.bindings]]
+key = "Return"
+mods = "Control"
+chars = "\u001b[13;5u"
+
 # Ctrl+Number → CSI-u sequences for tmux quick window switching
 # Format: ESC [ <keycode> ; 5 u  (5 = Ctrl modifier in CSI-u)
 # Alacritty doesn't natively send CSI-u for Ctrl+Number; Ghostty/cmux does.

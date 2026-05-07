@@ -18,36 +18,31 @@ bleopt prompt_eol_mark=
 # Vi-mode keymap: ble.sh auto-detects `set -o vi` (set in 05_vi_mode.bash)
 # and activates its full vi-mode. No additional config needed.
 
-# Custom keybindings — currently none. Drop ble-bind invocations here
-# (e.g., `ble-bind -x 'C-r' 'atuin-search-bash'`) when porting zsh
-# widgets to bash; reminder: anything that was `bindkey -M viins` in zsh
-# is `ble-bind -m vi_imap -x` in ble.sh.
+# Custom keybindings below. Reminder: `bindkey -M viins` in zsh →
+# `ble-bind -m vi_imap -x` in ble.sh; `bindkey -M vicmd` → `vi_nmap`.
 
-# === Multi-line submit: Ctrl+Enter ===
+# === Multi-line submit: Ctrl+Enter / Shift+Enter ===
 #
-# Default ble.sh + vi-mode behaviour: when the buffer contains a newline
-# (multi-line paste, multi-line typed input, here-doc etc.), the shell
-# enters MULTILINE mode and plain RET / Ctrl-M re-binds to "insert
-# newline" rather than "submit" — meaning Enter alone won't run the
-# command. The official escape is Ctrl-J (linefeed = accept-line), but
-# tmux's vim-tmux-navigator already eats `C-j` for pane navigation
-# (dot_config/tmux/keybindings.conf:183), so it never reaches ble.sh.
+# In ble.sh vi-mode, plain RET in multiline buffers inserts a newline
+# (safe default). Ctrl+Enter and Shift+Enter always submit via
+# accept-line, which bypasses the single-line check unconditionally.
 #
-# Ctrl+Enter is the cleanest free key on this stack:
-#   - tmux extended-keys + xterm:extkeys are enabled, so Ctrl+Enter
-#     sends a distinct CSI-u sequence (\e[13;5u) which tmux forwards
-#     intact (no collision with C-j).
-#   - ble.sh sees `C-RET` as a separate keysym when extended-keys flow
-#     through, and binds it independently from `RET` / `C-m`.
-#   - Plain RET still does the safe-multiline-newline thing — useful for
-#     intentionally building multi-line commands.
+# Key encoding path:
+#   Terminal emits CSI-u: \e[13;5u (C-RET) or \e[13;2u (S-RET)
+#   tmux forwards via: extended-keys on + terminal-features xterm*:extkeys
+#   ble.sh decodes to named keysym C-RET / S-RET
 #
-# If your terminal can't emit Ctrl+Enter as CSI-u (some minimal SSH
-# clients), Alt+Enter (`M-RET` below) is a portable fallback.
+# Both the named keysyms (-f flag) AND the raw escape sequences are bound
+# as belt-and-suspenders in case the decode chain drops a link.
+# S-RET (Shift+Enter) tends to be more reliably emitted by terminal
+# emulators than C-RET, so both are offered.
+#
+# Collision check: tmux C-j (vim-tmux-navigator pane nav) eats plain
+# C-j; C-RET and S-RET use distinct CSI-u codes that tmux forwards intact.
 ble-bind -m vi_imap -f 'C-RET' accept-line
 ble-bind -m vi_nmap -f 'C-RET' accept-line
-ble-bind -m vi_imap -f 'M-RET' accept-line
-ble-bind -m vi_nmap -f 'M-RET' accept-line
+ble-bind -m vi_imap -f 'S-RET' accept-line
+ble-bind -m vi_nmap -f 'S-RET' accept-line
 
 # === Suppress mouse keyseq warnings ===
 #
@@ -63,3 +58,15 @@ ble-bind -m vi_nmap -f 'M-RET' accept-line
 # pseudo-keysym are covered.
 ble-bind -f 'mouse' nop 2>/dev/null
 ble-bind -f 'mouse_xterm' nop 2>/dev/null
+
+# === Ctrl+C: discard buffer (zsh / bash muscle memory) ===
+#
+# ble.sh vi-mode defaults:
+#   vi_imap C-c → enter normal mode
+#   vi_nmap C-c → vi-command/cancel (:q prompt)
+#
+# Override both: cancel the line, keep old text visible in the scroll
+# buffer (still copyable), show a fresh prompt — matching zsh insert-mode
+# C-c behaviour. Escape still handles insert → normal mode for vi use.
+ble-bind -m vi_imap -f 'C-c' discard-line
+ble-bind -m vi_nmap -f 'C-c' discard-line
