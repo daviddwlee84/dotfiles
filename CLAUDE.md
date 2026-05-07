@@ -263,7 +263,7 @@ See `pitfalls/tmux-display-menu-silent-fail.md` for the full debugging story (re
 
 These are non-obvious settings that other tools depend on; do not remove without checking:
 
-- `extended-keys always` + `terminal-features 'xterm*:extkeys'` — forwards Shift+Enter, Ctrl+Enter through tmux to inner apps (Claude Code, Neovim, etc.)
+- `extended-keys on` + `terminal-features 'xterm*:extkeys'` — forwards Shift+Enter, Ctrl+Enter, Ctrl+/, Ctrl+digit through tmux to inner apps (Claude Code, Neovim, etc.). **Do NOT use `always`** — that re-encodes EVERY `Ctrl+letter` as CSI-u including the LF/`\n` (Ctrl+J) embedded in pasted multi-line text, which ble.sh then inserts as literal `^[[106;5u` instead of as a newline. See `pitfalls/tmux-extended-keys-always-paste.md`.
 - `escape-time 0` — eliminates ESC delay for Neovim
 - `set-clipboard on` + `terminal-features …:clipboard` (for `xterm*`, `ghostty*`, `alacritty*`) — OSC 52 over SSH without terminfo `Ms`. Paired with SSH-conditional `vim.g.clipboard = vim.ui.clipboard.osc52` in `dot_config/nvim/lua/config/options.lua`. See [docs/tools/tmux/README.md](docs/tools/tmux/README.md) → "OSC 52 Clipboard".
 - `allow-passthrough on` — OSC passthrough for terminal images
