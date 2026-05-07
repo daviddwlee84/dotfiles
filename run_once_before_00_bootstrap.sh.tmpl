@@ -116,10 +116,14 @@ elif [[ -f /usr/local/bin/brew ]]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
 {{ else -}}
-# Linux: Linuxbrew paths
-if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+# Linux: Linuxbrew paths — guard on the binary, not the dir, because a
+# failed Homebrew installer (e.g. CentOS 7 where curl < 7.41 aborts mid-
+# install) leaves /home/linuxbrew/.linuxbrew/ as an empty sudo'd skeleton,
+# which would make `eval "$(.../bin/brew shellenv)"` print
+# "No such file or directory" on every bootstrap re-run.
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-elif [[ -d "$HOME/.linuxbrew" ]]; then
+elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
     eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
 fi
 {{ end -}}
@@ -173,10 +177,12 @@ case "$BREW_REAL_ARCH" in
             fi
             # Install Linuxbrew
             NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            # Add to PATH for this session
-            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+            # Add to PATH for this session — same -x guard as the upper
+            # path-detection block (failed installer leaves dirs but no
+            # brew binary; eval would emit "No such file or directory").
+            if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
                 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-            elif [[ -d "$HOME/.linuxbrew" ]]; then
+            elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
                 eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
             fi
             success "Linuxbrew installed successfully"
@@ -226,34 +232,64 @@ if ! mise --version &> /dev/null; then
         warn "Removing non-functional mise binary (possible architecture mismatch)..."
         rm -f "$(command -v mise)" 2>/dev/null || true
     fi
-    # Try curl installer first (fast, no sudo)
-    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh && mise --version &> /dev/null; then
-        success "mise installed via curl"
+
+    # Detect glibc version: mise's default `linux-x64` binary is built against
+    # modern glibc (~2.28+) and crashes on CentOS 7 (glibc 2.17) with
+    # `GLIBC_2.28 not found`. On such hosts skip the curl installer entirely
+    # and reach for the musl variant directly — otherwise we waste a network
+    # round-trip + a 120s timeout on the glibc binary that could never run.
+    MISE_GLIBC_OLD=0
+    if command -v ldd &> /dev/null; then
+        MISE_GLIBC_VER="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+        if [[ -n "$MISE_GLIBC_VER" ]]; then
+            # awk fragment compares glibc version to 2.28 (works without `bc`).
+            awk -v v="$MISE_GLIBC_VER" 'BEGIN { split(v, a, "."); exit !(a[1]<2 || (a[1]==2 && a[2]<28)) }' \
+                && MISE_GLIBC_OLD=1
+        fi
+    fi
+
+    MISE_REAL_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+    case "$MISE_REAL_ARCH" in
+        amd64|x86_64) MISE_BIN_ARCH="x64" ;;
+        arm64|aarch64) MISE_BIN_ARCH="arm64" ;;
+        armhf) MISE_BIN_ARCH="armv7" ;;
+        *) MISE_BIN_ARCH="" ;;
+    esac
+
 {{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
+    if [[ "$MISE_GLIBC_OLD" == "1" && -n "$MISE_BIN_ARCH" ]]; then
+        # CentOS 7 / RHEL 7 path — go straight to musl (glibc-independent).
+        info "glibc $MISE_GLIBC_VER < 2.28 — preferring mise musl variant directly"
+        MISE_URL_MUSL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}-musl"
+        if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL_MUSL" -o "$HOME/.local/bin/mise" \
+           && chmod +x "$HOME/.local/bin/mise" \
+           && "$HOME/.local/bin/mise" --version &> /dev/null; then
+            success "mise installed via direct binary download (linux-${MISE_BIN_ARCH}-musl)"
+        else
+            rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+            warn "Could not install mise from $MISE_URL_MUSL — skipping (Node.js via mise will not be available)"
+            warn "  Manual fallback: download from https://github.com/jdx/mise/releases/latest"
+        fi
+    elif curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh && mise --version &> /dev/null; then
+        # Modern glibc path — the standard installer drops a glibc-built
+        # binary that runs fine.
+        success "mise installed via curl"
 {{ if not $noRootMise -}}
     else
-        # Fallback: try direct binary download with correct userland arch
+        # Modern-glibc fallback: curl installer succeeded but mise binary
+        # didn't run (rare — e.g. a brand-new arch upstream hasn't built for).
         warn "curl installer failed or produced non-functional binary, trying direct download..."
         # Clean up broken binary from curl installer
         if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
             rm -f "$(command -v mise)" 2>/dev/null || true
         fi
-        MISE_REAL_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
-        case "$MISE_REAL_ARCH" in
-            amd64|x86_64) MISE_BIN_ARCH="x64" ;;
-            arm64|aarch64) MISE_BIN_ARCH="arm64" ;;
-            armhf) MISE_BIN_ARCH="armv7" ;;
-            *) MISE_BIN_ARCH="" ;;
-        esac
         if [[ -n "$MISE_BIN_ARCH" ]]; then
             MISE_URL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}"
             info "Downloading mise from ${MISE_URL}..."
             if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise"; then
-                # Verify the binary actually runs
                 if "$HOME/.local/bin/mise" --version &> /dev/null; then
                     success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
                 else
-                    # Try musl variant (some armhf systems need it)
                     warn "glibc binary failed, trying musl variant..."
                     MISE_URL_MUSL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}-musl"
                     if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL_MUSL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && "$HOME/.local/bin/mise" --version &> /dev/null; then

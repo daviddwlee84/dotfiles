@@ -18,15 +18,29 @@
     update_cache: true
     cache_valid_time: 3600
 
-- name: Install Ruby compile dependencies (RedHat/CentOS)
+# yum CLI instead of `ansible.builtin.yum:` so this works on CentOS 7
+# (no dnf binary) — see pitfalls/centos7-ansible-yum-dnf-backend.md.
+- name: Install Ruby compile dependencies (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
   when: ansible_facts["os_family"] == "RedHat"
   become: true
   tags: [sudo]
-  ansible.builtin.yum:
-    name:
-      - libffi-devel
-      - libyaml-devel
-    state: present
+  # See pitfalls/centos7-ansible-yum-dnf-backend.md for why we avoid
+  # `${#missing[@]}` (collides with Jinja2 comment syntax `{# #}`).
+  ansible.builtin.shell: |
+    set -e
+    missing=()
+    for p in libffi-devel libyaml-devel; do
+      rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if [ -z "${missing[*]:-}" ]; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y "${missing[@]}"
+  args:
+    executable: /bin/bash
+  register: ruby_yum_result
+  changed_when: "'ALL_INSTALLED' not in ruby_yum_result.stdout"
   ignore_errors: true
 
 # =============================================================================

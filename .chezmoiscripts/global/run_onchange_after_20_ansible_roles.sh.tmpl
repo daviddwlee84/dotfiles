@@ -82,10 +82,14 @@ elif [[ -f /usr/local/bin/brew ]]; then
     eval "$(/usr/local/bin/brew shellenv)"
 fi
 {{ else -}}
-# Linuxbrew
-if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+# Linuxbrew — guard on the binary, not the dir. A failed Homebrew install
+# leaves the /home/linuxbrew/.linuxbrew/ tree behind (sudo'd by the
+# installer) without the brew binary, and `eval "$(.../bin/brew shellenv)"`
+# would then noisy-fail on every chezmoi apply. See
+# pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md → CentOS 7 brew note.
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-elif [[ -d "$HOME/.linuxbrew" ]]; then
+elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
     eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
 fi
 {{ end -}}

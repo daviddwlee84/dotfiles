@@ -49,22 +49,38 @@
 # they're EPEL-only on CentOS 7 and the GitHub-release fallback below
 # handles them more reliably (musl tarballs ignore glibc 2.17). Skipped
 # entirely on noRoot (tags: [sudo] → --skip-tags sudo).
-- name: Install base packages (RedHat/CentOS)
+#
+# Why `command: yum install` instead of `ansible.builtin.yum:`?
+# ansible-core 2.18+ collapsed the yum module into a wrapper that
+# routes through the dnf module backend. On CentOS 7 there is no `dnf`
+# binary, so `ansible.builtin.yum:` aborts with
+# `Could not detect which major revision of dnf is in use`. Rocky/Alma 8+
+# do ship dnf, but using yum CLI works on both — see
+# pitfalls/centos7-ansible-yum-dnf-backend.md.
+- name: Install base packages (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
   when: ansible_facts["os_family"] == "RedHat"
   become: true
   tags: [sudo]
-  ansible.builtin.yum:
-    name:
-      - git
-      - git-lfs
-      - curl
-      - wget
-      - jq
-      - tree
-      - gcc
-      - gcc-c++
-      - make
-    state: present
+  # Why `${missing[*]:-}` instead of `${#missing[@]}`?
+  # Jinja2 templating in ansible reads `${#...}` as a comment block
+  # (`{# ... #}` in Jinja syntax) and aborts with "unbalanced jinja2 block".
+  # `${missing[*]:-}` expands to space-joined elements (empty when unset)
+  # so `[ -z ... ]` cleanly tests "any missing packages" without `{#`.
+  ansible.builtin.shell: |
+    set -e
+    missing=()
+    for p in git git-lfs curl wget jq tree gcc gcc-c++ make; do
+      rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if [ -z "${missing[*]:-}" ]; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y "${missing[@]}"
+  args:
+    executable: /bin/bash
+  register: base_yum_result
+  changed_when: "'ALL_INSTALLED' not in base_yum_result.stdout"
   ignore_errors: true
 
 # --- ripgrep (user-level fallback) ---

@@ -55,10 +55,14 @@ elif [[ -f /usr/local/bin/brew ]]; then
 fi
 {{ else -}}
 # Linux: Initialize Linuxbrew if installed
-# Linuxbrew is optional on Linux (most packages managed by apt via Ansible)
-if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+# Linuxbrew is optional on Linux (most packages managed by apt via Ansible).
+# Check the binary, not just the dir — a failed `brew install` leaves the
+# /home/linuxbrew/.linuxbrew/ tree behind (sudo'd by the installer before
+# the actual brew binary download), and `eval "$(.../brew shellenv)"`
+# would then print "No such file or directory" on every shell start.
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-elif [[ -d "$HOME/.linuxbrew" ]]; then
+elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
     eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
 fi
 {{ end -}}

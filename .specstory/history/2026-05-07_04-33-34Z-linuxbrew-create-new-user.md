@@ -3971,3 +3971,2758 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
 )"
 ```
+
+---
+
+_**User (2026-05-07 06:50:53Z)**_
+
+```
+[yczhang@idc-server104 ~]$ chezmoi update
+bash: chezmoi: command not found...
+[yczhang@idc-server104 ~]$  ~/.local/bin/chezmoi update
+remote: Enumerating objects: 22, done.
+remote: Counting objects: 100% (22/22), done.
+remote: Compressing objects: 100% (5/5), done.
+remote: Total 14 (delta 9), reused 14 (delta 9), pack-reused 0 (from 0)
+Unpacking objects: 100% (14/14), 54.62 KiB | 3.03 MiB/s, done.
+From https://github.com/daviddwlee84/dotfiles
+   772cc36..243177a  main       -> origin/main
+Updating 772cc36..243177a
+Fast-forward
+ .pre-commit-config.yaml                                              |   12 +-
+ .specstory/history/2026-05-07_04-33-34Z-linuxbrew-create-new-user.md | 3973 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ README.md                                                            |   26 ++
+ justfile                                                             |   11 +
+ pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md                     |  199 ++++++++
+ scripts/apply_with_sudo.sh                                           |  166 +++++++
+ 6 files changed, 4384 insertions(+), 3 deletions(-)
+ create mode 100644 .specstory/history/2026-05-07_04-33-34Z-linuxbrew-create-new-user.md
+ create mode 100644 pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md
+ create mode 100755 scripts/apply_with_sudo.sh
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+.ssh has changed since chezmoi last wrote it?
+[yczhang@idc-server104 ~]$  ~/.local/bin/chezmoi update --apply
+Already up to date.
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+[yczhang@idc-server104 ~]$  ~/.local/bin/chezmoi apply
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+[yczhang@idc-server104 ~]$  ~/.local/bin/chezmoi apply --force
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+```
+
+有方法強制重跑 嗎？ 現在感覺都被跳過了
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 06:51:07Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 06:51:19Z)**_
+
+對，`run_once_*` / `run_onchange_*` 都被 chezmoi 的 `scriptState` bucket 記錄成「跑過了」或「內容沒變」，所以 `apply --force` 也不會重跑（`--force` 只強制覆寫檔案，不重置 script state）。
+
+清掉 script state 即可：
+
+```bash
+~/.local/bin/chezmoi state delete-bucket --bucket=scriptState
+```
+
+之後再跑就會把 `run_once_before_00_bootstrap.sh.tmpl`、`run_onchange_after_20_ansible_roles.sh.tmpl` 等全部重新觸發一次。配合 wrapper：
+
+```bash
+# 方法 A：用 wrapper 注入密碼
+bash ~/.local/share/chezmoi/scripts/apply_with_sudo.sh
+
+# 方法 B：暫時 NOPASSWD（最省事，你有 root）
+echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-bootstrap
+sudo chmod 440 /etc/sudoers.d/99-bootstrap
+
+~/.local/bin/chezmoi state delete-bucket --bucket=scriptState
+~/.local/bin/chezmoi apply -v   # -v 看 script 重跑進度
+
+# 跑完拿掉 NOPASSWD
+sudo rm /etc/sudoers.d/99-bootstrap
+```
+
+順帶提醒一下你看到的三個 `modify_*: jq not found` warning — 這是 cold-start 雞生蛋（jq 還沒裝就要 modify settings），上次 commit `772cc36 modify_: pass-through when jq/python3 missing (cold-start fix)` 已經把它們改成「沒 jq 就 pass-through」不會掛 chezmoi。等 base ansible role 跑完裝了 jq，再 `chezmoi apply` 一次它們就會正常合 settings。
+
+那個 `.ssh has changed since chezmoi last wrote it?` 是良性 drift（`~/.ssh/config` 是 create-only 模板，你機器上手寫過會被 chezmoi 偵測到，不是錯）。
+
+如果重跑後 base role 真的把 jq、curl、git 等都裝上，`chezmoi apply` 第三次就應該全綠。要我邊看你的下一輪輸出邊接續 debug 就再貼 log 過來。
+
+---
+
+_**User (2026-05-07 07:16:11Z)**_
+
+```
+[yczhang@idc-server104 ~]$ ~/.local/bin/chezmoi state delete-bucket --bucket=scriptState
+[yczhang@idc-server104 ~]$  ~/.local/bin/chezmoi apply
+mkdir: cannot create directory ‘/run/user/162000029’: Permission denied
+[WARN] Could not establish a sudo session (no TTY and sudo needs a password);
+[WARN] bootstrap will attempt its sudo steps anyway and they may prompt or skip.
+[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+/tmp/553991925.00_bootstrap.sh: line 472: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+[INFO] Linuxbrew is already installed
+[INFO] uv is already installed
+[INFO] Installing mise...
+mise: installing mise...
+######################################################################## 100.0%
+mise: installed successfully to /home/yczhang/.local/bin/mise
+mise: run the following to activate mise in your shell:
+echo "eval \"\$(/home/yczhang/.local/bin/mise activate bash)\"" >> ~/.bashrc
+
+mise: run `mise doctor` to verify this is set up correctly
+[WARN] curl installer failed or produced non-functional binary, trying direct download...
+[INFO] Downloading mise from https://mise.jdx.dev/mise-latest-linux-x64...
+curl: (28) Operation timed out after 120000 milliseconds with 4569856 out of 81559928 bytes received
+[WARN] Could not download mise — skipping
+[INFO] ansible is already installed
+[INFO] Installing ansible-galaxy collections...
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/community-general-12.6.0.tar.gz to /home/yczhang/.ansible/tmp/ansible-local-449782o0py8cjf/tmp6i378ac9/community-general-12.6.0-msrxyciv
+Installing 'community.general:12.6.0' to '/home/yczhang/.ansible/collections/ansible_collections/community/general'
+community.general:12.6.0 was installed successfully
+[SUCCESS] ansible-galaxy collections installed
+[INFO] Added ~/.local/bin to PATH in /home/yczhang/.bashrc
+[SUCCESS] Bootstrap complete!
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+.bashrc has changed since chezmoi last wrote it?
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+[yczhang@idc-server104 ~]$ just
+bash: just: command not found...
+```
+
+沒sudo一開始全部跳過了
+
+```
+[yczhang@idc-server104 ~]$ ~/.local/share/chezmoi/scripts/apply_with_sudo.sh
+[apply_with_sudo] sudo password for yczhang:
+[apply_with_sudo] /home/yczhang/.local/bin/chezmoi apply
+mkdir: cannot create directory ‘/run/user/162000029’: Permission denied
+[WARN] Could not establish a sudo session (no TTY and sudo needs a password);
+[WARN] bootstrap will attempt its sudo steps anyway and they may prompt or skip.
+[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+/tmp/450472440.00_bootstrap.sh: line 472: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+[INFO] Linuxbrew is already installed
+[INFO] uv is already installed
+[INFO] Installing mise...
+mise: installing mise...
+#####                                                                      7.4%
+```
+
+然後用 @scripts/apply_with_sudo.sh 跑
+somehow 它說裝好mise了 然後重跑又裝
+另外還是有看到permission denied
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 07:17:46Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 07:17:48Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+219	# 3. Install mise if missing (runtime manager for Node.js, etc.)
+220	# Use "mise --version" instead of "command -v" to catch arch-mismatch binaries
+221	# (e.g. aarch64 binary on armhf userland — file exists but cannot execute)
+222	if ! mise --version &> /dev/null; then
+223	    info "Installing mise..."
+224	    # Remove broken binary if present (wrong architecture)
+225	    if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+226	        warn "Removing non-functional mise binary (possible architecture mismatch)..."
+227	        rm -f "$(command -v mise)" 2>/dev/null || true
+228	    fi
+229	    # Try curl installer first (fast, no sudo)
+230	    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh && mise --version &> /dev/null; then
+231	        success "mise installed via curl"
+232	{{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
+233	{{ if not $noRootMise -}}
+234	    else
+235	        # Fallback: try direct binary download with correct userland arch
+236	        warn "curl installer failed or produced non-functional binary, trying direct download..."
+237	        # Clean up broken binary from curl installer
+238	        if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+239	            rm -f "$(command -v mise)" 2>/dev/null || true
+240	        fi
+241	        MISE_REAL_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+242	        case "$MISE_REAL_ARCH" in
+243	            amd64|x86_64) MISE_BIN_ARCH="x64" ;;
+244	            arm64|aarch64) MISE_BIN_ARCH="arm64" ;;
+245	            armhf) MISE_BIN_ARCH="armv7" ;;
+246	            *) MISE_BIN_ARCH="" ;;
+247	        esac
+248	        if [[ -n "$MISE_BIN_ARCH" ]]; then
+249	            MISE_URL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}"
+250	            info "Downloading mise from ${MISE_URL}..."
+251	            if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise"; then
+252	                # Verify the binary actually runs
+253	                if "$HOME/.local/bin/mise" --version &> /dev/null; then
+254	                    success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+255	                else
+256	                    # Try musl variant (some armhf systems need it)
+257	                    warn "glibc binary failed, trying musl variant..."
+258	                    MISE_URL_MUSL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}-musl"
+259	                    if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL_MUSL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && "$HOME/.local/bin/mise" --version &> /dev/null; then
+260	                        success "mise installed via direct binary download (linux-${MISE_BIN_ARCH}-musl)"
+261	                    else
+262	                        rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+263	                        warn "Could not install mise — skipping (Node.js via mise will not be available)"
+264	                        warn "  Tried: linux-${MISE_BIN_ARCH} and linux-${MISE_BIN_ARCH}-musl"
+265	                        warn "  You can install mise manually: https://mise.jdx.dev/installing-mise.html"
+266	                    fi
+267	                fi
+268	            else
+269	                rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+270	                warn "Could not download mise — skipping"
+271	            fi
+272	        else
+273	            warn "Could not install mise — unsupported architecture '$MISE_REAL_ARCH'"
+274	        fi
+275	{{ end -}}
+276	    fi
+277	else
+278	    info "mise is already installed"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 07:19:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 07:19:33Z)**_
+
+幾件事拆開講：
+
+## 1. 為什麼 wrapper 還是 fail
+
+`apply_with_sudo.sh` 自己 `sudo -v` 成功（不然會看到 `ERROR: sudo rejected the supplied password` 然後退出），所以你的密碼是對的。但 chezmoi 子進程的 `sudo_session_init` 還是噴 WARN — 三種可能：
+
+- (a) chezmoi 沒把 `CHEZMOI_SUDO_PASSWORD_FILE` env var 傳給 run-script
+- (b) 傳到了，但 `mkdir -p "$dir"` 建 state dir 時靜默失敗
+- (c) 傳到了，但 helper 內的第二次 `sudo -S -v -p ''` 在這個 subprocess 的 tty 環境下被 reject
+
+驗證 (a)：
+
+```bash
+echo 'whatever' > /tmp/cz_test
+chmod 600 /tmp/cz_test
+CHEZMOI_SUDO_PASSWORD_FILE=/tmp/cz_test ~/.local/bin/chezmoi execute-template '{{ env "CHEZMOI_SUDO_PASSWORD_FILE" }}'
+rm /tmp/cz_test
+```
+
+印出 `/tmp/cz_test` → env propagation 沒問題，是 (b) 或 (c)。印空字串 → chezmoi 沒傳，要用 `runScriptEnv` 那條路（chezmoi 2.70 應該不會吃這虧但不排除）。
+
+## 2. 不要再卡了：直接 NOPASSWD
+
+你有 root，這是你目前最快收斂的路徑。wrapper 的 bug 我們之後另外修：
+
+```bash
+echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-bootstrap
+sudo chmod 440 /etc/sudoers.d/99-bootstrap
+
+~/.local/bin/chezmoi state delete-bucket --bucket=scriptState
+~/.local/bin/chezmoi apply -v   # 全綠走完
+
+sudo rm /etc/sudoers.d/99-bootstrap
+```
+
+`_sudo_is_truly_passwordless`（`sudo_shared.sh:175-177`）一看到 `NOPASSWD: ALL` 直接 short-circuit，連 state dir、watchdog、`/dev/tty` 都不需要。
+
+## 3. mise 為什麼「裝好了又重裝」
+
+不是被跳過 — 是 **mise 的 glibc-modern 二進制在 CentOS 7 (glibc 2.17) 上跑不起來**。看 bootstrap 邏輯 (`run_once_before_00_bootstrap.sh.tmpl:230`)：
+
+```bash
+if curl ... | sh && mise --version &> /dev/null; then ...
+```
+
+curl installer 成功放下 `~/.local/bin/mise`（你看到的 `mise installed successfully`），但接下來 `mise --version` 會炸 `GLIBC_2.28 not found` 之類的，整個 `if` 條件就 false → 進 fallback「直接下載」分支 → 又下載一次同樣的 glibc 二進制 → 同樣跑不起來 → 應該再 fallback 到 musl 變體（line 257-260）。
+
+但你 fallback 在第一次直接下載就 **網路 timeout**（`curl: (28) Operation timed out`，corporate proxy 抽風）→ 連 musl 那條路都沒走到 → skip。
+
+下一次 `chezmoi apply` 重跑 bootstrap，又看到沒 mise（因為只有壞掉的 binary 在那裡），於是又 install 一次。死循環直到 musl 那條路成功為止。
+
+**手動修法**：
+
+```bash
+# 直接拉 mise 的 musl 變體（CentOS 7 glibc-2.17 相容）
+curl -fsSL https://mise.jdx.dev/mise-latest-linux-x64-musl -o ~/.local/bin/mise
+chmod +x ~/.local/bin/mise
+mise --version   # 應該印版本而不是炸 glibc
+```
+
+裝對之後 bootstrap 的 `mise --version` 就過，不會再重裝。
+
+## 4. 「都被跳過了」其實沒被跳
+
+`run_once_*` 第一次 chezmoi apply 跑了，state 記住。之後不管 `chezmoi update`、`chezmoi apply`、甚至 `chezmoi apply --force` 都不會 re-trigger（`--force` 只覆寫檔案，不重置 script state）。`state delete-bucket --bucket=scriptState` 就是用來砍 state 讓它們重跑的，這次成功了 — 你看到 bootstrap 跑了一輪就是證明。
+
+但 ansible_roles 那次因為 `sudo_session_init` 失敗就 `exit 0` 不真的跑 ansible（`run_onchange_after_20_ansible_roles.sh.tmpl:321`），所以 jq / git / curl 等 base role 該裝的東西沒裝 → modify_*.json 一直噴 jq not found。
+
+## 建議的下一步
+
+1. **NOPASSWD（30 秒）→ `state delete-bucket` → `apply -v`** — 一口氣跑完，base role 裝 jq/curl/git，後續 modify scripts 才不會繼續 pass-through
+2. 跑完手動裝 mise musl 變體
+3. 再 `chezmoi apply` 一次收尾
+4. 拿掉 NOPASSWD
+
+跑完貼結果，我看下一輪有什麼新坑。wrapper 的 env-propagation bug 我等你 unblock 後另外開一個 commit 加 debug 輸出查。
+
+---
+
+_**User (2026-05-07 08:00:04Z)**_
+
+```
+[yczhang@idc-server104 ~]$ echo 'whatever' > /tmp/cz_test
+[yczhang@idc-server104 ~]$ chmod 600 /tmp/cz_test
+[yczhang@idc-server104 ~]$ CHEZMOI_SUDO_PASSWORD_FILE=/tmp/cz_test ~/.local/bin/chezmoi execute-template '{{ env "CHEZMOI_SUDO_PASSWORD_FILE" }}'
+/tmp/cz_test[yczhang@idc-server104 ~]$ rm /tmp/cz_test
+
+[yczhang@idc-server104 ~]$ echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-bootstrap
+[sudo] password for yczhang:
+yczhang ALL=(ALL) NOPASSWD: ALL
+[yczhang@idc-server104 ~]$ sudo chmod 440 /etc/sudoers.d/99-bootstrap
+
+[yczhang@idc-server104 ~]$ ~/.local/bin/chezmoi apply -v   # 全綠走完
+[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+/tmp/2128591372.00_bootstrap.sh: line 472: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+[INFO] Linuxbrew is already installed
+[INFO] uv is already installed
+[INFO] Installing mise...
+^[[A^[[A^[[A^[[A^[[A^[[A^[[A^[[Amise: installing mise...
+############################################                              61.6%
+
+######################################################################## 100.0%
+mise: installed successfully to /home/yczhang/.local/bin/mise
+mise: run the following to activate mise in your shell:
+echo "eval \"\$(/home/yczhang/.local/bin/mise activate bash)\"" >> ~/.bashrc
+
+mise: run `mise doctor` to verify this is set up correctly
+[WARN] curl installer failed or produced non-functional binary, trying direct download...
+[INFO] Downloading mise from https://mise.jdx.dev/mise-latest-linux-x64...
+curl: (28) Operation timed out after 120000 milliseconds with 7455872 out of 81559928 bytes received
+[WARN] Could not download mise — skipping
+[INFO] ansible is already installed
+[INFO] Installing ansible-galaxy collections...
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/community-general-12.6.0.tar.gz to /home/yczhang/.ansible/tmp/ansible-local-453185lstl8is_/tmpdghva19v/community-general-12.6.0-rgzzow4t
+Installing 'community.general:12.6.0' to '/home/yczhang/.ansible/collections/ansible_collections/community/general'
+community.general:12.6.0 was installed successfully
+[SUCCESS] ansible-galaxy collections installed
+[INFO] Added ~/.local/bin to PATH in /home/yczhang/.bashrc
+[SUCCESS] Bootstrap complete!
+modify_dot_skill-lock.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+.bashrc has changed since chezmoi last wrote it?
+diff --git a/.bashrc b/.bashrc
+index 881be8611cce3402c667e08fb6cf637eca969607..8d5d4afc28707e8e793f725dafd6fff3c344a120 100644
+--- a/.bashrc
++++ b/.bashrc
+@@ -177,6 +177,3 @@ fi
+
+ # Source adhoc config
+ [ -r "$HOME/.bashrc.adhoc" ] && . "$HOME/.bashrc.adhoc"
+-
+-# Added by chezmoi bootstrap - ~/.local/bin for uv, mise, chezmoi
+-export PATH="$HOME/.local/bin:$PATH"
+modify_keybindings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+modify_settings.json: jq not found; passing live file through unchanged. Re-run `chezmoi apply` after the base ansible role installs jq.
+[yczhang@idc-server104 ~]$
+```
+
+還是依然很快就掛了...
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:08Z)**_
+
+關鍵差別 — 你看：
+
+```
+[INFO] useChineseMirror=true: ...     ← bootstrap 跑了
+[SUCCESS] Bootstrap complete!         ← 跑完
+modify_dot_skill-lock.json: jq not found...
+.bashrc has changed since chezmoi last wrote it?
+modify_keybindings.json: ...
+modify_settings.json: ...
+[yczhang@idc-server104 ~]$            ← 結束！沒看到 ansible_roles!
+```
+
+`run_onchange_after_20_ansible_roles.sh.tmpl` 完全沒 fire，bat_theme、ble.sh、skills 那些 `run_onchange_after_*` 也沒跑。所以 ansible 根本沒裝 jq/curl/git。
+
+也注意到一個小好消息 — `mkdir: cannot create directory '/run/user/...'` 已經消失了，NOPASSWD short-circuit 生效。
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List chezmoiscripts to confirm what should fire
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/ 2>/dev/null && echo "---" && ls /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/repo/ 2>/dev/null`
+
+```text
+ run_onchange_after_20_ansible_roles.sh.tmpl
+ run_onchange_after_25_bat_theme.sh.tmpl
+ run_onchange_after_26_install_blesh.sh.tmpl
+ run_onchange_after_30_brew_bundle.sh.tmpl
+ run_onchange_after_40_install_global_skills.sh.tmpl
+---
+ run_onchange_after_45_bootstrap_skills.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if chezmoiscripts are gated by chezmoiignore
+
+`grep -n "skipBoot\|noOp\|^.*skip\|chezmoiignore\|chezmoiscripts" /Users/daviddwlee84/.local/share/chezmoi/.chezmoiignore.tmpl | head -20`
+
+```text
+1:# https://www.chezmoi.io/reference/special-files/chezmoiignore/
+45:#   .chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl when source dir == repo;
+160:# Presence gates below skip the entire tree when the CLI isn't installed,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:23Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiignore.tmpl`
+
+```text
+35	backlog/** # ignore long-term backlog research (repo metadata, not user config)
+36	
+37	pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user config)
+38	
+39	# Agent skills installed via `npx skills`.
+40	#
+41	# Project-scope (chezmoi repo's own .agents/skills/ + .claude/skills/ + skills-lock.json):
+42	#   These exist purely so the chezmoi repo itself can use project-scope skills
+43	#   while you edit it.  They MUST NOT deploy — global install at ~/.agents/skills/
+44	#   already covers every machine.  Auto-restored on `chezmoi apply` by
+45	#   .chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl when source dir == repo;
+46	#   manual fallback: `just bootstrap-skills` (or `npx skills experimental_install`).
+47	#
+48	# Global-scope (~/.agents/.skill-lock.json + ~/.agents/skills/):
+49	#   The lock file IS chezmoi-managed via dot_agents/modify_dot_skill-lock.json.tmpl
+50	#   (merger script, see docs/tools/agent-skills.md).  The skills/ folder under
+51	#   it is owned by the npx skills CLI and re-populated by
+52	#   run_onchange_after_install_global_skills.sh.tmpl whenever the lock changes,
+53	#   so we do NOT want chezmoi to manage skills/ contents directly.
+54	.agents/skills
+55	.agents/skills/**
+56	.claude/skills
+57	.claude/skills/**
+58	skills-lock.json
+59	
+60	scripts/**
+61	
+62	# markdownlint (nvim mfussenegger/nvim-lint)
+63	.markdownlint.jsonc
+64	
+65	# Pre-commit and security configuration (development only)
+66	.pre-commit-config.yaml
+67	.gitleaks.toml
+68	.gitignore
+69	
+70	# Pyright config — repo-local LSP settings, not deployed (see docs/tools/opencode.md)
+71	pyrightconfig.json
+72	
+73	# Zsh secrets file (API keys, tokens, proxy - never track)
+74	.config/zsh/secrets.zsh
+75	
+76	# Zsh adhoc file (personal experiments - never track)
+77	.zshrc.adhoc
+78	
+79	# Bash secrets file (API keys, tokens, proxy - never track).
+80	# Mirror of zsh/secrets.zsh; sourced by dot_bashrc.tmpl.
+81	.config/bash/secrets.sh
+82	
+83	# Bash adhoc file (personal experiments - never track).
+84	# Mirror of .zshrc.adhoc; sourced at the tail of dot_bashrc.tmpl
+85	# AFTER ble-attach so ble-bind / readline `bind -x` calls in it
+86	# take effect.
+87	.bashrc.adhoc
+88	
+89	# Per-machine git overrides (host-specific [safe], [credential],
+90	# [http.proxy], etc.). Same self-managed pattern as .zshrc.adhoc:
+91	# silently included by ~/.gitconfig (`[include] path = ~/.gitconfig.local`)
+92	# when present, ignored by git when absent. See dot_gitconfig.tmpl.
+93	.gitconfig.local
+94	
+95	# Python bytecode caches
+96	**/__pycache__
+97	
+98	# .local directory (dynamically managed by package managers)
+99	.local/
+100	
+101	# GFW-only managed files — only manage when useChineseMirror=true,
+102	# otherwise leave any existing user file untouched.
+103	{{- if not .useChineseMirror }}
+104	.condarc
+105	.gemrc
+106	{{- end }}
+107	
+108	# -----------------------------------------------------------------------------
+109	# Editor overlays (VSCode / Cursor / Antigravity)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiignore.tmpl`
+
+```text
+155	# Each tree ships a `modify_*` overlay that enforces a small set of stable
+156	# preferences over the live config file. Everything else (auth tokens,
+157	# per-project trust, plugin caches, sessions, telemetry) stays as machine-
+158	# local state and is intentionally NOT tracked.
+159	#
+160	# Presence gates below skip the entire tree when the CLI isn't installed,
+161	# so we don't create phantom ~/.cursor/ etc. dirs on fresh machines.
+162	# -----------------------------------------------------------------------------
+163	
+164	{{- if not (stat (joinPath .chezmoi.homeDir ".cursor")) }}
+165	.cursor
+166	.cursor/**
+167	{{- end }}
+168	
+169	{{- if not (stat (joinPath .chezmoi.homeDir ".codex")) }}
+170	.codex
+171	.codex/**
+172	{{- end }}
+173	
+174	{{- if not (stat (joinPath .chezmoi.homeDir ".config" "opencode")) }}
+175	.config/opencode
+176	.config/opencode/**
+177	{{- end }}
+178	
+179	# -----------------------------------------------------------------------------
+180	# CodeIsland-owned hook sidecars (macOS-only HUD app, see
+181	# docs/tools/agent-overlays.md → "CodeIsland integration").
+182	#
+183	# These files are written and auto-repaired by the CodeIsland.app on every
+184	# launch. They MUST NOT be checked into the source tree — if accidentally
+185	# `chezmoi add`-ed they would clobber CodeIsland's runtime updates and
+186	# create a ping-pong with the app's auto-installer. The Claude
+187	# settings.json overlay uses a hook-aware merger to coexist with
+188	# CodeIsland's parallel entries; for these dedicated sidecars we leave
+189	# the file fully unmanaged.
+190	#
+191	# Always-ignore (regardless of OS / dir presence) because the only sane
+192	# state on machines without CodeIsland is "doesn't exist".
+193	# -----------------------------------------------------------------------------
+194	.codex/hooks.json
+195	.cursor/hooks.json
+196	.copilot/hooks/codeisland.json
+197	.copilot/hooks/**
+198	.gemini/settings.json
+199	.antigravity/settings.json
+200
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:01:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`
+
+```text
+1	#!/bin/bash
+2	# Re-run ansible when any role changes
+3	# Triggers on changes to any role's tasks or defaults files
+4	# Profile: {{ .profile }}
+5	
+6	# === Role Hashes (changes trigger re-run) ===
+7	# homebrew: {{ include "dot_ansible/roles/homebrew/tasks/main.yml" | sha256sum }}
+8	# base: {{ include "dot_ansible/roles/base/tasks/main.yml" | sha256sum }}
+9	# zsh tasks: {{ include "dot_ansible/roles/zsh/tasks/main.yml" | sha256sum }}
+10	# zsh defaults: {{ include "dot_ansible/roles/zsh/defaults/main.yml" | sha256sum }}
+11	# bash tasks: {{ include "dot_ansible/roles/bash/tasks/main.yml" | sha256sum }}
+12	# bash defaults: {{ include "dot_ansible/roles/bash/defaults/main.yml" | sha256sum }}
+13	# neovim tasks: {{ include "dot_ansible/roles/neovim/tasks/main.yml" | sha256sum }}
+14	# neovim defaults: {{ include "dot_ansible/roles/neovim/defaults/main.yml" | sha256sum }}
+15	# lazyvim_deps tasks: {{ include "dot_ansible/roles/lazyvim_deps/tasks/main.yml" | sha256sum }}
+16	# lazyvim_deps defaults: {{ include "dot_ansible/roles/lazyvim_deps/defaults/main.yml" | sha256sum }}
+17	# devtools: {{ include "dot_ansible/roles/devtools/tasks/main.yml" | sha256sum }}
+18	# docker: {{ include "dot_ansible/roles/docker/tasks/main.yml" | sha256sum }}
+19	# nerdfonts: {{ include "dot_ansible/roles/nerdfonts/tasks/main.yml" | sha256sum }}
+20	# coding_agents tasks: {{ include "dot_ansible/roles/coding_agents/tasks/main.yml" | sha256sum }}
+21	# coding_agents defaults: {{ include "dot_ansible/roles/coding_agents/defaults/main.yml" | sha256sum }}
+22	# bitwarden tasks: {{ include "dot_ansible/roles/bitwarden/tasks/main.yml" | sha256sum }}
+23	# bitwarden defaults: {{ include "dot_ansible/roles/bitwarden/defaults/main.yml" | sha256sum }}
+24	# security_tools: {{ include "dot_ansible/roles/security_tools/tasks/main.yml" | sha256sum }}
+25	# python_uv_tools tasks: {{ include "dot_ansible/roles/python_uv_tools/tasks/main.yml" | sha256sum }}
+26	# python_uv_tools defaults: {{ include "dot_ansible/roles/python_uv_tools/defaults/main.yml" | sha256sum }}
+27	# js_cli_tools tasks: {{ include "dot_ansible/roles/js_cli_tools/tasks/main.yml" | sha256sum }}
+28	# js_cli_tools defaults: {{ include "dot_ansible/roles/js_cli_tools/defaults/main.yml" | sha256sum }}
+29	# llm_tools tasks: {{ include "dot_ansible/roles/llm_tools/tasks/main.yml" | sha256sum }}
+30	# llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
+31	# rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
+32	# rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+33	# ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
+34	# ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
+35	# starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
+36	# input_method: {{ include "dot_ansible/roles/input_method/tasks/main.yml" | sha256sum }}
+37	# networking_tools: {{ include "dot_ansible/roles/networking_tools/tasks/main.yml" | sha256sum }}
+38	# iac_tools tasks: {{ include "dot_ansible/roles/iac_tools/tasks/main.yml" | sha256sum }}
+39	# iac_tools defaults: {{ include "dot_ansible/roles/iac_tools/defaults/main.yml" | sha256sum }}
+40	# media_tools: {{ include "dot_ansible/roles/media_tools/tasks/main.yml" | sha256sum }}
+41	# dotnet_tools tasks: {{ include "dot_ansible/roles/dotnet_tools/tasks/main.yml" | sha256sum }}
+42	# dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
+43	# gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
+44	# gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
+45	
+46	set -e
+47	export PATH="$HOME/.local/bin:$PATH"
+48	
+49	# Override locale to a safe default so ansible can start even before locale
+50	# packages are installed. Prefer C.UTF-8 (universal since glibc 2.35) but
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:02:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:02:34Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`
+
+```text
+45	
+46	set -e
+47	export PATH="$HOME/.local/bin:$PATH"
+48	
+49	# Override locale to a safe default so ansible can start even before locale
+50	# packages are installed. Prefer C.UTF-8 (universal since glibc 2.35) but
+51	# fall back to en_US.UTF-8 on CentOS 7 (glibc 2.17) where C.UTF-8 is
+52	# missing and `LC_ALL=C.UTF-8` triggers
+53	# `Ansible could not initialize the preferred locale: unsupported locale
+54	# setting`. Fall through silently if neither is available — the parent
+55	# shell's LANG/LC_ALL (e.g. set via ENV in Dockerfile.centos7) wins.
+56	if locale -a 2>/dev/null | grep -qiE '^C\.utf-?8$'; then
+57	    export LC_ALL=C.UTF-8
+58	    export LANG=C.UTF-8
+59	elif locale -a 2>/dev/null | grep -qiE '^en_US\.utf-?8$'; then
+60	    export LC_ALL=en_US.UTF-8
+61	    export LANG=en_US.UTF-8
+62	fi
+63	
+64	# --- Shared sudo session (see scripts/lib/sudo_shared.sh for full docs)
+65	# Inlined at template-render time so this script carries the helper body.
+66	# bootstrap has already prompted + spawned a watchdog in the normal flow;
+67	# the idempotent `sudo_session_init` below just re-exports the env vars
+68	# and (re)registers the INT/TERM/HUP abort trap. It will prompt here only
+69	# when the user ran ansible manually without the bootstrap phase.
+70	{{ include "scripts/lib/sudo_shared.sh" }}
+71	# --- end sudo helper
+72	
+73	# Whether ANY sudo surface is exercised in this run. Linux ansible always
+74	# needs sudo unless noRoot. On macOS only the input_method role needs sudo.
+75	NEED_SUDO={{ if or (and (eq .chezmoi.os "linux") (not .noRoot)) (and (eq .chezmoi.os "darwin") .installInputMethod) }}1{{ else }}0{{ end }}
+76	
+77	# Setup Homebrew PATH so brew subprocesses can find sibling tools like git-lfs.
+78	{{ if eq .chezmoi.os "darwin" -}}
+79	if [[ -f /opt/homebrew/bin/brew ]]; then
+80	    eval "$(/opt/homebrew/bin/brew shellenv)"
+81	elif [[ -f /usr/local/bin/brew ]]; then
+82	    eval "$(/usr/local/bin/brew shellenv)"
+83	fi
+84	{{ else -}}
+85	# Linuxbrew
+86	if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+87	    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+88	elif [[ -d "$HOME/.linuxbrew" ]]; then
+89	    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+90	fi
+91	{{ end -}}
+92	
+93	{{ if .useChineseMirror -}}
+94	# GFW mirrors (useChineseMirror=true) — exported so ansible subprocesses
+95	# (community.general.homebrew, mise, rustup, gem) inherit them. Without
+96	# this, ghcr.io bottle downloads frequently fail with
+97	# `curl: (18) Transferred a partial file` and rust-lang.org / nodejs.org
+98	# downloads time out on constrained networks.
+99	# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/
+100	export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+101	export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+102	export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+103	export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+104	export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+105	export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+106	export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+107	export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+108	{{ end -}}
+109	
+110	# Colors
+111	info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+112	success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+113	warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+114	
+115	ANSIBLE_DIR="$HOME/.ansible"
+116	export ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg"
+117	INVENTORY="$ANSIBLE_DIR/inventories/localhost.ini"
+118	
+119	command -v ansible-playbook &> /dev/null || { warn "ansible-playbook not found"; exit 0; }
+120	
+121	# === Profile-based tag selection ===
+122	# Profile: {{ .profile }}
+123	#
+124	# Tag categories:
+125	#   Core:    base, zsh, starship, neovim, lazyvim_deps, security_tools
+126	#   Desktop: devtools, docker, nerdfonts
+127	#   Server:  devtools, docker (no nerdfonts - no GUI)
+128	#   macOS:   homebrew
+129	#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
+130	
+131	{{ if eq .chezmoi.os "darwin" -}}
+132	PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
+133	# macOS: full desktop experience
+134	TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+135	{{ else if eq .profile "ubuntu_desktop" -}}
+136	PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+137	# Ubuntu Desktop: full desktop experience (no homebrew).
+138	# gui_apps bundles alacritty + AppImageLauncher + VSCode + Cursor (see
+139	# dot_ansible/roles/gui_apps_linux/tasks/main.yml); libfuse2 comes with it
+140	# so AppImage-based editors work out of the box on Ubuntu 22.04+.
+141	TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
+142	{{ else if eq .profile "ubuntu_server" -}}
+143	PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+144	# Ubuntu Server: no GUI stuff (no nerdfonts)
+145	TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+146	{{ else if eq .profile "centos_server" -}}
+147	PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
+148	# CentOS Server: same playbook + tag set as Ubuntu Server. Ansible roles
+149	# disambiguate apt vs yum via ansible_os_family ("Debian" vs "RedHat").
+150	# On a noRoot CentOS box every [sudo]-tagged task is skipped; what
+151	# actually runs are the user-level GitHub-release / cargo / mise
+152	# fallbacks — see pitfalls/centos7-noroot.md for the gate-broadening
+153	# fix that lets those fire on RedHat too.
+154	TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+155	{{ else -}}
+156	warn "Unknown profile: {{ .profile }}"
+157	exit 0
+158	{{ end -}}
+159	
+160	# Add optional tags based on chezmoi config
+161	{{ if .installCodingAgents -}}
+162	TAGS="${TAGS},coding_agents"
+163	{{ end -}}
+164	{{ $installBitwarden := false }}{{ if hasKey . "installBitwarden" }}{{ $installBitwarden = .installBitwarden }}{{ end -}}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:03:07Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:03:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if any chezmoiscripts get ignored
+
+`grep -n "chezmoiscripts\|run_onchange\|run_once" /Users/daviddwlee84/.local/share/chezmoi/.chezmoiignore.tmpl | head -10`
+
+```text
+45:#   .chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl when source dir == repo;
+52:#   run_onchange_after_install_global_skills.sh.tmpl whenever the lock changes,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:03:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:03:53Z)**_
+
+我看出問題了。`chezmoi apply` 在 modify 那一輪後就停了（你的 prompt `$` 直接回來，沒有 ansible_roles 任何輸出）。`run_onchange_after_20_ansible_roles.sh.tmpl` 應該在 modify scripts 之後跑，但完全沒 fire。可能性：
+
+1. chezmoi 看到 `.bashrc` drift 後 silently 跳過後續某些步驟
+2. ansible_roles 的 content hash 已經 cache 住沒重觸發
+3. ansible-playbook 不在 chezmoi 子進程的 PATH（雖然 script 自己會 prepend `~/.local/bin`）
+
+但這時候 debug chezmoi 的 run_onchange 邏輯已經是次要的了 — **你已經有 ansible 了，直接手動跑就行**：
+
+```bash
+# 環境快速確認
+~/.local/bin/chezmoi data | grep -E '"profile"|"useChineseMirror"|"noRoot"'
+ls ~/.ansible/playbooks/  # 應該看到 linux.yml
+which ansible-playbook    # 應該指向 ~/.local/bin/ansible-playbook (uv tool install 的 symlink)
+
+# 直接跑 ansible（NOPASSWD 已經生效，不用 --ask-become-pass）
+cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \
+  playbooks/linux.yml \
+  --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+  -v
+```
+
+跑完應該會把 `jq`、`curl`、`git`、`zsh`、`tmux` 等都裝上。然後再 `chezmoi apply -v`，那些 modify_*.json 就不會再 pass-through。
+
+順便也手動修 mise（你 corporate proxy 對 mise.jdx.dev 抽風 + glibc-2.17 不相容）：
+
+```bash
+# musl 變體相容 CentOS 7 glibc-2.17
+curl -fsSL https://mise.jdx.dev/mise-latest-linux-x64-musl -o ~/.local/bin/mise
+chmod +x ~/.local/bin/mise
+~/.local/bin/mise --version  # 應該印版本不再炸 GLIBC
+```
+
+如果 musl 那個 URL 也 timeout，先試 TUNA 鏡像（你已經 `useChineseMirror=true`）：
+
+```bash
+# 或直接從 GitHub release（mise 自己發布的 musl）
+curl -fsSL https://github.com/jdx/mise/releases/latest/download/mise-v2025.x.x-linux-x64-musl.tar.gz -o /tmp/mise.tar.gz
+# 看 GitHub releases 拿正確 URL
+```
+
+## 平行的另一條路：debug `chezmoi apply` 為什麼不跑 run_onchange
+
+跑這個能看出 chezmoi 的決策：
+
+```bash
+~/.local/bin/chezmoi apply --debug 2>&1 | grep -iE "ansible_roles|run_onchange|skip|state" | head -30
+echo "exit: $?"
+```
+
+可能會看到類似：
+- `script unchanged, skipping` → content hash 沒變，要再 `state delete-bucket` 一次
+- 或 `prompt: skip` → drift 處理導致中斷
+- 或 `playbook not found` 之類的具體錯誤
+
+**建議流程**：
+1. 先手動跑 ansible 把 base tools 裝起來（jq/curl/git/zsh/tmux 等）
+2. 修好 mise musl
+3. 再 `state delete-bucket --bucket=scriptState && chezmoi apply -v` 收尾
+4. 拿掉 NOPASSWD
+
+跑完貼 ansible 的進度結果跟最後 chezmoi apply 的輸出，我看下一輪。
+
+---
+
+_**User (2026-05-07 08:07:15Z)**_
+
+ansible也沒跑通
+```
+[yczhang@idc-server104 ~]$ ~/.local/bin/chezmoi data | grep -E '"profile"|"useChineseMirror"|"noRoot"'
+        "profile": "",
+        "noRoot": false,
+        "profile": "centos_server",
+        "useChineseMirror": true
+  "noRoot": false,
+  "profile": "centos_server",
+  "useChineseMirror": true
+[yczhang@idc-server104 ~]$ ls ~/.ansible/playbooks/  # 應該看到 linux.yml
+base.yml  linux.yml  macos.yml
+[yczhang@idc-server104 ~]$ which ansible-playbook    # 應該指向 ~/.local/bin/ansible-playbook (uv tool install 的 symlink)
+/usr/bin/which: no ansible-playbook in (/opt/pyenv/thirdparty/bin:/opt/pyenv/local/bin:/opt/pyenv/local/sbin:/usr/local/cuda/bin:/opt/pyenv/mambaforge/bin:/opt/pyenv/thirdparty/bin:/opt/pyenv/local/bin:/opt/pyenv/local/sbin:/usr/local/cu
+da/bin:/opt/pyenv/mambaforge/bin:/opt/pyenv/thirdparty/bin:/opt/pyenv/local/bin:/opt/pyenv/local/sbin:/usr/local/cuda/bin:/opt/pyenv/mambaforge/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/yzhang/.local/bin:/home/yzhang/bi
+n:/home/yzhang/.local/bin:/home/yzhang/bin)
+[yczhang@idc-server104 .ansible]$ cd ~/.ansible && ansible-playbook -i inventories/localhost.ini \
+>   playbooks/linux.yml \
+>   --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+>   -v
+bash: ansible-playbook: command not found...
+[yczhang@idc-server104 .ansible]$
+[yczhang@idc-server104 .ansible]$ ~/.local/bin/ansible-
+ansible-config     ansible-console    ansible-doc        ansible-galaxy     ansible-inventory  ansible-playbook   ansible-pull       ansible-test       ansible-vault
+[yczhang@idc-server104 .ansible]$ ~/.local/bin/ansible-playbook -i inventories/localhost.ini \
+>   playbooks/linux.yml \
+>   --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+>   -v
+Using /home/yczhang/.ansible/ansible.cfg as config file
+
+────────────────────────────────────────────────────────────
+PLAY [Linux setup]
+────────────────────────────────────────────────────────────
+[1] TASK · [Gathering Facts]
+[ERROR]: Task failed: Action failed: The following modules failed to execute: ansible.legacy.setup.
+
+Task failed: Action failed.
+
+<<< caused by >>>
+
+The following modules failed to execute: ansible.legacy.setup.
+
++--[ Sub-Event 1 of 1 ]---
+|
+| Module result deserialization failed: No start of json char found See stdout/stderr for the returned output.
+|
++--[ End Sub-Event ]---
+
+✘ fatal: [localhost]: FAILED! (0.4s) =>
+    ansible_facts: {}
+    changed: false
+    failed_modules:
+        ansible.legacy.setup:
+            ansible_facts:
+                discovered_interpreter_python: /usr/bin/python3
+            exception: (traceback unavailable)
+            failed: true
+            module_stderr: |4-
+                  File "/home/yczhang/.ansible/tmp/ansible-tmp-1778141158.3538644-454473-116421938055667/AnsiballZ_setup.py", line 3
+                    from __future__ import annotations
+                    ^
+                SyntaxError: future feature annotations is not defined
+            module_stdout: ''
+            msg: 'Module result deserialization failed: No start of json char found'
+            rc: 1
+    msg: 'The following modules failed to execute: ansible.legacy.setup.'
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (0.6s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0
+```
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 08:07:45Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:08:07Z)**_
+
+新層次的問題出來了。看這行：
+
+```
+discovered_interpreter_python: /usr/bin/python3
+exception: SyntaxError: future feature annotations is not defined
+```
+
+ansible-core 2.20 的 module bootstrap 用 `from __future__ import annotations`，這個 syntax 要 **Python 3.7+**。CentOS 7 的 `/usr/bin/python3` 是 **Python 3.6.8** — 跑不動。
+
+Controller side 你裝的是 uv 的 Python 3.13 (uv 自己 fetch 的 python-build-standalone)，但 target side（這台 localhost）ansible 自己 discover 出來的 Python 是系統的 3.6.8。要把 target 也指到 uv 的 3.13。
+
+順便注意你的 PATH 裡有怪東西 — `/home/yzhang/.local/bin`（少一個 `c`），不是你的 home `/home/yczhang/`。應該是 `/etc/profile.d/` 或某個 system-wide config 寫死了別的 user。所以 `which ansible-playbook` 找不到，但 `~/.local/bin/ansible-playbook` 直接路徑是 work 的。等下檢查一下。
+
+## 立即修法
+
+找到 uv 的 Python 3.13：
+
+```bash
+ls ~/.local/share/uv/python/    # 應該看到 cpython-3.13.x-linux-x86_64-gnu
+UV_PY313=$(ls -d ~/.local/share/uv/python/cpython-3.13.*-linux-x86_64-gnu/bin/python3 2>/dev/null | head -1)
+echo "$UV_PY313"
+$UV_PY313 --version              # 確認 Python 3.13.x
+```
+
+然後跑 ansible 時指定 target python：
+
+```bash
+~/.local/bin/ansible-playbook -i inventories/localhost.ini \
+  playbooks/linux.yml \
+  --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+  -e "ansible_python_interpreter=$UV_PY313" \
+  -v
+```
+
+或者比較簡單（不依賴上面那個變數展開）：
+
+```bash
+~/.local/bin/ansible-playbook -i inventories/localhost.ini \
+  playbooks/linux.yml \
+  --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+  -e "ansible_python_interpreter=$(uv python find 3.13 2>/dev/null)" \
+  -v
+```
+
+`uv python find 3.13` 會印出 uv 管理的 Python 3.13 binary 完整路徑。
+
+## 順便檢查 PATH 詭異現象
+
+```bash
+echo "$HOME"                              # 應該是 /home/yczhang
+whoami                                    # 應該是 yczhang
+grep -rn "yzhang" /etc/profile.d/ /etc/profile /etc/bashrc 2>/dev/null | head -5
+grep -rn "/home/yzhang" /etc/profile.d/ /etc/profile /etc/bashrc 2>/dev/null | head -5
+ls -ld /home/yzhang /home/yczhang 2>/dev/null
+```
+
+這個 `/home/yzhang` 出現在 PATH 很可能是公司預設的 `/etc/profile.d/something.sh` 裡寫死了某個別人的 home 路徑。不影響運作（因為 `~/.local/bin` 還是會被 .bashrc append），但 `which` 找不到 `ansible-playbook` 這類就是這個原因 — 它先進到一堆假路徑，沒命中。
+
+## chezmoi 為什麼 ansible_roles 不 fire 的副線
+
+```bash
+~/.local/bin/chezmoi state dump --bucket=scriptState 2>/dev/null | head -40
+```
+
+看一下哪些 script 已經被記錄成「跑過了」。如果 ansible_roles 的 entry 在裡面，表示之前某次跑過 (exit 0)，hash 也記下了 — 後面就不會再 fire 直到你 `state delete-bucket` 或 role 內容變化。
+
+## pitfall 我等下補
+
+這個 target-python-too-old 是 CentOS 7 上一個獨立的雷，跟 controller 那邊的 uv-Python-3.13 修法是兩件事。`pitfalls/centos7-noroot.md` 已經寫過 controller 這層；target Python 那層 ansible-core 2.20 才開始踩，要新加一個 pitfall（或補進 centos7-noroot.md 的延伸）。等你跑通 ansible 我來補。
+
+先試 `-e "ansible_python_interpreter=..."` 那行，貼結果給我看下一步。
+
+---
+
+_**User (2026-05-07 08:25:46Z)**_
+
+```
+[yczhang@idc-server104 .ansible]$ ~/.local/bin/ansible-playbook -i inventories/localhost.ini \
+>   playbooks/linux.yml \
+>   --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+>   -e "ansible_python_interpreter=$(uv python find 3.13 2>/dev/null)" \
+>   -v
+Using /home/yczhang/.ansible/ansible.cfg as config file
+
+────────────────────────────────────────────────────────────
+PLAY [Linux setup]
+────────────────────────────────────────────────────────────
+[1] TASK · [Gathering Facts]
+[WARNING]: Host 'localhost' is using the discovered Python interpreter at '/usr/bin/python3', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[ERROR]: Task failed: Action failed: The following modules failed to execute: ansible.legacy.setup.
+
+Task failed: Action failed.
+
+<<< caused by >>>
+
+The following modules failed to execute: ansible.legacy.setup.
+
++--[ Sub-Event 1 of 1 ]---
+|
+| Module result deserialization failed: No start of json char found See stdout/stderr for the returned output.
+|
++--[ End Sub-Event ]---
+
+✘ fatal: [localhost]: FAILED! (0.4s) =>
+    ansible_facts: {}
+    changed: false
+    failed_modules:
+        ansible.legacy.setup:
+            ansible_facts:
+                discovered_interpreter_python: /usr/bin/python3
+            exception: (traceback unavailable)
+            failed: true
+            module_stderr: |4-
+                  File "/home/yczhang/.ansible/tmp/ansible-tmp-1778141303.1936326-454676-258106610554973/AnsiballZ_setup.py", line 3
+                    from __future__ import annotations
+                    ^
+                SyntaxError: future feature annotations is not defined
+            module_stdout: ''
+            msg: 'Module result deserialization failed: No start of json char found'
+            rc: 1
+    msg: 'The following modules failed to execute: ansible.legacy.setup.'
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (0.6s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0
+```
+
+```
+[yczhang@idc-server104 .ansible]$ ~/.local/bin/ansible-playbook -i inventories/localhost.ini \                                                                                                                                      [48/1112]
+>   playbooks/linux.yml \
+>   --tags 'base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools' \
+>   -e "ansible_python_interpreter=$UV_PY313" \
+>   -v
+Using /home/yczhang/.ansible/ansible.cfg as config file
+
+
+────────────────────────────────────────────────────────────
+PLAY [Linux setup]
+────────────────────────────────────────────────────────────
+┌─ System Info
+│  OS:      CentOS 7.9
+│  Arch:    x86_64
+│  Python:  3.13.13
+│  Kernel:  3.10.0-1160.el7.x86_64
+│  Locale:  en_US.UTF-8
+│  Tags:    devtools, security_tools, starship, docker,
+│           zsh, neovim, ruby_gem_tools, bash,
+│           lazyvim_deps, rust_cargo_tools, base
+└─
+[1] TASK · [Gathering Facts]
+ok: [localhost] (2.2s)
+[2] TASK · [Detect userland architecture via dpkg]
+ok: [localhost] (0.5s) =>
+    changed: false
+    cmd: dpkg --print-architecture
+    failed_when_result: false
+    failed_when_suppressed_exception: (traceback unavailable)
+    msg: Error executing command.
+    rc: 13
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+[3] TASK · [Fallback target_architecture to gathered facts]
+ok: [localhost] (0.1s) =>
+    ansible_facts:
+        target_architecture: x86_64
+    changed: false
+─────────────────────────── base ───────────────────────────
+[4] TASK · [base : Install base packages (RedHat/CentOS)]
+[ERROR]: Task failed: Action failed: ('Could not detect which major revision of dnf is in use, which is required to determine module backend.', 'You should manually specify use_backend to tell the module whether to use the dnf4 or dnf5 b
+ackend})')
+Origin: /home/yczhang/.ansible/roles/base/tasks/main.yml:52:3
+
+50 # handles them more reliably (musl tarballs ignore glibc 2.17). Skipped
+51 # entirely on noRoot (tags: [sudo] → --skip-tags sudo).
+52 - name: Install base packages (RedHat/CentOS)
+     ^ column 3
+
+✘ fatal: [localhost]: FAILED! (0.7s) =>
+    ansible_facts:
+        pkg_mgr: unknown
+    changed: false
+    msg:
+    - Could not detect which major revision of dnf is in use, which is required to determine
+        module backend.
+    - You should manually specify use_backend to tell the module whether to use the dnf4
+52 - name: Install base packages (RedHat/CentOS)                                                                                                                                                                                     [0/1112]
+     ^ column 3
+
+✘ fatal: [localhost]: FAILED! (0.7s) =>
+    ansible_facts:
+        pkg_mgr: unknown
+    changed: false
+    msg:
+    - Could not detect which major revision of dnf is in use, which is required to determine
+        module backend.
+    - You should manually specify use_backend to tell the module whether to use the dnf4
+        or dnf5 backend})
+...ignoring
+[5] TASK · [base : Re-check if ripgrep is installed]
+ok: [localhost] (0.4s) =>
+    changed: false
+    cmd: command -v rg
+    delta: '0:00:00.009238'
+    end: '2026-05-07 16:09:45.746956'
+    failed_when_result: false
+    msg: ''
+    rc: 0
+    start: '2026-05-07 16:09:45.737718'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: /usr/bin/rg
+    stdout_lines: <omitted>
+[6] TASK · [base : Re-check if fd is installed]
+ok: [localhost] (0.4s) =>
+    changed: false
+    cmd: command -v fd
+    delta: '0:00:00.009313'
+    end: '2026-05-07 16:09:46.416688'
+    failed_when_result: false
+    failed_when_suppressed_exception: (traceback unavailable)
+    msg: non-zero return code
+    rc: 1
+    start: '2026-05-07 16:09:46.407375'
+    stderr: ''
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+^[[A^[[A^[[A^[[A^[[A^[[A^[[A^[[A^[[A[7] TASK · [base : Ensure ~/.local/bin exists (fd)]
+ok: [localhost] (0.5s) =>
+    changed: false
+    gid: 8091
+    group: yczhang
+    mode: '0755'
+    owner: yczhang
+    path: /home/yczhang/.local/bin
+    size: 325
+    state: directory
+    uid: 8091
+[8] TASK · [base : Set fd release target]
+ok: [localhost] (0.0s) =>
+    ansible_facts:
+        fd_target: x86_64-unknown-linux-musl
+    changed: false
+
+...
+
+─────────────────────────── bash ───────────────────────────
+[32] TASK · [bash : Install gawk (RedHat/CentOS) — required by ble.sh Makefile]
+[ERROR]: Task failed: Action failed: ('Could not detect which major revision of dnf is in use, which is required to determine module backend.', 'You should manually specify use_backend to tell the module whether to use the dnf4 or dnf5 backend})')
+Origin: /home/yczhang/.ansible/roles/bash/tasks/main.yml:25:3
+
+23     state: present
+24
+25 - name: Install gawk (RedHat/CentOS) — required by ble.sh Makefile
+     ^ column 3
+
+✘ fatal: [localhost]: FAILED! (0.7s) =>
+    ansible_facts:
+        pkg_mgr: unknown
+    changed: false
+    msg:
+    - Could not detect which major revision of dnf is in use, which is required to determine
+        module backend.
+    - You should manually specify use_backend to tell the module whether to use the dnf4
+        or dnf5 backend})
+...ignoring
+
+
+Origin: /home/yczhang/.ansible/roles/devtools/tasks/main.yml:3374:3
+
+3372   register: tpm_bin
+3373
+3374 - name: Install tmux plugins via TPM
+       ^ column 3
+
+✘ fatal: [localhost]: FAILED! (0.4s) =>
+    changed: true
+    cmd: |-
+        # Source config to set TMUX_PLUGIN_MANAGER_PATH (works with running server)
+        tmux source-file /home/yczhang/.tmux.conf
+        # Now install plugins
+        /home/yczhang/.tmux/plugins/tpm/bin/install_plugins
+    delta: '0:00:00.057518'
+    end: '2026-05-07 16:19:32.940674'
+    msg: non-zero return code
+    rc: 1
+    start: '2026-05-07 16:19:32.883156'
+    stderr: |-
+        failed to connect to server
+        failed to connect to server
+        FATAL: Tmux Plugin Manager not configured in tmux.conf
+        Aborting.
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (9m51s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=52   changed=14   unreachable=0    failed=1    skipped=399  rescued=0    ignored=4
+
+Changed tasks (13):
+  ✦ base : Download fd binary (25.9s)
+  ✦ base : Extract fd (1.2s)
+  ✦ base : Install fd to ~/.local/bin (0.5s)
+  ✦ base : Clean up fd temp files (0.7s)
+  ✦ base : Download jq binary (58.3s)
+  ✦ base : Download git-lfs tarball (1m42s)
+  ✦ base : Extract and install git-lfs (0.6s)
+  ✦ base : Clean up git-lfs temp files (0.7s)
+  ✦ base : Download and install just to ~/.local/bin (50.0s)
+  ✦ starship : Install starship via official installer (user-level) (2m40s)
+  ... and 3 more
+
+Slow tasks (>5s):
+  ⏱ starship : Install starship via official installer (user-level) (2m40s)
+  ⏱ base : Download git-lfs tarball (1m42s)
+  ⏱ starship : Install starship via official installer (Debian/Ubuntu/RedHat) (1m32s)
+  ⏱ base : Download jq binary (58.3s)
+  ⏱ base : Download and install just to ~/.local/bin (50.0s)
+  ⏱ base : Download fd binary (25.9s)
+  ⏱ devtools : Download bats-core tarball (10.1s)
+```
+
+目前勉強能跑到這樣
+
+```
+[yczhang@idc-server104 .ansible]$ bash
+bash: conda: command not found
+ble/term.sh: updating tput cache for TERM=screen... done
+bash: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+
+yczhang in 🌐 idc-server104 in ~/.ansible
+❯
+```
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 08:26:30Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:26:30Z)**_
+
+巨大進展！52 ok、14 changed — 大半東西其實裝上了。剩三個獨立問題：
+
+_**Agent (claude-opus-4-7 2026-05-07 08:26:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the failing dnf/yum tasks
+
+`grep -n "Install base packages (RedHat\|Install gawk (RedHat\|use_backend\|ansible.builtin.yum\|ansible.builtin.dnf\|ansible.builtin.package" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml 2>/dev/null | head -30`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml:52:- name: Install base packages (RedHat/CentOS)
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml:56:  ansible.builtin.yum:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml:25:- name: Install gawk (RedHat/CentOS) — required by ble.sh Makefile
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml:29:  ansible.builtin.yum:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:26:38Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/base/tasks/main.yml`
+
+```text
+48	# RedHat (CentOS/Rocky/Alma) base packages. ripgrep + fd skipped here:
+49	# they're EPEL-only on CentOS 7 and the GitHub-release fallback below
+50	# handles them more reliably (musl tarballs ignore glibc 2.17). Skipped
+51	# entirely on noRoot (tags: [sudo] → --skip-tags sudo).
+52	- name: Install base packages (RedHat/CentOS)
+53	  when: ansible_facts["os_family"] == "RedHat"
+54	  become: true
+55	  tags: [sudo]
+56	  ansible.builtin.yum:
+57	    name:
+58	      - git
+59	      - git-lfs
+60	      - curl
+61	      - wget
+62	      - jq
+63	      - tree
+64	      - gcc
+65	      - gcc-c++
+66	      - make
+67	    state: present
+68	  ignore_errors: true
+69	
+70	# --- ripgrep (user-level fallback) ---
+71	- name: Re-check if ripgrep is installed
+72	  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:27:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:27:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find where bashrc sources brew shellenv
+
+`grep -rn "/home/linuxbrew/.linuxbrew/bin/brew" /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/ /Users/daviddwlee84/.local/share/chezmoi/dot_config/bash/ /Users/daviddwlee84/.local/share/chezmoi/dot_bashrc.tmpl 2>/dev/null | head -10`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/00_exports.sh.tmpl:60:    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:27:16Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/shell/00_exports.sh.tmpl`
+
+```text
+55	fi
+56	{{ else -}}
+57	# Linux: Initialize Linuxbrew if installed
+58	# Linuxbrew is optional on Linux (most packages managed by apt via Ansible)
+59	if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+60	    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+61	elif [[ -d "$HOME/.linuxbrew" ]]; then
+62	    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+63	fi
+64	{{ end -}}
+65	
+66	# Set default Brewfile location (XDG-compliant)
+67	export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+68	
+69	{{ if .useChineseMirror -}}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:27:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:28:05Z)**_
+
+跑通到一半了。剩下 4 個獨立問題，給你逐個修法：
+
+## 1. dnf module 在 CentOS 7 上爆掉
+
+ansible-core 2.20 的 `ansible.builtin.yum` 現在預設走 dnf backend，CentOS 7 沒裝 dnf 所以直接掛。`role/base` 裡寫的是 `ansible.builtin.yum:` 但底層被路由到 dnf → fail → `pkg_mgr: unknown`。
+
+最快直接 `yum install` 把該裝的補上（`ignore_errors: true` 所以後面 ansible 步驟還是會繼續）：
+
+```bash
+sudo yum install -y git git-lfs curl wget jq tree gcc gcc-c++ make gawk zsh tmux htop direnv tree-sitter
+```
+
+裝完後續的 modify_*.json 就有 jq 可用。
+
+## 2. `/home/linuxbrew/.linuxbrew/bin/brew: No such file or directory`
+
+之前那次 brew installer 跑到一半失敗（curl 太舊），但 sudo 已經幫它把 `/home/linuxbrew/.linuxbrew/` 整個目錄樹建出來了。`dot_config/shell/00_exports.sh.tmpl:59` 的檢查只看目錄是否存在，導致 eval 一個不存在的 binary。
+
+```bash
+sudo rm -rf /home/linuxbrew
+```
+
+下次新開 shell 就不會看到這個錯誤。
+
+## 3. mise musl 變體（glibc-2.17 相容）
+
+```bash
+# 先把現在那個跑不起來的 mise 刪掉
+rm -f ~/.local/bin/mise
+
+# 從你的 GFW-friendly 鏡像拉 musl 變體（mise 自己有 cdn）
+curl -fsSL https://mise.jdx.dev/mise-latest-linux-x64-musl -o ~/.local/bin/mise
+chmod +x ~/.local/bin/mise
+~/.local/bin/mise --version   # 應該印版本而不是 GLIBC error
+```
+
+如果 `mise.jdx.dev` 還是 timeout，從 GitHub release 抓：
+
+```bash
+# 看一下最新版號
+curl -fsSL https://api.github.com/repos/jdx/mise/releases/latest | grep tag_name
+# 然後抓對應 musl tarball（替換 vYYYY.MM.DD）
+curl -fsSL https://github.com/jdx/mise/releases/download/v2025.x.x/mise-v2025.x.x-linux-x64-musl.tar.gz -o /tmp/mise.tar.gz
+tar -xzf /tmp/mise.tar.gz -C /tmp
+mv /tmp/mise/bin/mise ~/.local/bin/mise
+chmod +x ~/.local/bin/mise
+```
+
+## 4. PATH 裡的 `/home/yzhang/...`（少一個 c）
+
+```bash
+grep -rn "yzhang\|/home/yzhang" /etc/profile /etc/profile.d/ /etc/bashrc 2>/dev/null
+# 八成是某個 site-wide profile 寫死了某個前同事的 home
+```
+
+這個 cosmetic，不影響功能（你 bashrc append 的 `~/.local/bin` 還是會接到 PATH 後面）。但 `which ansible-playbook` 找不到就是因為它先掃到 `/home/yzhang/.local/bin`（存在但不是你的）。**看完內容貼給我，我看要不要在 bashrc 把這條路徑顯式 dedupe / 移除**。
+
+## 5. TPM 那個失敗的 task
+
+```
+FATAL: Tmux Plugin Manager not configured in tmux.conf
+failed to connect to server
+```
+
+`devtools : Install tmux plugins via TPM` 需要一個 active tmux session 才能跑 `install_plugins`。Ansible 跑時沒 tmux server，所以失敗。修法簡單，下次你開 tmux 之後手動：
+
+```bash
+# 進 tmux
+tmux new -s test
+# 在 tmux 裡按 prefix + I（大寫 I）— 預設 prefix 是 Ctrl-b
+# TPM 會自動裝 plugins
+# 或直接 CLI：
+tmux source ~/.tmux.conf
+~/.tmux/plugins/tpm/bin/install_plugins
+```
+
+## 建議流程
+
+```bash
+# 1. 補裝 system packages
+sudo yum install -y git git-lfs curl wget jq tree gcc gcc-c++ make gawk zsh tmux htop direnv
+
+# 2. 清掉破 brew 目錄
+sudo rm -rf /home/linuxbrew
+
+# 3. 修 mise（用 musl 變體）
+rm -f ~/.local/bin/mise
+curl -fsSL https://mise.jdx.dev/mise-latest-linux-x64-musl -o ~/.local/bin/mise
+chmod +x ~/.local/bin/mise
+
+# 4. 看一下 PATH 的怪 entry 從哪來（貼結果）
+grep -rn "yzhang" /etc/profile /etc/profile.d/ /etc/bashrc 2>/dev/null
+
+# 5. 再跑一次 chezmoi（重置 script state 確保 run_onchange 重觸發）
+~/.local/bin/chezmoi state delete-bucket --bucket=scriptState
+~/.local/bin/chezmoi apply -v
+
+# 6. 拿掉 NOPASSWD（一切 work 之後）
+sudo rm /etc/sudoers.d/99-bootstrap
+```
+
+跑完後手動進 tmux 裝 TPM plugins，那條 ansible task 就不用煩它。
+
+## 一個重要的 follow-up: 寫一個 CentOS 7 dnf-failure pitfall
+
+ansible-core 2.20 + CentOS 7 (no dnf) 是新出現的雷，現有的 `pitfalls/centos7-noroot.md` 沒涵蓋（那篇講的是 noRoot path）。等你 unblock 完，我加一篇 `pitfalls/centos7-yum-dnf-backend-fail.md` 並提案在 `dot_ansible/roles/*` 的 yum 任務上加 `use_backend: yum` 或改用 `ansible.builtin.command: yum install -y ...` 繞過。
+
+要不要先試上面 5 步，再貼第 4 步的結果跟最後 chezmoi apply 的輸出？
+
+---
+
+_**User (2026-05-07 08:37:57Z)**_
+
+```
+2026-04-28-sleep-helper on  main [!?] via  v1.25.7 took 2h14m57s
+❯ ssh zyc_friend
+(yczhang@10.10.10.104) Password:
+Last login: Thu May  7 14:11:33 2026 from 10.10.10.102
+-bash: conda: command not found
+ble/term.sh: updating tput cache for TERM=xterm-256color... done
+-bash: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ zsh
+bash: zsh: command not found...
+Similar command is: 'ssh'
+[ble: exit 127]
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ sudo yum install -y git git-lfs curl wget jq tree gcc gcc-c++ make gawk zsh tmux htop direnv tree-sitter
+Loaded plugins: auto-update-debuginfo, fastestmirror, langpacks
+Determining fastest mirrors
+Could not retrieve mirrorlist http://mirrorlist.centos.org/?release=7&arch=x86_64&repo=os&infra=stock error was
+14: curl#6 - "Could not resolve host: mirrorlist.centos.org; Unknown error"
+epel/x86_64/metalink                                                                                                                                                                                                  | 4.2 kB  00:00:00
+epel-debuginfo/x86_64/metalink                                                                                                                                                                                        | 3.4 kB  00:00:00
+Could not retrieve mirrorlist http://mirrorlist.centos.org/?release=7&arch=x86_64&repo=extras&infra=stock error was
+14: curl#6 - "Could not resolve host: mirrorlist.centos.org; Unknown error"
+Could not retrieve mirrorlist http://mirrorlist.centos.org/?release=7&arch=x86_64&repo=updates&infra=stock error was
+14: curl#6 - "Could not resolve host: mirrorlist.centos.org; Unknown error"
+ * base: mirrors.bfsu.edu.cn
+ * epel: pubmirror1.math.uh.edu
+ * epel-debuginfo: pubmirror1.math.uh.edu
+ * extras: mirrors.bfsu.edu.cn
+ * updates: mirrors.bfsu.edu.cn
+http://mirrors.huaweicloud.com/centos/7.9.2009/os/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+To address this issue please refer to the below wiki article
+
+https://wiki.centos.org/yum-errors
+
+If above article doesn't help to resolve this issue please use https://bugs.centos.org/.
+
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/os/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+base                                                                                                                                                                                                                  | 3.6 kB  00:00:00
+Not using downloaded base/repomd.xml because it is older than what we have:
+  Current   : Mon Apr 12 11:02:43 2021
+  Downloaded: Fri Oct 30 04:03:00 2020
+base-debuginfo                                                                                                                                                                                                        | 2.5 kB  00:00:00
+https://download.copr.fedorainfracloud.org/results/carlwgeorge/ripgrep/epel-7-x86_64/repodata/repomd.xml: [Errno 14] HTTPS Error 404 - Not Found
+Trying other mirror.
+epel                                                                                                                                                                                                                  | 4.3 kB  00:00:00
+epel-debuginfo                                                                                                                                                                                                        | 3.0 kB  00:00:00
+http://mirrors.huaweicloud.com/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.ustc.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.nju.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.jlu.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] curl#52 - "Empty reply from server"
+Trying other mirror.
+http://mirrors.cqu.edu.cn/CentOS/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 503 - Service Unavailable
+Trying other mirror.
+http://mirrors.163.com/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://ftp.sjtu.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] curl#7 - "Failed to connect to 2001:da8:8000:6023::230: Network is unreachable"
+Trying other mirror.
+http://mirrors.bupt.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] curl#6 - "Could not resolve host: mirrors.bupt.edu.cn; Unknown error"
+Trying other mirror.
+http://mirrors.tuna.tsinghua.edu.cn/centos/7.9.2009/extras/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.huaweicloud.com/centos/7.9.2009/updates/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/updates/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404 - Not Found
+Trying other mirror.
+updates                                                                                                                                                                                                               | 2.9 kB  00:00:00
+(1/3): epel/x86_64/primary_db                                                                                                                                                                                         | 8.7 MB  00:00:02
+(2/3): epel-debuginfo/x86_64/primary_db                                                                                                                                                                               | 1.1 MB  00:00:09
+(3/3): epel/x86_64/updateinfo                                                                                                                                                                                         | 1.0 MB  00:00:32
+Package matching git-1.8.3.1-25.el7_9.x86_64 already installed. Checking for update.
+Package wget-1.14-18.el7_6.1.x86_64 already installed and latest version
+Package tree-1.6.0-10.el7.x86_64 already installed and latest version
+Package gcc-4.8.5-44.el7.x86_64 already installed and latest version
+Package gcc-c++-4.8.5-44.el7.x86_64 already installed and latest version
+Package 1:make-3.82-24.el7.x86_64 already installed and latest version
+Package gawk-4.0.2-4.el7_3.1.x86_64 already installed and latest version
+Package tmux-1.8-4.el7.x86_64 already installed and latest version
+Package htop-2.2.0-3.el7.x86_64 already installed and latest version
+No package direnv available.
+No package tree-sitter available.
+Resolving Dependencies
+There are unfinished transactions remaining. You might consider running yum-complete-transaction, or "yum-complete-transaction --cleanup-only" and "yum history redo last", first to finish them. If those don't work you'll have to try removing/installing packages by hand (maybe package-cleanup can help).
+--> Running transaction check
+---> Package curl.x86_64 0:7.29.0-59.el7 will be updated
+---> Package curl.x86_64 0:7.29.0-59.el7_9.2 will be an update
+--> Processing Dependency: libcurl = 7.29.0-59.el7_9.2 for package: curl-7.29.0-59.el7_9.2.x86_64
+---> Package git-lfs.x86_64 0:2.10.0-2.el7 will be installed
+---> Package jq.x86_64 0:1.6-2.el7 will be installed
+--> Processing Dependency: libonig.so.5()(64bit) for package: jq-1.6-2.el7.x86_64
+---> Package zsh.x86_64 0:5.0.2-34.el7_8.2 will be installed
+--> Running transaction check
+---> Package libcurl.x86_64 0:7.29.0-59.el7 will be updated
+---> Package libcurl.x86_64 0:7.29.0-59.el7_9.2 will be an update
+---> Package oniguruma.x86_64 0:6.8.2-2.el7 will be installed
+--> Finished Dependency Resolution
+
+Dependencies Resolved
+
+=============================================================================================================================================================================================================================================
+ Package                                                 Arch                                                 Version                                                            Repository                                             Size
+=============================================================================================================================================================================================================================================
+Installing:
+ git-lfs                                                 x86_64                                               2.10.0-2.el7                                                       epel                                                  3.7 M
+ jq                                                      x86_64                                               1.6-2.el7                                                          epel                                                  167 k
+ zsh                                                     x86_64                                               5.0.2-34.el7_8.2                                                   base                                                  2.4 M
+Updating:
+ curl                                                    x86_64                                               7.29.0-59.el7_9.2                                                  updates                                               271 k
+Installing for dependencies:
+ oniguruma                                               x86_64                                               6.8.2-2.el7                                                        epel                                                  181 k
+Updating for dependencies:
+ libcurl                                                 x86_64                                               7.29.0-59.el7_9.2                                                  updates                                               223 k
+
+Transaction Summary
+=============================================================================================================================================================================================================================================
+Install  3 Packages (+1 Dependent package)
+Upgrade  1 Package  (+1 Dependent package)
+
+Total download size: 6.9 M
+Downloading packages:
+No Presto metadata available for updates
+curl-7.29.0-59.el7_9.2.x86_64. FAILED
+http://mirrors.huaweicloud.com/centos/7.9.2009/updates/x86_64/Packages/curl-7.29.0-59.el7_9.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found                                                            ]  0.0 B/s |    0 B  --:--:-- ETA
+Trying other mirror.
+(1/6): git-lfs-2.10.0-2.el7.x86_64.rpm                                                                                                                                                                                | 3.7 MB  00:00:01
+libcurl-7.29.0-59.el7_9.2.x86_ FAILED
+http://mirrors.huaweicloud.com/centos/7.9.2009/updates/x86_64/Packages/libcurl-7.29.0-59.el7_9.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found=========-                                               ] 4.4 MB/s | 3.4 MB  00:00:00 ETA
+Trying other mirror.
+(2/6): jq-1.6-2.el7.x86_64.rpm                                                                                                                                                                                        | 167 kB  00:00:00
+zsh-5.0.2-34.el7_8.2.x86_64.rp FAILED
+http://mirrors.huaweicloud.com/centos/7.9.2009/os/x86_64/Packages/zsh-5.0.2-34.el7_8.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found===================-                                               ] 4.4 MB/s | 3.4 MB  00:00:00 ETA
+Trying other mirror.
+(3/6): oniguruma-6.8.2-2.el7.x86_64.rpm                                                                                                                                                                               | 181 kB  00:00:00
+curl-7.29.0-59.el7_9.2.x86_64. FAILED
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/updates/x86_64/Packages/curl-7.29.0-59.el7_9.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found================-                                               ] 4.4 MB/s | 3.4 MB  00:00:00 ETA
+Trying other mirror.
+libcurl-7.29.0-59.el7_9.2.x86_ FAILED
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/updates/x86_64/Packages/libcurl-7.29.0-59.el7_9.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found=============-                                               ] 4.4 MB/s | 3.4 MB  00:00:00 ETA
+Trying other mirror.
+zsh-5.0.2-34.el7_8.2.x86_64.rp FAILED
+http://mirrors.bfsu.edu.cn/centos/7.9.2009/os/x86_64/Packages/zsh-5.0.2-34.el7_8.2.x86_64.rpm: [Errno 14] HTTP Error 404 - Not Found=======================-                                               ] 4.4 MB/s | 3.4 MB  00:00:00 ETA
+Trying other mirror.
+(4/6): libcurl-7.29.0-59.el7_9.2.x86_64.rpm                                                                                                                                                                           | 223 kB  00:00:00
+(5/6): curl-7.29.0-59.el7_9.2.x86_64.rpm                                                                                                                                                                              | 271 kB  00:00:00
+(6/6): zsh-5.0.2-34.el7_8.2.x86_64.rpm                                                                                                                                                                                | 2.4 MB  00:00:00
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Total                                                                                                                                                                                                        2.7 MB/s | 6.9 MB  00:00:02
+Running transaction check
+Running transaction test
+Transaction test succeeded
+Running transaction
+  Installing : oniguruma-6.8.2-2.el7.x86_64                                                                                                                                                                                              1/8
+  Updating   : libcurl-7.29.0-59.el7_9.2.x86_64                                                                                                                                                                                          2/8
+  Updating   : curl-7.29.0-59.el7_9.2.x86_64                                                                                                                                                                                             3/8
+  Installing : jq-1.6-2.el7.x86_64                                                                                                                                                                                                       4/8
+  Installing : zsh-5.0.2-34.el7_8.2.x86_64                                                                                                                                                                                               5/8
+  Installing : git-lfs-2.10.0-2.el7.x86_64                                                                                                                                                                                               6/8
+  Cleanup    : curl-7.29.0-59.el7.x86_64                                                                                                                                                                                                 7/8
+  Cleanup    : libcurl-7.29.0-59.el7.x86_64                                                                                                                                                                                              8/8
+  Verifying  : libcurl-7.29.0-59.el7_9.2.x86_64                                                                                                                                                                                          1/8
+  Verifying  : oniguruma-6.8.2-2.el7.x86_64                                                                                                                                                                                              2/8
+  Verifying  : jq-1.6-2.el7.x86_64                                                                                                                                                                                                       3/8
+  Verifying  : curl-7.29.0-59.el7_9.2.x86_64                                                                                                                                                                                             4/8
+  Verifying  : git-lfs-2.10.0-2.el7.x86_64                                                                                                                                                                                               5/8
+  Verifying  : zsh-5.0.2-34.el7_8.2.x86_64                                                                                                                                                                                               6/8
+  Verifying  : libcurl-7.29.0-59.el7.x86_64                                                                                                                                                                                              7/8
+  Verifying  : curl-7.29.0-59.el7.x86_64                                                                                                                                                                                                 8/8
+
+Installed:
+  git-lfs.x86_64 0:2.10.0-2.el7                                                    jq.x86_64 0:1.6-2.el7                                                    zsh.x86_64 0:5.0.2-34.el7_8.2
+
+Dependency Installed:
+  oniguruma.x86_64 0:6.8.2-2.el7
+
+Updated:
+  curl.x86_64 0:7.29.0-59.el7_9.2
+
+Dependency Updated:
+  libcurl.x86_64 0:7.29.0-59.el7_9.2
+
+Complete!
+[ble: elapsed 81.613s (CPU 17.5%)] sudo yum install -y git git-lfs curl wget jq tree gcc gcc-c++ make gawk zsh tmux htop direnv tree-sitter
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5 took 1m21s
+❯ rm -f ~/.local/bin/mise
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ curl -fsSL https://mise.jdx.dev/mise-latest-linux-x64-musl -o ~/.local/bin/mise
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5 took 40s
+❯ chmod +x ~/.local/bin/mise
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ grep -rn "yzhang" /etc/profile /etc/profile.d/ /etc/bashrc 2>/dev/null
+[ble: exit 1]
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ grep -rn "yczhang" /etc/profile /etc/profile.d/ /etc/bashrc 2>/dev/null
+[ble: exit 1]
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ ~/.local/bin/chezmoi apply
+[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+/tmp/1914186029.00_bootstrap.sh: line 472: /home/linuxbrew/.linuxbrew/bin/brew: No such file or directory
+[INFO] Linuxbrew is already installed
+[INFO] uv is already installed
+[INFO] mise is already installed
+[INFO] ansible is already installed
+[INFO] Installing ansible-galaxy collections...
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/community-general-12.6.0.tar.gz to /home/yczhang/.ansible/tmp/ansible-local-3021zqkpbukc/tmpq74pkarr/community-general-12.6.0-1pash502
+Installing 'community.general:12.6.0' to '/home/yczhang/.ansible/collections/ansible_collections/community/general'
+community.general:12.6.0 was installed successfully
+[SUCCESS] ansible-galaxy collections installed
+[INFO] Installing mise global tools...
+info: downloading installer
+warn: Not enforcing strong cipher suites for TLS, this is potentially less secure
+warn: It looks like you have an existing rustup settings file at:
+warn: /home/yczhang/.rustup/settings.toml
+warn: Rustup will install the default toolchain as specified in the settings file,
+warn: instead of the one inferred from the default host triple.
+info: profile set to default
+info: default host triple is x86_64-unknown-linux-gnu
+info: skipping toolchain installation
+info: syncing channel updates for 1.95.0-x86_64-unknown-linux-gnu
+error: could not download nonexistent rust version `1.95.0-x86_64-unknown-linux-gnu`: could not download file from 'https://mirrors.tuna.tsinghua.edu.cn/rustup/dist/rust-1.95.0-x86_64-unknown-linux-gnu.tar.gz.sha256' to '/home/yczhang/.rustup/tmp/f3v0m289aju1rmi0_file': http request returned an unsuccessful status code: 404
+mise ERROR rustup failed
+mise 2026.5.1 by @jdx                                                                                                                                                                                                                   [2/5]
+ruby@3.4.9      download ruby-3.4.9.x86_64_linux.no_yjit.tar.gz                                                                                                                                           1.1 MB 4m50s [>                 ] ◠
+node@24.15.0    download node-v24.15.0.tar.gz                                                                                                                                                                                               ◠
+bun@1.3.13      download bun-linux-x64-musl.zip                                                                                                                                                           1.4 MB 6m17s [>                 ] ◠
+rust@1.95.0     source "$HOME/.cargo/env.xsh"   # For xonsh                                                                                                                                                                                 ◠
+dotnet@10.0.203 Installing .NET SDK 10.0.203                                                                                                                                                                                                ◠
+```
+
+除了 /home/linuxbrew 還沒清 以及還沒拿掉 NOPASSWD
+其他大概是能跑 正在裝mise下的東西
+看起來能根據目前已知先修一版？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 08:38:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:38:23Z)**_
+
+對，先把這次學到的修進 repo。讓我盤點要動的點：
+
+_**Agent (claude-opus-4-7 2026-05-07 08:38:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find where mise global tools install lives
+
+`grep -n "Installing mise global tools\|mise install\|mise use" /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl 2>/dev/null | head -10`
+
+```text
+71:# `brew install`, `rustup`, or `mise install` so every bootstrap fetch
+231:        success "mise installed via curl"
+254:                    success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+260:                        success "mise installed via direct binary download (linux-${MISE_BIN_ARCH}-musl)"
+326:    info "Installing mise global tools..."
+330:        warn "mise install had errors (some tools may have failed to build). Continuing..."
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:38:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Count + list yum tasks needing use_backend fix
+
+`grep -rn "ansible.builtin.yum:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ 2>/dev/null | wc -l && echo "---" && grep -rln "ansible.builtin.yum:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/`
+
+```text
+       4
+---
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:38:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See actual yum task shapes to know how to add use_backend
+
+`grep -B1 -A8 "ansible.builtin.yum:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/{base,zsh,bash,ruby_gem_tools}/tasks/main.yml | head -80`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-  tags: [sudo]
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml:  ansible.builtin.yum:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-    name: zsh
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-    state: present
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-  ignore_errors: true
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-# oh-my-zsh core + custom plugins are managed via .chezmoiexternal.toml.tmpl
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-# (repo root). chezmoi auto-refreshes them weekly; to force a pull run
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-# `chezmoi apply --refresh-externals`. Nothing to do here.
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml-
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-  tags: [sudo]
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml:  ansible.builtin.yum:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-    name: gawk
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-    state: present
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-  ignore_errors: true
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-- name: Install gawk (macOS) — required by ble.sh Makefile
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-  when: ansible_facts["os_family"] == "Darwin"
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-  community.general.homebrew:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml-    name: gawk
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-  tags: [sudo]
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml:  ansible.builtin.yum:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-    name:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-      - libffi-devel
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-      - libyaml-devel
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-    state: present
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-  ignore_errors: true
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-# =============================================================================
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml-# Ensure Ruby is installed via mise
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-  tags: [sudo]
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml:  ansible.builtin.yum:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-    name:
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - git
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - git-lfs
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - curl
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - wget
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - jq
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - tree
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml-      - gcc
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:31Z)**_
+
+可以。盤點下來四件事，按 blast radius 從小到大：
+
+1. **brew shellenv guard 收緊** — `[[ -d /home/linuxbrew/.linuxbrew ]]` 改 `[[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]`，3 個地方（`dot_config/shell/00_exports.sh.tmpl`、bootstrap、ansible_roles）
+2. **mise install 在 glibc < 2.28 直接走 musl 路徑**（避開 timeout 才 fallback 的問題）
+3. **4 個 `ansible.builtin.yum:` task 改成 `rpm -q || yum install`** shell-based（ansible-core 2.20 的 yum module 強制 dnf backend，CentOS 7 沒 dnf 就 fail）
+4. **新 pitfall** `pitfalls/centos7-ansible-yum-dnf-backend.md`
+
+開始動。
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/00_exports.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:42Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+117	fi
+118	{{ else -}}
+119	# Linux: Linuxbrew paths
+120	if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+121	    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+122	elif [[ -d "$HOME/.linuxbrew" ]]; then
+123	    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+124	fi
+125	{{ end -}}
+126
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:39:53Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+175	                sudo_run apt-get update
+176	                sudo_run apt-get install -y build-essential procps curl file git
+177	            fi
+178	            # Install Linuxbrew
+179	            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+180	            # Add to PATH for this session
+181	            if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+182	                eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+183	            elif [[ -d "$HOME/.linuxbrew" ]]; then
+184	                eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+185	            fi
+186	            success "Linuxbrew installed successfully"
+187	        else
+188	            info "Linuxbrew is already installed"
+189	        fi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:40:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:40:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:40:13Z)**_
+
+Now mise musl-priority on glibc < 2.28.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:40:14Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./run_once_before_00_bootstrap.sh.tmpl`
+
+```text
+219	    # sudo_run pipes the shared-session password on stdin; falls back to
+220	    # plain `sudo` when NOPASSWD is detected (CHEZMOI_SUDO_PASS_FILE unset).
+221	    sudo_run apt-get install -y libffi-dev libyaml-dev python3-dev 2>/dev/null || true
+222	fi
+223	{{ end -}}
+224	
+225	# 3. Install mise if missing (runtime manager for Node.js, etc.)
+226	# Use "mise --version" instead of "command -v" to catch arch-mismatch binaries
+227	# (e.g. aarch64 binary on armhf userland — file exists but cannot execute)
+228	if ! mise --version &> /dev/null; then
+229	    info "Installing mise..."
+230	    # Remove broken binary if present (wrong architecture)
+231	    if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+232	        warn "Removing non-functional mise binary (possible architecture mismatch)..."
+233	        rm -f "$(command -v mise)" 2>/dev/null || true
+234	    fi
+235	    # Try curl installer first (fast, no sudo)
+236	    if curl -fsSL --connect-timeout 10 --max-time 60 https://mise.run | sh && mise --version &> /dev/null; then
+237	        success "mise installed via curl"
+238	{{ $noRootMise := false }}{{ if hasKey . "noRoot" }}{{ $noRootMise = .noRoot }}{{ end -}}
+239	{{ if not $noRootMise -}}
+240	    else
+241	        # Fallback: try direct binary download with correct userland arch
+242	        warn "curl installer failed or produced non-functional binary, trying direct download..."
+243	        # Clean up broken binary from curl installer
+244	        if command -v mise &> /dev/null && ! mise --version &> /dev/null; then
+245	            rm -f "$(command -v mise)" 2>/dev/null || true
+246	        fi
+247	        MISE_REAL_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+248	        case "$MISE_REAL_ARCH" in
+249	            amd64|x86_64) MISE_BIN_ARCH="x64" ;;
+250	            arm64|aarch64) MISE_BIN_ARCH="arm64" ;;
+251	            armhf) MISE_BIN_ARCH="armv7" ;;
+252	            *) MISE_BIN_ARCH="" ;;
+253	        esac
+254	        if [[ -n "$MISE_BIN_ARCH" ]]; then
+255	            MISE_URL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}"
+256	            info "Downloading mise from ${MISE_URL}..."
+257	            if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise"; then
+258	                # Verify the binary actually runs
+259	                if "$HOME/.local/bin/mise" --version &> /dev/null; then
+260	                    success "mise installed via direct binary download (linux-${MISE_BIN_ARCH})"
+261	                else
+262	                    # Try musl variant (some armhf systems need it)
+263	                    warn "glibc binary failed, trying musl variant..."
+264	                    MISE_URL_MUSL="https://mise.jdx.dev/mise-latest-linux-${MISE_BIN_ARCH}-musl"
+265	                    if curl -fsSL --connect-timeout 10 --max-time 120 "$MISE_URL_MUSL" -o "$HOME/.local/bin/mise" && chmod +x "$HOME/.local/bin/mise" && "$HOME/.local/bin/mise" --version &> /dev/null; then
+266	                        success "mise installed via direct binary download (linux-${MISE_BIN_ARCH}-musl)"
+267	                    else
+268	                        rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+269	                        warn "Could not install mise — skipping (Node.js via mise will not be available)"
+270	                        warn "  Tried: linux-${MISE_BIN_ARCH} and linux-${MISE_BIN_ARCH}-musl"
+271	                        warn "  You can install mise manually: https://mise.jdx.dev/installing-mise.html"
+272	                    fi
+273	                fi
+274	            else
+275	                rm -f "$HOME/.local/bin/mise" 2>/dev/null || true
+276	                warn "Could not download mise — skipping"
+277	            fi
+278	        else
+279	            warn "Could not install mise — unsupported architecture '$MISE_REAL_ARCH'"
+280	        fi
+281	{{ end -}}
+282	    fi
+283	else
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:40:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/run_once_before_00_bootstrap.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:01Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:02Z)**_
+
+Now the 4 yum tasks. Going to convert them to `rpm -q || yum install` so they work on CentOS 7 (no dnf binary).
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:15Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:20Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/zsh/tasks/main.yml`
+
+```text
+1	---
+2	# Zsh role - install zsh package + (conditionally) switch login shell.
+3	# oh-my-zsh core and plugin clones are handled by .chezmoiexternal.toml.tmpl.
+4	#
+5	# Login-shell switch is gated on `primary_shell == "zsh"` (default). The
+6	# zsh PACKAGE is always installed regardless — even on bash-primary hosts
+7	# we want zsh available so the deployed ~/.zshrc still works when the
+8	# user runs `zsh` ad-hoc. See .chezmoi.toml.tmpl primaryShell prompt and
+9	# the sister bash role.
+10	
+11	# Install zsh package
+12	- name: Install zsh (macOS)
+13	  when: ansible_facts["os_family"] == "Darwin"
+14	  community.general.homebrew:
+15	    name: zsh
+16	    state: present
+17	
+18	- name: Install zsh (Debian/Ubuntu)
+19	  when: ansible_facts["os_family"] == "Debian"
+20	  become: true
+21	  tags: [sudo]
+22	  ansible.builtin.apt:
+23	    name: zsh
+24	    state: present
+25	
+26	- name: Install zsh (RedHat/CentOS)
+27	  when: ansible_facts["os_family"] == "RedHat"
+28	  become: true
+29	  tags: [sudo]
+30	  ansible.builtin.yum:
+31	    name: zsh
+32	    state: present
+33	  ignore_errors: true
+34	
+35	# oh-my-zsh core + custom plugins are managed via .chezmoiexternal.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/zsh/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/bash/tasks/main.yml`
+
+```text
+20	  tags: [sudo]
+21	  ansible.builtin.apt:
+22	    name: gawk
+23	    state: present
+24	
+25	- name: Install gawk (RedHat/CentOS) — required by ble.sh Makefile
+26	  when: ansible_facts["os_family"] == "RedHat"
+27	  become: true
+28	  tags: [sudo]
+29	  ansible.builtin.yum:
+30	    name: gawk
+31	    state: present
+32	  ignore_errors: true
+33	
+34	- name: Install gawk (macOS) — required by ble.sh Makefile
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/bash/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See ruby_gem_tools yum block
+
+`grep -B3 -A6 "ansible.builtin.yum:" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml`
+
+```text
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name:
+      - libffi-devel
+      - libyaml-devel
+    state: present
+  ignore_errors: true
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:41:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find exact line numbers
+
+`grep -n "ansible.builtin.yum:\|libffi-devel" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml | head -5`
+
+```text
+25:  ansible.builtin.yum:
+27:      - libffi-devel
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:42:01Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/ruby_gem_tools/tasks/main.yml`
+
+```text
+18	    update_cache: true
+19	    cache_valid_time: 3600
+20	
+21	- name: Install Ruby compile dependencies (RedHat/CentOS)
+22	  when: ansible_facts["os_family"] == "RedHat"
+23	  become: true
+24	  tags: [sudo]
+25	  ansible.builtin.yum:
+26	    name:
+27	      - libffi-devel
+28	      - libyaml-devel
+29	    state: present
+30	  ignore_errors: true
+31	
+32	# =============================================================================
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:42:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:42:12Z)**_
+
+Now the new pitfall.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:42:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# `ansible.builtin.yum:` aborts on CentOS 7 — "Could not detect dnf revision"
+
+## Symptom
+
+Running ansible-core 2.18+ (anything you'd `uv tool install` today) against
+a CentOS 7 host, every `ansible.builtin.yum:` task fails:
+
+\```
+[ERROR]: Task failed: Action failed:
+  ('Could not detect which major revision of dnf is in use, which is required to determine module backend.',
+   'You should manually specify use_backend to tell the module whether to use the dnf4 or dnf5 backend')
+Origin: /home/yczhang/.ansible/roles/base/tasks/main.yml:52:3
+
+50 # handles them more reliably (musl tarballs ignore glibc 2.17). Skipped
+51 # entirely on noRoot (tags: [sudo] → --skip-tags sudo).
+52 - name: Install base packages (RedHat/CentOS)
+     ^ column 3
+
+✘ fatal: [localhost]: FAILED! (0.7s) =>
+    ansible_facts:
+        pkg_mgr: unknown
+    msg:
+    - Could not detect which major revision of dnf is in use ...
+    - You should manually specify use_backend to tell the module whether to use the dnf4 or dnf5 backend
+...ignoring
+\```
+
+`ignore_errors: true` keeps the play going, but **the package never gets
+installed** — `git`, `git-lfs`, `jq`, `gcc`, `gawk`, `zsh`, etc. are
+silently absent on the target after a "successful" `chezmoi apply`.
+Downstream tasks then fail in mysterious ways (e.g. `modify_*.json: jq
+not found`, `ble.sh Makefile: gawk not found`).
+
+## Root cause
+
+ansible-core 2.18 collapsed the `yum` module into a thin alias that
+routes through the `dnf` module backend
+([release notes](https://docs.ansible.com/ansible/latest/porting_guides/porting_guide_2.18.html)).
+The module's runtime auto-detection looks for `dnf` / `dnf-3` / `dnf-5`
+binaries to decide which backend to invoke. **CentOS 7 ships only
+`/usr/bin/yum` — there is no `dnf` binary anywhere on the system**.
+Detection returns nothing, the module aborts.
+
+`use_backend: yum` (or `yum3`) used to force the legacy yum-CLI path,
+but that fallback was removed in ansible-core 2.18 too. The
+parameter still accepts `dnf | dnf4 | dnf5 | auto`, none of which work
+without a dnf binary.
+
+This is **independent** from the noRoot CentOS 7 issue documented in
+[`centos7-noroot.md`](centos7-noroot.md) (which covers the OS-family
+gating around user-level GitHub-release fallbacks). The `dnf-backend`
+trap fires when sudo IS available — exactly the path noRoot doesn't
+exercise — so the two pitfalls compound: noRoot users dodge this
+entirely; sudo'd CentOS 7 users hit it on every system-package task.
+
+## Fix
+
+Replace `ansible.builtin.yum:` with `ansible.builtin.shell:` invoking
+yum CLI directly + `rpm -q` for idempotency:
+
+\```yaml
+- name: Install base packages (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    set -e
+    pkgs=(git git-lfs curl wget jq tree gcc gcc-c++ make)
+    missing=()
+    for p in "${pkgs[@]}"; do
+      rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if [ ${#missing[@]} -eq 0 ]; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y "${missing[@]}"
+  args:
+    executable: /bin/bash
+  register: base_yum_result
+  changed_when: "'ALL_INSTALLED' not in base_yum_result.stdout"
+  ignore_errors: true
+\```
+
+Why this works on **both** CentOS 7 and Rocky/Alma 8+:
+
+- CentOS 7: `yum` is the real package manager (yum 3.x, Python 2 era).
+- Rocky/Alma 8+: `/usr/bin/yum` is a symlink/shim to `dnf` — running
+  `yum install` from the shell invokes dnf transparently. No
+  feature loss vs. `ansible.builtin.yum:`.
+
+Why `rpm -q` first: `yum install -y X` of an already-installed package
+returns success but its output is "Package X already installed" — we use
+the explicit `ALL_INSTALLED` sentinel to keep ansible's `changed:`
+reporting honest. Saves repeated `yum install` calls (slow on networks
+behind GFW where the metadata refresh alone takes minutes).
+
+Applied across `dot_ansible/roles/{base,zsh,bash,ruby_gem_tools}/tasks/main.yml`
+in the same commit that opened this pitfall. Future RHEL-family yum
+tasks should follow the same pattern.
+
+## Why not...
+
+- **Install dnf on CentOS 7 first**: requires EPEL + `yum install dnf`.
+  EPEL works but bootstrapping a new package manager just to satisfy
+  ansible's module backend feels backwards, and the result is still
+  brittle (dnf on EL7 is upstream-deprecated).
+- **`community.general.yum`**: doesn't exist as a separate module —
+  yum lives only in ansible-core, and the dnf-backend collapse there is
+  the source of the bug.
+- **`ansible.builtin.package`**: discovers `pkg_mgr` from facts; on
+  CentOS 7 it currently reports `pkg_mgr: unknown` (visible in the
+  error above), defeating auto-routing. Same root cause.
+- **Pin ansible-core to 2.17 on the controller**: 2.17 still has the
+  yum CLI fallback. But it's EOL'd Q4 2025; not a sustainable answer.
+  Also conflicts with [`centos7-noroot.md`](centos7-noroot.md)'s fix
+  pinning Python 3.13 + ansible-core 2.18+ via `uv tool install` —
+  that pin exists because *older* ansible-core versions can't speak
+  Galaxy NG.
+
+## Related
+
+- [`pitfalls/centos7-noroot.md`](centos7-noroot.md) — sister pitfall:
+  user-level GitHub-release / cargo / mise fallbacks gated wrongly on
+  `os_family == "Debian"` (sudo-less CentOS 7 path).
+- [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](bootstrap-no-tty-sudo-prompt-skipped.md) —
+  upstream dependency: without sudo, ansible doesn't even reach these
+  tasks (gets gated by `tags: [sudo]` + `--skip-tags sudo`).
+- `dot_ansible/roles/{base,zsh,bash,ruby_gem_tools}/tasks/main.yml` —
+  the four tasks that needed the `shell:` rewrite.
+- ansible-core 2.18 porting guide:
+  <https://docs.ansible.com/ansible/latest/porting_guides/porting_guide_2.18.html>
+
+## Repro (Docker)
+
+\```bash
+just docker-test-centos7   # full suite — currently expects yum tasks to pass
+\```
+
+When this pitfall first surfaced (CentOS 7 + sudo + ansible-core 2.20),
+none of the existing Docker test profiles caught it because:
+
+- `docker-test-centos7` previously ran with `noRoot=true` (skipped sudo
+  tasks entirely)
+- `docker-test-rocky9` has dnf installed, so the auto-detection works
+
+Adding a `centos7-sudo` Docker variant would close that gap; tracked in
+[`backlog/centos7-sudo-test-profile.md`](../backlog/centos7-sudo-test-profile.md)
+once filed.
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/pitfalls/centos7-ansible-yum-dnf-backend.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:02Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:03Z)**_
+
+Sanity check: render bootstrap template to verify no template-syntax errors.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render and syntax-check bootstrap template
+
+`chezmoi execute-template < run_once_before_00_bootstrap.sh.tmpl > /tmp/bootstrap_render.sh 2>&1 && bash -n /tmp/bootstrap_render.sh && echo "syntax OK" && wc -l /tmp/bootstrap_render.sh`
+
+```text
+syntax OK
+     671 /tmp/bootstrap_render.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Sanity-check all modified files
+
+```bash
+chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl > /tmp/ansible_render.sh 2>&1 && bash -n /tmp/ansible_render.sh && echo "ansible syntax OK"
+echo "---"
+chezmoi execute-template < dot_config/shell/00_exports.sh.tmpl > /tmp/exports_render.sh 2>&1 && bash -n /tmp/exports_render.sh && echo "exports syntax OK"
+echo "---"
+# Quick yaml-lint on the modified ansible roles
+for f in dot_ansible/roles/{base,zsh,bash,ruby_gem_tools}/tasks/main.yml; do
+  python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 | head -2 && echo "$f: yaml OK"
+done
+```
+
+```text
+ansible syntax OK
+---
+exports syntax OK
+---
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+dot_ansible/roles/base/tasks/main.yml: yaml OK
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+dot_ansible/roles/zsh/tasks/main.yml: yaml OK
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+dot_ansible/roles/bash/tasks/main.yml: yaml OK
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+dot_ansible/roles/ruby_gem_tools/tasks/main.yml: yaml OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:22Z)**_
+
+Let me actually check the YAML properly.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Properly check yaml validity
+
+```bash
+for f in dot_ansible/roles/{base,zsh,bash,ruby_gem_tools}/tasks/main.yml; do
+  if python3 -c "import yaml,sys; yaml.safe_load(open('$f'))" 2>/dev/null; then
+    echo "OK: $f"
+  else
+    echo "FAIL: $f"
+    python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 | tail -5
+  fi
+done
+```
+
+```text
+FAIL: dot_ansible/roles/base/tasks/main.yml
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load(open('dot_ansible/roles/base/tasks/main.yml'))
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+FAIL: dot_ansible/roles/zsh/tasks/main.yml
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load(open('dot_ansible/roles/zsh/tasks/main.yml'))
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+FAIL: dot_ansible/roles/bash/tasks/main.yml
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load(open('dot_ansible/roles/bash/tasks/main.yml'))
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+FAIL: dot_ansible/roles/ruby_gem_tools/tasks/main.yml
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load(open('dot_ansible/roles/ruby_gem_tools/tasks/main.yml'))
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+YAML validate via uv-run pyyaml
+
+```bash
+uv run --with pyyaml python -c "
+import yaml
+for f in ['dot_ansible/roles/base/tasks/main.yml', 'dot_ansible/roles/zsh/tasks/main.yml', 'dot_ansible/roles/bash/tasks/main.yml', 'dot_ansible/roles/ruby_gem_tools/tasks/main.yml']:
+    try:
+        with open(f) as fh:
+            yaml.safe_load(fh)
+        print(f'OK: {f}')
+    except Exception as e:
+        print(f'FAIL {f}: {e}')
+"
+```
+
+```text
+OK: dot_ansible/roles/base/tasks/main.yml
+OK: dot_ansible/roles/zsh/tasks/main.yml
+OK: dot_ansible/roles/bash/tasks/main.yml
+OK: dot_ansible/roles/ruby_gem_tools/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:33Z)**_
+
+All four YAML files parse cleanly. Now also run an ansible-syntax check just to be safe.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+ansible syntax check if available
+
+```bash
+if command -v ansible-playbook &>/dev/null || [[ -x ~/.local/bin/ansible-playbook ]]; then
+  cd /Users/daviddwlee84/.local/share/chezmoi/dot_ansible 2>/dev/null
+  PLAYBOOK_BIN="$(command -v ansible-playbook 2>/dev/null || echo ~/.local/bin/ansible-playbook)"
+  "$PLAYBOOK_BIN" --syntax-check playbooks/linux.yml 2>&1 | tail -10
+else
+  echo "ansible not installed locally — skipping syntax check (sanity already passed via yaml)"
+fi
+```
+
+```text
+  exit 0
+fi
+yum install -y "${missing[@]}"
+Origin: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml:60:3
+
+58 # do ship dnf, but using yum CLI works on both — see
+59 # pitfalls/centos7-ansible-yum-dnf-backend.md.
+60 - name: Install base packages (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
+     ^ column 3
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:43:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full ansible syntax check output
+
+`~/.local/bin/ansible-playbook --syntax-check playbooks/linux.yml 2>&1 | head -40`
+
+```text
+[ERROR]: Error loading tasks: failed at splitting arguments, either an unbalanced jinja2 block or quotes: set -e
+pkgs=(git git-lfs curl wget jq tree gcc gcc-c++ make)
+missing=()
+for p in "${pkgs[@]}"; do
+  rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+done
+if [ ${#missing[@]} -eq 0 ]; then
+  echo "ALL_INSTALLED"
+  exit 0
+fi
+yum install -y "${missing[@]}"
+Origin: /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml:60:3
+
+58 # do ship dnf, but using yum CLI works on both — see
+59 # pitfalls/centos7-ansible-yum-dnf-backend.md.
+60 - name: Install base packages (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
+     ^ column 3
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:17Z)**_
+
+ansible's Jinja2 templating mistakes `${#missing[@]}` for a Jinja2 comment block (`{#...#}`). Need to avoid `${#...}` syntax in shell blocks.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:23Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/base/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/ruby_gem_tools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:37Z)**_
+
+Now update the pitfall doc to mention the Jinja2 trap (it's a real gotcha worth recording).
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/pitfalls/centos7-ansible-yum-dnf-backend.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:44:59Z)**_
+
+Re-run ansible syntax check.
+
+_**Agent (claude-opus-4-7 2026-05-07 08:45:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-run ansible syntax check
+
+`~/.local/bin/ansible-playbook --syntax-check playbooks/linux.yml 2>&1 | tail -5`
+
+```text
+playbook: playbooks/linux.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:45:05Z)**_
+
+Syntax check passes. Final verification + show changes:
+
+_**Agent (claude-opus-4-7 2026-05-07 08:45:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Summary of all changes
+
+`git status --short && echo "---" && git diff --stat`
+
+```text
+ M ../.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl
+ M ../.specstory/history/2026-05-07_04-33-34Z-linuxbrew-create-new-user.md
+ M roles/base/tasks/main.yml
+ M roles/bash/tasks/main.yml
+ M roles/ruby_gem_tools/tasks/main.yml
+ M roles/zsh/tasks/main.yml
+ M ../dot_config/shell/00_exports.sh.tmpl
+ M ../run_once_before_00_bootstrap.sh.tmpl
+?? ../pitfalls/centos7-ansible-yum-dnf-backend.md
+---
+ .../run_onchange_after_20_ansible_roles.sh.tmpl    |   10 +-
+ ...26-05-07_04-33-34Z-linuxbrew-create-new-user.md | 2749 +++++++++++++++++++-
+ dot_ansible/roles/base/tasks/main.yml              |   42 +-
+ dot_ansible/roles/bash/tasks/main.yml              |   18 +-
+ dot_ansible/roles/ruby_gem_tools/tasks/main.yml    |   26 +-
+ dot_ansible/roles/zsh/tasks/main.yml               |   18 +-
+ dot_config/shell/00_exports.sh.tmpl                |   10 +-
+ run_once_before_00_bootstrap.sh.tmpl               |   74 +-
+ 8 files changed, 2834 insertions(+), 113 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 08:45:31Z)**_
+
+All changes look right. Commit message:
+
+```
+ansible+bootstrap: CentOS 7 fixes — yum→shell, mise glibc detect, brew guard
+
+Three independent CentOS 7 traps surfaced in this debugging session;
+each has a separate fix in this commit.
+
+1. ansible.builtin.yum: aborts on CentOS 7 (no dnf binary)
+   ansible-core 2.18+ collapsed the yum module into a wrapper that
+   routes through the dnf module backend. CentOS 7 has no /usr/bin/dnf
+   so every yum task fails with "Could not detect dnf revision". Switch
+   the four yum tasks (base, zsh, bash, ruby_gem_tools) to
+   ansible.builtin.shell invoking yum CLI + rpm -q for idempotency.
+   Works on both CentOS 7 (yum 3.x) and Rocky/Alma 8+ (yum is a dnf
+   shim). Documented in pitfalls/centos7-ansible-yum-dnf-backend.md
+   including the Jinja2 ${#array[@]} → {# ... #} comment-trap that bit
+   the first attempt.
+
+2. mise glibc-2.17 incompat → prefer musl directly
+   bootstrap previously tried curl|sh (glibc binary) → direct download
+   (glibc binary, 120s timeout) → musl. On CentOS 7 the first two
+   always fail (binary won't run on glibc 2.17), and a flaky proxy
+   makes the second curl time out, so the musl fallback never gets
+   reached. Now detect glibc < 2.28 via `ldd --version` + awk and
+   jump straight to the musl variant.
+
+3. brew shellenv guard tightened
+   `[[ -d /home/linuxbrew/.linuxbrew ]]` → `[[ -x .../bin/brew ]]` in
+   three places (dot_config/shell/00_exports.sh.tmpl, bootstrap.tmpl
+   x2, ansible_roles.tmpl). A failed Homebrew installer leaves the
+   /home/linuxbrew/.linuxbrew/ tree behind without the brew binary
+   (sudo'd by the installer before curl checked), so the dir-only
+   check made every shell start print "No such file or directory".
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+```
+
+HEREDOC for one-shot:
+
+```bash
+git add dot_ansible/roles/base/tasks/main.yml \
+        dot_ansible/roles/zsh/tasks/main.yml \
+        dot_ansible/roles/bash/tasks/main.yml \
+        dot_ansible/roles/ruby_gem_tools/tasks/main.yml \
+        dot_config/shell/00_exports.sh.tmpl \
+        run_once_before_00_bootstrap.sh.tmpl \
+        .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl \
+        pitfalls/centos7-ansible-yum-dnf-backend.md \
+        .specstory/history/2026-05-07_04-33-34Z-linuxbrew-create-new-user.md
+
+git commit -m "$(cat <<'EOF'
+ansible+bootstrap: CentOS 7 fixes — yum→shell, mise glibc detect, brew guard
+
+Three independent CentOS 7 traps surfaced in this debugging session;
+each has a separate fix in this commit.
+
+1. ansible.builtin.yum: aborts on CentOS 7 (no dnf binary)
+   ansible-core 2.18+ collapsed the yum module into a wrapper that
+   routes through the dnf module backend. CentOS 7 has no /usr/bin/dnf
+   so every yum task fails with "Could not detect dnf revision". Switch
+   the four yum tasks (base, zsh, bash, ruby_gem_tools) to
+   ansible.builtin.shell invoking yum CLI + rpm -q for idempotency.
+   Works on both CentOS 7 (yum 3.x) and Rocky/Alma 8+ (yum is a dnf
+   shim). Documented in pitfalls/centos7-ansible-yum-dnf-backend.md
+   including the Jinja2 \${#array[@]} → {# ... #} comment-trap that bit
+   the first attempt.
+
+2. mise glibc-2.17 incompat → prefer musl directly
+   bootstrap previously tried curl|sh (glibc binary) → direct download
+   (glibc binary, 120s timeout) → musl. On CentOS 7 the first two
+   always fail (binary won't run on glibc 2.17), and a flaky proxy
+   makes the second curl time out, so the musl fallback never gets
+   reached. Now detect glibc < 2.28 via \`ldd --version\` + awk and
+   jump straight to the musl variant.
+
+3. brew shellenv guard tightened
+   \`[[ -d /home/linuxbrew/.linuxbrew ]]\` → \`[[ -x .../bin/brew ]]\` in
+   three places (dot_config/shell/00_exports.sh.tmpl, bootstrap.tmpl
+   x2, ansible_roles.tmpl). A failed Homebrew installer leaves the
+   /home/linuxbrew/.linuxbrew/ tree behind without the brew binary
+   (sudo'd by the installer before curl checked), so the dir-only
+   check made every shell start print "No such file or directory".
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+跑 ansible-syntax-check 通過了。你 push 後 server 端 `chezmoi update --apply` 就會把這三個修法拿到。

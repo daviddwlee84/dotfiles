@@ -22,13 +22,23 @@
     name: gawk
     state: present
 
-- name: Install gawk (RedHat/CentOS) — required by ble.sh Makefile
+# yum CLI instead of `ansible.builtin.yum:` so this works on CentOS 7
+# (no dnf binary) — see pitfalls/centos7-ansible-yum-dnf-backend.md.
+- name: Install gawk (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
   when: ansible_facts["os_family"] == "RedHat"
   become: true
   tags: [sudo]
-  ansible.builtin.yum:
-    name: gawk
-    state: present
+  ansible.builtin.shell: |
+    set -e
+    if rpm -q gawk >/dev/null 2>&1; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y gawk
+  args:
+    executable: /bin/bash
+  register: gawk_yum_result
+  changed_when: "'ALL_INSTALLED' not in gawk_yum_result.stdout"
   ignore_errors: true
 
 - name: Install gawk (macOS) — required by ble.sh Makefile
