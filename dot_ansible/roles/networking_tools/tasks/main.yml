@@ -43,9 +43,9 @@
 # Linux (Debian/Ubuntu)
 # =============================================================================
 
-# --- apt packages (system-level) ---
+# --- system-level packages (apt) ---
 - name: Install networking tools from apt (Debian/Ubuntu)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_pkg_mgr == "apt"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -58,9 +58,34 @@
       - tcpdump
     state: present
 
+# --- system-level packages (yum/CentOS 7+) ---
+# yum CLI for CentOS 7 compat — see pitfalls/centos7-ansible-yum-dnf-backend.md
+- name: Install networking tools from yum (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    set -e
+    missing=()
+    for p in nmap arp-scan mtr iperf3 tcpdump; do
+      rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    # NOTE: httpie is in EPEL on CentOS 7 and pip-installed via uv elsewhere
+    # if missing, so we skip it here to avoid hard-requiring EPEL.
+    if [ -z "${missing[*]:-}" ]; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y "${missing[@]}"
+  args:
+    executable: /bin/bash
+  register: networking_yum_result
+  changed_when: "'ALL_INSTALLED' not in networking_yum_result.stdout"
+  ignore_errors: true
+
 # --- Architecture mapping for GitHub release downloads ---
 - name: Set networking tools release architecture
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.set_fact:
     net_arch_deb: >-
       {{
@@ -71,7 +96,7 @@
 
 # --- doggo (modern DNS lookup) ---
 - name: Check if doggo is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: doggo --version
   register: doggo_check
   changed_when: false
@@ -79,7 +104,7 @@
 
 - name: Install doggo from GitHub releases (Debian/Ubuntu)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - doggo_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -173,7 +198,7 @@
 
 # --- gping (graphical ping) ---
 - name: Check if gping is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: gping --version
   register: gping_check
   changed_when: false
@@ -181,7 +206,7 @@
 
 - name: Install gping from GitHub releases (Debian/Ubuntu)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gping_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -237,7 +262,7 @@
 
 # --- trippy (TUI traceroute) ---
 - name: Check if trippy is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: trip --version
   register: trippy_check
   changed_when: false
@@ -245,7 +270,7 @@
 
 - name: Set trippy target mappings
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - trippy_check.rc != 0
   ansible.builtin.set_fact:
     trippy_gnu_target: >-
@@ -265,7 +290,7 @@
 
 - name: Skip trippy on unsupported architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - trippy_check.rc != 0
     - trippy_gnu_target | trim == '' or trippy_musl_target | trim == ''
   ansible.builtin.debug:
@@ -276,7 +301,7 @@
   # compiled on modern CI can require a glibc newer than Jammy's 2.35 and fail
   # to start. Upstream ships musl builds for x86_64, aarch64, and armv7.
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - trippy_check.rc != 0
   become: true
   tags: [sudo]
@@ -350,7 +375,7 @@
 
 # --- trippy (user-level fallback) ---
 - name: Re-check if trippy is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v trip
   register: trippy_recheck
   changed_when: false
@@ -358,7 +383,7 @@
 
 - name: Install trippy from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - trippy_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (trippy)
@@ -436,7 +461,7 @@
 
 # --- bandwhich (bandwidth monitor) ---
 - name: Check if bandwhich is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: bandwhich --version
   register: bandwhich_check
   changed_when: false
@@ -444,7 +469,7 @@
 
 - name: Install bandwhich from GitHub releases (Debian/Ubuntu)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - bandwhich_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -494,7 +519,7 @@
 
 # --- Ookla Speedtest CLI ---
 - name: Check if speedtest is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: speedtest --version
   register: speedtest_check
   changed_when: false
@@ -502,7 +527,7 @@
 
 - name: Install Ookla Speedtest CLI (Debian/Ubuntu)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - speedtest_check.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (speedtest)
@@ -555,7 +580,7 @@
 
 # --- rustscan (fast port scanner) ---
 - name: Check if rustscan is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: rustscan --version
   register: rustscan_check
   changed_when: false
@@ -563,7 +588,7 @@
 
 - name: Install rustscan from GitHub releases (Debian/Ubuntu)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - rustscan_check.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (rustscan)

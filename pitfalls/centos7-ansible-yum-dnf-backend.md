@@ -122,6 +122,36 @@ Fixes that all work:
 Same trap applies to `${#var}` (string length) anywhere in `shell:` /
 `command:` blocks. Either avoid the syntax or use `{% raw %}`.
 
+### Companion trap: apostrophes in shell-block comments
+
+While porting more roles to the yum-CLI pattern, a sister trap surfaced.
+ansible's `shell: |` block aborts with the same "unbalanced jinja2 block
+or quotes" error when a comment line contains an English contraction:
+
+```yaml
+ansible.builtin.shell: |
+  set -e
+  # We don't install it here to avoid X
+  yum install -y foo
+```
+
+The apostrophe in `don't` is the culprit. Jinja2 parses the YAML scalar
+looking for closing quotes; an unmatched `'` makes it run off the end.
+Bash itself doesn't care (apostrophes inside `#` comments are
+harmless), but ansible's Jinja2 pass happens BEFORE the script reaches
+bash.
+
+Fixes (any of):
+- Rephrase to avoid contractions: `# We do not install it...`
+- Use double quotes around: `"don't"` (still apostrophe but at least
+  paired)
+- Move the comment OUT of the shell block (into the YAML preamble
+  `# above the task)
+- Wrap the whole shell block in `{% raw %}{% endraw %}`
+
+This repo prefers rewriting comments to avoid contractions because the
+other options have their own readability/maintenance costs.
+
 Why this works on **both** CentOS 7 and Rocky/Alma 8+:
 
 - CentOS 7: `yum` is the real package manager (yum 3.x, Python 2 era).

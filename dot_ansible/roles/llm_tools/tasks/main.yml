@@ -30,7 +30,7 @@
     state: present
 
 - name: Install llmfit via official local installer (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: |
     curl -fsSL https://llmfit.axjns.dev/install.sh | sh -s -- --local
   args:
@@ -47,7 +47,7 @@
     msg: "llmfit installation failed (likely network timeout) - skipping"
 
 - name: Check if Homebrew is available
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which brew
   register: llm_tools_brew_check
   changed_when: false
@@ -61,7 +61,7 @@
 
 - name: Check if models formula is available in Homebrew (Linuxbrew)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - llm_tools_brew_check.rc == 0
   ansible.builtin.command: brew info models
   register: llm_tools_models_brew_info
@@ -70,7 +70,7 @@
 
 - name: Install models via Homebrew (Linuxbrew)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - llm_tools_brew_check.rc == 0
     - llm_tools_models_brew_info.rc == 0
   community.general.homebrew:
@@ -79,7 +79,7 @@
 
 - name: Install models via cargo fallback (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - llm_tools_brew_check.rc != 0 or (llm_tools_models_brew_info is defined and llm_tools_models_brew_info.rc != 0)
   ansible.builtin.command: cargo install modelsdev
   args:
@@ -96,7 +96,7 @@
     state: present
 
 - name: Check if Ollama is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: ollama --version
   register: llm_tools_ollama_linux_check
   changed_when: false
@@ -104,7 +104,7 @@
 
 - name: Warn that Ollama is skipped in noRoot mode
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - llm_tools_no_root | bool
     - llm_tools_ollama_linux_check.rc != 0
   ansible.builtin.debug:
@@ -112,7 +112,7 @@
 
 - name: Install Ollama via official installer (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - not (llm_tools_no_root | bool)
     - llm_tools_ollama_linux_check.rc != 0
   become: true

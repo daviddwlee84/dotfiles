@@ -21,14 +21,14 @@
 
 # Linux - download from GitHub releases
 - name: Ensure fonts directory exists (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.file:
     path: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
     state: directory
     mode: '0755'
 
 - name: Check if Hack Nerd Font is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.find:
     paths: "{{ ansible_facts.env.HOME }}/.local/share/fonts"
     patterns: "HackNerdFont*.ttf"
@@ -36,15 +36,34 @@
 
 - name: Download and install Hack Nerd Font (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - hack_font_check.matched == 0
   block:
-    - name: Install fontconfig for fc-cache
+    - name: Install fontconfig for fc-cache (apt)
+      when: ansible_pkg_mgr == "apt"
       become: true
       ansible.builtin.apt:
         name: fontconfig
         state: present
       tags: [sudo]
+
+    # yum CLI for CentOS 7 compat — see pitfalls/centos7-ansible-yum-dnf-backend.md
+    - name: Install fontconfig for fc-cache (RedHat/CentOS)
+      when: ansible_facts["os_family"] == "RedHat"
+      become: true
+      tags: [sudo]
+      ansible.builtin.shell: |
+        set -e
+        if rpm -q fontconfig >/dev/null 2>&1; then
+          echo "ALL_INSTALLED"
+          exit 0
+        fi
+        yum install -y fontconfig
+      args:
+        executable: /bin/bash
+      register: fontconfig_yum_result
+      changed_when: "'ALL_INSTALLED' not in fontconfig_yum_result.stdout"
+      ignore_errors: true
 
     - name: Download Hack Nerd Font
       ansible.builtin.get_url:
