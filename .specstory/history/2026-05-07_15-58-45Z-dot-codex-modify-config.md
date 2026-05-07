@@ -5935,4 +5935,630 @@ for i in 1 2 3 4 5; do
 done
 exit 1
 ```
+```
+Chunk ID: b92ad4
+Wall time: 0.3690 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
 </details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:44:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git commit -m "fix: remove invalid codex provider override"`</summary>
+```
+Chunk ID: f44143
+Wall time: 0.7541 seconds
+Process exited with code 0
+Original token count: 344
+Output:
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778197486-86087.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778197486-86087.
+[main a9db046] fix: remove invalid codex provider override
+ 8 files changed, 1037 insertions(+), 82 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:44:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: b2034b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 18
+Output:
+ M .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:44:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git show --stat --oneline --no-renames HEAD`</summary>
+```
+Chunk ID: 99af13
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 155
+Output:
+a9db046 fix: remove invalid codex provider override
+ ...2026-05-07_15-58-45Z-dot-codex-modify-config.md | 1014 ++++++++++++++++++++
+ README.md                                          |    2 +-
+ docs/tools/agent-overlays.md                       |   10 +-
+ docs/tools/agent-overlays.zh-TW.md                 |   10 +-
+ docs/tools/mirrors.md                              |    1 -
+ docs/tools/mirrors.zh-TW.md                        |    1 -
+ dot_codex/modify_config.toml.tmpl                  |   53 +-
+ tests/unit/agent_overlays.bats                     |   28 +-
+ 8 files changed, 1037 insertions(+), 82 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:44:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "model_providers|stream_max_retries|websocket_connect_timeout_ms|supports_websockets" ~/.codex/config.toml || true`</summary>
+```
+Chunk ID: 964f22
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:45:05Z)**_
+
+Fixed and applied.
+
+`~/.codex/config.toml` no longer contains `[model_providers.openai]`, and these parse checks now pass:
+
+- `codex debug models --bundled`
+- `codex features list`
+- `codex debug prompt-input 'parse smoke'`
+
+I also committed the repo repair as `a9db046 fix: remove invalid codex provider override`. The fix removes the invalid persisted provider override path, prunes stale `[model_providers.openai]` tables from live config, and updates tests/docs to reflect that Codex rejects built-in provider overrides in `config.toml`.
+
+Only remaining dirty state is the active SpecStory transcript tail continuing to update after the commit.
+
+---
+
+_**User (2026-05-07 23:49:29Z)**_
+
+以後牽涉改對應app的config 條件允許（例如app本身有支援check/validate syntax等等的）就必須要驗證能正確讀到才能宣佈修改完畢 而有些syntax正確但runtime才能發現錯誤者 只要跑起來不影響原系統 最好都有測試run （可以考慮在 /tmp 等地方測試之類的） 因為經常ansible playbook的yaml看起來沒問題 其實一跑就會掛 這些請更新到 AGENTS.md
+
+---
+
+_**Agent (gpt-5.5 2026-05-07 23:49:41Z)**_
+
+I’ll update the repo contract in `AGENTS.md` with a validation invariant for app configs and runtime-only failures. I’ll first inspect the surrounding sections so the new rule lands in the right place without duplicating existing testing guidance.
+
+_**Agent (gpt-5.5 2026-05-07 23:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "validate|syntax|runtime|ansible|config|test|AGENTS|CLAUDE|GEMINI" AGENTS.md CLAUDE.md GEMINI.md README.md docs/this_repo/testing.md -S`</summary>
+```
+Chunk ID: 9daab7
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 17702
+Output:
+Total output lines: 335
+
+GEMINI.md:3:Cross-platform dotfiles managed by **chezmoi** (configs) + **ansible** (system deps). This file is the agent-facing contract: maintenance rules, hard invariants, and pointers to docs. User-facing intro is in [README.md](README.md).
+GEMINI.md:13:When adding/modifying configurations, update [README.md](README.md):
+GEMINI.md:15:- **New config files** → "What You Get > Config Files" section
+GEMINI.md:16:- **New ansible roles/tools** → "What You Get > Tools" section
+GEMINI.md:30:3. Run `uv run mkdocs build --strict` locally to catch broken links / stale anchors. If you're adding *external*-relative links (to `dot_config/…`, `pitfalls/…`, `backlog/…`), the `validation.links.not_found: info` config tolerates them — that's intentional, don't tighten it without cleaning up the ~20 known anchor-drift cases tracked in [`backlog/mkdocs-anchor-drift.md`](backlog/mkdocs-anchor-drift.md) first.
+GEMINI.md:39:| `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` | Agent-operational contract; `docs/for-maintainers.md` references it |
+GEMINI.md:47:When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/`, `dot_config/bash/`, or `dot_config/shell/` file, update [`docs/shells/aliases.md`](docs/shells/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), shell scope (`zsh`/`bash`/`both`), and a one-line description.
+GEMINI.md:51:- `dot_config/shell/*.sh` (or `*.sh.tmpl`) — POSIX-portable env / PATH / aliases / functions usable by **both** zsh and bash. Source-time shell detection via `$ZSH_VERSION` / `$BASH_VERSION` is OK; zsh-only constructs (ZLE widgets, `read -q`, `${m:t}`, glob qualifiers, `setopt`, `compdef`) are NOT — keep them out so bash doesn't error on source.
+GEMINI.md:52:- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — zsh-only. ZLE widgets (aisuggest, tools_picker, television, sesh-sessions), `compdef`-driven completions, anything calling `bindkey`, `zsh-vi-mode` hooks.
+GEMINI.md:53:- `dot_config/bash/*.bash` — bash-only. `bind -x` / `ble-bind`-driven keybindings, oh-my-bash plugin / completion / alias arrays, bash-specific `shopt`s.
+GEMINI.md:55:When porting a zsh-only helper to bash via ble.sh's `ble-bind`, prefer extracting the shell-agnostic backend (the function that produces the shell command string) into `dot_config/shell/` and keeping each shell's widget binding in its own dir.
+GEMINI.md:57:For broader context on the conventions this repo uses (XDG vs `.d/` drop-ins vs hybrid loaders, override layers via `*.local` / `*.adhoc` / skel files, chezmoi prefixes, login vs interactive shell loading) see [`docs/this_repo/config-conventions.md`](docs/this_repo/config-conventions.md). New contributors / agents adding non-shell config files should skim that page first to know which convention applies.
+GEMINI.md:59:### `gui_apps_linux` ansible role → `docs/playbooks/linux-gui-apps.md`
+GEMINI.md:61:When adding/modifying/removing a Linux GUI app in [`dot_ansible/roles/gui_apps_linux/tasks/main.yml`](dot_ansible/roles/gui_apps_linux/tasks/main.yml), update the **Inventory** table in [`docs/playbooks/linux-gui-apps.md`](docs/playbooks/linux-gui-apps.md). The playbook is the single source of truth for the per-app mechanism / auto-update story, and is the first thing a maintainer (or agent) should read before adding a new app — it contains the `.deb` / Snap / Flatpak / AppImage decision tree and the concrete copy-paste patterns. Read it first; update it in the same commit.
+GEMINI.md:75:SpecStory transcripts and coding-agent plan files commonly paste shell output, config snippets, or `.env` values that may contain secrets. Four directories are auto-scanned/redacted:
+GEMINI.md:90:When adding/modifying keybindings in any tool config, cross-check against other tools — multiple tools share the terminal's key namespace, especially `Ctrl+` and `Alt+`.
+GEMINI.md:94:| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch); `prefix + a` (live agent panes picker — `tv agent-panes`, see [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)) |
+GEMINI.md:95:| Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
+GEMINI.md:96:| Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
+GEMINI.md:97:| Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
+GEMINI.md:98:| Ghostty | `dot_config/ghostty/config` | `macos-option-as-alt` affects `Alt+` availability |
+GEMINI.md:99:| zsh ZLE widgets | `dot_config/zsh/tools/{11_tools_picker,12_television,22_sesh,05_aisuggest}.zsh` | `Alt+T/R/P/G/E/A/I/S` (pickers), `Alt+;` (aisuggest, configurable via `AISUGGEST_KEY`); rebound from `zvm_after_init` in `
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,220p' AGENTS.md`</summary>
+```
+Chunk ID: b665f4
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 4872
+Output:
+# Dotfiles Repository — Agent Contract
+
+Cross-platform dotfiles managed by **chezmoi** (configs) + **ansible** (system deps). This file is the agent-facing contract: maintenance rules, hard invariants, and pointers to docs. User-facing intro is in [README.md](README.md).
+
+> **Headroom rule**: keep this file under ~30k chars. Push handbook content into `docs/`; keep only edit rules and cross-file invariants here.
+
+## Cross-file maintenance rules
+
+When you change one of these surfaces, update the listed mirror file in the same commit. These are the rules most often forgotten.
+
+### README.md
+
+When adding/modifying configurations, update [README.md](README.md):
+
+- **New config files** → "What You Get > Config Files" section
+- **New ansible roles/tools** → "What You Get > Tools" section
+- **New platforms** → "Supported Platforms" table
+- **Changed setup steps** → "Quick Setup" section
+
+Keep README.md concise and user-focused. Technical details belong here or in `docs/`.
+
+### `docs/` + MkDocs site → `mkdocs.yml` nav
+
+`docs/` is published to **<https://daviddwlee84.github.io/dotfiles/>** via a MkDocs Material site (auto-deployed by [`.github/workflows/docs.yml`](.github/workflows/docs.yml) on push-to-main when `docs/**`, `mkdocs.yml`, `pyproject.toml`, or `uv.lock` changes). Source of truth remains the `.md` files in the repo; the site is a renderer.
+
+Any time you **add a new `docs/**/*.md` file**:
+
+1. Add a nav entry in [`mkdocs.yml`](mkdocs.yml) under the matching top-level section (Tools / Zsh / Neovim / This Repo / Infrastructure / Tutorials / Input methods / Misc). Alphabetical within a section unless there's a narrative order.
+2. Cross-link from related pages if applicable (e.g., a new `docs/tools/foo.md` probably wants a mention in `docs/tools/tmux/README.md` or `docs/tools/sesh.md` if relevant).
+3. Run `uv run mkdocs build --strict` locally to catch broken links / stale anchors. If you're adding *external*-relative links (to `dot_config/…`, `pitfalls/…`, `backlog/…`), the `validation.links.not_found: info` config tolerates them — that's intentional, don't tighten it without cleaning up the ~20 known anchor-drift cases tracked in [`backlog/mkdocs-anchor-drift.md`](backlog/mkdocs-anchor-drift.md) first.
+
+The `.claude/skills/mkdocs-site-bootstrap/scripts/add-docs-page.sh` helper can create a new page + insert the nav entry in one shot, but hand-editing `mkdocs.yml` is also fine as long as strict build passes.
+
+**What does NOT belong in `docs/`** (stays at repo root, NOT in MkDocs nav):
+
+| Surface | Why |
+|---|---|
+| `README.md` | Canonical GitHub landing page; `docs/index.md` links to it (no duplication, no snippet copy) |
+| `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` | Agent-operational contract; `docs/for-maintainers.md` references it |
+| `TODO.md`, `backlog/`, `pitfalls/` | Dynamic maintainer surfaces; `docs/for-maintainers.md` references them via absolute GitHub URLs (reference, not copy) |
+| `NOTES.md` | User's personal WIP notes |
+
+All four categories are **referenced** from [`docs/for-maintainers.md`](docs/for-maintainers.md) via absolute GitHub URLs — do not add them to `mkdocs.yml` nav or include them via `pymdownx.snippets`. The "reference yes, copy no" rule avoids drift between the site and the live repo root.
+
+### Custom aliases & shell functions → `docs/shells/aliases.md`
+
+When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/`, `dot_config/bash/`, or `dot_config/shell/` file, update [`docs/shells/aliases.md`](docs/shells/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), shell scope (`zsh`/`bash`/`both`), and a one-line description.
+
+**Place new helpers in the right tier:**
+
+- `dot_config/shell/*.sh` (or `*.sh.tmpl`) — POSIX-portable env / PATH / aliases / functions usable by **both** zsh and bash. Source-time shell detection via `$ZSH_VERSION` / `$BASH_VERSION` is OK; zsh-only constructs (ZLE widgets, `read -q`, `${m:t}`, glob qualifiers, `setopt`, `compdef`) are NOT — keep them out so bash doesn't error on source.
+- `dot_config/zsh/*.zsh` (or `tools/*.zsh`) — zsh-only. ZLE widgets (aisuggest, tools_picker, television, sesh-sessions), `compdef`-driven completions, anything calling `bindkey`, `zsh-vi-mode` hooks.
+- `dot_config/bash/*.bash` — bash-only. `bind -x` / `ble-bind`-driven keybindings, oh-my-bash plugin / completion / alias arrays, bash-specific `shopt`s.
+
+When porting a zsh-only helper to bash via ble.sh's `ble-bind`, prefer extracting the shell-agnostic backend (the function that produces the shell command string) into `dot_config/shell/` and keeping each shell's widget binding in its own dir.
+
+For broader context on the conventions this repo uses (XDG vs `.d/` drop-ins vs hybrid loaders, override layers via `*.local` / `*.adhoc` / skel files, chezmoi prefi
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ls -l AGENTS.md CLAUDE.md GEMINI.md`</summary>
+```
+Chunk ID: b79e06
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 55
+Output:
+lrwxr-xr-x@ 1 daviddwlee84  staff      9 Feb  3 18:00 AGENTS.md -> CLAUDE.md
+-rw-r--r--@ 1 daviddwlee84  staff  28397 May  7 19:05 CLAUDE.md
+lrwxr-xr-x@ 1 daviddwlee84  staff      9 Feb  5 15:44 GEMINI.md -> CLAUDE.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:49:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: d23a58
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 18
+Output:
+ M .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:49:54Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Updating agents**
+
+It looks like they requested an update for the AGENTS, which I believe means I might just need to edit. I don’t think staging is necessary here. I should mention and inspect the relevant line numbers afterward. Also, there’s a prior uncommitted transcript to note, but I don't need to touch that. So, I’ll go ahead and apply the patch as needed. Let’s keep things moving!
+</details></think>
+
+_**Agent (gpt-5.5 2026-05-07 23:49:54Z)**_
+
+`AGENTS.md` is a symlink to `CLAUDE.md`, and `GEMINI.md` is the same symlink target, so editing `CLAUDE.md` updates all three agent contracts at once. I’m adding this as a hard invariant, because it is a repo-wide safety rule rather than a one-off Codex rule.
+
+_**Agent (gpt-5.5 2026-05-07 23:50:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md`**
+
+```diff
+@@
+ ## Hard repo invariants
+ 
++### Validate app configs with the app, not just syntax
++
++When changing a managed config for an app/tool, successful template rendering
++or YAML/TOML/JSON syntax is not enough. If the app exposes a config check,
++parser, dry-run, or debug command, run it against the rendered/applied config
++before declaring the change done.
++
++Hard rules:
++
++- For `modify_` / templated app configs, render or apply the specific target
++  and then run the app's own loader when available (examples: `codex debug …`
++  for `~/.codex/config.toml`, `tmux source-file`/`display-menu` smoke for tmux,
++  `mkdocs build --strict` for MkDocs changes).
++- If syntax can pass but runtime can still fail, run a harmless smoke test in
++  an isolated location when possible (`/tmp`, temp `$HOME`, temp config file,
++  `--dry-run`, `--check`, or app-specific debug mode). The test should prove
++  the original system still starts/loads, not just that the file parses.
++- For Ansible, `--syntax-check` is only a first pass. If a changed task/role can
++  fail at execution time, also run the narrowest practical play/tag/check-mode
++  or container smoke that exercises that task without unintended upgrades or
++  broad system mutation.
++- If a validator/smoke cannot be run, say that explicitly in the final report
++  and name the missing command, dependency, host, or credential.
++
+ ### `primaryShell` choice gates `chsh` only — both shells always deploy
+ 
+ The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) **only governs which shell `chsh` switches to as the login shell**. Both `~/.zshrc` and `~/.bashrc` (plus `~/.config/zsh/`, `~/.config/bash/`, `~/.config/shell/`) deploy on every host regardless of choice. This is intentional: users routinely drop into the other shell ad-hoc (`bash` for a quirky script, `zsh` for `.zshrc` debugging on a bash-primary box), and having both work is cheap.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:14Z)**_
+
+The invariant is in place. I’m checking the symlink view and basic diff sanity now; I won’t touch the active SpecStory transcript.
+
+_**Agent (gpt-5.5 2026-05-07 23:50:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '155,220p' AGENTS.md`</summary>
+```
+Chunk ID: ac2587
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1395
+Output:
+| Desktop vs headless (user role) | `.profile` — `ubuntu_desktop` / `ubuntu_server`; macOS side covered by `eq .chezmoi.os "darwin"` |
+
+Profile values are intentionally limited to `macos`, `ubuntu_desktop`, `ubuntu_server`. **Do not** introduce new profile values for OS/arch facts (the historical `macos_intel` profile was removed for exactly this reason).
+
+Full decision table, before/after examples, and the `macos_intel` migration snippet: [docs/tools/chezmoi-templating.md](docs/tools/chezmoi-templating.md).
+
+## Hard repo invariants
+
+### Validate app configs with the app, not just syntax
+
+When changing a managed config for an app/tool, successful template rendering
+or YAML/TOML/JSON syntax is not enough. If the app exposes a config check,
+parser, dry-run, or debug command, run it against the rendered/applied config
+before declaring the change done.
+
+Hard rules:
+
+- For `modify_` / templated app configs, render or apply the specific target
+  and then run the app's own loader when available (examples: `codex debug …`
+  for `~/.codex/config.toml`, `tmux source-file`/`display-menu` smoke for tmux,
+  `mkdocs build --strict` for MkDocs changes).
+- If syntax can pass but runtime can still fail, run a harmless smoke test in
+  an isolated location when possible (`/tmp`, temp `$HOME`, temp config file,
+  `--dry-run`, `--check`, or app-specific debug mode). The test should prove
+  the original system still starts/loads, not just that the file parses.
+- For Ansible, `--syntax-check` is only a first pass. If a changed task/role can
+  fail at execution time, also run the narrowest practical play/tag/check-mode
+  or container smoke that exercises that task without unintended upgrades or
+  broad system mutation.
+- If a validator/smoke cannot be run, say that explicitly in the final report
+  and name the missing command, dependency, host, or credential.
+
+### `primaryShell` choice gates `chsh` only — both shells always deploy
+
+The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) **only governs which shell `chsh` switches to as the login shell**. Both `~/.zshrc` and `~/.bashrc` (plus `~/.config/zsh/`, `~/.config/bash/`, `~/.config/shell/`) deploy on every host regardless of choice. This is intentional: users routinely drop into the other shell ad-hoc (`bash` for a quirky script, `zsh` for `.zshrc` debugging on a bash-primary box), and having both work is cheap.
+
+**Hard rules**:
+
+- Do **not** add `{{ if eq .primaryShell "zsh" }}` / `{{ if eq .primaryShell "bash" }}` gates around `dot_zshrc.tmpl`, `dot_bashrc.tmpl`, or any `dot_config/{shell,zsh,bash}/**` file. The other shell needs to keep working.
+- Do **not** gate the zsh / bash ansible roles' **package install** task on `primary_shell`. Both shells' packages install everywhere; only the **chsh** task is gated. Reason: even on bash-primary mac, `zsh` ad-hoc must work — and vice versa.
+- Do **not** rely on `$SHELL` to detect the running shell — it reflects the login shell from `/etc/passwd`, which can disagree with the actual interactive shell after `chsh` until next login. Use `$ZSH_VERSION` / `$BASH_VERSION` instead (source-time detection in shared `dot_config/shell/*.sh.tmpl` files).
+- macOS bash 5.x install (via the `bash` ansible role's `community.general.homebrew: name=bash`) and `/etc/shells` whitelist are gated on `primary_shell == "bash"` — zsh-primary mac users get zero extra brew formula. The same gate covers the `chsh` to brew bash.
+
+**Three-tier file placement** when adding a shell helper (see "Custom aliases & shell functions" rule above for the cross-file update obligation):
+
+| Tier | Dir | When |
+|---|---|---|
+| Shared | `dot_config/shell/` | POSIX subset; both shells source. Use `$ZSH_VERSION` / `$BASH_VERSION` for source-time dispatch when needed. |
+| Zsh-only | `dot_config/zsh/` | ZLE widgets, `compdef`, `bindkey`, `setopt`, `read -q`, `${m:t}`, glob qualifiers. |
+| Bash-only | `dot_config/bash/` | `bind -x` / `ble-bind`, OMB plugin arrays, bash-specific `shopt`s. |
+
+ble.sh + oh-my-bash on bash side: see [docs/shells/bash.md](docs/shells/bash.md) for the load-bearing 12-step init order in `dot_bashrc.tmpl`. Key invariants — `ble.sh --attach=none` MUST source before bash-preexec/starship; `ble-attach` MUST be the last call before secrets/adhoc; OMB's `autosuggestions` / `syntax-highlighting` / `history-substring-search` plugins MUST be excluded (ble.sh provides better natives, double-init causes flicker).
+
+### Install vs upgrade is split on purpose
+
+`chezmoi apply` (+ ansible phase) is deliberately **install-only**: roles use `state: present` / `creates:` so re-applying never silently bumps every tool. The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes.
+
+- **Do not** rewrite ansible roles to `state: latest`
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff --check -- CLAUDE.md`</summary>
+```
+Chunk ID: f1ed06
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `wc -c CLAUDE.md`</summary>
+```
+Chunk ID: 4173ab
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 5
+Output:
+   29728 CLAUDE.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: 20b5d7
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 21
+Output:
+ M .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+ M CLAUDE.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:23Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Clarifying updates and expectations**
+
+I need to provide a concise summary about the AGENTS symlink and mention that CLAUDE has been updated to under 30k (specifically 29728). It's important to clarify that there's no commit involved; I might say something like "not committed." I should also note that "AGENTS/GEMINI can see the same via symlink." I think that's a clear way to communicate everything!
+</details></think>
+
+_**Agent (gpt-5.5 2026-05-07 23:50:26Z)**_
+
+已更新 `AGENTS.md` 內容。實際檔案結構是 `AGENTS.md -> CLAUDE.md`、`GEMINI.md -> CLAUDE.md`，所以這次改在 [CLAUDE.md](/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md:163)，三個 agent contract 都會讀到同一條規則。
+
+新增 hard invariant：改 app/tool config 時不能只靠語法檢查；若 app 有 config check/parser/debug/dry-run，就必須用 rendered/applied config 跑 app 自己的 loader。對 runtime 才會爆的情況，要盡量用 `/tmp`、temp `$HOME`、temp config、`--check`/`--dry-run` 等方式做 harmless smoke。Ansible 也明確寫了 `--syntax-check` 只是第一步，必要時要跑最窄的 tag/check-mode/container smoke。
+
+驗證：`git diff --check -- CLAUDE.md` 通過；檔案大小 `29,728` bytes，仍低於 AGENTS headroom 的約 30k。未提交。
+
+---
+
+_**User (2026-05-07 23:52:43Z)**_
+
+git commit
+
+---
+
+_**Agent (gpt-5.5 2026-05-07 23:52:54Z)**_
+
+I’ll commit the new AGENTS/CLAUDE invariant and include the current SpecStory transcript snapshot with redaction, matching this repo’s agent-artifact policy.
+
+_**Agent (gpt-5.5 2026-05-07 23:52:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: 35f018
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 21
+Output:
+ M .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+ M CLAUDE.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:52:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff -- CLAUDE.md`</summary>
+```
+Chunk ID: 2d4203
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 541
+Output:
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 92c5f23..40e802b 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -160,6 +160,30 @@ Full decision table, before/after examples, and the `macos_intel` migration snip
+ 
+ ## Hard repo invariants
+ 
++### Validate app configs with the app, not just syntax
++
++When changing a managed config for an app/tool, successful template rendering
++or YAML/TOML/JSON syntax is not enough. If the app exposes a config check,
++parser, dry-run, or debug command, run it against the rendered/applied config
++before declaring the change done.
++
++Hard rules:
++
++- For `modify_` / templated app configs, render or apply the specific target
++  and then run the app's own loader when available (examples: `codex debug …`
++  for `~/.codex/config.toml`, `tmux source-file`/`display-menu` smoke for tmux,
++  `mkdocs build --strict` for MkDocs changes).
++- If syntax can pass but runtime can still fail, run a harmless smoke test in
++  an isolated location when possible (`/tmp`, temp `$HOME`, temp config file,
++  `--dry-run`, `--check`, or app-specific debug mode). The test should prove
++  the original system still starts/loads, not just that the file parses.
++- For Ansible, `--syntax-check` is only a first pass. If a changed task/role can
++  fail at execution time, also run the narrowest practical play/tag/check-mode
++  or container smoke that exercises that task without unintended upgrades or
++  broad system mutation.
++- If a validator/smoke cannot be run, say that explicitly in the final report
++  and name the missing command, dependency, host, or credential.
++
+ ### `primaryShell` choice gates `chsh` only — both shells always deploy
+ 
+ The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) **only governs which shell `chsh` switches to as the login shell**. Both `~/.zshrc` and `~/.bashrc` (plus `~/.config/zsh/`, `~/.config/bash/`, `~/.config/shell/`) deploy on every host regardless of choice. This is intentional: users routinely drop into the other shell ad-hoc (`bash` for a quirky script, `zsh` for `.zshrc` debugging on a bash-primary box), and having both work is cheap.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:52:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff --stat`</summary>
+```
+Chunk ID: 7fc620
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 49
+Output:
+ ...2026-05-07_15-58-45Z-dot-codex-modify-config.md | 580 +++++++++++++++++++--
+ CLAUDE.md                                          |  24 +
+ 2 files changed, 562 insertions(+), 42 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:52:59Z)**_
+
+The intended code/doc change is only `CLAUDE.md`; the active transcript is still moving, so I’ll stage a redacted snapshot and commit immediately after the staged secret check passes.
+
+_**Agent (gpt-5.5 2026-05-07 23:53:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```bash
+git add CLAUDE.md .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+for i in 1 2 3 4 5; do
+  ./scripts/redact_secrets.py --fix >/tmp/agents-contract-redact.log 2>&1 || exit 1
+  git add .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+  if ./scripts/redact_secrets.py >/tmp/agents-contract-check.log 2>&1; then
+    exit 0
+  fi
+done
+exit 1
+```
+```
+Chunk ID: 2a82c9
+Wall time: 1.4100 seconds
+Process exited with code 0
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:53:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git commit -m "docs: require runtime validation for app configs"`</summary>
+```
+Chunk ID: 555000
+Wall time: 1.5101 seconds
+Process exited with code 0
+Original token count: 340
+Output:
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778197990-11521.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778197990-11521.
+[main 1b6b975] docs: require runtime validation for app configs
+ 2 files changed, 575 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:53:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: e84003
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 18
+Output:
+ M .specstory/history/2026-05-07_15-58-45Z-dot-codex-modify-config.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:53:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git show --stat --oneline --no-renames HEAD`</summary>
+```
+Chunk ID: cb3a3a
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 59
+Output:
+1b6b975 docs: require runtime validation for app configs
+ ...2026-05-07_15-58-45Z-dot-codex-modify-config.md | 551 +++++++++++++++++++++
+ CLAUDE.md                                          |  24 +
+ 2 files changed, 575 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-05-07 23:53:22Z)**_
+
+Committed as `1b6b975 docs: require runtime validation for app configs`.
+
+Pre-commit passed. The only remaining dirty state is the active SpecStory transcript continuing to append after the commit snapshot.

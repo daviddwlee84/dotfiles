@@ -160,6 +160,30 @@ Full decision table, before/after examples, and the `macos_intel` migration snip
 
 ## Hard repo invariants
 
+### Validate app configs with the app, not just syntax
+
+When changing a managed config for an app/tool, successful template rendering
+or YAML/TOML/JSON syntax is not enough. If the app exposes a config check,
+parser, dry-run, or debug command, run it against the rendered/applied config
+before declaring the change done.
+
+Hard rules:
+
+- For `modify_` / templated app configs, render or apply the specific target
+  and then run the app's own loader when available (examples: `codex debug …`
+  for `~/.codex/config.toml`, `tmux source-file`/`display-menu` smoke for tmux,
+  `mkdocs build --strict` for MkDocs changes).
+- If syntax can pass but runtime can still fail, run a harmless smoke test in
+  an isolated location when possible (`/tmp`, temp `$HOME`, temp config file,
+  `--dry-run`, `--check`, or app-specific debug mode). The test should prove
+  the original system still starts/loads, not just that the file parses.
+- For Ansible, `--syntax-check` is only a first pass. If a changed task/role can
+  fail at execution time, also run the narrowest practical play/tag/check-mode
+  or container smoke that exercises that task without unintended upgrades or
+  broad system mutation.
+- If a validator/smoke cannot be run, say that explicitly in the final report
+  and name the missing command, dependency, host, or credential.
+
 ### `primaryShell` choice gates `chsh` only — both shells always deploy
 
 The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) **only governs which shell `chsh` switches to as the login shell**. Both `~/.zshrc` and `~/.bashrc` (plus `~/.config/zsh/`, `~/.config/bash/`, `~/.config/shell/`) deploy on every host regardless of choice. This is intentional: users routinely drop into the other shell ad-hoc (`bash` for a quirky script, `zsh` for `.zshrc` debugging on a bash-primary box), and having both work is cheap.
