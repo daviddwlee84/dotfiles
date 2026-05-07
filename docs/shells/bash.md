@@ -178,6 +178,10 @@ Use it for:
 
 ## Related docs
 
+- [docs/shells/architecture.md](architecture.md) — 3-tier shell layout
+  rationale (`dot_config/shell/` vs `dot_config/zsh/` vs
+  `dot_config/bash/`), migration story for existing zsh users, future-
+  shell extension feasibility (fish, PowerShell).
 - [docs/shells/aliases.md](aliases.md) — shared alias / function
   inventory (which shells each is available in).
 - [docs/zsh/motd.md](../zsh/motd.md) — SSH login banner styles

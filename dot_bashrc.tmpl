@@ -8,11 +8,11 @@
 #   5.  Bash-specific config files (history / completion / vi-mode / aliases)
 #   6.  oh-my-bash source (after ble.sh so OMB's bash-preexec install no-ops)
 #   7.  Shared modular layer (starship / mise / zoxide / direnv / thefuck)
-#   8.  Bash-only modular layer (any post-attach ble-bind tweaks)
-#   9.  atuin init bash --disable-up-arrow (ble.sh handles up-arrow history)
-#   10. Secrets
-#   11. ble-attach   ← absorbs all precmd/preexec stacks accumulated above
-#   12. .bashrc.adhoc tail
+#   8.  atuin init bash --disable-up-arrow (ble.sh handles up-arrow history)
+#   9.  Secrets
+#   10. ble-attach   ← absorbs all precmd/preexec stacks accumulated above
+#   11. ~/.bash_aliases (backward-compat with Ubuntu/Debian skel convention)
+#   12. .bashrc.adhoc tail (chezmoi-ignored; highest-priority user override)
 #
 # The ble.sh / oh-my-bash / atuin steps are presence-gated and no-op
 # silently when the artefact isn't installed (e.g. fresh host before
@@ -133,6 +133,21 @@ if [[ -n $BLE_VERSION ]]; then
 fi
 
 # 11. ===========================================================
+# Backward-compat with the Ubuntu/Debian `~/.bash_aliases` convention.
+# /etc/skel/.bashrc on those distros sources this file unconditionally,
+# so users (or other dotfiles repos they cloned previously) routinely
+# accumulate aliases here. Without this, our managed bashrc would
+# silently strip those on first apply — hard to debug, hostile UX.
+#
+# Sourced AFTER ble-attach so any `bind -x` / `ble-bind -x` calls in it
+# take effect. Sourced BEFORE `.bashrc.adhoc` so that the chezmoi-
+# aware adhoc tail (which is also chezmoi-ignored) wins on conflict.
+# Convention: long-lived stuff goes in .bash_aliases (or migrate to
+# dot_config/bash/10_aliases.bash); machine-local experiments go in
+# .bashrc.adhoc.
+[ -r "$HOME/.bash_aliases" ] && . "$HOME/.bash_aliases"
+
+# 12. ===========================================================
 # Adhoc Configuration (not tracked by chezmoi)
 if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
     cat > "$HOME/.bashrc.adhoc" << 'ADHOC_EOF'
@@ -144,8 +159,10 @@ if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
 #   - Temporary PATH modifications
 #   - Testing before adding to chezmoi-managed configs
 #
-# This file is sourced at the end of ~/.bashrc (AFTER ble-attach),
-# so ble-bind / readline `bind -x` calls here will take effect.
+# This file is sourced at the end of ~/.bashrc (AFTER ble-attach + after
+# ~/.bash_aliases), so ble-bind / readline `bind -x` calls here will
+# take effect, and anything you set here overrides the older
+# ~/.bash_aliases on conflict.
 # Changes here apply to new shell sessions (or run: source ~/.bashrc.adhoc)
 
 # Example:

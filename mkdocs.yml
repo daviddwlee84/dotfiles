@@ -276,8 +276,9 @@ nav:
           - JSON Schema: tools/json-schema.md
           - Mirrors (Chinese CDN): tools/mirrors.md
   - Shells:
-      - Aliases & functions (zsh/bash): shells/aliases.md
+      - Architecture (3-tier shell/zsh/bash + future fish/powershell): shells/architecture.md
       - Bash bootstrap (oh-my-bash + ble.sh): shells/bash.md
+      - Aliases & functions (zsh/bash): shells/aliases.md
   - Zsh:
       - Completions: zsh/zsh-completions.md
       - SSH login banner (MOTD): zsh/motd.md
