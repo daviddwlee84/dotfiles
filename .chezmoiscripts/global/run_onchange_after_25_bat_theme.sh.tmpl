@@ -36,4 +36,11 @@ fi
 
 info "Rebuilding bat theme cache"
 bat cache --build >/dev/null
+
+if command -v delta >/dev/null 2>&1 && ! printf '' | delta --no-gitconfig --paging=never >/dev/null 2>&1; then
+    warn "bat cache is incompatible with delta; clearing cache so git pager keeps working"
+    bat cache --clear >/dev/null
+    exit 0
+fi
+
 success "bat theme cache rebuilt"

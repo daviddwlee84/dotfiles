@@ -373,6 +373,22 @@
     state: link
   ignore_errors: true
 
+- name: Detect Linuxbrew for bat (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: bat_brew_probe
+  changed_when: false
+
+- name: Install bat via Linuxbrew when available (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - bat_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: bat
+    state: present
+
 # --- bat (user-level fallback) ---
 - name: Re-check if bat is installed
   when: ansible_facts["os_family"] == "Debian"
@@ -693,15 +709,19 @@
       arm64 build.
 
 # --- git-delta ---
-# Upstream ships musl `.deb` + musl tarball for x86_64 only. On aarch64 only
-# `unknown-linux-gnu` assets exist, and delta 0.19.x briefly required glibc
-# 2.39 (unavailable on Jammy). We therefore:
-#   1) x86_64: use the musl `.deb` (sudo) / musl tarball (user).
+# Delta can start successfully but crash when reading stdin if bat's binary
+# theme cache was built by an incompatible bat version. Verify by actually
+# feeding delta an empty diff, not only by checking `--version`.
+# On aarch64 only `unknown-linux-gnu` assets exist, and delta 0.19.x briefly
+# required glibc 2.39 (unavailable on Jammy). We therefore:
+#   1) x86_64: use the upstream `.deb` (sudo) / tarball (user).
 #   2) aarch64: probe Linuxbrew and install via `brew`; otherwise skip with a
 #      clear debug message rather than silently pulling a glibc-risky binary.
 - name: Check if delta is installed
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: delta --version
+  ansible.builtin.shell: printf '' | delta --no-gitconfig --paging=never
+  args:
+    executable: /bin/bash
   register: delta_check
   changed_when: false
   failed_when: false
@@ -714,7 +734,7 @@
   ansible.builtin.debug:
     msg: "git-delta skipped: no release for {{ target_architecture }}"
 
-- name: Install git-delta musl .deb (Debian/Ubuntu, x86_64)
+- name: Install git-delta .deb (Debian/Ubuntu, x86_64)
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_check.rc != 0
@@ -728,16 +748,16 @@
         return_content: true
       register: delta_release
 
-    - name: Download git-delta musl .deb package
+    - name: Download git-delta .deb package
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta-musl_{{ delta_release.json.tag_name }}_amd64.deb"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release.json.tag_name }}/git-delta_{{ delta_release.json.tag_name }}_amd64.deb"
         dest: /tmp/git-delta.deb
         mode: '0644'
         timeout: 120
       retries: 3
       delay: 5
 
-    - name: Install delta musl .deb package
+    - name: Install delta .deb package
       ansible.builtin.apt:
         deb: /tmp/git-delta.deb
 
@@ -795,12 +815,14 @@
 # --- git-delta (user-level fallback) ---
 - name: Re-check if delta is installed
   when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.shell: command -v delta
+  ansible.builtin.shell: command -v delta && printf '' | delta --no-gitconfig --paging=never
+  args:
+    executable: /bin/bash
   register: delta_recheck
   changed_when: false
   failed_when: false
 
-- name: Install git-delta musl tarball (user-level, no sudo, x86_64)
+- name: Install git-delta tarball (user-level, no sudo, x86_64)
   when:
     - ansible_facts["os_family"] == "Debian"
     - delta_recheck.rc != 0
@@ -818,9 +840,9 @@
         return_content: true
       register: delta_release_user
 
-    - name: Download delta musl tarball (user)
+    - name: Download delta tarball (user)
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl.tar.gz"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
         timeout: 120
@@ -835,7 +857,7 @@
 
     - name: Install delta to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl/delta"
+        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu/delta"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/delta"
         mode: '0755'
         remote_src: true
@@ -846,7 +868,7 @@
         state: absent
       loop:
         - /tmp/delta.tar.gz
-        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl"
+        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu"
 
   rescue:
     - name: Warn git-delta (user) installation failed

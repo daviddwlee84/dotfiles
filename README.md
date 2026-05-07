@@ -161,7 +161,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/git/hooks/` - Global Git hooks (pre-commit + Git LFS hooks)
 - `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
 - `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff pager
-- `~/.config/bat/themes/tokyonight_night.tmTheme` - Managed Tokyo Night theme for bat
+- `~/.config/bat/themes/tokyonight_night.tmTheme` - Managed Tokyo Night theme for bat; apply rebuilds the bat cache and clears it if the cache is incompatible with `delta`
 - `~/.config/nvim/` - Neovim (LazyVim) configuration; system clipboard via `unnamedplus`, with an SSH-conditional OSC 52 override so remote yanks reach the local clipboard (pairs with tmux `set-clipboard on`, see [docs](docs/tools/tmux/README.md#osc-52-clipboard-ssh-friendly-yank))
 - `~/.config/uv/uv.toml` - uv package manager config (PyPI: official / Aliyun+TUNA+USTC via `useChineseMirror`)
 - `~/.cargo/config.toml` - Cargo registry config (crates.io / TUNA sparse index via `useChineseMirror`)
