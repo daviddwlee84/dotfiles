@@ -96,6 +96,32 @@ This automatically:
 3. Runs ansible playbooks (git, ripgrep, fd, neovim, etc.)
 4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled)
 
+#### Sudo password injection (when chezmoi can't open `/dev/tty`)
+
+Some Linux environments — notably **CentOS 7 + AD/LDAP user with high UID** where `pam_systemd` never created `/run/user/<UID>/` — leave the chezmoi-spawned bootstrap script unable to open `/dev/tty`, so the shared sudo helper can't prompt and Linuxbrew aborts with `Insufficient permissions to install Homebrew to "/home/linuxbrew/.linuxbrew"`. The fix is to pre-stage the password via `CHEZMOI_SUDO_PASSWORD_FILE` (the same env-var [`fleet_apply`](docs/this_repo/fleet-apply.md) uses over SSH).
+
+The repo ships [`scripts/apply_with_sudo.sh`](scripts/apply_with_sudo.sh) to handle the prompt → 0600 tmpfile → export → run → `shred` dance:
+
+```bash
+# First time (chezmoi not installed yet):
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"   # install chezmoi only
+bash <(curl -fsSL https://raw.githubusercontent.com/$GITHUB_USERNAME/dotfiles/main/scripts/apply_with_sudo.sh) \
+  --init "https://github.com/$GITHUB_USERNAME/dotfiles.git"
+
+# Re-runs (after chezmoi source is cloned at ~/.local/share/chezmoi):
+just apply-with-sudo                                              # interactive prompt
+just apply-with-sudo --pass-from-env                              # reads $SUDO_PASSWORD
+SUDO_PASSWORD=xxx just apply-with-sudo --pass-from-env            # one-liner
+```
+
+The wrapper validates the password against `sudo -v` before invoking `chezmoi`, then shreds the tmpfile on exit (any signal). Inside chezmoi's run-scripts, `sudo_session_init` adopts the file, moves it into the shared state dir, and spawns the watchdog that keeps the sudo timestamp warm.
+
+**Even simpler alternative** if you have root and don't mind editing sudoers: add `$USER ALL=(ALL) NOPASSWD: ALL` to `/etc/sudoers.d/99-bootstrap`, run `chezmoi apply`, then remove the line. The shared helper short-circuits cleanly when sudo is truly passwordless.
+
+> CentOS 7 also blocks Linuxbrew install because system curl 7.29 is older than Homebrew's 7.41 minimum, and Homebrew bottles built on Ubuntu 22.04+ don't run on glibc 2.17 anyway. Linuxbrew is fully optional on Linux — every ansible task that uses it has a non-brew fallback (cargo / GitHub musl release / AppImage). On CentOS 7, drop a stub `~/.local/bin/brew` (`#!/bin/sh\nexit 0`) before applying to short-circuit the bootstrap's brew step.
+
+Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md) and [`pitfalls/centos7-noroot.md`](pitfalls/centos7-noroot.md).
+
 ### After install
 
 - `~/.local/bin` and the rest of the shared layer (mise/uv/cargo/bun PATH) are exported via `~/.config/shell/00_exports.sh`, sourced by both the chezmoi-managed `~/.bashrc` and `~/.zshrc`.

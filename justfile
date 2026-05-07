@@ -110,6 +110,17 @@ chezmoi-diff:
 chezmoi-apply:
     chezmoi --no-pager apply
 
+# Apply with sudo password injected via CHEZMOI_SUDO_PASSWORD_FILE.
+# For environments where chezmoi-spawned run-scripts can't open /dev/tty
+# (CentOS 7 + AD/LDAP user, missing pam_systemd, SSH without proper PAM
+# session, etc.). See pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md.
+# Prompts once, validates against sudo, shreds tmpfile on exit.
+#     just apply-with-sudo                      # interactive prompt
+#     just apply-with-sudo --pass-from-env      # uses $SUDO_PASSWORD env var
+#     just apply-with-sudo --pass-from-file ~/.cz_sudo
+apply-with-sudo *ARGS:
+    bash scripts/apply_with_sudo.sh {{ARGS}}
+
 # Dry run (preview without applying)
 chezmoi-dry-run:
     chezmoi --no-pager apply --dry-run
