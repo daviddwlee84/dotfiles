@@ -96,13 +96,34 @@ sudo yum install -y ncurses-devel
 cd /tmp
 curl -fLO https://www.zsh.org/pub/zsh-5.9.tar.xz
 tar xf zsh-5.9.tar.xz && cd zsh-5.9
-./configure --prefix="$HOME/.local" --enable-multibyte
+./configure --prefix="$HOME/.local" --enable-multibyte --with-tcsetpgrp
 make -j"$(nproc)" && make install
 ~/.local/bin/zsh --version            # zsh 5.9
 
 echo "$HOME/.local/bin/zsh" | sudo tee -a /etc/shells
 chsh -s "$HOME/.local/bin/zsh" "$USER"
 ```
+
+## Subtlety: `./configure` needs `--with-tcsetpgrp` when run non-interactively
+
+zsh's `configure` auto-probes tcsetpgrp(3) by **spawning a child that
+asks for its controlling TTY**. When the build runs from ansible's
+`shell:` (no controlling TTY in the child process), the probe aborts:
+
+```
+configure: error: no controlling tty
+Try running configure with --with-tcsetpgrp or --without-tcsetpgrp
+```
+
+We pass `--with-tcsetpgrp` explicitly because zsh needs job control to
+function as a real interactive shell. Without it, the build either
+fails (as above) or ships a zsh that can't background processes.
+
+If you ever copy the `./configure` invocation out of the role to debug
+manually in an SSH session, keep `--with-tcsetpgrp` even though
+interactive `configure` would auto-detect it correctly — having both
+paths produce the same artifact avoids "works on my terminal, fails in
+ansible" drift.
 
 ## Related
 

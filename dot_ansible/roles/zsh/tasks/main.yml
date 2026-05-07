@@ -104,6 +104,11 @@
   when:
     - ansible_facts["os_family"] == "RedHat"
     - zsh_too_old | default(false)
+  # `--with-tcsetpgrp` MUST be passed explicitly: configure auto-probes
+  # for tcsetpgrp(3) by spawning a sub-shell that asks for its controlling
+  # TTY, but ansible runs us with no controlling terminal so the probe
+  # aborts with `configure: error: no controlling tty`. We know zsh
+  # needs job control (interactive shell), so just force-enable it.
   ansible.builtin.shell: |
     set -e
     cd /tmp
@@ -111,7 +116,11 @@
     curl -fLO https://www.zsh.org/pub/zsh-5.9.tar.xz
     tar xf zsh-5.9.tar.xz
     cd zsh-5.9
-    ./configure --prefix="$HOME/.local" --enable-multibyte --quiet
+    ./configure \
+      --prefix="$HOME/.local" \
+      --enable-multibyte \
+      --with-tcsetpgrp \
+      --quiet
     make -j"$(nproc)" --silent
     make install --silent
     "$HOME/.local/bin/zsh" --version
