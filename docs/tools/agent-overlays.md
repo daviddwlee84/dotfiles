@@ -120,6 +120,16 @@ enabled = true
 - `[features]` — opt into the experimental flags this user always wants on.
 - `[plugins."<id>".enabled]` — curated plugin set; user-installed plugins appear under their own `[plugins."..."]` blocks and are preserved by the deep merge.
 
+When `useChineseMirror=true`, `dot_codex/modify_config.toml.tmpl` also appends:
+
+```toml
+[model_providers.openai]
+stream_max_retries = 1
+websocket_connect_timeout_ms = 3000
+```
+
+This keeps WebSocket enabled but reduces failed WebSocket retry cost before Codex falls back to HTTPS/SSE. If the flag is later disabled, the modify script prunes only these exact managed retry values and preserves user provider overrides.
+
 ## What is intentionally NOT managed
 
 | File / subtree | CLI | Why |
