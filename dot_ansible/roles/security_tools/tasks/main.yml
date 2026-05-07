@@ -26,7 +26,7 @@
       can install uv, or install it manually from https://astral.sh/uv.
 
 - name: Install pre-commit via uv (pinned Python 3.13, all OSes)
-  ansible.builtin.command: uv tool install --force pre-commit --python 3.13
+  ansible.builtin.command: uv tool install pre-commit --python 3.13
   register: precommit_install
   changed_when: "'already installed' not in (precommit_install.stdout | default('') ~ precommit_install.stderr | default(''))"
 

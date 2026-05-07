@@ -38,8 +38,11 @@
     update_homebrew: true
   ignore_errors: true
 
+# Skip cleanup on the same 24 h window as brew update — no new installs = nothing to clean.
 - name: Clean up stale Homebrew versions and links
-  when: homebrew_installed
+  when:
+    - homebrew_installed
+    - not brew_fetch_head.stat.exists or (lookup('pipe', 'date +%s') | int - brew_fetch_head.stat.mtime | int) > 86400
   ansible.builtin.command: brew cleanup
   changed_when: false
   ignore_errors: true

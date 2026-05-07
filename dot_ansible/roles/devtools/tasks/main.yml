@@ -3073,14 +3073,43 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
-- name: Update television channel prototypes
+# tv update-channels always does a ~18s GitHub fetch even when all channels exist.
+# Skip unless the tv version changed since we last ran it (sentinel = version string).
+- name: Get current tv version (for channel update guard)
   when: tv_final_probe.rc == 0
-  ansible.builtin.command: tv update-channels
-  register: tv_update_channels
-  changed_when: "'already exists' not in tv_update_channels.stderr"
+  ansible.builtin.command: tv --version
+  register: tv_version_current
+  changed_when: false
   failed_when: false
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Check tv channel version sentinel
+  when: tv_final_probe.rc == 0
+  ansible.builtin.slurp:
+    src: "{{ ansible_facts['env']['HOME'] }}/.config/television/.cable-version"
+  register: tv_cable_sentinel
+  ignore_errors: true
+
+- name: Update television channel prototypes
+  when:
+    - tv_final_probe.rc == 0
+    - tv_cable_sentinel is failed or (tv_cable_sentinel.content | b64decode | trim) != (tv_version_current.stdout | trim)
+  ansible.builtin.command: tv update-channels
+  register: tv_update_channels
+  changed_when: true
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Write tv channel version sentinel
+  when:
+    - tv_final_probe.rc == 0
+    - tv_update_channels is changed
+  ansible.builtin.copy:
+    content: "{{ tv_version_current.stdout | trim }}"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.config/television/.cable-version"
+    mode: "0644"
 
 # =============================================================================
 # Log viewers (Linux)
