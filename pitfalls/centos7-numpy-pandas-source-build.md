@@ -33,10 +33,11 @@ ok: [localhost] => (item=trafilatura)
 (pure-Python). The two failing items both transitively require numpy
 2.x:
 
-| Item | numpy chain |
-|------|-------------|
-| `sqlit-tui[ssh]` | `textual-fastdatatable` → `pandas` → `numpy` |
-| `visidata` | explicit `--with pandas pyarrow` → `pandas` → `numpy` |
+| Item | C-build chain |
+|------|---------------|
+| `sqlit-tui[ssh]` | `textual-fastdatatable` → `pandas` → `numpy 2.x` (needs gcc 9.3+) |
+| `visidata` | explicit `--with pandas pyarrow` → `pandas` → `numpy 2.x` |
+| `mlflow` | `sqlalchemy` → `greenlet` (C++ ext; CentOS 7 gcc 4.8.5 supports C++11 only with explicit `-std=c++11`, which greenlet's setup.py doesn't pass) |
 
 ## Root cause
 

@@ -33,6 +33,7 @@ python_uv_tools:
     binary: git-filter-repo
   - name: mlflow
     binary: mlflow
+    needs_modern_gcc: true  # sqlalchemy -> greenlet C++ ext needs proper C++11 (CentOS 7 gcc 4.8.5 lacks it by default)
   - name: tmuxp
     binary: tmuxp
   - name: visidata

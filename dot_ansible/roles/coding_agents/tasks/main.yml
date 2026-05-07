@@ -12,9 +12,12 @@
     name: terminal-notifier
     state: present
 
-# Linux - libnotify-bin (provides notify-send)
+# Linux - libnotify-bin (provides notify-send). apt-only because the sister
+# RedHat package is `libnotify` (different name) and rarely needed on
+# headless servers — skip on RedHat without a yum fallback. Rocky/Alma
+# users who need notify-send can `sudo yum install libnotify` manually.
 - name: Install libnotify-bin (Debian/Ubuntu)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_pkg_mgr == "apt"
   become: true
   tags: [sudo]
   ansible.builtin.apt:
@@ -39,7 +42,7 @@
     state: present
 
 - name: Check if Claude Code is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which claude
   register: claude_check
   changed_when: false
@@ -47,7 +50,7 @@
 
 - name: Skip Claude Code on unsupported architecture (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - claude_check.rc != 0
     - target_architecture not in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.debug:
@@ -55,7 +58,7 @@
 
 - name: Install Claude Code (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - claude_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.shell: |
@@ -89,7 +92,7 @@
     state: present
 
 - name: Check if OpenCode is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which opencode
   register: opencode_check
   changed_when: false
@@ -97,7 +100,7 @@
 
 - name: Install OpenCode (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - opencode_check.rc != 0
   ansible.builtin.shell: |
     curl -fsSL https://opencode.ai/install | bash
@@ -148,7 +151,7 @@
 
 - name: Install GitHub Copilot CLI via mise npm (Linux, user-level no-sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - copilot_check.rc != 0
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
@@ -196,7 +199,7 @@
 
 - name: Check if OpenAI Codex CLI is installed (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm list -g --depth=0 @openai/codex >/dev/null 2>&1
@@ -215,7 +218,7 @@
 
 - name: Install OpenAI Codex CLI via mise npm (Linux fallback, user-level no-sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codex_linux_npm_check.rc != 0
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
@@ -270,7 +273,7 @@
 
 - name: Check if Gemini CLI is installed (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which gemini
   register: gemini_check
   changed_when: false
@@ -278,7 +281,7 @@
 
 - name: Install Gemini CLI via mise npm (Linux, user-level no-sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gemini_check.rc != 0
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
@@ -312,7 +315,7 @@
     state: present
 
 - name: Check if RTK is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which rtk
   register: rtk_check
   changed_when: false
@@ -322,7 +325,7 @@
 
 - name: Ensure ~/.local/bin exists (RTK)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - rtk_check.rc != 0
   ansible.builtin.file:
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
@@ -331,7 +334,7 @@
 
 - name: Install RTK (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - rtk_check.rc != 0
   ansible.builtin.shell: |
     curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
@@ -455,7 +458,7 @@
         state: absent
 
 - name: Check if SpecStory is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which specstory
   register: specstory_check
   changed_when: false
@@ -463,7 +466,7 @@
 
 - name: Get latest SpecStory release version (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - specstory_check.rc != 0
   ansible.builtin.uri:
     url: https://api.github.com/repos/specstoryai/getspecstory/releases/latest
@@ -472,7 +475,7 @@
 
 - name: Set SpecStory architecture (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - specstory_check.rc != 0
   ansible.builtin.set_fact:
     specstory_linux_arch: >-
@@ -484,7 +487,7 @@
 
 - name: Skip SpecStory on unsupported architecture (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - specstory_check.rc != 0
     - specstory_linux_arch | trim == ''
   ansible.builtin.debug:
@@ -492,7 +495,7 @@
 
 - name: Install SpecStory from GitHub release (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - specstory_check.rc != 0
     - specstory_release is defined
     - specstory_linux_arch | trim != ''
@@ -564,7 +567,7 @@
     state: present
 
 - name: Check if CodexBar is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which codexbar
   register: codexbar_check
   changed_when: false
@@ -572,7 +575,7 @@
 
 - name: Check if Homebrew (Linuxbrew) is available
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
   ansible.builtin.command: command -v brew
   register: codexbar_brew_check
@@ -581,7 +584,7 @@
 
 - name: Install CodexBar via Linuxbrew (preferred)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc == 0
   block:
@@ -601,7 +604,7 @@
 
 - name: Ensure ~/.local/bin exists (CodexBar fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
   ansible.builtin.file:
@@ -611,7 +614,7 @@
 
 - name: Get latest CodexBar release (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
   ansible.builtin.uri:
@@ -621,7 +624,7 @@
 
 - name: Compute CodexBar arch and tag (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_release is defined
@@ -632,7 +635,7 @@
 
 - name: Compute CodexBar release asset name (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_tag is defined
@@ -641,7 +644,7 @@
 
 - name: Install CodexBar from GitHub releases (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codexbar_check.rc != 0
     - codexbar_brew_check.rc != 0 or (codexbar_brew_failed | default(false))
     - codexbar_asset is defined
@@ -747,7 +750,7 @@
     state: present
 
 - name: Check if td is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which td
   register: td_check
   changed_when: false
@@ -755,7 +758,7 @@
 
 - name: Check whether installed td is Sidecar-compatible (Linux)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc == 0
   ansible.builtin.shell: td --help 2>&1 | grep -Eq '\bsession\b'
   register: td_compatible_check
@@ -764,7 +767,7 @@
 
 - name: Check if Homebrew (Linuxbrew) is available for td
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
   ansible.builtin.command: command -v brew
   register: td_brew_check
@@ -773,7 +776,7 @@
 
 - name: Remove conflicting td formula (Linuxbrew)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc == 0
     - td_compatible_check.rc != 0
     - td_brew_check.rc == 0
@@ -783,7 +786,7 @@
 
 - name: Install td via Linuxbrew (preferred)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_brew_check.rc == 0
   block:
@@ -803,7 +806,7 @@
 
 - name: Re-check if td is installed after Linuxbrew attempt
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
   ansible.builtin.command: which td
   register: td_recheck
@@ -812,7 +815,7 @@
 
 - name: Ensure ~/.local/bin exists (td fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
   ansible.builtin.file:
@@ -822,7 +825,7 @@
 
 - name: Get latest td release (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
   ansible.builtin.uri:
@@ -832,7 +835,7 @@
 
 - name: Compute td release arch and version (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_release is defined
@@ -843,7 +846,7 @@
 
 - name: Warn when td release fallback does not support current architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch == "unsupported"
@@ -852,7 +855,7 @@
 
 - name: Install td from GitHub releases (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - td_check.rc != 0 or (td_compatible_check.rc is defined and td_compatible_check.rc != 0)
     - td_recheck.rc != 0
     - td_linux_arch != "unsupported"
@@ -940,7 +943,7 @@
     state: present
 
 - name: Check if sidecar is installed (Linux)
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: which sidecar
   register: sidecar_check
   changed_when: false
@@ -948,7 +951,7 @@
 
 - name: Check if Homebrew (Linuxbrew) is available for sidecar
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
   ansible.builtin.command: command -v brew
   register: sidecar_brew_check
@@ -957,7 +960,7 @@
 
 - name: Install sidecar via Linuxbrew (preferred)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_brew_check.rc == 0
   block:
@@ -977,7 +980,7 @@
 
 - name: Re-check if sidecar is installed after Linuxbrew attempt
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
   ansible.builtin.command: which sidecar
   register: sidecar_recheck
@@ -986,7 +989,7 @@
 
 - name: Ensure ~/.local/bin exists (sidecar fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
   ansible.builtin.file:
@@ -996,7 +999,7 @@
 
 - name: Get latest sidecar release (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
   ansible.builtin.uri:
@@ -1006,7 +1009,7 @@
 
 - name: Compute sidecar release arch and version (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
     - sidecar_release is defined
@@ -1017,7 +1020,7 @@
 
 - name: Warn when sidecar release fallback does not support current architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
     - sidecar_linux_arch == "unsupported"
@@ -1026,7 +1029,7 @@
 
 - name: Install sidecar from GitHub releases (Linux fallback)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - sidecar_check.rc != 0
     - sidecar_recheck.rc != 0
     - sidecar_linux_arch != "unsupported"
@@ -1144,7 +1147,7 @@
 
 - name: Install OpenChamber via mise npm (Linux, user-level no-sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - openchamber_check.rc != 0
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
