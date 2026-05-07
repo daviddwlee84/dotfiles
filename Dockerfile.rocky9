@@ -108,5 +108,11 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}" \
     --promptChoice "Primary interactive shell (zsh|bash)=${CHEZMOI_PRIMARY_SHELL}"
 
+# Symlink chezmoi's default sourceDir to the COPY target. See Dockerfile
+# for the full rationale — required so post-init bare `chezmoi apply`
+# (e.g. the bats smoke suite's idempotency check) can find the source.
+RUN mkdir -p "$HOME/.local/share" \
+    && ln -sfn /tmp/dotfiles-source "$HOME/.local/share/chezmoi"
+
 # Default to bash shell
 CMD ["/bin/bash"]

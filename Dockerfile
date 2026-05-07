@@ -160,5 +160,17 @@ RUN export PATH="$HOME/.local/bin:$PATH" && \
     --promptChoice "SSH login banner style (figlet|fastfetch-slim|fastfetch-full)=${CHEZMOI_MOTD_STYLE}" \
     --promptChoice "Primary interactive shell (zsh|bash)=${CHEZMOI_PRIMARY_SHELL}"
 
+# Make the source dir discoverable via chezmoi's default lookup path.
+# `chezmoi init --apply --source=/tmp/dotfiles-source` only uses the
+# override for the initial render — it does NOT persist sourceDir into
+# ~/.config/chezmoi/chezmoi.toml or copy the source into the default
+# ~/.local/share/chezmoi/. Without this symlink, a bare `chezmoi apply`
+# (e.g. tests/smoke/docker_install.bats test #1) exits 1 with
+# `chezmoi: stat /home/devuser/.local/share/chezmoi: no such file or
+# directory`. The symlink mirrors what `chezmoi init <git-url>` would
+# do when cloning a real repo.
+RUN mkdir -p "$HOME/.local/share" \
+    && ln -sfn /tmp/dotfiles-source "$HOME/.local/share/chezmoi"
+
 # Default to bash shell
 CMD ["/bin/bash"]
