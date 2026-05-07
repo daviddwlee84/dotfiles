@@ -120,9 +120,15 @@ export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 # Python is usually fine since mise pulls pre-compiled binaries from the
 # python-build-standalone GitHub releases (not blocked). If you hit issues,
 # set PYTHON_BUILD_MIRROR_URL manually.
-# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/
-export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
-export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+#
+# Mirror choice: Aliyun (NOT TUNA). TUNA's `nodejs-release` mirror keeps
+# only ~5 hand-picked versions and aggressively garbage-collects the rest,
+# so `mise install node@lts` 404s on whatever LTS patch isn't in their
+# small set (see pitfalls/tuna-nodejs-mirror-aggressive-gc.md). Aliyun
+# mirrors all of nodejs.org/dist/ and is much more reliable in practice.
+# Ref: https://developer.aliyun.com/mirror/nodejs
+export MISE_NODE_MIRROR_URL="https://mirrors.aliyun.com/nodejs-release/"
+export NODE_BUILD_MIRROR_URL="https://mirrors.aliyun.com/nodejs-release/"
 
 # Go modules: goproxy.cn is the Qiniu-hosted de-facto standard for China;
 # TUNA does not host a Go module proxy. `direct` fallback preserves private

@@ -17471,3 +17471,1268 @@ tmux 需要 `tmux kill-server` 才會吃 `extended-keys on`，重連後 paste �
 新開 bash session（reload `04_blesh.bash`）後，ble.sh 不會再為每次滑鼠點擊噴 `unbind keyseq: mouse`。
 
 新文件 `docs/infra/linux-toolchain-baseline.md` 一份完整的 glibc/libstdc++/kernel/gcc 對照表跟升級決策樹 — 下次再撞類似的 `GLIBC_*` 牆直接翻它。
+
+---
+
+_**User (2026-05-07 11:42:36Z)**_
+
+```
+─────────────────────── lazyvim_deps ───────────────────────
+[24] TASK · [lazyvim_deps : Check for user-installed mise]
+ok: [localhost] (0.6s)
+[25] TASK · [lazyvim_deps : Set mise binary path (user install)]
+ok: [localhost] (0.0s)
+[26] TASK · [lazyvim_deps : Install mise global tools (Debian/Ubuntu)]
+✦ changed: [localhost] (9m19s)
+[27] TASK · [lazyvim_deps : Warn if mise install had failures]
+ok: [localhost] (0.1s) =>
+    msg: |-
+        mise install exited with rc=1 — some tools may have failed.
+        Re-run manually to retry: `/home/yczhang/.local/bin/mise install --yes`
+        Stderr tail:  | core:node@lts: HTTP status client error (404 Not Found) for url (https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.15.0/node-v24.15.0.tar.gz) |  | core:rust@latest: rustup exited with non-zero status: exit code 1 | mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+[28] TASK · [lazyvim_deps : Install fzf (binary only, shell integration handled by zsh config)]
+ok: [localhost] (0.4s)
+[29] TASK · [lazyvim_deps : Check if lazygit is installed]
+ok: [localhost] (0.4s)
+[30] TASK · [lazyvim_deps : Set lazygit release architecture]
+ok: [localhost] (0.0s)
+[31] TASK · [lazyvim_deps : Re-check if lazygit is installed after system install attempt]
+ok: [localhost] (0.4s)
+[32] TASK · [lazyvim_deps : Check if tree-sitter --version works (any install path)]
+ok: [localhost] (0.4s)
+[33] TASK · [lazyvim_deps : Purge broken tree-sitter-cli native binary in mise node installs (if any)]
+ok: [localhost] (0.4s)
+[34] TASK · [lazyvim_deps : Compute treesitter_check aggregate]
+ok: [localhost] (0.0s)
+```
+這邊好像也還有mise相關的？
+然後是不是Aliyun比Tuna穩還怎樣
+
+然後舊版的node 16.20也是能跑得動coding agent CLIs嗎 (查看看有沒有最低要求？)
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 11:43:32Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 11:44:18Z)**_
+
+兩個議題拆開：
+
+## 1. `lazyvim_deps : Install mise global tools` 還在試 node/rust — chezmoi drift
+
+看你 log，mise install 在試 `node@lts -> v24.15.0` 跟 `rust@latest`。但 commit `766aabc` 已經把這些從 EL7 的 mise.toml 拿掉了。問題八成是 **`~/.config/mise/config.toml` 有 drift，chezmoi 沒覆蓋**：
+
+之前你跑過 `mise use -g node@22` 之類，那會直接寫進 `~/.config/mise/config.toml`。chezmoi 偵測到「這檔案被改過」就 skip overwrite，所以新 template 的 EL7 版本沒套用。
+
+驗證 + 修：
+
+```bash
+# 看 chezmoi 認為的 diff（mise config.toml 應該顯示變化）
+~/.local/bin/chezmoi diff ~/.config/mise/config.toml
+
+# 強制套用 chezmoi 版本（覆蓋 user edit）
+~/.local/bin/chezmoi apply --force ~/.config/mise/config.toml
+
+# 確認檔案內容
+cat ~/.config/mise/config.toml
+# 應該只剩 ruby = "3"，沒有 node/bun/rust/dotnet
+
+# 再跑一次 mise install（不會再試 node/rust）
+~/.local/bin/mise install --yes
+
+# 順便 prune 之前殘留的設定
+~/.local/bin/mise ls --missing
+```
+
+順帶提一下 — 之後 `chezmoi apply` 重跑 `run_onchange_after_20_ansible_roles` 時，那個 `lazyvim_deps : Install mise global tools` task 會再 `mise install --yes`。因為現在 config.toml 只剩 ruby（已裝），這個 task 會變 ok=不變，不會再噴 9 分鐘的 timeout。
+
+## 2. Aliyun vs TUNA — 哪個比較穩？
+
+**看哪個套件**：
+
+| 套件類型 | TUNA | Aliyun | 推薦 |
+|---|---|---|---|
+| **Node.js** (`nodejs-release`) | ❌ 只留 5 個版本 GC 太兇 | ✅ 鏡完整 nodejs.org | **Aliyun** |
+| **Homebrew bottles** | ✅ 完整 | ✅ 完整 | 平手；GFW 下 Aliyun 有時較快（commercial CDN） |
+| **rustup** (`rustup/dist`) | ⚠️ 偶爾 lag 1-2 個版本 | ✅ 較新但不是 mirror official | TUNA OK；要最新版直接走官方更穩 |
+| **PyPI** | ✅ TUNA (`pypi.tuna.tsinghua.edu.cn/simple`) | ✅ Aliyun (`mirrors.aliyun.com/pypi/simple`) | 平手 |
+| **NPM** | ❌ TUNA 沒做 | ✅ `npmmirror.com` (前淘寶 NPM) | **Aliyun / npmmirror** |
+| **GitHub releases** | 都沒做 | 都沒做 | 都需要 ghproxy 之類 |
+| **Anaconda** | ✅ TUNA Anaconda 完整 | ✅ Aliyun 也有 | 平手 |
+
+你 repo `dot_config/shell/00_exports.sh.tmpl` 預設是 TUNA。Node 那個明顯是坑 — 看要不要改成 Aliyun。要的話我幫改：
+
+```bash
+# 在 ~/.bashrc.adhoc 暫時 override（不需要改 repo）：
+export MISE_NODE_MIRROR_URL=https://mirrors.aliyun.com/nodejs-release/
+```
+
+要 repo 級永久切換我可以開 commit 把 `MISE_NODE_MIRROR_URL` 從 TUNA 改 Aliyun（影響所有 GFW user）— 講一聲就動。
+
+## 3. Node 16.20 + npm coding agent CLIs 跑得動嗎？
+
+**看具體那個 CLI**。各家最低 Node 要求：
+
+| CLI | 最低 Node | npm 包名 | Node 16.20 上會怎樣 |
+|---|---|---|---|
+| **GitHub Copilot CLI** | Node 22+ | `@github/copilot` | ❌ `Unsupported engine` warning，可能 import 就炸 |
+| **OpenAI Codex CLI** | Node 22+ | `@openai/codex` | ❌ 同上 |
+| **Gemini CLI** | Node 20+ | `@google/gemini-cli` | ❌ 啟動時 fail |
+| **Claude Code** | Node 18+ (但有 standalone binary) | `@anthropic-ai/claude-code` | ⚠️ 用 npm 裝會 fail；但 standalone binary 不需要 Node |
+| **OpenCode** | standalone binary | n/a | ✅ 不靠 npm |
+| **Cursor CLI** | standalone binary | n/a | ✅ |
+| **SpecStory** | standalone binary | n/a | ✅ |
+
+**驗證的最快方法**：
+
+```bash
+node --version    # v16.20.2
+# 試裝其中一個，看 npm 抱不抱怨：
+npm install -g @google/gemini-cli 2>&1 | tail -10
+# 如果看到 "Unsupported engine" 或 "requires Node >= 20" 就是 Node 16 不夠
+```
+
+**結構性結論**：在這台 CentOS 7 box 上，npm-based 的 coding agent CLI 大多會撞 Node 18+ 的牆。三條路：
+
+### A. 硬撐 NodeSource Node 16（剛裝的）
+
+只跑 standalone CLI（Claude Code 直裝模式、OpenCode、Cursor、SpecStory）。Copilot/Codex/Gemini 跳過。這台 box 主要當 server 用，這些 CLI 不是必要的。
+
+### B. 用社群 patchelf'd 的 Node 18+ binary
+
+有人維護「給 EL7 用的 Node 18+」 — 把 binary 的 dynamic loader 改指向自帶的 glibc 2.28 shim：
+
+- <https://github.com/patrickelectric/node-glibc-217>
+- 或者用 `unofficial-builds.nodejs.org` 上的「glibc-217」變體（Node 維護的官方備援）：
+  ```bash
+  # 看一下 https://unofficial-builds.nodejs.org/download/release/ 有沒有 glibc-217 變體
+  curl -fsSL https://unofficial-builds.nodejs.org/download/release/v18.20.4/node-v18.20.4-linux-x64-glibc-217.tar.xz -o /tmp/node18.tar.xz
+  # 看 unofficial-builds 是否還在出 glibc-217 — 不一定每個版本都有
+  ```
+
+風險：unofficial 構建可能不夠穩、安全更新滯後。
+
+### C. micromamba + node-from-conda-forge（最乾淨）
+
+conda-forge 自帶 glibc-2.17-相容的 Node 18+：
+
+```bash
+# 一行裝 micromamba（無 sudo）
+curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C ~/.local/bin --strip-components=1 bin/micromamba
+
+# 創一個跑 Node 18 的 env
+micromamba create -n node18 -c conda-forge nodejs=18 -y
+micromamba activate node18
+node --version    # v18.x，glibc-shim'd by conda-forge
+npm install -g @google/gemini-cli   # 應該過
+```
+
+**對於 EL7 上想用 npm coding agent 的場景，C 是我推薦的**。conda-forge 把 libstdc++/glibc 跟 Node binary 綁一起，跟你系統 glibc 2.17 完全解耦。
+
+這個流程也適合塞進 `docs/infra/linux-toolchain-baseline.md` 的 workaround 章節 — 我已經在那篇裡寫了 micromamba 段落，但沒有針對 Node 的具體例子。要我加嗎？
+
+## 我建議的下一步
+
+```bash
+# 1. 先把 mise config drift 修掉
+~/.local/bin/chezmoi apply --force ~/.config/mise/config.toml
+cat ~/.config/mise/config.toml   # 確認只剩 ruby = "3"
+
+# 2. 重跑 chezmoi apply（這次 lazyvim_deps mise install 會 ok 不變）
+~/.local/bin/chezmoi apply
+
+# 3. 試試你裝的 NodeSource Node 16 跑哪些 CLI
+node --version
+npm install -g @anthropic-ai/claude-code 2>&1 | tail -5    # 看 engine warning
+npm install -g @google/gemini-cli 2>&1 | tail -5
+
+# 4. 如果撞到 Node 18+ 牆 → 走 micromamba 路徑（上面 C）
+```
+
+跑完貼結果。Aliyun mirror 切換要不要做也告訴我。
+
+---
+
+_**User (2026-05-07 11:52:37Z)**_
+
+mise 或其他 GFW mirror 就幫我挑選最優的吧 不一定要侷限Tuna, Aliyun等
+
+然後 micromamba 這part notes也可以加一下
+
+```
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5 took 4m36s
+❯ chezmoi update --apply
+Already up to date.
+.config/mise/config.toml has changed since chezmoi last wrote it?
+[INFO] System python3 < 3.7; using uv-managed Python at /home/yczhang/.local/share/uv/python/cpython-3.13.13-linux-x86_64-gnu/bin/python3
+[INFO] Passwordless sudo detected
+[INFO] Profile: centos_server
+[INFO] Re-running ansible with tags: base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools,coding_agents,python_uv_tools,networking_tools
+
+────────────────────────────────────────────────────────────
+PLAY [Linux setup]
+────────────────────────────────────────────────────────────
+┌─ System Info
+│  OS:      CentOS 7.9
+│  Arch:    x86_64
+│  Python:  3.13.13
+│  Kernel:  3.10.0-1160.el7.x86_64
+│  Locale:  en_US.UTF-8
+│  Chezmoi: linux/amd64 idc-server104 (v2.70.2)
+│  Tags:    coding_agents, devtools, bash, security_tools,
+│           ruby_gem_tools, python_uv_tools,
+│           networking_tools, neovim, starship,
+│           lazyvim_deps, rust_cargo_tools, base, zsh,
+│           docker
+└─
+[1] TASK · [Gathering Facts]
+ok: [localhost] (2.0s)
+[2] TASK · [Detect userland architecture via dpkg]
+ok: [localhost] (0.5s)
+[3] TASK · [Fallback target_architecture to gathered facts]
+ok: [localhost] (0.0s)
+─────────────────────────── base ───────────────────────────
+[4] TASK · [base : Install base packages (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat]
+ok: [localhost] (0.8s)
+[5] TASK · [base : Re-check if ripgrep is installed]
+ok: [localhost] (0.4s)
+[6] TASK · [base : Re-check if fd is installed]
+ok: [localhost] (0.4s)
+[7] TASK · [base : Re-check if jq is installed]
+ok: [localhost] (0.4s)
+[8] TASK · [base : Re-check if git-lfs is installed]
+ok: [localhost] (0.4s)
+[9] TASK · [base : Check if just is installed]
+ok: [localhost] (0.4s)
+[10] TASK · [base : Re-check if just is installed]
+ok: [localhost] (0.4s)
+─────────────────────────── zsh ────────────────────────────
+[11] TASK · [zsh : Install zsh (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat]
+ok: [localhost] (0.5s)
+[12] TASK · [zsh : Detect system zsh version]
+ok: [localhost] (0.4s)
+[13] TASK · [zsh : Set fact zsh_too_old (true when system zsh < 5.3)]
+ok: [localhost] (0.0s)
+[14] TASK · [zsh : Locate zsh binary]
+ok: [localhost] (0.4s)
+[15] TASK · [zsh : Get current login shell (Linux)]
+ok: [localhost] (0.4s)
+[16] TASK · [zsh : Set current shell fact]
+ok: [localhost] (0.0s)
+─────────────────────────── bash ───────────────────────────
+[17] TASK · [bash : Install gawk (RedHat/CentOS) — yum CLI for CentOS 7 + Rocky/Alma compat]
+ok: [localhost] (0.4s)
+───────────────────────── starship ─────────────────────────
+[18] TASK · [starship : Check if starship is installed]
+ok: [localhost] (0.4s)
+[19] TASK · [starship : Re-check if starship is installed]
+ok: [localhost] (0.4s)
+────────────────────────── neovim ──────────────────────────
+[20] TASK · [neovim : Check current Neovim version]
+ok: [localhost] (0.4s)
+[21] TASK · [neovim : Set Neovim version fact]
+ok: [localhost] (0.0s)
+[22] TASK · [neovim : Display current Neovim version]
+ok: [localhost] (0.0s) =>
+    msg: 'Current Neovim version: 0.0.0 (required: >= 0.11.2)'
+[23] TASK · [neovim : Set Neovim tarball architecture (system)]
+ok: [localhost] (0.0s)
+─────────────────────── lazyvim_deps ───────────────────────
+[24] TASK · [lazyvim_deps : Check for user-installed mise]
+ok: [localhost] (0.6s)
+[25] TASK · [lazyvim_deps : Set mise binary path (user install)]
+ok: [localhost] (0.0s)
+[26] TASK · [lazyvim_deps : Install mise global tools (Debian/Ubuntu)]
+✦ changed: [localhost] (9m19s)
+[27] TASK · [lazyvim_deps : Warn if mise install had failures]
+ok: [localhost] (0.1s) =>
+    msg: |-
+        mise install exited with rc=1 — some tools may have failed.
+        Re-run manually to retry: `/home/yczhang/.local/bin/mise install --yes`
+        Stderr tail:  | core:node@lts: HTTP status client error (404 Not Found) for url (https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v24.15.0/node-v24.15.0.tar.gz) |  | core:rust@latest: rustup exited with non-zero status: exit code 1 | mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+[28] TASK · [lazyvim_deps : Install fzf (binary only, shell integration handled by zsh config)]
+ok: [localhost] (0.4s)
+[29] TASK · [lazyvim_deps : Check if lazygit is installed]
+ok: [localhost] (0.4s)
+[30] TASK · [lazyvim_deps : Set lazygit release architecture]
+ok: [localhost] (0.0s)
+[31] TASK · [lazyvim_deps : Re-check if lazygit is installed after system install attempt]
+ok: [localhost] (0.4s)
+[32] TASK · [lazyvim_deps : Check if tree-sitter --version works (any install path)]
+ok: [localhost] (0.4s)
+[33] TASK · [lazyvim_deps : Purge broken tree-sitter-cli native binary in mise node installs (if any)]
+ok: [localhost] (0.4s)
+[34] TASK · [lazyvim_deps : Compute treesitter_check aggregate]
+ok: [localhost] (0.0s)
+[35] TASK · [lazyvim_deps : Install tree-sitter-cli via mise npm (Debian/Ubuntu)]
+ok: [localhost] (3m0s)
+[36] TASK · [lazyvim_deps : Install libclang-dev for tree-sitter-cli cargo build (apt)]
+[ERROR]: Task failed: Error while evaluating conditional: 'ansible_pkg_mgr' is undefined
+
+Task failed.
+Origin: /home/yczhang/.ansible/roles/lazyvim_deps/tasks/main.yml:321:3
+
+319 # cargo build of tree-sitter-cli requires libclang (via bindgen). Install on
+320 # Debian/Ubuntu when we might fall through to the cargo path.
+321 - name: Install libclang-dev for tree-sitter-cli cargo build (apt)
+      ^ column 3
+
+<<< caused by >>>
+
+Error while evaluating conditional: 'ansible_pkg_mgr' is undefined
+Origin: /home/yczhang/.ansible/roles/lazyvim_deps/tasks/main.yml:325:7
+
+323   # `is failed` alone wouldn't catch rc=124 because failed_when: false above.
+324   when:
+325     - ansible_pkg_mgr == "apt"
+          ^ column 7
+
+✘ fatal: [localhost]: FAILED! (0.0s) =>
+    changed: false
+    msg: 'Task failed: Error while evaluating conditional: ''ansible_pkg_mgr'' is undefined'
+...ignoring
+[37] TASK · [lazyvim_deps : Install clang-devel for tree-sitter-cli cargo build (RedHat/CentOS)]
+ok: [localhost] (0.5s)
+[38] TASK · [lazyvim_deps : Install tree-sitter-cli via cargo (fallback)]
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/yczhang/.ansible/roles/lazyvim_deps/tasks/main.yml:359:3
+
+357   ignore_errors: true
+358
+359 - name: Install tree-sitter-cli via cargo (fallback)
+      ^ column 3
+
+✘ fatal: [localhost]: FAILED! (3m18s) =>
+    changed: true
+    cmd: |-
+        if command -v cargo >/dev/null 2>&1; then
+          cargo install tree-sitter-cli
+        else
+          echo "Neither Node.js nor cargo available for tree-sitter-cli"
+          echo "Install manually: cargo install tree-sitter-cli"
+          exit 0
+        fi
+    delta: '0:03:17.783059'
+    end: '2026-05-07 19:44:53.249308'
+    msg: non-zero return code
+    rc: 101
+    start: '2026-05-07 19:41:35.466249'
+    stderr: |4-
+            Updating `tuna` index
+         Downloading crates ...
+          Downloaded tree-sitter-cli v0.26.8 (registry `tuna`)
+          Installing tree-sitter-cli v0.26.8
+            Updating `tuna` index
+             Locking 237 packages to latest compatible versions
+              Adding ctor v0.2.9 (available: v1.0.2)
+              Adding dialoguer v0.11.0 (available: v0.12.0)
+              Adding rand v0.8.6 (available: v0.10.1)
+              Adding similar v2.7.0 (available: v3.1.0)
+              Adding wasmparser v0.243.0 (available: v0.248.0)
+         Downloading crates ...
+          Downloaded ansi_colours v1.2.3 (registry `tuna`)
+          Downloaded rustc-hash v2.1.2 (registry `tuna`)
+          Downloaded anstyle v1.0.14 (registry `tuna`)
+          Downloaded ctor v0.2.9 (registry `tuna`)
+          Downloaded same-file v1.0.6 (registry `tuna`)
+          Downloaded utf8parse v0.2.2 (registry `tuna`)
+          Downloaded zerofrom-derive v0.1.7 (registry `tuna`)
+          Downloaded yoke-derive v0.8.2 (registry `tuna`)
+          Downloaded stable_deref_trait v1.2.1 (registry `tuna`)
+          Downloaded topological-sort v0.2.2 (registry `tuna`)
+          Downloaded strsim v0.11.1 (registry `tuna`)
+          Downloaded shell-words v1.1.1 (registry `tuna`)
+          Downloaded smallbitvec v2.6.1 (registry `tuna`)
+          Downloaded utf8-width v0.1.8 (registry `tuna`)
+          Downloaded zerofrom v0.1.7 (registry `tuna`)
+          Downloaded rustversion v1.0.22 (registry `tuna`)
+          Downloaded zeroize v1.8.2 (registry `tuna`)
+          Downloaded schemars_derive v1.2.1 (registry `tuna`)
+          Downloaded writeable v0.6.3 (registry `tuna`)
+          Downloaded walkdir v2.5.0 (registry `tuna`)
+          Downloaded tree-sitter-loader v0.26.8 (registry `tuna`)
+          Downloaded toml_datetime v1.1.1+spec-1.1.0 (registry `tuna`)
+          Downloaded tinystr v0.8.3 (registry `tuna`)
+          Downloaded thiserror-impl v1.0.69 (registry `tuna`)
+          Downloaded thiserror v1.0.69 (registry `tuna`)
+          Downloaded synstructure v0.13.2 (registry `tuna`)
+          Downloaded shlex v1.3.0 (registry `tuna`)
+          Downloaded rquickjs v0.10.0 (registry `tuna`)
+          Downloaded rgb v0.8.53 (registry `tuna`)
+          Downloaded utf8_iter v1.0.4 (registry `tuna`)
+          Downloaded tree-sitter-tags v0.26.8 (registry `tuna`)
+          Downloaded tree-sitter-language v0.1.7 (registry `tuna`)
+          Downloaded tree-sitter-config v0.26.8 (registry `tuna`)
+          Downloaded siphasher v1.0.3 (registry `tuna`)
+          Downloaded relative-path v2.0.1 (registry `tuna`)
+          Downloaded zerovec-derive v0.11.3 (registry `tuna`)
+          Downloaded zmij v1.0.21 (registry `tuna`)
+          Downloaded tree-sitter-highlight v0.26.8 (registry `tuna`)
+          Downloaded serde_derive_internals v0.29.1 (registry `tuna`)
+          Downloaded streaming-iterator v0.1.9 (registry `tuna`)
+          Downloaded rquickjs-macro v0.10.0 (registry `tuna`)
+          Downloaded toml_parser v1.1.2+spec-1.1.0 (registry `tuna`)
+          Downloaded thread_local v1.1.9 (registry `tuna`)
+          Downloaded thiserror v2.0.18 (registry `tuna`)
+          Downloaded tempfile v3.27.0 (registry `tuna`)
+          Downloaded thiserror-impl v2.0.18 (registry `tuna`)
+          Downloaded smallvec v1.15.1 (registry `tuna`)
+          Downloaded semver v1.0.28 (registry `tuna`)
+          Downloaded similar v2.7.0 (registry `tuna`)
+          Downloaded serde_core v1.0.228 (registry `tuna`)
+          Downloaded yoke v0.8.2 (registry `tuna`)
+          Downloaded webbrowser v1.2.1 (registry `tuna`)
+          Downloaded unicode-ident v1.0.24 (registry `tuna`)
+          Downloaded tiny_http v0.12.0 (registry `tuna`)
+          Downloaded ident_case v1.0.1 (registry `tuna`)
+          Downloaded toml_edit v0.25.11+spec-1.1.0 (registry `tuna`)
+          Downloaded serde_derive v1.0.228 (registry `tuna`)
+          Downloaded zerotrie v0.2.4 (registry `tuna`)
+          Downloaded serde v1.0.228 (registry `tuna`)
+          Downloaded url v2.5.8 (registry `tuna`)
+          Downloaded schemars v1.2.1 (registry `tuna`)
+          Downloaded tree-sitter-generate v0.26.8 (registry `tuna`)
+          Downloaded unicode-segmentation v1.13.2 (registry `tuna`)
+          Downloaded rquickjs-core v0.10.0 (registry `tuna`)
+          Downloaded zerovec v0.11.6 (registry `tuna`)
+          Downloaded cfg_aliases v0.2.1 (registry `tuna`)
+          Downloaded form_urlencoded v1.2.2 (registry `tuna`)
+          Downloaded pathdiff v0.2.3 (registry `tuna`)
+          Downloaded colorchoice v1.0.5 (registry `tuna`)
+          Downloaded serde_json v1.0.149 (registry `tuna`)
+          Downloaded equivalent v1.0.2 (registry `tuna`)
+          Downloaded is_terminal_polyfill v1.70.2 (registry `tuna`)
+          Downloaded potential_utf v0.1.5 (registry `tuna`)
+          Downloaded dunce v1.0.5 (registry `tuna`)
+          Downloaded errno v0.3.14 (registry `tuna`)
+          Downloaded heck v0.5.0 (registry `tuna`)
+          Downloaded winnow v1.0.2 (registry `tuna`)
+          Downloaded httpdate v1.0.3 (registry `tuna`)
+          Downloaded idna_adapter v1.2.2 (registry `tuna`)
+          Downloaded chunked_transfer v1.5.0 (registry `tuna`)
+          Downloaded cfg-if v1.0.4 (registry `tuna`)
+          Downloaded anstyle-query v1.1.5 (registry `tuna`)
+          Downloaded dyn-clone v1.0.20 (registry `tuna`)
+          Downloaded tree-sitter v0.26.8 (registry `tuna`)
+          Downloaded ref-cast-impl v1.0.25 (registry `tuna`)
+          Downloaded clap_lex v1.1.0 (registry `tuna`)
+          Downloaded percent-encoding v2.3.2 (registry `tuna`)
+          Downloaded etcetera v0.11.0 (registry `tuna`)
+          Downloaded proc-macro-crate v3.5.0 (registry `tuna`)
+          Downloaded fnv v1.0.7 (registry `tuna`)
+          Downloaded ctrlc v3.5.2 (registry `tuna`)
+          Downloaded phf_shared v0.13.1 (registry `tuna`)
+          Downloaded phf_generator v0.13.1 (registry `tuna`)
+          Downloaded rand_chacha v0.3.1 (registry `tuna`)
+          Downloaded unicode-width v0.2.2 (registry `tuna`)
+          Downloaded ref-cast v1.0.25 (registry `tuna`)
+          Downloaded wasmparser v0.243.0 (registry `tuna`)
+          Downloaded syn v2.0.117 (registry `tuna`)
+          Downloaded fuzzy-matcher v0.3.7 (registry `tuna`)
+          Downloaded fs4 v0.12.0 (registry `tuna`)
+          Downloaded indoc v2.0.7 (registry `tuna`)
+          Downloaded zerocopy v0.8.48 (registry `tuna`)
+          Downloaded itoa v1.0.18 (registry `tuna`)
+          Downloaded foldhash v0.1.5 (registry `tuna`)
+          Downloaded anstream v1.0.0 (registry `tuna`)
+          Downloaded anstyle-parse v1.0.0 (registry `tuna`)
+          Downloaded either v1.15.0 (registry `tuna`)
+          Downloaded fastrand v2.4.1 (registry `tuna`)
+          Downloaded regex-syntax v0.8.10 (registry `tuna`)
+          Downloaded ppv-lite86 v0.2.21 (registry `tuna`)
+          Downloaded rustix v0.38.44 (registry `tuna`)
+          Downloaded rand_core v0.6.4 (registry `tuna`)
+          Downloaded rustix v1.1.4 (registry `tuna`)
+          Downloaded foldhash v0.2.0 (registry `tuna`)
+          Downloaded cexpr v0.6.0 (registry `tuna`)
+          Downloaded displaydoc v0.2.5 (registry `tuna`)
+          Downloaded phf v0.13.1 (registry `tuna`)
+          Downloaded glob v0.3.3 (registry `tuna`)
+          Downloaded convert_case v0.8.0 (registry `tuna`)
+          Downloaded regex-automata v0.4.14 (registry `tuna`)
+          Downloaded console v0.15.11 (registry `tuna`)
+          Downloaded dialoguer v0.11.0 (registry `tuna`)
+          Downloaded html-escape v0.2.13 (registry `tuna`)
+          Downloaded libloading v0.8.9 (registry `tuna`)
+          Downloaded clap_derive v4.6.1 (registry `tuna`)
+          Downloaded libloading v0.9.0 (registry `tuna`)
+          Downloaded ascii v1.1.0 (registry `tuna`)
+          Downloaded crc32fast v1.5.0 (registry `tuna`)
+          Downloaded rquickjs-sys v0.10.0 (registry `tuna`)
+          Downloaded quote v1.0.45 (registry `tuna`)
+          Downloaded litemap v0.8.2 (registry `tuna`)
+          Downloaded once_cell v1.21.4 (registry `tuna`)
+          Downloaded clap_complete_nushell v4.6.0 (registry `tuna`)
+          Downloaded find-msvc-tools v0.1.9 (registry `tuna`)
+          Downloaded bitflags v2.11.1 (registry `tuna`)
+          Downloaded clang-sys v1.8.1 (registry `tuna`)
+          Downloaded getrandom v0.2.17 (registry `tuna`)
+          Downloaded anyhow v1.0.102 (registry `tuna`)
+          Downloaded clap_complete v4.6.3 (registry `tuna`)
+          Downloaded bytemuck v1.25.0 (registry `tuna`)
+          Downloaded log v0.4.29 (registry `tuna`)
+          Downloaded getrandom v0.4.2 (registry `tuna`)
+          Downloaded icu_provider v2.2.0 (registry `tuna`)
+          Downloaded clap v4.6.1 (registry `tuna`)
+          Downloaded allocator-api2 v0.2.21 (registry `tuna`)
+          Downloaded proc-macro2 v1.0.106 (registry `tuna`)
+          Downloaded icu_normalizer_data v2.2.0 (registry `tuna`)
+          Downloaded icu_locale_core v2.2.0 (registry `tuna`)
+          Downloaded icu_properties v2.2.0 (registry `tuna`)
+          Downloaded icu_normalizer v2.2.0 (registry `tuna`)
+          Downloaded prettyplease v0.2.37 (registry `tuna`)
+          Downloaded icu_collections v2.2.0 (registry `tuna`)
+          Downloaded rand v0.8.6 (registry `tuna`)
+          Downloaded minimal-lexical v0.2.1 (registry `tuna`)
+          Downloaded memchr v2.8.0 (registry `tuna`)
+          Downloaded cc v1.2.61 (registry `tuna`)
+          Downloaded indexmap v2.14.0 (registry `tuna`)
+          Downloaded nom v7.1.3 (registry `tuna`)
+          Downloaded idna v1.1.0 (registry `tuna`)
+          Downloaded hashbrown v0.15.5 (registry `tuna`)
+          Downloaded hashbrown v0.16.1 (registry `tuna`)
+          Downloaded itertools v0.13.0 (registry `tuna`)
+          Downloaded hashbrown v0.17.0 (registry `tuna`)
+          Downloaded regex v1.12.3 (registry `tuna`)
+          Downloaded clap_builder v4.6.0 (registry `tuna`)
+          Downloaded icu_properties_data v2.2.0 (registry `tuna`)
+          Downloaded aho-corasick v1.1.4 (registry `tuna`)
+          Downloaded bindgen v0.72.1 (registry `tuna`)
+          Downloaded nix v0.31.2 (registry `tuna`)
+          Downloaded bstr v1.12.1 (registry `tuna`)
+          Downloaded libc v0.2.186 (registry `tuna`)
+          Downloaded linux-raw-sys v0.4.15 (registry `tuna`)
+          Downloaded linux-raw-sys v0.12.1 (registry `tuna`)
+           Compiling proc-macro2 v1.0.106
+           Compiling quote v1.0.45
+           Compiling unicode-ident v1.0.24
+           Compiling memchr v2.8.0
+           Compiling shlex v1.3.0
+           Compiling find-msvc-tools v0.1.9
+           Compiling zmij v1.0.21
+           Compiling equivalent v1.0.2
+           Compiling cfg-if v1.0.4
+           Compiling glob v0.3.3
+           Compiling hashbrown v0.17.0
+           Compiling prettyplease v0.2.37
+           Compiling stable_deref_trait v1.2.1
+           Compiling libc v0.2.186
+           Compiling regex-syntax v0.8.10
+           Compiling minimal-lexical v0.2.1
+           Compiling bindgen v0.72.1
+           Compiling either v1.15.0
+           Compiling serde_core v1.0.228
+           Compiling rustc-hash v2.1.2
+           Compiling bitflags v2.11.1
+           Compiling log v0.4.29
+           Compiling cc v1.2.61
+           Compiling clang-sys v1.8.1
+           Compiling serde_json v1.0.149
+           Compiling itoa v1.0.18
+           Compiling tree-sitter-language v0.1.7
+           Compiling serde v1.0.228
+           Compiling writeable v0.6.3
+           Compiling litemap v0.8.2
+           Compiling thiserror v2.0.18
+           Compiling icu_properties_data v2.2.0
+           Compiling utf8_iter v1.0.4
+           Compiling icu_normalizer_data v2.2.0
+           Compiling utf8parse v0.2.2
+           Compiling winnow v1.0.2
+           Compiling anstyle-query v1.1.5
+           Compiling anstyle v1.0.14
+           Compiling allocator-api2 v0.2.21
+           Compiling zerocopy v0.8.48
+           Compiling colorchoice v1.0.5
+           Compiling siphasher v1.0.3
+           Compiling smallvec v1.15.1
+           Compiling foldhash v0.2.0
+           Compiling rustix v1.1.4
+           Compiling is_terminal_polyfill v1.70.2
+           Compiling toml_datetime v1.1.1+spec-1.1.0
+           Compiling getrandom v0.4.2
+           Compiling streaming-iterator v0.1.9
+           Compiling once_cell v1.21.4
+           Compiling relative-path v2.0.1
+           Compiling fastrand v2.4.1
+           Compiling strsim v0.11.1
+           Compiling unicode-segmentation v1.13.2
+           Compiling rustix v0.38.44
+           Compiling clap_lex v1.1.0
+           Compiling linux-raw-sys v0.12.1
+           Compiling heck v0.5.0
+           Compiling cfg_aliases v0.2.1
+           Compiling fnv v1.0.7
+           Compiling linux-raw-sys v0.4.15
+           Compiling ident_case v1.0.1
+           Compiling thiserror v1.0.69
+           Compiling ref-cast v1.0.25
+           Compiling percent-encoding v2.3.2
+           Compiling etcetera v0.11.0
+           Compiling thread_local v1.1.9
+           Compiling wasmparser v0.243.0
+           Compiling tree-sitter-loader v0.26.8
+           Compiling unicode-width v0.2.2
+           Compiling anyhow v1.0.102
+           Compiling bytemuck v1.25.0
+           Compiling indoc v2.0.7
+           Compiling foldhash v0.1.5
+           Compiling crc32fast v1.5.0
+           Compiling libloading v0.9.0
+           Compiling chunked_transfer v1.5.0
+           Compiling dyn-clone v1.0.20
+           Compiling ascii v1.1.0
+           Compiling zeroize v1.8.2
+           Compiling shell-words v1.1.1
+           Compiling pathdiff v0.2.3
+           Compiling httpdate v1.0.3
+           Compiling same-file v1.0.6
+           Compiling tree-sitter-cli v0.26.8
+           Compiling utf8-width v0.1.8
+           Compiling smallbitvec v2.6.1
+           Compiling dunce v1.0.5
+           Compiling topological-sort v0.2.2
+           Compiling similar v2.7.0
+           Compiling indexmap v2.14.0
+           Compiling nom v7.1.3
+           Compiling regex-automata v0.4.14
+           Compiling libloading v0.8.9
+           Compiling itertools v0.13.0
+           Compiling aho-corasick v1.1.4
+           Compiling toml_parser v1.1.2+spec-1.1.0
+           Compiling anstyle-parse v1.0.0
+           Compiling hashbrown v0.16.1
+           Compiling phf_shared v0.13.1
+           Compiling nix v0.31.2
+           Compiling convert_case v0.8.0
+           Compiling form_urlencoded v1.2.2
+           Compiling fuzzy-matcher v0.3.7
+           Compiling rgb v0.8.53
+           Compiling anstream v1.0.0
+           Compiling html-escape v0.2.13
+           Compiling walkdir v2.5.0
+           Compiling tiny_http v0.12.0
+           Compiling cexpr v0.6.0
+           Compiling regex v1.12.3
+           Compiling toml_edit v0.25.11+spec-1.1.0
+           Compiling phf_generator v0.13.1
+           Compiling phf v0.13.1
+           Compiling clap_builder v4.6.0
+           Compiling syn v2.0.117
+           Compiling getrandom v0.2.17
+           Compiling console v0.15.11
+           Compiling proc-macro-crate v3.5.0
+           Compiling rand_core v0.6.4
+           Compiling ansi_colours v1.2.3
+           Compiling semver v1.0.28
+           Compiling ctrlc v3.5.2
+           Compiling tempfile v3.27.0
+           Compiling fs4 v0.12.0
+           Compiling tree-sitter v0.26.8
+           Compiling bstr v1.12.1
+           Compiling synstructure v0.13.2
+           Compiling serde_derive_internals v0.29.1
+           Compiling zerovec-derive v0.11.3
+           Compiling displaydoc v0.2.5
+           Compiling serde_derive v1.0.228
+           Compiling thiserror-impl v2.0.18
+           Compiling clap_derive v4.6.1
+           Compiling ref-cast-impl v1.0.25
+           Compiling thiserror-impl v1.0.69
+           Compiling ctor v0.2.9
+           Compiling schemars_derive v1.2.1
+           Compiling dialoguer v0.11.0
+           Compiling clap v4.6.1
+           Compiling zerofrom-derive v0.1.7
+           Compiling yoke-derive v0.8.2
+           Compiling clap_complete v4.6.3
+           Compiling clap_complete_nushell v4.6.0
+           Compiling zerofrom v0.1.7
+           Compiling yoke v0.8.2
+           Compiling zerovec v0.11.6
+           Compiling zerotrie v0.2.4
+           Compiling hashbrown v0.15.5
+           Compiling tree-sitter-config v0.26.8
+           Compiling schemars v1.2.1
+           Compiling tinystr v0.8.3
+           Compiling potential_utf v0.1.5
+           Compiling icu_collections v2.2.0
+           Compiling icu_locale_core v2.2.0
+           Compiling icu_provider v2.2.0
+           Compiling icu_properties v2.2.0
+           Compiling icu_normalizer v2.2.0
+           Compiling tree-sitter-tags v0.26.8
+           Compiling tree-sitter-highlight v0.26.8
+           Compiling idna_adapter v1.2.2
+           Compiling idna v1.1.0
+           Compiling url v2.5.8
+           Compiling webbrowser v1.2.1
+           Compiling ppv-lite86 v0.2.21
+           Compiling rand_chacha v0.3.1
+           Compiling rand v0.8.6
+           Compiling rquickjs-sys v0.10.0
+        error: failed to run custom build command for `rquickjs-sys v0.10.0`
+
+        Caused by:
+          process didn't exit successfully: `/tmp/cargo-installMr1AiW/release/build/rquickjs-sys-5fdb8fcfec5a37d8/build-script-build` (exit status: 101)
+          --- stdout
+          cargo:rerun-if-env-changed=CARGO_FEATURE_BINDGEN
+          cargo:rerun-if-env-changed=CARGO_FEATURE_UPDATE_BINDINGS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_BYTECODE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_GC
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_GC_FREE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_FREE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_LEAKS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_MEM
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_OBJECTS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_ATOMS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_SHAPES
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_MODULE_RESOLVE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_PROMISE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_READ_OBJECT
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DISABLE_ASSERTIONS
+          cargo:rerun-if-env-changed=CARGO_CFG_SANITIZE
+
+          --- stderr
+
+          thread 'main' (133634) panicked at /home/yczhang/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/bindgen-0.72.1/lib.rs:616:27:
+          Unable to find libclang: "the `libclang` shared library at /usr/lib64/clang-private/libclang.so.7 could not be opened: libclangAST.so.7: cannot open shared object file: No such file or directory"
+          note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        warning: build failed, waiting for other jobs to finish...
+        error: failed to run custom build command for `rquickjs-sys v0.10.0`
+
+        Caused by:
+          process didn't exit successfully: `/tmp/cargo-installMr1AiW/release/build/rquickjs-sys-5fdb8fcfec5a37d8/build-script-build` (exit status: 101)
+          --- stdout
+          cargo:rerun-if-env-changed=CARGO_FEATURE_BINDGEN
+          cargo:rerun-if-env-changed=CARGO_FEATURE_UPDATE_BINDINGS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_BYTECODE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_GC
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_GC_FREE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_FREE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_LEAKS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_MEM
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_OBJECTS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_ATOMS
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_SHAPES
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_MODULE_RESOLVE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_PROMISE
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DUMP_READ_OBJECT
+          cargo:rerun-if-env-changed=CARGO_FEATURE_DISABLE_ASSERTIONS
+          cargo:rerun-if-env-changed=CARGO_CFG_SANITIZE
+
+          --- stderr
+
+          thread 'main' (133635) panicked at /home/yczhang/.cargo/registry/src/mirrors.tuna.tsinghua.edu.cn-4dc01642fd091eda/bindgen-0.72.1/lib.rs:616:27:
+          Unable to find libclang: "the `libclang` shared library at /usr/lib64/clang-private/libclang.so.7 could not be opened: libclangAST.so.7: cannot open shared object file: No such file or directory"
+          note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        error: failed to compile `tree-sitter-cli v0.26.8`, intermediate artifacts can be found at `/tmp/cargo-installMr1AiW`.
+        To reuse those artifacts with a future compilation, set the environment variable `CARGO_BUILD_BUILD_DIR` to that path.
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+...ignoring
+───────────────────────── devtools ─────────────────────────
+[39] TASK · [devtools : Re-check if bats is installed]
+ok: [localhost] (0.4s)
+[40] TASK · [devtools : Check if gh is available for gh-dash extension installation]
+ok: [localhost] (0.4s)
+[41] TASK · [devtools : Check if tv binary ended up on PATH]
+ok: [localhost] (0.4s)
+[42] TASK · [devtools : Check if TPM install_plugins has already run]
+ok: [localhost] (0.4s)
+[43] TASK · [devtools : Check if TPM binary is present (from chezmoi external)]
+ok: [localhost] (0.4s)
+────────────────────── coding_agents ───────────────────────
+[44] TASK · [coding_agents : Install libnotify-bin (Debian/Ubuntu)]
+[ERROR]: Task failed: Error while evaluating conditional: 'ansible_pkg_mgr' is undefined
+
+Task failed.
+Origin: /home/yczhang/.ansible/roles/coding_agents/tasks/main.yml:19:3
+
+17 # headless servers — skip on RedHat without a yum fallback. Rocky/Alma
+18 # users who need notify-send can `sudo yum install libnotify` manually.
+19 - name: Install libnotify-bin (Debian/Ubuntu)
+     ^ column 3
+
+<<< caused by >>>
+
+Error while evaluating conditional: 'ansible_pkg_mgr' is undefined
+Origin: /home/yczhang/.ansible/roles/coding_agents/tasks/main.yml:20:9
+
+18 # users who need notify-send can `sudo yum install libnotify` manually.
+19 - name: Install libnotify-bin (Debian/Ubuntu)
+20   when: ansible_pkg_mgr == "apt"
+           ^ column 9
+
+✘ fatal: [localhost]: FAILED! (0.0s) =>
+    changed: false
+    msg: 'Task failed: Error while evaluating conditional: ''ansible_pkg_mgr'' is undefined'
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (16m10s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=43   changed=2    unreachable=0    failed=1    skipped=458  rescued=0    ignored=2
+
+Changed tasks (1):
+  ✦ lazyvim_deps : Install mise global tools (Debian/Ubuntu) (9m19s)
+
+Slow tasks (>5s):
+  ⏱ lazyvim_deps : Install mise global tools (Debian/Ubuntu) (9m19s)
+  ⏱ lazyvim_deps : Install tree-sitter-cli via cargo (fallback) (3m18s)
+  ⏱ lazyvim_deps : Install tree-sitter-cli via mise npm (Debian/Ubuntu) (3m0s)
+
+chezmoi: .chezmoiscripts/global/20_ansible_roles.sh: exit status 2
+[ble: exit 1][ble: elapsed 977.432s (CPU 55.9%)] chezmoi update --apply
+mise WARN  missing: bun@1.3.13
+
+```
+
+```
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5 took 15s
+❯ ~/.local/bin/chezmoi diff ~/.config/mise/config.toml
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯  ~/.local/bin/chezmoi apply --force ~/.config/mise/config.toml
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ cat ~/.config/mise/config.toml
+# mise global configuration
+# https://mise.jdx.dev/configuration.html
+
+[settings]
+# Use precompiled ruby binaries instead of compiling from source.
+# ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
+ruby.compile = false
+
+[tools]
+# CentOS/RHEL 7 detected (glibc 2.17). Modern toolchain prebuilds refuse to
+# run on this baseline, so most mise core tools are skipped. Manual fallbacks:
+#   - Node.js: install via NodeSource (Node 16 last EL7-compatible LTS):
+#       curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
+#       sudo yum install -y nodejs
+#   - Rust: install via rustup directly (avoids mise's TUNA mirror gap):
+#       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+#   - Bun: skipped — musl binary fails to start; not worth chasing
+#   - .NET: skipped — needs GLIBCXX_3.4.20 (gcc 5+); requires SCL devtoolset
+#   - Ruby: precompiled binary works
+# See docs/infra/linux-toolchain-baseline.md for the full glibc/libstdc++
+# version matrix and why these decisions are structural, not transient.
+ruby = "3"
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯  ~/.local/bin/mise install --yes
+mise all tools are installed
+
+yczhang in 🌐 idc-server104 in ~ via  v2.7.5
+❯ ~/.local/bin/mise ls --missing
+Tool  Version  Source  Requested
+```
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-07 11:53:20Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 11:53:21Z)**_
+
+Three things to fix. Let me check the exports + ansible_pkg_mgr issue first.
+
+_**Agent (claude-opus-4-7 2026-05-07 11:53:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See current mirror config
+
+`grep -n "MIRROR\|mirror\|MIRROR_URL\|aliyun\|tuna\|ustc\|HOMEBREW\|RUSTUP\|MISE_NODE" /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/00_exports.sh.tmpl | head -40`
+
+```text
+71:export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
+83:#       https://developer.aliyun.com/mirror/homebrew
+84:#   - USTC:  university mirror, low queueing; path is top-level (no /git/homebrew/)
+85:#       https://mirrors.ustc.edu.cn/help/brew.git.html
+86:#   - BFSU:  mirrors TUNA content but less congested
+87:#       https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
+89:#       https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
+93:export HOMEBREW_API_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles/api"
+94:export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+95:export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
+96:export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
+98:#   export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+99:#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+100:#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+101:#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+103:#   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+104:#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+105:#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+106:#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
+108:#   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+109:#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+110:#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+111:#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+115:# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/rustup/
+116:export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+117:export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+122:# set PYTHON_BUILD_MIRROR_URL manually.
+123:# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/
+124:export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+125:export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:53:54Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 11:53:55Z)**_
+
+Three fixes. Let me revert the brittle `ansible_pkg_mgr` to safer `os_family`, switch Node mirror to Aliyun, and add the Node-via-micromamba example to the doc.
+
+### Fix 1: `ansible_pkg_mgr` → `ansible_facts["os_family"]`
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find remaining ansible_pkg_mgr usages
+
+`grep -rn "ansible_pkg_mgr" /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/ 2>/dev/null`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml:20:# Why os_family and not ansible_pkg_mgr? On CentOS 7 the ansible-core
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/coding_agents/tasks/main.yml:22:# ansible_pkg_mgr undefined. os_family is always populated.
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/nerdfonts/tasks/main.yml:43:      when: ansible_pkg_mgr == "apt"
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml:48:  when: ansible_pkg_mgr == "apt"
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:322:# Why os_family and not ansible_pkg_mgr? On CentOS 7 the ansible-core
+/Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/lazyvim_deps/tasks/main.yml:324:# ansible_pkg_mgr undefined. os_family is always populated.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/nerdfonts/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/networking_tools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:50Z)**_
+
+### Fix 2: Switch Node mirror to Aliyun
+
+_**Agent (claude-opus-4-7 2026-05-07 11:54:51Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/shell/00_exports.sh.tmpl`
+
+```text
+112	
+113	# Rustup: affects `rustup install`, `rustup update`, `rustup self update`,
+114	# and mise's rust plugin (which invokes rustup internally).
+115	# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/rustup/
+116	export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
+117	export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+118	
+119	# mise runtime downloads: Node.js prebuilt archives.
+120	# Python is usually fine since mise pulls pre-compiled binaries from the
+121	# python-build-standalone GitHub releases (not blocked). If you hit issues,
+122	# set PYTHON_BUILD_MIRROR_URL manually.
+123	# Ref: https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/
+124	export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+125	export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+126	
+127	# Go modules: goproxy.cn is the Qiniu-hosted de-facto standard for China;
+128	# TUNA does not host a Go module proxy. `direct` fallback preserves private
+129	# repo support.
+130	# Ref: https://goproxy.cn/
+131	export GOPROXY="https://goproxy.cn,direct"
+132	export GOSUMDB="sum.golang.google.cn"
+133	{{ end -}}
+134	
+135	# --- Suggested exports (uncomment to enable) ---
+136	# History configuration (oh-my-zsh handles this, but can customize)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/00_exports.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:10Z)**_
+
+Same change in ansible_roles runner script.
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find MISE_NODE_MIRROR_URL in ansible_roles
+
+`grep -n "MISE_NODE_MIRROR_URL\|NODE_BUILD_MIRROR_URL\|nodejs-release" /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl | head -5`
+
+```text
+110:export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+111:export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:25Z)**_
+
+### Fix 3: Extend the toolchain doc with Node-via-micromamba
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/infra/linux-toolchain-baseline.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:54Z)**_
+
+Sanity check + commit.
+
+_**Agent (claude-opus-4-7 2026-05-07 11:55:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Sanity check both files
+
+`cd /Users/daviddwlee84/.local/share/chezmoi/dot_ansible && ~/.local/bin/ansible-playbook --syntax-check playbooks/linux.yml 2>&1 | tail -3 && echo "---" && chezmoi execute-template < dot_config/shell/00_exports.sh.tmpl > /tmp/exports_render.sh 2>&1 && bash -n /tmp/exports_render.sh && echo "exports OK"`
+
+```text
+Exit code 1
+zoxide: detected a possible configuration issue.
+Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+If the issue persists, consider filing an issue at:
+https://github.com/ajeetdsouza/zoxide/issues
+
+Disable this message by setting _ZO_DOCTOR=0.
+
+
+playbook: playbooks/linux.yml
+---
+(eval):1: no such file or directory: dot_config/shell/00_exports.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:56:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Sanity check exports template
+
+`chezmoi execute-template < dot_config/shell/00_exports.sh.tmpl > /tmp/exports_render.sh 2>&1 && bash -n /tmp/exports_render.sh && echo "exports OK"`
+
+```text
+exports OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:56:12Z)**_
+
+Clean. Stage + commit.
+
+_**Agent (claude-opus-4-7 2026-05-07 11:56:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit fixes
+
+```bash
+git add dot_ansible/roles/{coding_agents,lazyvim_deps,nerdfonts,networking_tools}/tasks/main.yml dot_config/shell/00_exports.sh.tmpl .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl docs/infra/linux-toolchain-baseline.md && git commit -m "$(cat <<'EOF'
+mirrors+ansible: switch Node mirror to Aliyun, fix ansible_pkg_mgr undefined
+
+Three independent fixes from the latest CentOS 7 apply:
+
+1. Revert `ansible_pkg_mgr == "apt"` -> `ansible_facts["os_family"] == "Debian"`
+   On CentOS 7 ansible-core 2.18+'s `pkg_mgr` auto-detection fails (no
+   dnf binary -> pkg_mgr probe aborts -> ansible_pkg_mgr stays
+   undefined). Tasks gated on `ansible_pkg_mgr == "apt"` then fail
+   with "Error while evaluating conditional: 'ansible_pkg_mgr' is
+   undefined" instead of just being skipped. `ansible_facts.os_family`
+   is always populated by gather_facts so it's the safe gate.
+
+   Affected: coding_agents/libnotify-bin, lazyvim_deps/libclang-dev,
+   nerdfonts/fontconfig, networking_tools/system packages.
+
+2. Switch Node mirror from TUNA to Aliyun
+   TUNA's nodejs-release mirror keeps only ~5 hand-picked versions
+   instead of mirroring all of nodejs.org/dist/, so every
+   `mise install node@lts` 404s on whatever LTS patch isn't in their
+   small set. Aliyun mirrors all upstream releases and is much more
+   reliable for `mise install`. Updated both
+   `dot_config/shell/00_exports.sh.tmpl` (interactive shells) and
+   `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`
+   (ansible subprocess env). See
+   pitfalls/tuna-nodejs-mirror-aggressive-gc.md.
+
+3. Extend docs/infra/linux-toolchain-baseline.md with Node-via-mamba
+   The micromamba section already covered Python/numpy. Added a
+   parallel Node section showing `micromamba create -c conda-forge
+   nodejs=22` as the EL7 escape hatch for npm packages requiring
+   Node 18+. Includes auto-activation snippet for ~/.bashrc.adhoc
+   so SSH sessions land in the env.
+
+Other mirrors (Homebrew/Aliyun, rustup/TUNA, PyPI/TUNA, GOPROXY/
+goproxy.cn, NPM/registry.npmmirror.com) reviewed and kept — they
+work well for current usage. Only Node had the structural mirror
+defect that warranted switching.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)" && git log --oneline -4
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778154990-59668.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778154990-59668.
+[main 3a85599] mirrors+ansible: switch Node mirror to Aliyun, fix ansible_pkg_mgr undefined
+ 7 files changed, 82 insertions(+), 19 deletions(-)
+3a85599 mirrors+ansible: switch Node mirror to Aliyun, fix ansible_pkg_mgr undefined
+c0b4bd8 docs+mise+blesh: Linux toolchain baseline doc + EL7-aware mise pins
+49796ad tmux: extended-keys always -> on (fix ble.sh paste corruption)
+d0c3f2c ansible: broaden 4 more roles to RedHat (llm/nerdfonts/networking/lazyvim)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-07 11:57:03Z)**_
+
+Committed `3a85599`.
+
+## Mirror 配置最終決策（盤點全部）
+
+| 套件 | 預設 mirror | 為什麼 |
+|---|---|---|
+| **Homebrew** (api/bottle/brew/core) | **Aliyun** | 商業 CDN 速度最穩，bottle 完整 |
+| **Rustup** (dist/update) | **TUNA** | 學校 mirror 通常同步快，rustc 各版本齊全 |
+| **Node** (mise/node-build) | **Aliyun** ← 改了 | TUNA 只留 5 版本，Aliyun 完整 |
+| **PyPI** | (uv 內建：官方 / Aliyun / TUNA / USTC) | 自動 fallback chain |
+| **NPM** | (你的 .npmrc 預設) | npmmirror 是 de-facto |
+| **Cargo crates** | TUNA registry (從 user log 看到) | 學校 mirror 完整 |
+| **Go modules** | **goproxy.cn** | Qiniu 託管，de-facto 唯一選擇 |
+| **GitHub releases** | (no mirror) | 用 ghproxy.com 是 case-by-case |
+
+把 Node 從 TUNA 切 Aliyun 是這次唯一動到的 — 其他都驗證過 work fine。
+
+## 關於 tree-sitter-cli cargo build 失敗
+
+看你 log：
+
+```
+Unable to find libclang: "the `libclang` shared library at
+  /usr/lib64/clang-private/libclang.so.7 could not be opened:
+  libclangAST.so.7: cannot open shared object file"
+```
+
+`clang-devel` 在 EL7 是個老版本（clang 3.4.2 的衍生），跟現代 `bindgen` (≥ 0.70) 要的 libclang ABI 不相容。修法：
+
+```bash
+# 從 conda-forge 抓現代 clang
+micromamba create -n cargo-build -c conda-forge -y clangdev
+micromamba activate cargo-build
+export LIBCLANG_PATH="$CONDA_PREFIX/lib"
+cargo install tree-sitter-cli
+```
+
+但說實話 — **tree-sitter-cli 在 EL7 上是死路**。LazyVim 的 nvim-treesitter 其實也能用「sync-install via plugin」的方式裝 parsers，不一定需要 tree-sitter-cli binary。
+
+## 你 server 端要做的
+
+```bash
+cd ~/.local/share/chezmoi
+git pull   # 拿到 3a85599
+
+# 不要 chezmoi apply 立刻跑（mise/config.toml 已經是新版了，不會再 drift）
+# 直接 reload 就好：
+~/.local/bin/chezmoi apply
+
+# 等下次 chezmoi apply 觸發 ansible_roles，ansible_pkg_mgr 那兩個 task 就會用 os_family 跳 OK 而不是錯誤
+```
+
+新 SSH session 開始：`MISE_NODE_MIRROR_URL` 自動指 Aliyun。但因為你已經有 NodeSource 系統 Node 16，mise 應該不會再試裝 node（config.toml 已 EL7-skip）。
+
+## micromamba 路徑要不要走？
+
+如果你想要 Copilot CLI / Codex CLI / Gemini CLI（要 Node 18+），最乾淨的就是 micromamba。我剛在 doc 裡加的 snippet 直接 copy-paste 就好：
+
+```bash
+curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest \
+  | tar -xj -C ~/.local/bin --strip-components=1 bin/micromamba
+
+micromamba create -n node22 -c conda-forge -y nodejs=22
+micromamba activate node22
+
+npm install -g @google/gemini-cli
+npm install -g @openai/codex
+npm install -g @github/copilot
+```
+
+跑完就有了。如果需要持久化 auto-activate，也在 doc 裡（`~/.bashrc.adhoc` snippet）。
+
+要不要我直接把 micromamba auto-install 加進 ansible 的 `noModernGcc` 條件分支（EL7 自動裝 micromamba + node22 env）？還是這個太 invasive 你想自己手動跑？

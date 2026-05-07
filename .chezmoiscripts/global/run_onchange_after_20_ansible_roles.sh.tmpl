@@ -107,8 +107,10 @@ export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebr
 export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
 export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"
 export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
-export MISE_NODE_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
-export NODE_BUILD_MIRROR_URL="https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/"
+# Aliyun mirror — TUNA's nodejs-release keeps only ~5 versions; see
+# pitfalls/tuna-nodejs-mirror-aggressive-gc.md.
+export MISE_NODE_MIRROR_URL="https://mirrors.aliyun.com/nodejs-release/"
+export NODE_BUILD_MIRROR_URL="https://mirrors.aliyun.com/nodejs-release/"
 {{ end -}}
 
 # Colors

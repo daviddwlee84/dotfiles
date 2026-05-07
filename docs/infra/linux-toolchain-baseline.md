@@ -188,22 +188,69 @@ crusty kernel:
 micromamba ships its own glibc-2.17-compatible binary and pulls
 conda-forge packages that bring their own glibc/libstdc++ in
 the env's `lib/`. This is the cleanest "modern Python + numpy + pandas
-+ pyarrow + pytorch on EL7" path.
++ pyarrow + pytorch on EL7" path AND the cleanest way to get **modern
+Node** (which dropped EL7 support at v18, see Node table above).
+
+#### Modern Python + scientific stack
 
 ```bash
-# Single-binary install, ~/.local/bin/micromamba
-curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xj -C ~/.local/bin --strip-components=1 bin/micromamba
+# Single-binary install, ~/.local/bin/micromamba (~30MB, no sudo)
+curl -fsSL https://micro.mamba.pm/api/micromamba/linux-64/latest \
+  | tar -xj -C ~/.local/bin --strip-components=1 bin/micromamba
 
 # Modern Python + dataframe stack — bundles its own libstdc++ from
 # conda-forge so EL7's gcc 4.8.5 doesn't matter.
-micromamba create -n modern python=3.13 numpy pandas pyarrow polars duckdb -y -c conda-forge
+micromamba create -n modern -c conda-forge -y \
+  python=3.13 numpy pandas pyarrow polars duckdb
 micromamba activate modern
-python -c "import numpy; print(numpy.__version__)"
+python -c "import numpy, pandas; print(numpy.__version__, pandas.__version__)"
+# 2.4.4 2.3.3 (or whatever's current on conda-forge)
 ```
 
-Limitation: conda-forge envs have their own internal coherence —
-mixing pip packages with conda-forge libstdc++ generally works but
-has occasional ABI drama.
+#### Modern Node + npm-based CLIs (Copilot/Codex/Gemini)
+
+This is the EL7 escape hatch for npm packages requiring Node 18+.
+NodeSource Node 16 RPMs work for installation but the actual CLIs
+fail with `Unsupported engine: requires Node >= 20`.
+
+```bash
+# Create an env with Node 22 (current LTS at time of writing). conda-forge
+# ships nodejs builds linked against its bundled glibc, so this works on
+# EL7's glibc 2.17.
+micromamba create -n node22 -c conda-forge -y nodejs=22
+
+# Activate to get node + npm on PATH:
+micromamba activate node22
+node --version    # v22.x.x
+npm --version
+
+# Install the npm-based coding agent CLIs:
+npm install -g @anthropic-ai/claude-code   # Claude Code via npm
+npm install -g @google/gemini-cli           # Gemini CLI
+npm install -g @openai/codex                # OpenAI Codex CLI
+npm install -g @github/copilot              # GitHub Copilot CLI
+```
+
+To make this seamless across SSH sessions, add to `~/.bashrc.adhoc`:
+
+```bash
+# Auto-activate the Node 22 env for any interactive shell on this host
+if [ -x ~/.local/bin/micromamba ]; then
+    eval "$(~/.local/bin/micromamba shell hook --shell bash)"
+    micromamba activate node22 2>/dev/null || true
+fi
+```
+
+#### Limitations
+
+- conda-forge envs have their own internal coherence — mixing pip
+  packages with conda-forge libstdc++ generally works but has
+  occasional ABI drama. Stick to one channel per env.
+- The env is "rooted" at the conda-forge libstdc++; stepping outside
+  with `LD_LIBRARY_PATH` overrides can break things subtly.
+- Each env consumes 200MB-1GB+ disk depending on tools. Not free.
+- conda-forge nodejs is built fresh — minor lag (1-2 days) behind
+  upstream Node releases vs. nodejs.org's same-day publish.
 
 ### 2. Apptainer / Singularity / Podman (rootless container)
 

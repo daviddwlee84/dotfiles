@@ -16,8 +16,12 @@
 # RedHat package is `libnotify` (different name) and rarely needed on
 # headless servers — skip on RedHat without a yum fallback. Rocky/Alma
 # users who need notify-send can `sudo yum install libnotify` manually.
+#
+# Why os_family and not ansible_pkg_mgr? On CentOS 7 the ansible-core
+# 2.18+ pkg_mgr auto-detection fails (no dnf binary), leaving
+# ansible_pkg_mgr undefined. os_family is always populated.
 - name: Install libnotify-bin (Debian/Ubuntu)
-  when: ansible_pkg_mgr == "apt"
+  when: ansible_facts["os_family"] == "Debian"
   become: true
   tags: [sudo]
   ansible.builtin.apt:

@@ -318,11 +318,15 @@
 
 # cargo build of tree-sitter-cli requires libclang (via bindgen). Install on
 # Debian/Ubuntu when we might fall through to the cargo path.
-- name: Install libclang-dev for tree-sitter-cli cargo build (apt)
+#
+# Why os_family and not ansible_pkg_mgr? On CentOS 7 the ansible-core
+# 2.18+ pkg_mgr auto-detection fails (no dnf binary), leaving
+# ansible_pkg_mgr undefined. os_family is always populated.
+- name: Install libclang-dev for tree-sitter-cli cargo build (Debian/Ubuntu)
   # rc != 0 covers both: regular npm failure AND `timeout` exit 124.
   # `is failed` alone wouldn't catch rc=124 because failed_when: false above.
   when:
-    - ansible_pkg_mgr == "apt"
+    - ansible_facts["os_family"] == "Debian"
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
     - treesitter_npm.rc | default(1) != 0
