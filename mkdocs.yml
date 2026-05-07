@@ -306,6 +306,7 @@ nav:
       - Overview: infra/README.md
       - Linux toolchain baseline (glibc / libstdc++ / kernel / gcc): infra/linux-toolchain-baseline.md
       - RHEL ecosystem & CentOS migration: infra/rhel-ecosystem.md
+      - Debian ecosystem (Debian / Ubuntu / Raspberry Pi OS): infra/debian-ecosystem.md
       - Virtualization: infra/virtualization.md
       - Compute scheduling: infra/compute-scheduling.md
       - Shared storage: infra/shared-storage.md
