@@ -45,6 +45,9 @@ case "$MODE" in
         for f in \
             "$HOME/.zshrc" \
             "$HOME/.zshenv" \
+            "$HOME/.bashrc" \
+            "$HOME/.bash_profile" \
+            "$HOME/.bash_aliases" \
             "$HOME/.gitconfig" \
             "$HOME/.tmux.conf"; do
             copy_one "$f"
@@ -52,6 +55,8 @@ case "$MODE" in
         for d in \
             "$HOME/.config/nvim" \
             "$HOME/.config/zsh" \
+            "$HOME/.config/bash" \
+            "$HOME/.config/shell" \
             "$HOME/.config/mise" \
             "$HOME/.config/alacritty" \
             "$HOME/.config/yazi" \
