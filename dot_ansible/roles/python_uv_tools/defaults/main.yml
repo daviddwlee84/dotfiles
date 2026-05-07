@@ -4,6 +4,13 @@
 #   - name: package name (can include extras like [cli])
 #   - binary: executable name to check for idempotency
 #   - with: (optional) additional dependency to install with --with
+#   - python: (optional) pin Python version (e.g. "3.11" for thefuck)
+#   - needs_modern_gcc: (optional, default false) tool transitively pulls
+#     numpy 2.x / pandas 3.x / pyarrow which require GCC ≥ 9.3 to compile
+#     from source. Skipped on systems where GCC < 9 (e.g. CentOS 7's
+#     gcc 4.8.5). uv falls back to source build because numpy 2.x
+#     dropped manylinux_2_17 wheels — see
+#     pitfalls/centos7-numpy-pandas-source-build.md.
 
 python_uv_tools:
   - name: thefuck
@@ -13,6 +20,7 @@ python_uv_tools:
     binary: apprise
   - name: sqlit-tui[ssh]
     binary: sqlit
+    needs_modern_gcc: true  # textual-fastdatatable -> pandas -> numpy 2.x
     with:
       - psycopg2-binary
       - pymysql
@@ -29,6 +37,7 @@ python_uv_tools:
     binary: tmuxp
   - name: visidata
     binary: vd
+    needs_modern_gcc: true  # explicit pandas + pyarrow deps
     with:
       - pandas
       - pyarrow  # To be able open feather file

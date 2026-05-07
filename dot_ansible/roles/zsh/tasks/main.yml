@@ -42,13 +42,113 @@
   changed_when: "'ALL_INSTALLED' not in zsh_yum_result.stdout"
   ignore_errors: true
 
+# === User-level zsh source build (CentOS 7: system zsh is 5.0.2, too old) ===
+#
+# CentOS 7's yum ships zsh 5.0.2 (2014). The deployed ~/.zshrc + oh-my-zsh
+# + zsh-vi-mode + plugins assume zsh ≥ 5.3+ for `[[ -v var ]]`,
+# `add-zle-hook-widget`, modern glob qualifiers, etc. Symptoms when the
+# system zsh runs against this config:
+#
+#   /home/.../zsh-vi-mode.zsh:487: parse error near `]]'
+#   (eval):73: unknown condition: -v
+#   .../05_aisuggest.zsh:429: add-zle-hook-widget: function definition file not found
+#   .../28_tldr.zsh:4: unknown file attribute
+#
+# Fix: build zsh 5.9 user-level into ~/.local. CentOS 7's gcc 4.8.5 can
+# compile it; only `ncurses-devel` is needed beyond base build tools.
+# Idempotent via `creates: ~/.local/bin/zsh`. See
+# pitfalls/centos7-zsh-too-old.md.
+- name: Detect system zsh version
+  when: ansible_facts["os_family"] == "RedHat"
+  ansible.builtin.shell: |
+    set -e
+    if command -v zsh >/dev/null 2>&1; then
+      zsh --version 2>/dev/null | awk '{print $2}' | head -1
+    else
+      echo "0.0"
+    fi
+  args:
+    executable: /bin/bash
+  register: zsh_version_probe
+  changed_when: false
+  failed_when: false
+
+- name: Set fact zsh_too_old (true when system zsh < 5.3)
+  when: ansible_facts["os_family"] == "RedHat"
+  ansible.builtin.set_fact:
+    zsh_too_old: >-
+      {{ ((zsh_version_probe.stdout | default('0.0') | trim).split('.')[0] | int) < 5 or
+         (((zsh_version_probe.stdout | default('0.0') | trim).split('.')[0] | int) == 5 and
+          ((zsh_version_probe.stdout | default('0.0') | trim).split('.')[1] | int) < 3) }}
+
+- name: Install ncurses-devel for user-level zsh build (RedHat 7, system zsh too old)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - zsh_too_old | default(false)
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: |
+    set -e
+    if rpm -q ncurses-devel >/dev/null 2>&1; then
+      echo "ALL_INSTALLED"
+      exit 0
+    fi
+    yum install -y ncurses-devel
+  args:
+    executable: /bin/bash
+  register: ncurses_yum_result
+  changed_when: "'ALL_INSTALLED' not in ncurses_yum_result.stdout"
+  ignore_errors: true
+
+- name: Build zsh 5.9 from source to ~/.local (RedHat 7, system zsh too old)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - zsh_too_old | default(false)
+  ansible.builtin.shell: |
+    set -e
+    cd /tmp
+    rm -rf zsh-5.9 zsh-5.9.tar.xz
+    curl -fLO https://www.zsh.org/pub/zsh-5.9.tar.xz
+    tar xf zsh-5.9.tar.xz
+    cd zsh-5.9
+    ./configure --prefix="$HOME/.local" --enable-multibyte --quiet
+    make -j"$(nproc)" --silent
+    make install --silent
+    "$HOME/.local/bin/zsh" --version
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/zsh"
+
+- name: Add user-level zsh to /etc/shells (so chsh accepts it)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - zsh_too_old | default(false)
+  become: true
+  tags: [sudo]
+  ansible.builtin.lineinfile:
+    path: /etc/shells
+    line: "{{ ansible_facts['env']['HOME'] }}/.local/bin/zsh"
+    state: present
+    create: false
+
 # oh-my-zsh core + custom plugins are managed via .chezmoiexternal.toml.tmpl
 # (repo root). chezmoi auto-refreshes them weekly; to force a pull run
 # `chezmoi apply --refresh-externals`. Nothing to do here.
 
-# Switch the user's login shell to zsh (requires sudo to edit /etc/passwd)
+# Switch the user's login shell to zsh (requires sudo to edit /etc/passwd).
+# When zsh_too_old triggered the user-level build above, prefer
+# ~/.local/bin/zsh over the system 5.0.2 — `command -v zsh` will also
+# pick it up automatically on CentOS 7 if ~/.local/bin is at the front
+# of PATH (chezmoi-managed dot_config/shell/00_exports.sh exports it).
 - name: Locate zsh binary
-  ansible.builtin.shell: command -v zsh
+  ansible.builtin.shell: |
+    if [[ -x "$HOME/.local/bin/zsh" ]]; then
+      echo "$HOME/.local/bin/zsh"
+    else
+      command -v zsh
+    fi
+  args:
+    executable: /bin/bash
   register: zsh_path
   changed_when: false
   check_mode: false

@@ -2,6 +2,31 @@
 # Python CLI tools via uv
 # uv is bootstrapped before ansible runs
 
+# Detect whether the system has a modern-enough GCC for numpy 2.x / pandas
+# 3.x / pyarrow source builds. Modern wheel ecosystem dropped manylinux_2_17
+# (CentOS 7 baseline) so older glibc hosts fall back to compiling these from
+# source — and the build now requires GCC >= 9.3 (numpy meson build asserts).
+# CentOS 7 ships gcc 4.8.5; the tools tagged `needs_modern_gcc: true` get
+# skipped there. See pitfalls/centos7-numpy-pandas-source-build.md.
+- name: Detect host C compiler (gcc) version
+  ansible.builtin.shell: |
+    set -e
+    if command -v gcc >/dev/null 2>&1; then
+      gcc -dumpversion 2>/dev/null | head -1
+    else
+      echo "0"
+    fi
+  args:
+    executable: /bin/bash
+  register: gcc_version_probe
+  changed_when: false
+  failed_when: false
+
+- name: Set fact gcc_too_old (true when major < 9)
+  ansible.builtin.set_fact:
+    gcc_too_old: >-
+      {{ ((gcc_version_probe.stdout | trim).split('.')[0] | int) < 9 }}
+
 - name: Install Python CLI tools via uv
   ansible.builtin.command: >-
     uv tool install {{ item.name }}
@@ -16,6 +41,9 @@
   environment:
     UV_HTTP_TIMEOUT: "120"
     UV_HTTP_RETRIES: "5"
+  # Skip tools that pull numpy 2.x / pandas 3.x source-build chain when
+  # the host's GCC can't compile them (e.g. CentOS 7 — gcc 4.8.5).
+  when: not (item.needs_modern_gcc | default(false) and gcc_too_old)
   loop: "{{ python_uv_tools }}"
   loop_control:
-    label: "{{ item.name }}"
+    label: "{{ item.name }}{% if item.needs_modern_gcc | default(false) and gcc_too_old %} [SKIPPED: needs gcc >= 9]{% endif %}"

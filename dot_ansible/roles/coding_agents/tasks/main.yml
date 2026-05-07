@@ -1165,10 +1165,20 @@
 # Install-only by design: the helper exits early without any network access when
 # a claude-hud cache or installed_plugins.json entry already exists. Explicit
 # upgrades are handled by `just upgrade-plugins`.
+#
+# Why `ansible_facts.python.executable` instead of literal `python3`?
+# claude_hud_sync.py uses `from __future__ import annotations` (Py3.7+
+# syntax) plus `@dataclass`. CentOS 7's `/usr/bin/python3` is 3.6.8 which
+# can't parse `from __future__ import annotations` and aborts with
+# `SyntaxError: future feature annotations is not defined`.
+# `ansible_facts.python.executable` is the interpreter ansible itself
+# discovered/was-told-to-use (which on CentOS 7 is the uv-managed 3.13
+# we override via the controlling chezmoi script — see
+# .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl).
 - name: Install claude-hud plugin on first apply only
   ansible.builtin.command:
     argv:
-      - python3
+      - "{{ ansible_facts.python.executable | default('python3') }}"
       - "{{ role_path }}/files/claude_hud_sync.py"
       - --only-if-missing
   register: claude_hud_sync
