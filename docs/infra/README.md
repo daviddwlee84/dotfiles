@@ -32,6 +32,7 @@ flowchart TD
 
 | Doc | What it covers |
 |-----|----------------|
+| [rhel-ecosystem.md](rhel-ecosystem.md) | RHEL / CentOS family tree, EOL timeline, migration paths from CentOS 7 (→ AlmaLinux / Rocky / RHEL), AlmaLinux vs Rocky comparison. |
 | [virtualization.md](virtualization.md) | Desktop VM managers (OrbStack, UTM, VirtualBox, Fusion, Lima, libvirt), type-1 hypervisors (Proxmox VE, ESXi, XCP-ng, Harvester, Nutanix), K8s-native VMs (KubeVirt). Includes the explicit OrbStack-vs-Proxmox comparison. |
 | [shared-storage.md](shared-storage.md) | CephFS, BeeGFS, Lustre, GlusterFS, MooseFS / SeaweedFS / JuiceFS, NFSv4, Samba. Decision matrix by workload + client mount recipes. |
 | [compute-scheduling.md](compute-scheduling.md) | SLURM, Kubernetes + Kueue/Volcano, Nomad, HTCondor, OpenPBS, YARN, Mesos, Ray/Dask, OpenStack Nova, Proxmox HA. Covers multi-user CPU/GPU/VM allocation. |
