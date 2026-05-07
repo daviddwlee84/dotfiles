@@ -22,8 +22,18 @@
   ansible.builtin.debug:
     msg: "Homebrew not installed. It should be installed by bootstrap script."
 
-- name: Update Homebrew
+# Only update if FETCH_HEAD is older than 24 h — brew update is a slow git fetch
+# and upgrade_tools.sh brew already runs it on explicit upgrade runs.
+- name: Check when Homebrew was last updated
   when: homebrew_installed
+  ansible.builtin.stat:
+    path: "{{ homebrew_arm.stat.exists | ternary('/opt/homebrew', '/usr/local/Homebrew') }}/.git/FETCH_HEAD"
+  register: brew_fetch_head
+
+- name: Update Homebrew
+  when:
+    - homebrew_installed
+    - not brew_fetch_head.stat.exists or (lookup('pipe', 'date +%s') | int - brew_fetch_head.stat.mtime | int) > 86400
   community.general.homebrew:
     update_homebrew: true
   ignore_errors: true
