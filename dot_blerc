@@ -1,0 +1,10 @@
+# ~/.blerc - ble.sh configuration
+
+# Fix: in vi normal mode Ctrl-J (newline, 0x0A) was falling through to
+# the 'j' motion, corrupting pasted multi-line text. Bind it to
+# accept-line (same as Enter) so paste newlines terminate the line
+# correctly instead of being treated as vi commands.
+ble-bind -m vi_nmap -f 'C-j' 'accept-line'
+
+# Bracketed paste is on by default (term_bracketed_paste_mode=on);
+# no override needed.
