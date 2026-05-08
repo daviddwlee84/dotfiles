@@ -113,6 +113,10 @@ sudo 自己的 credential cache；helper **不**整合本 repo 的
 [`dot_config/television/cable/`](https://github.com/daviddwlee84/dotfiles/tree/main/dot_config/television/cable)。
 從任何地方 `tv <name>` 啟動，或用 `Alt+T` tools picker 啟動。
 
+**快速 launcher**：`tv sysadmin` 開一個 meta-channel，只列下面的 sysadmin
+channel — triage 時不用滑過 30 個 productivity channel。Enter 開該
+channel；預覽顯示底層 TOML config。
+
 | Channel | 來源 (`Ctrl+S` 切換) | 預覽 (`Ctrl+F` 切換) | Enter | 平台 |
 |---|---|---|---|---|
 | `tv sessions` | 1) `last -F -i`  2) `lastlog` (Linux)  3) `journalctl _COMM=sshd -n 2000` (systemd)  4) `who -a` | 該 user 細節：`id <u>`、`lastlog -u <u>`、近期 sshd event | 在 `lnav` 鑽入 `journalctl _COMM=sshd \| grep <user>` | macOS + Linux |

@@ -1,0 +1,63 @@
+# sysadmin meta-channel for television (tv)
+# Curated launcher for the sysadmin / audit channels in this repo. Like
+# `tv channels` but filtered to the security + ops surface so you don't
+# scroll past 30 productivity channels when you're trying to triage.
+#
+# See docs/sysadmin/helpers.md for what each underlying channel does.
+#
+# Usage:
+#   tv sysadmin
+#
+# Keybindings:
+#   Enter      Open selected channel in tv
+#   Ctrl+/     Toggle preview panel
+
+[metadata]
+name = "sysadmin"
+description = "Launcher: all sysadmin / audit TV channels in this repo"
+
+[source]
+command = """
+cat <<'EOF'
+sessions          │ Login records: last + lastlog + sshd journal + who -a
+users             │ Local accounts: passwd + groups + sudoers + authorized_keys
+{{- if eq .chezmoi.os "linux" }}
+sudo-history      │ Sudo events: journal + auth.log/secure + sudoreplay
+audit-events      │ auditd events: aureport summary + ausearch by baseline key
+{{- end }}
+firewall          │ Firewall rules + listening sockets + active connections (multi-backend)
+scheduled-jobs    │ All scheduled jobs: crontabs + systemd timers + at + launchd
+disk              │ df + inode + largest dirs/files + mount info (color-coded)
+services-health   │ Failed units + restart loops + OOM kills + recent crashes
+EOF
+"""
+
+[preview]
+command = """
+ch='{split: :0}'
+for f in ~/.config/television/cable/${ch}.toml ~/.config/television/cable/${ch}.toml.tmpl; do
+  if [ -f "$f" ]; then
+    if command -v bat >/dev/null 2>&1; then
+      bat -n --color=always "$f" 2>/dev/null
+    else
+      cat "$f"
+    fi
+    exit 0
+  fi
+done
+echo "(channel file not found for: $ch)"
+"""
+
+[ui]
+input_header = "Sysadmin channels"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open the selected channel in tv"
+command = "tv '{split: :0}'"
+mode = "execute"

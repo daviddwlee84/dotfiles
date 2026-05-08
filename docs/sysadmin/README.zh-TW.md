@@ -60,6 +60,8 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 「即時監控可疑活動」                      →  audit-watch
 「合規 / 鑑識事件」                      →  auditd + 異地 log shipping
 「我自己回想用過什麼 command」           →  atuin            (不是審計)
+
+「直接開個 sysadmin channel」             →  tv sysadmin      (curated launcher)
 ```
 
 ## 本節不涵蓋

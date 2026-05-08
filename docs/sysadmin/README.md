@@ -66,6 +66,8 @@ ceiling is.
 "Live monitor for risky activity"       →  audit-watch
 "Compliance / forensic incident"        →  auditd + offsite log shipping
 "My own command history for recall"     →  atuin            (NOT audit)
+
+"Just open a sysadmin channel"          →  tv sysadmin      (curated launcher)
 ```
 
 ## What this section is not

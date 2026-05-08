@@ -122,6 +122,11 @@ Defined under
 [`dot_config/television/cable/`](https://github.com/daviddwlee84/dotfiles/tree/main/dot_config/television/cable).
 Launch via `tv <name>` from anywhere or via the `Alt+T` tools picker.
 
+**Quick launcher**: `tv sysadmin` opens a meta-channel listing only the
+sysadmin channels below — saves scrolling past 30 productivity channels
+when triaging. Enter on a row opens that channel; preview shows the
+underlying TOML config.
+
 | Channel | Sources (cycle with `Ctrl+S`) | Preview (cycle with `Ctrl+F`) | Enter | Platforms |
 |---|---|---|---|---|
 | `tv sessions` | 1) `last -F -i`  2) `lastlog` (Linux)  3) `journalctl _COMM=sshd -n 2000` (systemd)  4) `who -a` | Per-user detail: `id <u>`, `lastlog -u <u>`, recent sshd events | Drill-down: `journalctl _COMM=sshd \| grep <user>` in `lnav` | macOS + Linux |
