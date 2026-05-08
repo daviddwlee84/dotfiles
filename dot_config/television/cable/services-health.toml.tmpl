@@ -1,0 +1,261 @@
+# services-health channel for television (tv)
+# Health-focused service browser (vs the existing `tv services` channel
+# which is productivity-focused). Surfaces failed units, restart loops,
+# OOM-killed services, and recent crashes — the things that actually
+# wake a sysadmin up.
+#
+# See docs/sysadmin/services-health.md and helpers.md.
+#
+# Source cycling (Ctrl+S):
+{{- if eq .chezmoi.os "linux" }}
+#   1. Failed units (systemctl --failed --all)
+#   2. High restart-count units (Restart= active, NRestarts > 3)
+#   3. Recent OOM kills (journalctl -k | grep "Out of memory")
+#   4. All running services (systemctl list-units --type=service --state=running)
+#   5. Recent service crashes (journalctl -p err --since '24h ago')
+{{- else }}
+#   1. launchctl errored (Status != 0 or PID = "-" with KeepAlive)
+#   2. launchctl all loaded
+#   3. Recent service crashes (log show --predicate 'eventMessage CONTAINS "crash"')
+{{- end }}
+#
+# Preview cycling (Ctrl+F):
+#   1. systemctl status <unit> --no-pager (15 lines) + last 10 logs
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    Open journalctl -u <unit> in lnav
+#   Alt+R    Restart the service (with confirmation)
+#   Alt+S    Stop the service (with confirmation)
+#   Alt+E    systemctl edit --full <unit>
+#   Ctrl+Y   Copy unit name
+
+[metadata]
+name = "services-health"
+description = "Service health: failed units, restart loops, OOM kills, crashes"
+requirements = []
+
+[source]
+command = [
+{{- if eq .chezmoi.os "linux" }}
+  # 1. Failed units
+  """
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --failed --all --no-pager --no-legend 2>/dev/null \
+      | awk '{printf "[failed] %s | %s | %s\\n", $1, $3" "$4, substr($0, index($0,$5))}'
+  fi
+  """,
+  # 2. High restart-count units
+  """
+  if command -v systemctl >/dev/null 2>&1; then
+    for u in $(systemctl list-units --type=service --no-pager --no-legend 2>/dev/null | awk '{print $1}'); do
+      n=$(systemctl show -p NRestarts --value "$u" 2>/dev/null)
+      [ -z "$n" ] && continue
+      [ "$n" -gt 3 ] 2>/dev/null && printf '[restarts:%s] %s\\n' "$n" "$u"
+    done
+  fi
+  """,
+  # 3. OOM kills (last 7 days)
+  """
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo -n journalctl -k --since '7 days ago' 2>/dev/null \
+      | grep -iE 'out of memory|oom-killer|killed process' \
+      | sed 's/^/[oom] /' | tail -50
+  fi
+  """,
+  # 4. Running services (background context)
+  """
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-units --type=service --state=running --no-pager --no-legend 2>/dev/null \
+      | awk '{printf "[running] %s\\n", $1}'
+  fi
+  """,
+  # 5. Recent error-level service crashes (last 24h)
+  """
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo -n journalctl -p err --since '24 hours ago' --no-pager 2>/dev/null \
+      | grep -iE 'fail|crash|core dumped|segfault' | tail -50 | sed 's/^/[crash] /'
+  fi
+  """,
+{{- else }}
+  # macOS: launchctl
+  """
+  if command -v launchctl >/dev/null 2>&1; then
+    # bootstrap user domain
+    launchctl list 2>/dev/null \
+      | awk 'NR>1 { status=$2; pid=$1
+                    if (status != "0" && status != "-") printf "[errored] PID=%s STATUS=%s LABEL=%s\\n", pid, status, $3
+                  }'
+  fi
+  """,
+  """
+  if command -v launchctl >/dev/null 2>&1; then
+    launchctl list 2>/dev/null | tail -n +2 \
+      | awk '{printf "[loaded] PID=%s STATUS=%s LABEL=%s\\n", $1, $2, $3}'
+  fi
+  """,
+  """
+  if command -v log >/dev/null 2>&1; then
+    log show --last 24h --predicate 'eventMessage CONTAINS[c] "crash" OR eventMessage CONTAINS[c] "abort"' --style compact 2>/dev/null | head -50 | sed 's/^/[crash] /'
+  fi
+  """,
+{{- end }}
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Per-unit status + last logs
+  """
+  row='{}'
+{{- if eq .chezmoi.os "linux" }}
+  case "$row" in
+    '[failed] '*|'[running] '*)
+      unit=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//')
+      ;;
+    '[restarts:'*)
+      unit=$(printf '%s\\n' "$row" | awk '{print $2}')
+      ;;
+    *)
+      printf '%s\\n' "$row"; exit 0 ;;
+  esac
+  [ -z "$unit" ] && { printf '%s\\n' "$row"; exit 0; }
+  printf '== systemctl status %s ==\\n' "$unit"
+  systemctl status "$unit" --no-pager 2>/dev/null | head -15
+  printf '\\n== last 10 logs ==\\n'
+  if command -v journalctl >/dev/null 2>&1; then
+    (sudo -n journalctl -u "$unit" --no-pager -n 10 2>/dev/null \
+      || journalctl -u "$unit" --no-pager -n 10 2>/dev/null)
+  fi
+{{- else }}
+  case "$row" in
+    '[errored] '*|'[loaded] '*)
+      label=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+      ;;
+    *) printf '%s\\n' "$row"; exit 0 ;;
+  esac
+  [ -z "$label" ] && { printf '%s\\n' "$row"; exit 0; }
+  printf '== launchctl print of %s ==\\n' "$label"
+  launchctl list "$label" 2>/dev/null | head -25
+{{- end }}
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Services health"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open_logs"
+alt-r = "actions:restart"
+alt-s = "actions:stop"
+alt-e = "actions:edit"
+ctrl-y = "actions:copy_unit"
+
+[actions.open_logs]
+description = "Open full unit logs in lnav"
+command = """
+row='{}'
+{{- if eq .chezmoi.os "linux" }}
+case "$row" in
+  '[failed] '*|'[running] '*)
+    unit=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//') ;;
+  '[restarts:'*)
+    unit=$(printf '%s\\n' "$row" | awk '{print $2}') ;;
+  *) echo "(no unit parsed); press q"; read -r _; exit 0 ;;
+esac
+tmp=$(mktemp)
+sudo journalctl -u "$unit" --no-pager -n 500 > "$tmp" 2>/dev/null
+if command -v lnav >/dev/null 2>&1; then lnav "$tmp"; else less -R "$tmp"; fi
+rm -f "$tmp"
+{{- else }}
+label=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+[ -z "$label" ] && { echo "(no label parsed)"; read -r _; exit 0; }
+launchctl print "user/$(id -u)/$label" 2>/dev/null | less -R
+{{- end }}
+"""
+mode = "execute"
+
+[actions.restart]
+description = "Restart this service (asks for confirmation)"
+command = """
+row='{}'
+{{- if eq .chezmoi.os "linux" }}
+unit=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//')
+[ -z "$unit" ] && { echo "(no unit)"; read -r _; exit 0; }
+printf 'Restart %s? [y/N] ' "$unit"; read -r ans
+case "$ans" in y|Y|yes) sudo systemctl restart "$unit" && echo "restarted" ;; *) echo "cancelled" ;; esac
+read -r _
+{{- else }}
+label=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+[ -z "$label" ] && { echo "(no label)"; read -r _; exit 0; }
+printf 'Kickstart %s? [y/N] ' "$label"; read -r ans
+case "$ans" in y|Y|yes) launchctl kickstart -k "user/$(id -u)/$label" && echo "kickstarted" ;; *) echo "cancelled" ;; esac
+read -r _
+{{- end }}
+"""
+mode = "execute"
+
+[actions.stop]
+description = "Stop this service (asks for confirmation)"
+command = """
+row='{}'
+{{- if eq .chezmoi.os "linux" }}
+unit=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//')
+[ -z "$unit" ] && exit 0
+printf 'Stop %s? [y/N] ' "$unit"; read -r ans
+case "$ans" in y|Y|yes) sudo systemctl stop "$unit" ;; esac
+read -r _
+{{- else }}
+label=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+[ -z "$label" ] && exit 0
+printf 'Bootout %s? [y/N] ' "$label"; read -r ans
+case "$ans" in y|Y|yes) launchctl bootout "user/$(id -u)/$label" ;; esac
+read -r _
+{{- end }}
+"""
+mode = "execute"
+
+[actions.edit]
+description = "Edit unit (systemctl edit --full / show plist)"
+command = """
+row='{}'
+{{- if eq .chezmoi.os "linux" }}
+unit=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//')
+[ -z "$unit" ] && exit 0
+exec sudo systemctl edit --full "$unit"
+{{- else }}
+label=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+[ -z "$label" ] && exit 0
+for cand in "/Library/LaunchDaemons/$label.plist" "/Library/LaunchAgents/$label.plist" "$HOME/Library/LaunchAgents/$label.plist"; do
+  [ -f "$cand" ] && { exec "${EDITOR:-vi}" "$cand"; }
+done
+echo "no plist found for $label"; read -r _
+{{- end }}
+"""
+mode = "execute"
+
+[actions.copy_unit]
+description = "Copy unit name to clipboard (OSC 52 over SSH)"
+command = """
+row='{}'
+{{- if eq .chezmoi.os "linux" }}
+v=$(printf '%s\\n' "$row" | awk '{print $2}' | sed 's/|//')
+{{- else }}
+v=$(printf '%s\\n' "$row" | grep -oE 'LABEL=[^ ]+' | cut -d= -f2-)
+{{- end }}
+[ -z "$v" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$v" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$v" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$v" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$v" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

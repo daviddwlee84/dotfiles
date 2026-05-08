@@ -1,0 +1,202 @@
+# disk channel for television (tv)
+# Filesystem usage triage: which mount is filling up, what's eating it,
+# inode pressure, mount options. Color-coded thresholds in the source rows.
+# See docs/sysadmin/disk.md and helpers.md.
+#
+# Source cycling (Ctrl+S):
+#   1. df -hT  per-mount usage with size / used / avail / pct
+#   2. df -hi  inode usage (catches "no space left" with apparent free space)
+#   3. Largest dirs at depth 1 under /var, /home, /tmp, /opt
+#   4. Active mounts with options
+#   5. Largest files (find / -size +100M, fastest top-50)
+#
+# Preview cycling (Ctrl+F):
+#   1. For mount rows: `du -h --max-depth=1 <mount>` top 20
+#      For dir rows:   `ls -laSh <dir>` top 20
+#      For file rows:  `ls -lh + stat` for the file
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    cd into the path (or open in $FILE_MANAGER)
+#   Alt+E    Edit /etc/fstab in $EDITOR
+#   Alt+T    Tail dmesg for "ENOSPC" / I/O error patterns
+#   Ctrl+Y   Copy path
+
+[metadata]
+name = "disk"
+description = "Filesystem usage triage (df / du / inodes / mounts / largest)"
+requirements = []
+
+[source]
+command = [
+  # 1. Per-mount df with color-coded threshold annotation in the row text
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  df -h 2>/dev/null
+{{- else }}
+  df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay -x autofs -x fuse.gvfsd-fuse 2>/dev/null
+{{- end }}
+  """,
+  # 2. Inodes
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  df -hi 2>/dev/null | sed 's/^/[inodes] /'
+{{- else }}
+  df -hi -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | sed 's/^/[inodes] /'
+{{- end }}
+  """,
+  # 3. Largest immediate children under common system roots
+  """
+  for d in /var /home /tmp /opt /srv; do
+    [ -d "$d" ] || continue
+    if [ -r "$d" ]; then
+      du -h --max-depth=1 "$d" 2>/dev/null | sort -h | tail -10 | sed "s|^|[dir] |"
+    else
+      sudo -n du -h --max-depth=1 "$d" 2>/dev/null | sort -h | tail -10 | sed "s|^|[dir] |"
+    fi
+  done
+  """,
+  # 4. Active mounts with options
+  """
+  mount 2>/dev/null | sed 's/^/[mount] /'
+  """,
+  # 5. Largest files >100M (fast: find with size cap, head a lot)
+  """
+  for d in /var /home /tmp /opt /srv; do
+    [ -d "$d" ] || continue
+    find "$d" -xdev -type f -size +100M 2>/dev/null | head -100 \
+      | xargs -I{} stat -c '%s %n' {} 2>/dev/null \
+      || find "$d" -xdev -type f -size +100M 2>/dev/null | head -100 \
+        | xargs -I{} stat -f '%z %N' {} 2>/dev/null
+  done | sort -rn | head -50 | awk '{
+    s=$1; unit="B"
+    if(s>=1073741824){s=s/1073741824; unit="GB"}
+    else if(s>=1048576){s=s/1048576; unit="MB"}
+    else if(s>=1024){s=s/1024; unit="KB"}
+    $1=""
+    printf "[file] %.1f%s %s\\n", s, unit, substr($0,2)
+  }'
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Path-aware preview
+  """
+  row='{}'
+  case "$row" in
+    '[dir] '*)
+      path=$(printf '%s\\n' "$row" | awk '{$1=""; sub(/^[ \\t]+/,""); print}' | awk '{$1=""; sub(/^[ \\t]+/,""); print}')
+      [ -d "$path" ] || { printf '%s\\n' "$row"; exit 0; }
+      printf '== %s ==\\n' "$path"
+      du -h --max-depth=1 "$path" 2>/dev/null | sort -h | tail -20
+      ;;
+    '[file] '*)
+      path=$(printf '%s\\n' "$row" | awk '{$1=""; $2=""; sub(/^[ \\t]+/,""); print}')
+      [ -e "$path" ] || { printf '%s\\n' "$row"; exit 0; }
+      printf '== %s ==\\n' "$path"
+      ls -lh "$path" 2>/dev/null
+      printf '\\n== file type ==\\n'
+      file "$path" 2>/dev/null | head -3
+      ;;
+    '[mount] '*|'[inodes] '*)
+      printf '%s\\n' "$row"
+      ;;
+    *)
+      # bare df row: first column is filesystem, last is mountpoint
+      mp=$(printf '%s\\n' "$row" | awk '{print $NF}')
+      [ -d "$mp" ] || { printf '%s\\n' "$row"; exit 0; }
+      printf '== %s ==\\n' "$mp"
+      du -h --max-depth=1 "$mp" 2>/dev/null | sort -h | tail -15
+      ;;
+  esac
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Disk"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open"
+alt-e = "actions:edit_fstab"
+alt-t = "actions:tail_dmesg"
+ctrl-y = "actions:copy_path"
+
+[actions.open]
+description = "Open path in shell (cd) / yazi / less"
+command = """
+row='{}'
+case "$row" in
+  '[dir] '*)
+    path=$(printf '%s\\n' "$row" | awk '{for(i=3;i<=NF;i++)printf "%s ",$i; print ""}' | sed 's/ $//')
+    ;;
+  '[file] '*)
+    path=$(printf '%s\\n' "$row" | awk '{for(i=3;i<=NF;i++)printf "%s ",$i; print ""}' | sed 's/ $//')
+    ;;
+  '[mount] '*|'[inodes] '*)
+    path=$(printf '%s\\n' "$row" | awk '{print $NF}')
+    ;;
+  *)
+    path=$(printf '%s\\n' "$row" | awk '{print $NF}')
+    ;;
+esac
+[ -z "$path" ] && exit 0
+if [ -d "$path" ] && command -v yazi >/dev/null 2>&1; then
+  yazi "$path"
+elif [ -d "$path" ]; then
+  cd "$path" 2>/dev/null && ls -la && exec "${SHELL:-bash}"
+elif [ -f "$path" ]; then
+  less "$path"
+else
+  echo "$path (does not exist?)"; read -r _
+fi
+"""
+mode = "execute"
+
+[actions.edit_fstab]
+description = "Edit /etc/fstab"
+command = """
+exec sudo "${EDITOR:-vi}" /etc/fstab
+"""
+mode = "execute"
+
+[actions.tail_dmesg]
+description = "Tail dmesg for ENOSPC / I/O errors"
+command = """
+if command -v dmesg >/dev/null 2>&1; then
+  exec sudo dmesg -wT --color=always 2>/dev/null
+else
+  echo "dmesg not available"; read -r _
+fi
+"""
+mode = "execute"
+
+[actions.copy_path]
+description = "Copy path to clipboard (OSC 52 over SSH)"
+command = """
+row='{}'
+case "$row" in
+  '[dir] '*|'[file] '*)
+    path=$(printf '%s\\n' "$row" | awk '{for(i=3;i<=NF;i++)printf "%s ",$i; print ""}' | sed 's/ $//')
+    ;;
+  *)
+    path=$(printf '%s\\n' "$row" | awk '{print $NF}')
+    ;;
+esac
+[ -z "$path" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$path" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$path" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$path" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$path" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

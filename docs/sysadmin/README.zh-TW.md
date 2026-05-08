@@ -34,6 +34,10 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
   四層）
 - [排程任務](scheduled-jobs.md) — cron + systemd timer + at + launchd；
   persistence 偵測面
+- [Disk / filesystem 監控](disk.md) — `df` / `du` / inode / mount；
+  auditd disk-full 預防
+- [Service health](services-health.md) — failed unit、restart loop、OOM；
+  `health-check` 早晨摘要
 - [Atuin vs audit](atuin-vs-audit.md) — 為什麼個人 shell history 不是
   正確工具，含完整對照表
 - [**Cookbook（場景食譜）**](cookbook.md) — 實戰導覽：「有人從新 IP
@@ -51,6 +55,9 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 「/etc/<file> 有被改嗎？」               →  audit-file       (Level 3，需 watch 規則)
 「這台 server 曝什麼？」                  →  fw-listening     (firewall.md)
 「這台機器排了什麼會自動執行？」          →  cron-list        (scheduled-jobs.md)
+「有東西滿了 / 快滿了嗎？」               →  disk-usage       (disk.md)
+「早晨快速健康檢查」                      →  health-check     (services-health.md)
+「即時監控可疑活動」                      →  audit-watch
 「合規 / 鑑識事件」                      →  auditd + 異地 log shipping
 「我自己回想用過什麼 command」           →  atuin            (不是審計)
 ```

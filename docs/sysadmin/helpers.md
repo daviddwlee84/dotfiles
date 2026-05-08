@@ -46,6 +46,53 @@ helpers are templated to use the right one per host.
 | `fw-port <port>` | Who is using `<port>`? (LISTEN + ESTABLISHED + `/etc/services`) | `ss` / `lsof` filtered to port | Yes | macOS + Linux |
 | `cron-list [--user U \| --system \| --timers]` | All scheduled jobs: user crontabs + system cron + systemd timers + at + launchd | composite | Sometimes (other users' crontabs) | macOS + Linux |
 
+### Live monitor + morning summary
+
+| Function | What it answers | Sudo? |
+|---|---|---|
+| `audit-watch [--auth\|--audit\|--all] [--no-color]` | Live colorized stream of security-relevant events (sshd / sudo / su / auditd) with RED/YELLOW/CYAN risk highlighting | Yes (TTY-driven, one prompt) |
+| `health-check [--quick\|--full] [--since W] [--no-color]` | Unified morning summary: host / disk / failed services / OOM kills / failed logins / sudo events / listeners / audit summary; ends with verdict line | Yes (graceful per-section degrade) |
+
+### Disk + filesystem
+
+| Function | What it answers | Sudo? |
+|---|---|---|
+| `disk-usage` | Per-mount usage with color-coded thresholds (>=70% yellow, >=90% red) | No |
+| `disk-largest [path] [--top N]` | Largest immediate children of `<path>` (default `$HOME`); auto-elevates for root-owned paths | Sometimes |
+| `disk-inodes` | Inode usage per mount (catches "no space left" with apparent free space) | No |
+| `mount-info` | Active mounts with options + `/etc/fstab` contents | No |
+| `disk-watch [mount]` | Live `watch -n 1` of `df -h <mount>` + largest files | No |
+
+### Package install history
+
+| Function | What it answers | Sudo? |
+|---|---|---|
+| `pkg-recent [--days N]` | Recently installed/upgraded/removed packages (apt / dnf / pacman / brew / npm-g / pip --user) | dnf needs sudo; others read user-readable logs |
+
+## Sudo and shell-function gotcha
+
+These are shell **functions**, not executables. `sudo audit-foo` will
+fail with `command not found` because sudo spawns a fresh process that
+doesn't inherit your shell's functions.
+
+The helpers handle this transparently when **you** invoke them:
+
+1. They try `sudo -n` first (free if your sudo cache is warm or you
+   have NOPASSWD).
+2. If that fails and you're on a TTY, they call `sudo -v` once, then
+   `sudo <underlying-command>`.
+3. If you're not on a TTY (cron, pipe), they print:
+   `audit: needs root. Run \`sudo -v\` once in this shell first, then
+   re-run this helper.`
+
+So the working pattern in any awkward shell setup is:
+
+```bash
+sudo -v                # warm the cache once per terminal
+audit-failed-logins    # works
+audit-summary          # works (cache still warm)
+```
+
 All helpers accept `--help` for usage and exit 0 (so piping into `head`
 doesn't cause SIGPIPE noise).
 
@@ -83,6 +130,8 @@ Launch via `tv <name>` from anywhere or via the `Alt+T` tools picker.
 | `tv users` | 1) all passwd entries  2) login-capable users (real shell)  3) groups + members  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) authorized_keys per home (with fingerprint + comment) | Per-user identity dump: id, groups, passwd, last login, sudo events, SSH key count | Drill-down: full identity report in `lnav`; `Alt+G` show groups; `Alt+E` `visudo` | macOS + Linux |
 | `tv firewall` | 1) firewall rules (nft / iptables / ufw / firewalld / pf / ALF)  2) listening TCP+UDP  3) established TCP  4) default policies / zones | Per-row: resolve port to service, walk owning-process parent tree | Drill: full rule context + `lsof -p` in `lnav`; `Alt+E` edit firewall config; `Alt+R` reload rules | macOS + Linux |
 | `tv scheduled-jobs` | 1) user crontabs  2) system cron (`/etc/crontab` + `cron.d/` + `cron.{hourly,daily,...}/`)  3) systemd timers (system + user)  4) at jobs  5) anacron (Linux) / launchd plists (macOS) | Per-row: decode schedule, show triggered unit, `systemctl status` for timers | Drill: `systemctl cat` + last 30 logs in `lnav`; `Alt+E` edit crontab/unit; `Alt+T` tail relevant log | macOS + Linux |
+| `tv disk` | 1) `df -hT` per-mount  2) `df -hi` inodes  3) largest dirs at depth 1 under `/var /home /tmp /opt /srv`  4) active mounts with options  5) largest files >100M | Path-aware: `du -h --max-depth=1` for dirs, `ls -lh` + `file` for files | `Enter` opens dir in yazi / file in less; `Alt+E` edits `/etc/fstab`; `Alt+T` tails `dmesg -wT` | macOS + Linux |
+| `tv services-health` | 1) failed units (Linux) / errored launchctl (macOS)  2) high-restart units (NRestarts > 3)  3) recent OOM kills (Linux)  4) all running services  5) recent error-level crashes | `systemctl status` + last 10 logs (Linux); `launchctl list` detail (macOS) | `Enter` opens journalctl in lnav; `Alt+R` restart (confirms); `Alt+S` stop (confirms); `Alt+E` `systemctl edit --full` | macOS + Linux |
 
 Common bindings shared with this repo's other channels:
 

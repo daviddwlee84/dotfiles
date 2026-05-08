@@ -22,11 +22,20 @@
 # Internal helpers (prefix _audit_ — not part of public surface)
 # ---------------------------------------------------------------------------
 
-_audit_is_tty() { [ -t 0 ] && [ -t 1 ]; }
+_audit_is_tty() { [ -t 0 ] || [ -t 1 ] || [ -t 2 ]; }
 _audit_is_root() { [ "$(id -u)" = "0" ]; }
 
 # Run "$@" with sudo if not root; if root, run directly.
-# If sudo would prompt and we're non-interactive, fail with hint.
+#
+# Strategy:
+#   1. If already root -> run directly.
+#   2. If `sudo -n true` works (sudo cache still warm OR NOPASSWD) -> sudo -n.
+#   3. If we have any TTY (stdin/stdout/stderr) -> sudo -v then sudo.
+#   4. Otherwise print a clear hint and exit 1.
+#
+# IMPORTANT: these helpers are shell *functions*, so plain `sudo audit-foo`
+# will NOT work — sudo spawns a fresh process that doesn't inherit your
+# functions. The hint below tells the user to run `sudo -v` first instead.
 _audit_run_root() {
     if _audit_is_root; then
         "$@"
@@ -36,20 +45,22 @@ _audit_run_root() {
         printf 'audit: needs root and sudo not installed\n' >&2
         return 1
     fi
-    if _audit_is_tty; then
-        # Refresh the timestamp once; subsequent calls within the cache
-        # window run silently.
-        sudo -v || return 1
+    # Try non-interactive first (fast path: cache warm or NOPASSWD).
+    if sudo -n true 2>/dev/null; then
         sudo "$@"
-    else
-        # Try non-interactive first; if sudo asks for password, give up.
-        if sudo -n true 2>/dev/null; then
-            sudo -n "$@"
-        else
-            printf 'audit: needs root; re-run with sudo or in an interactive shell\n' >&2
-            return 1
-        fi
+        return $?
     fi
+    # Need to prompt. Try TTY-driven `sudo -v`.
+    if _audit_is_tty; then
+        if sudo -v; then
+            sudo "$@"
+            return $?
+        fi
+        return 1
+    fi
+    printf 'audit: needs root. Run `sudo -v` once in this shell first, then re-run this helper.\n' >&2
+    printf '       (Note: these are shell functions, so `sudo <helper>` will NOT work — sudo spawns a fresh process.)\n' >&2
+    return 1
 }
 
 # Detect which distro auth log file exists. Echoes file path or empty.
@@ -741,4 +752,535 @@ cron-list() {
         printf '\n== at jobs ==\n'
         atq 2>/dev/null
     fi
+}
+
+# ===========================================================================
+# audit-watch — live colorized risk-pattern monitor.
+#
+# Tails journalctl + auditd events and highlights:
+#   RED      = high-severity (passwd/shadow edits, root login, sudo to root,
+#              new sudoers, useradd/userdel, ssh authorized_keys writes,
+#              audit rules disabled)
+#   YELLOW   = medium (sudo COMMAND, su, failed auth, new SSH login, chmod
+#              777, /tmp execve)
+#   CYAN     = low / informational (general sudo / sshd events)
+#
+# Plain text fallback when not on a TTY (no ANSI escapes — pipe-friendly).
+# ===========================================================================
+
+audit-watch() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'audit-watch [--auth | --audit | --all] [--no-color]' \
+                'Live colorized monitor of security-relevant events.' \
+                '  --auth   only sshd/sudo/su events (default; works without auditd)' \
+                '  --audit  only auditd events (needs auditd)' \
+                '  --all    both (default if auditd is installed)' \
+                '  --no-color  plain text (auto-on when not a TTY)' \
+                'Press Ctrl+C to exit.'
+            return 0 ;;
+    esac
+    src='auth'
+    color=1
+    if _audit_have ausearch; then src='all'; fi
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --auth) src='auth'; shift ;;
+            --audit) src='audit'; shift ;;
+            --all) src='all'; shift ;;
+            --no-color) color=0; shift ;;
+            *) printf 'audit-watch: unknown arg: %s\n' "$1" >&2; return 1 ;;
+        esac
+    done
+    [ -t 1 ] || color=0
+
+    # Patterns. Order matters — first match wins.
+    # High = red, medium = yellow, low = cyan.
+    awk_prog='
+BEGIN {
+  if (color) {
+    R="\033[1;31m"; Y="\033[1;33m"; C="\033[36m"; D="\033[2m"; N="\033[0m"
+  }
+  # high-severity regexes (anchored loosely; case-sensitive where it matters)
+  hi[1]="(passwd|shadow|gshadow): (open|write)"
+  hi[2]="useradd|userdel|usermod"
+  hi[3]="root.*session opened|Accepted .* for root"
+  hi[4]="sudoers"
+  hi[5]="\\.ssh/authorized_keys"
+  hi[6]="auditctl.*-D|audit.*disabled|audit.*enabled=0"
+  hi[7]="COMMAND=.*(/bin/bash|/bin/sh|su -|sudo -i|/bin/zsh)$"
+  hi[8]="chmod 777|chmod -R 777"
+  hi[9]="curl .*\\| ?(sh|bash)|wget .*\\| ?(sh|bash)"
+  # medium
+  mi[1]="sudo: .* : TTY="
+  mi[2]="Failed password|authentication failure|FAILED|invalid user"
+  mi[3]="session opened for user"
+  mi[4]="su(\\[|:).*Successful su"
+  mi[5]=" /tmp/[^ ]+ "
+  # low
+  lo[1]="sshd|sudo|su"
+}
+{
+  marker=""; tag=""
+  for (i in hi) if ($0 ~ hi[i]) { marker=R; tag="[!!]"; break }
+  if (marker == "") for (i in mi) if ($0 ~ mi[i]) { marker=Y; tag="[!] "; break }
+  if (marker == "") for (i in lo) if ($0 ~ lo[i]) { marker=C; tag="[ ] "; break }
+  if (marker != "") {
+    printf "%s%s%s %s\n", marker, tag, N, $0
+  }
+  # Drop everything else (keeps the stream readable).
+  fflush()
+}'
+
+    # Build the command stream. Use `stdbuf` if available so awk sees lines
+    # promptly; otherwise journalctl's --output=cat is line-buffered enough.
+    if [ "$src" = "audit" ]; then
+        if ! _audit_have ausearch; then
+            printf 'audit-watch: --audit needs auditd installed\n' >&2
+            return 1
+        fi
+{{- if eq .chezmoi.os "linux" }}
+        # tail audit.log; format keeps it grep-friendly
+        if _audit_is_root; then
+            tail -F /var/log/audit/audit.log 2>/dev/null \
+                | awk -v color="$color" "$awk_prog"
+        else
+            sudo -v && sudo tail -F /var/log/audit/audit.log 2>/dev/null \
+                | awk -v color="$color" "$awk_prog"
+        fi
+{{- else }}
+        printf 'audit-watch: --audit not supported on macOS\n' >&2
+        return 1
+{{- end }}
+    else
+{{- if eq .chezmoi.os "linux" }}
+        # auth (or all): merge sshd / sudo / su / login from journal + audit
+        if _audit_have journalctl; then
+            sudo_cmd=""
+            if ! _audit_is_root; then sudo -v 2>/dev/null && sudo_cmd="sudo"; fi
+            (
+                $sudo_cmd journalctl -f -o short-iso \
+                    _COMM=sshd _COMM=sudo _COMM=su _COMM=login _COMM=systemd-logind \
+                    2>/dev/null &
+                jpid=$!
+                if [ "$src" = "all" ] && [ -r /var/log/audit/audit.log -o -n "$sudo_cmd" ]; then
+                    $sudo_cmd tail -F /var/log/audit/audit.log 2>/dev/null &
+                    apid=$!
+                fi
+                trap "kill $jpid $apid 2>/dev/null" INT TERM EXIT
+                wait
+            ) | awk -v color="$color" "$awk_prog"
+        else
+            printf 'audit-watch: journalctl not found; cannot --auth\n' >&2
+            return 1
+        fi
+{{- else }}
+        # macOS: log stream for sshd / sudo / login
+        if _audit_have log; then
+            log stream --style compact --predicate 'process == "sshd" OR process == "sudo" OR process == "login" OR process == "su"' 2>/dev/null \
+                | awk -v color="$color" "$awk_prog"
+        else
+            printf 'audit-watch: macOS log(1) not found\n' >&2
+            return 1
+        fi
+{{- end }}
+    fi
+}
+
+# ===========================================================================
+# Disk / filesystem helpers — sysadmin morning checks. Cross-platform; uses
+# coreutils on Linux, macOS-compatible flags on Darwin.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# disk-usage
+#   df + per-mount summary, color-coded thresholds.
+#   GREEN <70% / YELLOW 70-90% / RED >90%.
+# ---------------------------------------------------------------------------
+disk-usage() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'disk-usage' \
+                'Per-mount usage with color-coded thresholds.' \
+                'GREEN <70% / YELLOW 70-89% / RED >=90%.' \
+                'Excludes pseudo / kernel / overlay filesystems.'
+            return 0 ;;
+    esac
+{{- if eq .chezmoi.os "darwin" }}
+    df -h -T nooverlay,nodevfs,nomap 2>/dev/null \
+        | awk 'NR==1{print; next}
+{ pct=$5; gsub("%","",pct);
+  c="\033[32m"; if(pct>=70)c="\033[33m"; if(pct>=90)c="\033[1;31m";
+  printf "%s%s\033[0m\n", c, $0 }'
+{{- else }}
+    df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay -x autofs -x fuse.gvfsd-fuse 2>/dev/null \
+        | awk 'NR==1{print; next}
+{ pct=$6; gsub("%","",pct);
+  c="\033[32m"; if(pct>=70)c="\033[33m"; if(pct>=90)c="\033[1;31m";
+  printf "%s%s\033[0m\n", c, $0 }'
+{{- end }}
+}
+
+# ---------------------------------------------------------------------------
+# disk-largest [path] [--top N]
+#   Largest dirs at depth 1 under <path> (default $HOME). Sudo for /var, /etc.
+# ---------------------------------------------------------------------------
+disk-largest() {
+    path=${HOME:-/}
+    top=20
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h|--help)
+                _audit_help 'disk-largest [path] [--top N]' \
+                    'Show the N largest immediate children of <path> by disk usage.' \
+                    'Default path is $HOME, default N is 20.' \
+                    'For root-owned paths (/var, /etc) the helper auto-elevates.' \
+                    'Hint: `disk-largest /var/log --top 10` is the classic disk-full triage.'
+                return 0 ;;
+            --top) top=$2; shift 2 ;;
+            *) path=$1; shift ;;
+        esac
+    done
+    [ -d "$path" ] || { printf 'disk-largest: not a directory: %s\n' "$path" >&2; return 1; }
+    if [ -r "$path" ]; then
+        du -h --max-depth=1 -- "$path" 2>/dev/null | sort -h | tail -"$top"
+    else
+        _audit_run_root du -h --max-depth=1 -- "$path" 2>/dev/null | sort -h | tail -"$top"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# disk-inodes
+#   Inodes per mount — catches "disk has free space but can't create files".
+# ---------------------------------------------------------------------------
+disk-inodes() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'disk-inodes' \
+                'Inode usage per mount. Catches "no space left on device" with' \
+                'apparent free space — the inode table is exhausted.'
+            return 0 ;;
+    esac
+{{- if eq .chezmoi.os "darwin" }}
+    df -hi 2>/dev/null
+{{- else }}
+    df -hi -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null
+{{- end }}
+}
+
+# ---------------------------------------------------------------------------
+# mount-info
+#   Active mounts with options, plus /etc/fstab definitions.
+# ---------------------------------------------------------------------------
+mount-info() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'mount-info' \
+                'Active mounts (mount -t) + persisted /etc/fstab definitions.' \
+                'Useful for "is this drive mounted nodev/nosuid/noexec correctly?"'
+            return 0 ;;
+    esac
+    printf '== active mounts ==\n'
+    mount 2>/dev/null | column -t 2>/dev/null || mount
+    printf '\n== /etc/fstab ==\n'
+    if [ -r /etc/fstab ]; then
+        grep -vE '^\s*(#|$)' /etc/fstab 2>/dev/null
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# disk-watch [mount]
+#   Watch usage of one mount over time (1-second updates). Default: /
+# ---------------------------------------------------------------------------
+disk-watch() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'disk-watch [mount]' \
+                'Live updating usage of one mount (default /). Press Ctrl+C to exit.'
+            return 0 ;;
+    esac
+    m=${1:-/}
+    if _audit_have watch; then
+        watch -n 1 "df -h '$m'; echo; ls -laSh '$m' 2>/dev/null | head -10"
+    else
+        # macOS without coreutils watch — fall back to a loop
+        while true; do
+            clear 2>/dev/null
+            df -h "$m"; echo
+            ls -laSh "$m" 2>/dev/null | head -10
+            sleep 1
+        done
+    fi
+}
+
+# ===========================================================================
+# Package install history — pkg-recent.
+# Wraps the platform's package-manager log so you can answer "what was
+# installed yesterday?" without remembering the per-distro command.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# pkg-recent [--days N]
+#   Recently-installed/upgraded/removed packages.
+# ---------------------------------------------------------------------------
+pkg-recent() {
+    days=7
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h|--help)
+                _audit_help 'pkg-recent [--days N]' \
+                    'Show package install/upgrade/remove events from the last N days.' \
+                    'Default --days 7. Auto-detects apt / dnf / pacman / brew / npm-g.' \
+                    'Useful for supply-chain triage and onboarding ("what changed?").'
+                return 0 ;;
+            --days) days=$2; shift 2 ;;
+            *) printf 'pkg-recent: unknown arg: %s\n' "$1" >&2; return 1 ;;
+        esac
+    done
+{{- if eq .chezmoi.os "linux" }}
+    if [ -d /var/log/apt ]; then
+        printf '== apt history (last %s days) ==\n' "$days"
+        if _audit_have zgrep; then
+            zgrep -hE 'Start-Date|Commandline|Install:|Upgrade:|Remove:' \
+                /var/log/apt/history.log* 2>/dev/null \
+                | awk -v cutoff="$(date -u -d "$days days ago" +%Y-%m-%d 2>/dev/null)" '
+                /^Start-Date/ { d=$2; show=(d>=cutoff) }
+                show { print }
+            '
+        else
+            tail -200 /var/log/apt/history.log 2>/dev/null
+        fi
+    fi
+    if _audit_have dnf; then
+        printf '\n== dnf history (last %s days) ==\n' "$days"
+        _audit_run_root dnf history list --reverse 2>/dev/null | head -50
+    fi
+    if _audit_have pacman; then
+        printf '\n== pacman -Qll-time (last %s days) ==\n' "$days"
+        if [ -r /var/log/pacman.log ]; then
+            tail -500 /var/log/pacman.log | grep -E "installed|upgraded|removed" | tail -100
+        fi
+    fi
+{{- else }}
+    if _audit_have brew; then
+        printf '== brew install/upgrade history (last %s days) ==\n' "$days"
+        # brew has no native history; use HOMEBREW_LOGS or the Cellar mtimes
+        cellar=$(brew --cellar 2>/dev/null)
+        caskroom=$(brew --caskroom 2>/dev/null)
+        for c in "$cellar" "$caskroom"; do
+            [ -d "$c" ] || continue
+            find "$c" -maxdepth 2 -type d -mtime "-$days" 2>/dev/null \
+                | awk -F/ '{print $(NF-1) "/" $NF}' | sort -u
+        done
+    fi
+{{- end }}
+    if _audit_have npm; then
+        printf '\n== npm -g recently changed ==\n'
+        npmroot=$(npm root -g 2>/dev/null)
+        [ -d "$npmroot" ] && find "$npmroot" -maxdepth 1 -type d -mtime "-$days" 2>/dev/null \
+            | awk -F/ '{print $NF}' | grep -v '^$\|^node_modules$'
+    fi
+    if _audit_have pip; then
+        printf '\n== pip --user recently installed ==\n'
+        if _audit_have pip; then
+            pip list --user --format=columns 2>/dev/null | head -20
+        fi
+    fi
+}
+
+# ===========================================================================
+# health-check — unified morning summary. One command, one screen, the
+# 30-second "is this server OK?" overview.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# health-check [--quick | --full] [--no-color] [--since <when>]
+# ---------------------------------------------------------------------------
+health-check() {
+    mode='quick'
+    color=1
+    since='24 hours ago'
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h|--help)
+                _audit_help 'health-check [--quick | --full] [--since <when>] [--no-color]' \
+                    'Unified morning summary. Sections (each runs independently;' \
+                    'failures in one do not block others):' \
+                    '  - Hostname / uptime / load' \
+                    '  - Disk usage (color-coded)' \
+                    '  - Failed / restart-looping services' \
+                    '  - Recent OOM kills' \
+                    '  - Recent failed logins (Linux)' \
+                    '  - Recent sudo events (last <since>)' \
+                    '  - Listening ports (non-loopback only)' \
+                    '  - Audit summary (if auditd installed)' \
+                    'Modes:' \
+                    '  --quick (default): condensed, ~25 lines' \
+                    '  --full: per-section detail, ~80 lines' \
+                    'Cron-friendly: --no-color is auto-on when stdout is not a TTY.'
+                return 0 ;;
+            --quick) mode='quick'; shift ;;
+            --full) mode='full'; shift ;;
+            --no-color) color=0; shift ;;
+            --since) since=$2; shift 2 ;;
+            *) printf 'health-check: unknown arg: %s\n' "$1" >&2; return 1 ;;
+        esac
+    done
+    [ -t 1 ] || color=0
+    if [ "$color" = "1" ]; then
+        H='\033[1;36m'; G='\033[32m'; Y='\033[33m'; R='\033[1;31m'; D='\033[2m'; N='\033[0m'
+    else
+        H=''; G=''; Y=''; R=''; D=''; N=''
+    fi
+
+    _hc_section() { printf "${H}== %s ==${N}\n" "$1"; }
+
+    _hc_section 'host'
+    printf '  hostname: %s\n' "$(hostname)"
+    printf '  uptime:   %s\n' "$(uptime | sed 's/^[ \t]*//')"
+    if [ -r /proc/loadavg ]; then
+        printf '  loadavg:  %s\n' "$(cut -d' ' -f1-3 /proc/loadavg)"
+    fi
+    printf '\n'
+
+    _hc_section 'disk usage (>=90%% red, >=70%% yellow)'
+{{- if eq .chezmoi.os "darwin" }}
+    df -h 2>/dev/null | awk -v G="$G" -v Y="$Y" -v R="$R" -v N="$N" '
+NR==1 { print "  "$0; next }
+$5 ~ /%/ {
+  pct=$5; gsub("%","",pct);
+  c=G; if(pct>=70)c=Y; if(pct>=90)c=R;
+  printf "  %s%s%s\n", c, $0, N
+}'
+{{- else }}
+    df -hT -x tmpfs -x devtmpfs -x squashfs -x overlay 2>/dev/null | awk -v G="$G" -v Y="$Y" -v R="$R" -v N="$N" '
+NR==1 { print "  "$0; next }
+$6 ~ /%/ {
+  pct=$6; gsub("%","",pct);
+  c=G; if(pct>=70)c=Y; if(pct>=90)c=R;
+  printf "  %s%s%s\n", c, $0, N
+}'
+{{- end }}
+    printf '\n'
+
+{{- if eq .chezmoi.os "linux" }}
+    _hc_section 'failed services'
+    if _audit_have systemctl; then
+        out=$(systemctl --failed --all --no-pager --no-legend 2>/dev/null)
+        if [ -z "$out" ]; then
+            printf '  ${G}none${N}\n' | sed "s/\${G}/$G/g; s/\${N}/$N/g"
+        else
+            printf '%s\n' "$out" | awk -v R="$R" -v N="$N" '{printf "  %s%s%s\n", R, $0, N}'
+        fi
+    fi
+    printf '\n'
+
+    _hc_section 'high-restart services (NRestarts > 3)'
+    if _audit_have systemctl; then
+        found=0
+        for u in $(systemctl list-units --type=service --no-pager --no-legend 2>/dev/null | awk '{print $1}'); do
+            n=$(systemctl show -p NRestarts --value "$u" 2>/dev/null)
+            [ -z "$n" ] && continue
+            if [ "$n" -gt 3 ] 2>/dev/null; then
+                printf '  %sNRestarts=%s%s %s\n' "$Y" "$n" "$N" "$u"
+                found=1
+            fi
+        done
+        [ "$found" = "0" ] && printf '  %snone%s\n' "$G" "$N"
+    fi
+    printf '\n'
+
+    _hc_section "recent OOM kills (since $since)"
+    if _audit_have journalctl; then
+        out=$(_audit_run_root journalctl -k --since "$since" 2>/dev/null \
+              | grep -iE 'out of memory|oom-killer|killed process' | tail -5)
+        if [ -z "$out" ]; then
+            printf '  %snone%s\n' "$G" "$N"
+        else
+            printf '%s\n' "$out" | awk -v R="$R" -v N="$N" '{printf "  %s%s%s\n", R, $0, N}'
+        fi
+    fi
+    printf '\n'
+
+    _hc_section "failed login attempts (since $since)"
+    if _audit_have lastb; then
+        n=$(_audit_run_root lastb -F -i 2>/dev/null | grep -v '^$' | grep -v '^btmp' | wc -l)
+        c="$G"; [ "$n" -gt 5 ] 2>/dev/null && c="$Y"; [ "$n" -gt 50 ] 2>/dev/null && c="$R"
+        printf '  %s%s attempts%s\n' "$c" "$n" "$N"
+        if [ "$mode" = "full" ] && [ "$n" -gt 0 ] 2>/dev/null; then
+            _audit_run_root lastb -F -i 2>/dev/null | head -10 | sed 's/^/    /'
+        fi
+    fi
+    printf '\n'
+{{- else }}
+    _hc_section 'launchctl errored services'
+    if _audit_have launchctl; then
+        out=$(launchctl list 2>/dev/null \
+              | awk 'NR>1 && $2 != "0" && $2 != "-" {printf "  PID=%s STATUS=%s LABEL=%s\n", $1, $2, $3}')
+        if [ -z "$out" ]; then
+            printf '  %snone%s\n' "$G" "$N"
+        else
+            printf '%s\n' "$out" | sed "s/^/  $R/" | sed "s/$/$N/"
+        fi
+    fi
+    printf '\n'
+{{- end }}
+
+    _hc_section "sudo events (since $since)"
+    if _audit_have journalctl; then
+        n=$(_audit_run_root journalctl _COMM=sudo --since "$since" --no-pager 2>/dev/null | wc -l)
+        printf '  %s events\n' "$n"
+        if [ "$mode" = "full" ] && [ "$n" -gt 0 ] 2>/dev/null; then
+            _audit_run_root journalctl _COMM=sudo --since "$since" --no-pager 2>/dev/null | tail -10 | sed 's/^/    /'
+        fi
+    fi
+    printf '\n'
+
+    _hc_section 'listening ports (non-loopback)'
+    if _audit_have ss; then
+        out=$(_audit_run_root ss -tlnp 2>/dev/null | tail -n +2 | grep -vE '127\.0\.0\.1|::1|\[::1\]')
+        if [ -z "$out" ]; then
+            printf '  %snone exposed externally%s\n' "$G" "$N"
+        else
+            n=$(printf '%s\n' "$out" | wc -l)
+            printf '  %s listener(s):\n' "$n"
+            printf '%s\n' "$out" | head -10 | sed 's/^/    /'
+        fi
+    elif _audit_have lsof; then
+        _audit_run_root lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | grep -vE '127\.0\.0\.1|::1' | head -10 | sed 's/^/    /'
+    fi
+    printf '\n'
+
+{{- if eq .chezmoi.os "linux" }}
+    if _audit_have aureport; then
+        _hc_section "audit summary (since $since)"
+        _audit_run_root aureport --start "$since" --summary -i 2>/dev/null | head -25 | sed 's/^/  /'
+        printf '\n'
+    fi
+{{- end }}
+
+    if [ "$mode" = "full" ]; then
+        _hc_section "scheduled jobs (next 5 timer fires)"
+{{- if eq .chezmoi.os "linux" }}
+        if _audit_have systemctl; then
+            systemctl list-timers --no-pager --no-legend 2>/dev/null | head -5 | sed 's/^/  /'
+        fi
+{{- else }}
+        if _audit_have launchctl; then
+            launchctl list 2>/dev/null | tail -n +2 | head -5 | sed 's/^/  /'
+        fi
+{{- end }}
+        printf '\n'
+    fi
+
+    _hc_section 'verdict'
+    # Quick & dirty: if anything in failed-services / OOM / failed-logins>50
+    # was non-zero, mark RED. Otherwise GREEN.
+    verdict="${G}OK${N}"
+{{- if eq .chezmoi.os "linux" }}
+    if _audit_have systemctl && [ -n "$(systemctl --failed --all --no-pager --no-legend 2>/dev/null)" ]; then
+        verdict="${R}WARN: failed services${N}"
+    fi
+{{- end }}
+    printf "  %b\n" "$verdict"
 }

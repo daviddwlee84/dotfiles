@@ -39,6 +39,10 @@ ceiling is.
   bound, who's connected (cross-cuts all 4 levels)
 - [Scheduled jobs](scheduled-jobs.md) — cron + systemd timers + at +
   launchd; the persistence-detection surface
+- [Disk / filesystem monitoring](disk.md) — `df` / `du` / inodes /
+  mounts; auditd disk-full prevention
+- [Service health](services-health.md) — failed units, restart loops,
+  OOM kills; `health-check` morning summary
 - [Atuin vs audit](atuin-vs-audit.md) — why personal shell history is not
   the right tool, with the full comparison table
 - [**Cookbook (scenario recipes)**](cookbook.md) — hands-on walkthroughs:
@@ -57,6 +61,9 @@ ceiling is.
 "Was /etc/<file> modified?"             →  audit-file       (Level 3, needs watch rule)
 "What's exposed on this server?"        →  fw-listening     (firewall.md)
 "What's scheduled to run on this box?"  →  cron-list        (scheduled-jobs.md)
+"Is anything full / about to fill up?"  →  disk-usage       (disk.md)
+"Quick morning health check"            →  health-check     (services-health.md)
+"Live monitor for risky activity"       →  audit-watch
 "Compliance / forensic incident"        →  auditd + offsite log shipping
 "My own command history for recall"     →  atuin            (NOT audit)
 ```

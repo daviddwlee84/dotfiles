@@ -44,6 +44,50 @@ POSIX 形式，zsh 與 bash 共用。少數 zsh-only 便利處用 source-time �
 | `fw-port <port>` | 誰在用 `<port>`？(LISTEN + ESTABLISHED + `/etc/services`) | `ss` / `lsof` filter port | 是 | macOS + Linux |
 | `cron-list [--user U \| --system \| --timers]` | 所有排程任務：user crontab + system cron + systemd timer + at + launchd | 組合 | 有時需（其他 user 的 crontab） | macOS + Linux |
 
+### 即時監控 + 早晨摘要
+
+| 函式 | 回答 | sudo？ |
+|---|---|---|
+| `audit-watch [--auth\|--audit\|--all] [--no-color]` | 即時染色串流 sshd / sudo / su / auditd 事件，RED/YELLOW/CYAN 風險高亮 | 是（TTY 互動，一次 prompt） |
+| `health-check [--quick\|--full] [--since W] [--no-color]` | 統一早晨摘要：host / disk / failed services / OOM / failed login / sudo / listener / audit summary，最後一行 verdict | 是（每段獨立失敗 graceful） |
+
+### Disk + filesystem
+
+| 函式 | 回答 | sudo？ |
+|---|---|---|
+| `disk-usage` | 每 mount 用量，色階（>=70% 黃、>=90% 紅） | 否 |
+| `disk-largest [path] [--top N]` | `<path>` 下第一層最大子項（預設 `$HOME`）；root-owned 路徑自動提權 | 有時 |
+| `disk-inodes` | 每 mount inode 用量（抓「磁碟有空間但建不了檔」） | 否 |
+| `mount-info` | active mount + options + `/etc/fstab` | 否 |
+| `disk-watch [mount]` | 即時 `watch -n 1` of `df -h <mount>` + 最大檔 | 否 |
+
+### 套件安裝歷史
+
+| 函式 | 回答 | sudo？ |
+|---|---|---|
+| `pkg-recent [--days N]` | 近期 install/upgrade/remove 套件（apt / dnf / pacman / brew / npm-g / pip --user） | dnf 需要；其他讀 user-readable log |
+
+## Sudo 與 shell function 的踩雷
+
+這些是 shell **function** 不是執行檔。`sudo audit-foo` 會 `command not
+found`，因為 sudo 開新 process 不會繼承你 shell 的 function。
+
+你**自己**呼叫時 helper 透明處理：
+
+1. 先試 `sudo -n`（cache 還在或 NOPASSWD 時免費）。
+2. 失敗且在 TTY，呼叫 `sudo -v` 一次，然後 `sudo <底層命令>`。
+3. 不在 TTY (cron、pipe) 時印：
+   `audit: needs root. Run \`sudo -v\` once in this shell first, then
+   re-run this helper.`
+
+所以任何彆扭 shell setup 下的可用 pattern：
+
+```bash
+sudo -v                # 每個 terminal 預熱 cache 一次
+audit-failed-logins    # 過
+audit-summary          # 過（cache 還在）
+```
+
 所有 helper 接受 `--help` 顯示用法，且在 pipe 到 `head` 等時 exit 0
 (避免 SIGPIPE 噪音)。
 
@@ -77,6 +121,8 @@ sudo 自己的 credential cache；helper **不**整合本 repo 的
 | `tv users` | 1) 全 passwd 條目  2) 可登入 user (有真 shell)  3) groups + 成員  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) 每 home 的 authorized_keys（含 fingerprint + comment） | 單 user 身份 dump：id、groups、passwd、last login、sudo 事件、SSH key 數 | 鑽入：`lnav` 開完整身份報告；`Alt+G` 顯示 group；`Alt+E` `visudo` | macOS + Linux |
 | `tv firewall` | 1) 防火牆規則 (nft / iptables / ufw / firewalld / pf / ALF)  2) listening TCP+UDP  3) established TCP  4) 預設政策 / zone | 每列：解析 port → service、走擁有者 process parent tree | 鑽入：`lnav` 開完整規則 context + `lsof -p`；`Alt+E` 編輯 firewall config；`Alt+R` reload 規則 | macOS + Linux |
 | `tv scheduled-jobs` | 1) user crontab  2) system cron (`/etc/crontab` + `cron.d/` + `cron.{hourly,daily,...}/`)  3) systemd timer (system + user)  4) at job  5) anacron (Linux) / launchd plist (macOS) | 每列：解碼排程、顯示觸發 unit、timer 顯示 `systemctl status` | 鑽入：`lnav` 開 `systemctl cat` + 最近 30 條 log；`Alt+E` 編輯 crontab/unit；`Alt+T` tail 相關 log | macOS + Linux |
+| `tv disk` | 1) `df -hT` 每 mount  2) `df -hi` inodes  3) `/var /home /tmp /opt /srv` 下第一層最大目錄  4) active mount + options  5) >100M 最大檔 | 路徑感知：dir 用 `du -h --max-depth=1`、file 用 `ls -lh` + `file` | `Enter` yazi 開 dir / less 開 file；`Alt+E` 編輯 `/etc/fstab`；`Alt+T` tail `dmesg -wT` | macOS + Linux |
+| `tv services-health` | 1) failed unit (Linux) / errored launchctl (macOS)  2) high-restart unit (NRestarts > 3)  3) 近期 OOM kill (Linux)  4) 全 running service  5) 近期 error 級 crash | `systemctl status` + 最近 10 條 log (Linux)；`launchctl list` 細節 (macOS) | `Enter` lnav 開 journalctl；`Alt+R` 重啟（確認）；`Alt+S` 停止（確認）；`Alt+E` `systemctl edit --full` | macOS + Linux |
 
 與本 repo 其他 channel 共用的 binding：
 
