@@ -680,15 +680,37 @@
   tags: [tunnel_tools]
   when: ansible_facts["os_family"] == "Darwin"
   block:
-    - name: Install ngrok via Homebrew
+    # Skip the install when the binary is already on PATH — ngrok cask downloads
+    # from bin.ngrok.com which periodically returns HTTP 52 "empty reply from
+    # server" (Heroku-fronted, transient). Pre-checking lets re-applies short-
+    # circuit instead of paying a 1-2 min download attempt that may fail.
+    - name: Check if ngrok is already installed (macOS)
+      ansible.builtin.command: which ngrok
+      register: ngrok_present_macos
+      changed_when: false
+      failed_when: false
+
+    - name: Install ngrok via Homebrew (with retries for flaky bin.ngrok.com CDN)
+      when: ngrok_present_macos.rc != 0
       community.general.homebrew:
         name: ngrok
         state: present
+      register: ngrok_brew_install
+      until: ngrok_brew_install is succeeded
+      retries: 3
+      delay: 15
 
   rescue:
+    # Most common failure: `Download failed: ... curl: (52) Empty reply from
+    # server` from bin.ngrok.com (Heroku CDN). Transient — retrying minutes
+    # later usually works. We don't fail the whole apply over it; user can
+    # re-run `chezmoi apply --tag tunnel_tools` or `brew install --cask ngrok`
+    # later. See pitfalls/ngrok-cask-download-flaky.md for the full story.
     - name: Warn ngrok installation failed (macOS)
       ansible.builtin.debug:
-        msg: "ngrok macOS installation failed — skipping. Error: {{ ansible_failed_result.msg | default('unknown') }}"
+        msg: |-
+          ngrok macOS installation failed after 3 retries — skipping. Re-run
+          `brew install --cask ngrok` later. Error: {{ ansible_failed_result.msg | default('unknown') }}
 
 - name: Install ngrok (Debian/Ubuntu)
   tags: [tunnel_tools]

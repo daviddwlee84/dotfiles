@@ -57,8 +57,20 @@ base=$(cat)
 
 # Bootstrap path: live file does not exist yet. Emit just the overlay so
 # the file is well-formed when Claude Code reads it on its next launch.
+#
+# IMPORTANT: Claude Code v2.1.116+ rejects the file with `/doctor` error
+# `keybindings.json must have a "bindings" array` if `.bindings` is absent.
+# So the stub MUST include `"bindings": []` even though we don't ship any
+# overrides. Empty array = use built-in defaults.
+# See: pitfalls/claude-code-keybindings-empty-bindings-array.md
 if [ -z "$base" ]; then
-  printf '%s\n' "$overlay"
+  cat <<'JSON'
+{
+  "$schema": "https://www.schemastore.org/claude-code-keybindings.json",
+  "$docs": "https://code.claude.com/docs/en/keybindings",
+  "bindings": []
+}
+JSON
   exit 0
 fi
 
@@ -75,4 +87,13 @@ fi
 # .bindings array is preserved verbatim — `. * $overlay` replaces arrays
 # wholesale only at matching key paths, and our overlay has no .bindings
 # key, so the live array is left untouched.
-printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'
+#
+# Heal-mode: if the live file is missing `.bindings` entirely (e.g. it was
+# bootstrapped by an older version of this script that emitted only the
+# metadata stub), inject `"bindings": []` so Claude Code v2.1.116+ stops
+# erroring in `/doctor`. We only inject when the key is absent, never when
+# it's a populated array, to avoid clobbering user-defined bindings.
+printf '%s' "$base" | jq --argjson overlay "$overlay" '
+  (. * $overlay)
+  | if has("bindings") then . else . + {bindings: []} end
+'
