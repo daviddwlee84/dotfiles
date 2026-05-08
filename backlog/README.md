@@ -99,6 +99,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`ai-capture-non-tmux-output`](ai-capture-non-tmux-output.md) | P2 deferred / P3 rejected | "aicapture: non-tmux output capture (Tier 2 tee / Tier 3 script/PTY)" |
 | [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
 | [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
+| [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
 | [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
