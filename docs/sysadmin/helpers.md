@@ -122,10 +122,13 @@ Defined under
 [`dot_config/television/cable/`](https://github.com/daviddwlee84/dotfiles/tree/main/dot_config/television/cable).
 Launch via `tv <name>` from anywhere or via the `Alt+T` tools picker.
 
-**Quick launcher**: `tv sysadmin` opens a meta-channel listing only the
+**Quick launcher**: `tv sysadmin` opens a meta-channel listing the
 sysadmin channels below — saves scrolling past 30 productivity channels
-when triaging. Enter on a row opens that channel; preview shows the
-underlying TOML config.
+when triaging. Includes adjacent channels useful in the same workflow:
+**`services`** (full systemd/launchd browser with log preview + lifecycle
+actions; complement to the failure-focused `services-health`) and
+**`logs`** (general-purpose log browser with tailspin/lnav). Enter on a
+row opens that channel; preview shows the underlying TOML config.
 
 | Channel | Sources (cycle with `Ctrl+S`) | Preview (cycle with `Ctrl+F`) | Enter | Platforms |
 |---|---|---|---|---|

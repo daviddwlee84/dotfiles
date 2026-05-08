@@ -113,9 +113,12 @@ sudo 自己的 credential cache；helper **不**整合本 repo 的
 [`dot_config/television/cable/`](https://github.com/daviddwlee84/dotfiles/tree/main/dot_config/television/cable)。
 從任何地方 `tv <name>` 啟動，或用 `Alt+T` tools picker 啟動。
 
-**快速 launcher**：`tv sysadmin` 開一個 meta-channel，只列下面的 sysadmin
-channel — triage 時不用滑過 30 個 productivity channel。Enter 開該
-channel；預覽顯示底層 TOML config。
+**快速 launcher**：`tv sysadmin` 開一個 meta-channel，列下面的 sysadmin
+channel — triage 時不用滑過 30 個 productivity channel。也包含同工作流
+相關的鄰近 channel：**`services`**（完整 systemd/launchd 瀏覽器含 log
+預覽 + lifecycle 動作；補完只看失敗的 `services-health`）與 **`logs`**
+（通用 log 瀏覽器含 tailspin/lnav）。Enter 開該 channel；預覽顯示底層
+TOML config。
 
 | Channel | 來源 (`Ctrl+S` 切換) | 預覽 (`Ctrl+F` 切換) | Enter | 平台 |
 |---|---|---|---|---|

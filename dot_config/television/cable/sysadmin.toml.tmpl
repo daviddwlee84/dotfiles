@@ -28,7 +28,9 @@ audit-events      │ auditd events: aureport summary + ausearch by baseline key
 firewall          │ Firewall rules + listening sockets + active connections (multi-backend)
 scheduled-jobs    │ All scheduled jobs: crontabs + systemd timers + at + launchd
 disk              │ df + inode + largest dirs/files + mount info (color-coded)
+services          │ Browse systemd / launchd units with log preview + lifecycle (start/stop/restart)
 services-health   │ Failed units + restart loops + OOM kills + recent crashes
+logs              │ Browse log files (.log / journalctl / /var/log) with tailspin preview, lnav drill
 EOF
 """
 
