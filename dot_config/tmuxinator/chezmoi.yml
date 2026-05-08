@@ -3,6 +3,17 @@
 # Window 1 "shell":     plain shell at chezmoi repo root
 # Window 2 "git":       lazygit for dotfiles version control
 # Window 3 "overrides": nvim with vertical splits for untracked override files
+#                       (chezmoi-ignored; highest-priority user overrides per
+#                       dot_zshrc.tmpl / dot_bashrc.tmpl load order)
+#
+# Override file tiers (see AGENTS.md → "primaryShell choice gates chsh only"):
+#   ~/.zshrc.adhoc           - zsh-only adhoc tail (always exists; auto-seeded)
+#   ~/.bashrc.adhoc          - bash-only adhoc tail, sourced AFTER ble-attach
+#                              (always exists; auto-seeded; ble-bind lives here)
+#   ~/.config/zsh/secrets.zsh   - zsh-only secrets (optional; create on demand)
+#   ~/.config/bash/secrets.bash - bash-only secrets (optional; create on demand)
+#   ~/.config/shell/secrets.sh  - POSIX-portable secrets shared by both shells
+#                                 (optional; create on demand)
 #
 # ── Usage ────────────────────────────────────────────────────────────────────
 #
@@ -24,4 +35,4 @@ windows:
         - lazygit
   - overrides:
       panes:
-        - nvim -O ~/.zshrc.adhoc ~/.config/zsh/secrets.zsh
+        - nvim -O ~/.zshrc.adhoc ~/.bashrc.adhoc ~/.config/zsh/secrets.zsh ~/.config/bash/secrets.bash ~/.config/shell/secrets.sh
