@@ -1,0 +1,101 @@
+# Custom keybindings cable channel for television (tv)
+# Reads the same data source as the `keys-picker` ZLE widget (Alt+/) and
+# the `bindings` shell function: ~/.config/docs/shells/keybindings.md
+#
+# Format contract (enforced by the picker too): every row is
+#   | `<KEY>` | `<widget>` | <description> |
+# parsed by awk -F'|' on lines that start with `| \``.
+#
+# Usage:
+#   tv keybindings                          (CLI)
+#   bindings                                (shell function fallback)
+#   Alt+/                                   (ZLE widget — the canonical entry)
+#
+# Keybindings inside the picker:
+#   Enter      Paste "# <key> → <widget>: <desc>" comment
+#   Ctrl+Y     Copy the key combo to clipboard
+#   Ctrl+/     Toggle preview panel (live `bindkey` lookup + source grep)
+
+[metadata]
+name = "keybindings"
+description = "Zsh keybindings cheatsheet: search built-in / plugin / custom widgets"
+
+[source]
+command = """
+awk -F'|' '
+    /^[[:space:]]*\\|[[:space:]]*`/ {
+        key=$2; widget=$3; desc=$4
+        for (i in arr) delete arr[i]
+        n = split("key widget desc", arr, " ")
+        for (i = 1; i <= n; i++) {
+            v = (arr[i] == "key") ? key : (arr[i] == "widget") ? widget : desc
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+            gsub(/^`|`$/, "", v)
+            if (arr[i] == "key")    key = v
+            if (arr[i] == "widget") widget = v
+            if (arr[i] == "desc")   desc = v
+        }
+        if (key == "Key" || key ~ /^-+$/) next
+        if (key == "<KEY>") next
+        printf "%-16s  %-32s  %s\\n", key, widget, desc
+    }
+' ~/.config/docs/shells/keybindings.md
+"""
+
+[preview]
+command = """
+key=$(printf '%s' '{}' | awk '{print $1}')
+widget=$(printf '%s' '{}' | awk '{print $2}')
+echo "Key:    $key"
+echo "Widget: $widget"
+echo
+echo '── Live bindkey lookup (emacs keymap) ──'
+case "$key" in
+  Ctrl+*)
+    ksym=$(printf '^%s' "${key#Ctrl+}")
+    bindkey -M emacs "$ksym" 2>/dev/null || echo '(not bound)'
+    ;;
+  Alt+*)
+    rest=${key#Alt+}
+    rest=$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')
+    ksym=$(printf '\\e%s' "$rest")
+    bindkey -M emacs "$ksym" 2>/dev/null || echo '(not bound)'
+    ;;
+  Tab) bindkey -M emacs '^I' 2>/dev/null ;;
+  End) bindkey -M emacs '^[[F' 2>/dev/null ;;
+  *)   echo '(no live lookup)' ;;
+esac
+echo
+echo '── Source files in ~/.config/zsh ──'
+if [ -d "$HOME/.config/zsh" ]; then
+    grep -rn "^${widget}()\\|zle -N ${widget}\\b" "$HOME/.config/zsh" 2>/dev/null | head -5
+fi
+"""
+
+[keybindings]
+enter = "actions:paste"
+ctrl-y = "actions:copy"
+
+[actions.paste]
+description = "Paste 'key → widget: desc' comment"
+command = """
+key=$(printf '%s' '{}' | awk '{print $1}')
+widget=$(printf '%s' '{}' | awk '{print $2}')
+desc=$(printf '%s' '{}' | sed -E 's/^[^ ]+ +[^ ]+ +//')
+printf '# %s → %s: %s' "$key" "$widget" "$desc"
+"""
+mode = "execute"
+
+[actions.copy]
+description = "Copy key combo to clipboard"
+command = """
+key=$(printf '%s' '{}' | awk '{print $1}')
+if command -v pbcopy >/dev/null 2>&1; then
+    printf '%s' "$key" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then
+    printf '%s' "$key" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then
+    printf '%s' "$key" | xclip -selection clipboard
+fi
+"""
+mode = "fork"

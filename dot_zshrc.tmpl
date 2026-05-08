@@ -37,6 +37,12 @@ zvm_after_init() {
         bindkey -M vicmd "${AISUGGEST_KEY:-^[;}" aisuggest
         bindkey -M emacs "${AISUGGEST_KEY:-^[;}" aisuggest
     fi
+    # keys-picker (Alt+/) — see dot_config/zsh/tools/13_keys_picker.zsh
+    if (( ${+widgets[keys-picker]} )); then
+        bindkey -M viins '\e/' keys-picker
+        bindkey -M vicmd '\e/' keys-picker
+        bindkey -M emacs '\e/' keys-picker
+    fi
 }
 
 # Oh-My-Zsh path

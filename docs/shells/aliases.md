@@ -589,6 +589,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | Profile zsh startup time (`ZSH_PROF=1 zsh -i -c exit`) |
+| `bindings` | function | `dot_config/shell/10_aliases.sh` | View zsh keybindings cheatsheet (data source: `~/.config/docs/shells/keybindings.md`); pairs with the `Alt+/` ZLE picker — see [keybindings.md](keybindings.md) |
 | `ghostty-ssh-terminfo` | function | `dot_config/shell/10_aliases.sh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
 | `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
 

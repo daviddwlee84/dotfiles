@@ -6,6 +6,29 @@
 # --- Editor ----------------------------------------------------------------
 alias v="nvim"
 
+# --- Keybindings cheatsheet ------------------------------------------------
+# Static viewer for ~/.config/docs/shells/keybindings.md (the same data
+# source that the `keys-picker` ZLE widget on Alt+/ reads). Useful on bash
+# (no ZLE port) and inside non-interactive shells. Prefers `tv keybindings`
+# (television channel) → `bat` → `cat` in that order.
+bindings() {
+  doc="${HOME}/.config/docs/shells/keybindings.md"
+  if [ ! -f "$doc" ]; then
+    echo "bindings: $doc not found (chezmoi apply needed?)" >&2
+    unset doc
+    return 1
+  fi
+  if command -v tv >/dev/null 2>&1 && \
+     [ -f "${HOME}/.config/television/cable/keybindings.toml" ]; then
+    tv keybindings
+  elif command -v bat >/dev/null 2>&1; then
+    bat --style=plain --paging=always "$doc"
+  else
+    "${PAGER:-less}" "$doc" 2>/dev/null || cat "$doc"
+  fi
+  unset doc
+}
+
 # --- Chezmoi ---------------------------------------------------------------
 # https://www.chezmoi.io/user-guide/frequently-asked-questions/design/#why-does-chezmoi-cd-spawn-a-shell-instead-of-just-changing-directory
 chezmoi-cd() {
