@@ -135,8 +135,8 @@ section still constrains agents who can't see the skill:
 
 Touching any of these surfaces requires updating [`docs/this_repo/fleet-apply.md`](docs/this_repo/fleet-apply.md) in the same commit:
 
-- `scripts/fleet_apply.py` — CLI flags, mode semantics, sudo helper integration, log/sentinel paths
-- `justfile` `fleet-*` recipes — name, args, doc-comment
+- `scripts/fleet_apply.py` — CLI flags, mode semantics, sudo helper integration, log/sentinel paths, **readiness probe** (`--readiness*` flags, `_run_readiness`, state classifier, `_PROMPT_KEY_RE`)
+- `justfile` `fleet-*` recipes — name, args, doc-comment. Family currently: `fleet-edit`, `fleet-status`, `fleet-status-quick`, `fleet-apply`, `fleet-apply-file`, `fleet-apply-dry-run`, `fleet-apply-status`, `fleet-apply-tail`, `fleet-apply-watch`, `fleet-apply-kill`, plus host-targeted variants
 - `dot_config/fleet/create_private_machines.toml.tmpl` — schema (`local`, `chezmoi_path`, `no_root_machine`, `password.source`, etc.)
 - Any change to `scripts/lib/sudo_shared.sh` that affects how `CHEZMOI_SUDO_PASSWORD_FILE` is consumed (also see "Sudo session" invariant below)
 
@@ -257,6 +257,11 @@ A few `just fleet-apply*` behaviours WILL trip up agents who don't know them. Fu
 - **Install-only by design**. fleet-apply inherits the [Install vs upgrade is split](#install-vs-upgrade-is-split-on-purpose) invariant: it never silently bumps tools. The explicit upgrade path is `just upgrade-*` which must be run on each host (fleet-apply does NOT broadcast upgrades).
 - **Process substitution + sentinel are load-bearing**. `> >(tee -a $log) 2>&1 & _cz_pid=$!; wait $_cz_pid; _rc=$?; echo $_rc > $sentinel` is the contract that `--status` / `--tail` / `--watch` rely on. Don't change to a pipeline (`| tee`) — the wrapper's SIGHUP trap depends on `$_cz_pid` pointing to chezmoi, not tee. See [docs/this_repo/fleet-apply.md → Killing orphans, checking status, re-attaching](docs/this_repo/fleet-apply.md#killing-orphans-checking-status-re-attaching).
 - **Conservative drift classifier**. `_classify_drift()` only downgrades stderr lines matching the exact `chezmoi: <path>: could not open a new TTY: open /dev/tty:` fingerprint. Any unrecognised stderr line keeps `failed` state. Don't broaden the regex without explicit user request — silent downgrades hide real errors.
+- **`fleet-status` ≠ `fleet-apply-status`** — easy to confuse, answer different questions:
+  - `just fleet-status` → **pre-flight readiness probe**. Read-only SSH probe per host that predicts what `fleet-apply` would do (states: `up-to-date`, `behind`, `ahead`, `dirty`, `drift`, `ready-to-update`, `busy`, `toml-mismatch`, `not-init`, `no-source`, `no-chezmoi`, `unreachable`). Run **before** `fleet-apply`. Always exits 0 (informational) — use `--readiness-json | jq` for scripted gates. Companion: `fleet-status-quick` skips remote `git fetch`. See [docs/this_repo/fleet-apply.md → Readiness probe](docs/this_repo/fleet-apply.md#readiness-probe-just-fleet-status).
+  - `just fleet-apply-status` → **process-liveness probe**. Checks the sentinel + PID files (`~/.cache/fleet-apply/<host>.{pid,sentinel,log}`) on each host to answer "is a `fleet-apply` still running, and what was its last exit code?". Run **during/after** `fleet-apply`. Pairs with `fleet-apply-tail` / `fleet-apply-watch` / `fleet-apply-kill`.
+  - The `toml-mismatch` state specifically catches the failure mode where a remote's `~/.config/chezmoi/chezmoi.toml` is missing prompt keys that `.chezmoi.toml.tmpl` now requires (e.g. after adding a new `promptBoolOnce`). Detection is by static prompt-key set comparison via `_PROMPT_KEY_RE` against the rendered toml — `chezmoi dump-config` cannot be used because it re-evaluates the very template we're trying to inspect.
+  - `fleet-edit` is forgiving (auto-seeds `~/.config/fleet/machines.toml` with chmod 600 + `[defaults]` template if missing); `fleet-status` is forgiving (exits 0 with hint when inventory missing); but `fleet-apply` keeps strict exit-2 on missing inventory — don't unify these.
 
 ### `modify_` and `create_` prefix semantics
 

@@ -343,6 +343,8 @@ Push the same `chezmoi update --init` to every host in
 plaintext / interactive prompt / Bitwarden CLI:
 
 ```bash
+just fleet-edit                      # edit ~/.config/fleet/machines.toml ($EDITOR)
+just fleet-status                    # pre-flight readiness probe (read-only, ~1.5s/host)
 just fleet-apply                     # parallel, all hosts (chezmoi update --init)
 just fleet-apply-dry-run             # `chezmoi diff` on each host (no changes)
 just fleet-apply-one lab-box         # single host, --serial mode (debug)
@@ -353,6 +355,13 @@ etc. all inherited) and falls back to explicit `hostname/user/port/identity_file
 Per-host log: `logs/fleet-apply/<UTC-timestamp>/<host>.log`. Exit code = number
 of failed hosts. Inventory file is seeded once by chezmoi as a
 `create_private_` template, so your edits are never overwritten.
+
+`fleet-status` is the recommended pre-apply gate — it predicts what `fleet-apply`
+would do per host (`up-to-date` / `behind` / `drift` / `busy` /
+`toml-mismatch` / `not-init` / `unreachable` / ...) without changing
+anything, and prints actionable hints for each non-green state. See
+[docs/this_repo/fleet-apply.md § Readiness probe](docs/this_repo/fleet-apply.md#readiness-probe-just-fleet-status)
+for the full state matrix.
 
 Conflict-handling defaults match the "push canonical config" mental model:
 `--keep-going` is **on** (skip drifted files non-destructively, continue

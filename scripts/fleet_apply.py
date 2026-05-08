@@ -1212,13 +1212,67 @@ def cli(
             )
         ),
     ] = False,
+    readiness: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Pre-flight readiness probe (`just fleet-status`). Connects "
+                "to each selected host once and reports per-host state — "
+                "would `fleet-apply` succeed right now? States: up-to-date, "
+                "ready-to-update, behind, drift, dirty, busy, toml-mismatch "
+                "(NEW prompt keys not yet answered — the david_ubuntu "
+                "failure mode), not-init, no-chezmoi, unreachable. Read-only; "
+                "always exits 0 (use --readiness-json for scripting). Pair "
+                "with --hosts to scope. Cheaper than --dry-run (no full "
+                "chezmoi diff) and more actionable than --status (which "
+                "only sees live processes)."
+            )
+        ),
+    ] = False,
+    readiness_no_fetch: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "With --readiness, skip `git fetch` on the remote. Faster "
+                "(saves ~0.5–2s per host) but the 'behind' state will be "
+                "stale — you may apply without realising the remote has "
+                "new commits. Useful offline or when you only care about "
+                "drift / busy / init state."
+            )
+        ),
+    ] = False,
+    readiness_json: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "With --readiness, emit machine-readable JSON to stdout "
+                "instead of the Rich table. Schema: list of "
+                "{host, state, notes, behind, ahead, dirty, drift_count, "
+                "branch, local_sha, remote_sha, busy_pids, error}. Pipe "
+                "into `jq` for pre-apply gates in CI."
+            )
+        ),
+    ] = False,
 ) -> int:
-    """Apply chezmoi to a fleet of hosts in parallel. Exit code = failed-host count."""
     console = Console()
 
     try:
         all_hosts, _defaults = load_hosts(config)
-    except (FileNotFoundError, ValueError) as e:
+    except FileNotFoundError as e:
+        # Friendlier exit for --readiness (the "is my fleet ready?" probe):
+        # missing inventory is the expected first-run state, not an error.
+        # Apply / kill / status / tail all keep the exit-2 behaviour because
+        # the user asked to do something and we can't.
+        if readiness:
+            console.print(f"[yellow]no fleet configured yet[/] — {e}")
+            console.print(
+                "[dim]hint:[/] run [bold]just fleet-edit[/] to add machines, "
+                "then re-run [bold]just fleet-status[/]."
+            )
+            return 0
+        console.print(f"[red]error[/]: {e}")
+        return 2
+    except ValueError as e:
         console.print(f"[red]error[/]: {e}")
         return 2
 
@@ -1230,11 +1284,24 @@ def cli(
         if (not include or h.name in include) and h.name not in exclude_set
     ]
     if not selected:
+        if readiness:
+            console.print(
+                "[yellow]no hosts selected[/] — "
+                "edit [bold]~/.config/fleet/machines.toml[/] "
+                "(or run [bold]just fleet-edit[/])."
+            )
+            return 0
         console.print("[yellow]no hosts selected[/]")
         return 0
 
     if kill_orphans:
         return _run_kill(console, selected, connect_timeout)
+
+    if readiness:
+        return _run_readiness(
+            console, selected, connect_timeout,
+            no_fetch=readiness_no_fetch, json_out=readiness_json,
+        )
 
     if status:
         return _run_status(console, selected, connect_timeout, watch=watch)
@@ -1647,7 +1714,611 @@ def _run_status(
         return 130
 
 
-def _parse_compact_log(log_text: str) -> dict:
+# ---------------------------------------------------------------------------
+# Readiness probe (--readiness / `just fleet-status`)
+# ---------------------------------------------------------------------------
+#
+# Predicts what `just fleet-apply` would do on each host WITHOUT changing
+# anything. fleet-apply defaults to `chezmoi update --init`, which is three
+# things in sequence:
+#
+#   1. `git -C <source> pull`     — bring in new template commits
+#   2. `chezmoi init`             — re-render ~/.config/chezmoi/chezmoi.toml
+#                                    (re-evaluates promptBoolOnce / ...; NEW
+#                                    keys without saved answers cause the
+#                                    "could not open a new TTY" failure
+#                                    non-interactively — the `david_ubuntu`
+#                                    failure mode in the motivating bug)
+#   3. `chezmoi apply`            — render templates, run run_* scripts
+#
+# The readiness probe inspects each host once over SSH and emits a per-host
+# classification covering all three failure surfaces above PLUS the busy-host
+# overlap with --status. Cheaper than --dry-run (which runs full chezmoi
+# diff) and more actionable than --status (which only sees live processes,
+# not pending drift / missing init / new prompt keys).
+
+
+def _build_readiness_probe_cmd(no_fetch: bool) -> str:
+    """Construct the per-host readiness probe shell snippet.
+
+    Emits KEY=VALUE lines, then a DRIFT_BEGIN ... DRIFT_END block with
+    `chezmoi status` output. Format is parsed by _parse_readiness_stdout;
+    keep it stable. The snippet is non-fatal at every step (early
+    `printf STATE=... + exit 0` for blocking states) so partial answers
+    reach the orchestrator even when later steps would fail.
+    Classification is done in Python (_classify_readiness), not in shell.
+    """
+    fetch = (
+        ":"
+        if no_fetch
+        else 'git -C "$_src" fetch --quiet origin 2>/dev/null || true'
+    )
+    return (
+        # Same PATH augmentation as build_remote_command so non-interactive
+        # SSH shells (which don't source ~/.zshrc) find chezmoi installed
+        # in any of the standard prefixes.
+        'export PATH="$HOME/.local/bin:$HOME/bin:'
+        '/home/linuxbrew/.linuxbrew/bin:/opt/homebrew/bin:'
+        '/usr/local/bin:/snap/bin:$PATH"; '
+        # 1) chezmoi binary present?
+        '_cz=$(command -v chezmoi 2>/dev/null); '
+        'if [ -z "$_cz" ]; then '
+        '  printf "STATE=no-chezmoi\\n"; exit 0; '
+        'fi; '
+        'printf "CHEZMOI_BIN=%s\\n" "$_cz"; '
+        # 2) chezmoi init done? Look for the on-disk config that `chezmoi
+        #    init` writes. Honour XDG_CONFIG_HOME for parity with chezmoi.
+        #    NB: we can't use `chezmoi dump-config` here because it
+        #    re-evaluates the template — exactly the thing we are trying
+        #    to detect missing prompts in.
+        '_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"; '
+        'if [ ! -f "$_cfg" ]; then '
+        '  printf "INIT=no\\nSTATE=not-init\\n"; exit 0; '
+        'fi; '
+        'printf "INIT=yes\\n"; '
+        # 3) Source path + git state. `chezmoi source-path` (no args) prints
+        #    the source directory; works regardless of where chezmoi was
+        #    installed.
+        '_src=$("$_cz" --no-pager source-path 2>/dev/null); '
+        'if [ -z "$_src" ] || [ ! -d "$_src/.git" ]; then '
+        '  printf "STATE=no-source\\nSOURCE_PATH=%s\\n" "${_src:-}"; exit 0; '
+        'fi; '
+        'printf "SOURCE_PATH=%s\\n" "$_src"; '
+        # Fetch (or skip per --no-fetch) so behind/ahead counts are honest.
+        f'{fetch}; '
+        '_local_sha=$(git -C "$_src" rev-parse HEAD 2>/dev/null || echo ""); '
+        '_remote_sha=$(git -C "$_src" rev-parse @{u} 2>/dev/null || echo ""); '
+        '_behind=$(git -C "$_src" rev-list --count HEAD..@{u} 2>/dev/null || echo 0); '
+        '_ahead=$(git -C "$_src" rev-list --count @{u}..HEAD 2>/dev/null || echo 0); '
+        '_dirty=$(git -C "$_src" status --porcelain 2>/dev/null | wc -l | tr -d " "); '
+        '_branch=$(git -C "$_src" rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""); '
+        'printf "LOCAL_SHA=%s\\nREMOTE_SHA=%s\\nBEHIND=%s\\nAHEAD=%s\\nDIRTY=%s\\nBRANCH=%s\\n" '
+        '  "$_local_sha" "$_remote_sha" "$_behind" "$_ahead" "$_dirty" "$_branch"; '
+        # 4) Extract top-level keys from the on-disk chezmoi.toml (under
+        #    [data]). Comma-joined; orchestrator compares against the set
+        #    of prompt keys grepped from the local .chezmoi.toml.tmpl and
+        #    warns about any missing ones (the david_ubuntu failure mode).
+        '_keys=$(awk -F"=" '
+        '\'/^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/ '
+        '{ gsub(/[[:space:]]/, "", $1); print $1 }\' '
+        '"$_cfg" | sort -u | paste -sd, -); '
+        'printf "TOML_KEYS=%s\\n" "$_keys"; '
+        # 5) Busy probe — same self-exclusion strategy as _STATUS_PROBE_CMD.
+        '_self_pid=$$; '
+        '_parent_pid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " "); '
+        '_pids=$(pgrep -u "$(id -un)" -lf "chezmoi|ansible-playbook" 2>/dev/null '
+        '  | awk -v self="$_self_pid" -v parent="$_parent_pid" '
+        '\'{ pid=$1; if (pid==self || pid==parent) next; '
+        '   $1=""; sub(/^ /, ""); '
+        '   if ($0 ~ /ansible-playbook/) { print pid; next } '
+        '   if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/)) { print pid } }\' '
+        '  | paste -sd, - || true); '
+        'printf "BUSY_PIDS=%s\\n" "${_pids:-}"; '
+        # 6) chezmoi status — drift detection. Empty output = clean.
+        #    Cap at 50 lines to bound transcript size (a host with hundreds
+        #    of drifted files is broken in a different way; ssh in instead).
+        'printf "DRIFT_BEGIN\\n"; '
+        'PAGER=cat GIT_PAGER=cat "$_cz" --no-pager status 2>/dev/null | head -50 || true; '
+        'printf "DRIFT_END\\n"'
+    )
+
+
+def _parse_readiness_stdout(stdout: str) -> tuple[dict[str, str], list[str]]:
+    """Split the probe output into (KEY=VAL fields, drift lines)."""
+    fields: dict[str, str] = {}
+    drift: list[str] = []
+    in_drift = False
+    for line in stdout.splitlines():
+        if line == "DRIFT_BEGIN":
+            in_drift = True
+            continue
+        if line == "DRIFT_END":
+            in_drift = False
+            continue
+        if in_drift:
+            if line.strip():
+                drift.append(line)
+        elif "=" in line:
+            k, _, v = line.partition("=")
+            fields[k] = v
+    return fields, drift
+
+
+# Regex matching a chezmoi prompt call in .chezmoi.toml.tmpl. Captures the
+# prompt KEY (second positional argument). Covers:
+#   promptBool / promptBoolOnce
+#   promptString / promptStringOnce
+#   promptInt / promptIntOnce
+#   promptChoice / promptChoiceOnce
+# Pattern: `promptXxxOnce . "key"` — `.` is the chezmoi root context.
+_PROMPT_KEY_RE = re.compile(
+    r'prompt(?:Bool|String|Int|Choice)(?:Once)?\s+\.\s+"([^"]+)"'
+)
+
+
+def _extract_expected_prompt_keys(repo_root: Path) -> set[str]:
+    """Return the set of prompt-key names declared in .chezmoi.toml.tmpl.
+
+    Used to detect the david_ubuntu failure mode: a NEW promptBoolOnce was
+    added to the template but the remote's saved chezmoi.toml predates it,
+    so a `chezmoi update --init` would re-prompt non-interactively and
+    crash. Best-effort: returns an empty set if the file isn't found
+    (falls back to "we can't tell" — readiness check skips toml-mismatch).
+    """
+    tmpl = repo_root / ".chezmoi.toml.tmpl"
+    if not tmpl.exists():
+        return set()
+    try:
+        text = tmpl.read_text(errors="replace")
+    except OSError:
+        return set()
+    return set(_PROMPT_KEY_RE.findall(text))
+
+
+def _classify_readiness(
+    fields: dict[str, str],
+    drift: list[str],
+    expected_keys: set[str],
+) -> tuple[str, list[str]]:
+    """Map probe fields → (primary state, list of secondary notes).
+
+    Priority order (most actionable first):
+      unreachable > no-chezmoi > not-init > no-source > toml-mismatch
+        > busy > dirty > drift > behind > ahead > ready-to-update > up-to-date
+
+    Secondary notes carry context the primary state hides (e.g. a
+    `behind` host with drift will show "drift: 2 files" in notes).
+    """
+    notes: list[str] = []
+
+    # Hard blockers (early exit from probe → only STATE field set).
+    state = fields.get("STATE", "")
+    if state in {"no-chezmoi", "not-init", "no-source"}:
+        return state, notes
+
+    # toml-mismatch: prompt keys present in template but missing on remote.
+    if expected_keys:
+        remote_keys = set(
+            k for k in (fields.get("TOML_KEYS") or "").split(",") if k
+        )
+        missing = expected_keys - remote_keys
+        if missing:
+            preview = ", ".join(sorted(missing)[:3])
+            extra = (
+                ""
+                if len(missing) <= 3
+                else f" (+{len(missing) - 3} more)"
+            )
+            notes.append(f"missing prompt keys: {preview}{extra}")
+            return "toml-mismatch", notes
+
+    busy_pids = fields.get("BUSY_PIDS") or ""
+    if busy_pids:
+        if busy_pids == "chezmoi-state-locked":
+            notes.append("chezmoi state lock held (parallel run in progress)")
+        else:
+            notes.append(f"pids={busy_pids}")
+        return "busy", notes
+
+    behind = int(fields.get("BEHIND") or 0)
+    ahead = int(fields.get("AHEAD") or 0)
+    dirty = int(fields.get("DIRTY") or 0)
+    drift_count = len(drift)
+
+    # Build secondary notes regardless of primary state.
+    branch = fields.get("BRANCH") or ""
+    if branch and branch not in {"main", "master"}:
+        notes.append(f"branch={branch}")
+    if behind:
+        notes.append(f"behind: {behind} commit{'s' if behind != 1 else ''}")
+    if ahead:
+        notes.append(f"ahead: {ahead} commit{'s' if ahead != 1 else ''}")
+    if dirty:
+        notes.append(f"dirty: {dirty} file{'s' if dirty != 1 else ''}")
+    if drift_count:
+        # First drift entry as preview; chezmoi status format is
+        # "MM <relpath>" (two status chars + path) so strip the prefix.
+        first = drift[0]
+        first_path = first[3:] if len(first) > 3 and first[2] == " " else first
+        more = (
+            ""
+            if drift_count == 1
+            else f" (+{drift_count - 1} more)"
+        )
+        notes.append(f"drift: {first_path}{more}")
+
+    # Primary classification.
+    if dirty:
+        return "dirty", notes
+    if ahead and not behind:
+        return "ahead", notes
+    if drift_count:
+        # Drift without git changes = remote target was hand-edited.
+        # Counts as actionable (would block apply without --force) but
+        # apply itself would proceed past it with --keep-going (default).
+        return "drift", notes
+    if behind:
+        return "ready-to-update", notes
+    return "up-to-date", notes
+
+
+def _probe_readiness_local(no_fetch: bool) -> tuple[dict[str, str], list[str]]:
+    """Local-host equivalent of the SSH readiness probe.
+
+    Mirrors _build_readiness_probe_cmd but uses Python subprocess + Path
+    APIs directly. Skips the busy probe filter for self-process / parent
+    (mirrors _probe_local). Returns the same (fields, drift_lines) shape.
+    """
+    fields: dict[str, str] = {}
+    drift: list[str] = []
+
+    # 1) chezmoi binary
+    cz = subprocess.run(
+        ["command", "-v", "chezmoi"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip() if False else None
+    # `command -v` is a shell builtin, not an executable — use shutil.which.
+    import shutil
+    cz_path = shutil.which("chezmoi")
+    if not cz_path:
+        fields["STATE"] = "no-chezmoi"
+        return fields, drift
+    fields["CHEZMOI_BIN"] = cz_path
+
+    # 2) chezmoi.toml present?
+    cfg = Path(
+        os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")
+    ) / "chezmoi" / "chezmoi.toml"
+    if not cfg.exists():
+        fields["INIT"] = "no"
+        fields["STATE"] = "not-init"
+        return fields, drift
+    fields["INIT"] = "yes"
+
+    # 3) Source path + git state
+    src = ""
+    locked = False
+    try:
+        r = subprocess.run(
+            [cz_path, "--no-pager", "source-path"],
+            capture_output=True, text=True, check=False, timeout=10,
+        )
+        src = r.stdout.strip()
+        # chezmoi may be holding the persistent-state lock from a parallel
+        # fleet-apply / chezmoi run. The error goes to stderr and stdout
+        # is empty. Detect & fall back to $PWD (when run from inside the
+        # source dir via `just`) so the rest of the probe still works.
+        if not src and "persistent state lock" in (r.stderr or ""):
+            locked = True
+            cwd_top = subprocess.run(
+                ["git", "-C", str(Path.cwd()), "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, check=False, timeout=5,
+            ).stdout.strip()
+            if cwd_top and (Path(cwd_top) / ".chezmoiroot").exists() or (
+                cwd_top and (Path(cwd_top) / ".chezmoi.toml.tmpl").exists()
+            ):
+                src = cwd_top
+    except (subprocess.TimeoutExpired, OSError):
+        src = ""
+    if not src or not (Path(src) / ".git").is_dir():
+        fields["STATE"] = "no-source"
+        fields["SOURCE_PATH"] = src
+        if locked:
+            # Surface the real cause so the user doesn't chase a phantom
+            # "no source" diagnosis. Promote to its own state for clarity.
+            fields["STATE"] = "busy"
+            fields["BUSY_PIDS"] = "chezmoi-state-locked"
+        return fields, drift
+    fields["SOURCE_PATH"] = src
+    if locked:
+        # We recovered via $PWD fallback, but still flag that chezmoi
+        # itself is locked — `chezmoi status` below will fail too.
+        fields["CHEZMOI_LOCKED"] = "1"
+
+    def _git(*args: str, default: str = "") -> str:
+        try:
+            r = subprocess.run(
+                ["git", "-C", src, *args],
+                capture_output=True, text=True, check=False, timeout=15,
+            )
+            return r.stdout.strip() or default
+        except (subprocess.TimeoutExpired, OSError):
+            return default
+
+    if not no_fetch:
+        # Best-effort fetch; ignore failures (offline, auth, etc.).
+        _git("fetch", "--quiet", "origin")
+
+    fields["LOCAL_SHA"] = _git("rev-parse", "HEAD")
+    fields["REMOTE_SHA"] = _git("rev-parse", "@{u}")
+    fields["BEHIND"] = _git("rev-list", "--count", "HEAD..@{u}", default="0")
+    fields["AHEAD"] = _git("rev-list", "--count", "@{u}..HEAD", default="0")
+    dirty_out = _git("status", "--porcelain")
+    fields["DIRTY"] = str(len([l for l in dirty_out.splitlines() if l.strip()]))
+    fields["BRANCH"] = _git("rev-parse", "--abbrev-ref", "HEAD")
+
+    # 4) Top-level keys in chezmoi.toml
+    keys: list[str] = []
+    try:
+        for raw in cfg.read_text(errors="replace").splitlines():
+            stripped = raw.lstrip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("["):
+                continue
+            head, sep, _ = stripped.partition("=")
+            if sep and head.strip().replace("_", "").isalnum():
+                keys.append(head.strip())
+    except OSError:
+        pass
+    fields["TOML_KEYS"] = ",".join(sorted(set(keys)))
+
+    # 5) Busy probe (reuse _probe_local's pgrep logic, sans log probe)
+    pid_list: list[str] = []
+    try:
+        result = subprocess.run(
+            ["pgrep", "-u", str(os.getuid()), "-lf",
+             "chezmoi|ansible-playbook"],
+            capture_output=True, text=True, check=False,
+        )
+        own = {os.getpid(), os.getppid()}
+        for line in result.stdout.splitlines():
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            pid_s, cmd = parts
+            try:
+                pid_i = int(pid_s)
+            except ValueError:
+                continue
+            if pid_i in own:
+                continue
+            if "ansible-playbook" in cmd:
+                pid_list.append(pid_s)
+            elif "chezmoi" in cmd and (" update" in cmd or " apply" in cmd):
+                pid_list.append(pid_s)
+    except FileNotFoundError:
+        pass
+    fields["BUSY_PIDS"] = ",".join(pid_list)
+
+    # 6) chezmoi status (drift) — skip if state lock is held (would just
+    #    timeout uselessly; the lock state itself already tells the user
+    #    something is in progress).
+    if not fields.get("CHEZMOI_LOCKED"):
+        try:
+            r = subprocess.run(
+                [cz_path, "--no-pager", "status"],
+                capture_output=True, text=True, check=False, timeout=30,
+                env={**os.environ, "PAGER": "cat", "GIT_PAGER": "cat"},
+            )
+            for line in r.stdout.splitlines()[:50]:
+                if line.strip():
+                    drift.append(line)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    return fields, drift
+
+
+# Style + symbol per readiness state. Symbol is shown in the host column
+# of the table (so the eye can scan a long fleet quickly), full state name
+# in its own column.
+_READINESS_STYLE: dict[str, tuple[str, str]] = {
+    "up-to-date":      ("✓", "green"),
+    "ready-to-update": ("↻", "blue"),
+    "behind":          ("→", "cyan"),
+    "ahead":           ("?", "magenta"),
+    "drift":           ("⚠", "yellow"),
+    "dirty":           ("⚠", "yellow"),
+    "busy":            ("⏳", "yellow"),
+    "toml-mismatch":   ("!", "yellow bold"),
+    "not-init":        ("✗", "red"),
+    "no-source":       ("✗", "red"),
+    "no-chezmoi":      ("✗", "red"),
+    "unreachable":     ("✗", "red"),
+}
+
+
+# Per-state recovery hint for the footer. None means "no action needed".
+_READINESS_HINT: dict[str, str] = {
+    "no-chezmoi":    "ssh in & install chezmoi (curl https://chezmoi.io/get | sh) — see README Quick Setup",
+    "not-init":      "ssh in & run `chezmoi init` interactively (one-off; needs TTY for prompts)",
+    "no-source":     "ssh in: chezmoi source dir missing or not a git repo — re-init may be needed",
+    "toml-mismatch": "ssh in & re-run `chezmoi init` to answer the new prompts (their default values are usually fine)",
+    "drift":         "`just fleet-apply --hosts HOST --force` (overwrite) OR migrate to a *.local override",
+    "dirty":         "ssh in & commit/stash uncommitted changes in the source dir before applying",
+    "ahead":         "ssh in: source dir has unpushed local commits — `git push` or reset before applying",
+    "busy":          "wait for the running run, OR `just fleet-apply-status --hosts HOST` for live state",
+    "behind":        "`just fleet-apply --hosts HOST` (or whole fleet)",
+    "ready-to-update": "`just fleet-apply --hosts HOST` (or whole fleet)",
+    "unreachable":   "check ssh_alias / network / sudo / 1Password agent",
+    "up-to-date":    "",
+}
+
+
+def _run_readiness(
+    console: Console,
+    selected: list[Host],
+    connect_timeout: int,
+    no_fetch: bool,
+    json_out: bool,
+) -> int:
+    """Probe each host's readiness; render table + actionable hints.
+
+    Always returns 0 (probe is informational, not a verdict — matches
+    --status / --compact). Use --json for machine-readable output suitable
+    for `jq` / scripting / pre-apply gates in CI.
+
+    Note: fleet-apply defaults to `chezmoi update --init` (= git pull +
+    re-render chezmoi.toml + apply). The probe predicts ALL three
+    sub-steps' failure modes:
+      * pull:  behind / ahead / dirty
+      * init:  toml-mismatch (NEW prompt keys not yet answered)
+      * apply: drift (target hand-edited on remote)
+    """
+    expected_keys = _extract_expected_prompt_keys(Path.cwd())
+    probe_cmd = _build_readiness_probe_cmd(no_fetch)
+
+    async def _probe_one(h: Host) -> dict:
+        row: dict = {
+            "host": h.name,
+            "state": "unreachable",
+            "notes": [],
+            "fields": {},
+            "drift": [],
+            "error": None,
+        }
+        if h.local:
+            try:
+                fields, drift = _probe_readiness_local(no_fetch)
+            except Exception as e:  # noqa: BLE001
+                row["error"] = f"{type(e).__name__}: {e}"
+                return row
+            row["fields"] = fields
+            row["drift"] = drift
+            state, notes = _classify_readiness(fields, drift, expected_keys)
+            row["state"] = state
+            row["notes"] = notes
+            return row
+        try:
+            async with asyncio.timeout(connect_timeout):
+                conn = await asyncssh.connect(**_connect_kwargs(h))
+            async with conn:
+                result = await conn.run(probe_cmd, check=False)
+            stdout = result.stdout or ""
+        except (asyncssh.Error, OSError, TimeoutError) as e:
+            row["error"] = f"{type(e).__name__}: {e}"
+            return row
+        fields, drift = _parse_readiness_stdout(stdout)
+        row["fields"] = fields
+        row["drift"] = drift
+        state, notes = _classify_readiness(fields, drift, expected_keys)
+        row["state"] = state
+        row["notes"] = notes
+        return row
+
+    async def _orchestrate() -> list[dict]:
+        return await asyncio.gather(*(_probe_one(h) for h in selected))
+
+    rows = asyncio.run(_orchestrate())
+
+    if json_out:
+        import json
+        # Drop verbose `fields` dict from JSON to keep it readable; expose
+        # the classification + key counts. Callers wanting raw fields can
+        # parse the probe output themselves.
+        slim = []
+        for r in rows:
+            slim.append({
+                "host": r["host"],
+                "state": r["state"],
+                "notes": r["notes"],
+                "behind": int(r["fields"].get("BEHIND") or 0),
+                "ahead": int(r["fields"].get("AHEAD") or 0),
+                "dirty": int(r["fields"].get("DIRTY") or 0),
+                "drift_count": len(r["drift"]),
+                "branch": r["fields"].get("BRANCH") or "",
+                "local_sha": (r["fields"].get("LOCAL_SHA") or "")[:7],
+                "remote_sha": (r["fields"].get("REMOTE_SHA") or "")[:7],
+                "busy_pids": r["fields"].get("BUSY_PIDS") or "",
+                "error": r["error"],
+            })
+        print(json.dumps(slim, indent=2))
+        return 0
+
+    console.print(
+        f"[bold]fleet-status[/] — readiness probe across "
+        f"{len(selected)} host(s)"
+        + (" [dim](no fetch)[/]" if no_fetch else "")
+    )
+    table = Table(title="readiness probe", expand=True, show_lines=False)
+    table.add_column("host", style="bold")
+    table.add_column("state")
+    table.add_column("notes", overflow="fold")
+
+    # Group hosts by state for the hints section.
+    by_state: dict[str, list[str]] = {}
+    for row in rows:
+        symbol, color = _READINESS_STYLE.get(
+            row["state"], ("?", "white")
+        )
+        # Compose notes; for unreachable show the error.
+        notes_str = ", ".join(row["notes"]) if row["notes"] else ""
+        if row["error"] and not notes_str:
+            notes_str = row["error"]
+        elif row["error"]:
+            notes_str = f"{notes_str}; {row['error']}"
+        table.add_row(
+            row["host"],
+            f"[{color}]{symbol} {row['state']}[/]",
+            notes_str,
+        )
+        by_state.setdefault(row["state"], []).append(row["host"])
+
+    console.print(table)
+
+    # Hints footer — one bullet per non-green state, listing affected hosts
+    # and the recovery command. Suppressed when everything is up-to-date.
+    actionable = {
+        s: hosts
+        for s, hosts in by_state.items()
+        if s != "up-to-date" and _READINESS_HINT.get(s)
+    }
+    if actionable:
+        console.print("\n[bold]Hints:[/]")
+        # Stable order: most-blocking states first.
+        priority = [
+            "unreachable", "no-chezmoi", "not-init", "no-source",
+            "toml-mismatch", "busy", "dirty", "ahead", "drift",
+            "behind", "ready-to-update",
+        ]
+        for state in priority:
+            hosts_for_state = actionable.get(state)
+            if not hosts_for_state:
+                continue
+            symbol, color = _READINESS_STYLE.get(state, ("?", "white"))
+            host_list = ", ".join(hosts_for_state)
+            hint = _READINESS_HINT[state]
+            console.print(
+                f"  [{color}]{symbol}[/] [{color}]{state}[/] "
+                f"({len(hosts_for_state)}: {host_list})"
+            )
+            console.print(f"      → {hint}")
+
+    # Summary line: how many can fleet-apply right now without surprise?
+    ready_states = {"up-to-date", "behind", "ready-to-update"}
+    ready_count = sum(
+        1 for r in rows if r["state"] in ready_states
+    )
+    blocked_count = len(rows) - ready_count
+    console.print(
+        f"\n[dim]Summary: {ready_count}/{len(rows)} hosts ready for "
+        f"`just fleet-apply`"
+        + (f", {blocked_count} need attention" if blocked_count else "")
+        + "[/]"
+    )
+    return 0
+
+
+
     """Extract a one-row summary from a fleet-apply log.
 
     Greps for the patterns the chezmoi run_* scripts + ansible

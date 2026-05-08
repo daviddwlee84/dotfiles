@@ -5,6 +5,8 @@
 > password injection sourced from plaintext / interactive prompt / Bitwarden
 > CLI. Per-host logs land under `logs/fleet-apply/<UTC-timestamp>/<host>.log`
 > and the process exits with the number of failed hosts (capped at 125).
+>
+> **Before applying, run [`just fleet-status`](#readiness-probe-just-fleet-status)** — a read-only pre-flight probe that predicts what `fleet-apply` would do per host (up-to-date / behind / drift / busy / toml-mismatch / not-init / unreachable / ...).
 
 Implementation: [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py)
 (uv inline-script: `asyncssh` + `tyro` + `rich`).
@@ -13,6 +15,51 @@ See also: [fleet-apply-vs-fabric.md](fleet-apply-vs-fabric.md) for an
 archaeological comparison against the author's 2018-era Fabric `fabfile.py`
 on RaspPi-Cluster — same problem shape, ~7 years of operational lessons
 encoded into the current implementation.
+
+## The fleet-* command family at a glance
+
+The fleet- recipes split into **three layers** of concern. Pick the right one based on what you want to do:
+
+| Recipe | What it does | Side effects | When to use |
+|---|---|---|---|
+| `just fleet-edit` | Open `~/.config/fleet/machines.toml` in `$EDITOR` (seeds an empty template on first run) | Edits inventory file only | First-time setup, adding/removing hosts |
+| `just fleet-status` | **Pre-flight readiness probe** — predicts what `fleet-apply` would do per host | None (read-only, ~1.5s/host) | **Before** `fleet-apply`, to triage which hosts need attention |
+| `just fleet-status-quick` | Same as `fleet-status` but skips remote `git fetch` (~0.5s/host) | None | Offline / quick re-check |
+| `just fleet-apply-dry-run` | Run `chezmoi diff` on every host (full template render comparison) | Reads remote source dir; no writes | Detailed file-by-file preview after `fleet-status` flagged something |
+| `just fleet-diff HOST` | `chezmoi diff` on ONE host, serial output | None | Inspecting exactly what one host would change |
+| `just fleet-apply` | `chezmoi update --init` on every host (= `git pull` + re-render `chezmoi.toml` + `apply` + run_* scripts) | **Mutates remotes** | The actual deploy |
+| `just fleet-apply-file PATH` | `chezmoi apply --exclude=scripts <PATH>` on every host (skips ansible / Brewfile) | Mutates only that one target | Vibe loop — fast feedback for one dotfile |
+| `just fleet-apply-branch BRANCH` | Pin remotes to a feature branch before applying | Mutates remotes + checks out branch on remote source dir | Iterating on a topic branch across the fleet |
+| `just fleet-apply-one HOST` | Apply to a single host in `--serial` mode (debug-friendly output) | Mutates that host | Targeted apply / debugging |
+| `just fleet-apply-status` | **Process-liveness probe** — is a chezmoi/ansible run still going on each host? | None (read-only) | After Ctrl+C'ing controller, to see which remotes are still busy |
+| `just fleet-apply-watch` | Same as `fleet-apply-status` but polls every 10s until everyone idle | None | Passive "wait for fleet to settle" cursor |
+| `just fleet-apply-tail HOST` | Live-tail the latest fleet-apply log on `HOST` over a fresh SSH session | None | Re-attach to a still-running run after Ctrl+C |
+| `just fleet-apply-compact` | Post-mortem summary across the fleet (final task, runtime, slow tasks, exit code) | None (reads remote logs) | After a finished run, when per-host `--tail` is too noisy |
+| `just fleet-apply-kill` | `pkill -TERM` then `-KILL` chezmoi/ansible on every host | **Kills processes** | Cleanup after Ctrl+C left orphans |
+
+> **Common naming confusion**: `fleet-status` ≠ `fleet-apply-status`. The first is a pre-apply readiness probe ("would `fleet-apply` succeed right now?"), the second is a process-liveness probe ("is a `fleet-apply` still running?"). They answer different questions and are usually used in different phases of your workflow.
+
+### Typical workflows
+
+```bash
+# Daily: push to repo, then deploy.
+git push
+just fleet-status              # pre-flight check — anything need attention?
+just fleet-apply               # actual deploy
+
+# Vibe loop: edit one file, push, fast-apply across fleet.
+git add .config/zsh/aliases.zsh && git commit -m "..." && git push
+just fleet-apply-file .config/zsh/aliases.zsh
+
+# After Ctrl+C'ing a long fleet-apply: where am I?
+just fleet-apply-status        # which hosts still running?
+just fleet-apply-watch         # wait until everyone idle
+just fleet-apply-tail lab-box  # re-attach to one host's log
+just fleet-apply-kill          # nuke leftover orphans
+
+# After fleet-apply finished, want a summary:
+just fleet-apply-compact
+```
 
 ## When to use
 
@@ -30,6 +77,125 @@ each one and typing the sudo password by hand.
   tool stays scoped to chezmoi apply.
 - It does not provision new hosts. Each remote must already have `chezmoi`
   installed and `chezmoi init` completed at least once.
+
+## Readiness probe (`just fleet-status`)
+
+`fleet-apply` defaults to `chezmoi update --init`, which is **three things in
+sequence** under the hood:
+
+1. `git -C <source> pull` — bring in new template commits
+2. `chezmoi init` — re-render `~/.config/chezmoi/chezmoi.toml` (re-evaluates `promptBoolOnce` / `promptStringOnce` calls; **NEW prompt keys without saved answers will fail non-interactively** with `chezmoi: ... could not open a new TTY`)
+3. `chezmoi apply` — render templates, write targets, run `run_*` scripts (ansible, Brewfile, etc.)
+
+The readiness probe inspects each host once over SSH and predicts what each of
+those three sub-steps would do, **without changing anything**. Cheaper than
+`fleet-apply-dry-run` (which runs full `chezmoi diff`) and more actionable
+than `fleet-apply-status` (which only sees live processes, not pending
+drift / missing init / new prompt keys).
+
+```bash
+just fleet-status                              # all hosts, with `git fetch`
+just fleet-status --hosts lab-box,vps-tokyo    # subset
+just fleet-status-quick                        # skip remote `git fetch` (faster, may show stale 'behind')
+just fleet-status --readiness-json | jq .      # machine-readable
+```
+
+### State matrix
+
+The probe classifies each host into exactly one primary state and zero or
+more secondary notes (e.g. a `behind` host with drift will show
+`behind: 3 commits, drift: 2 files` in the notes column).
+
+| State | Symbol | Meaning | Recovery |
+|---|---|---|---|
+| `up-to-date` | ✓ green | Source dir at `origin/HEAD`, no drift, init done | Nothing to do |
+| `ready-to-update` | ↻ blue | Source is behind origin → `fleet-apply` will pull + apply cleanly | `just fleet-apply --hosts HOST` |
+| `behind` | → cyan | Same as `ready-to-update` but used when there are also other notes (drift / dirty co-existing) | `just fleet-apply --hosts HOST` |
+| `drift` | ⚠ yellow | Remote target was hand-edited; would trigger "could not open a new TTY" prompt without `--force`. With default `--keep-going`, applies the rest of the fleet and skips this file | `just fleet-apply --hosts HOST --force` (overwrite) OR migrate to a `*.local` override |
+| `dirty` | ⚠ yellow | Remote source dir has uncommitted changes (someone hand-edited the template on the remote) | ssh in & commit/stash before applying |
+| `ahead` | ? magenta | Remote source dir has local commits not on origin — `git pull` would diverge | ssh in & `git push` or reset before applying |
+| `busy` | ⏳ yellow | A `chezmoi update/apply` or `ansible-playbook` is already running, OR the chezmoi state lock is held | Wait, then re-probe; OR `just fleet-apply-status --hosts HOST` for live state |
+| `toml-mismatch` | ! yellow bold | The local `.chezmoi.toml.tmpl` declares prompt keys (`promptBoolOnce` / `promptStringOnce` / etc.) that are missing from the remote's saved `~/.config/chezmoi/chezmoi.toml`. **This is the `david_ubuntu` failure mode** — `fleet-apply` will crash on this host with `chezmoi: ... could not open a new TTY` on `chezmoi init` | ssh in & re-run `chezmoi init` to answer the new prompts |
+| `not-init` | ✗ red | `~/.config/chezmoi/chezmoi.toml` doesn't exist — host was never `chezmoi init`'d | ssh in & run `chezmoi init` interactively (one-off; needs TTY) |
+| `no-source` | ✗ red | `chezmoi source-path` returns nothing or the path is not a git repo | ssh in & re-init (or fix custom `chezmoi.toml` `sourceDir =`) |
+| `no-chezmoi` | ✗ red | `chezmoi` binary not found in augmented PATH | ssh in & install chezmoi (`curl https://chezmoi.io/get \| sh`) |
+| `unreachable` | ✗ red | SSH connection failed (timeout, auth, host key, network) | check ssh_alias / network / sudo / 1Password agent |
+
+### Output format
+
+```
+fleet-status — readiness probe across 6 host(s)
+                                readiness probe
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ host       ┃ state                  ┃ notes                                    ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ self       │ ✓ up-to-date           │                                          │
+│ hanru_mac  │ ↻ ready-to-update      │ behind: 3 commits                        │
+│ ts_nas     │ ⏳ busy                │ pids=12345                               │
+│ jingle207  │ ⚠ drift                │ drift: .config/mise/config.toml          │
+│ david_ub   │ ! toml-mismatch        │ missing prompt keys: installTunnelTools  │
+│ idc-srv    │ ✗ unreachable          │ TimeoutError: 30s                        │
+└────────────┴────────────────────────┴──────────────────────────────────────────┘
+
+Hints:
+  ✗ unreachable (1: idc-srv)
+      → check ssh_alias / network / sudo / 1Password agent
+  ! toml-mismatch (1: david_ub)
+      → ssh in & re-run `chezmoi init` to answer the new prompts (their default values are usually fine)
+  ⏳ busy (1: ts_nas)
+      → wait for the running run, OR `just fleet-apply-status --hosts HOST` for live state
+  ⚠ drift (1: jingle207)
+      → `just fleet-apply --hosts HOST --force` (overwrite) OR migrate to a *.local override
+  ↻ ready-to-update (1: hanru_mac)
+      → `just fleet-apply --hosts HOST` (or whole fleet)
+
+Summary: 2/6 hosts ready for `just fleet-apply`, 4 need attention
+```
+
+### Exit code
+
+Always 0 (probe is informational). Use `--readiness-json` and parse for
+fine-grained gating in CI:
+
+```bash
+# Pre-apply gate: refuse to apply if any host is unreachable.
+if just fleet-status --readiness-json | jq -e 'any(.state == "unreachable")' >/dev/null; then
+    echo "abort: at least one host unreachable"
+    exit 1
+fi
+just fleet-apply
+```
+
+### How `toml-mismatch` works
+
+The probe greps the **local** `.chezmoi.toml.tmpl` for `promptBool` /
+`promptString` / `promptInt` / `promptChoice` (with or without `Once`)
+calls and extracts the second positional argument (the prompt key name).
+Then it compares against the set of top-level keys in the remote's saved
+`~/.config/chezmoi/chezmoi.toml`. Any keys missing on the remote = the
+remote will trigger an interactive prompt during `chezmoi update --init`,
+which has no TTY → fails with the familiar `could not open a new TTY`.
+
+False positives are unlikely — only newly-added prompt keys trigger this
+state. False negatives are possible (e.g. if you wrap a prompt in a
+template conditional that the remote's profile evaluates to false), but
+those don't actually break `fleet-apply` either, so they're not a regression.
+
+### Empty inventory UX
+
+`just fleet-status` on a fresh box without `~/.config/fleet/machines.toml`
+exits 0 with:
+
+```
+no fleet configured yet — Fleet config not found: ~/.config/fleet/machines.toml
+hint: run `just fleet-edit` to add machines, then re-run `just fleet-status`.
+```
+
+`just fleet-edit` itself seeds an empty template (with `[defaults]` and a
+commented-out `[[hosts]]` example) on first run, so you don't need to
+remember the schema. `just fleet-apply` keeps its old strict behaviour
+(exit 2 on missing config) — readiness is the only command that's
+forgiving here.
 
 ## Inventory file
 
@@ -166,6 +332,9 @@ itself found `chezmoi`).
 ## Commands
 
 ```bash
+just fleet-edit                                 # edit ~/.config/fleet/machines.toml ($EDITOR)
+just fleet-status                               # readiness probe (use BEFORE apply — see § Readiness probe)
+just fleet-status-quick                         # readiness probe, skip remote `git fetch`
 just fleet-apply                                # parallel, all hosts, update --init
 just fleet-apply-dry-run                        # `chezmoi diff` instead of update
 just fleet-apply-one lab-box                    # single host, --serial mode

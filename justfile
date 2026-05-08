@@ -460,10 +460,30 @@ bootstrap-skills:
 fleet-apply *ARGS:
     ./scripts/fleet_apply.py {{ARGS}}
 
-# Apply chezmoi update to all configured hosts in parallel
+# Edit fleet inventory (~/.config/fleet/machines.toml). Seeds an empty
+# template on first run; opens with $EDITOR (defaults to nvim).
 fleet-edit:
-    # TODO: use EDITOR
-    nvim ~/.config/fleet/machines.toml
+    @mkdir -p ~/.config/fleet
+    @if [ ! -f ~/.config/fleet/machines.toml ]; then \
+        echo "[INFO] seeding empty ~/.config/fleet/machines.toml — add [[hosts]] entries below"; \
+        printf '# fleet-apply inventory — see docs/this_repo/fleet-apply.md\n# Schema reference: dot_config/fleet/create_private_machines.toml.tmpl\n\n[defaults]\nchezmoi_path    = "auto"\nconnect_timeout = 30\ncommand_timeout = 7200\n\n# [[hosts]]\n# name      = "lab-box"\n# ssh_alias = "lab-box"\n# no_root_machine = false\n# password_source = { type = "prompt" }\n' > ~/.config/fleet/machines.toml; \
+        chmod 600 ~/.config/fleet/machines.toml; \
+    fi
+    "${EDITOR:-nvim}" ~/.config/fleet/machines.toml
+
+
+# Pre-flight readiness probe across all configured hosts. Predicts what
+# `just fleet-apply` would do per host (up-to-date / behind / drift / busy
+# / toml-mismatch / not-init / unreachable / ...) WITHOUT changing anything.
+# Read-only, ~1.5s per host (with `git fetch`). See docs/this_repo/fleet-apply.md
+# § Readiness probe.
+fleet-status *ARGS:
+    ./scripts/fleet_apply.py --readiness {{ARGS}}
+
+# Like fleet-status but skip remote `git fetch` (faster, but 'behind' state
+# may be stale). Useful offline or when you only care about drift / busy.
+fleet-status-quick *ARGS:
+    ./scripts/fleet_apply.py --readiness --readiness-no-fetch {{ARGS}}
 
 
 # Preview only: runs `chezmoi diff` on every host (no changes applied)
