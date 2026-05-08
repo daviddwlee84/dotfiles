@@ -267,6 +267,106 @@ sudo killall -HUP WindowServer
 | 停用 swap | macOS 在 Apple Silicon 上沒有支援的「無 swap」模式。別嘗試。 |
 | App Store 的第三方「memory cleaner」app | 多數只是呼叫 `sudo purge`（你自己免費就能做），再用裝飾性圖表灌水結果。有些會積極殺 process，造成資料遺失。 |
 
+## FAQ：「我就只是想清掉 swap 而已」
+
+短答：**做不到，除非重開機。** 這是初次遇到 macOS swap 累積最常見的錯誤期待，
+所以這裡完整列出選項矩陣：
+
+| 方法 | 風險 | 能回收 swapfile？ | 評語 |
+|---|---|---|---|
+| **重開機** | 無（除了打斷工作） | ✓ 100% —— kernel 把它們全砍掉 | **唯一乾淨的方案。** |
+| 關掉 memory 大戶（瀏覽器 / Electron / VM）然後等 | 無 | ✗ —— 釋放 RAM + compressor，但磁碟上的 swapfile 仍在 | 降低*未來* swap 成長，不會縮小現況 |
+| `sudo killall -HUP WindowServer` | 中 —— 登出，未存檔 GUI 工作沒了 | ✗（只釋放 ~1-3 GB RAM） | 既然要登出，不如直接重開機 |
+| `mac-mem-reclaim`（本 repo） | 低 —— wrap `sudo purge` + opt-in 加碼 | ✗ —— 動 cache、snapshot、sleepimage；從不動 swapfile | 回收*周邊*儲存；可以爭取時間，不會縮小 swap |
+| `sudo dynamic_pager -L 0` 切換 | **高 —— 新 macOS 上 kernel hang** | ✗ | **別碰。** 老 10.6 時代招式，現在已失效。 |
+| 執行中時 `sudo rm /System/Volumes/VM/swapfile*` | **高 —— process corruption** | ✗ —— kernel 還透過 `mmap` 開著；`unlink` 不會釋放磁碟 | **別碰。** 釋放 0 空間，可能搞壞被 swap 出去的 process。 |
+| 完全停用 swap（無支援的 flag） | **Apple Silicon 災難級** | n/a | Apple Silicon 的 VM 子系統假設 swap 存在。別碰。 |
+| App Store「memory cleaner」app | 浮動 —— 多數是 `sudo purge` 包裝 | ✗ | 騙錢。沒有任何一個能縮小 swapfile —— Apple 沒這個 API。 |
+
+**為什麼會這樣**：macOS 把 swap 當作開機時清掉的 ephemeral state。沒有 public
+kernel API 可以叫 `dynamic_pager(8)` 刪指定 swapfile、沒有 `swapoff` 對應、
+沒有 sysctl 觸發收縮。對比 Linux（`swapoff -a` 把 page 遷回 RAM 然後 unlink
+swap）或 Windows（registry + 重開機調整 pagefile）—— 兩者都有使用者可控的
+swap 回收；macOS 刻意不做。
+
+**實務結論**：預防 > 治療。如果你的 workload 定期累積 10+ GB swap：
+
+1. **排程每週重開機**（例如週一早上開工前）。
+2. **盯著 `mms`** —— 看到 `CRITICAL — REBOOT RECOMMENDED`，那就是 OS 告訴你
+   「下次大記憶體尖峰就會搞掛某個 app」的緩衝區用完了。
+3. **找出長期凶手**：用 `tv mac-procs` 觀察幾個 session。如果 Arc / Discord /
+   特定 Electron app 永遠在前面，考慮原生替代品或不要同時開那麼多。
+
+本 repo 的 `mac-mem-reclaim` 在 `disk_free < 3%` 時會拒絕執行 —— 不是因為
+reclaim *危險*，而是因為會*沒用*（這個程度下 `purge` 通常只釋放 < 100 MB，
+但真正的問題是只有 `reboot` 能處理的 GB 級 swap）。要硬幹用 `--force`，但
+reboot 比較快。
+
+## FAQ：「那一直開著的 Linux server 怎麼辦？」
+
+短答：**完全不一樣 —— Linux server 一開始就沒 macOS 的問題。** Linux server
+能跑超過一年不被 swap 拖垮的四個原因：
+
+### 1. Linux swap 執行中*可以*縮回去
+
+```sh
+sudo swapoff -a && sudo swapon -a
+```
+
+這個 idiom 在 Linux 是合法的。`swapoff` 把每個被 swap 出去的 page 遷移**回
+RAM**（前提：RAM 夠裝）然後 unmap swap device，接著 `swapon` 重新 attach 一個
+空的。沒有資料遺失、沒有 process corruption、不需重開機。macOS *沒有*對應的
+東西 —— 沒有 public API 可以把 swapfile drain 回 RAM。
+
+### 2. Linux swap 是 fixed-size
+
+典型安裝：安裝時設定的 swap *partition* 或 *file*（一般是 RAM 的 0.5-2x，
+上限約 8-16 GB）。它**不會**像 macOS swapfile 那樣動態吃掉剩餘磁碟。
+用滿了就觸發 OOM killer；swap 配置本身永遠不會膨脹。
+
+macOS「系統卷剩下多少 GB 都能變成 swap」的 model 才是「系統資料吃光磁碟」這個
+症狀的根源 —— 也就是這頁存在的理由。
+
+### 3. Linux 暴露 `vm.swappiness`
+
+```sh
+sysctl vm.swappiness=10   # 預設 60；越低越偏好 evict cache 而非 anon page
+```
+
+Server 調校通常落在 10-30，把 anonymous（app）memory 留在 RAM 久一點，讓 file
+cache 先被回收。macOS 沒有暴露這個 knob —— 它的 compressor + dynamic_pager
+pipeline 對使用者不可調。
+
+### 4. Linux 長 uptime 真正會遇到的問題*個別可處置*
+
+| 問題 | 對策 |
+|---|---|
+| 特定 service memory leak | `systemctl restart <service>`（單個 service，不是整機） |
+| `journald` 磁碟用量 | `journalctl --vacuum-size=500M` 或 `--vacuum-time=30d` |
+| `/tmp` / `/var/tmp` 累積 | `systemd-tmpfiles --clean`（多數發行版每天自動跑） |
+| Docker image / volume / build cache | `docker system prune -a --volumes` |
+| Slab cache 膨脹（罕見） | `echo 2 \| sudo tee /proc/sys/vm/drop_caches` |
+| Kernel 安全更新 | *唯一*真正需要重開機的東西 —— 且 RHEL / SLES / Ubuntu Pro 上可用 `kpatch` / `livepatch` 規避 |
+
+Linux server 一年以上 uptime 很常見，因為**每種資源都有對應的回收工具**。
+macOS 為了 UX 簡單把這些全砍了，代價就是「每週重開機」變成標準答案。
+
+### 對本 repo fleet 的實務意義
+
+[`scripts/fleet_apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet_apply.py)
+同時對 macOS 與 Linux 主機跑。重開機節奏不一樣：
+
+| 主機類型 | 監控 | 膨脹時的動作 |
+|---|---|---|
+| macOS（Mac mini / 筆電） | `mms` 顯示 `CRITICAL` | **重開機**（沒別的辦法） |
+| Linux server（IDC / NAS / VPS） | `free -h`、`vmstat 1`、`journalctl --disk-usage`、`df -h` | **針對性回收**（`swapoff -a && swapon -a` 處理 swap；`systemctl restart` 處理 leak service；`journalctl --vacuum-*` 處理 log；`docker system prune` 處理 container）。重開機只給 kernel update。 |
+| Linux desktop（本 fleet 罕見） | 同 server | 同 server |
+
+未來會做一個 `linux-mem-status` / `linux-mem-reclaim` helper，在 Linux 端鏡像
+`mac-mem-*` 的 ergonomics，用相同的 diagnose / dry-run / opt-in 形狀暴露針對性
+回收工具。記在 [TODO.md](https://github.com/daviddwlee84/dotfiles/blob/main/TODO.md)
+P3 下。
+
 ## 為什麼重開機真的就是答案
 
 很容易把「重開機就解決」讀成 Windows-9x 時代的認輸。不是。這是 macOS 刻意的

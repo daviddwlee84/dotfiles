@@ -204,6 +204,10 @@ mac-mem-status() {
     # Modern macOS (Big Sur+, Apple Silicon) stores swapfiles in
     # /System/Volumes/VM/. Older / some installs use /private/var/vm/.
     # Sleepimage stays in /private/var/vm/sleepimage.
+    #
+    # We use `stat -f` (BSD stat) instead of `ls -lh` because `ls -lh` switches
+    # column count when files cross the 6-month threshold (date "Apr 28 15:16"
+    # vs "Apr 28  2025") which broke awk indexing for older swapfiles.
     _macmem_h "Swapfiles on disk"
     _vm_dir=""
     for _d in /System/Volumes/VM /private/var/vm; do
@@ -214,17 +218,27 @@ mac-mem-status() {
     done
     if [ -n "$_vm_dir" ]; then
         printf '  %s\n' "$(_macmem_color dim "(location: $_vm_dir)")"
-        # ls -lh on the swapfiles. Glob may be root-only readable on some setups;
-        # ls itself usually works because dir is world-readable.
-        ls -lh "$_vm_dir"/swapfile* 2>/dev/null \
-            | awk '{ printf "  %-10s  %s\n", $5, $NF }'
-        _swap_total=$(du -ch "$_vm_dir"/swapfile* 2>/dev/null | awk '/total$/{print $1}')
-        [ -n "$_swap_total" ] && printf '  %s\n' "$(_macmem_color dim "swapfile* total: $_swap_total")"
+        # `stat -f '%z %N'` -> "<size_bytes> <full_path>" — stable columns.
+        # Sort by numeric suffix on swapfile name so swapfile2 sorts before swapfile10.
+        _swap_total_bytes=0
+        _swap_count=0
+        for _f in "$_vm_dir"/swapfile*; do
+            [ -f "$_f" ] || continue
+            _sz=$(stat -f '%z' "$_f" 2>/dev/null) || continue
+            _swap_total_bytes=$(( _swap_total_bytes + _sz ))
+            _swap_count=$(( _swap_count + 1 ))
+            _hsz=$(_macmem_human_bytes "$_sz")
+            _name=$(basename "$_f")
+            printf '  %10s  %s\n' "$_hsz" "$_name"
+        done
+        if [ "$_swap_count" -gt 0 ]; then
+            printf '  %s\n' "$(_macmem_color dim "$_swap_count file(s), total $(_macmem_human_bytes "$_swap_total_bytes")")"
+        fi
     else
         printf '  (no swapfiles found in /System/Volumes/VM or /private/var/vm)\n'
     fi
     if [ -e /private/var/vm/sleepimage ]; then
-        _sleep_size=$(ls -l /private/var/vm/sleepimage 2>/dev/null | awk '{print $5}')
+        _sleep_size=$(stat -f '%z' /private/var/vm/sleepimage 2>/dev/null)
         [ -n "$_sleep_size" ] && printf '  %s\n' \
             "$(_macmem_color dim "sleepimage:      $(_macmem_human_bytes "$_sleep_size")")"
     fi
@@ -279,21 +293,42 @@ mac-mem-status() {
     # ── Color-coded summary
     _free_pct=$(df -k / 2>/dev/null | awk 'NR==2 { gsub("%","",$5); print 100-$5 }')
     : "${_free_pct:=0}"
+    # Also pull swap total to compute swap_used / swap_total ratio (catches
+    # "all 17 swapfiles maxed out" even if absolute swap_used is "only" 15 GB).
+    _swap_total_mb=$(sysctl -n vm.swapusage 2>/dev/null \
+        | awk '{ for(i=1;i<=NF;i++) if($i=="total") { gsub("M","",$(i+2)); print $(i+2); exit } }')
+    : "${_swap_total_mb:=1}"
+    # awk for floating compare (POSIX shell can't do floats)
+    _swap_pct=$(awk -v u="${_swap_used_mb:-0}" -v t="$_swap_total_mb" 'BEGIN { if (t>0) printf "%.0f", (u/t)*100; else print 0 }')
+
     _macmem_h "Verdict"
     _verdict_color=green
     _verdict_label="OK"
-    # Heuristics — tunable:
-    if [ "${_swap_used_mb%.*}" -gt 8000 ] || [ "$_free_pct" -lt 10 ]; then
+    _is_critical=0
+    # CRITICAL: disk under 5% OR swap >90% used of allocated total
+    # (the latter means: every swapfile is nearly full, OS will need to
+    # allocate a new one but disk is also tight -> imminent failure)
+    if [ "$_free_pct" -lt 5 ] || [ "$_swap_pct" -ge 90 ]; then
+        _verdict_color=red
+        _verdict_label="CRITICAL — REBOOT RECOMMENDED"
+        _is_critical=1
+    elif [ "${_swap_used_mb%.*}" -gt 8000 ] || [ "$_free_pct" -lt 10 ]; then
         _verdict_color=red
         _verdict_label="HIGH PRESSURE"
     elif [ "${_swap_used_mb%.*}" -gt 2000 ] || [ "$_free_pct" -lt 20 ]; then
         _verdict_color=yellow
         _verdict_label="ELEVATED"
     fi
-    printf '  swap_used=%s MB  disk_free=%s%%  ->  %s\n' \
-        "${_swap_used_mb}" "$_free_pct" \
+    printf '  swap_used=%s MB (%s%% of total)  disk_free=%s%%  ->  %s\n' \
+        "${_swap_used_mb}" "$_swap_pct" "$_free_pct" \
         "$(_macmem_color "$_verdict_color" "$_verdict_label")"
-    if [ "$_verdict_color" != "green" ]; then
+    if [ "$_is_critical" = 1 ]; then
+        printf '  %s\n' "$(_macmem_color red "Reclaim cannot help here:")"
+        printf '  %s\n' "$(_macmem_color dim "  - swapfiles cannot shrink without reboot (no API)")"
+        printf '  %s\n' "$(_macmem_color dim "  - sudo purge typically frees only file-backed cache (currently small)")"
+        printf '  %s\n' "$(_macmem_color dim "  - Spotlight/snapshots cleanup is bytes-level vs GB needed")"
+        printf '  %s\n\n' "$(_macmem_color red "ACTION: save your work and reboot. macOS will rebuild swap fresh.")"
+    elif [ "$_verdict_color" != "green" ]; then
         printf '  %s\n' "$(_macmem_color dim "Try:  mac-mem-reclaim --dry-run    (or: mac-mem-reclaim)")"
         printf '  %s\n' "$(_macmem_color dim "Doc:  docs/tools/macos-swap.md     (why reboot is sometimes the answer)")"
     fi
@@ -361,6 +396,21 @@ mac-mem-reclaim() {
     done
     _macmem_guard_darwin || return 1
 
+    # Safety gate: if disk_free < 3%, reclaim cannot help meaningfully (purge
+    # typically frees < 100 MB at this level; spotlight/snapshots are bytes
+    # vs GB needed). User should reboot, not chase reclaim.
+    _free_pct=$(df -k / 2>/dev/null | awk 'NR==2 { gsub("%","",$5); print 100-$5 }')
+    : "${_free_pct:=100}"
+    if [ "$_free_pct" -lt 3 ] && [ "$_force" != 1 ]; then
+        printf '%s\n' "$(_macmem_color red "REFUSING: disk_free=${_free_pct}% — reclaim cannot help.")"
+        printf '%s\n' "$(_macmem_color dim "  - sudo purge typically frees < 100 MB at this level")"
+        printf '%s\n' "$(_macmem_color dim "  - swapfiles cannot shrink without reboot (no API)")"
+        printf '%s\n' "$(_macmem_color dim "  - Spotlight/snapshots cleanup is bytes-level vs GB needed")"
+        printf '\n%s\n' "$(_macmem_color bold "Save your work and reboot.")"
+        printf '%s\n' "$(_macmem_color dim "Override with --force if you really want to try.")"
+        return 1
+    fi
+
     _includes_has() {
         case ",$_include," in
             *",$1,"*) return 0 ;;
@@ -400,6 +450,45 @@ mac-mem-reclaim() {
         "$@"
     }
 
+    # Wrapper for `killall` calls so "No matching processes were found" (which
+    # killall writes to stderr with exit 1) is reported as a friendly info line
+    # instead of leaking raw stderr noise. Real failures (permission denied,
+    # binary missing) still surface unchanged.
+    _run_killall() {
+        # Usage: _run_killall <label> <process-name> [signal]
+        # signal defaults to nothing (= SIGTERM); pass e.g. HUP for SIGHUP.
+        _label=$1; _pname=$2; _sig=${3:-}
+        if [ -n "$_sig" ]; then
+            _killargs="-$_sig $_pname"
+        else
+            _killargs="$_pname"
+        fi
+        if [ "$_dry" = 1 ]; then
+            printf '%s %s\n' "$(_macmem_color cyan "DRY")" "$_label"
+            printf '    %s\n' "_macmem_run_root killall $_killargs"
+            return 0
+        fi
+        printf '%s %s\n' "$(_macmem_color cyan "RUN")" "$_label"
+        # Capture stderr so we can pattern-match the benign "no matches" case.
+        if [ -n "$_sig" ]; then
+            _err=$(_macmem_run_root killall "-$_sig" "$_pname" 2>&1 1>/dev/null)
+        else
+            _err=$(_macmem_run_root killall "$_pname" 2>&1 1>/dev/null)
+        fi
+        _rc=$?
+        if [ "$_rc" = 0 ]; then
+            return 0
+        fi
+        case "$_err" in
+            *"No matching processes"*|*"no process found"*)
+                printf '    %s\n' "$(_macmem_color dim "(no $_pname running — already idle, nothing to reclaim)")"
+                return 0 ;;
+            *)
+                printf '    %s\n' "$_err" >&2
+                return $_rc ;;
+        esac
+    }
+
     # Snapshot before
     _swap_before=$(sysctl -n vm.swapusage 2>/dev/null \
         | awk '{ for(i=1;i<=NF;i++) if($i=="used") { print $(i+2); exit } }')
@@ -414,8 +503,8 @@ mac-mem-reclaim() {
     # ── Step 2 (opt-in): Spotlight indexer restart
     if _includes_has spotlight; then
         if _confirm "Restart mds_stores + mdworker_shared (Spotlight will re-index — CPU spike)?"; then
-            _run "killall mds_stores"     _macmem_run_root killall mds_stores
-            _run "killall mdworker_shared" _macmem_run_root killall mdworker_shared
+            _run_killall "killall mds_stores"     mds_stores
+            _run_killall "killall mdworker_shared" mdworker_shared
         fi
     fi
 
@@ -446,7 +535,7 @@ mac-mem-reclaim() {
         printf '        Save all unsaved work in every GUI app first.\n'
         if _confirm "Restart WindowServer (you WILL be logged out)?" 1; then
             if _confirm "Really? Last chance — unsaved work will be LOST." 1; then
-                _run "killall -HUP WindowServer" _macmem_run_root killall -HUP WindowServer
+                _run_killall "killall -HUP WindowServer (will log you out)" WindowServer HUP
             fi
         fi
     fi

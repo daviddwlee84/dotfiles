@@ -295,7 +295,118 @@ workaround failure.
 | Disabling swap | macOS has no supported "no swap" mode on Apple Silicon. Don't try. |
 | Third-party "memory cleaner" apps from the App Store | Most just call `sudo purge` (which you can do for free) and pad the result with cosmetic graphs. Some aggressively kill processes, causing data loss. |
 
-## Why reboot really is the answer
+## FAQ: "How do I just clean swap?"
+
+Short answer: **you can't, except by rebooting.** This is the most common
+mistaken expectation when first encountering macOS swap accumulation, so
+let's lay out the complete option matrix:
+
+| Method | Risk | Reclaims swapfiles? | Verdict |
+|---|---|---|---|
+| **Reboot** | None (other than interrupting work) | ✓ 100% — kernel deletes them all | **Only clean option.** |
+| Close memory hogs (browsers / Electron / VMs) and wait | None | ✗ — frees RAM + compressor, but on-disk swapfiles stay allocated | Reduces *future* swap growth, doesn't shrink current usage |
+| `sudo killall -HUP WindowServer` | Medium — logs you out, unsaved GUI work lost | ✗ (frees ~1-3 GB of RAM only) | If you're going to log out anyway, just reboot |
+| `mac-mem-reclaim` (this repo) | Low — wraps `sudo purge` + opt-in extras | ✗ — touches caches, snapshots, sleepimage; never swapfiles | Reclaims *adjacent* storage; can buy time but doesn't shrink swap |
+| `sudo dynamic_pager -L 0` toggling | **High — kernel hang on modern macOS** | ✗ | **Don't.** Old 10.6-era trick that no longer works. |
+| `sudo rm /System/Volumes/VM/swapfile*` while running | **High — process corruption** | ✗ — kernel still has them open via `mmap`; `unlink` doesn't free disk | **Don't.** Reclaims zero space, can corrupt swapped processes. |
+| Disable swap entirely (no supported flag) | **Catastrophic on Apple Silicon** | n/a | Apple Silicon's VM subsystem assumes swap exists. Don't. |
+| App Store "memory cleaner" apps | Variable — most are wrappers around `sudo purge` | ✗ | Snake oil. None can shrink swapfiles — Apple has no API. |
+
+**Why this is the case**: macOS treats swap as ephemeral state cleared at
+boot. There's no public kernel API to ask `dynamic_pager(8)` to delete a
+specific swapfile, no `swapoff` equivalent, no sysctl to trigger
+contraction. Compare with Linux (`swapoff -a` migrates pages back to RAM
+then unlinks swap) or Windows (registry + reboot to resize pagefile) —
+both have user-controllable swap reclaim; macOS deliberately doesn't.
+
+**Practical takeaway**: prevention > cure. If your workload regularly
+accumulates 10+ GB of swap per week:
+
+1. **Schedule a weekly reboot** (e.g. Monday morning before starting work).
+2. **Keep an eye on `mms`** — if it hits `CRITICAL — REBOOT RECOMMENDED`,
+   that's the OS telling you the buffer to act has shrunk to "next big
+   memory spike crashes something".
+3. **Identify chronic offenders** with `tv mac-procs` over a few sessions.
+   If Arc / Discord / a specific Electron app is always near the top,
+   consider native alternatives or running fewer of them concurrently.
+
+The repo's `mac-mem-reclaim` will refuse to run when `disk_free < 3%` —
+not because reclaim is *dangerous* there, but because it would be *useless*
+(`purge` typically frees < 100 MB at that level, while the actual problem
+is GB of swap that only `reboot` can address). Override with `--force`
+if you really want to try, but reboot is faster.
+
+## FAQ: "Then how do always-on Linux servers cope?"
+
+Short answer: **completely differently — they don't have macOS's problem
+in the first place.** Four reasons Linux servers can run for a year+
+without swap-driven degradation:
+
+### 1. Linux swap *can* shrink at runtime
+
+```sh
+sudo swapoff -a && sudo swapon -a
+```
+
+This idiom is legitimate on Linux. `swapoff` migrates every swapped page
+back into RAM (preconditions: enough free RAM to hold them) then unmaps
+the swap device, then `swapon` re-attaches it empty. No data loss, no
+process corruption, no reboot. macOS has *no equivalent* — there is no
+public API to drain a swapfile back into RAM.
+
+### 2. Linux swap is fixed-size
+
+Typical install: a swap *partition* or *file* sized at install time
+(usually 0.5-2× RAM, capped around 8-16 GB). It does **not** dynamically
+grow into free disk like macOS swapfiles do. Once full, the OOM killer
+fires; the swap allocation itself never balloons.
+
+macOS's "every spare GB on the system volume can become swap" model is
+specifically what causes the "System Data ate my disk" symptom that this
+page exists to address.
+
+### 3. Linux exposes `vm.swappiness`
+
+```sh
+sysctl vm.swappiness=10   # default 60; lower = prefer evicting cache over anon pages
+```
+
+Server tuning typically lands at 10-30, which keeps anonymous (app)
+memory in RAM longer and lets file cache get reclaimed first. macOS
+does not expose this knob — its compressor + dynamic_pager pipeline is
+not user-tunable.
+
+### 4. Linux's actual long-uptime problems are *individually addressable*
+
+| Problem | Fix |
+|---|---|
+| Memory leak in a specific service | `systemctl restart <service>` (one service, not whole machine) |
+| `journald` disk usage | `journalctl --vacuum-size=500M` or `--vacuum-time=30d` |
+| `/tmp` / `/var/tmp` accumulation | `systemd-tmpfiles --clean` (auto-runs daily on most distros) |
+| Docker images / volumes / build cache | `docker system prune -a --volumes` |
+| Slab cache bloat (rare) | `echo 2 \| sudo tee /proc/sys/vm/drop_caches` |
+| Kernel security update | The *only* thing genuinely requiring reboot — and even that is avoidable with `kpatch` / `livepatch` on RHEL/SLES/Ubuntu Pro |
+
+Year-plus Linux server uptimes are common because **each resource has a
+targeted reclaim tool**. macOS retired all of these for UX simplicity;
+the cost is "weekly reboot" being the canonical answer.
+
+### Practical implication for this repo's fleet
+
+[`scripts/fleet_apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet_apply.py)
+runs against both macOS and Linux hosts. Different reboot cadences apply:
+
+| Host type | Monitoring | Action when bloated |
+|---|---|---|
+| macOS (Mac mini / laptop) | `mms` shows `CRITICAL` | **Reboot** (no alternative) |
+| Linux server (IDC / NAS / VPS) | `free -h`, `vmstat 1`, `journalctl --disk-usage`, `df -h` | **Targeted reclaim** (`swapoff -a && swapon -a` for swap; `systemctl restart` for leaky service; `journalctl --vacuum-*` for logs; `docker system prune` for containers). Reboot only for kernel updates. |
+| Linux desktop (rare in this fleet) | Same as server | Same as server |
+
+A future companion `linux-mem-status` / `linux-mem-reclaim` helper
+would mirror the `mac-mem-*` ergonomics on the Linux side, exposing
+the targeted reclaim tools through the same diagnose / dry-run / opt-in
+shape. Tracked in [TODO.md](https://github.com/daviddwlee84/dotfiles/blob/main/TODO.md)
+under P3.
 
 It's tempting to read "reboot fixes it" as a Windows-9x-era admission of
 defeat. It isn't. It's a deliberate macOS design trade-off:
