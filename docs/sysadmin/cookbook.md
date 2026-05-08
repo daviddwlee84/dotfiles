@@ -20,6 +20,7 @@ the dense helper reference, see [helpers.md](helpers.md).
 - [8. Daily 5-minute health check (cron-friendly)](#8-daily-5-minute-health-check-cron-friendly)
 - [9. "What did the root shell do?" — beyond sudo logs](#9-what-did-the-root-shell-do--beyond-sudo-logs)
 - [10. Quickly silence a noisy audit rule without losing the rest](#10-quickly-silence-a-noisy-audit-rule-without-losing-the-rest)
+- [11. Audit local user inventory](#11-audit-local-user-inventory)
 
 ---
 
@@ -416,3 +417,66 @@ reboot. Plan immutability flips with this in mind.
   setup
 - [Atuin vs audit](atuin-vs-audit.md) — why personal shell history
   doesn't substitute for any of this
+
+---
+
+## 11. Audit local user inventory
+
+You inherited a server. You want to know: **who exists, who can log in,
+who can sudo, who has SSH keys**, before you trust anything else.
+
+### 11a. Quick CLI sweep (90 seconds)
+
+```bash
+user-list --login          # who has a real shell?
+user-sudoers               # who can sudo? (groups + sudoers.d/)
+user-ssh-keys              # who has authorized_keys, with fingerprint?
+```
+
+Read in this order: `--login` shows the *capability* surface, `sudoers`
+shows the *privilege* surface, `ssh-keys` shows the *remote-access*
+surface. A user appearing in all three is a full-power principal — make
+sure you recognise every one.
+
+### 11b. Drill into a specific user
+
+```bash
+user-info alice
+```
+
+One screen with id, groups, passwd entry, last 5 logins, last 5 sudo
+events, and authorized_keys count. Good first stop when something
+looks off.
+
+### 11c. Interactive browse with `tv users`
+
+```bash
+tv users
+```
+
+`Ctrl+S` cycles 5 sources: passwd → login-capable → groups → sudoers →
+SSH keys. Preview shows per-user detail. `Enter` opens a full identity
+report in `lnav`. `Alt+G` shows just the user's group list. `Alt+E`
+opens `visudo`.
+
+### 11d. Recent identity changes (auditd only)
+
+```bash
+user-recent-changes --days 30
+```
+
+Shows `ausearch -k identity` and `-k sudoers` events from the last 30
+days. Requires the baseline rule set this repo's `auditd` role
+installs. Catches: new accounts (`useradd`), shell changes (`chsh`),
+sudoers grants, password changes.
+
+### 11e. Red flags to look for
+
+| Pattern | What it might mean |
+|---|---|
+| User with uid 0 other than `root` | Backdoor account (uid=0 grants root regardless of name) |
+| Login-capable user you don't recognise | Forgotten / unauthorised account |
+| `authorized_keys` containing comments like `<unknown>@<unknown>` or no comment at all | Key dropped in by someone who didn't bother to label it |
+| `NOPASSWD: ALL` in `/etc/sudoers.d/` for a non-system user | Permanent passwordless root — usually a foot-gun or a backdoor |
+| User home outside `/home/` (e.g. `/tmp/x`) | Created by an attacker dodging quota / monitoring |
+| `nologin`-shelled user with active SSH keys | Common attacker move — the user can't `ssh` interactively but can still execute via `ssh user@host '<cmd>'` if `ForceCommand` isn't set |

@@ -77,6 +77,11 @@ sudo tail -F /var/log/secure
 - **Television channel**: `tv sessions` — fuzzy-browse rows from `last`,
   `lastlog`, `journalctl _COMM=sshd`, and `who -a`. Preview pane shows
   per-user details. Source cycles via `Ctrl+S`.
+- **Companion `tv users` channel** — for the *static* "who could log in
+  if they wanted to?" question (vs `tv sessions` which is "who actually
+  did?"): cycles through passwd, login-capable users, groups,
+  sudoers, and authorized_keys per home. See
+  [helpers.md](helpers.md#television-channels).
 - See [Helpers in this repo](helpers.md) for the full table.
 
 ## See also

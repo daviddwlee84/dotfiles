@@ -1,0 +1,296 @@
+# users channel for television (tv)
+# Inventory local user accounts: who exists, who can log in, who can sudo,
+# who's in which group, who has SSH keys installed.
+#
+# See docs/sysadmin/sessions.md (login records) and the cookbook recipe
+# "Audit local user inventory" for end-to-end use cases.
+#
+# Source cycling (Ctrl+S):
+#   1. All users (passwd entries)
+#   2. Login-capable users (shell != nologin / false)
+#   3. Groups (group: members)
+{{- if eq .chezmoi.os "linux" }}
+#   4. Sudoers (sudo / wheel / admin group members + /etc/sudoers.d/ NOPASSWD lines)
+#   5. Authorized SSH keys per home (sudo to read other users' ~/.ssh/authorized_keys)
+{{- else }}
+#   4. Sudoers (admin group + /etc/sudoers.d/)
+#   5. Authorized SSH keys per home
+{{- end }}
+#
+# Preview cycling (Ctrl+F):
+#   1. Per-user detail: id + groups + passwd entry + last login
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    Drill: full identity dump (id, groups, last, sudo events) in lnav
+#   Alt+E    Edit /etc/sudoers via visudo (Linux) / sudo $EDITOR /etc/sudoers (macOS)
+#   Alt+G    Show all groups the user belongs to (separate view)
+#   Ctrl+Y   Copy row to clipboard
+
+[metadata]
+name = "users"
+description = "Inventory local user accounts (passwd / groups / sudoers / SSH keys)"
+requirements = []
+
+[source]
+command = [
+  # 1. All users — passwd entries
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  dscl . -list /Users UniqueID 2>/dev/null \
+    | awk '$2 !~ /^_/ && $2 != "nobody" && $2 != "daemon" {printf "%-24s uid=%s\\n", $1, $2}'
+{{- else }}
+  getent passwd 2>/dev/null \
+    | awk -F: '{printf "%-24s uid=%-6s gid=%-6s shell=%-20s home=%s\\n", $1, $3, $4, $7, $6}'
+{{- end }}
+  """,
+  # 2. Login-capable users — non-nologin / non-false shells
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  # macOS: filter by shell. UserShell starts at /bin/bash, /bin/zsh, etc.
+  for u in $(dscl . -list /Users UniqueID 2>/dev/null | awk '$2 !~ /^_/ && $2 >= 500 {print $1}'); do
+    sh=$(dscl . -read "/Users/$u" UserShell 2>/dev/null | awk '{print $2}')
+    case "$sh" in
+      */false|*/nologin|"") ;;
+      *) printf "%-24s shell=%s\\n" "$u" "$sh" ;;
+    esac
+  done
+{{- else }}
+  getent passwd 2>/dev/null \
+    | awk -F: '$7 !~ /(nologin|false)$/ {printf "%-24s uid=%-6s shell=%s\\n", $1, $3, $7}'
+{{- end }}
+  """,
+  # 3. Groups + members
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  dscl . -list /Groups PrimaryGroupID 2>/dev/null \
+    | awk '$2 < 500 {next} {print $1}' \
+    | while read -r g; do
+        members=$(dscl . -read "/Groups/$g" GroupMembership 2>/dev/null | sed 's/^GroupMembership: //')
+        printf "%-24s members=%s\\n" "$g" "${members:-(empty)}"
+      done
+{{- else }}
+  getent group 2>/dev/null \
+    | awk -F: '{printf "%-24s gid=%-6s members=%s\\n", $1, $3, ($4 == "" ? "(empty)" : $4)}'
+{{- end }}
+  """,
+  # 4. Sudoers — group membership + sudoers.d/
+  """
+{{- if eq .chezmoi.os "linux" }}
+  for g in sudo wheel admin; do
+    m=$(getent group "$g" 2>/dev/null | cut -d: -f4)
+    [ -z "$m" ] && continue
+    printf "[group:%s] members=%s\\n" "$g" "$m"
+  done
+  # /etc/sudoers and /etc/sudoers.d/ — show user-bearing lines (skip Defaults)
+  sudo -n cat /etc/sudoers /etc/sudoers.d/* 2>/dev/null \
+    | grep -vE '^[[:space:]]*(#|Defaults|$)' \
+    | awk '{printf "[sudoers] %s\\n", $0}'
+{{- else }}
+  for g in admin wheel; do
+    members=$(dscl . -read "/Groups/$g" GroupMembership 2>/dev/null | sed 's/^GroupMembership: //')
+    [ -z "$members" ] && continue
+    printf "[group:%s] members=%s\\n" "$g" "$members"
+  done
+  sudo -n cat /etc/sudoers /etc/sudoers.d/* 2>/dev/null \
+    | grep -vE '^[[:space:]]*(#|Defaults|$)' \
+    | awk '{printf "[sudoers] %s\\n", $0}'
+{{- end }}
+  """,
+  # 5. Authorized SSH keys per home
+  """
+  # Iterate homes; sudo where needed. Show one row per key with comment + fingerprint.
+{{- if eq .chezmoi.os "darwin" }}
+  homes=$(dscl . -list /Users NFSHomeDirectory 2>/dev/null | awk '$2 ~ "^/Users/" {print $1":"$2}')
+{{- else }}
+  homes=$(getent passwd 2>/dev/null | awk -F: '$3 >= 1000 && $3 < 65000 {print $1":"$6}')
+{{- end }}
+  printf '%s\\n' "$homes" | while IFS=: read -r u h; do
+    [ -z "$h" ] || [ ! -d "$h/.ssh" ] && continue
+    ak="$h/.ssh/authorized_keys"
+    if [ -r "$ak" ] || sudo -n test -r "$ak" 2>/dev/null; then
+      (sudo -n cat "$ak" 2>/dev/null || cat "$ak" 2>/dev/null) \
+        | grep -vE '^[[:space:]]*(#|$)' \
+        | while read -r line; do
+            comment=$(printf '%s' "$line" | awk '{for(i=3;i<=NF;i++)printf "%s ",$i; print ""}')
+            fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')
+            printf '[sshkey] %-24s %s  %s\\n' "$u" "${fp:-?}" "${comment:-(no comment)}"
+          done
+    fi
+  done
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Per-user identity dump.
+  """
+  row='{}'
+  # Parse user from common formats:
+  #   "alice    uid=1000 ..."           -> $1
+  #   "[group:sudo] members=alice,bob"  -> first member, just for context
+  #   "[sudoers] alice ALL=(ALL) ..."   -> $2
+  #   "[sshkey] alice SHA256:... ..."   -> $2
+  case "$row" in
+    '[group:'*)
+      g=$(printf '%s\\n' "$row" | sed -E 's/^\\[group:([^]]+)\\].*/\\1/')
+      printf '== group %s ==\\n' "$g"
+{{- if eq .chezmoi.os "linux" }}
+      getent group "$g" 2>/dev/null
+{{- else }}
+      dscl . -read "/Groups/$g" 2>/dev/null
+{{- end }}
+      exit 0 ;;
+    '[sudoers]'*)
+      printf '== sudoers entry ==\\n%s\\n' "$row"
+      exit 0 ;;
+    '[sshkey]'*)
+      user=$(printf '%s\\n' "$row" | awk '{print $2}')
+      ;;
+    *)
+      user=$(printf '%s\\n' "$row" | awk '{print $1}') ;;
+  esac
+  case "$user" in ''|uid=*|members=*) printf '(no user)\\n%s\\n' "$row"; exit 0 ;; esac
+  printf '== id %s ==\\n' "$user"
+  id "$user" 2>/dev/null || printf '(unknown user)\\n'
+  printf '\\n== passwd entry ==\\n'
+{{- if eq .chezmoi.os "linux" }}
+  getent passwd "$user" 2>/dev/null
+  printf '\\n== last login (5) ==\\n'
+  last -F -i "$user" 2>/dev/null | head -5
+  printf '\\n== sudo events (last 5) ==\\n'
+  if command -v journalctl >/dev/null 2>&1; then
+    (sudo -n journalctl _COMM=sudo --since '30 days ago' --no-pager 2>/dev/null \
+      || journalctl _COMM=sudo --since '30 days ago' --no-pager 2>/dev/null) \
+      | grep -E " $user :" | tail -5
+  fi
+{{- else }}
+  dscl . -read "/Users/$user" 2>/dev/null | head -20
+  printf '\\n== last login (5) ==\\n'
+  last "$user" 2>/dev/null | head -5
+{{- end }}
+  printf '\\n== ~/.ssh/authorized_keys ==\\n'
+  home=$(eval echo "~$user")
+  if [ -r "$home/.ssh/authorized_keys" ]; then
+    cat "$home/.ssh/authorized_keys" | grep -vE '^\\s*(#|$)' | wc -l | awk '{print $1, "key(s)"}'
+  elif sudo -n test -r "$home/.ssh/authorized_keys" 2>/dev/null; then
+    sudo cat "$home/.ssh/authorized_keys" | grep -vE '^\\s*(#|$)' | wc -l | awk '{print $1, "key(s) [sudo]"}'
+  else
+    printf '(unreadable / no .ssh)\\n'
+  fi
+  """,
+  # 2. raw row
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Users"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:drill_user"
+alt-e = "actions:edit_sudoers"
+alt-g = "actions:show_groups"
+ctrl-y = "actions:copy_row"
+
+[actions.drill_user]
+description = "Full identity dump in lnav: id, groups, last, sudo events, SSH keys"
+command = """
+row='{}'
+case "$row" in
+  '[group:'*) user='' ;;
+  '[sudoers]'*) user='' ;;
+  '[sshkey]'*) user=$(printf '%s\\n' "$row" | awk '{print $2}') ;;
+  *) user=$(printf '%s\\n' "$row" | awk '{print $1}') ;;
+esac
+case "$user" in ''|uid=*|members=*)
+  echo "(no user from this row); press q"; read -r _; exit 0 ;;
+esac
+tmp=$(mktemp)
+{
+  echo "==================== $user ===================="
+  echo
+  echo "== id =="
+  id "$user" 2>/dev/null
+  echo
+  echo "== groups =="
+  groups "$user" 2>/dev/null
+  echo
+  echo "== passwd =="
+{{- if eq .chezmoi.os "linux" }}
+  getent passwd "$user" 2>/dev/null
+{{- else }}
+  dscl . -read "/Users/$user" 2>/dev/null
+{{- end }}
+  echo
+  echo "== last login (30 entries) =="
+  last -F -i "$user" 2>/dev/null | head -30
+{{- if eq .chezmoi.os "linux" }}
+  echo
+  echo "== sudo events (last 30 days) =="
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo journalctl _COMM=sudo --since '30 days ago' --no-pager 2>/dev/null \
+      | grep -E " $user :"
+  fi
+{{- end }}
+  echo
+  echo "== ~/.ssh/authorized_keys =="
+  home=$(eval echo "~$user")
+  if [ -r "$home/.ssh/authorized_keys" ]; then
+    cat "$home/.ssh/authorized_keys"
+  else
+    sudo cat "$home/.ssh/authorized_keys" 2>/dev/null || echo "(unreadable / missing)"
+  fi
+} > "$tmp"
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$tmp"
+else
+  less -R "$tmp"
+fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.edit_sudoers]
+description = "Edit /etc/sudoers safely via visudo"
+command = """
+exec sudo visudo
+"""
+mode = "execute"
+
+[actions.show_groups]
+description = "Show all groups the user in this row belongs to"
+command = """
+row='{}'
+case "$row" in
+  '[group:'*|'[sudoers]'*) user='' ;;
+  '[sshkey]'*) user=$(printf '%s\\n' "$row" | awk '{print $2}') ;;
+  *) user=$(printf '%s\\n' "$row" | awk '{print $1}') ;;
+esac
+case "$user" in ''|uid=*|members=*) echo "(no user); press q"; read -r _; exit 0 ;; esac
+echo "== groups for $user =="
+id -Gn "$user" 2>/dev/null | tr ' ' '\\n' | sort
+echo
+echo "(press q to exit)"
+read -r _
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

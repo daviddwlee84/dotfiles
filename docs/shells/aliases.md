@@ -582,6 +582,13 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `audit-file <path>` | function | `dot_config/shell/45_audit.sh.tmpl` | `ausearch -f <path> -i` — who touched this file? Requires auditd + watch rule. |
 | `audit-summary [--start <when>]` | function | `dot_config/shell/45_audit.sh.tmpl` | Chained `aureport --summary` + `-au` + `-x` (top 20). Default `--start today`. |
 | `audit-rules-show` | function | `dot_config/shell/45_audit.sh.tmpl` | `auditctl -l` (loaded) + `cat /etc/audit/rules.d/*.rules` (persisted). |
+| `user-list [--login]` | function | `dot_config/shell/45_audit.sh.tmpl` | List local users via `getent passwd` (Linux) or `dscl . -list /Users` (macOS). `--login` filters to non-nologin shells. |
+| `user-info <user>` | function | `dot_config/shell/45_audit.sh.tmpl` | Full identity dump: id, groups, passwd entry, last login, sudo events (Linux), authorized_keys count. |
+| `user-groups <user>` | function | `dot_config/shell/45_audit.sh.tmpl` | All groups a user belongs to (`id -Gn` sorted). |
+| `group-members <group>` | function | `dot_config/shell/45_audit.sh.tmpl` | All members of a group (`getent group` / `dscl`). |
+| `user-sudoers` | function | `dot_config/shell/45_audit.sh.tmpl` | Who can sudo: members of sudo/wheel/admin groups + user-bearing lines from `/etc/sudoers` and `/etc/sudoers.d/`. |
+| `user-ssh-keys [user]` | function | `dot_config/shell/45_audit.sh.tmpl` | List `authorized_keys` entries (`<user> <fingerprint> <comment>`); scans all home dirs if no user. |
+| `user-recent-changes [--days N]` | function | `dot_config/shell/45_audit.sh.tmpl` | Recent `/etc/passwd` `/etc/shadow` `/etc/sudoers` writes via `ausearch -k identity` + `-k sudoers`. |
 
 ---
 

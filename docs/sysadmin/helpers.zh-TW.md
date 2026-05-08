@@ -19,6 +19,21 @@ POSIX 形式，zsh 與 bash 共用。少數 zsh-only 便利處用 source-time �
 | `audit-summary [--start <when>]` | 每日安全摘要 | `aureport --summary -i` + `aureport -au -i` + `aureport -x -i` | 是 | Linux + auditd |
 | `audit-rules-show` | 目前載入的 vs 持久化規則 | `auditctl -l` + `cat /etc/audit/rules.d/*.rules` | 是 | Linux + auditd |
 
+### User inventory helper
+
+底層資料源 macOS (`dscl`) 與 Linux (`getent`) 不同；helper 透過 template
+依 host 帶正確的命令。
+
+| 函式 | 回答 | 包裝 | 需要 sudo？ | 平台 |
+|---|---|---|---|---|
+| `user-list [--login]` | 這台有哪些 user 帳號？ | `getent passwd` (Linux) / `dscl . -list /Users` (macOS) | 否 | macOS + Linux |
+| `user-info <user>` | 單一 user 的完整身份 dump (id、groups、passwd、last login、sudo 事件、SSH key 數) | 組合 | 部分需 sudo | macOS + Linux |
+| `user-groups <user>` | 這 user 在哪些 group？ | `id -Gn <user>` 排序 | 否 | macOS + Linux |
+| `group-members <group>` | 這個 group 有誰？ | `getent group` (Linux) / `dscl . -read /Groups/<g>` (macOS) | 否 | macOS + Linux |
+| `user-sudoers` | 誰能 sudo？(sudo/wheel/admin 成員 + `/etc/sudoers.d/`) | 組合 | 是（讀 `/etc/sudoers`） | macOS + Linux |
+| `user-ssh-keys [user]` | 誰有 authorized_keys，含 fingerprint + comment？ | 掃 `~/.ssh/authorized_keys`；`ssh-keygen -lf -` 算 fingerprint | 其他 user 的檔需 sudo | macOS + Linux |
+| `user-recent-changes [--days N]` | 近期 passwd/shadow/sudoers 修改 (auditd) | `ausearch -k identity` + `-k sudoers` | 是 | Linux + auditd |
+
 所有 helper 接受 `--help` 顯示用法，且在 pipe 到 `head` 等時 exit 0
 (避免 SIGPIPE 噪音)。
 
@@ -49,6 +64,7 @@ sudo 自己的 credential cache；helper **不**整合本 repo 的
 | `tv sessions` | 1) `last -F -i`  2) `lastlog` (Linux)  3) `journalctl _COMM=sshd -n 2000` (systemd)  4) `who -a` | 該 user 細節：`id <u>`、`lastlog -u <u>`、近期 sshd event | 在 `lnav` 鑽入 `journalctl _COMM=sshd \| grep <user>` | macOS + Linux |
 | `tv sudo-history` | 1) `journalctl _COMM=sudo -n 2000`  2) `grep -E 'sudo(\\\|:)' /var/log/auth.log /var/log/secure`  3) `sudoreplay -l` (有設定時) | Event metadata；sudoreplay 列：session info | sudoreplay 列 → `sudoreplay <id>`；其他 → lnav 開 event | Linux only |
 | `tv audit-events` | 1) `aureport --summary -i`  2) `ausearch -k <baseline-key> --interpret -ts recent` for identity / privileged / sudoers / sshd_config  3) `aureport -au -i` 和 `aureport -x -i` | 選中列的 `ausearch -i -a <eventid>` | `lnav` 開完整 event；`Alt+E` 用 `$EDITOR` 開 `/etc/audit/rules.d/` | Linux + auditd |
+| `tv users` | 1) 全 passwd 條目  2) 可登入 user (有真 shell)  3) groups + 成員  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) 每 home 的 authorized_keys（含 fingerprint + comment） | 單 user 身份 dump：id、groups、passwd、last login、sudo 事件、SSH key 數 | 鑽入：`lnav` 開完整身份報告；`Alt+G` 顯示 group；`Alt+E` `visudo` | macOS + Linux |
 
 與本 repo 其他 channel 共用的 binding：
 

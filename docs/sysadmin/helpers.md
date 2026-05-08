@@ -21,6 +21,21 @@ handles the few zsh-only convenience bits.
 | `audit-summary [--start <when>]` | Daily security summary | `aureport --summary -i` + `aureport -au -i` + `aureport -x -i` | Yes | Linux + auditd |
 | `audit-rules-show` | Currently loaded vs persisted rules | `auditctl -l` + `cat /etc/audit/rules.d/*.rules` | Yes | Linux + auditd |
 
+### User-inventory helpers
+
+Backing data sources differ macOS (`dscl`) vs Linux (`getent`); the
+helpers are templated to use the right one per host.
+
+| Function | What it answers | Wraps | Needs sudo? | Platforms |
+|---|---|---|---|---|
+| `user-list [--login]` | Which user accounts exist on this box? | `getent passwd` (Linux) / `dscl . -list /Users` (macOS) | No | macOS + Linux |
+| `user-info <user>` | Full identity dump for one user (id, groups, passwd, last login, sudo events, SSH key count) | composite | Some sections need sudo | macOS + Linux |
+| `user-groups <user>` | Which groups is this user in? | `id -Gn <user>` sorted | No | macOS + Linux |
+| `group-members <group>` | Who is in this group? | `getent group` (Linux) / `dscl . -read /Groups/<g>` (macOS) | No | macOS + Linux |
+| `user-sudoers` | Who can sudo? (sudo/wheel/admin members + `/etc/sudoers.d/`) | composite | Yes (reads `/etc/sudoers`) | macOS + Linux |
+| `user-ssh-keys [user]` | Who has authorized_keys, with fingerprint + comment? | scans `~/.ssh/authorized_keys`; `ssh-keygen -lf -` for fingerprint | Yes for other users' files | macOS + Linux |
+| `user-recent-changes [--days N]` | Recent edits to passwd/shadow/sudoers (auditd) | `ausearch -k identity` + `-k sudoers` | Yes | Linux + auditd |
+
 All helpers accept `--help` for usage and exit 0 (so piping into `head`
 doesn't cause SIGPIPE noise).
 
@@ -55,6 +70,7 @@ Launch via `tv <name>` from anywhere or via the `Alt+T` tools picker.
 | `tv sessions` | 1) `last -F -i`  2) `lastlog` (Linux)  3) `journalctl _COMM=sshd -n 2000` (systemd)  4) `who -a` | Per-user detail: `id <u>`, `lastlog -u <u>`, recent sshd events | Drill-down: `journalctl _COMM=sshd \| grep <user>` in `lnav` | macOS + Linux |
 | `tv sudo-history` | 1) `journalctl _COMM=sudo -n 2000`  2) `grep -E 'sudo(\\\|:)' /var/log/auth.log /var/log/secure`  3) `sudoreplay -l` (when configured) | Event metadata; for sudoreplay rows: session info | sudoreplay row → `sudoreplay <id>`; otherwise lnav on event | Linux only |
 | `tv audit-events` | 1) `aureport --summary -i`  2) `ausearch -k <baseline-key> --interpret -ts recent` for keys identity / privileged / sudoers / sshd_config  3) `aureport -au -i` and `aureport -x -i` | `ausearch -i -a <eventid>` for the selected row | Full event in `lnav`; `Alt+E` opens `/etc/audit/rules.d/` in `$EDITOR` | Linux + auditd |
+| `tv users` | 1) all passwd entries  2) login-capable users (real shell)  3) groups + members  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) authorized_keys per home (with fingerprint + comment) | Per-user identity dump: id, groups, passwd, last login, sudo events, SSH key count | Drill-down: full identity report in `lnav`; `Alt+G` show groups; `Alt+E` `visudo` | macOS + Linux |
 
 Common bindings shared with this repo's other channels:
 

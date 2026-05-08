@@ -19,6 +19,7 @@
 - [8. 每日 5 分鐘健康檢查（cron 友善）](#8-每日-5-分鐘健康檢查cron-友善)
 - [9. 「root shell 做了什麼？」 — sudo log 之外](#9-root-shell-做了什麼--sudo-log-之外)
 - [10. 快速關掉吵雜的 audit 規則但保留其他](#10-快速關掉吵雜的-audit-規則但保留其他)
+- [11. 盤點本機 user inventory](#11-盤點本機-user-inventory)
 
 ---
 
@@ -388,3 +389,61 @@ Role 的「Remove full execve rules when not opted in」task 會刪
 - [sudo 審計](sudo-audit.md) — Level 1 深入、`sudoreplay` 設定
 - [Atuin vs audit](atuin-vs-audit.md) — 為什麼個人 shell history 替代
   不了上述任何一個
+
+---
+
+## 11. 盤點本機 user inventory
+
+你接手一台 server。要知道：**誰存在、誰能登入、誰能 sudo、誰有 SSH
+key**，再相信其他事。
+
+### 11a. CLI 快掃 (90 秒)
+
+```bash
+user-list --login          # 誰有真 shell？
+user-sudoers               # 誰能 sudo？(group + sudoers.d/)
+user-ssh-keys              # 誰有 authorized_keys，含 fingerprint？
+```
+
+按順序讀：`--login` 是*能力*面、`sudoers` 是*特權*面、`ssh-keys` 是
+*遠端存取*面。三個都出現的 user 是滿權限主體 — 確保每個你都認得。
+
+### 11b. 鑽進單一 user
+
+```bash
+user-info alice
+```
+
+一頁含 id、groups、passwd entry、last 5 logins、last 5 sudo 事件、
+authorized_keys 數量。覺得不對勁時的第一站。
+
+### 11c. 用 `tv users` 互動瀏覽
+
+```bash
+tv users
+```
+
+`Ctrl+S` 切 5 個來源：passwd → 可登入 → groups → sudoers → SSH key。
+預覽顯示 user 細節。`Enter` 在 `lnav` 開完整身份報告。`Alt+G` 只顯示 user
+的 group 清單。`Alt+E` 開 `visudo`。
+
+### 11d. 近期身份變更（只 auditd）
+
+```bash
+user-recent-changes --days 30
+```
+
+顯示過去 30 天的 `ausearch -k identity` 和 `-k sudoers` 事件。需要
+本 repo `auditd` role 安裝的基準規則集。能抓：新帳號 (`useradd`)、
+shell 變更 (`chsh`)、sudoers 授權、密碼變更。
+
+### 11e. 要找的警訊
+
+| Pattern | 可能是什麼 |
+|---|---|
+| 除 `root` 外有 uid 0 的 user | 後門帳號 (uid=0 不論名字都是 root) |
+| 不認得的可登入 user | 忘記 / 未授權帳號 |
+| `authorized_keys` comment 是 `<unknown>@<unknown>` 或沒 comment | 有人放進來但懶得標註 |
+| 非系統 user 有 `NOPASSWD: ALL` in `/etc/sudoers.d/` | 永久免密碼 root — 通常是踩雷或後門 |
+| User home 不在 `/home/` (e.g. `/tmp/x`) | 攻擊者建立以避 quota / 監控 |
+| `nologin` shell 但有 SSH key | 常見攻擊招 — user 不能互動 ssh 但仍可 `ssh user@host '<cmd>'` 執行命令（如果沒設 `ForceCommand`） |
