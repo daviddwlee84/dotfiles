@@ -179,6 +179,32 @@ tv update-channels
 
 ---
 
+### `mac-procs` 頻道（僅 macOS）
+
+依**含壓縮資料**的 memory 大小（`top -l 1 -o mem`，對應 Activity Monitor 的「Memory」欄）fuzzy 挑選最重的 macOS process。以 `tv mac-procs` 開啟。
+
+來源檔：[`dot_config/television/cable/mac-procs.toml.tmpl`](../../dot_config/television/cable/mac-procs.toml.tmpl)（chezmoi 模板以 `eq .chezmoi.os "darwin"` 把關，所以僅 macOS 主機看得到此頻道）。
+
+**為什麼存在 vs 通用 `kill-process` 頻道**：`kill-process` 透過 `ps -axm` 按 RSS 排序。Apple Silicon 上 RSS **不**包含 compressed 或 swapped pages —— 一個 leak 2 GB 壓縮資料的 process 在 RSS 視角只顯示 100 MB。`mac-procs` 用 `top -o mem`，其 `mem` 欄位含壓縮資料。完整心智模型見 [macos-swap.zh-TW.md](macos-swap.zh-TW.md)。
+
+來源切換 (`Ctrl+S`)：
+
+1. **依 Memory 排序**（含壓縮資料、預設）—— 對應 Activity Monitor
+2. **依 CPU 排序** —— 誰在燒風扇 / 電池
+3. **依 virtual size 排序** (`ps -axm` VSZ) —— fragmented 的 app / Electron sniffing
+
+預覽切換 (`Ctrl+F`)：
+
+1. `vmmap -summary <pid>` —— VM region 拆解（不需 sudo）
+2. `ps -p <pid> -o ...` —— pid/ppid/user/etime/state/full command
+3. `lsof -p <pid> | head -40` —— 排前的開啟檔案 / sockets
+
+按鍵綁定：目前只有 `Enter`（passthrough）。Alt 鍵動作（kill、force-kill、footprint dump）刻意延後 —— 先用 alias-only 流程評估使用情況；候選 slot 與 AGENTS.md「Keyboard shortcuts」衝突矩陣見頻道檔 header。
+
+無新依賴 —— `top`、`vmmap`、`ps`、`lsof` 都是 macOS 內建。
+
+---
+
 ### `ansible` 頻道
 
 瀏覽 `dot_ansible/`（部署到 `~/.ansible/`）中提供的 ansible playbooks / roles / tags。適合快速跑 playbook、編輯後語法檢查，或複製完整的 `ansible-playbook` 呼叫貼到 shell。

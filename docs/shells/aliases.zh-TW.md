@@ -639,3 +639,17 @@
 | `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | 將 NVM 延遲載入 (lazy-load) 到當前 session（啟動時通常會略過） |
 | `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | 重新產生快取的 Bitwarden zsh 補全檔案 |
 | `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {aliyun\|ustc\|bfsu\|tuna}`。更新環境變數 + 改寫既有的 clone origin；無參數時印出當前 endpoints。預設基準為 Aliyun（在 `dot_config/shell/00_exports.sh.tmpl` 中設定） |
+
+---
+
+## macOS 系統 (memory / swap / storage)
+
+> macOS 專屬。Diagnose / reclaim / watch macOS memory pressure 與 swap accumulation —
+> 即「儲存空間 > 系統資料」一夜暴增、Activity Monitor 顯示 `Swap Used: 17.59 GB` 但 Memory Pressure 還是綠的這個經典情況。
+> 完整深入解說：[tools/macos-swap.zh-TW.md](../tools/macos-swap.zh-TW.md)。Pitfall 案例：[`pitfalls/macos-swap-files-never-shrink.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macos-swap-files-never-shrink.md)。
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `mac-mem-status` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 單頁 memory + swap + storage 報告：`vm.swapusage`、`memory_pressure`、解析過的 `vm_stat`、swapfile 大小（`/System/Volumes/VM/swapfile*`）、按 compressed-aware memory 排前 10（`top -o mem`）、TM 本機快照數、彩色 verdict 行。不需 sudo。 |
+| `mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 互動式清理。永遠安全：`sudo purge`。`--include` 加碼選項：`spotlight`（`killall mds_stores+mdworker_shared`）、`snapshots`（`tmutil thinlocalsnapshots / 5GB 4`）、`sleepimage`（刪 `/private/var/vm/sleepimage` —— 筆電不安全）、`windowserver`（`sudo killall -HUP WindowServer` —— 會把你登出）。 |
+| `mac-mem-watch [INTERVAL_SEC]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | Live 一行一拍 tail：free / compressed / swap_used + 每秒 pageins / pageouts / swapins / swapouts。預設 5 秒。設計給 tmux 旁邊面板用。 |

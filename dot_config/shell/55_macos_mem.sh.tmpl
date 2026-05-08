@@ -1,0 +1,554 @@
+{{- if eq .chezmoi.os "darwin" -}}
+# shellcheck shell=sh
+# mac-mem-* helpers — diagnose + reclaim macOS memory / swap / storage
+# pressure without rebooting.
+#
+# POSIX-portable wrappers around vm_stat / sysctl / footprint(1) /
+# memory_pressure(1) / tmutil / pmset / sudo purge. Sourced by both bash
+# and zsh via load_modular_dir of ~/.config/shell/. Darwin-only — the
+# entire file is gated by the chezmoi `eq .chezmoi.os "darwin"` template
+# so it never lands on Linux hosts. The defensive runtime check inside
+# each function exists for the copy-paste-onto-Linux case.
+#
+# Why these helpers exist:
+#   - macOS dynamically grows /private/var/vm/swapfile* up to free disk
+#     and only contracts them on reboot. "System Data" / "Other Volumes"
+#     in About > Storage balloons silently.
+#   - Activity Monitor's Memory Pressure graph going green/yellow does
+#     NOT mean swap shrunk — it usually didn't.
+#   - `ps -o rss` cannot see compressed or swapped pages on Apple
+#     Silicon; `footprint(1)` can.
+#
+# See: docs/tools/macos-swap.md (full deep-dive incl. why reboot really
+# is the answer sometimes), docs/shells/aliases.md (one-line summary
+# row per function), pitfalls/macos-swap-files-never-shrink.md.
+#
+# Conventions (mirror dot_config/shell/45_audit.sh.tmpl):
+#   - All public functions accept --help.
+#   - Sudo path: interactive TTY -> single `sudo -v` then sudo <cmd>;
+#     non-interactive -> exit 1 with stderr hint. Does NOT integrate
+#     with scripts/lib/sudo_shared.sh (that helper is run-script-scoped
+#     and not deployed to ~/).
+#   - All functions exit 0 on broken pipe (head | less etc.).
+#   - Color output via tput when stdout is a TTY; bare otherwise.
+
+# ---------------------------------------------------------------------------
+# Internal helpers (prefix _macmem_ — not part of public surface)
+# ---------------------------------------------------------------------------
+
+_macmem_is_darwin() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
+_macmem_is_tty() { [ -t 1 ]; }
+_macmem_is_arm64() { [ "$(uname -m 2>/dev/null)" = "arm64" ]; }
+_macmem_have() { command -v "$1" >/dev/null 2>&1; }
+
+_macmem_guard_darwin() {
+    if ! _macmem_is_darwin; then
+        printf 'mac-mem: this helper is macOS-only (current OS: %s)\n' \
+            "$(uname -s 2>/dev/null || echo unknown)" >&2
+        return 1
+    fi
+}
+
+# Run "$@" with sudo if not root. If sudo would prompt and we're
+# non-interactive, fail with hint.
+_macmem_run_root() {
+    if [ "$(id -u)" = "0" ]; then
+        "$@"
+        return $?
+    fi
+    if ! _macmem_have sudo; then
+        printf 'mac-mem: needs root and sudo not installed\n' >&2
+        return 1
+    fi
+    if _macmem_is_tty; then
+        sudo -v || return 1
+        sudo "$@"
+    else
+        if sudo -n true 2>/dev/null; then
+            sudo -n "$@"
+        else
+            printf 'mac-mem: needs root; re-run with sudo or in an interactive shell\n' >&2
+            return 1
+        fi
+    fi
+}
+
+# Color helpers — only emit escapes if stdout is a TTY.
+_macmem_color() {
+    # Usage: _macmem_color <name> <text>
+    # name: red|yellow|green|bold|dim|reset
+    if ! _macmem_is_tty || ! _macmem_have tput; then
+        printf '%s' "$2"
+        return
+    fi
+    case $1 in
+        red)    printf '%s%s%s' "$(tput setaf 1)" "$2" "$(tput sgr0)" ;;
+        yellow) printf '%s%s%s' "$(tput setaf 3)" "$2" "$(tput sgr0)" ;;
+        green)  printf '%s%s%s' "$(tput setaf 2)" "$2" "$(tput sgr0)" ;;
+        cyan)   printf '%s%s%s' "$(tput setaf 6)" "$2" "$(tput sgr0)" ;;
+        bold)   printf '%s%s%s' "$(tput bold)"    "$2" "$(tput sgr0)" ;;
+        dim)    printf '%s%s%s' "$(tput dim)"     "$2" "$(tput sgr0)" ;;
+        *)      printf '%s' "$2" ;;
+    esac
+}
+
+# Convert bytes to human-readable. Awk-only so no deps.
+_macmem_human_bytes() {
+    awk -v b="${1:-0}" 'BEGIN {
+        split("B KB MB GB TB PB", u, " ");
+        i = 1;
+        while (b >= 1024 && i < 6) { b /= 1024; i++ }
+        if (i == 1) printf "%d %s", b, u[i];
+        else        printf "%.2f %s", b, u[i];
+    }'
+}
+
+# Print a 1-line section header.
+_macmem_h() {
+    printf '\n%s\n' "$(_macmem_color bold "── $1 ─────────────────────────────────────────")"
+}
+
+_macmem_help() {
+    # Usage: _macmem_help <function-name> <one-liner> [more lines...]
+    name=$1; shift
+    printf 'Usage: %s\n\n' "$name"
+    for line in "$@"; do printf '  %s\n' "$line"; done
+}
+
+# Public: SECTION FUNCTIONS appended below (mac-mem-status, mac-mem-reclaim, mac-mem-watch).
+# Each function defined in its own block; keep this file ordered:
+#   1. internal helpers (above)
+#   2. mac-mem-status
+#   3. mac-mem-reclaim
+#   4. mac-mem-watch
+#   5. completions / aliases (none for now — user wanted to try aliases first)
+
+# === FUNCTION: mac-mem-status =============================================
+# Single-screen dense report:
+#   - vm.swapusage line + parsed vm_stat (free/active/inactive/wired/
+#     compressed/cached) in human bytes
+#   - Top 10 processes by RSS (always) and by swapped+compressed footprint
+#     (Apple Silicon only, parsed from `footprint -summary`)
+#   - Sizes of /private/var/vm/swapfile* and /private/var/vm/sleepimage
+#   - Time Machine local snapshot count + total size on / (best-effort)
+#   - Color-coded summary line: 🟢/🟡/🔴 based on swap_used / free disk
+mac-mem-status() {
+    case ${1:-} in
+        -h|--help)
+            _macmem_help 'mac-mem-status' \
+                'Single-screen macOS memory + swap + storage report.' \
+                '' \
+                'No flags. Reads-only — no sudo, no kills, no purge.' \
+                'Apple Silicon: also shows top processes by compressed+swapped' \
+                'footprint via /usr/bin/footprint.' \
+                '' \
+                'Pair with: mac-mem-reclaim (interactive cleanup),' \
+                '          mac-mem-watch  (live tail).' \
+                '' \
+                'See docs/tools/macos-swap.md for what each number means.'
+            return 0 ;;
+    esac
+    _macmem_guard_darwin || return 1
+
+    # ── Swap (sysctl vm.swapusage gives "total = X used = Y free = Z (encrypted)")
+    _macmem_h "Swap (vm.swapusage)"
+    sysctl -n vm.swapusage 2>/dev/null || printf '  (sysctl unavailable)\n'
+
+    # Capture swap_used in MB for the summary line below
+    _swap_used_mb=$(sysctl -n vm.swapusage 2>/dev/null \
+        | awk '{ for(i=1;i<=NF;i++) if($i=="used") { gsub("M","",$(i+2)); print $(i+2); exit } }')
+    : "${_swap_used_mb:=0}"
+
+    # ── Memory pressure (one-shot snapshot)
+    _macmem_h "Memory pressure"
+    if _macmem_have memory_pressure; then
+        # `memory_pressure` runs forever by default; -Q gives a one-shot
+        # query on recent macOS. Fall back to plain header if -Q missing.
+        memory_pressure -Q 2>/dev/null \
+            || memory_pressure 2>/dev/null | head -3 \
+            || printf '  (memory_pressure unavailable)\n'
+    fi
+
+    # ── vm_stat parsed to human bytes
+    _macmem_h "vm_stat (page-class breakdown)"
+    vm_stat 2>/dev/null | awk '
+        /page size of/ { ps=$8; next }
+        /^Pages free:/                       { free=$3 }
+        /^Pages active:/                     { active=$3 }
+        /^Pages inactive:/                   { inactive=$3 }
+        /^Pages speculative:/                { spec=$3 }
+        /^Pages wired down:/                 { wired=$4 }
+        /^Pages occupied by compressor:/     { comp=$5 }
+        /^File-backed pages:/                { fileb=$3 }
+        /^Anonymous pages:/                  { anon=$3 }
+        END {
+            if (!ps) ps=16384;
+            split("free active inactive speculative wired compressor file-backed anonymous", k, " ");
+            v[1]=free; v[2]=active; v[3]=inactive; v[4]=spec;
+            v[5]=wired; v[6]=comp; v[7]=fileb; v[8]=anon;
+            for (i=1;i<=8;i++) {
+                gsub(/\.$/, "", v[i]);
+                bytes = v[i]*ps;
+                # human bytes inline (cant call shell function from awk)
+                u="B"; b=bytes;
+                if (b>=1024) { b/=1024; u="KB" }
+                if (b>=1024) { b/=1024; u="MB" }
+                if (b>=1024) { b/=1024; u="GB" }
+                if (b>=1024) { b/=1024; u="TB" }
+                printf "  %-13s  %10.2f %s\n", k[i], b, u;
+            }
+        }'
+
+    # ── Swapfile sizes on disk
+    # Modern macOS (Big Sur+, Apple Silicon) stores swapfiles in
+    # /System/Volumes/VM/. Older / some installs use /private/var/vm/.
+    # Sleepimage stays in /private/var/vm/sleepimage.
+    _macmem_h "Swapfiles on disk"
+    _vm_dir=""
+    for _d in /System/Volumes/VM /private/var/vm; do
+        if [ -d "$_d" ] && [ -n "$(ls -A "$_d"/swapfile* 2>/dev/null)" ]; then
+            _vm_dir=$_d
+            break
+        fi
+    done
+    if [ -n "$_vm_dir" ]; then
+        printf '  %s\n' "$(_macmem_color dim "(location: $_vm_dir)")"
+        # ls -lh on the swapfiles. Glob may be root-only readable on some setups;
+        # ls itself usually works because dir is world-readable.
+        ls -lh "$_vm_dir"/swapfile* 2>/dev/null \
+            | awk '{ printf "  %-10s  %s\n", $5, $NF }'
+        _swap_total=$(du -ch "$_vm_dir"/swapfile* 2>/dev/null | awk '/total$/{print $1}')
+        [ -n "$_swap_total" ] && printf '  %s\n' "$(_macmem_color dim "swapfile* total: $_swap_total")"
+    else
+        printf '  (no swapfiles found in /System/Volumes/VM or /private/var/vm)\n'
+    fi
+    if [ -e /private/var/vm/sleepimage ]; then
+        _sleep_size=$(ls -l /private/var/vm/sleepimage 2>/dev/null | awk '{print $5}')
+        [ -n "$_sleep_size" ] && printf '  %s\n' \
+            "$(_macmem_color dim "sleepimage:      $(_macmem_human_bytes "$_sleep_size")")"
+    fi
+
+    # ── Top-10 by memory footprint (top's `mem` column is compressed-aware,
+    # matches Activity Monitor's "Memory" column — works on Intel + Apple
+    # Silicon, no sudo needed).
+    _macmem_h "Top 10 processes by Memory (compressed-aware, matches Activity Monitor)"
+    if _macmem_have top; then
+        # -l 1: one sample. -o mem: order by mem desc. -n 11: header + 10 rows.
+        # -stats picks columns; vsize prints "N/A" on Apple Silicon for some
+        # procs (kernel restriction), so we skip it and show pid/command/mem/cpu.
+        top -l 1 -o mem -n 10 -stats pid,command,mem,cpu,threads 2>/dev/null \
+            | awk '
+                /^PID/ { found=1; printf "  %-7s  %-30s  %10s  %6s  %s\n", $1, $2, $3, $4, $5; next }
+                found==1 && NF>=5 {
+                    pid=$1; mem=$(NF-2); cpu=$(NF-1); thr=$NF;
+                    cmd=""; for (i=2;i<=NF-3;i++) cmd=cmd" "$i; sub(/^ /, "", cmd);
+                    if (length(cmd) > 30) cmd=substr(cmd,1,27)"...";
+                    printf "  %-7s  %-30s  %10s  %6s  %s\n", pid, cmd, mem, cpu, thr;
+                }'
+    else
+        # Fallback to ps if `top` not available (essentially impossible on macOS)
+        ps -axm -o pid,rss,user,comm 2>/dev/null | head -11 \
+            | awk '{ printf "  %s\n", $0 }'
+    fi
+    if _macmem_is_arm64; then
+        printf '  %s\n' \
+            "$(_macmem_color dim "Deeper view: sudo footprint -all -s --swapped --sort=swapped 2>/dev/null | head -40")"
+    fi
+
+    # ── Time Machine local snapshots (counts toward "Other Volumes" in Storage)
+    _macmem_h "Time Machine local snapshots on /"
+    if _macmem_have tmutil; then
+        _snap_lines=$(tmutil listlocalsnapshots / 2>/dev/null | grep -c '^com.apple.TimeMachine')
+        printf '  %d snapshot(s) on /\n' "${_snap_lines:-0}"
+        if [ "${_snap_lines:-0}" -gt 0 ] && _macmem_have diskutil; then
+            # Best-effort: snapshot sizes via diskutil apfs listSnapshots
+            diskutil apfs listSnapshots / 2>/dev/null \
+                | awk '/^\| +Name: /{n=$3} /^\| +Size: /{print "  "n"  "$2" "$3}' \
+                | head -5
+            [ "${_snap_lines:-0}" -gt 5 ] && printf '  %s\n' "$(_macmem_color dim "(showing 5 of $_snap_lines — see: tmutil listlocalsnapshots /)")"
+        fi
+    else
+        printf '  (tmutil unavailable)\n'
+    fi
+
+    # ── Disk free on /
+    _macmem_h "Disk free on /"
+    df -Hh / 2>/dev/null | awk 'NR<=2 { printf "  %s\n", $0 }'
+
+    # ── Color-coded summary
+    _free_pct=$(df -k / 2>/dev/null | awk 'NR==2 { gsub("%","",$5); print 100-$5 }')
+    : "${_free_pct:=0}"
+    _macmem_h "Verdict"
+    _verdict_color=green
+    _verdict_label="OK"
+    # Heuristics — tunable:
+    if [ "${_swap_used_mb%.*}" -gt 8000 ] || [ "$_free_pct" -lt 10 ]; then
+        _verdict_color=red
+        _verdict_label="HIGH PRESSURE"
+    elif [ "${_swap_used_mb%.*}" -gt 2000 ] || [ "$_free_pct" -lt 20 ]; then
+        _verdict_color=yellow
+        _verdict_label="ELEVATED"
+    fi
+    printf '  swap_used=%s MB  disk_free=%s%%  ->  %s\n' \
+        "${_swap_used_mb}" "$_free_pct" \
+        "$(_macmem_color "$_verdict_color" "$_verdict_label")"
+    if [ "$_verdict_color" != "green" ]; then
+        printf '  %s\n' "$(_macmem_color dim "Try:  mac-mem-reclaim --dry-run    (or: mac-mem-reclaim)")"
+        printf '  %s\n' "$(_macmem_color dim "Doc:  docs/tools/macos-swap.md     (why reboot is sometimes the answer)")"
+    fi
+    printf '\n'
+}
+
+# === FUNCTION: mac-mem-reclaim ============================================
+# Interactive cleanup. Always-safe steps run by default; risky steps gated
+# behind --include flags + double confirmation.
+#
+# Default (always-safe) steps:
+#   1. sudo purge        — flush disk caches, reclaim Cached Files
+#   2. (info) print before/after vm.swapusage and df / deltas
+#
+# Opt-in via --include CSV:
+#   spotlight    — killall mds_stores + mdworker_shared (re-spawned by launchd)
+#   snapshots    — tmutil thinlocalsnapshots / 5000000000 4
+#   sleepimage   — pmset -a hibernatemode 0 + sudo rm /private/var/vm/sleepimage
+#                  (laptop users lose safe-sleep — battery-dead = lost state)
+#   windowserver — sudo killall -HUP WindowServer (LOGS YOU OUT — save first)
+#
+# Flags:
+#   --dry-run   Print every command that would run; do nothing.
+#   --yes       Skip the per-step confirmation prompt for the *always-safe*
+#               steps. risky steps (sleepimage, windowserver) STILL prompt
+#               unless --force is also passed.
+#   --force     With --yes, also skip prompts on risky steps. Use only in
+#               scripted contexts you control.
+mac-mem-reclaim() {
+    _dry=0; _yes=0; _force=0; _include=""
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h|--help)
+                _macmem_help 'mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]' \
+                    'Reclaim macOS memory / swap / storage interactively.' \
+                    '' \
+                    'Always-safe steps (run by default):' \
+                    '  1. sudo purge                  flush disk caches' \
+                    '' \
+                    'Opt-in via --include (comma-separated):' \
+                    '  spotlight    restart mds_stores + mdworker_shared' \
+                    '  snapshots    tmutil thinlocalsnapshots / 5GB urgency 4' \
+                    '  sleepimage   disable + delete /private/var/vm/sleepimage (~RAM)' \
+                    '  windowserver sudo killall -HUP WindowServer (LOGS YOU OUT)' \
+                    '' \
+                    'Flags:' \
+                    '  --dry-run    print commands; run nothing' \
+                    '  --yes        no prompt on safe steps (risky still prompt)' \
+                    '  --force      with --yes, also skip risky-step prompts' \
+                    '' \
+                    'Example:' \
+                    '  mac-mem-reclaim --include spotlight,snapshots' \
+                    '  mac-mem-reclaim --dry-run --include sleepimage' \
+                    '' \
+                    'NOTE: there is no safe non-reboot way to shrink existing' \
+                    'swapfiles. See pitfalls/macos-swap-files-never-shrink.md.'
+                return 0 ;;
+            --dry-run)  _dry=1; shift ;;
+            --yes|-y)   _yes=1; shift ;;
+            --force)    _force=1; shift ;;
+            --include)  _include=$2; shift 2 ;;
+            --include=*) _include=${1#--include=}; shift ;;
+            *) printf 'mac-mem-reclaim: unknown arg: %s\n' "$1" >&2; return 2 ;;
+        esac
+    done
+    _macmem_guard_darwin || return 1
+
+    _includes_has() {
+        case ",$_include," in
+            *",$1,"*) return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+
+    _confirm() {
+        # Usage: _confirm <prompt>  -> returns 0 if confirmed
+        # Honors --yes for safe steps, --force for risky.
+        _is_risky=${2:-0}
+        if [ "$_yes" = 1 ] && { [ "$_is_risky" = 0 ] || [ "$_force" = 1 ]; }; then
+            return 0
+        fi
+        if ! _macmem_is_tty; then
+            printf 'mac-mem-reclaim: non-interactive and missing --yes/--force; skipping\n' >&2
+            return 1
+        fi
+        if _macmem_have gum; then
+            gum confirm "$1"
+        else
+            printf '%s [y/N] ' "$1"
+            read -r _ans
+            case ${_ans:-} in [yY]|[yY][eE][sS]) return 0 ;; *) return 1 ;; esac
+        fi
+    }
+
+    _run() {
+        # Usage: _run <label> <cmd...>
+        _label=$1; shift
+        if [ "$_dry" = 1 ]; then
+            printf '%s %s\n' "$(_macmem_color cyan "DRY")" "$_label"
+            printf '    %s\n' "$*"
+            return 0
+        fi
+        printf '%s %s\n' "$(_macmem_color cyan "RUN")" "$_label"
+        "$@"
+    }
+
+    # Snapshot before
+    _swap_before=$(sysctl -n vm.swapusage 2>/dev/null \
+        | awk '{ for(i=1;i<=NF;i++) if($i=="used") { print $(i+2); exit } }')
+    _free_before=$(df -Hh / 2>/dev/null | awk 'NR==2 {print $4}')
+    printf '%s swap_used=%s  disk_free=%s\n' "$(_macmem_color bold "BEFORE")" "${_swap_before:-?}" "${_free_before:-?}"
+
+    # ── Step 1 (always): sudo purge
+    if _confirm "Run 'sudo purge' (flush disk caches; safe)?"; then
+        _run "sudo purge" _macmem_run_root purge
+    fi
+
+    # ── Step 2 (opt-in): Spotlight indexer restart
+    if _includes_has spotlight; then
+        if _confirm "Restart mds_stores + mdworker_shared (Spotlight will re-index — CPU spike)?"; then
+            _run "killall mds_stores"     _macmem_run_root killall mds_stores
+            _run "killall mdworker_shared" _macmem_run_root killall mdworker_shared
+        fi
+    fi
+
+    # ── Step 3 (opt-in): TM local snapshots thin
+    if _includes_has snapshots; then
+        if _confirm "Thin Time Machine local snapshots on / (urgency 4, 5GB)?"; then
+            _run "tmutil thinlocalsnapshots / 5000000000 4" \
+                tmutil thinlocalsnapshots / 5000000000 4
+        fi
+    fi
+
+    # ── Step 4 (opt-in, RISKY): sleepimage
+    if _includes_has sleepimage; then
+        printf '%s on a laptop, deleting sleepimage breaks safe-sleep\n' \
+            "$(_macmem_color yellow "WARNING:")"
+        printf '         (battery-dead while suspended -> lost session).\n'
+        printf '         Desktops (Mac mini/Studio/Pro on AC) are unaffected.\n'
+        if _confirm "Disable hibernation (pmset hibernatemode 0) + delete sleepimage?" 1; then
+            _run "pmset -a hibernatemode 0" _macmem_run_root pmset -a hibernatemode 0
+            _run "rm /private/var/vm/sleepimage" _macmem_run_root rm -f /private/var/vm/sleepimage
+        fi
+    fi
+
+    # ── Step 5 (opt-in, VERY RISKY): WindowServer restart
+    if _includes_has windowserver; then
+        printf '%s restarting WindowServer LOGS YOU OUT.\n' \
+            "$(_macmem_color red "DANGER:")"
+        printf '        Save all unsaved work in every GUI app first.\n'
+        if _confirm "Restart WindowServer (you WILL be logged out)?" 1; then
+            if _confirm "Really? Last chance — unsaved work will be LOST." 1; then
+                _run "killall -HUP WindowServer" _macmem_run_root killall -HUP WindowServer
+            fi
+        fi
+    fi
+
+    # Snapshot after
+    if [ "$_dry" = 0 ]; then
+        sleep 1
+        _swap_after=$(sysctl -n vm.swapusage 2>/dev/null \
+            | awk '{ for(i=1;i<=NF;i++) if($i=="used") { print $(i+2); exit } }')
+        _free_after=$(df -Hh / 2>/dev/null | awk 'NR==2 {print $4}')
+        printf '%s swap_used=%s  disk_free=%s\n' "$(_macmem_color bold "AFTER")" "${_swap_after:-?}" "${_free_after:-?}"
+    fi
+    printf '%s\n' "$(_macmem_color dim "Tip: existing swapfiles will not shrink without reboot — see pitfalls/macos-swap-files-never-shrink.md")"
+}
+
+# === FUNCTION: mac-mem-watch ==============================================
+# Live tail. Parses `vm_stat <interval>` deltas (one row per interval) into a
+# colored single-line summary. Designed for tmux side panes.
+#
+# Usage: mac-mem-watch [INTERVAL_SEC]   (default: 5)
+mac-mem-watch() {
+    case ${1:-} in
+        -h|--help)
+            _macmem_help 'mac-mem-watch [INTERVAL_SEC]' \
+                'Live one-line-per-tick memory + swap activity tail.' \
+                '' \
+                'Default INTERVAL_SEC = 5.' \
+                '' \
+                'Each line shows:' \
+                '  [HH:MM:SS] free=NN compressed=NN swap_used=NN' \
+                '             pageins/s  pageouts/s  swapins/s  swapouts/s' \
+                '' \
+                'Ctrl+C to stop. Designed for a tmux side pane while debugging an offender.'
+            return 0 ;;
+    esac
+    _macmem_guard_darwin || return 1
+    _interval=${1:-5}
+    case $_interval in
+        ''|*[!0-9]*) printf 'mac-mem-watch: INTERVAL_SEC must be a positive integer\n' >&2; return 2 ;;
+    esac
+
+    # vm_stat <N> emits a header row, a "Mach Virtual Memory Statistics" line,
+    # then a 22-column row every N seconds. The FIRST data row is cumulative
+    # since boot (huge values like "22864M"); SUBSEQUENT rows are per-interval
+    # deltas (small values). We skip row 1 and divide row N values by interval
+    # to get per-second rates.
+    #
+    # Column indices (1-based, Darwin vm_stat circa 2024+):
+    #   1=free 2=active 3=specul 4=inactive 5=throttle 6=wired 7=prgable
+    #   8=faults 9=copy 10=0fill 11=reactive 12=purged 13=file-backed
+    #   14=anonymous 15=cmprssed 16=cmprssor 17=dcomprs 18=comprs
+    #   19=pageins 20=pageout 21=swapins 22=swapouts
+    printf '%s tail starting (interval=%ds, Ctrl+C to stop)\n' \
+        "$(_macmem_color bold "mac-mem-watch")" "$_interval"
+    printf '%s  free  | compressor | swap_used | pageins/s | pageouts/s | swapins/s | swapouts/s\n' \
+        "$(_macmem_color dim "TIME    ")"
+
+    # Page size for human conversion (Apple Silicon = 16384, Intel = 4096)
+    _ps=$(sysctl -n hw.pagesize 2>/dev/null || echo 4096)
+
+    vm_stat "$_interval" 2>/dev/null | awk -v ps="$_ps" -v intv="$_interval" '
+        function fmt_bytes(b,    u) {
+            u="B";
+            if (b>=1024) { b/=1024; u="KB" }
+            if (b>=1024) { b/=1024; u="MB" }
+            if (b>=1024) { b/=1024; u="GB" }
+            return sprintf("%6.2f%s", b, u);
+        }
+        function ts() { ("date +%H:%M:%S" | getline t); close("date +%H:%M:%S"); return t }
+        /Mach Virtual Memory/ { next }
+        # Header line — first DATA row will be skipped via the row counter.
+        /^ *free / { in_data=1; row=0; next }
+        in_data==1 && NF >= 22 && $1 ~ /^[0-9]+/ {
+            row++;
+            # Skip row 1 — its values are cumulative since boot, not per-interval.
+            if (row == 1) next;
+            free=$1+0; cmprssor=$16+0;
+            pageins=$19+0; pageouts=$20+0; swapins=$21+0; swapouts=$22+0;
+            # Some columns may carry "K" / "M" suffixes when values are huge
+            # (e.g. faults). Strip suffixes defensively.
+            gsub(/[KM]$/, "", pageins);
+            gsub(/[KM]$/, "", pageouts);
+            gsub(/[KM]$/, "", swapins);
+            gsub(/[KM]$/, "", swapouts);
+            # Per-second rates
+            d_pi = pageins  / intv;
+            d_po = pageouts / intv;
+            d_si = swapins  / intv;
+            d_so = swapouts / intv;
+            # query swap_used via sysctl each tick
+            cmd="sysctl -n vm.swapusage 2>/dev/null";
+            cmd | getline su; close(cmd);
+            n = split(su, a, " "); swap_used="?";
+            for (i=1;i<=n;i++) if (a[i]=="used") { swap_used=a[i+2]; break }
+            printf "[%s] %s | %s | %9s | %9.1f | %10.1f | %9.1f | %10.1f\n",
+                ts(),
+                fmt_bytes(free*ps),
+                fmt_bytes(cmprssor*ps),
+                swap_used,
+                d_pi, d_po, d_si, d_so;
+            fflush();
+        }
+    '
+}
+
+{{ end -}}

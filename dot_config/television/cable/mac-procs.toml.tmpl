@@ -1,0 +1,99 @@
+{{- if eq .chezmoi.os "darwin" -}}
+# mac-procs channel for television (tv) — macOS-only
+# Fuzzy-pick the heaviest processes by memory (compressed-aware), with
+# previews showing per-process VM map and open files.
+#
+# Pairs with: dot_config/shell/55_macos_mem.sh.tmpl (mac-mem-*)
+#             docs/tools/macos-swap.md (full deep-dive)
+#
+# Why this exists vs the generic kill-process channel:
+#   - kill-process sorts by RSS (ps -axm). On Apple Silicon, RSS does
+#     NOT include compressed or swapped pages — a process leaking 2 GB
+#     of compressed data shows as 100 MB in RSS view.
+#   - This channel uses `top -l 1 -o mem`, whose mem column matches
+#     Activity Monitor's "Memory" column (compressed-aware).
+#   - Per-PID preview uses `vmmap -summary` for the VM region breakdown
+#     ps cannot show. (Apple Silicon also has `footprint -p PID` but it
+#     needs sudo to inspect other users' processes.)
+#
+# No Alt-key bindings yet — user wanted to start with Enter only, add
+# shortcuts after evaluating which actions are actually used. When
+# ready, candidates: Alt+K (kill -TERM), Alt+9 (kill -9), Alt+I
+# (footprint), Alt+V (vmmap full). Check AGENTS.md "Keyboard shortcuts"
+# matrix before claiming any new Alt slot.
+#
+# Usage:
+#   tv mac-procs
+#
+# Source cycling (Ctrl+S):
+#   1. Top by Memory (compressed-aware, default) — matches Activity Monitor
+#   2. Top by CPU                                — what's burning the fan
+#   3. Top by virtual size (ps -axm)             — fragmented apps / Electron
+#
+# Preview cycling (Ctrl+F):
+#   1. vmmap -summary  — VM region breakdown (no sudo)
+#   2. ps metadata     — pid/ppid/user/etime/state/full command
+#   3. lsof head       — top open files / sockets
+
+[metadata]
+name = "mac-procs"
+description = "macOS process picker — sorted by compressed-aware memory (top -o mem)"
+requirements = []
+
+[source]
+command = [
+  # Cycle 1: top by Memory (compressed-aware). Default. PID is field 1.
+  '''
+  top -l 1 -o mem -n 30 -stats pid,command,mem,cpu,threads,state 2>/dev/null \
+    | awk '/^PID/ {found=1; next}
+           found==1 && NF>=5 {
+               pid=$1; mem=$(NF-3); cpu=$(NF-2); thr=$(NF-1); st=$NF;
+               cmd=""; for (i=2;i<=NF-4;i++) cmd=cmd" "$i; sub(/^ /, "", cmd);
+               if (length(cmd) > 35) cmd=substr(cmd,1,32)"...";
+               printf "%-7s  %-35s  MEM %8s  CPU %5s%%  TH %4s  %s\n", pid, cmd, mem, cpu, thr, st;
+           }'
+  ''',
+  # Cycle 2: top by CPU. -l 2 because the first sample of `top -o cpu` is
+  # since-boot and useless; the second sample is the actual delta.
+  '''
+  top -l 2 -o cpu -n 30 -stats pid,command,mem,cpu,threads,state 2>/dev/null \
+    | awk '/^PID/ {found++; if(found==2) p=1; next}
+           p==1 && NF>=5 {
+               pid=$1; mem=$(NF-3); cpu=$(NF-2); thr=$(NF-1); st=$NF;
+               cmd=""; for (i=2;i<=NF-4;i++) cmd=cmd" "$i; sub(/^ /, "", cmd);
+               if (length(cmd) > 35) cmd=substr(cmd,1,32)"...";
+               printf "%-7s  %-35s  MEM %8s  CPU %5s%%  TH %4s  %s\n", pid, cmd, mem, cpu, thr, st;
+           }'
+  ''',
+  # Cycle 3: top by virtual size via ps. Catches Electron / fragmented apps
+  # whose VSZ dwarfs their compressed-aware mem.
+  '''
+  ps -axm -o pid,vsz,rss,comm 2>/dev/null \
+    | awk 'NR==1 {next}
+           NR<=31 {
+               pid=$1; vsz=$2/1024; rss=$3/1024;
+               cmd=$4; for (i=5;i<=NF;i++) cmd=cmd" "$i;
+               n=split(cmd,a,"/"); short=a[n];
+               if (length(short) > 35) short=substr(short,1,32)"...";
+               printf "%-7s  %-35s  VSZ %7.0fMB  RSS %7.0fMB\n", pid, short, vsz, rss;
+           }'
+  ''',
+]
+
+[preview]
+command = [
+  # Cycle 1: vmmap -summary. Always available without sudo for own-uid procs;
+  # for system procs you'll see "(parent's information not available)" — fine.
+  "vmmap -summary '{split: :0}' 2>/dev/null | head -80",
+  # Cycle 2: ps metadata in long form.
+  "ps -p '{split: :0}' -o pid,ppid,user,pgid,%cpu,%mem,etime,state,command 2>/dev/null",
+  # Cycle 3: lsof head — open files / sockets. Truncate to keep preview fast.
+  "lsof -p '{split: :0}' 2>/dev/null | head -40",
+]
+
+[keybindings]
+# Enter: select_passthrough emits the current row to stdout, so users can
+# pipe into other commands (e.g. `kill $(tv mac-procs | awk '{print $1}')`).
+# No Alt-key actions yet — see file header for rationale and future
+# candidates.
+{{ end -}}

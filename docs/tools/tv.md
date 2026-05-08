@@ -174,6 +174,32 @@ No new dependencies — uses `systemctl`/`journalctl` (base systemd) on Linux, `
 
 ---
 
+### `mac-procs` channel (macOS-only)
+
+Fuzzy-pick the heaviest macOS processes by **compressed-aware** memory (`top -l 1 -o mem`, matches Activity Monitor's "Memory" column). Open with `tv mac-procs`.
+
+Source file: [`dot_config/television/cable/mac-procs.toml.tmpl`](../../dot_config/television/cable/mac-procs.toml.tmpl) (chezmoi template gated on `eq .chezmoi.os "darwin"`, so the channel only appears on macOS hosts).
+
+**Why this exists vs the generic `kill-process` channel**: `kill-process` sorts by RSS via `ps -axm`. On Apple Silicon, RSS does NOT include compressed or swapped pages — a process leaking 2 GB of compressed data shows as 100 MB in the RSS view. `mac-procs` uses `top -o mem` whose `mem` column is compressed-aware. See [macos-swap.md](macos-swap.md) for the full mental model.
+
+Source cycling (`Ctrl+S`):
+
+1. **Top by Memory** (compressed-aware, default) — matches Activity Monitor
+2. **Top by CPU** — what's burning the fan / battery
+3. **Top by virtual size** (`ps -axm` VSZ) — fragmented apps / Electron sniffing
+
+Preview cycling (`Ctrl+F`):
+
+1. `vmmap -summary <pid>` — VM region breakdown (no sudo)
+2. `ps -p <pid> -o ...` — pid/ppid/user/etime/state/full command
+3. `lsof -p <pid> | head -40` — top open files / sockets
+
+Keybindings: only `Enter` (passthrough) for now. Alt-key actions (kill, force-kill, footprint dump) are deliberately deferred — usage will be evaluated via the alias-only flow first; see the channel file header for candidate slots and the AGENTS.md "Keyboard shortcuts" matrix before claiming any new Alt slot.
+
+No new dependencies — `top`, `vmmap`, `ps`, `lsof` are all macOS built-ins.
+
+---
+
 ### `ansible` channel
 
 Browse the ansible playbooks / roles / tags shipped in `dot_ansible/` (deployed to `~/.ansible/`). Useful for quickly running a playbook, syntax-checking after edits, or copying the full `ansible-playbook` invocation to paste into a shell.
