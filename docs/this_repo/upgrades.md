@@ -53,6 +53,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `flatpak` | `flatpak update --user --noninteractive --assumeyes` for user-scope Flathub apps (Discord et al. when `discordChannel=flatpak` — see [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md)). Skipped when `flatpak` is absent OR when no user-scope apps are installed. System-scope (`flatpak update --system`) is intentionally NOT covered — it requires `sudo` and is rare in this repo's flow; run manually if needed. |
 | `warp` | **Linux only.** `sudo apt-get update` + `sudo apt-get install --only-upgrade -y warp-terminal` via the shared sudo session. macOS Warp is handled by `cat_brew` (cask `warp` + `--greedy`); this category short-circuits with `SKIPPED` on Darwin. The on-disk binary is replaced but the running Warp process is **not** restarted — quit + relaunch Warp to load the new version. The in-app `warp_finish_update <token>` graceful-restart only works from inside a live Warp session (Warp-injected shell function, not on `$PATH` otherwise) — see [`docs/tools/warp.md`](../tools/warp.md) for the full mechanism. |
 | `agents` | Re-runs the official `curl \| bash` installers for **tools already present** only — Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. Bootstrap list mirrors [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml). |
+| `atuin` | macOS: `brew upgrade atuin` (no-op when atuin was installed via the upstream installer rather than brew). Linux: re-runs `curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh \| env ATUIN_NO_MODIFY_PATH=1 sh` so the upstream installer drops the new binary into `~/.atuin/bin/` while leaving PATH wiring to [`dot_config/shell/15_atuin.sh`](../../dot_config/shell/15_atuin.sh). Skipped with `SKIPPED` if `atuin` is not on PATH. The local SQLite history (`~/.local/share/atuin/`) and config (`~/.config/atuin/config.toml`) are untouched. |
 | `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → refresh installed `claude-hud` via [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
 
 ### Run order
@@ -68,7 +69,8 @@ flowchart LR
     dotnet["dotnet<br/>(tool update --global)"] --> gem
     gem["gem<br/>(gem update)"] --> flatpak
     flatpak["flatpak<br/>(--user update)"] --> warp
-    warp["warp<br/>(Linux apt-only)"] --> agents
+    warp["warp<br/>(Linux apt-only)"] --> atuin
+    atuin["atuin<br/>(brew or setup.atuin.sh)"] --> agents
     agents["agents<br/>(curl \| bash installers)"] --> plugins
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
 ```

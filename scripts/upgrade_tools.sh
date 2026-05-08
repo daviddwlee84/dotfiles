@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak warp agents plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak warp atuin agents plugins)
 
 usage() {
   cat <<EOF
@@ -137,7 +137,7 @@ while [[ $# -gt 0 ]]; do
       SELECTED=("${ALL_CATEGORIES[@]}")
       shift
       ;;
-    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | warp | agents | plugins)
+    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | warp | atuin | agents | plugins)
       SELECTED+=("$1")
       shift
       ;;
@@ -616,6 +616,36 @@ cat_warp() {
 }
 
 # ============================================================================
+# Category: atuin — shell history (https://atuin.sh)
+# ============================================================================
+# macOS path is covered by `brew upgrade atuin` in cat_brew. This category
+# only does work on Linux, where atuin was installed via the official
+# https://setup.atuin.sh installer (see dot_ansible/roles/atuin/).
+cat_atuin() {
+  if ! command -v atuin >/dev/null 2>&1; then
+    warn "atuin not installed — skipping"
+    return $SKIP_RC
+  fi
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    info "Not Linux — atuin upgraded via brew (cat_brew), skipping"
+    return $SKIP_RC
+  fi
+
+  local any_fail=0
+  # `atuin update` (subcommand) is the upstream-recommended self-upgrade for
+  # installer-based installs. Falls back to re-running the installer.
+  info "Upgrading atuin (Linux, official installer)"
+  if ! _run atuin update; then
+    warn "atuin update failed; falling back to installer re-run"
+    if ! _run_sh 'curl --proto "=https" --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive'; then
+      any_fail=1
+      error "atuin installer re-run failed"
+    fi
+  fi
+  return "$any_fail"
+}
+
+# ============================================================================
 # Category: agents — re-run install.sh for curl-installed CLI tools
 # ============================================================================
 # Only re-runs when the binary is already present. The installers are (by
@@ -836,6 +866,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         gem) run_category gem cat_gem ;;
         flatpak) run_category flatpak cat_flatpak ;;
         warp) run_category warp cat_warp ;;
+        atuin) run_category atuin cat_atuin ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
       esac

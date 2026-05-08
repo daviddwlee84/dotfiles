@@ -50,10 +50,10 @@ and the `tv keybindings` television channel and the `bindings` shell function.
 
 | Key | Widget | Description |
 |-----|--------|-------------|
-| `Ctrl+R` | `fzf-history-widget` | fzf fuzzy history search (overrides ZLE built-in) |
+| `Ctrl+R` | `fzf-history-widget` | fzf fuzzy history search (zsh: stays on fzf for muscle memory; bash: bound to atuin instead) |
 | `Ctrl+P` | `up-line-or-history` | Previous history entry |
 | `Ctrl+N` | `down-line-or-history` | Next history entry |
-| `Alt+R` | `tv-history` | Television-style history search (custom) |
+| `Alt+R` | `_atuin_search_widget` | atuin history TUI (cross-shell binding; same SQLite db as bash's Ctrl+R) |
 
 ### File / directory pickers
 

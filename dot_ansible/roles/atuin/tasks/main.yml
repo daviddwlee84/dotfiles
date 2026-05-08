@@ -1,0 +1,95 @@
+---
+# atuin role - magical shell history (https://atuin.sh)
+#
+# Install only; shell wiring lives in:
+#   - dot_config/zsh/tools/15_atuin.zsh   (Alt+R = atuin search, Ctrl+R untouched)
+#   - dot_bashrc.tmpl                     (atuin init bash --disable-up-arrow)
+#
+# Sync server: NOT configured here. Default install is local-only;
+# see docs/tools/atuin.md for opt-in `atuin register`/`atuin login` flow.
+
+# =============================================================================
+# macOS - via Homebrew
+# =============================================================================
+- name: Install atuin (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: atuin
+    state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu/RedHat) — official installer to ~/.atuin/bin
+# =============================================================================
+#
+# atuin's installer writes the binary into ~/.atuin/bin/atuin. PATH wiring
+# for ~/.atuin/bin happens in dot_config/shell/05_path.sh / 02_legacy_tools.zsh
+# (added below); here we just ensure the binary exists.
+
+- name: Check if atuin is installed (Linux)
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  ansible.builtin.shell: |
+    set -o pipefail
+    command -v atuin || test -x "$HOME/.atuin/bin/atuin"
+  args:
+    executable: /bin/bash
+  register: atuin_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.atuin/bin:{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install atuin via official installer (Linux, user-level — no sudo)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - atuin_check.rc != 0
+  block:
+    - name: Install atuin via setup.atuin.sh (--non-interactive)
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive
+      args:
+        executable: /bin/bash
+      failed_when: false
+      register: atuin_install_result
+      environment:
+        # Suppress the installer's interactive prompts for sync registration
+        # and shell-init injection. We do shell init ourselves via
+        # dot_config/zsh/tools/15_atuin.zsh + dot_bashrc.tmpl.
+        ATUIN_NO_MODIFY_PATH: "1"
+
+    - name: Warn atuin installation failed
+      when:
+        - atuin_install_result.rc is defined
+        - atuin_install_result.rc != 0
+      ansible.builtin.debug:
+        msg: >-
+          atuin installation failed (likely network timeout) — skipping.
+          stdout: {{ atuin_install_result.stdout | default('') | truncate(200) }}
+          stderr: {{ atuin_install_result.stderr | default('') | truncate(200) }}
+
+# =============================================================================
+# Verify post-install (informational)
+# =============================================================================
+
+- name: Verify atuin is on PATH or in ~/.atuin/bin
+  ansible.builtin.shell: |
+    set -o pipefail
+    if command -v atuin >/dev/null 2>&1; then
+      atuin --version
+    elif [ -x "$HOME/.atuin/bin/atuin" ]; then
+      "$HOME/.atuin/bin/atuin" --version
+    else
+      echo "atuin not found"
+      exit 1
+    fi
+  args:
+    executable: /bin/bash
+  register: atuin_version
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.atuin/bin:{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Report atuin version
+  when: atuin_version.rc == 0
+  ansible.builtin.debug:
+    msg: "atuin installed: {{ atuin_version.stdout | trim }}"

@@ -31,6 +31,13 @@ plugins=(
 # from the new path; the zsh path here matches what load_modular_dir sees.
 zvm_after_init() {
     [ -f "$XDG_CONFIG_HOME/shell/10_fzf.sh" ] && source "$XDG_CONFIG_HOME/shell/10_fzf.sh"
+    # atuin Alt+R re-bind — see dot_config/shell/15_atuin.sh
+    # (only the bindkey call needs replaying; atuin init already ran on first source)
+    if (( ${+widgets[_atuin_search_widget]} )); then
+        bindkey -M emacs '\er' _atuin_search_widget
+        bindkey -M viins '\er' _atuin_search_widget
+        bindkey -M vicmd '\er' _atuin_search_widget
+    fi
     # aisuggest trigger (Alt+; default) — see dot_config/zsh/tools/05_aisuggest.zsh
     if (( ${+widgets[aisuggest]} )); then
         bindkey -M viins "${AISUGGEST_KEY:-^[;}" aisuggest

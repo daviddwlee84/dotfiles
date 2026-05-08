@@ -117,6 +117,10 @@ load_modular_dir "$XDG_CONFIG_HOME/shell" sh
 # atuin (history sync) — `--disable-up-arrow` is mandatory when
 # ble.sh is loaded; ble.sh's history navigation owns the up arrow.
 # Ctrl+R still opens atuin's TUI (no conflict).
+# Alt+R is also bound to atuin via dot_config/shell/15_atuin.sh
+# (cross-shell parity with zsh; deferred-bind via PROMPT_COMMAND
+# because __atuin_history is defined by THIS init below, after
+# 15_atuin.sh has already been sourced by load_modular_dir).
 if command -v atuin >/dev/null 2>&1; then
     eval "$(atuin init bash --disable-up-arrow)"
 fi

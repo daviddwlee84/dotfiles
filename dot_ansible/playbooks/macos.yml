@@ -26,6 +26,9 @@
     - role: starship
       tags: [starship]
 
+    - role: atuin
+      tags: [atuin]
+
     - role: neovim
       tags: [neovim]
 

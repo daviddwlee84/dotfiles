@@ -24,11 +24,13 @@ every binding**, opened by a single hotkey.
 Three forgetfulness traps motivate it:
 
 1. **Custom `Alt+*` widgets in this repo** (`Alt+T` tools-picker,
-   `Alt+S` sesh, `Alt+R/P/G/E/A/I` television channels, `Alt+;` aisuggest)
+   `Alt+S` sesh, `Alt+R` atuin, `Alt+P/G/E/A/I` television channels,
+   `Alt+;` aisuggest, `Alt+/` keys-picker)
    — the namespace is dense; new widgets are forgotten within days.
 2. **Plugin overrides** that shadow ZLE built-ins — e.g. `Ctrl+R` is no
-   longer `history-incremental-search-backward`; it's
-   `fzf-history-widget` (and on bash-side it's atuin's TUI).
+   longer `history-incremental-search-backward`; on zsh it's
+   `fzf-history-widget`, on bash it's atuin's TUI (asymmetric on purpose
+   — see [atuin docs](../tools/atuin.md#keybindings-cross-shell-asymmetry--read-this)).
 3. **Built-in editing shortcuts you rarely need until you do** —
    `Ctrl+X Ctrl+E` (open command in `$EDITOR`), `Alt+.` (insert last
    argument of previous command), `Ctrl+_` (undo).
@@ -42,7 +44,7 @@ selected for "frequently forgotten" rather than "every widget exists".
 |---|-------|--------|------------------------|
 | 1 | **ZLE built-in** (emacs keymap) | Ships with zsh | `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Alt+.`, `Ctrl+X Ctrl+E` |
 | 2 | **OMZ / third-party plugins** | `dot_zshrc.tmpl:21-26` (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-vi-mode`) + fzf shell integration | `Ctrl+R` → fzf, `Ctrl+T` → fzf, `Alt+C` → fzf, `End` → autosuggest-accept |
-| 3 | **Custom widgets in this repo** | `dot_config/zsh/tools/{05_aisuggest,11_tools_picker,12_television,22_sesh,13_keys_picker}.zsh` | All `Alt+*` pickers + `Tab`/`→` aisuggest swap |
+| 3 | **Custom widgets in this repo** | `dot_config/zsh/tools/{05_aisuggest,11_tools_picker,12_television,22_sesh,13_keys_picker}.zsh` + `dot_config/shell/15_atuin.sh` | All `Alt+*` pickers + `Tab`/`→` aisuggest swap + `Alt+R` atuin |
 | 4 | **Mode switches (vi)** | `zsh-vi-mode` plugin | Intentionally **not listed** — `Esc` / `i` / `:` are mode transitions, not bindings |
 
 Layer 4 omitted on purpose (per the design spec): listing every

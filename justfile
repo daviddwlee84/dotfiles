@@ -416,6 +416,10 @@ upgrade-flatpak:
 upgrade-warp:
     ./scripts/upgrade_tools.sh warp
 
+# Linux-only: `atuin update` (re-runs setup.atuin.sh on failure). macOS atuin is in upgrade-brew.
+upgrade-atuin:
+    ./scripts/upgrade_tools.sh atuin
+
 # curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:
     ./scripts/upgrade_tools.sh agents

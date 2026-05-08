@@ -228,6 +228,7 @@ nav:
           - Clipboard: tools/clipboard.md
           - XDG: tools/xdg.md
           - Fzf: tools/fzf.md
+          - Atuin (shell history): tools/atuin.md
           - Television (tv): tools/tv.md
           - TV vs fzf: tools/tv-vs-fzf.md
           - Glow (markdown reader): tools/glow.md
