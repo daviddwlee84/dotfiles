@@ -1,0 +1,28 @@
+# 05-privileged.rules — managed by dot_ansible/roles/auditd
+#
+# Logs every execve() of a setuid/setgid binary. Generated and kept in
+# sync with the system's actual setuid binaries by /usr/local/sbin/
+# audit-refresh-privileged.sh? — NO, this file is intentionally a static
+# baseline. The role drops it once; tune per host.
+#
+# To regenerate manually for your host:
+#   sudo find / -xdev -type f \( -perm -4000 -o -perm -2000 \) 2>/dev/null \
+#     | awk '{print "-a always,exit -F path=" $1 " -F perm=x -F auid>=1000 -F auid!=unset -k privileged"}'
+#
+# Below is a conservative starter set of common setuid/setgid binaries
+# present on most Debian/RHEL systems. Missing-binary rules are silently
+# ignored by auditctl, so over-listing is safe.
+
+-a always,exit -F path=/usr/bin/sudo     -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/su       -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/passwd   -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/chsh     -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/chfn     -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/gpasswd  -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/newgrp   -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/mount    -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/umount   -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/crontab  -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/useradd -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/groupadd -F perm=x -F auid>=1000 -F auid!=unset -k privileged

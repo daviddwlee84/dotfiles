@@ -1,0 +1,11 @@
+# 10-execve.rules — managed by dot_ansible/roles/auditd
+#
+# Logs EVERY execve()/execveat() syscall as type=EXECVE with full argv.
+# This produces a lot of audit volume on busy hosts (a `make` invocation
+# can produce thousands of records per minute). Only deployed when the
+# role variable `auditd_log_all_execve: true`.
+#
+# To search:  sudo ausearch -k execve-all --start '1h ago' -i
+
+-a always,exit -F arch=b64 -S execve,execveat -k execve-all
+-a always,exit -F arch=b32 -S execve,execveat -k execve-all

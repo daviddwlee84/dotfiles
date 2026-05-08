@@ -105,3 +105,6 @@
 
     - role: dotnet_tools
       tags: [dotnet_tools]
+
+    - role: auditd
+      tags: [auditd]

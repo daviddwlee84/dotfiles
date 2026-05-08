@@ -258,6 +258,10 @@ TAGS="${TAGS},media_tools"
 {{ if $installDotnetTools -}}
 TAGS="${TAGS},dotnet_tools"
 {{ end -}}
+{{ $installAuditd := false }}{{ if hasKey . "installAuditd" }}{{ $installAuditd = .installAuditd }}{{ end -}}
+{{ if and $installAuditd (eq .chezmoi.os "linux") -}}
+TAGS="${TAGS},auditd"
+{{ end -}}
 
 # Extra vars for role-level configuration
 # primary_shell is read by both the zsh role (gates chsh-to-zsh) and the

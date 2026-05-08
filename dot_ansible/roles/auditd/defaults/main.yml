@@ -1,0 +1,21 @@
+---
+# auditd role defaults
+
+# When true, the final rule appended to /etc/audit/rules.d/99-finalize.rules
+# is `-e 2`, which makes the running rule set immutable until reboot. Useful
+# for hardened production boxes; leave false during initial tuning so you
+# can `auditctl -d` and reload rules without rebooting.
+auditd_immutable: false
+
+# When true, also drop /etc/audit/rules.d/10-execve.rules with broad
+# execve/execveat logging for both 32- and 64-bit syscalls. Very high
+# event volume on busy hosts — leave false unless you've sized
+# /var/log/audit/ accordingly.
+auditd_log_all_execve: false
+
+# auditd.conf knobs the role manages. Conservative defaults; tune per host.
+auditd_max_log_file_mb: 50          # rotate at 50 MB
+auditd_num_logs: 8                  # keep 8 rotated files (~400 MB)
+auditd_space_left_mb: 200           # warn when /var/log/audit/ has < 200 MB free
+auditd_space_left_action: "syslog"  # syslog | email | exec | suspend | single | halt
+auditd_disk_full_action: "syslog"   # same vocabulary; "halt" panics the kernel

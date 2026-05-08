@@ -1,0 +1,36 @@
+# 00-baseline.rules — managed by dot_ansible/roles/auditd
+# See docs/sysadmin/auditd.md and docs/playbooks/auditd.md.
+#
+# Rule keys (use with `ausearch -k <key>` or `audit-execve` / `audit-file`):
+#   identity       — /etc/passwd, /etc/group, /etc/shadow, /etc/gshadow
+#   sudoers        — /etc/sudoers and /etc/sudoers.d/
+#   sshd_config    — /etc/ssh/sshd_config
+#   audit_config   — /etc/audit/ (the audit config itself)
+#   privileged     — every execve of a setuid/setgid binary
+#   time-change    — adjtimex / settimeofday / clock_settime / stime
+#   access-denied  — EACCES / EPERM on production paths
+
+# Identity changes: who edited /etc/passwd & friends?
+-w /etc/passwd  -p wa -k identity
+-w /etc/group   -p wa -k identity
+-w /etc/shadow  -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+
+# Sudoers — any change is significant
+-w /etc/sudoers   -p wa -k sudoers
+-w /etc/sudoers.d -p wa -k sudoers
+
+# SSH daemon config
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+
+# Audit framework config — watching the watcher
+-w /etc/audit/  -p wa -k audit_config
+-w /etc/libaudit.conf -p wa -k audit_config
+
+# Time changes (clock-skew abuse, log-evasion)
+-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change
+-a always,exit -F arch=b32 -S adjtimex,settimeofday,clock_settime,stime -k time-change
+
+# Access-denied on production directories (failed reads/writes / EPERM / EACCES)
+-a always,exit -F arch=b64 -S open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access-denied
+-a always,exit -F arch=b64 -S open,openat,truncate,ftruncate -F exit=-EPERM  -F auid>=1000 -F auid!=unset -k access-denied

@@ -1,0 +1,184 @@
+---
+# auditd role — install + baseline rules + auditd.conf tuning
+# See docs/playbooks/auditd.md and docs/sysadmin/auditd.md.
+#
+# This role is a no-op on macOS (no auditd; macOS uses Endpoint Security)
+# and on hosts where the user opted out via the `installAuditd` chezmoi
+# prompt — the prompt gates whether the `auditd` tag is included in the
+# ansible run at all (see .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl).
+
+- name: Skip auditd role on non-Linux
+  when: ansible_facts["os_family"] not in ["Debian", "RedHat"]
+  ansible.builtin.meta: end_play
+
+# -----------------------------------------------------------------------------
+# Install
+# -----------------------------------------------------------------------------
+
+- name: Install auditd (Debian / Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  ansible.builtin.apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [sudo]
+
+- name: Install audit (RHEL / CentOS / Rocky / Alma)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  ansible.builtin.dnf:
+    name:
+      - audit
+    state: present
+  tags: [sudo]
+
+# -----------------------------------------------------------------------------
+# Rules
+# -----------------------------------------------------------------------------
+
+- name: Ensure /etc/audit/rules.d exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/audit/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [sudo]
+
+- name: Drop baseline audit rules (00-baseline.rules)
+  become: true
+  ansible.builtin.copy:
+    src: 00-baseline.rules
+    dest: /etc/audit/rules.d/00-baseline.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Reload audit rules
+  tags: [sudo]
+
+- name: Drop privileged-binary audit rules (05-privileged.rules)
+  become: true
+  ansible.builtin.copy:
+    src: 05-privileged.rules
+    dest: /etc/audit/rules.d/05-privileged.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Reload audit rules
+  tags: [sudo]
+
+- name: Drop full execve logging (10-execve.rules) — opt-in
+  become: true
+  ansible.builtin.copy:
+    src: 10-execve.rules
+    dest: /etc/audit/rules.d/10-execve.rules
+    owner: root
+    group: root
+    mode: "0640"
+  when: auditd_log_all_execve | bool
+  notify: Reload audit rules
+  tags: [sudo]
+
+- name: Remove full execve rules when not opted in
+  become: true
+  ansible.builtin.file:
+    path: /etc/audit/rules.d/10-execve.rules
+    state: absent
+  when: not (auditd_log_all_execve | bool)
+  notify: Reload audit rules
+  tags: [sudo]
+
+- name: Drop finalize rule (-e 2 immutability) — opt-in
+  become: true
+  ansible.builtin.copy:
+    content: |
+      # 99-finalize.rules — make rule set immutable until next reboot.
+      # Toggled via auditd_immutable role variable.
+      -e 2
+    dest: /etc/audit/rules.d/99-finalize.rules
+    owner: root
+    group: root
+    mode: "0640"
+  when: auditd_immutable | bool
+  notify: Reload audit rules
+  tags: [sudo]
+
+- name: Remove finalize rule when not immutable
+  become: true
+  ansible.builtin.file:
+    path: /etc/audit/rules.d/99-finalize.rules
+    state: absent
+  when: not (auditd_immutable | bool)
+  notify: Reload audit rules
+  tags: [sudo]
+
+# -----------------------------------------------------------------------------
+# auditd.conf tuning (rotation / disk-full behaviour)
+# -----------------------------------------------------------------------------
+
+- name: Tune auditd.conf — max_log_file
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^max_log_file\\s*="
+    line: "max_log_file = {{ auditd_max_log_file_mb }}"
+    state: present
+  notify: Restart auditd
+  tags: [sudo]
+
+- name: Tune auditd.conf — num_logs
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^num_logs\\s*="
+    line: "num_logs = {{ auditd_num_logs }}"
+    state: present
+  notify: Restart auditd
+  tags: [sudo]
+
+- name: Tune auditd.conf — space_left
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^space_left\\s*="
+    line: "space_left = {{ auditd_space_left_mb }}"
+    state: present
+  notify: Restart auditd
+  tags: [sudo]
+
+- name: Tune auditd.conf — space_left_action
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^space_left_action\\s*="
+    line: "space_left_action = {{ auditd_space_left_action }}"
+    state: present
+  notify: Restart auditd
+  tags: [sudo]
+
+- name: Tune auditd.conf — disk_full_action
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^disk_full_action\\s*="
+    line: "disk_full_action = {{ auditd_disk_full_action }}"
+    state: present
+  notify: Restart auditd
+  tags: [sudo]
+
+# -----------------------------------------------------------------------------
+# Service
+# -----------------------------------------------------------------------------
+
+- name: Enable + start auditd service
+  become: true
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+  tags: [sudo]

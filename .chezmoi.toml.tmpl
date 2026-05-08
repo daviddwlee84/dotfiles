@@ -75,6 +75,10 @@ installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-
 installMediaTools = {{ promptBoolOnce . "installMediaTools" "Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)" false }}
 # 是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
+# 是否安裝 Linux Audit framework (auditd) + 基準規則集（identity / sudoers /
+# sshd_config / privileged-exec watch）。Linux only；macOS 自動跳過。
+# 詳見 docs/sysadmin/auditd.md 與 docs/playbooks/auditd.md。
+installAuditd = {{ promptBoolOnce . "installAuditd" "Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches) — Linux only" false }}
 # 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
 noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
 # 在 chezmoi apply 之前備份現有的 dotfiles。
