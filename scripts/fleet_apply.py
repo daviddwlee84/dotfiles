@@ -696,11 +696,88 @@ async def run_one_local(
                     stderr_lines.append(text)
 
         async with asyncio.timeout(command_timeout):
-            await asyncio.gather(
-                _drain(proc.stdout, "out"),  # type: ignore[arg-type]
-                _drain(proc.stderr, "err"),  # type: ignore[arg-type]
-                proc.wait(),
+            # Spawn the three coroutines but key the wait on a kill -0 poll —
+            # NOT on proc.wait() OR an asyncio.gather of all three. Reason:
+            # chezmoi's run_onchange_* scripts (ansible, brew bundle, mas,
+            # etc.) routinely leave background children that inherit our
+            # stdout/stderr fds and outlive their parent script.
+            #
+            # Two layers of asyncio quirk make this tricky:
+            #   1. asyncio.gather(_drain, _drain, proc.wait) blocks because
+            #      _drain waits on stream EOF, which only fires when ALL fd
+            #      holders close — orphan grandchildren never close ours.
+            #   2. proc.wait() ALONE also blocks: asyncio's
+            #      BaseSubprocessTransport._try_finish only fires
+            #      _process_exited when proc.returncode is set AND all
+            #      stdin/stdout/stderr pipes are closed. So even
+            #      `await proc.wait()` waits for the orphans.
+            #
+            # Workaround: poll `os.kill(pid, 0)` (signal 0 = existence check,
+            # doesn't actually signal) at 100ms intervals. When that throws
+            # ProcessLookupError, chezmoi itself is gone — the orphans are
+            # someone else's problem. We don't waitpid() directly because
+            # asyncio's child watcher owns the zombie reap.
+            #
+            # See pitfalls/fleet-apply-self-stuck-running.md for the full
+            # debugging story including the failed first-fix attempt.
+            stdout_task = asyncio.create_task(_drain(proc.stdout, "out"))  # type: ignore[arg-type]
+            stderr_task = asyncio.create_task(_drain(proc.stderr, "err"))  # type: ignore[arg-type]
+
+            async def _wait_for_chezmoi_exit() -> None:
+                while True:
+                    try:
+                        os.kill(proc.pid, 0)
+                        await asyncio.sleep(0.1)
+                    except ProcessLookupError:
+                        # chezmoi is gone. Give asyncio's watcher up to 5s to
+                        # set returncode (it'll do so once the SIGCHLD fires
+                        # and the child watcher reaps).
+                        for _ in range(50):
+                            if proc.returncode is not None:
+                                return
+                            await asyncio.sleep(0.1)
+                        return
+
+            # Phase 1: wait for chezmoi itself to exit (not the orphans).
+            await _wait_for_chezmoi_exit()
+            # Phase 2: give drains a short grace period to flush any
+            # buffered output that's already in flight, then cancel them.
+            # 5s is enough for any sane buffer; orphan-held pipes will
+            # never EOF so we MUST cancel rather than wait.
+            grace = 5.0
+            done, pending = await asyncio.wait(
+                [stdout_task, stderr_task],
+                timeout=grace,
+                return_when=asyncio.ALL_COMPLETED,
             )
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+                # Note for future debugging: if pending is non-empty,
+                # an orphan child of chezmoi is holding our pipes open.
+                # Most common offenders on macOS: brew bundle, mas
+                # install, ansible homebrew tasks. Use lsof -p $$ |
+                # grep -i pipe + pgrep -af 'brew|mas|ansible' to find
+                # them. This is benign — chezmoi's exit code is correct.
+                log_fp.write(
+                    f"\n# fleet-apply: {len(pending)} stream(s) still open "
+                    f"{grace}s after chezmoi exit (orphan child holding "
+                    f"stdout/stderr fds — see pitfalls/"
+                    f"fleet-apply-self-stuck-running.md). Output below "
+                    f"this point may be truncated.\n"
+                )
+            # If asyncio still hasn't set returncode (very rare — child
+            # watcher race), reap manually so status.rc isn't None.
+            if proc.returncode is None:
+                try:
+                    pid, raw_status = os.waitpid(proc.pid, os.WNOHANG)
+                    if pid != 0 and hasattr(proc, "_transport"):
+                        proc._transport._returncode = (  # type: ignore[attr-defined]
+                            os.waitstatus_to_exitcode(raw_status)
+                        )
+                except (ChildProcessError, AttributeError, OSError):
+                    pass
         status.rc = proc.returncode or 0
         if status.rc == 0:
             status.state = "done"
