@@ -1296,9 +1296,12 @@ def cli(
                 "Pre-flight readiness probe (`just fleet-status`). Connects "
                 "to each selected host once and reports per-host state — "
                 "would `fleet-apply` succeed right now? States: up-to-date, "
-                "ready-to-update, behind, drift, dirty, busy, toml-mismatch "
+                "ready-to-update, behind, drift, dirty, busy, "
+                "init-in-progress (chezmoi update/apply/init mid-flight), "
+                "toml-mismatch "
                 "(NEW prompt keys not yet answered — the david_ubuntu "
-                "failure mode), not-init, no-chezmoi, unreachable. Read-only; "
+                "failure mode), not-init, no-source, no-chezmoi, "
+                "unreachable. Read-only; "
                 "always exits 0 (use --readiness-json for scripting). Pair "
                 "with --hosts to scope. Cheaper than --dry-run (no full "
                 "chezmoi diff) and more actionable than --status (which "
@@ -1514,7 +1517,7 @@ _STATUS_PROBE_CMD = (
     "        '{ pid=$1; if (pid==self || pid==parent) next; "
     "           $1=\"\"; sub(/^ /, \"\"); "
     "           if ($0 ~ /ansible-playbook/) { print pid; next } "
-    "           if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/)) { print pid } }' "
+    "           if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/ || $0 ~ / init/)) { print pid } }' "
     "  | paste -sd, - || true); "
     # 2) Find the most recent run log + sentinel.
     "_dir=\"$HOME/.cache/chezmoi-fleet/logs\"; "
@@ -1603,10 +1606,12 @@ def _probe_local() -> tuple[dict, str]:
             if len(parts) != 2:
                 continue
             pid_s, cmd = parts
-            # Positive match: chezmoi running update/apply, OR ansible-playbook.
+            # Positive match: chezmoi running update/apply/init, OR ansible-playbook.
             if "ansible-playbook" in cmd:
                 pid_list.append(pid_s)
-            elif "chezmoi" in cmd and (" update" in cmd or " apply" in cmd):
+            elif "chezmoi" in cmd and (
+                " update" in cmd or " apply" in cmd or " init" in cmd
+            ):
                 pid_list.append(pid_s)
     except FileNotFoundError:
         pass
@@ -1858,6 +1863,24 @@ def _build_readiness_probe_cmd(no_fetch: bool) -> str:
         #    installed.
         '_src=$("$_cz" --no-pager source-path 2>/dev/null); '
         'if [ -z "$_src" ] || [ ! -d "$_src/.git" ]; then '
+        # Before declaring permanent `no-source`, check whether a chezmoi
+        # apply/update/init is *actively* running on this host. If yes, the
+        # source dir absence is transient (mid-clone, mid-init, or paused at
+        # an interactive prompt in another SSH session) and the host is
+        # really `init-in-progress`, not `no-source`. Same self-exclusion
+        # strategy as the main busy probe below.
+        '  _self_pid=$$; '
+        '  _parent_pid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " "); '
+        '  _busy_pids=$(pgrep -u "$(id -un)" -lf "chezmoi|ansible-playbook" 2>/dev/null '
+        '    | awk -v self="$_self_pid" -v parent="$_parent_pid" '
+        '          \'{ pid=$1; if (pid==self || pid==parent) next; '
+        '             $1=""; sub(/^ /, ""); '
+        '             if ($0 ~ /ansible-playbook/) { print pid; next } '
+        '             if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/ || $0 ~ / init/)) { print pid } }\' '
+        '    | paste -sd, - || true); '
+        '  if [ -n "$_busy_pids" ]; then '
+        '    printf "STATE=init-in-progress\\nBUSY_PIDS=%s\\nSOURCE_PATH=%s\\n" "$_busy_pids" "${_src:-}"; exit 0; '
+        '  fi; '
         '  printf "STATE=no-source\\nSOURCE_PATH=%s\\n" "${_src:-}"; exit 0; '
         'fi; '
         'printf "SOURCE_PATH=%s\\n" "$_src"; '
@@ -1888,7 +1911,7 @@ def _build_readiness_probe_cmd(no_fetch: bool) -> str:
         '\'{ pid=$1; if (pid==self || pid==parent) next; '
         '   $1=""; sub(/^ /, ""); '
         '   if ($0 ~ /ansible-playbook/) { print pid; next } '
-        '   if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/)) { print pid } }\' '
+        '   if ($0 ~ /chezmoi/ && ($0 ~ / update/ || $0 ~ / apply/ || $0 ~ / init/)) { print pid } }\' '
         '  | paste -sd, - || true); '
         'printf "BUSY_PIDS=%s\\n" "${_pids:-}"; '
         # 6) chezmoi status — drift detection. Empty output = clean.
@@ -1960,8 +1983,16 @@ def _classify_readiness(
     """Map probe fields → (primary state, list of secondary notes).
 
     Priority order (most actionable first):
-      unreachable > no-chezmoi > not-init > no-source > toml-mismatch
-        > busy > dirty > drift > behind > ahead > ready-to-update > up-to-date
+      unreachable > no-chezmoi > not-init > init-in-progress > no-source
+        > toml-mismatch > busy > dirty > drift > behind > ahead
+        > ready-to-update > up-to-date
+
+    `init-in-progress` outranks `no-source` because the former is a
+    transient state (chezmoi is mid-clone or paused at an interactive
+    prompt) while the latter is a permanent failure that needs human
+    intervention. The probe's SSH script promotes `no-source` ⇒
+    `init-in-progress` if it sees an active chezmoi update/apply/init
+    PID; we just trust that signal here.
 
     Secondary notes carry context the primary state hides (e.g. a
     `behind` host with drift will show "drift: 2 files" in notes).
@@ -1971,6 +2002,11 @@ def _classify_readiness(
     # Hard blockers (early exit from probe → only STATE field set).
     state = fields.get("STATE", "")
     if state in {"no-chezmoi", "not-init", "no-source"}:
+        return state, notes
+    if state == "init-in-progress":
+        busy_pids = fields.get("BUSY_PIDS") or ""
+        if busy_pids:
+            notes.append(f"pids={busy_pids}")
         return state, notes
 
     # toml-mismatch: prompt keys present in template but missing on remote.
@@ -2105,6 +2141,40 @@ def _probe_readiness_local(no_fetch: bool) -> tuple[dict[str, str], list[str]]:
             # "no source" diagnosis. Promote to its own state for clarity.
             fields["STATE"] = "busy"
             fields["BUSY_PIDS"] = "chezmoi-state-locked"
+        else:
+            # Source missing AND no state lock — could still be transient
+            # if a chezmoi update/apply/init is mid-clone. Promote to
+            # init-in-progress in that case (mirrors the SSH probe's
+            # logic). See pitfall: david_ubuntu was running
+            # `chezmoi update --init` paused at an interactive prompt.
+            try:
+                r = subprocess.run(
+                    ["pgrep", "-u", str(os.getuid()), "-lf",
+                     "chezmoi|ansible-playbook"],
+                    capture_output=True, text=True, check=False, timeout=5,
+                )
+                own = {os.getpid(), os.getppid()}
+                in_progress: list[str] = []
+                for line in r.stdout.splitlines():
+                    parts = line.split(None, 1)
+                    if len(parts) != 2:
+                        continue
+                    try:
+                        pid_i = int(parts[0])
+                    except ValueError:
+                        continue
+                    if pid_i in own:
+                        continue
+                    cmd = parts[1]
+                    if "chezmoi" in cmd and (
+                        " update" in cmd or " apply" in cmd or " init" in cmd
+                    ):
+                        in_progress.append(parts[0])
+                if in_progress:
+                    fields["STATE"] = "init-in-progress"
+                    fields["BUSY_PIDS"] = ",".join(in_progress)
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                pass
         return fields, drift
     fields["SOURCE_PATH"] = src
     if locked:
@@ -2170,7 +2240,9 @@ def _probe_readiness_local(no_fetch: bool) -> tuple[dict[str, str], list[str]]:
                 continue
             if "ansible-playbook" in cmd:
                 pid_list.append(pid_s)
-            elif "chezmoi" in cmd and (" update" in cmd or " apply" in cmd):
+            elif "chezmoi" in cmd and (
+                " update" in cmd or " apply" in cmd or " init" in cmd
+            ):
                 pid_list.append(pid_s)
     except FileNotFoundError:
         pass
@@ -2206,6 +2278,7 @@ _READINESS_STYLE: dict[str, tuple[str, str]] = {
     "drift":           ("⚠", "yellow"),
     "dirty":           ("⚠", "yellow"),
     "busy":            ("⏳", "yellow"),
+    "init-in-progress":("⏳", "yellow"),
     "toml-mismatch":   ("!", "yellow bold"),
     "not-init":        ("✗", "red"),
     "no-source":       ("✗", "red"),
@@ -2224,6 +2297,7 @@ _READINESS_HINT: dict[str, str] = {
     "dirty":         "ssh in & commit/stash uncommitted changes in the source dir before applying",
     "ahead":         "ssh in: source dir has unpushed local commits — `git push` or reset before applying",
     "busy":          "wait for the running run, OR `just fleet-apply-status --hosts HOST` for live state",
+    "init-in-progress": "chezmoi is initializing the source dir (or paused at an interactive prompt in another SSH session) — wait or `ssh HOST` to check",
     "behind":        "`just fleet-apply --hosts HOST` (or whole fleet)",
     "ready-to-update": "`just fleet-apply --hosts HOST` (or whole fleet)",
     "unreachable":   "check ssh_alias / network / sudo / 1Password agent",
@@ -2363,8 +2437,8 @@ def _run_readiness(
         console.print("\n[bold]Hints:[/]")
         # Stable order: most-blocking states first.
         priority = [
-            "unreachable", "no-chezmoi", "not-init", "no-source",
-            "toml-mismatch", "busy", "dirty", "ahead", "drift",
+            "unreachable", "no-chezmoi", "not-init", "init-in-progress",
+            "no-source", "toml-mismatch", "busy", "dirty", "ahead", "drift",
             "behind", "ready-to-update",
         ]
         for state in priority:
