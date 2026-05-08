@@ -47,11 +47,11 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ls` | alias | `dot_config/zsh/tools/26_eza.zsh` | Compact listing with icons, colors, git status |
-| `la` | alias | `dot_config/zsh/tools/26_eza.zsh` | Long listing including hidden files, sorted dirs-first |
-| `ll` | alias | `dot_config/zsh/tools/26_eza.zsh` | Long listing, sorted dirs-first (no hidden files) |
-| `lt` | alias | `dot_config/zsh/tools/26_eza.zsh` | Tree view, 2 levels deep |
-| `llt` | alias | `dot_config/zsh/tools/26_eza.zsh` | Long tree view, 3 levels deep |
+| `ls` | alias | `dot_config/shell/26_eza.sh` | Compact listing with icons, colors, git status |
+| `la` | alias | `dot_config/shell/26_eza.sh` | Long listing including hidden files, sorted dirs-first |
+| `ll` | alias | `dot_config/shell/26_eza.sh` | Long listing, sorted dirs-first (no hidden files) |
+| `lt` | alias | `dot_config/shell/26_eza.sh` | Tree view, 2 levels deep |
+| `llt` | alias | `dot_config/shell/26_eza.sh` | Long tree view, 3 levels deep |
 
 ---
 
@@ -73,7 +73,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 |---------|------|-------------|-------------|
 | `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"` (replace message) |
 | `gundo` | function | `dot_config/shell/10_aliases.sh` | Undo last commit → back to staged; prints undone commit message |
-| `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | Open lazygit TUI |
+| `lg` | alias | `dot_config/shell/37_lazygit.sh` | Open lazygit TUI |
 
 ### oh-my-zsh git plugin
 
@@ -494,10 +494,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cbu` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | Claude Code CLI usage stats (`codexbar usage --provider claude --source cli`) |
-| `cbc` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | Claude Code cost breakdown (`codexbar cost --provider claude`) |
-| `cbca` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | Cost breakdown across all providers (`codexbar cost`) |
-| `ccusage` | alias | `dot_config/zsh/tools/07_bunx_cli.zsh` | Claude Code usage tracker via `bunx ccusage` |
+| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code CLI usage stats (`codexbar usage --provider claude --source cli`) |
+| `cbc` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code cost breakdown (`codexbar cost --provider claude`) |
+| `cbca` | alias | `dot_config/shell/40_codexbar.sh` | Cost breakdown across all providers (`codexbar cost`) |
+| `ccusage` | alias | `dot_config/shell/07_bunx_cli.sh` | Claude Code usage tracker via `bunx ccusage` |
 
 ---
 

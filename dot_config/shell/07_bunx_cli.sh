@@ -1,4 +1,4 @@
-# 07_bunx_cli.zsh - bunx CLI tool aliases
+# 07_bunx_cli.sh - bunx CLI tool aliases (shared by zsh/bash)
 # These tools run via bunx (Bun's package runner)
 
 # ccusage - Claude Code usage tracker

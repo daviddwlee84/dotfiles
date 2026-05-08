@@ -68,7 +68,7 @@ Last 30 days: $8.50 · 9.1M tokens
 
 ## Shell aliases
 
-定義於 `~/.config/zsh/tools/40_codexbar.zsh`：
+定義於 `~/.config/shell/40_codexbar.sh`：
 
 | Alias | 命令 | 說明 |
 |-------|---------|-------------|

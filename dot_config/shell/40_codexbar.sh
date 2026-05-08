@@ -1,4 +1,4 @@
-# 40_codexbar.zsh - CodexBar CLI aliases (AI usage tracker)
+# 40_codexbar.sh - CodexBar CLI aliases (AI usage tracker; shared by zsh/bash)
 
 # Check if codexbar is installed
 command -v codexbar &>/dev/null || return 0

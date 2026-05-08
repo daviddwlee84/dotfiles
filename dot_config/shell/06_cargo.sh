@@ -1,4 +1,4 @@
-# 06_cargo.zsh - Cargo (Rust) bin path
+# 06_cargo.sh - Cargo (Rust) bin path (shared by zsh/bash via dot_config/shell/)
 # cargo install places binaries in ~/.cargo/bin
 
 # Add cargo bin to PATH if it exists

@@ -25,3 +25,11 @@ once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 .config/zsh/tools/27_thefuck.zsh
 .config/zsh/tools/30_direnv.zsh
 .config/zsh/tools/10_fzf.zsh
+.config/zsh/tools/06_cargo.zsh
+.config/zsh/tools/07_bunx_cli.zsh
+.config/zsh/tools/25_bat.zsh
+.config/zsh/tools/26_eza.zsh
+.config/zsh/tools/29_marimo.zsh
+.config/zsh/tools/34_openclaw.zsh
+.config/zsh/tools/37_lazygit.zsh
+.config/zsh/tools/40_codexbar.zsh

@@ -48,11 +48,11 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ls` | alias | `dot_config/zsh/tools/26_eza.zsh` | 緊湊列表，含圖示、顏色、git 狀態 |
-| `la` | alias | `dot_config/zsh/tools/26_eza.zsh` | 長列表，含隱藏檔，目錄優先排序 |
-| `ll` | alias | `dot_config/zsh/tools/26_eza.zsh` | 長列表，目錄優先排序（不含隱藏檔） |
-| `lt` | alias | `dot_config/zsh/tools/26_eza.zsh` | 樹狀檢視，2 層深 |
-| `llt` | alias | `dot_config/zsh/tools/26_eza.zsh` | 長樹狀檢視，3 層深 |
+| `ls` | alias | `dot_config/shell/26_eza.sh` | 緊湊列表，含圖示、顏色、git 狀態 |
+| `la` | alias | `dot_config/shell/26_eza.sh` | 長列表，含隱藏檔，目錄優先排序 |
+| `ll` | alias | `dot_config/shell/26_eza.sh` | 長列表，目錄優先排序（不含隱藏檔） |
+| `lt` | alias | `dot_config/shell/26_eza.sh` | 樹狀檢視，2 層深 |
+| `llt` | alias | `dot_config/shell/26_eza.sh` | 長樹狀檢視，3 層深 |
 
 ---
 
@@ -74,7 +74,7 @@
 |---------|------|-------------|-------------|
 | `gcam-amend` | function | `dot_config/shell/10_aliases.sh` | `git commit --amend -m "<msg>"`（取代訊息） |
 | `gundo` | function | `dot_config/shell/10_aliases.sh` | 還原最後一次 commit → 回到 staged；印出已還原的 commit 訊息 |
-| `lg` | alias | `dot_config/zsh/tools/37_lazygit.zsh` | 開啟 lazygit TUI |
+| `lg` | alias | `dot_config/shell/37_lazygit.sh` | 開啟 lazygit TUI |
 
 ### oh-my-zsh git 外掛
 
@@ -495,10 +495,10 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `cbu` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | Claude Code CLI 使用統計 (`codexbar usage --provider claude --source cli`) |
-| `cbc` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | Claude Code 成本明細 (`codexbar cost --provider claude`) |
-| `cbca` | alias | `dot_config/zsh/tools/40_codexbar.zsh` | 跨所有 provider 的成本明細 (`codexbar cost`) |
-| `ccusage` | alias | `dot_config/zsh/tools/07_bunx_cli.zsh` | 透過 `bunx ccusage` 的 Claude Code 用量追蹤 |
+| `cbu` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code CLI 使用統計 (`codexbar usage --provider claude --source cli`) |
+| `cbc` | alias | `dot_config/shell/40_codexbar.sh` | Claude Code 成本明細 (`codexbar cost --provider claude`) |
+| `cbca` | alias | `dot_config/shell/40_codexbar.sh` | 跨所有 provider 的成本明細 (`codexbar cost`) |
+| `ccusage` | alias | `dot_config/shell/07_bunx_cli.sh` | 透過 `bunx ccusage` 的 Claude Code 用量追蹤 |
 
 ---
 

@@ -1,4 +1,4 @@
-# 25_bat.zsh - bat configuration
+# 25_bat.sh - bat configuration (shared by zsh/bash)
 
 # Check if bat is installed
 command -v bat &>/dev/null || return 0

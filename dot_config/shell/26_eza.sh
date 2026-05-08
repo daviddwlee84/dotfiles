@@ -1,4 +1,4 @@
-# 26_eza.zsh - eza configuration (modern ls replacement)
+# 26_eza.sh - eza configuration (modern ls replacement; shared by zsh/bash)
 
 # Check if eza is installed
 command -v eza &>/dev/null || return 0
