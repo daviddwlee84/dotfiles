@@ -168,7 +168,7 @@ PROMPTS: tuple[Prompt, ...] = (
            "Linux audit framework (auditd)",
            "Installs auditd + a baseline rule set (identity / sudoers / sshd_config / privileged-exec watches). Linux only — no-op on macOS. See docs/sysadmin/auditd.md.",
            default=False,
-           prompt_text="Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches) — Linux only"),
+           prompt_text="Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches)"),
     Prompt("installIacTools", "bool", "Dev tooling",
            "Infrastructure-as-Code tools",
            "Azure CLI, Terraform, OpenTofu.",

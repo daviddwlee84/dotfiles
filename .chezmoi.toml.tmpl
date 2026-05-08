@@ -76,9 +76,14 @@ installMediaTools = {{ promptBoolOnce . "installMediaTools" "Install media/AV CL
 # 是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
 # 是否安裝 Linux Audit framework (auditd) + 基準規則集（identity / sudoers /
-# sshd_config / privileged-exec watch）。Linux only；macOS 自動跳過。
+# sshd_config / privileged-exec watch）。Linux only — macOS 自動跳過（macOS 用
+# OpenBSM，不是 auditd），所以在 darwin 上不問也直接 false。
 # 詳見 docs/sysadmin/auditd.md 與 docs/playbooks/auditd.md。
-installAuditd = {{ promptBoolOnce . "installAuditd" "Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches) — Linux only" false }}
+{{ if eq .chezmoi.os "linux" -}}
+installAuditd = {{ promptBoolOnce . "installAuditd" "Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches)" false }}
+{{ else -}}
+installAuditd = false
+{{ end -}}
 # 沒有 sudo/root 權限，只安裝 user-level 工具 (mise, cargo, gem, uv, npm)
 noRoot = {{ promptBoolOnce . "noRoot" "No sudo/root access - skip all system package installations" false }}
 # 在 chezmoi apply 之前備份現有的 dotfiles。
