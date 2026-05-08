@@ -130,6 +130,33 @@ atuin import bash
 
 `just upgrade-all` 透過分類分派 (categorised dispatch) 同時涵蓋兩者。
 
+## 管理員可見性與審計邊界
+
+Atuin 是個人 shell history 工具，不是 server audit 系統。
+
+啟用 sync 時，Atuin 把 end-to-end 加密的 history 上傳到 sync server。
+Server operator 應該無法檢視 user 的命令歷史，因為加密金鑰不離開使用者
+機器。本機上特權管理員可能可以讀其他 user 的 shell history 檔或 Atuin
+DB，但那些紀錄是 user-space 便利資料，不是可靠的審計證據 — 該檔由 user
+擁有，可刪可改。
+
+傳統 shell history 對審計更不可靠。User 可改 `HISTFILE`、停用持久化、用
+`HISTIGNORE`/`HISTCONTROL` 過濾、或 `set +o history`。History 檔還可能
+因多 session race、延遲 flush、截斷、手動編輯而不完整。
+
+多 user server 的運維審計請改用系統級資料源：
+
+- 登入 / session 紀錄：`last`、`lastlog`、`journalctl _COMM=sshd`、
+  `/var/log/auth.log` (Debian) 或 `/var/log/secure` (RHEL)。
+- 提權：`journalctl _COMM=sudo`、sudoreplay (有設定時)。
+- Process accounting：`acct` / `psacct`、`lastcomm`。
+- Linux audit framework：`auditd` + `auditctl` + `ausearch` +
+  `aureport`。
+
+完整 audit 來源導覽含對照表、helper、和可選的 `auditd` ansible role，請見
+[**系統管理 → Atuin vs audit**](../sysadmin/atuin-vs-audit.md) 與
+[審計層級概觀](../sysadmin/README.md)。
+
 ## 相關
 
 - [Zsh keybindings & keys-picker](../shells/keybindings.md) — 完整的 repo

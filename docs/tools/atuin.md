@@ -132,6 +132,41 @@ Run on each host once. Idempotent — re-running won't duplicate entries.
 
 `just upgrade-all` covers both via the categorised dispatch.
 
+## Admin visibility and audit boundaries
+
+Atuin is a personal shell history tool, not a server audit system.
+
+If sync is enabled, Atuin uploads end-to-end encrypted history to the
+sync server. The server operator should not be able to inspect users'
+command history because synced history is encrypted with a key that
+never leaves the user's machine. On the local machine, a privileged
+administrator may be able to inspect a user's shell history files or
+Atuin database, but those records are user-space convenience data, not
+reliable audit evidence — the user owns the file and can delete or
+edit it.
+
+Traditional shell history is even more unreliable for auditing. Users
+can change `HISTFILE`, disable history persistence, filter entries with
+`HISTIGNORE`/`HISTCONTROL`, or use `set +o history`. History files can
+also be incomplete because of multi-session race conditions, delayed
+flushing, truncation, or manual edits.
+
+For operational auditing on a multi-user server, use system-level data
+sources instead:
+
+- Login / session records: `last`, `lastlog`, `journalctl _COMM=sshd`,
+  `/var/log/auth.log` (Debian) or `/var/log/secure` (RHEL).
+- Privilege escalation: `journalctl _COMM=sudo`, sudoreplay (when
+  configured).
+- Process accounting: `acct` / `psacct`, `lastcomm`.
+- Linux audit framework: `auditd` + `auditctl` + `ausearch` +
+  `aureport`.
+
+For the full audit-source tour with comparison tables, helpers, and the
+opt-in `auditd` ansible role, see
+[**System admin → Atuin vs audit**](../sysadmin/atuin-vs-audit.md) and
+the [audit hierarchy overview](../sysadmin/README.md).
+
 ## Related
 
 - [Zsh keybindings & keys-picker](../shells/keybindings.md) — full repo-wide

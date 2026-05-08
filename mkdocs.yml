@@ -60,12 +60,22 @@ plugins:
             Home: 首頁
             Playbooks: 工作流程
             Tools: 工具
+            "System admin": 系統管理
             Repo Internals: 本 Repo 內部
             Infrastructure: 基礎建設
             Tutorials: 教學
             Input methods: 輸入法
             Misc: 雜項
             For Maintainers: 給維護者
+            # System admin subsections / leaves
+            Overview (audit hierarchy): 概觀（審計層級）
+            Sessions and login (Level 0): Session 與登入 (Level 0)
+            sudo auditing (Level 1): sudo 審計 (Level 1)
+            Process accounting (Level 2): Process accounting (Level 2)
+            auditd framework (Level 3): auditd 框架 (Level 3)
+            Atuin vs audit: Atuin vs audit
+            Helpers in this repo: 本 repo 提供的 helper
+            auditd role (opt-in): auditd role（可選）
             # Tools subsections
             "Shell & terminal": Shell 與終端機
             "Sessions & worktrees": Session 與 worktree
@@ -213,6 +223,7 @@ nav:
   - Playbooks:
       - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
       - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
+      - auditd role (opt-in): playbooks/auditd.md
   - Tools:
       - tools/aicapture.md
       - Inline AI suggestions (aisuggest): tools/zsh-inline-ai.md
@@ -281,6 +292,14 @@ nav:
           - chezmoi templating: tools/chezmoi-templating.md
           - JSON Schema: tools/json-schema.md
           - Mirrors (Chinese CDN): tools/mirrors.md
+  - System admin:
+      - Overview (audit hierarchy): sysadmin/README.md
+      - Sessions and login (Level 0): sysadmin/sessions.md
+      - sudo auditing (Level 1): sysadmin/sudo-audit.md
+      - Process accounting (Level 2): sysadmin/process-accounting.md
+      - auditd framework (Level 3): sysadmin/auditd.md
+      - Atuin vs audit: sysadmin/atuin-vs-audit.md
+      - Helpers in this repo: sysadmin/helpers.md
   - Shells:
       - Architecture (3-tier shell/zsh/bash + future fish/powershell): shells/architecture.md
       - "POSIX, sh, bash, zsh: what's portable": shells/posix.md

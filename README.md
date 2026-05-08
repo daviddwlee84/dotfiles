@@ -257,6 +257,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **LLM tools** (optional): Ollama local runtime, LiteLLM proxy, `llmfit` hardware-fit recommender, `models` TUI/CLI for model discovery and benchmarks
 - **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
 - **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
+- **Linux audit framework** (optional, Linux only, `installAuditd=true`): [`auditd`](docs/sysadmin/auditd.md) + baseline rule set (identity / sudoers / sshd_config / privileged-exec watches), plus `audit-*` shell helpers and `tv sessions` / `tv sudo-history` / `tv audit-events` Television channels for the routine "who did what on this server" queries. Full guide: [docs/sysadmin/](docs/sysadmin/README.md); ansible role: [docs/playbooks/auditd.md](docs/playbooks/auditd.md)
 - **Media / AV tools** (optional, `installMediaTools=true`): [ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md). Plus three zsh helpers (`compress-video`, `extract-audio`, `to-wav16k`) at [`dot_config/zsh/tools/29_media.zsh`](dot_config/zsh/tools/29_media.zsh). Also satisfies `vhs`'s runtime ffmpeg dep.
 - **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
