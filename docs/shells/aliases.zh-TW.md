@@ -540,6 +540,7 @@
 | `proxy-on` | function | `dot_config/zsh/tools/50_networking.zsh` | 在當前 shell 匯出 `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` |
 | `proxy-off` | function | `dot_config/zsh/tools/50_networking.zsh` | 在當前 shell 取消所有 proxy 環境變數 |
 | `proxy-status` | function | `dot_config/zsh/tools/50_networking.zsh` | 回報狀態：**active**（已匯出）、**available**（已偵測到）或 **unavailable** |
+| `proxy-test` | function | `dot_config/zsh/tools/50_networking.zsh` | 以 `curl https://www.google.com/generate_204` 測試已偵測 proxy 是否可出網（HTTP，不是 ICMP ping） |
 | `proxy-refresh` | function | `dot_config/zsh/tools/50_networking.zsh` | 清除快取的偵測結果、重新探測、印出狀態（在切換 proxy 後使用） |
 
 ### Web reader

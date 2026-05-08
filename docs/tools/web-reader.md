@@ -144,6 +144,7 @@ Pairs naturally with `LOCAL_PROXY_URL` + `LOCAL_PROXY_SOCKS_URL` for determinist
 | `proxy-on` / `proxy-on -q` | current shell, exports env vars | `-q` skips the success print |
 | `proxy-off` | current shell, unsets env vars | also clears `ALL_PROXY`/`all_proxy`/`NO_PROXY` |
 | `proxy-status` | read-only | reports **active** / **available** / **unavailable** + HTTP / SOCKS URLs |
+| `proxy-test [url]` | one child process | validates egress with `curl`; defaults to Google's `generate_204` endpoint because `ping` does not use proxy env vars |
 | `proxy-refresh` | invalidate cache, re-probe | run after starting/stopping your proxy |
 
 ## Installation

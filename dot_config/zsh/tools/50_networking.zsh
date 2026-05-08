@@ -304,6 +304,29 @@ proxy-status() {
   fi
 }
 
+# Validate that the detected proxy can actually reach the public internet.
+# ICMP ping does not honor proxy env vars, so use Google's HTTP 204 endpoint.
+proxy-test() {
+  local url="${1:-https://www.google.com/generate_204}"
+  if ! command -v curl >/dev/null 2>&1; then
+    print -u2 "proxy-test: curl not found"
+    return 127
+  fi
+
+  __zsh_net_detect_proxy
+  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+    print -u2 "proxy-test: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)"
+    return 1
+  fi
+
+  local all_url
+  all_url="$(__zsh_net_all_proxy_url)"
+  print "proxy-test: http=$_ZSH_NET_PROXY_CACHE  all=$all_url  url=$url"
+  withproxy curl -sS -o /dev/null \
+    -w 'proxy-test: http=%{http_code} remote=%{remote_ip} total=%{time_total}s\n' \
+    --max-time 10 "$url"
+}
+
 # Clear the cached detection and re-probe; call after toggling your proxy.
 proxy-refresh() {
   __zsh_net_clear_proxy_cache

@@ -539,6 +539,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `proxy-on` | function | `dot_config/zsh/tools/50_networking.zsh` | Export `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` in the current shell |
 | `proxy-off` | function | `dot_config/zsh/tools/50_networking.zsh` | Unset all proxy env vars in the current shell |
 | `proxy-status` | function | `dot_config/zsh/tools/50_networking.zsh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
+| `proxy-test` | function | `dot_config/zsh/tools/50_networking.zsh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
 | `proxy-refresh` | function | `dot_config/zsh/tools/50_networking.zsh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
 
 ### Web reader

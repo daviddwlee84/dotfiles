@@ -171,6 +171,7 @@ export LOCAL_PROXY_AUTO_ACTIVATE=1
 | `proxy-on` / `proxy-on -q` | 當前 shell，export 環境變數 | `-q` 略過成功訊息 |
 | `proxy-off` | 當前 shell，unset 環境變數 | 也會清掉 `ALL_PROXY`/`all_proxy`/`NO_PROXY` |
 | `proxy-status` | 唯讀 | 顯示 **active** / **available** / **unavailable** + HTTP / SOCKS URL |
+| `proxy-test [url]` | 單個子行程 | 用 `curl` 驗證出網；預設打 Google `generate_204` endpoint，因為 `ping` 不會使用 proxy 環境變數 |
 | `proxy-refresh` | 清快取，重新探測 | 啟動或關閉 proxy 後執行 |
 
 ## 安裝
