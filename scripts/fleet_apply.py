@@ -1333,6 +1333,22 @@ def cli(
             )
         ),
     ] = False,
+    no_preflight: Annotated[
+        bool,
+        tyro.conf.arg(
+            help=(
+                "Skip the pre-flight readiness probe that runs before "
+                "`fleet-apply` and warns (with a 5s countdown) when any "
+                "selected host is in `init-in-progress` state — i.e. a "
+                "`chezmoi update --init` / `chezmoi init` is already running "
+                "(often paused at an interactive prompt in another SSH "
+                "session). Default behaviour is warn-don't-refuse: the "
+                "countdown auto-continues so scripted/CI use is unaffected. "
+                "No effect with --readiness / --status / --tail / --kill / "
+                "--dry-run (they don't apply)."
+            )
+        ),
+    ] = False,
 ) -> int:
     console = Console()
 
@@ -1410,6 +1426,19 @@ def cli(
         "diff" if dry_run else ("apply" if (no_init or apply_only_path or branch) else "update")
     )
     init = mode == "update"
+
+    # Pre-flight readiness probe (only on real apply paths; --dry-run is
+    # safe enough on its own, --status/--tail/--kill never reach here).
+    # Warn-don't-refuse: 5s countdown auto-continues so scripted/CI use is
+    # unaffected. Catches the david_ubuntu failure mode where a paused
+    # `chezmoi update --init` (waiting for an interactive prompt in another
+    # SSH session) would otherwise silently block the new fleet-apply.
+    if mode != "diff" and not no_preflight:
+        rc_preflight = _run_preflight(
+            console, selected, connect_timeout,
+        )
+        if rc_preflight != 0:
+            return rc_preflight
 
     rc = _run(
         console, selected, mode, init, log_dir, serial, max_parallel,
@@ -2305,25 +2334,84 @@ _READINESS_HINT: dict[str, str] = {
 }
 
 
-def _run_readiness(
+def _run_preflight(
     console: Console,
     selected: list[Host],
     connect_timeout: int,
-    no_fetch: bool,
-    json_out: bool,
 ) -> int:
-    """Probe each host's readiness; render table + actionable hints.
+    """Pre-flight readiness probe for `fleet-apply` — warn on init-in-progress.
 
-    Always returns 0 (probe is informational, not a verdict — matches
-    --status / --compact). Use --json for machine-readable output suitable
-    for `jq` / scripting / pre-apply gates in CI.
+    Runs the readiness probe (no-fetch for speed; we only care about
+    transient mid-flight state, not behind/ahead counts) and warns with a
+    5s countdown if any selected host is in `init-in-progress` state.
+    Always returns 0 (warn-don't-refuse) — the countdown auto-continues
+    so scripted/CI use is unaffected. User can Ctrl+C during the
+    countdown to abort.
 
-    Note: fleet-apply defaults to `chezmoi update --init` (= git pull +
-    re-render chezmoi.toml + apply). The probe predicts ALL three
-    sub-steps' failure modes:
-      * pull:  behind / ahead / dirty
-      * init:  toml-mismatch (NEW prompt keys not yet answered)
-      * apply: drift (target hand-edited on remote)
+    Probe failures (unreachable / SSH error) are surfaced as a single
+    dim line but do NOT block apply — fleet-apply itself will report
+    those hosts as failed via its normal error path.
+    """
+    try:
+        rows = _collect_readiness_rows(
+            selected, connect_timeout, no_fetch=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        # Probe infrastructure failure (e.g. cwd not a chezmoi source dir).
+        # Don't block apply — print a dim warning and continue.
+        console.print(
+            f"[dim]preflight: probe failed ({type(e).__name__}: {e}); "
+            f"continuing without check[/]"
+        )
+        return 0
+
+    busy_rows = [r for r in rows if r["state"] == "init-in-progress"]
+    if not busy_rows:
+        return 0
+
+    console.print(
+        f"[bold yellow]⏳ preflight:[/] "
+        f"{len(busy_rows)} host(s) in [yellow]init-in-progress[/] state"
+    )
+    for r in busy_rows:
+        pids = r["fields"].get("BUSY_PIDS") or "?"
+        console.print(
+            f"  [yellow]·[/] [bold]{r['host']}[/] — "
+            f"chezmoi update/apply/init running (pid {pids}); "
+            f"may be paused at an interactive prompt in another SSH session"
+        )
+    console.print(
+        "[dim]hint:[/] `ssh HOST` to check, "
+        "or `just fleet-apply --no-preflight` to skip this check.\n"
+        "[dim]continuing in 5s — Ctrl+C to abort[/]"
+    )
+
+    # 5s countdown with single-line update (Rich Live would be overkill
+    # here; rewrite the same line via \r-style print).
+    import time
+    try:
+        for remaining in (5, 4, 3, 2, 1):
+            console.print(
+                f"[dim]  starting fleet-apply in {remaining}s...[/]",
+                end="\r",
+            )
+            time.sleep(1)
+        console.print(" " * 60, end="\r")  # clear countdown line
+    except KeyboardInterrupt:
+        console.print("\n[red]aborted by user[/]")
+        return 130
+    return 0
+
+
+def _collect_readiness_rows(
+    selected: list[Host], connect_timeout: int, no_fetch: bool,
+) -> list[dict]:
+    """Run the readiness probe over `selected` and return classified rows.
+
+    Shared between `_run_readiness` (`just fleet-status`) and the
+    `_run_apply` pre-flight hook. Each row dict has keys:
+      host, state, notes, fields, drift, error
+    See `_classify_readiness` for the state vocabulary.
     """
     expected_keys = _extract_expected_prompt_keys(Path.cwd())
     probe_cmd = _build_readiness_probe_cmd(no_fetch)
@@ -2369,7 +2457,30 @@ def _run_readiness(
     async def _orchestrate() -> list[dict]:
         return await asyncio.gather(*(_probe_one(h) for h in selected))
 
-    rows = asyncio.run(_orchestrate())
+    return asyncio.run(_orchestrate())
+
+
+def _run_readiness(
+    console: Console,
+    selected: list[Host],
+    connect_timeout: int,
+    no_fetch: bool,
+    json_out: bool,
+) -> int:
+    """Probe each host's readiness; render table + actionable hints.
+
+    Always returns 0 (probe is informational, not a verdict — matches
+    --status / --compact). Use --json for machine-readable output suitable
+    for `jq` / scripting / pre-apply gates in CI.
+
+    Note: fleet-apply defaults to `chezmoi update --init` (= git pull +
+    re-render chezmoi.toml + apply). The probe predicts ALL three
+    sub-steps' failure modes:
+      * pull:  behind / ahead / dirty
+      * init:  toml-mismatch (NEW prompt keys not yet answered)
+      * apply: drift (target hand-edited on remote)
+    """
+    rows = _collect_readiness_rows(selected, connect_timeout, no_fetch)
 
     if json_out:
         import json
