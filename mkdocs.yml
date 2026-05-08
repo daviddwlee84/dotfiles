@@ -102,6 +102,7 @@ plugins:
             Language servers (LSP): 語言伺服器 (LSP)
             SpecStory internals: SpecStory 內部運作
             git diff workflow: git diff 工作流程
+            GitHub CLI (gh) auth: GitHub CLI (gh) 認證
             Infrastructure-as-Code: Infrastructure-as-Code
             Containers: 容器
             Container config map: 容器設定對應
@@ -254,6 +255,7 @@ nav:
           - LLM: tools/llm.md
       - Git & DevOps:
           - git diff workflow: tools/git_diff_workflow.md
+          - GitHub CLI (gh) auth: tools/gh-cli.md
           - pre-commit: tools/pre-commit.md
           - Infrastructure-as-Code: tools/infrastructure-as-code.md
           - Containers: tools/containers.md

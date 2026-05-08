@@ -157,7 +157,7 @@ To change options later: `chezmoi init --force`
 
 ### Config Files
 
-- `~/.gitconfig` - Git configuration
+- `~/.gitconfig` - Git configuration; managed via `modify_` so `gh auth setup-git`'s `[credential "..."]` blocks (with the per-machine absolute path to `gh`) survive `chezmoi apply` ([docs](docs/tools/gh-cli.md))
 - `~/.config/git/hooks/` - Global Git hooks (pre-commit + Git LFS hooks)
 - `~/.config/gh-dash/config.yml` - Global gh-dash config, with `diffnav` as the diff pager
 - `~/.config/lazygit/config.yml` - Global LazyGit config, with `delta` as the custom diff pager

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# modify_ script: render chezmoi-managed baseline gitconfig, then preserve any
+# [credential "<URL>"] sections from the existing ~/.gitconfig (typically
+# injected by `gh auth setup-git` or `gh auth login --git-protocol https`).
+#
+# Why modify_: gh CLI rewrites ~/.gitconfig out-of-band on every `gh auth
+# login` / `setup-git` invocation, hard-coding the absolute path to the local
+# `gh` binary (e.g. /opt/homebrew/bin/gh on Apple Silicon, /usr/local/bin/gh
+# on Intel mac, /home/linuxbrew/.linuxbrew/bin/gh on Linux). A plain template
+# would clobber that on every `chezmoi apply`, causing a ping-pong fight with
+# whatever `gh` wrote last.
+#
+# Per-machine overrides (proxy, safe.directory, etc.) still belong in
+# ~/.gitconfig.local — that's loaded via [include] from the baseline below.
+# This script ONLY preserves [credential "<URL>"] blocks; everything else in
+# the live file gets replaced by the chezmoi baseline.
+#
+# DO NOT hand-edit ~/.gitconfig directly — non-credential edits will be
+# silently overwritten on the next `chezmoi apply`. Use ~/.gitconfig.local.
+
+set -euo pipefail
+
+# 1. Slurp current target contents from stdin (chezmoi modify_ contract).
+existing="$(cat)"
+
+# 2. Emit the chezmoi-managed baseline.
+cat <<'CHEZMOI_BASELINE_EOF'
+[user]
+	email = {{ .email }}
+	name = {{ .name }}
+[http]
+	postBuffer = 524288000
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[init]
+    defaultBranch = main
+[core]
+    hooksPath = ~/.config/git/hooks
+{{- if lookPath "delta" }}
+    pager = delta
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true
+    side-by-side = true
+{{- end }}
+# Per-machine overrides (safe, credential, http.proxy, etc.) live in
+# ~/.gitconfig.local so they don't conflict with chezmoi-managed updates
+# to this template. The file is git-ignored by chezmoi (.chezmoiignore)
+# and silently skipped by git if it doesn't exist — see
+# https://git-scm.com/docs/git-config#_includes. Same pattern as
+# ~/.zshrc.adhoc for shell customisations.
+[include]
+    path = ~/.gitconfig.local
+CHEZMOI_BASELINE_EOF
+
+# 3. Extract and re-emit any [credential "<scope>"] sections from the live
+#    file. awk captures the section header AND its body (indented or
+#    `key = value` lines) until the next [section] header or EOF. The
+#    gh-injected absolute path to the gh binary is preserved verbatim — we
+#    intentionally do NOT normalize it, so each machine keeps the path that
+#    its local `gh auth setup-git` wrote.
+if [ -n "$existing" ]; then
+  # awk extracts each `[credential "<url>"]` section + its body. We strip
+  # leading/trailing blank lines so re-running this script on its own output
+  # is idempotent (no blank-line accretion across successive `chezmoi apply`
+  # passes).
+  preserved="$(printf '%s\n' "$existing" | awk '
+    /^\[credential "/ { keep=1; print; next }
+    /^\[/             { keep=0 }
+    keep              { print }
+  ' | awk 'NF { found=1 } found { print }' | awk '
+    { lines[NR]=$0 }
+    END { for (i=NR; i>0 && lines[i]==""; i--); for (j=1; j<=i; j++) print lines[j] }
+  ')"
+  if [ -n "$preserved" ]; then
+    printf '\n%s\n' "$preserved"
+  fi
+fi
