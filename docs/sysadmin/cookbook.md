@@ -21,6 +21,7 @@ the dense helper reference, see [helpers.md](helpers.md).
 - [9. "What did the root shell do?" — beyond sudo logs](#9-what-did-the-root-shell-do--beyond-sudo-logs)
 - [10. Quickly silence a noisy audit rule without losing the rest](#10-quickly-silence-a-noisy-audit-rule-without-losing-the-rest)
 - [11. Audit local user inventory](#11-audit-local-user-inventory)
+- [12. Network exposure + persistence: the weekly sweep](#12-network-exposure--persistence-the-weekly-sweep)
 
 ---
 
@@ -480,3 +481,83 @@ sudoers grants, password changes.
 | `NOPASSWD: ALL` in `/etc/sudoers.d/` for a non-system user | Permanent passwordless root — usually a foot-gun or a backdoor |
 | User home outside `/home/` (e.g. `/tmp/x`) | Created by an attacker dodging quota / monitoring |
 | `nologin`-shelled user with active SSH keys | Common attacker move — the user can't `ssh` interactively but can still execute via `ssh user@host '<cmd>'` if `ForceCommand` isn't set |
+
+---
+
+## 12. Network exposure + persistence: the weekly sweep
+
+Combine firewall, listening sockets, and scheduled jobs into one
+weekly pass. Catches: forgotten exposed services, attacker-installed
+cron jobs that call home, and persistence implants in launchd /
+systemd timers.
+
+### 12a. Network attack surface (60 seconds)
+
+```bash
+fw-listening | grep -vE '127\.0\.0\.1|::1'
+```
+
+Every line is something the world can connect to. For each:
+
+- Recognise the process? (sshd, nginx — yes; `bash` listening on
+  port 4444 — **persistence implant**)
+- Should the firewall block it externally? (`fw-rules`)
+
+### 12b. Currently-active connections
+
+```bash
+fw-conn | grep -vE '127\.0\.0\.1|::1'
+```
+
+Active outbound + inbound. Anything connecting to a public IP you
+don't recognise (after filtering legit traffic — DNS, package
+mirrors, your monitoring) is worth investigating.
+
+```bash
+# Drill into a specific connection
+fw-port <suspicious-port>
+```
+
+### 12c. What's scheduled to run?
+
+```bash
+cron-list --timers   # systemd timers — most modern hosts
+cron-list --system   # /etc/crontab + cron.d/ (package-installed jobs)
+cron-list            # everything including user crontabs
+```
+
+Cross-check user crontabs against `user-list --login`. A `nobody`
+or `daemon` user with a crontab is suspicious.
+
+### 12d. Combine: "what's calling home at 3am?"
+
+```bash
+# 1. Find the timer that fires near the suspicious time
+cron-list --timers | sort
+
+# 2. See what unit it activates
+systemctl cat <unit>.timer
+systemctl cat <unit>.service   # check ExecStart
+
+# 3. Sanity-check by following the next run
+sudo journalctl -fu <unit>.service
+# (in another terminal)
+fw-conn --all | grep -v 127
+```
+
+If the service makes outbound connections you don't expect, that's
+your answer. If `installAuditd` is on, also:
+
+```bash
+audit-execve <suspect-binary>
+```
+
+### 12e. Red flags collected
+
+| Pattern | Where you spot it | Concern |
+|---|---|---|
+| Listener on `0.0.0.0:<weird-port>` owned by `bash` / `python` / `nc` | `fw-listening` | Reverse / bind shell |
+| ESTAB connection to a public IP from a process that should stay local (e.g. local postgres) | `fw-conn` | Data exfiltration |
+| `crontab -u nobody` exists | `cron-list` | Persistence (nobody shouldn't have one) |
+| systemd unit in `/etc/systemd/system/` not from a package | `cron-list --timers`; cross-check with `dpkg -S` / `rpm -qf` | Manually installed unit (could be legit, could be implant) |
+| launchd plist with `RunAtLoad=true` and unfamiliar `ProgramArguments` | `cron-list` (macOS) | Boot-time persistence |

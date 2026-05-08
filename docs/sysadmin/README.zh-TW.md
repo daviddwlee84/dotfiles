@@ -30,6 +30,10 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 - [sudo 審計](sudo-audit.md) — Level 1
 - [Process accounting](process-accounting.md) — Level 2
 - [auditd 框架](auditd.md) — Level 3
+- [Firewall 與網路曝險面](firewall.md) — 什麼擋、什麼 bind、誰連著（橫跨
+  四層）
+- [排程任務](scheduled-jobs.md) — cron + systemd timer + at + launchd；
+  persistence 偵測面
 - [Atuin vs audit](atuin-vs-audit.md) — 為什麼個人 shell history 不是
   正確工具，含完整對照表
 - [**Cookbook（場景食譜）**](cookbook.md) — 實戰導覽：「有人從新 IP
@@ -45,6 +49,8 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 「今天 <user> 有用 sudo 嗎？」           →  audit-sudo       (Level 1)
 「有人跑過 /usr/bin/<x> 嗎？」           →  audit-execve     (Level 3，需事先設規則)
 「/etc/<file> 有被改嗎？」               →  audit-file       (Level 3，需 watch 規則)
+「這台 server 曝什麼？」                  →  fw-listening     (firewall.md)
+「這台機器排了什麼會自動執行？」          →  cron-list        (scheduled-jobs.md)
 「合規 / 鑑識事件」                      →  auditd + 異地 log shipping
 「我自己回想用過什麼 command」           →  atuin            (不是審計)
 ```

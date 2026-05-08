@@ -34,6 +34,16 @@ POSIX 形式，zsh 與 bash 共用。少數 zsh-only 便利處用 source-time �
 | `user-ssh-keys [user]` | 誰有 authorized_keys，含 fingerprint + comment？ | 掃 `~/.ssh/authorized_keys`；`ssh-keygen -lf -` 算 fingerprint | 其他 user 的檔需 sudo | macOS + Linux |
 | `user-recent-changes [--days N]` | 近期 passwd/shadow/sudoers 修改 (auditd) | `ausearch -k identity` + `-k sudoers` | 是 | Linux + auditd |
 
+### Firewall + 排程任務 helper
+
+| 函式 | 回答 | 包裝 | 需要 sudo？ | 平台 |
+|---|---|---|---|---|
+| `fw-rules` | 所有 backend 的防火牆規則 | `nft list ruleset` / `iptables -S` / `ufw status` / `firewall-cmd --list-all` (Linux); `pfctl -s rules` + ALF (macOS) | 是 | macOS + Linux |
+| `fw-listening` | bound TCP+UDP socket + 擁有者 process | `ss -tlnp` / `ss -ulnp` (Linux); `lsof -nP -iTCP -sTCP:LISTEN` 退路 | 完整 process 資訊需要 | macOS + Linux |
+| `fw-conn [--all]` | Established TCP 連線 (--all 含所有狀態) | `ss -tnp state established` | process 資訊需要 | macOS + Linux |
+| `fw-port <port>` | 誰在用 `<port>`？(LISTEN + ESTABLISHED + `/etc/services`) | `ss` / `lsof` filter port | 是 | macOS + Linux |
+| `cron-list [--user U \| --system \| --timers]` | 所有排程任務：user crontab + system cron + systemd timer + at + launchd | 組合 | 有時需（其他 user 的 crontab） | macOS + Linux |
+
 所有 helper 接受 `--help` 顯示用法，且在 pipe 到 `head` 等時 exit 0
 (避免 SIGPIPE 噪音)。
 
@@ -65,6 +75,8 @@ sudo 自己的 credential cache；helper **不**整合本 repo 的
 | `tv sudo-history` | 1) `journalctl _COMM=sudo -n 2000`  2) `grep -E 'sudo(\\\|:)' /var/log/auth.log /var/log/secure`  3) `sudoreplay -l` (有設定時) | Event metadata；sudoreplay 列：session info | sudoreplay 列 → `sudoreplay <id>`；其他 → lnav 開 event | Linux only |
 | `tv audit-events` | 1) `aureport --summary -i`  2) `ausearch -k <baseline-key> --interpret -ts recent` for identity / privileged / sudoers / sshd_config  3) `aureport -au -i` 和 `aureport -x -i` | 選中列的 `ausearch -i -a <eventid>` | `lnav` 開完整 event；`Alt+E` 用 `$EDITOR` 開 `/etc/audit/rules.d/` | Linux + auditd |
 | `tv users` | 1) 全 passwd 條目  2) 可登入 user (有真 shell)  3) groups + 成員  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) 每 home 的 authorized_keys（含 fingerprint + comment） | 單 user 身份 dump：id、groups、passwd、last login、sudo 事件、SSH key 數 | 鑽入：`lnav` 開完整身份報告；`Alt+G` 顯示 group；`Alt+E` `visudo` | macOS + Linux |
+| `tv firewall` | 1) 防火牆規則 (nft / iptables / ufw / firewalld / pf / ALF)  2) listening TCP+UDP  3) established TCP  4) 預設政策 / zone | 每列：解析 port → service、走擁有者 process parent tree | 鑽入：`lnav` 開完整規則 context + `lsof -p`；`Alt+E` 編輯 firewall config；`Alt+R` reload 規則 | macOS + Linux |
+| `tv scheduled-jobs` | 1) user crontab  2) system cron (`/etc/crontab` + `cron.d/` + `cron.{hourly,daily,...}/`)  3) systemd timer (system + user)  4) at job  5) anacron (Linux) / launchd plist (macOS) | 每列：解碼排程、顯示觸發 unit、timer 顯示 `systemctl status` | 鑽入：`lnav` 開 `systemctl cat` + 最近 30 條 log；`Alt+E` 編輯 crontab/unit；`Alt+T` tail 相關 log | macOS + Linux |
 
 與本 repo 其他 channel 共用的 binding：
 

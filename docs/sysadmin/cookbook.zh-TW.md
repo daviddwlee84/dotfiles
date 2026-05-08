@@ -20,6 +20,7 @@
 - [9. 「root shell 做了什麼？」 — sudo log 之外](#9-root-shell-做了什麼--sudo-log-之外)
 - [10. 快速關掉吵雜的 audit 規則但保留其他](#10-快速關掉吵雜的-audit-規則但保留其他)
 - [11. 盤點本機 user inventory](#11-盤點本機-user-inventory)
+- [12. 網路曝險 + persistence：每週掃一次](#12-網路曝險--persistence每週掃一次)
 
 ---
 
@@ -447,3 +448,80 @@ shell 變更 (`chsh`)、sudoers 授權、密碼變更。
 | 非系統 user 有 `NOPASSWD: ALL` in `/etc/sudoers.d/` | 永久免密碼 root — 通常是踩雷或後門 |
 | User home 不在 `/home/` (e.g. `/tmp/x`) | 攻擊者建立以避 quota / 監控 |
 | `nologin` shell 但有 SSH key | 常見攻擊招 — user 不能互動 ssh 但仍可 `ssh user@host '<cmd>'` 執行命令（如果沒設 `ForceCommand`） |
+
+---
+
+## 12. 網路曝險 + persistence：每週掃一次
+
+把 firewall、listening socket、scheduled job 合成一次每週掃描。能抓：
+忘了關的曝險服務、攻擊者裝的 call-home cron、藏在 launchd / systemd
+timer 裡的 persistence。
+
+### 12a. 網路攻擊面 (60 秒)
+
+```bash
+fw-listening | grep -vE '127\.0\.0\.1|::1'
+```
+
+每一列都是世界能連的東西。每筆：
+
+- 認得 process 嗎？(sshd、nginx — 是；`bash` listen 在 port 4444 —
+  **persistence implant**)
+- Firewall 對外有擋嗎？(`fw-rules`)
+
+### 12b. 目前 active 的連線
+
+```bash
+fw-conn | grep -vE '127\.0\.0\.1|::1'
+```
+
+active outbound + inbound。連到不認得的 public IP（過濾掉 DNS、套件
+mirror、你的監控等合法流量後）就值得看。
+
+```bash
+# 鑽入特定連線
+fw-port <可疑 port>
+```
+
+### 12c. 排了什麼會自動跑？
+
+```bash
+cron-list --timers   # systemd timer — 多數現代主機
+cron-list --system   # /etc/crontab + cron.d/ (套件安裝的 job)
+cron-list            # 全部，含 user crontab
+```
+
+對照 user crontab 與 `user-list --login`。`nobody` 或 `daemon` user 有
+crontab 就可疑。
+
+### 12d. 合用：「凌晨 3 點誰 call home？」
+
+```bash
+# 1. 找接近可疑時間觸發的 timer
+cron-list --timers | sort
+
+# 2. 看它啟動什麼 unit
+systemctl cat <unit>.timer
+systemctl cat <unit>.service   # 檢查 ExecStart
+
+# 3. 跟下一次執行確認
+sudo journalctl -fu <unit>.service
+# (另一個 terminal)
+fw-conn --all | grep -v 127
+```
+
+Service 做了你沒預期的 outbound 連線就是答案。開了 `installAuditd` 也可以：
+
+```bash
+audit-execve <可疑 binary>
+```
+
+### 12e. 警訊清單
+
+| Pattern | 在哪看到 | 為什麼擔心 |
+|---|---|---|
+| `0.0.0.0:<奇怪 port>` 上 listener，owner 是 `bash` / `python` / `nc` | `fw-listening` | Reverse / bind shell |
+| 該本機的 process（如 local postgres）有對 public IP 的 ESTAB 連線 | `fw-conn` | 資料外流 |
+| `crontab -u nobody` 存在 | `cron-list` | Persistence (nobody 不該有 crontab) |
+| `/etc/systemd/system/` 內非套件來的 unit | `cron-list --timers`；對照 `dpkg -S` / `rpm -qf` | 手動裝的 unit（可能合法、可能 implant） |
+| launchd plist `RunAtLoad=true` 且 `ProgramArguments` 不認識 | `cron-list` (macOS) | 開機時 persistence |

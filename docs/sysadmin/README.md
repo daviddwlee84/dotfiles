@@ -35,6 +35,10 @@ ceiling is.
 - [sudo auditing](sudo-audit.md) — Level 1
 - [Process accounting](process-accounting.md) — Level 2
 - [auditd framework](auditd.md) — Level 3
+- [Firewall and network exposure](firewall.md) — what's blocking, what's
+  bound, who's connected (cross-cuts all 4 levels)
+- [Scheduled jobs](scheduled-jobs.md) — cron + systemd timers + at +
+  launchd; the persistence-detection surface
 - [Atuin vs audit](atuin-vs-audit.md) — why personal shell history is not
   the right tool, with the full comparison table
 - [**Cookbook (scenario recipes)**](cookbook.md) — hands-on walkthroughs:
@@ -51,6 +55,8 @@ ceiling is.
 "Did <user> use sudo today?"            →  audit-sudo       (Level 1)
 "Did anyone run /usr/bin/<x>?"          →  audit-execve     (Level 3, needs rule set in advance)
 "Was /etc/<file> modified?"             →  audit-file       (Level 3, needs watch rule)
+"What's exposed on this server?"        →  fw-listening     (firewall.md)
+"What's scheduled to run on this box?"  →  cron-list        (scheduled-jobs.md)
 "Compliance / forensic incident"        →  auditd + offsite log shipping
 "My own command history for recall"     →  atuin            (NOT audit)
 ```

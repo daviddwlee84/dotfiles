@@ -498,3 +498,247 @@ user-recent-changes() {
         printf '\n'
     done
 }
+
+# ===========================================================================
+# Firewall helpers — fw-* (multi-backend; auto-detects nft / iptables / ufw
+# / firewalld / pf at runtime).
+# ===========================================================================
+
+_fw_have_active() {
+    # Echo the first detected active backend, or empty.
+    if command -v ufw >/dev/null 2>&1 && (sudo -n ufw status 2>/dev/null || ufw status 2>/dev/null) | grep -q 'Status: active'; then
+        echo ufw; return 0
+    fi
+    if command -v nft >/dev/null 2>&1 && (sudo -n nft list ruleset 2>/dev/null | head -1 | grep -q . ); then
+        echo nft; return 0
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && (sudo -n firewall-cmd --state 2>/dev/null | grep -q running); then
+        echo firewalld; return 0
+    fi
+    if command -v iptables >/dev/null 2>&1; then
+        echo iptables; return 0
+    fi
+    if command -v pfctl >/dev/null 2>&1; then
+        echo pf; return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# fw-rules
+#   Show active firewall rules across whichever backend is in use.
+# ---------------------------------------------------------------------------
+fw-rules() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'fw-rules' \
+                'Dump active firewall rules. Auto-detects ufw / nft / firewalld /' \
+                'iptables (Linux) or pf + Application Firewall (macOS).' \
+                'Reads root-only files via sudo.'
+            return 0 ;;
+    esac
+{{- if eq .chezmoi.os "linux" }}
+    if command -v nft >/dev/null 2>&1; then
+        printf '== nft list ruleset ==\n'
+        _audit_run_root nft list ruleset 2>/dev/null
+    fi
+    if command -v ufw >/dev/null 2>&1; then
+        printf '\n== ufw status numbered ==\n'
+        _audit_run_root ufw status numbered 2>/dev/null
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        printf '\n== firewall-cmd --list-all-zones ==\n'
+        _audit_run_root firewall-cmd --list-all-zones 2>/dev/null
+    fi
+    if command -v iptables >/dev/null 2>&1; then
+        printf '\n== iptables -S ==\n'
+        _audit_run_root iptables -S 2>/dev/null
+        if command -v ip6tables >/dev/null 2>&1; then
+            printf '\n== ip6tables -S ==\n'
+            _audit_run_root ip6tables -S 2>/dev/null
+        fi
+    fi
+{{- else }}
+    if command -v pfctl >/dev/null 2>&1; then
+        printf '== pfctl -s rules ==\n'
+        _audit_run_root pfctl -s rules 2>/dev/null
+        printf '\n== pfctl -s nat ==\n'
+        _audit_run_root pfctl -s nat 2>/dev/null
+        printf '\n== pfctl -s info ==\n'
+        _audit_run_root pfctl -s info 2>/dev/null
+    fi
+    if [ -x /usr/libexec/ApplicationFirewall/socketfilterfw ]; then
+        printf '\n== Application Firewall ==\n'
+        /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate
+        /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode
+        /usr/libexec/ApplicationFirewall/socketfilterfw --getallowsigned
+    fi
+{{- end }}
+}
+
+# ---------------------------------------------------------------------------
+# fw-listening
+#   What ports are bound, by which process? TCP + UDP.
+# ---------------------------------------------------------------------------
+fw-listening() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'fw-listening' \
+                'List sockets in LISTEN state with owning process. Prefers ss; falls' \
+                'back to lsof. Sudo for full process info.'
+            return 0 ;;
+    esac
+    if _audit_have ss; then
+        printf '== TCP listeners ==\n'
+        _audit_run_root ss -tlnp 2>/dev/null
+        printf '\n== UDP listeners ==\n'
+        _audit_run_root ss -ulnp 2>/dev/null
+    elif _audit_have lsof; then
+        printf '== TCP listeners (lsof) ==\n'
+        _audit_run_root lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null
+        printf '\n== UDP (lsof) ==\n'
+        _audit_run_root lsof -nP -iUDP 2>/dev/null
+    else
+        printf 'fw-listening: neither ss(8) nor lsof(8) found\n' >&2
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# fw-conn [--all]
+#   Established TCP connections. With --all, include LISTEN and other states.
+# ---------------------------------------------------------------------------
+fw-conn() {
+    state='state established'
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'fw-conn [--all]' \
+                'Active TCP connections. Default: established only.' \
+                '--all includes LISTEN and other states.'
+            return 0 ;;
+        --all) state='' ;;
+    esac
+    if _audit_have ss; then
+        # shellcheck disable=SC2086
+        _audit_run_root ss -tnp $state 2>/dev/null
+    elif _audit_have lsof; then
+        _audit_run_root lsof -nP -iTCP -sTCP:ESTABLISHED 2>/dev/null
+    else
+        printf 'fw-conn: neither ss(8) nor lsof(8) found\n' >&2
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# fw-port <port>
+#   Who is using <port>? Resolves both inbound (LISTEN) and outbound (ESTAB).
+# ---------------------------------------------------------------------------
+fw-port() {
+    case ${1:-} in
+        ''|-h|--help)
+            _audit_help 'fw-port <port>' \
+                'Find the process bound to <port> (LISTEN) or connected via <port>' \
+                '(ESTABLISHED). Useful when something complains "port already in use".'
+            return 0 ;;
+    esac
+    p=$1
+    if _audit_have ss; then
+        printf '== ss matches for :%s ==\n' "$p"
+        _audit_run_root ss -tnp "( sport = :$p or dport = :$p )" 2>/dev/null
+        _audit_run_root ss -unp "( sport = :$p or dport = :$p )" 2>/dev/null
+    elif _audit_have lsof; then
+        _audit_run_root lsof -nP -i ":$p" 2>/dev/null
+    fi
+    printf '\n== /etc/services ==\n'
+    awk -v p="$p" '$2 ~ ("^"p"/") {print}' /etc/services 2>/dev/null \
+        || getent services "$p" 2>/dev/null
+}
+
+# ===========================================================================
+# Scheduled-job helper — cron-list (wraps the data the tv channel cycles).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# cron-list [--user <u>] [--system] [--timers] [--all]
+#   Inventory of scheduled jobs. Default: everything readable.
+# ---------------------------------------------------------------------------
+cron-list() {
+    show_user=1; show_system=1; show_timers=1; only_user=''
+    while [ $# -gt 0 ]; do
+        case $1 in
+            -h|--help)
+                _audit_help 'cron-list [--user U] [--system] [--timers] [--all]' \
+                    'Inventory scheduled jobs across crontab + system cron + systemd timers.' \
+                    'Default shows all sources. Filters narrow scope for noisy hosts:' \
+                    '  --user U     only crontab for user U' \
+                    '  --system     only /etc/crontab + /etc/cron.d + cron.{hourly,daily,...}' \
+                    '  --timers     only systemd timers (Linux)'
+                return 0 ;;
+            --user) only_user=$2; show_system=0; show_timers=0; shift 2 ;;
+            --system) show_user=0; show_timers=0; shift ;;
+            --timers) show_user=0; show_system=0; shift ;;
+            --all) shift ;;
+            *) printf 'cron-list: unknown arg: %s\n' "$1" >&2; return 1 ;;
+        esac
+    done
+    if [ -n "$only_user" ]; then
+        printf '== crontab for %s ==\n' "$only_user"
+        crontab -l -u "$only_user" 2>/dev/null \
+            || _audit_run_root crontab -l -u "$only_user" 2>/dev/null \
+            || printf '(no crontab)\n'
+        return 0
+    fi
+    if [ "$show_user" = "1" ]; then
+        printf '== user crontabs ==\n'
+{{- if eq .chezmoi.os "darwin" }}
+        users=$(dscl . -list /Users UniqueID 2>/dev/null | awk '$2 !~ /^_/ && $2 >= 500 {print $1}')
+{{- else }}
+        users=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65000 || $1 == "root" {print $1}')
+{{- end }}
+        printf '%s\n' "$users" | while read -r u; do
+            [ -z "$u" ] && continue
+            out=$(crontab -l -u "$u" 2>/dev/null || sudo -n crontab -l -u "$u" 2>/dev/null)
+            [ -z "$out" ] && continue
+            printf '\n--- %s ---\n%s\n' "$u" "$out"
+        done
+    fi
+{{- if eq .chezmoi.os "linux" }}
+    if [ "$show_system" = "1" ]; then
+        printf '\n== /etc/crontab ==\n'
+        [ -f /etc/crontab ] && grep -vE '^\s*(#|$)' /etc/crontab 2>/dev/null
+        printf '\n== /etc/cron.d/ ==\n'
+        if [ -d /etc/cron.d ]; then
+            for f in /etc/cron.d/*; do
+                [ -f "$f" ] || continue
+                printf '--- %s ---\n' "$f"
+                grep -vE '^\s*(#|$)' "$f" 2>/dev/null
+            done
+        fi
+        for d in /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly; do
+            [ -d "$d" ] || continue
+            printf '\n== %s ==\n' "$d"
+            ls -la "$d" 2>/dev/null | tail -n +2
+        done
+    fi
+    if [ "$show_timers" = "1" ] && _audit_have systemctl; then
+        printf '\n== systemd timers (system) ==\n'
+        systemctl list-timers --all --no-pager 2>/dev/null
+        printf '\n== systemd timers (user) ==\n'
+        systemctl --user list-timers --all --no-pager 2>/dev/null \
+            || printf '(no user timers)\n'
+    fi
+{{- else }}
+    if [ "$show_system" = "1" ]; then
+        printf '\n== launchd plists ==\n'
+        for d in /Library/LaunchDaemons /Library/LaunchAgents "$HOME/Library/LaunchAgents"; do
+            [ -d "$d" ] || continue
+            printf '\n--- %s ---\n' "$d"
+            ls "$d" 2>/dev/null | grep '\.plist$' | head -50
+        done
+    fi
+{{- end }}
+    if _audit_have atq; then
+        printf '\n== at jobs ==\n'
+        atq 2>/dev/null
+    fi
+}

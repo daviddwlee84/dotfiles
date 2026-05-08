@@ -36,6 +36,16 @@ helpers are templated to use the right one per host.
 | `user-ssh-keys [user]` | Who has authorized_keys, with fingerprint + comment? | scans `~/.ssh/authorized_keys`; `ssh-keygen -lf -` for fingerprint | Yes for other users' files | macOS + Linux |
 | `user-recent-changes [--days N]` | Recent edits to passwd/shadow/sudoers (auditd) | `ausearch -k identity` + `-k sudoers` | Yes | Linux + auditd |
 
+### Firewall + scheduled-job helpers
+
+| Function | What it answers | Wraps | Needs sudo? | Platforms |
+|---|---|---|---|---|
+| `fw-rules` | Active firewall rules across all backends | `nft list ruleset` / `iptables -S` / `ufw status` / `firewall-cmd --list-all` (Linux); `pfctl -s rules` + ALF (macOS) | Yes | macOS + Linux |
+| `fw-listening` | Bound TCP+UDP sockets with owning process | `ss -tlnp` / `ss -ulnp` (Linux); `lsof -nP -iTCP -sTCP:LISTEN` fallback | Yes for full process info | macOS + Linux |
+| `fw-conn [--all]` | Established TCP connections (or all states with --all) | `ss -tnp state established` | Yes for process info | macOS + Linux |
+| `fw-port <port>` | Who is using `<port>`? (LISTEN + ESTABLISHED + `/etc/services`) | `ss` / `lsof` filtered to port | Yes | macOS + Linux |
+| `cron-list [--user U \| --system \| --timers]` | All scheduled jobs: user crontabs + system cron + systemd timers + at + launchd | composite | Sometimes (other users' crontabs) | macOS + Linux |
+
 All helpers accept `--help` for usage and exit 0 (so piping into `head`
 doesn't cause SIGPIPE noise).
 
@@ -71,6 +81,8 @@ Launch via `tv <name>` from anywhere or via the `Alt+T` tools picker.
 | `tv sudo-history` | 1) `journalctl _COMM=sudo -n 2000`  2) `grep -E 'sudo(\\\|:)' /var/log/auth.log /var/log/secure`  3) `sudoreplay -l` (when configured) | Event metadata; for sudoreplay rows: session info | sudoreplay row → `sudoreplay <id>`; otherwise lnav on event | Linux only |
 | `tv audit-events` | 1) `aureport --summary -i`  2) `ausearch -k <baseline-key> --interpret -ts recent` for keys identity / privileged / sudoers / sshd_config  3) `aureport -au -i` and `aureport -x -i` | `ausearch -i -a <eventid>` for the selected row | Full event in `lnav`; `Alt+E` opens `/etc/audit/rules.d/` in `$EDITOR` | Linux + auditd |
 | `tv users` | 1) all passwd entries  2) login-capable users (real shell)  3) groups + members  4) sudoers (sudo/wheel/admin + `sudoers.d/`)  5) authorized_keys per home (with fingerprint + comment) | Per-user identity dump: id, groups, passwd, last login, sudo events, SSH key count | Drill-down: full identity report in `lnav`; `Alt+G` show groups; `Alt+E` `visudo` | macOS + Linux |
+| `tv firewall` | 1) firewall rules (nft / iptables / ufw / firewalld / pf / ALF)  2) listening TCP+UDP  3) established TCP  4) default policies / zones | Per-row: resolve port to service, walk owning-process parent tree | Drill: full rule context + `lsof -p` in `lnav`; `Alt+E` edit firewall config; `Alt+R` reload rules | macOS + Linux |
+| `tv scheduled-jobs` | 1) user crontabs  2) system cron (`/etc/crontab` + `cron.d/` + `cron.{hourly,daily,...}/`)  3) systemd timers (system + user)  4) at jobs  5) anacron (Linux) / launchd plists (macOS) | Per-row: decode schedule, show triggered unit, `systemctl status` for timers | Drill: `systemctl cat` + last 30 logs in `lnav`; `Alt+E` edit crontab/unit; `Alt+T` tail relevant log | macOS + Linux |
 
 Common bindings shared with this repo's other channels:
 

@@ -1,0 +1,278 @@
+# firewall channel for television (tv)
+# Inventory firewall rules + listening sockets + active connections.
+# Multi-backend: detects nft / iptables / ufw / firewalld / pf at runtime
+# and shows whichever are installed. See docs/sysadmin/firewall.md.
+#
+# Source cycling (Ctrl+S):
+#   1. Active firewall rules (nft preferred; falls back through iptables /
+#      ufw / firewalld / pf depending on what's installed)
+#   2. Listening sockets (ss / lsof) — what ports are bound, by which process
+#   3. Established connections (ss -tnp) — who's currently connected
+#   4. Default policies + zone summary (per-backend high-level view)
+#
+# Preview cycling (Ctrl+F):
+#   1. Per-row detail (resolve port -> service, show owning process tree)
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    Drill: full rule context / process tree for the row in lnav
+#   Alt+E    Edit firewall config in $EDITOR (best-effort: ufw / nftables / iptables)
+#   Alt+R    Reload firewall rules (best-effort)
+#   Ctrl+Y   Copy row
+
+[metadata]
+name = "firewall"
+description = "Firewall rules + listening sockets + active connections (multi-backend)"
+requirements = []
+
+[source]
+command = [
+  # 1. Firewall rules — try every backend that's installed
+  """
+  emitted=0
+{{- if eq .chezmoi.os "linux" }}
+  if command -v nft >/dev/null 2>&1; then
+    out=$(sudo -n nft list ruleset 2>/dev/null || nft list ruleset 2>/dev/null)
+    if [ -n "$out" ]; then
+      printf '%s\\n' "$out" | sed 's/^/[nft] /'
+      emitted=1
+    fi
+  fi
+  if command -v ufw >/dev/null 2>&1; then
+    out=$(sudo -n ufw status numbered 2>/dev/null)
+    if [ -n "$out" ]; then
+      printf '%s\\n' "$out" | sed 's/^/[ufw] /'
+      emitted=1
+    fi
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    for z in $(sudo -n firewall-cmd --get-active-zones 2>/dev/null | awk 'NR%2==1'); do
+      out=$(sudo -n firewall-cmd --zone="$z" --list-all 2>/dev/null)
+      printf '%s\\n' "$out" | sed "s/^/[firewalld:$z] /"
+      emitted=1
+    done
+  fi
+  if command -v iptables >/dev/null 2>&1 && [ "$emitted" = "0" ]; then
+    sudo -n iptables -S 2>/dev/null | sed 's/^/[iptables-v4] /'
+    if command -v ip6tables >/dev/null 2>&1; then
+      sudo -n ip6tables -S 2>/dev/null | sed 's/^/[iptables-v6] /'
+    fi
+  fi
+{{- else }}
+  if command -v pfctl >/dev/null 2>&1; then
+    sudo -n pfctl -s rules 2>/dev/null | sed 's/^/[pf:rules] /'
+    sudo -n pfctl -s nat 2>/dev/null | sed 's/^/[pf:nat] /'
+    sudo -n pfctl -s info 2>/dev/null | sed 's/^/[pf:info] /'
+  fi
+  # macOS Application Firewall (/usr/libexec/ApplicationFirewall/socketfilterfw)
+  if [ -x /usr/libexec/ApplicationFirewall/socketfilterfw ]; then
+    /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | sed 's/^/[alf] /'
+    /usr/libexec/ApplicationFirewall/socketfilterfw --getstealthmode 2>/dev/null | sed 's/^/[alf] /'
+  fi
+{{- end }}
+  """,
+  # 2. Listening sockets — what's bound, by which process
+  """
+  if command -v ss >/dev/null 2>&1; then
+    (sudo -n ss -tlnp 2>/dev/null || ss -tlnp 2>/dev/null) | tail -n +2 | sed 's/^/[tcp:listen] /'
+    (sudo -n ss -ulnp 2>/dev/null || ss -ulnp 2>/dev/null) | tail -n +2 | sed 's/^/[udp:listen] /'
+  elif command -v lsof >/dev/null 2>&1; then
+    sudo -n lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | tail -n +2 | sed 's/^/[tcp:listen] /'
+    sudo -n lsof -nP -iUDP 2>/dev/null | tail -n +2 | sed 's/^/[udp:listen] /'
+  fi
+  """,
+  # 3. Established connections — who's connected right now
+  """
+  if command -v ss >/dev/null 2>&1; then
+    (sudo -n ss -tnp state established 2>/dev/null || ss -tnp state established 2>/dev/null) \
+      | tail -n +2 | sed 's/^/[tcp:est] /'
+  elif command -v lsof >/dev/null 2>&1; then
+    sudo -n lsof -nP -iTCP -sTCP:ESTABLISHED 2>/dev/null | tail -n +2 | sed 's/^/[tcp:est] /'
+  fi
+  """,
+  # 4. Default policies / zone summary
+  """
+{{- if eq .chezmoi.os "linux" }}
+  if command -v ufw >/dev/null 2>&1; then
+    sudo -n ufw status verbose 2>/dev/null | sed 's/^/[ufw:status] /'
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    printf '[firewalld:default-zone] %s\\n' "$(sudo -n firewall-cmd --get-default-zone 2>/dev/null)"
+    printf '[firewalld:active-zones] %s\\n' "$(sudo -n firewall-cmd --get-active-zones 2>/dev/null | tr '\\n' ' ')"
+    printf '[firewalld:state] %s\\n' "$(sudo -n firewall-cmd --state 2>/dev/null)"
+  fi
+  if command -v iptables >/dev/null 2>&1; then
+    sudo -n iptables -L -n -v 2>/dev/null | head -3 | sed 's/^/[iptables:policy] /'
+  fi
+{{- else }}
+  if [ -x /usr/libexec/ApplicationFirewall/socketfilterfw ]; then
+    /usr/libexec/ApplicationFirewall/socketfilterfw --listapps 2>/dev/null | sed 's/^/[alf:app] /'
+  fi
+{{- end }}
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Per-row detail — resolve port to service, show owning process
+  """
+  row='{}'
+  case "$row" in
+    *'[tcp:listen]'*|*'[udp:listen]'*|*'[tcp:est]'*)
+      # Try to extract local port (after last :) and PID (users:(("name",pid=NNNN,fd=N)))
+      port=$(printf '%s\\n' "$row" | grep -oE ':[0-9]+' | tail -2 | head -1 | tr -d ':')
+      pid=$(printf '%s\\n' "$row" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+      [ -z "$pid" ] && pid=$(printf '%s\\n' "$row" | grep -oE '[A-Za-z_][A-Za-z0-9_-]*\\s+[0-9]+' | head -1 | awk '{print $2}')
+      if [ -n "$port" ]; then
+        printf '== port %s ==\\n' "$port"
+        getent services "$port" 2>/dev/null \
+          || awk -v p="$port" '$2 ~ p"\\\\/" {print; exit}' /etc/services 2>/dev/null \
+          || printf '(no /etc/services entry)\\n'
+      fi
+      if [ -n "$pid" ]; then
+        printf '\\n== pid %s ==\\n' "$pid"
+        ps -o pid,ppid,user,etime,cmd -p "$pid" 2>/dev/null
+        printf '\\n== process tree (parents) ==\\n'
+        cur=$pid
+        for _ in 1 2 3 4 5; do
+          [ -z "$cur" ] || [ "$cur" = "0" ] && break
+          line=$(ps -o pid,ppid,user,cmd -p "$cur" 2>/dev/null | tail -n +2)
+          [ -z "$line" ] && break
+          printf '  %s\\n' "$line"
+          cur=$(printf '%s' "$line" | awk '{print $2}')
+        done
+      fi
+      ;;
+    *'[nft]'*|*'[iptables'*|*'[ufw'*|*'[firewalld'*|*'[pf:'*|*'[alf]'*)
+      printf '%s\\n' "$row"
+      ;;
+    *)
+      printf '%s\\n' "$row"
+      ;;
+  esac
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Firewall"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:drill"
+alt-e = "actions:edit_config"
+alt-r = "actions:reload_rules"
+ctrl-y = "actions:copy_row"
+
+[actions.drill]
+description = "Open the row's full context (process tree / matching rules) in lnav"
+command = """
+row='{}'
+tmp=$(mktemp)
+{
+  echo "$row"
+  echo
+  case "$row" in
+    *'[tcp:listen]'*|*'[udp:listen]'*|*'[tcp:est]'*)
+      pid=$(printf '%s\\n' "$row" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+      port=$(printf '%s\\n' "$row" | grep -oE ':[0-9]+' | tail -2 | head -1 | tr -d ':')
+      if [ -n "$pid" ]; then
+        echo "== ps tree =="
+        ps -o pid,ppid,user,etime,cmd -p "$pid" 2>/dev/null
+        echo
+        echo "== open files (lsof -p $pid) =="
+        sudo lsof -p "$pid" 2>/dev/null | head -50
+      fi
+      if [ -n "$port" ]; then
+        echo
+        echo "== other processes touching :$port =="
+        sudo ss -tnp "( sport = :$port or dport = :$port )" 2>/dev/null
+      fi
+      ;;
+    *'[ufw]'*)
+      echo "== ufw status verbose =="
+      sudo ufw status verbose
+      ;;
+    *'[nft]'*)
+      echo "== full nft ruleset =="
+      sudo nft list ruleset
+      ;;
+    *'[iptables-v4]'*)
+      echo "== iptables -L -n -v =="
+      sudo iptables -L -n -v
+      ;;
+    *'[firewalld'*)
+      echo "== firewall-cmd --list-all-zones =="
+      sudo firewall-cmd --list-all-zones
+      ;;
+    *'[pf:'*)
+      echo "== pfctl -s all =="
+      sudo pfctl -s all
+      ;;
+  esac
+} > "$tmp"
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$tmp"
+else
+  less -R "$tmp"
+fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.edit_config]
+description = "Edit firewall config (best-effort detection)"
+command = """
+if [ -d /etc/ufw ]; then
+  exec sudo "${EDITOR:-vi}" /etc/ufw/before.rules
+elif [ -d /etc/nftables.d ] || [ -f /etc/nftables.conf ]; then
+  exec sudo "${EDITOR:-vi}" /etc/nftables.conf
+elif [ -d /etc/iptables ]; then
+  exec sudo "${EDITOR:-vi}" /etc/iptables/rules.v4
+elif [ -d /etc/firewalld ]; then
+  exec sudo "${EDITOR:-vi}" /etc/firewalld/firewalld.conf
+elif [ -f /etc/pf.conf ]; then
+  exec sudo "${EDITOR:-vi}" /etc/pf.conf
+else
+  echo "no firewall config found"; read -r _
+fi
+"""
+mode = "execute"
+
+[actions.reload_rules]
+description = "Reload firewall rules (best-effort)"
+command = """
+if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q 'Status: active'; then
+  sudo ufw reload
+elif command -v nft >/dev/null 2>&1 && [ -f /etc/nftables.conf ]; then
+  sudo nft -f /etc/nftables.conf
+elif command -v firewall-cmd >/dev/null 2>&1; then
+  sudo firewall-cmd --reload
+elif command -v pfctl >/dev/null 2>&1 && [ -f /etc/pf.conf ]; then
+  sudo pfctl -f /etc/pf.conf
+else
+  echo "no recognised firewall to reload"
+fi
+read -r _
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

@@ -1,0 +1,287 @@
+# scheduled jobs channel for television (tv)
+# Inventory all forms of "this will run automatically": crontabs, systemd
+# timers, at jobs, anacron. Critical surface for persistence detection
+# (attacker's favourite hiding spot) AND for "what will hammer this box
+# tonight at 3am?" capacity questions.
+#
+# See docs/sysadmin/scheduled-jobs.md.
+#
+# Source cycling (Ctrl+S):
+#   1. User crontabs (per-user, via crontab -l for each known user)
+{{- if eq .chezmoi.os "linux" }}
+#   2. System crontabs (/etc/crontab + /etc/cron.d/* + /etc/cron.{hourly,daily,weekly,monthly}/)
+#   3. systemd timers (active timer units with next-run + last-run)
+#   4. at jobs (one-shot scheduled jobs via at(1))
+#   5. anacron (/etc/anacrontab if present)
+{{- else }}
+#   2. launchd: /Library/Launch{Agents,Daemons}/ + ~/Library/LaunchAgents/
+{{- end }}
+#
+# Preview cycling (Ctrl+F):
+#   1. Per-row detail (decode cron schedule, show command + owner; for
+#      systemd timers, show next/last run)
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    Drill: full job context in lnav
+#   Alt+E    Edit user's crontab (crontab -e <user>) or systemd unit
+#   Alt+T    Tail the relevant log (cron.log / journalctl)
+#   Ctrl+Y   Copy row
+
+[metadata]
+name = "scheduled-jobs"
+description = "All scheduled jobs (cron / systemd timers / at / launchd)"
+requirements = []
+
+[source]
+command = [
+  # 1. User crontabs — iterate users with login shells
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  users=$(dscl . -list /Users UniqueID 2>/dev/null | awk '$2 !~ /^_/ && $2 >= 500 {print $1}')
+{{- else }}
+  users=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65000 || $1 == "root" {print $1}')
+{{- end }}
+  printf '%s\\n' "$users" | while read -r u; do
+    [ -z "$u" ] && continue
+    # crontab -l -u needs root; try direct first, fall back to sudo
+    out=$(crontab -l -u "$u" 2>/dev/null || sudo -n crontab -l -u "$u" 2>/dev/null)
+    [ -z "$out" ] && continue
+    printf '%s\\n' "$out" | grep -vE '^\\s*(#|$)' | while read -r line; do
+      printf '[crontab:%s] %s\\n' "$u" "$line"
+    done
+  done
+  """,
+{{- if eq .chezmoi.os "linux" }}
+  # 2. System crontabs
+  """
+  if [ -f /etc/crontab ]; then
+    grep -vE '^\\s*(#|$)' /etc/crontab 2>/dev/null | sed 's|^|[etc-crontab] |'
+  fi
+  if [ -d /etc/cron.d ]; then
+    for f in /etc/cron.d/*; do
+      [ -f "$f" ] || continue
+      base=$(basename "$f")
+      grep -vE '^\\s*(#|$)' "$f" 2>/dev/null | sed "s|^|[cron.d:$base] |"
+    done
+  fi
+  for d in /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly; do
+    [ -d "$d" ] || continue
+    base=$(basename "$d")
+    for f in "$d"/*; do
+      [ -f "$f" ] || continue
+      printf '[%s] %s\\n' "$base" "$(basename "$f")"
+    done
+  done
+  """,
+  # 3. systemd timers — active timers with NEXT / LAST + the unit they trigger
+  """
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-timers --all --no-pager --no-legend 2>/dev/null \
+      | awk '{printf "[timer] NEXT=%s LAST=%s UNIT=%s ACTIVATES=%s\\n", $1" "$2" "$3, $5" "$6" "$7, $9, $10}'
+    # User scope (if logged-in user has any)
+    systemctl --user list-timers --all --no-pager --no-legend 2>/dev/null \
+      | awk '{printf "[timer:user] NEXT=%s LAST=%s UNIT=%s ACTIVATES=%s\\n", $1" "$2" "$3, $5" "$6" "$7, $9, $10}'
+  fi
+  """,
+  # 4. at jobs (one-shot scheduled commands)
+  """
+  if command -v atq >/dev/null 2>&1; then
+    atq 2>/dev/null | sed 's|^|[at] |'
+  fi
+  """,
+  # 5. anacron
+  """
+  if [ -f /etc/anacrontab ]; then
+    grep -vE '^\\s*(#|$)' /etc/anacrontab 2>/dev/null | sed 's|^|[anacrontab] |'
+  fi
+  """,
+{{- else }}
+  # 2. launchd plists
+  """
+  for d in /Library/LaunchDaemons /Library/LaunchAgents "$HOME/Library/LaunchAgents"; do
+    [ -d "$d" ] || continue
+    base=$(basename "$d")
+    for f in "$d"/*.plist; do
+      [ -f "$f" ] || continue
+      label=$(/usr/libexec/PlistBuddy -c 'Print :Label' "$f" 2>/dev/null)
+      prog=$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' "$f" 2>/dev/null \
+        | tr '\\n' ' ' | sed -E 's/Array \\{|\\}//g; s/^[[:space:]]+//')
+      [ -z "$prog" ] && prog=$(/usr/libexec/PlistBuddy -c 'Print :Program' "$f" 2>/dev/null)
+      printf '[launchd:%s] %s | %s\\n' "$base" "${label:-$(basename "$f" .plist)}" "${prog:-(no program)}"
+    done
+  done
+  """,
+{{- end }}
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Per-row detail
+  """
+  row='{}'
+  case "$row" in
+    '[crontab:'*)
+      user=$(printf '%s\\n' "$row" | sed -E 's/^\\[crontab:([^]]+)\\].*/\\1/')
+      printf '== crontab owner: %s ==\\n' "$user"
+      id "$user" 2>/dev/null || true
+      printf '\\n== crontab entry ==\\n%s\\n' "${row#*] }"
+      printf '\\n== full crontab for %s ==\\n' "$user"
+      crontab -l -u "$user" 2>/dev/null || sudo -n crontab -l -u "$user" 2>/dev/null
+      ;;
+    '[timer]'*|'[timer:user]'*)
+      unit=$(printf '%s\\n' "$row" | grep -oE 'UNIT=[^ ]+' | cut -d= -f2)
+      activates=$(printf '%s\\n' "$row" | grep -oE 'ACTIVATES=.*' | cut -d= -f2)
+      printf '== timer: %s ==\\n' "$unit"
+      systemctl status "$unit" --no-pager 2>/dev/null | head -15
+      printf '\\n== triggered service: %s ==\\n' "$activates"
+      systemctl status "$activates" --no-pager 2>/dev/null | head -15
+      ;;
+    '[etc-crontab]'*|'[cron.d:'*|'[cron.'*)
+      printf '%s\\n' "$row"
+      ;;
+    '[launchd:'*)
+      label=$(printf '%s\\n' "$row" | awk -F'[][]' '{print $2}' | cut -d: -f2)
+      printf '== launchd label: %s ==\\n' "$label"
+      launchctl list 2>/dev/null | grep -F "$label" || printf '(not loaded)\\n'
+      ;;
+    '[at]'*)
+      jobid=$(printf '%s\\n' "$row" | awk '{print $2}')
+      printf '== at job %s ==\\n' "$jobid"
+      at -c "$jobid" 2>/dev/null | tail -20
+      ;;
+    *)
+      printf '%s\\n' "$row" ;;
+  esac
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Scheduled jobs"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:drill"
+alt-e = "actions:edit"
+alt-t = "actions:tail_log"
+ctrl-y = "actions:copy_row"
+
+[actions.drill]
+description = "Open full job context in lnav"
+command = """
+row='{}'
+tmp=$(mktemp)
+{
+  echo "$row"; echo
+  case "$row" in
+    '[crontab:'*)
+      u=$(printf '%s\\n' "$row" | sed -E 's/^\\[crontab:([^]]+)\\].*/\\1/')
+      echo "== full crontab for $u =="
+      crontab -l -u "$u" 2>/dev/null || sudo crontab -l -u "$u"
+      ;;
+    '[timer]'*|'[timer:user]'*)
+      unit=$(printf '%s\\n' "$row" | grep -oE 'UNIT=[^ ]+' | cut -d= -f2)
+      activates=$(printf '%s\\n' "$row" | grep -oE 'ACTIVATES=.*' | cut -d= -f2)
+      echo "== systemctl cat $unit =="
+      systemctl cat "$unit" 2>/dev/null
+      echo
+      echo "== systemctl cat $activates =="
+      systemctl cat "$activates" 2>/dev/null
+      echo
+      echo "== last 30 logs for $activates =="
+      sudo journalctl -u "$activates" --no-pager -n 30
+      ;;
+    '[etc-crontab]'*)
+      cat /etc/crontab ;;
+    '[cron.d:'*)
+      f=$(printf '%s\\n' "$row" | sed -E 's/^\\[cron.d:([^]]+)\\].*/\\1/')
+      sudo cat "/etc/cron.d/$f" ;;
+    '[cron.'*)
+      cat=$(printf '%s\\n' "$row" | awk -F'[][]' '{print $2}')
+      script=$(printf '%s\\n' "$row" | awk '{print $NF}')
+      sudo cat "/etc/$cat/$script" 2>/dev/null
+      ;;
+    '[launchd:'*)
+      d=$(printf '%s\\n' "$row" | awk -F'[][]' '{print $2}' | cut -d: -f1)
+      label=$(printf '%s\\n' "$row" | awk -F'[][]' '{print $2}' | cut -d: -f2)
+      for cand in "/Library/$d/$label.plist" "$HOME/Library/$d/$label.plist"; do
+        [ -f "$cand" ] && { echo "== $cand =="; cat "$cand"; break; }
+      done
+      ;;
+  esac
+} > "$tmp"
+if command -v lnav >/dev/null 2>&1; then lnav "$tmp"; else less -R "$tmp"; fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.edit]
+description = "Edit user's crontab / systemd unit"
+command = """
+row='{}'
+case "$row" in
+  '[crontab:'*)
+    u=$(printf '%s\\n' "$row" | sed -E 's/^\\[crontab:([^]]+)\\].*/\\1/')
+    if [ "$u" = "$(id -un)" ]; then
+      exec crontab -e
+    else
+      exec sudo crontab -e -u "$u"
+    fi
+    ;;
+  '[timer]'*)
+    unit=$(printf '%s\\n' "$row" | grep -oE 'UNIT=[^ ]+' | cut -d= -f2)
+    exec sudo systemctl edit --full "$unit"
+    ;;
+  '[etc-crontab]'*) exec sudo "${EDITOR:-vi}" /etc/crontab ;;
+  '[cron.d:'*)
+    f=$(printf '%s\\n' "$row" | sed -E 's/^\\[cron.d:([^]]+)\\].*/\\1/')
+    exec sudo "${EDITOR:-vi}" "/etc/cron.d/$f" ;;
+  *) echo "no edit handler for this row type"; read -r _ ;;
+esac
+"""
+mode = "execute"
+
+[actions.tail_log]
+description = "Tail the relevant log (cron / systemd journal)"
+command = """
+row='{}'
+case "$row" in
+  '[timer]'*|'[timer:user]'*)
+    activates=$(printf '%s\\n' "$row" | grep -oE 'ACTIVATES=.*' | cut -d= -f2)
+    exec sudo journalctl -fu "$activates"
+    ;;
+  *)
+    if command -v journalctl >/dev/null 2>&1; then
+      exec sudo journalctl -f _COMM=cron _COMM=CROND _COMM=anacron
+    elif [ -f /var/log/cron.log ]; then
+      exec sudo tail -F /var/log/cron.log
+    elif [ -f /var/log/syslog ]; then
+      exec sudo grep -i 'cron\\|crond' /var/log/syslog | tail -30
+    else
+      echo "no cron log found"; read -r _
+    fi
+    ;;
+esac
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

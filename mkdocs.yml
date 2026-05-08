@@ -73,6 +73,8 @@ plugins:
             sudo auditing (Level 1): sudo 審計 (Level 1)
             Process accounting (Level 2): Process accounting (Level 2)
             auditd framework (Level 3): auditd 框架 (Level 3)
+            Firewall and network exposure: Firewall 與網路曝險面
+            "Scheduled jobs (cron / timers / launchd)": "排程任務（cron / timer / launchd）"
             Atuin vs audit: Atuin vs audit
             Cookbook (scenario recipes): Cookbook（場景食譜）
             Helpers in this repo: 本 repo 提供的 helper
@@ -288,6 +290,7 @@ nav:
           - SMS (Huawei router): tools/sms.md
           - pqsum: tools/pqsum.md
           - direnv: tools/direnv.md
+          - macOS swap & memory: tools/macos-swap.md
       - chezmoi conventions:
           - chezmoi prefixes: tools/chezmoi-prefixes.md
           - chezmoi templating: tools/chezmoi-templating.md
@@ -299,6 +302,8 @@ nav:
       - sudo auditing (Level 1): sysadmin/sudo-audit.md
       - Process accounting (Level 2): sysadmin/process-accounting.md
       - auditd framework (Level 3): sysadmin/auditd.md
+      - Firewall and network exposure: sysadmin/firewall.md
+      - Scheduled jobs (cron / timers / launchd): sysadmin/scheduled-jobs.md
       - Atuin vs audit: sysadmin/atuin-vs-audit.md
       - Cookbook (scenario recipes): sysadmin/cookbook.md
       - Helpers in this repo: sysadmin/helpers.md

@@ -589,6 +589,14 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `user-sudoers` | function | `dot_config/shell/45_audit.sh.tmpl` | Who can sudo: members of sudo/wheel/admin groups + user-bearing lines from `/etc/sudoers` and `/etc/sudoers.d/`. |
 | `user-ssh-keys [user]` | function | `dot_config/shell/45_audit.sh.tmpl` | List `authorized_keys` entries (`<user> <fingerprint> <comment>`); scans all home dirs if no user. |
 | `user-recent-changes [--days N]` | function | `dot_config/shell/45_audit.sh.tmpl` | Recent `/etc/passwd` `/etc/shadow` `/etc/sudoers` writes via `ausearch -k identity` + `-k sudoers`. |
+| `fw-rules` | function | `dot_config/shell/45_audit.sh.tmpl` | Active firewall rules across all backends: nft, iptables, ufw, firewalld (Linux); pf + Application Firewall (macOS). |
+| `fw-listening` | function | `dot_config/shell/45_audit.sh.tmpl` | Bound TCP+UDP sockets with owning process. Prefers `ss -tlnp` / `ss -ulnp`; falls back to `lsof`. |
+| `fw-conn [--all]` | function | `dot_config/shell/45_audit.sh.tmpl` | Established TCP connections; `--all` includes all states. |
+| `fw-port <port>` | function | `dot_config/shell/45_audit.sh.tmpl` | Find process bound to / connected via `<port>`. Useful for "port already in use" debugging. |
+| `cron-list [--user U \| --system \| --timers]` | function | `dot_config/shell/45_audit.sh.tmpl` | Inventory all scheduled jobs: user crontabs + system cron + systemd timers + at + launchd. Filters narrow scope. |
+| `mac-mem-status` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Single-screen memory + swap + storage report: `vm.swapusage`, `memory_pressure`, parsed `vm_stat`, swapfile sizes (`/System/Volumes/VM/swapfile*`), top 10 by compressed-aware memory (`top -o mem`), TM local snapshot count, color-coded verdict. No sudo. See [tools/macos-swap.md](../tools/macos-swap.md). |
+| `mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Interactive cleanup. Always-safe: `sudo purge`. Opt-in via `--include`: `spotlight` (`killall mds_stores+mdworker_shared`), `snapshots` (`tmutil thinlocalsnapshots / 5GB 4`), `sleepimage` (delete `/private/var/vm/sleepimage` — laptop-unsafe), `windowserver` (`sudo killall -HUP WindowServer` — logs you out). |
+| `mac-mem-watch [INTERVAL_SEC]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Live one-line-per-tick tail: free/compressed/swap_used + pageins/pageouts/swapins/swapouts per second. Default 5s. Designed for tmux side panes. |
 
 ---
 
