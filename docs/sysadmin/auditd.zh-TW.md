@@ -150,6 +150,70 @@ sudo aureport --start today --summary -i
 
 完整對照表見 [本 repo 提供的 helper](helpers.md)。
 
+## FAQ
+
+### 為什麼 `/etc/audit/rules.d/` 不用 chezmoi 管（例如 `create_`）？
+
+三個原因都不行：
+
+1. **路徑寫死在 auditd 裡**。`auditd.service` 啟動時跑 `augenrules
+   --load`，**只**讀 `/etc/audit/rules.d/*.rules`。User 路徑
+   (`~/.config/audit/...`) daemon 看不到。不像 user-space 工具
+   (tmux、nvim) 自己決定 config 路徑，audit 是 kernel 子系統，路徑固定。
+2. **檔案必須是 `root:root` mode 0640**。chezmoi 跑在 user 權限下，
+   物理上寫不到 `/etc/`。`create_` 解決不了 — 它是 chezmoi 的*部署
+   語意*（種子一次），不是提權。目標必須在 chezmoi 管理的 home 裡。
+3. **Audit rules 是 system-wide 的**。Kernel 一次只有一份規則集，
+   影響所有 user。「per-user dotfile」模型本來就不適用。
+
+本 repo 的分工是：
+
+| 工具 | 範圍 | 權限 | 例子 |
+|---|---|---|---|
+| chezmoi | user-space (`~/.config/`、`~/.zshrc`) | user | shell aliases、tmux config |
+| ansible | system-wide (`/etc/`、`apt install`、systemd) | root via `become: true` | auditd 規則、Docker daemon config、`/etc/shells` |
+
+`auditd` role 跟 `docker`（裝 daemon + 寫 `/etc/docker/daemon.json` +
+把 user 加到 docker group）和 `bash`（brew 裝 bash 5.x + 改
+`/etc/shells` + `chsh`）是同一類。三者都是 install-once + idempotent
+（[`docs/this_repo/upgrades.md`](../this_repo/upgrades.md) 的
+install-vs-upgrade split 讓 `chezmoi apply` 不會每次重 bump），符合
+「one-time setup」直覺 — 只是執行者是 ansible-with-sudo 而不是
+chezmoi prefix。
+
+### 我可以手動編輯規則檔嗎？
+
+可以，但下次 `chezmoi apply` 會被覆蓋（role 用
+`ansible.builtin.copy` force-replace）。host-specific 調整推薦：
+
+- 新建 `/etc/audit/rules.d/50-local.rules` 檔（任何不在 role 管理集
+  `00-baseline`、`05-privileged`、`10-execve`、`99-finalize` 的檔名）。
+  Role 不碰其他檔名。
+- 或透過
+  [`docs/this_repo/ansible_customization.md`](../this_repo/ansible_customization.md)
+  的標準 ansible override 路徑 per-host 覆寫 role 變數
+  (`auditd_log_all_execve`、`auditd_immutable` 等)。
+
+### 怎麼看現在實際載入了什麼？
+
+```bash
+audit-rules-show     # 本 repo helper
+# 或：
+sudo auditctl -l
+```
+
+如果 `chezmoi apply` 後 `auditctl -l` 顯示 `No rules`，看
+`journalctl -u auditd` — role 有放檔，但 augenrules 在規則語法錯時
+會安靜失敗。Handler 也會跑 `augenrules --load`，失敗會出現在 apply log。
+
+### 為什麼我某 key 下零事件？
+
+三個常見原因：
+
+1. **規則沒載入** — `audit-rules-show` 確認。
+2. **Watch 路徑在這台不存在** — auditctl 對 `-w /missing/path` 安靜跳過。
+3. **`auditd` service 沒跑** — `systemctl is-active auditd`。
+
 ## 另見
 
 - [sudo 審計](sudo-audit.md) — Level 1 起點；auditd 從 sudo log 結束

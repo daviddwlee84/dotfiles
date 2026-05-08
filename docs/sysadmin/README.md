@@ -37,6 +37,9 @@ ceiling is.
 - [auditd framework](auditd.md) — Level 3
 - [Atuin vs audit](atuin-vs-audit.md) — why personal shell history is not
   the right tool, with the full comparison table
+- [**Cookbook (scenario recipes)**](cookbook.md) — hands-on walkthroughs:
+  "did anyone log in from a new IP?", "user reports compromise — what
+  now?", "silence a noisy rule without re-applying", and 7 more
 - [Helpers in this repo](helpers.md) — `audit-*` shell functions and
   `tv sessions` / `tv sudo-history` / `tv audit-events` Television
   channels that wrap the queries on this page

@@ -32,6 +32,9 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 - [auditd 框架](auditd.md) — Level 3
 - [Atuin vs audit](atuin-vs-audit.md) — 為什麼個人 shell history 不是
   正確工具，含完整對照表
+- [**Cookbook（場景食譜）**](cookbook.md) — 實戰導覽：「有人從新 IP
+  登入嗎？」、「user 回報被入侵 — 現在該做什麼？」、「不重 apply 就
+  關掉吵雜規則」，加另外 7 篇
 - [本 repo 提供的 helper](helpers.md) — `audit-*` shell 函式 + `tv
   sessions` / `tv sudo-history` / `tv audit-events` Television channel
 

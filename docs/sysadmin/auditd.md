@@ -160,6 +160,76 @@ sudo aureport --start today --summary -i
 
 See [Helpers in this repo](helpers.md) for the full table.
 
+## FAQ
+
+### Why isn't `/etc/audit/rules.d/` managed by chezmoi (e.g. via `create_`)?
+
+Three reasons it can't:
+
+1. **Path is hard-coded in auditd**. `auditd.service` runs `augenrules
+   --load`, which only reads `/etc/audit/rules.d/*.rules`. User paths
+   (`~/.config/audit/...`) are invisible to the daemon. Unlike user-space
+   tools (tmux, nvim) that pick their own config path, audit is a kernel
+   subsystem with a fixed system path.
+2. **Files must be `root:root` mode 0640**. chezmoi runs as the user; it
+   physically cannot write to `/etc/`. `create_` doesn't fix this — it's
+   a chezmoi *deployment semantic* (seed once), not a privilege
+   escalation. The target must be inside the chezmoi-managed home.
+3. **Audit rules are system-wide**. The kernel has one rule set,
+   affecting every user. The "per-user dotfile" model doesn't apply.
+
+This repo's split is:
+
+| Tool | Scope | Privilege | Examples |
+|---|---|---|---|
+| chezmoi | user-space (`~/.config/`, `~/.zshrc`) | user | shell aliases, tmux config |
+| ansible | system-wide (`/etc/`, `apt install`, systemd) | root via `become: true` | auditd rules, Docker daemon config, `/etc/shells` |
+
+The `auditd` role is in the same category as `docker` (installs daemon
++ writes `/etc/docker/daemon.json` + adds user to docker group) and
+`bash` (brew-installs bash 5.x + edits `/etc/shells` + `chsh`). All
+three are install-once + idempotent (the install-vs-upgrade split in
+[`docs/this_repo/upgrades.md`](../this_repo/upgrades.md) keeps
+`chezmoi apply` from re-bumping them every run), which matches the
+"one-time setup" intuition — just executed by ansible-with-sudo
+instead of a chezmoi prefix.
+
+### Can I edit rule files by hand on a host?
+
+Yes, but `chezmoi apply` will overwrite them on the next run because
+the role uses `ansible.builtin.copy` (force-replace semantics). For
+host-specific tweaks, prefer:
+
+- A new `/etc/audit/rules.d/50-local.rules` file (any filename outside
+  the role's managed set: `00-baseline`, `05-privileged`,
+  `10-execve`, `99-finalize`). The role won't touch other filenames.
+- Or override the role variables (`auditd_log_all_execve`,
+  `auditd_immutable`, etc.) per host via the standard ansible
+  override path documented in
+  [`docs/this_repo/ansible_customization.md`](../this_repo/ansible_customization.md).
+
+### How do I see what's actually loaded right now?
+
+```bash
+audit-rules-show     # this repo's helper
+# or:
+sudo auditctl -l
+```
+
+If `auditctl -l` shows `No rules` after `chezmoi apply`, check
+`journalctl -u auditd` — the role drops files but augenrules can
+fail silently if a syntax error sneaks in. The handler also runs
+`augenrules --load` so any failure shows up in the apply log.
+
+### Why is my host showing zero events under a key?
+
+Three usual causes:
+
+1. **Rule wasn't loaded** — `audit-rules-show` to confirm.
+2. **Watch path doesn't exist on this host** — auditctl silently skips
+   `-w /missing/path` rules.
+3. **`auditd` service not running** — `systemctl is-active auditd`.
+
 ## See also
 
 - [sudo auditing](sudo-audit.md) — Level 1 starting point; auditd
