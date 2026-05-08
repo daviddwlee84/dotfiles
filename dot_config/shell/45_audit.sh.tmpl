@@ -1,0 +1,273 @@
+# shellcheck shell=sh
+# audit-* helpers — sysadmin queries for "who did what on this server"
+#
+# POSIX-portable wrappers around last / lastlog / journalctl / ausearch /
+# aureport. Sourced by both bash and zsh via load_modular_dir of
+# ~/.config/shell/. See docs/sysadmin/helpers.md for the full reference
+# table and docs/sysadmin/README.md for the audit hierarchy this lives
+# under (Levels 0-3).
+#
+# Conventions:
+#   - All audit-* functions accept --help.
+#   - When the underlying source is root-only and the user is not root:
+#       interactive TTY  -> single `sudo -v` prompt, then sudo <cmd>
+#       non-interactive  -> exit 1 with stderr hint
+#   - All functions exit 0 on broken pipe (head | less etc.) — no
+#     SIGPIPE noise.
+#   - Distro detection avoided where journalctl works for both
+#     Debian/RHEL (we just query the journal); only auth.log vs secure
+#     fallback paths use distro detection.
+
+# ---------------------------------------------------------------------------
+# Internal helpers (prefix _audit_ — not part of public surface)
+# ---------------------------------------------------------------------------
+
+_audit_is_tty() { [ -t 0 ] && [ -t 1 ]; }
+_audit_is_root() { [ "$(id -u)" = "0" ]; }
+
+# Run "$@" with sudo if not root; if root, run directly.
+# If sudo would prompt and we're non-interactive, fail with hint.
+_audit_run_root() {
+    if _audit_is_root; then
+        "$@"
+        return $?
+    fi
+    if ! command -v sudo >/dev/null 2>&1; then
+        printf 'audit: needs root and sudo not installed\n' >&2
+        return 1
+    fi
+    if _audit_is_tty; then
+        # Refresh the timestamp once; subsequent calls within the cache
+        # window run silently.
+        sudo -v || return 1
+        sudo "$@"
+    else
+        # Try non-interactive first; if sudo asks for password, give up.
+        if sudo -n true 2>/dev/null; then
+            sudo -n "$@"
+        else
+            printf 'audit: needs root; re-run with sudo or in an interactive shell\n' >&2
+            return 1
+        fi
+    fi
+}
+
+# Detect which distro auth log file exists. Echoes file path or empty.
+_audit_authlog_path() {
+    if [ -r /var/log/auth.log ] 2>/dev/null || [ -e /var/log/auth.log ]; then
+        printf '/var/log/auth.log\n'
+    elif [ -r /var/log/secure ] 2>/dev/null || [ -e /var/log/secure ]; then
+        printf '/var/log/secure\n'
+    fi
+}
+
+_audit_have() { command -v "$1" >/dev/null 2>&1; }
+
+_audit_help() {
+    # Usage: _audit_help <function-name> <one-liner> [more lines...]
+    name=$1; shift
+    printf 'Usage: %s\n\n' "$name"
+    for line in "$@"; do printf '  %s\n' "$line"; done
+}
+
+# ---------------------------------------------------------------------------
+# audit-sessions [user]
+#   Level 0. Who logged in? when? from where?
+# ---------------------------------------------------------------------------
+audit-sessions() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'audit-sessions [user]' \
+                'Recent login sessions via last(1).' \
+                'On Linux also runs lastlog and shows currently-logged-in users.' \
+                'No sudo needed (wtmp/utmp are world-readable).'
+            return 0 ;;
+    esac
+    user=${1:-}
+    printf '== last (login history) ==\n'
+{{- if eq .chezmoi.os "darwin" }}
+    if [ -n "$user" ]; then last "$user" | head -50
+    else last | head -50
+    fi
+{{- else }}
+    if [ -n "$user" ]; then last -F -i "$user" | head -50
+    else last -F -i | head -50
+    fi
+    if _audit_have lastlog; then
+        printf '\n== lastlog (last login per account) ==\n'
+        if [ -n "$user" ]; then lastlog -u "$user"
+        else lastlog | awk 'NR==1 || $2 != "**Never"'
+        fi
+    fi
+{{- end }}
+    printf '\n== who -a (current sessions) ==\n'
+    who -a 2>/dev/null || who
+}
+
+# ---------------------------------------------------------------------------
+# audit-failed-logins
+#   Level 0. Failed login attempts via lastb(1). Linux only; root-only file.
+# ---------------------------------------------------------------------------
+audit-failed-logins() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'audit-failed-logins' \
+                'Failed login attempts (Linux btmp). Reads /var/log/btmp via lastb.' \
+                'Requires sudo.'
+            return 0 ;;
+    esac
+{{- if eq .chezmoi.os "linux" }}
+    if ! _audit_have lastb; then
+        printf 'audit-failed-logins: lastb(1) not found (install util-linux)\n' >&2
+        return 1
+    fi
+    _audit_run_root lastb -F -i | head -50
+{{- else }}
+    printf 'audit-failed-logins: not supported on %s (Linux btmp only)\n' "$(uname -s)" >&2
+    return 1
+{{- end }}
+}
+
+# ---------------------------------------------------------------------------
+# audit-sudo [user]
+#   Level 1. Who used sudo and what top-level command was invoked.
+# ---------------------------------------------------------------------------
+audit-sudo() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'audit-sudo [user]' \
+                'Sudo events: who escalated, what top-level command, success/failure.' \
+                'Prefers journalctl _COMM=sudo on systemd; falls back to grepping' \
+                '/var/log/auth.log (Debian) or /var/log/secure (RHEL).' \
+                'Requires sudo (auth log is root-only).' \
+                'NOTE: only captures the sudo line itself — anything typed inside' \
+                '`sudo bash` / `sudo -i` is invisible. See docs/sysadmin/sudo-audit.md.'
+            return 0 ;;
+    esac
+    user=${1:-}
+    if _audit_have journalctl; then
+        if [ -n "$user" ]; then
+            _audit_run_root journalctl _COMM=sudo --since '7 days ago' --no-pager \
+                | grep -E "(^| )$user( |:|$)" || true
+        else
+            _audit_run_root journalctl _COMM=sudo --since '7 days ago' --no-pager
+        fi
+        return $?
+    fi
+    log=$(_audit_authlog_path)
+    if [ -z "$log" ]; then
+        printf 'audit-sudo: no journalctl and no /var/log/auth.log|secure found\n' >&2
+        return 1
+    fi
+    if [ -n "$user" ]; then
+        _audit_run_root grep -E "sudo(\[|:).*${user}" "$log"
+    else
+        _audit_run_root grep -E 'sudo(\[|:)' "$log"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# audit-execve <pattern>
+#   Level 3. Did anyone exec <pattern>? Requires auditd + execve rule.
+# ---------------------------------------------------------------------------
+audit-execve() {
+    case ${1:-} in
+        ''|-h|--help)
+            _audit_help 'audit-execve <pattern>' \
+                'Search audit log for execve() of the binary matching <pattern>.' \
+                'Wraps `ausearch -sc execve -x <pattern> -i`.' \
+                'Requires auditd installed and an execve rule in place.' \
+                'See docs/sysadmin/auditd.md for the baseline rule set this repo ships.'
+            return 0 ;;
+    esac
+    if ! _audit_have ausearch; then
+        printf 'audit-execve: ausearch(1) not found (install auditd)\n' >&2
+        return 1
+    fi
+    pat=$1
+    _audit_run_root ausearch -sc execve -x "$pat" -i 2>/dev/null \
+        || { printf 'audit-execve: no events for %s (check rules: audit-rules-show)\n' "$pat" >&2; return 1; }
+}
+
+# ---------------------------------------------------------------------------
+# audit-file <path>
+#   Level 3. Who touched this file? Requires auditd + a watch rule.
+# ---------------------------------------------------------------------------
+audit-file() {
+    case ${1:-} in
+        ''|-h|--help)
+            _audit_help 'audit-file <path>' \
+                'Search audit log for events touching <path>.' \
+                'Wraps `ausearch -f <path> -i`.' \
+                'Requires auditd AND a `-w <path>` watch rule loaded.' \
+                'Useful for: /etc/passwd, /etc/sudoers, /etc/ssh/sshd_config.'
+            return 0 ;;
+    esac
+    if ! _audit_have ausearch; then
+        printf 'audit-file: ausearch(1) not found (install auditd)\n' >&2
+        return 1
+    fi
+    path=$1
+    _audit_run_root ausearch -f "$path" -i 2>/dev/null \
+        || { printf 'audit-file: no events for %s — is a watch rule loaded? (audit-rules-show)\n' "$path" >&2; return 1; }
+}
+
+# ---------------------------------------------------------------------------
+# audit-summary [--start <when>]
+#   Level 3. Daily security summary via aureport.
+# ---------------------------------------------------------------------------
+audit-summary() {
+    start='today'
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --start) start=$2; shift 2 ;;
+            -h|--help)
+                _audit_help 'audit-summary [--start <when>]' \
+                    'Chained aureport summary: overall + auth + executables.' \
+                    'Default: --start today. Examples: --start "24h ago", --start "2024-01-01".' \
+                    'Requires auditd.'
+                return 0 ;;
+            *) printf 'audit-summary: unknown arg: %s\n' "$1" >&2; return 1 ;;
+        esac
+    done
+    if ! _audit_have aureport; then
+        printf 'audit-summary: aureport(1) not found (install auditd)\n' >&2
+        return 1
+    fi
+    printf '== Overall summary (since %s) ==\n' "$start"
+    _audit_run_root aureport --summary -i --start "$start"
+    printf '\n== Authentication events ==\n'
+    _audit_run_root aureport -au -i --start "$start"
+    printf '\n== Executable summary (top 20) ==\n'
+    _audit_run_root aureport -x -i --start "$start" | head -22
+}
+
+# ---------------------------------------------------------------------------
+# audit-rules-show
+#   Level 3. Loaded rules + persisted rule files.
+# ---------------------------------------------------------------------------
+audit-rules-show() {
+    case ${1:-} in
+        -h|--help)
+            _audit_help 'audit-rules-show' \
+                'Show rules currently loaded in the kernel (auditctl -l) and' \
+                'the persisted rule files under /etc/audit/rules.d/.'
+            return 0 ;;
+    esac
+    if ! _audit_have auditctl; then
+        printf 'audit-rules-show: auditctl(1) not found (install auditd)\n' >&2
+        return 1
+    fi
+    printf '== Loaded rules (auditctl -l) ==\n'
+    _audit_run_root auditctl -l
+    printf '\n== Persisted rules under /etc/audit/rules.d/ ==\n'
+    if [ -d /etc/audit/rules.d ]; then
+        for f in /etc/audit/rules.d/*.rules; do
+            [ -f "$f" ] || continue
+            printf '\n--- %s ---\n' "$f"
+            _audit_run_root cat "$f"
+        done
+    else
+        printf '(directory missing)\n'
+    fi
+}

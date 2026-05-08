@@ -569,6 +569,22 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ---
 
+## System admin / audit
+
+> Wrappers around `last` / `lastlog` / `journalctl` / `ausearch` / `aureport` for "who did what on this server" queries. Full guide: [docs/sysadmin/](../sysadmin/README.md). Helpers reference table: [docs/sysadmin/helpers.md](../sysadmin/helpers.md).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `audit-sessions [user]` | function | `dot_config/shell/45_audit.sh.tmpl` | Recent login sessions: `last -F -i` + `lastlog` (Linux) + `who -a`. No sudo needed. |
+| `audit-failed-logins` | function | `dot_config/shell/45_audit.sh.tmpl` | Failed login attempts via `lastb -F -i` (Linux btmp). Requires sudo. |
+| `audit-sudo [user]` | function | `dot_config/shell/45_audit.sh.tmpl` | Sudo events via `journalctl _COMM=sudo` (systemd) or `grep sudo /var/log/{auth.log,secure}`. Auto-elevates via `sudo -v`. |
+| `audit-execve <pattern>` | function | `dot_config/shell/45_audit.sh.tmpl` | `ausearch -sc execve -x <pattern> -i` — did anyone exec `<pattern>`? Requires auditd + execve rule. |
+| `audit-file <path>` | function | `dot_config/shell/45_audit.sh.tmpl` | `ausearch -f <path> -i` — who touched this file? Requires auditd + watch rule. |
+| `audit-summary [--start <when>]` | function | `dot_config/shell/45_audit.sh.tmpl` | Chained `aureport --summary` + `-au` + `-x` (top 20). Default `--start today`. |
+| `audit-rules-show` | function | `dot_config/shell/45_audit.sh.tmpl` | `auditctl -l` (loaded) + `cat /etc/audit/rules.d/*.rules` (persisted). |
+
+---
+
 ## Media / AV
 
 > Powered by `ffmpeg` (video / audio) and `ImageMagick` (image). Loaded when any media tool is on `$PATH` — typically via `installMediaTools=true`. Each function self-checks for its specific dep. See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) and [docs/tools/imagemagick.md](../tools/imagemagick.md) for the underlying tools.

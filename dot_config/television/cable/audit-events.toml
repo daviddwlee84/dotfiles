@@ -1,0 +1,163 @@
+# audit-events channel for television (tv) — Linux only, requires auditd
+# Browse audit framework events. See docs/sysadmin/auditd.md and
+# docs/sysadmin/helpers.md.
+#
+# Suppressed on macOS via .chezmoiignore.tmpl.
+#
+# Source cycling (Ctrl+S):
+#   1. aureport --summary -i           (overall summary lines)
+#   2. ausearch -k <baseline-key> -i   (per-key recent events for the
+#      keys this repo's auditd role ships: identity, privileged, sudoers,
+#      sshd_config, audit_config, time-change, access-denied)
+#   3. aureport -au -i                 (authentication events)
+#   4. aureport -x -i                  (executable summary, top 50)
+#
+# Preview cycling (Ctrl+F):
+#   1. ausearch -i -a <eventid>  for the selected row (when an event id
+#      is parseable from the line)
+#   2. raw row
+#
+# Keybindings:
+#   Enter    Open event in lnav
+#   Alt+E    Edit /etc/audit/rules.d/ in $EDITOR
+#   Alt+R    Reload rules: sudo augenrules --load
+#   Ctrl+Y   Copy row
+
+[metadata]
+name = "audit-events"
+description = "Browse auditd events (aureport / ausearch)"
+requirements = []
+
+[source]
+command = [
+  # 1. overall summary
+  """
+  if command -v aureport >/dev/null 2>&1; then
+    sudo -n aureport --summary -i 2>/dev/null \
+      || aureport --summary -i 2>/dev/null
+  fi
+  """,
+  # 2. per-key recent events for the baseline rule keys this repo ships
+  """
+  if command -v ausearch >/dev/null 2>&1; then
+    for k in identity privileged sudoers sshd_config audit_config time-change access-denied; do
+      out=$(sudo -n ausearch -k "$k" --start '7 days ago' -i 2>/dev/null \
+            || ausearch -k "$k" --start '7 days ago' -i 2>/dev/null)
+      [ -z "$out" ] && continue
+      printf '%s\\n' "$out" | grep -E '^type=|^----' | head -200 | sed "s|^|[$k] |"
+    done
+  fi
+  """,
+  # 3. auth events
+  """
+  if command -v aureport >/dev/null 2>&1; then
+    sudo -n aureport -au -i 2>/dev/null \
+      || aureport -au -i 2>/dev/null
+  fi
+  """,
+  # 4. executable summary
+  """
+  if command -v aureport >/dev/null 2>&1; then
+    (sudo -n aureport -x -i 2>/dev/null || aureport -x -i 2>/dev/null) | head -52
+  fi
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. ausearch -a <eventid> for the row
+  """
+  row='{}'
+  # try to extract an audit event id (a=NNNN or just an integer field)
+  eid=$(printf '%s\\n' "$row" | grep -oE 'a=[0-9]+' | head -1 | cut -d= -f2)
+  if [ -z "$eid" ]; then
+    # aureport rows: "1. 2024-01-01 ... <user> ... <event-id>" — last numeric field
+    eid=$(printf '%s\\n' "$row" | grep -oE '\\b[0-9]{3,}\\b' | tail -1)
+  fi
+  if [ -n "$eid" ] && command -v ausearch >/dev/null 2>&1; then
+    sudo -n ausearch -a "$eid" -i 2>/dev/null \
+      || ausearch -a "$eid" -i 2>/dev/null \
+      || printf '(no event %s)\\n%s\\n' "$eid" "$row"
+  else
+    printf '(no event id parsed)\\n%s\\n' "$row"
+  fi
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Audit events"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open_event"
+alt-e = "actions:edit_rules"
+alt-r = "actions:reload_rules"
+ctrl-y = "actions:copy_row"
+
+[actions.open_event]
+description = "Open full ausearch event in lnav"
+command = """
+row='{}'
+eid=$(printf '%s\\n' "$row" | grep -oE 'a=[0-9]+' | head -1 | cut -d= -f2)
+[ -z "$eid" ] && eid=$(printf '%s\\n' "$row" | grep -oE '\\b[0-9]{3,}\\b' | tail -1)
+tmp=$(mktemp)
+if [ -n "$eid" ] && command -v ausearch >/dev/null 2>&1; then
+  sudo ausearch -a "$eid" -i > "$tmp" 2>/dev/null \
+    || printf '%s\\n' "$row" > "$tmp"
+else
+  printf '%s\\n' "$row" > "$tmp"
+fi
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$tmp"
+else
+  less -R "$tmp"
+fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.edit_rules]
+description = "Edit /etc/audit/rules.d/ in $EDITOR"
+command = """
+if [ -d /etc/audit/rules.d ]; then
+  exec sudo "${EDITOR:-vi}" /etc/audit/rules.d
+else
+  echo "/etc/audit/rules.d/ not found — is auditd installed?"; read -r _
+fi
+"""
+mode = "execute"
+
+[actions.reload_rules]
+description = "Reload audit rules: sudo augenrules --load"
+command = """
+if command -v augenrules >/dev/null 2>&1; then
+  sudo augenrules --load
+  echo
+  echo "Loaded rules:"
+  sudo auditctl -l
+else
+  echo "augenrules not found — install auditd"
+fi
+read -r _
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

@@ -1,0 +1,182 @@
+# sessions channel for television (tv)
+# Browse login sessions: who logged in, when, from where.
+# See docs/sysadmin/sessions.md and docs/sysadmin/helpers.md.
+#
+# Source cycling (Ctrl+S):
+#   1. last -F -i  (login history with full timestamps + IPs)
+{{- if eq .chezmoi.os "linux" }}
+#   2. lastlog     (last-login per account; Linux only)
+#   3. journalctl _COMM=sshd -n 2000  (sshd events; systemd only)
+#   4. who -a      (currently-logged-in sessions)
+{{- else }}
+#   2. who -a      (currently-logged-in sessions)
+{{- end }}
+#
+# Preview cycling (Ctrl+F):
+#   1. Per-user detail: id <user>, lastlog -u <user>, recent sshd events
+#   2. Raw row (for forensic copy/paste)
+#
+# Keybindings:
+#   Enter    Drill down: journalctl filtered by user (or auth.log grep)
+#   Alt+T    Tail-follow auth log live with tspin
+#   Alt+E    Edit /etc/ssh/sshd_config in $EDITOR
+#   Ctrl+Y   Copy row to clipboard
+
+[metadata]
+name = "sessions"
+description = "Browse login sessions (last/lastlog/sshd journal/who)"
+requirements = []
+
+[source]
+command = [
+  # 1. last -F -i  — recent login sessions
+  """
+{{- if eq .chezmoi.os "darwin" }}
+  last 2>/dev/null | head -200
+{{- else }}
+  last -F -i 2>/dev/null | head -200
+{{- end }}
+  """,
+{{- if eq .chezmoi.os "linux" }}
+  # 2. lastlog — last login per account (skip never-logged accounts)
+  """
+  if command -v lastlog >/dev/null 2>&1; then
+    lastlog 2>/dev/null | awk 'NR==1 || $2 != "**Never"'
+  fi
+  """,
+  # 3. sshd journal events
+  """
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo -n journalctl _COMM=sshd -n 2000 --no-pager -o short-iso 2>/dev/null \
+      || journalctl _COMM=sshd -n 2000 --no-pager -o short-iso 2>/dev/null
+  fi
+  """,
+{{- end }}
+  # last cycle: currently-online sessions
+  """
+  who -a 2>/dev/null || who
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Per-user detail. Parse user from common formats:
+  #    last:      "alice    pts/0  10.0.0.1  ..."   -> $1
+  #    lastlog:   "alice    pts/0  10.0.0.1  ..."   -> $1
+  #    journal:   "...sshd[1234]: Accepted ... for alice from ..." -> after "for"
+  #    who:       "alice    pts/0  ..."             -> $1
+  """
+  row='{}'
+  # try "for <user>" first (sshd journal style)
+  user=$(printf '%s\\n' "$row" | grep -oE 'for [a-z_][a-z0-9_-]*' | awk '{print $2}' | head -1)
+  if [ -z "$user" ]; then
+    user=$(printf '%s\\n' "$row" | awk '{print $1}')
+  fi
+  case "$user" in
+    ''|Username|reboot|wtmp|btmp) printf '(no user parsed from row)\\n%s\\n' "$row"; exit 0 ;;
+  esac
+  printf '== id %s ==\\n' "$user"
+  id "$user" 2>/dev/null || printf '(unknown user)\\n'
+{{- if eq .chezmoi.os "linux" }}
+  printf '\\n== lastlog -u %s ==\\n' "$user"
+  lastlog -u "$user" 2>/dev/null || true
+  printf '\\n== recent sshd events for %s ==\\n' "$user"
+  if command -v journalctl >/dev/null 2>&1; then
+    (sudo -n journalctl _COMM=sshd --since '7 days ago' --no-pager 2>/dev/null \
+      || journalctl _COMM=sshd --since '7 days ago' --no-pager 2>/dev/null) \
+      | grep -E "( |[\\[])$user( |\\$|\\])" | tail -20
+  fi
+{{- else }}
+  printf '\\n== last %s (last 20) ==\\n' "$user"
+  last "$user" 2>/dev/null | head -20
+{{- end }}
+  """,
+  # 2. raw row
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Sessions"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:drill_user"
+alt-t = "actions:tail_authlog"
+alt-e = "actions:edit_sshd_config"
+ctrl-y = "actions:copy_row"
+
+[actions.drill_user]
+description = "Drill down: all auth events for the user in this row"
+command = """
+row='{}'
+user=$(printf '%s\\n' "$row" | grep -oE 'for [a-z_][a-z0-9_-]*' | awk '{print $2}' | head -1)
+[ -z "$user" ] && user=$(printf '%s\\n' "$row" | awk '{print $1}')
+case "$user" in ''|Username|reboot|wtmp|btmp) echo "(no user); press q"; read -r _; exit 0 ;; esac
+tmp=$(mktemp)
+{
+  echo "== sshd events for $user (last 30 days) =="
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo journalctl _COMM=sshd --since '30 days ago' --no-pager 2>/dev/null \
+      | grep -E "( |\\\\[)$user( |\\\\$|\\\\])"
+  fi
+  echo
+  echo "== sudo events for $user (last 30 days) =="
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo journalctl _COMM=sudo --since '30 days ago' --no-pager 2>/dev/null \
+      | grep -E "( |\\\\[)$user( |\\\\$|\\\\])"
+  fi
+} > "$tmp"
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$tmp"
+else
+  less -R "$tmp"
+fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.tail_authlog]
+description = "Tail -F /var/log/{auth.log,secure} with tspin coloring"
+command = """
+log=
+[ -e /var/log/auth.log ] && log=/var/log/auth.log
+[ -z "$log" ] && [ -e /var/log/secure ] && log=/var/log/secure
+if [ -z "$log" ]; then
+  if command -v journalctl >/dev/null 2>&1; then
+    exec sudo journalctl -f _COMM=sshd _COMM=sudo
+  fi
+  echo "no auth log found"; read -r _; exit 0
+fi
+if command -v tspin >/dev/null 2>&1; then
+  exec sudo tail -F "$log" | tspin --print
+else
+  exec sudo tail -F "$log"
+fi
+"""
+mode = "execute"
+
+[actions.edit_sshd_config]
+description = "Edit /etc/ssh/sshd_config in $EDITOR"
+command = """
+sudo "${EDITOR:-vi}" /etc/ssh/sshd_config
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"

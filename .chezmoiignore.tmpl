@@ -133,6 +133,10 @@ Library/**
 .config/Cursor/**
 .config/Antigravity
 .config/Antigravity/**
+# TV channels that only make sense on Linux (sudo lives in unified log on
+# macOS; macOS has no auditd — see docs/sysadmin/atuin-vs-audit.md).
+.config/television/cable/sudo-history.toml
+.config/television/cable/audit-events.toml
 {{- end }}
 
 {{- range (list "Code" "Cursor" "Antigravity") }}

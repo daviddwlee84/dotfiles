@@ -1,0 +1,154 @@
+# sudo-history channel for television (tv) — Linux only
+# Browse sudo events: who escalated, what command. See
+# docs/sysadmin/sudo-audit.md and docs/sysadmin/helpers.md.
+#
+# This channel is suppressed on macOS via .chezmoiignore.tmpl (macOS sudo
+# logs land in the unified log; query with `log show --predicate
+# 'process == "sudo"'` instead).
+#
+# Source cycling (Ctrl+S):
+#   1. journalctl _COMM=sudo -n 2000  (systemd)
+#   2. grep sudo /var/log/auth.log /var/log/secure (non-systemd / fallback)
+#   3. sudoreplay -l  (only when log_input/log_output enabled in sudoers)
+#
+# Preview cycling (Ctrl+F):
+#   1. Event metadata; for sudoreplay rows, the session info line
+#   2. Raw row
+#
+# Keybindings:
+#   Enter    sudoreplay <id>  if row is from sudoreplay -l, else lnav on event
+#   Alt+T    Tail-follow auth log live
+#   Alt+E    Edit /etc/sudoers via visudo
+#   Ctrl+Y   Copy row
+
+[metadata]
+name = "sudo-history"
+description = "Browse sudo events (journal/auth.log/sudoreplay)"
+requirements = []
+
+[source]
+command = [
+  # 1. systemd journal
+  """
+  if command -v journalctl >/dev/null 2>&1; then
+    sudo -n journalctl _COMM=sudo -n 2000 --no-pager -o short-iso 2>/dev/null \
+      || journalctl _COMM=sudo -n 2000 --no-pager -o short-iso 2>/dev/null
+  fi
+  """,
+  # 2. plain auth.log / secure grep
+  """
+  for f in /var/log/auth.log /var/log/auth.log.1 /var/log/secure /var/log/secure-*; do
+    [ -f "$f" ] || continue
+    sudo -n grep -E 'sudo(\\[|:)' "$f" 2>/dev/null \
+      || grep -E 'sudo(\\[|:)' "$f" 2>/dev/null
+  done
+  """,
+  # 3. sudoreplay -l  (only if log_input was enabled)
+  """
+  if command -v sudoreplay >/dev/null 2>&1; then
+    sudo -n sudoreplay -l 2>/dev/null | sed 's/^/sudoreplay: /'
+  fi
+  """,
+]
+output = "{}"
+
+[preview]
+command = [
+  # 1. Event detail
+  """
+  row='{}'
+  case "$row" in
+    sudoreplay:*)
+      # extract session id (last token like "alice/00/00/01")
+      sid=$(printf '%s\\n' "$row" | grep -oE '[A-Za-z0-9_/-]+/[0-9][0-9]/[0-9][0-9]/[0-9][0-9]' | tail -1)
+      if [ -z "$sid" ]; then
+        sid=$(printf '%s\\n' "$row" | awk '{print $NF}')
+      fi
+      printf '== sudoreplay session %s ==\\n' "$sid"
+      sudo sudoreplay -l "id=$sid" 2>/dev/null \
+        || sudo sudoreplay -l 2>/dev/null | grep -F "$sid"
+      ;;
+    *)
+      printf '%s\\n' "$row"
+      ;;
+  esac
+  """,
+  # 2. raw
+  """
+  printf '%s\\n' '{}'
+  """,
+]
+header = "{}"
+
+[ui]
+input_header = "Sudo history"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:replay_or_open"
+alt-t = "actions:tail_authlog"
+alt-e = "actions:visudo"
+ctrl-y = "actions:copy_row"
+
+[actions.replay_or_open]
+description = "sudoreplay <id> for sudoreplay rows; else lnav on event"
+command = """
+row='{}'
+case "$row" in
+  sudoreplay:*)
+    sid=$(printf '%s\\n' "$row" | grep -oE '[A-Za-z0-9_/-]+/[0-9][0-9]/[0-9][0-9]/[0-9][0-9]' | tail -1)
+    [ -z "$sid" ] && sid=$(printf '%s\\n' "$row" | awk '{print $NF}')
+    if [ -n "$sid" ]; then
+      exec sudo sudoreplay "$sid"
+    fi
+    echo "no session id parsed; press q"; read -r _; exit 0
+    ;;
+esac
+tmp=$(mktemp)
+printf '%s\\n' "$row" > "$tmp"
+if command -v lnav >/dev/null 2>&1; then
+  lnav "$tmp"
+else
+  less -R "$tmp"
+fi
+rm -f "$tmp"
+"""
+mode = "execute"
+
+[actions.tail_authlog]
+description = "Tail -F auth log live"
+command = """
+log=
+[ -e /var/log/auth.log ] && log=/var/log/auth.log
+[ -z "$log" ] && [ -e /var/log/secure ] && log=/var/log/secure
+if [ -z "$log" ]; then
+  exec sudo journalctl -f _COMM=sudo
+fi
+if command -v tspin >/dev/null 2>&1; then
+  exec sudo tail -F "$log" | tspin --print
+else
+  exec sudo tail -F "$log"
+fi
+"""
+mode = "execute"
+
+[actions.visudo]
+description = "sudo visudo (edits /etc/sudoers safely)"
+command = """
+exec sudo visudo
+"""
+mode = "execute"
+
+[actions.copy_row]
+description = "Copy row to clipboard (OSC 52 over SSH)"
+command = """
+d='{}'
+[ -z "$d" ] && exit 0
+if command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\\033]52;c;%s\\007' "$(printf '%s' "$d" | base64 | tr -d '\\n')" > /dev/tty
+fi
+"""
+mode = "fork"
