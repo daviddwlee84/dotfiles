@@ -437,6 +437,7 @@ Controller 探索：
 
 1. `$CLASH_CONTROLLER` / `$CLASH_SECRET`
 2. 來自本機 Clash 設定的執行期 `external-controller`
+3. 可連線的 Docker/本機 controller `127.0.0.1:9090`
 
 範例：
 
@@ -480,6 +481,7 @@ CLASH_CONTROLLER=192.168.222.207:9090 CLASH_SECRET=mytoken tv clash-api
 注意事項：
 
 - 所有變更類動作（`Alt+S/C/R`）會先探測 `/version`；無法觸及的 controller 會以清楚訊息 no-op。
+- 未設定明確 env 覆寫時，若 YAML 的 `external-controller` 缺失或已失效，會在 `127.0.0.1:9090` API 可連線時自動 fallback。這涵蓋 Docker Clash 容器以 `0.0.0.0:9090->9090/tcp` 發布的情境。
 - `tv clash-api` 只有當 `CLASH_CONFIG` 指向在該 controller 主機上有意義的設定路徑時，才能 reload 遠端 controller。如果遠端主機與本機執行期 controller 不同，且未提供顯式 `CLASH_CONFIG`，`Alt+R` 會以說明拒絕，而不是送出錯誤的本機路徑。
 
 **遮蔽硬化**

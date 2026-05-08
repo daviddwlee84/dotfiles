@@ -432,6 +432,7 @@ Controller discovery:
 
 1. `$CLASH_CONTROLLER` / `$CLASH_SECRET`
 2. Runtime `external-controller` from the local Clash config
+3. Reachable Docker/local controller at `127.0.0.1:9090`
 
 Examples:
 
@@ -475,6 +476,7 @@ CLASH_CONTROLLER=192.168.222.207:9090 CLASH_SECRET=mytoken tv clash-api
 Notes:
 
 - All mutating actions (`Alt+S/C/R`) probe `/version` first; unreachable controllers no-op with a clear message.
+- If no explicit env override is set, a stale or missing YAML `external-controller` falls back to `127.0.0.1:9090` when that API answers. This covers Docker Clash containers published as `0.0.0.0:9090->9090/tcp`.
 - `tv clash-api` can reload a remote controller only when `CLASH_CONFIG` points at a config path that is meaningful on that controller host. If the remote host differs from the local runtime controller and no explicit `CLASH_CONFIG` is provided, `Alt+R` refuses with an explanation instead of sending a bad local path.
 
 **Redaction hardening**

@@ -55,15 +55,44 @@ _controller() {
     printf '%s\n%s\n' "$CLASH_CONTROLLER" "${CLASH_SECRET:-}"
     return 0
   fi
+
+  local host="" secret=""
   if [ ! -x "$PARSE" ]; then
-    printf '\n\n'
+    if curl -sS --max-time 1 "http://127.0.0.1:9090/version" >/dev/null 2>&1; then
+      printf '%s\n\n' "127.0.0.1:9090"
+    else
+      printf '\n\n'
+    fi
     return 0
   fi
   if ! command -v uv >/dev/null 2>&1; then
-    printf '\n\n'
+    if curl -sS --max-time 1 "http://127.0.0.1:9090/version" >/dev/null 2>&1; then
+      printf '%s\n\n' "127.0.0.1:9090"
+    else
+      printf '\n\n'
+    fi
     return 0
   fi
-  "$PARSE" controller 2>/dev/null || printf '\n\n'
+
+  {
+    read -r host || true
+    read -r secret || true
+  } < <("$PARSE" controller 2>/dev/null || printf '\n\n')
+
+  if [ -n "$host" ]; then
+    local auth=()
+    [ -n "$secret" ] && auth=(-H "Authorization: Bearer $secret")
+    if curl -sS --max-time 1 "${auth[@]}" "http://$host/version" >/dev/null 2>&1; then
+      printf '%s\n%s\n' "$host" "$secret"
+      return 0
+    fi
+  fi
+
+  if curl -sS --max-time 1 "http://127.0.0.1:9090/version" >/dev/null 2>&1; then
+    printf '%s\n\n' "127.0.0.1:9090"
+  else
+    printf '%s\n%s\n' "$host" "$secret"
+  fi
 }
 
 _urlencode() {

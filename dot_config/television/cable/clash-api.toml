@@ -10,6 +10,7 @@
 # Controller discovery:
 #   $CLASH_CONTROLLER / $CLASH_SECRET           (explicit override)
 #   runtime external-controller from local Clash config
+#   reachable Docker/local controller at 127.0.0.1:9090
 #
 # Prereqs: `curl`. `uv` is optional here: it is only used when no controller
 # env vars are set and the helper falls back to the local YAML config.
