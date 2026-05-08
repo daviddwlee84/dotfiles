@@ -10,9 +10,17 @@ GEMINI.md
 
 # Docker and development files
 Dockerfile
+Dockerfile.*
 docker-compose.yml
 justfile
 .dockerignore
+
+# Repo tooling that must not deploy to $HOME
+mkdocs.yml
+pyproject.toml
+uv.lock
+tests
+tests/**
 
 # curl|sh bootstrap for `dotfiles-init` — lives at repo root so
 # `curl … | bash` is a simple one-liner, but it's tooling-for-init,
