@@ -14,5 +14,11 @@
         "timeout": 600000
       }
     }
+  },
+  "permission": {
+    "external_directory": {
+      "/tmp/**": "allow",
+      "/var/folders/**": "allow"
+    }
   }
 }
