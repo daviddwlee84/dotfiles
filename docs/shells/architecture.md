@@ -6,7 +6,9 @@ feasibility of extending the same model to fish / PowerShell.
 
 For practical bash-side detail (init order, footguns, ble.sh + OMB
 integration) see [`bash.md`](bash.md). For the alias / function
-inventory across shells see [`aliases.md`](aliases.md).
+inventory across shells see [`aliases.md`](aliases.md). For background
+on what POSIX actually standardises (and where bash/zsh stop being
+portable) see [`posix.md`](posix.md).
 
 ## The three tiers
 

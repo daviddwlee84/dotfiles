@@ -123,6 +123,7 @@ plugins:
             Floating TUI: 浮動 TUI
             # Repo Internals leaves
             Architecture: 架構
+            "POSIX, sh, bash, zsh: what's portable": "POSIX、sh、bash、zsh：什麼可攜"
             Cheatsheet: 備忘錄
             Bootstrap (curl|sh): Bootstrap (curl|sh)
             Ansible customization: Ansible 客製化
@@ -281,6 +282,7 @@ nav:
           - Mirrors (Chinese CDN): tools/mirrors.md
   - Shells:
       - Architecture (3-tier shell/zsh/bash + future fish/powershell): shells/architecture.md
+      - "POSIX, sh, bash, zsh: what's portable": shells/posix.md
       - Bash bootstrap (oh-my-bash + ble.sh): shells/bash.md
       - Aliases & functions (zsh/bash): shells/aliases.md
   - Zsh:
