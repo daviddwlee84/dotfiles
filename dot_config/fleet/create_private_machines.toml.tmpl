@@ -5,6 +5,13 @@
 # File mode is 0600 (chezmoi `private_` prefix) — safe for plaintext passwords,
 # but Bitwarden / interactive prompt sources are still preferred.
 #
+# IMPORTANT: `password_source` is for the REMOTE `sudo` password ONLY (fed to
+# chezmoi via CHEZMOI_SUDO_PASSWORD_FILE for `run_*` scripts). It does NOT
+# authenticate the SSH login itself — fleet always uses non-interactive SSH
+# (key / agent auth). If `ssh <host>` prompts you for a password, the host
+# will show as `unreachable` in `just fleet-status`. Fix with `ssh-copy-id`.
+# See `pitfalls/fleet-apply-password-source-not-for-ssh-login.md` for context.
+#
 # Schema reference: docs/this_repo/fleet-apply.md
 # Run: `just fleet-apply` (parallel) | `just fleet-apply-dry-run` (chezmoi diff)
 
