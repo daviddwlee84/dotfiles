@@ -46,6 +46,8 @@ All four categories are **referenced** from [`docs/for-maintainers.md`](docs/for
 
 When adding/modifying/removing a custom alias or shell function in any `dot_config/zsh/`, `dot_config/bash/`, or `dot_config/shell/` file, update [`docs/shells/aliases.md`](docs/shells/aliases.md): one row per entry with command name, type (`alias` or `function`), source file (relative to repo root), shell scope (`zsh`/`bash`/`both`), and a one-line description.
 
+**Shell history env vars / setopts go in [`docs/shells/history.md`](docs/shells/history.md), not aliases.md.** Any change to `HISTSIZE` / `HISTFILESIZE` / `SAVEHIST` / `HISTCONTROL` / `HISTIGNORE` / `HISTFILE` / `setopt hist_*` / `shopt -s hist*` (currently centralised in [`dot_config/bash/02_history.bash`](dot_config/bash/02_history.bash) for bash; zsh side is fully delegated to OMZ's `lib/history.zsh` defaults) must be reflected in the "Env vars" / "`shopt`s" / "This repo sets ZERO custom zsh history options" tables in `docs/shells/history.md`. Same rule applies to atuin's `~/.config/atuin/config.toml` (`history_filter`, `cwd_filter`) — document the override in history.md and cross-link from [`docs/tools/atuin.md`](docs/tools/atuin.md).
+
 **Place new helpers in the right tier:**
 
 - `dot_config/shell/*.sh` (or `*.sh.tmpl`) — POSIX-portable env / PATH / aliases / functions usable by **both** zsh and bash. Source-time shell detection via `$ZSH_VERSION` / `$BASH_VERSION` is OK; zsh-only constructs (ZLE widgets, `read -q`, `${m:t}`, glob qualifiers, `setopt`, `compdef`) are NOT — keep them out so bash doesn't error on source.

@@ -142,5 +142,8 @@ Run on each host once. Idempotent — re-running won't duplicate entries.
 - [Bash bootstrap](../shells/bash.md) — load order; atuin init runs at
   step 8, AFTER `15_atuin.sh` is sourced by `load_modular_dir` (step 7),
   hence the deferred-bind via `PROMPT_COMMAND` for `Alt+R`.
+- [Shell history reference](../shells/history.md) — bash/zsh native
+  history files, env vars, multi-user audit on a server, how atuin's
+  SQLite store relates to the plain-text files.
 - Upstream docs: <https://docs.atuin.sh>
 - Upstream repo: <https://github.com/atuinsh/atuin>

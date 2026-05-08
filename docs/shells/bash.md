@@ -184,5 +184,8 @@ Use it for:
   shell extension feasibility (fish, PowerShell).
 - [docs/shells/aliases.md](aliases.md) — shared alias / function
   inventory (which shells each is available in).
+- [docs/shells/history.md](history.md) — bash/zsh native history files,
+  env vars (`HISTSIZE`, `HISTFILESIZE`, `HISTCONTROL`), `shopt`s, ble.sh
+  interaction, multi-user audit on a server, atuin's place.
 - [docs/zsh/motd.md](../zsh/motd.md) — SSH login banner styles
   (figlet / fastfetch-slim / fastfetch-full); shared between shells.

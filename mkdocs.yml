@@ -286,6 +286,7 @@ nav:
       - "POSIX, sh, bash, zsh: what's portable": shells/posix.md
       - Bash bootstrap (oh-my-bash + ble.sh): shells/bash.md
       - Aliases & functions (zsh/bash): shells/aliases.md
+      - "History (bash, zsh, atuin overview, multi-user audit)": shells/history.md
       - Keybindings & keys-picker: shells/keybindings.md
       - "Emacs-style line editing: origin & must-know subset": shells/emacs-line-editing.md
   - Zsh:
