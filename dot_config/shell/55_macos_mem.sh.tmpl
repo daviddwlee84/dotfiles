@@ -121,7 +121,8 @@ _macmem_help() {
 #   2. mac-mem-status
 #   3. mac-mem-reclaim
 #   4. mac-mem-watch
-#   5. completions / aliases (none for now — user wanted to try aliases first)
+#   5. short aliases (mms / mmr / mmw) — added per user request 2026-05
+#      after the alias-only evaluation period; rationale was "好用常用再加 shortcut".
 
 # === FUNCTION: mac-mem-status =============================================
 # Single-screen dense report:
@@ -550,5 +551,16 @@ mac-mem-watch() {
         }
     '
 }
+
+# === ALIASES ==============================================================
+# Short forms — POSIX alias works in both bash and zsh.
+#   mms   ->  mac-mem-status
+#   mmr   ->  mac-mem-reclaim
+#   mmw   ->  mac-mem-watch
+# Use the long form in scripts (alias resolution in non-interactive shells
+# is sketchy across shells); use the short form interactively.
+alias mms='mac-mem-status'
+alias mmr='mac-mem-reclaim'
+alias mmw='mac-mem-watch'
 
 {{ end -}}

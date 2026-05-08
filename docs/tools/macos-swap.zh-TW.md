@@ -20,6 +20,10 @@ mac-mem-reclaim                        # 執行安全清理
 mac-mem-reclaim --include snapshots    # 加碼：也清掉 TM 本機快照
 ```
 
+日常用短別名：**`mms`** = `mac-mem-status`、**`mmr`** = `mac-mem-reclaim`、
+**`mmw`** = `mac-mem-watch`。Script 裡用全名（非互動 shell 不解析 alias）；
+terminal 互動時用短別名。
+
 如果做完之後 swap 還是 10+ GB、磁碟還是吃緊——**重開機**。
 macOS 沒有 userspace API 可以縮小執行中系統的既有 swapfile；這不是
 workaround 失效，是 OS 設計選擇（見[為什麼重開機真的就是答案](#為什麼重開機真的就是答案)）。

@@ -22,6 +22,10 @@ mac-mem-reclaim                        # do the safe cleanup
 mac-mem-reclaim --include snapshots    # opt-in: also drop TM local snapshots
 ```
 
+Short aliases for daily use: **`mms`** = `mac-mem-status`, **`mmr`** =
+`mac-mem-reclaim`, **`mmw`** = `mac-mem-watch`. Use long forms in scripts
+(non-interactive shells skip alias resolution); short forms in your terminal.
+
 If swap is still 10+ GB and disk is still tight after that — **reboot**.
 There is no userspace API to shrink existing swapfiles on a running system;
 this is not a workaround failure, it's an OS design decision (see

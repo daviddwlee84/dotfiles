@@ -650,6 +650,6 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `mac-mem-status` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 單頁 memory + swap + storage 報告：`vm.swapusage`、`memory_pressure`、解析過的 `vm_stat`、swapfile 大小（`/System/Volumes/VM/swapfile*`）、按 compressed-aware memory 排前 10（`top -o mem`）、TM 本機快照數、彩色 verdict 行。不需 sudo。 |
-| `mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 互動式清理。永遠安全：`sudo purge`。`--include` 加碼選項：`spotlight`（`killall mds_stores+mdworker_shared`）、`snapshots`（`tmutil thinlocalsnapshots / 5GB 4`）、`sleepimage`（刪 `/private/var/vm/sleepimage` —— 筆電不安全）、`windowserver`（`sudo killall -HUP WindowServer` —— 會把你登出）。 |
-| `mac-mem-watch [INTERVAL_SEC]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | Live 一行一拍 tail：free / compressed / swap_used + 每秒 pageins / pageouts / swapins / swapouts。預設 5 秒。設計給 tmux 旁邊面板用。 |
+| `mac-mem-status` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 單頁 memory + swap + storage 報告：`vm.swapusage`、`memory_pressure`、解析過的 `vm_stat`、swapfile 大小（`/System/Volumes/VM/swapfile*`）、按 compressed-aware memory 排前 10（`top -o mem`）、TM 本機快照數、彩色 verdict 行。不需 sudo。短別名：`mms`。 |
+| `mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | 互動式清理。永遠安全：`sudo purge`。`--include` 加碼選項：`spotlight`（`killall mds_stores+mdworker_shared`）、`snapshots`（`tmutil thinlocalsnapshots / 5GB 4`）、`sleepimage`（刪 `/private/var/vm/sleepimage` —— 筆電不安全）、`windowserver`（`sudo killall -HUP WindowServer` —— 會把你登出）。短別名：`mmr`。 |
+| `mac-mem-watch [INTERVAL_SEC]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | Live 一行一拍 tail：free / compressed / swap_used + 每秒 pageins / pageouts / swapins / swapouts。預設 5 秒。設計給 tmux 旁邊面板用。短別名：`mmw`。 |
