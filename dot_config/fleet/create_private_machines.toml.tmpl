@@ -18,7 +18,22 @@ connect_timeout = 15
 command_timeout = 1800
 
 # ---------------------------------------------------------------------------
-# Examples — DELETE these and add your own [[hosts]] entries.
+# Default: apply to THIS machine (local execution, no SSH).
+# Seeded once on `chezmoi apply`; edit freely — chezmoi won't overwrite.
+# `no_root_machine` mirrors the chezmoi `.noRoot` prompt from
+# .chezmoi.toml.tmpl so this entry stays consistent with how the rest of
+# the dotfiles were initialised on this host.
+# `password_source` is intentionally omitted: for `local = true` hosts
+# fleet_apply.py skips its password gate (chezmoi inherits the parent
+# terminal's TTY and prompts for sudo there if needed).
+# ---------------------------------------------------------------------------
+[[hosts]]
+name            = "self"
+local           = true
+no_root_machine = {{ .noRoot }}
+
+# ---------------------------------------------------------------------------
+# Templates for adding REMOTE hosts — uncomment and edit as needed.
 # ---------------------------------------------------------------------------
 
 # 1) Preferred: ssh_config alias. Inherits ProxyJump, IdentityAgent (e.g.
