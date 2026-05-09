@@ -15,12 +15,36 @@
   ansible.builtin.set_fact:
     mise_bin: "{{ mise_user_install.stat.exists | ternary(ansible_facts['env']['HOME'] + '/.local/bin/mise', '/opt/homebrew/bin/mise' if ansible_facts['os_family'] == 'Darwin' else '/usr/local/bin/mise') }}"
 
-- name: Install Rust via mise
+- name: Install Rust via mise (non-EL7)
+  when: not (oldEL | default(false))
   ansible.builtin.command: "{{ mise_bin }} install rust@latest"
   args:
     creates: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/installs/rust"
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# CentOS 7 / RHEL 7: mise's rustup channel goes through the TUNA mirror which
+# garbage-collects old versions; `rust@latest` 404s when TUNA hasn't pulled the
+# newest release yet (observed 2026-05 on 1.95.0). Use upstream rustup-init
+# directly — it respects ~/.cargo/config.toml's crates.io mirror but bypasses
+# TUNA for the toolchain download. Path documented in
+# dot_config/mise/config.toml.tmpl:36-37.
+- name: Install Rust via rustup-init (CentOS/RHEL 7 fallback)
+  when: oldEL | default(false)
+  ansible.builtin.shell: |
+    set -e
+    if [ -x "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/cargo" ]; then
+      echo "ALREADY_INSTALLED"
+      exit 0
+    fi
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable --no-modify-path
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/cargo"
+  environment:
+    RUSTUP_DIST_SERVER: "https://static.rust-lang.org"
+    RUSTUP_UPDATE_ROOT: "https://static.rust-lang.org/rustup"
 
 # =============================================================================
 # Install cargo tools (all platforms)

@@ -33,6 +33,18 @@
       when: target_architecture is not defined
       tags: [always]
 
+    # Mirrors $oldEL in dot_config/mise/config.toml.tmpl (lines 8-19).
+    # CentOS/RHEL 7 ship glibc 2.17; mise's [tools] omits node and rust there
+    # (Node 18+/Bun musl/.NET refuse to load; rustup TUNA mirror GCs old
+    # versions). Roles use `not (oldEL | default(false))` to skip
+    # `mise exec -- npm` and `mise install rust@latest` on this baseline.
+    - name: Detect CentOS/RHEL 7 baseline (oldEL)
+      ansible.builtin.set_fact:
+        oldEL: >-
+          {{ ansible_facts['os_family'] == 'RedHat'
+             and (ansible_facts['distribution_major_version'] | string) == '7' }}
+      tags: [always]
+
   roles:
     - role: base
       tags: [base]

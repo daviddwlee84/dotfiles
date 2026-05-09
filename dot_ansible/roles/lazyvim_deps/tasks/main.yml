@@ -308,6 +308,7 @@
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
+    - not (oldEL | default(false))   # EL7: mise has no node; system node 16 too old
   ansible.builtin.shell: |
     timeout 180 {{ mise_bin }} exec -- npm install -g tree-sitter-cli
   args:
@@ -345,6 +346,7 @@
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
     - treesitter_npm.rc | default(1) != 0
+    - not (oldEL | default(false))   # EL7 cargo path skipped — see next task
   become: true
   tags: [sudo]
   ansible.builtin.shell: |
@@ -360,6 +362,17 @@
   changed_when: "'ALL_INSTALLED' not in clang_yum_result.stdout"
   ignore_errors: true
 
+- name: Notify tree-sitter-cli skipped on CentOS/RHEL 7
+  when:
+    - oldEL | default(false)
+    - treesitter_check.rc != 0
+  ansible.builtin.debug:
+    msg: >-
+      tree-sitter-cli skipped on CentOS/RHEL 7: mise has no managed node
+      (glibc 2.17 baseline) and the cargo+bindgen build needs a libclang
+      setup not provided by clang-devel on EL7. Install manually if needed:
+      enable SCL llvm-toolset-7 and rerun `cargo install tree-sitter-cli`.
+
 - name: Install tree-sitter-cli via cargo (fallback)
   # Triggered when npm install times out or fails. Cargo pulls from
   # crates.io which is TUNA-mirrored when useChineseMirror=true (via
@@ -369,6 +382,7 @@
     - treesitter_check.rc != 0
     - target_architecture not in ['armv7l', 'armv6l']
     - treesitter_npm.rc | default(1) != 0
+    - not (oldEL | default(false))   # EL7: bindgen can't find libclang
   ansible.builtin.shell: |
     if command -v cargo >/dev/null 2>&1; then
       cargo install tree-sitter-cli

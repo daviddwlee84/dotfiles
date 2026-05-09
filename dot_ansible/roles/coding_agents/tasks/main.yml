@@ -157,6 +157,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - copilot_check.rc != 0
+    - not (oldEL | default(false))   # EL7: mise has no node; system node 16 < required 18-20
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @githubnext/github-copilot-cli
@@ -224,6 +225,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - codex_linux_npm_check.rc != 0
+    - not (oldEL | default(false))   # EL7: mise has no node; system node 16 < required 18-20
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @openai/codex
@@ -287,6 +289,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gemini_check.rc != 0
+    - not (oldEL | default(false))   # EL7: mise has no node; system node 16 < required 20
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @google/gemini-cli
@@ -1153,6 +1156,7 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - openchamber_check.rc != 0
+    - not (oldEL | default(false))   # EL7: mise has no node; system node 16 < required 18-20
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
       {{ ansible_facts['env']['HOME'] }}/.local/bin/mise exec -- npm install -g @openchamber/web

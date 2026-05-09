@@ -147,6 +147,38 @@ If the box gets rebuilt as Rocky/Alma 8 or 9 (glibc 2.28 / 2.34), most
 of these go away — the gate-broadening fix above is still correct on
 those.
 
+### `mise exec -- npm install -g` and `mise install rust@latest` skipped on EL7
+
+`dot_config/mise/config.toml.tmpl` (lines 8-19, 30-43) intentionally omits
+`node` and `rust` from mise's `[tools]` on CentOS/RHEL 7 (glibc 2.17 baseline +
+TUNA rustup-mirror gap). Roles that don't know this and run
+`mise exec -- npm install -g <pkg>` end up using **system node** (v16 on EL7),
+which:
+
+1. Tries to write to root-owned `/usr/lib/node_modules` → `EACCES`.
+2. Is too old anyway for `@githubnext/github-copilot-cli`, `@openai/codex`,
+   `@google/gemini-cli`, `@openchamber/web` — all require Node ≥18 or ≥20.
+
+Likewise `mise install rust@latest` 404s when TUNA hasn't pulled the latest
+release (observed 2026-05 on rust 1.95.0).
+
+**Fix landed 2026-05:** `dot_ansible/playbooks/linux.yml` sets a top-level
+`oldEL` fact mirroring the mise template's `$oldEL` predicate. Roles gate
+their mise-dependent tasks on `not (oldEL | default(false))`:
+
+- `lazyvim_deps` — tree-sitter-cli mise-npm install, RedHat clang-devel,
+  cargo fallback (cargo+bindgen can't find libclang on EL7's split
+  `clang-devel` layout — needs SCL `llvm-toolset-7`, not enabled here).
+- `coding_agents` — Copilot, Codex, Gemini, OpenChamber CLI installs.
+- `rust_cargo_tools` — `mise install rust@latest` replaced by direct
+  `curl https://sh.rustup.rs | sh` (env: `RUSTUP_DIST_SERVER=https://static.rust-lang.org`)
+  on the EL7 branch.
+
+**Manual workaround if you actually need the node CLIs on EL7:** install
+NodeSource Node 20 (`curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo
+bash - && sudo yum install -y nodejs`) then `npm install -g <pkg>`. Not
+automated because corporate EL7 boxes commonly forbid third-party RPM repos.
+
 ## Required preconditions on a noRoot CentOS box
 
 The dotfiles can't install **everything** without sudo. On
