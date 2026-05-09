@@ -47,7 +47,7 @@ chezmoi apply
 
 過去由 Ansible 進行 clone 的上游 git 儲存庫 / 單一檔案下載，現在改在儲存庫根目錄的 `.chezmoiexternal.toml.tmpl` 宣告。`chezmoi` 會在 `chezmoi apply` 期間抓取這些資源，並每週重新拉取一次（`refreshPeriod = "168h"`）：
 
-- oh-my-zsh 核心 + 4 個自訂外掛 (`zsh-autosuggestions`、`zsh-syntax-highlighting`、`zsh-completions`、`zsh-vi-mode`)
+- oh-my-zsh 核心 + 4 個自訂外掛 (`zsh-autosuggestions`、`zsh-syntax-highlighting`、`zsh-completions`、`zsh-vi-mode` — 最後一個受 chezmoi `enableVimMode` 控制，詳見 [vim-mode.md](vim-mode.md))
 - TPM (tmux plugin manager，`~/.tmux/plugins/tpm`)
 - fzf git 來源（僅 Linux，`~/.fzf`；apt 版本沒有 `--zsh`）
 - toolkami.rb (`~/.local/share/toolkami/toolkami.rb`)

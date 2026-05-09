@@ -145,6 +145,7 @@ plugins:
             Upgrades: 升級
             Testing: 測試
             Sudo session: Sudo session
+            Vim mode (catalog + opt-out): Vim 模式（總覽與停用）
             Fleet apply: Fleet apply
             fleet-apply vs fabric: fleet-apply vs fabric
             chezmoiscripts layout: chezmoiscripts 佈局
@@ -333,6 +334,7 @@ nav:
       - Upgrades: this_repo/upgrades.md
       - Testing: this_repo/testing.md
       - Sudo session: this_repo/sudo-session.md
+      - Vim mode (catalog + opt-out): this_repo/vim-mode.md
       - Fleet apply: this_repo/fleet-apply.md
       - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
       - chezmoiscripts layout: this_repo/chezmoiscripts-layout.md

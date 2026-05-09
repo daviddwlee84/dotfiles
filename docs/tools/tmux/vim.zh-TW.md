@@ -7,6 +7,15 @@
 
 ## Vi 風格複製 / 捲動 — 已啟用
 
+# tmux × Vim / Neovim
+
+> **註**：本頁所有功能受 chezmoi `enableVimMode` prompt 控制（預設
+> `true`）。設為 `false` 時：`mode-keys vi` 改為 `mode-keys emacs`、
+> `copy-mode-vi` table 切換為 `copy-mode`、vim-tmux-navigator 區塊
+> （`Ctrl+h/j/k/l`）整段省略。完整影響清單見
+> [`docs/this_repo/vim-mode.md`](../../this_repo/vim-mode.md)。
+> Neovim 不受影響。
+
 當前設定有 `mode-keys vi`，所以捲動與複製模式 (copy mode) 開箱即可享有 vim 風格行為：
 
 | 鍵 | 動作 |

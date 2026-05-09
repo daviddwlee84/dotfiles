@@ -33,13 +33,20 @@ All bindings use the default prefix `Ctrl + b`.
 |------------|--------|
 | `Ctrl + 1..9` | Switch to window 1–9 (requires CSI-u terminal: Ghostty, Alacritty, Kitty) |
 | `Ctrl + 0` | Lightweight sesh session at repo root for current pane (mirrors `prefix + 0`) |
-| `Ctrl + h/j/k/l` | Move between panes — crosses into Neovim splits (vim-tmux-navigator) |
-| `Ctrl + \` | Focus previous pane/split (vim-tmux-navigator) |
+| `Ctrl + h/j/k/l` | Move between panes — crosses into Neovim splits (vim-tmux-navigator)* |
+| `Ctrl + \` | Focus previous pane/split (vim-tmux-navigator)* |
 | `prefix + h/j/k/l` | Move between panes (fallback, tmux-only) |
 | `prefix + H/J/K/L` | Resize panes (5 cells, repeatable) |
 | `prefix + M-h/j/k/l` | Fine resize panes (1 cell, repeatable) |
 | `prefix + +` | Set current pane to 75% width |
 | `prefix + \|` | Split left/right (vertical divider) |
+
+\* `Ctrl + h/j/k/l` and `Ctrl + \` (vim-tmux-navigator) are gated on
+the chezmoi `enableVimMode` prompt (default `true`). When `false`,
+those bindings are omitted — `Ctrl+L` reaches the inner shell as
+clear-screen, `Ctrl+H` as backspace, etc. Use `prefix + h/j/k/l` (kept
+regardless) or `prefix + Arrow` for pane navigation. See
+[`docs/this_repo/vim-mode.md`](../../this_repo/vim-mode.md).
 | `prefix + -` | Split top/bottom (horizontal divider) |
 | `prefix + c` | New window in current path |
 | `prefix + x` | Kill pane (with confirmation) |

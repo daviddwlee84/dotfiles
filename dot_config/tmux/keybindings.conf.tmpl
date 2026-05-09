@@ -1,6 +1,13 @@
 # ~/.config/tmux/keybindings.conf
 # All bind-key definitions and the prefix + Enter popup menu.
 # Managed by chezmoi - do not edit directly.
+#
+# Templated on the chezmoi `enableVimMode` prompt (default true). The
+# `copy-mode-vi` table bindings below switch to the `copy-mode` table
+# when vim mode is off, and the vim-tmux-navigator block (Ctrl+h/j/k/l)
+# is omitted entirely. See docs/this_repo/vim-mode.md.
+{{- $copyTable := "copy-mode" -}}
+{{- if .enableVimMode -}}{{ $copyTable = "copy-mode-vi" }}{{- end }}
 
 # =============================================================================
 # Mouse menu persistence
@@ -95,12 +102,12 @@ bind-key -n MouseDown3StatusLeft \
 #   C-v      rectangle select    y        yank to clipboard
 #   Escape   clear selection     q        exit copy mode
 
-bind -T copy-mode-vi v send-keys -X begin-selection
-bind -T copy-mode-vi V send-keys -X select-line
-bind -T copy-mode-vi C-v send-keys -X rectangle-toggle
-bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel
-bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection
-bind -T copy-mode-vi DoubleClick1Pane select-pane \; send-keys -X select-word
+bind -T {{ $copyTable }} v send-keys -X begin-selection
+bind -T {{ $copyTable }} V send-keys -X select-line
+bind -T {{ $copyTable }} C-v send-keys -X rectangle-toggle
+bind -T {{ $copyTable }} y send-keys -X copy-selection-and-cancel
+bind -T {{ $copyTable }} MouseDragEnd1Pane send-keys -X copy-selection
+bind -T {{ $copyTable }} DoubleClick1Pane select-pane \; send-keys -X select-word
 
 # -----------------------------------------------------------------------------
 # Command-boundary navigation in copy-mode (Warp-style).
@@ -114,10 +121,10 @@ bind -T copy-mode-vi DoubleClick1Pane select-pane \; send-keys -X select-word
 #   M-[ / M-] previous/next command output (line AFTER the prompt — usually
 #             what you want for "skip to the output of the previous command")
 # -----------------------------------------------------------------------------
-bind -T copy-mode-vi '{' send-keys -X previous-prompt
-bind -T copy-mode-vi '}' send-keys -X next-prompt
-bind -T copy-mode-vi M-[ send-keys -X previous-prompt -o
-bind -T copy-mode-vi M-] send-keys -X next-prompt -o
+bind -T {{ $copyTable }} '{' send-keys -X previous-prompt
+bind -T {{ $copyTable }} '}' send-keys -X next-prompt
+bind -T {{ $copyTable }} M-[ send-keys -X previous-prompt -o
+bind -T {{ $copyTable }} M-] send-keys -X next-prompt -o
 
 # =============================================================================
 # Capture Pane Helpers
@@ -178,6 +185,10 @@ bind l select-pane -R
 # -----------------------------------------------------------------------------
 # Detect if the current pane is running vim/neovim; if so forward the key,
 # otherwise move between tmux panes. Matches christoomey/vim-tmux-navigator.
+# Gated on chezmoi `enableVimMode` (default true). When off, Ctrl+h/j/k/l
+# pass through to the inner shell (Ctrl+L = clear, Ctrl+H = backspace, etc.).
+# See docs/this_repo/vim-mode.md.
+{{ if .enableVimMode -}}
 is_vim="ps -o state= -o comm= -t '#{pane_tty}' | grep -iqE '^[^TXZ ]+ +(\\S+\\/)?g?\\.?(view|n?vim?x?)(-wrapped)?(diff)?$'"
 bind-key -n 'C-h' if-shell "$is_vim" 'send-keys C-h'  'select-pane -L'
 bind-key -n 'C-j' if-shell "$is_vim" 'send-keys C-j'  'select-pane -D'
@@ -190,6 +201,10 @@ bind-key -T copy-mode-vi 'C-h' select-pane -L
 bind-key -T copy-mode-vi 'C-j' select-pane -D
 bind-key -T copy-mode-vi 'C-k' select-pane -U
 bind-key -T copy-mode-vi 'C-l' select-pane -R
+{{- else -}}
+# enableVimMode = false: vim-tmux-navigator omitted. Use prefix + h/j/k/l
+# (kept below) or prefix + Arrow for pane navigation.
+{{- end }}
 
 # Intuitive split bindings (| = left/right, - = top/bottom)
 bind | split-window -h -c "#{pane_current_path}"

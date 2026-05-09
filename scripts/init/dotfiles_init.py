@@ -246,6 +246,11 @@ PROMPTS: tuple[Prompt, ...] = (
            default="zsh",
            prompt_text="Primary interactive shell (zsh|bash)",
            choices=("zsh", "bash")),
+    Prompt("enableVimMode", "bool", "Preferences",
+           "Vim mode in shells & tmux",
+           "zsh-vi-mode plugin, bash `set -o vi`, ble.sh vi_imap/vi_nmap, tmux mode-keys vi, vim-tmux-navigator C-h/j/k/l. Does NOT touch Neovim or editor configs (VSCode/Cursor/Codex/OpenCode). Full catalog: docs/this_repo/vim-mode.md.",
+           default=True,
+           prompt_text="Enable vim-style modal editing in shells (zsh-vi-mode, set -o vi, ble.sh vi-mode) and tmux vim navigation (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim"),
 )
 
 
@@ -308,6 +313,10 @@ BUNDLES: dict[str, dict[str, object]] = {
         "backupMode": "off",
         "allowPartialFailure": False,
         "noRoot": False,
+        # Vim mode off: CI / Docker shells don't benefit from modal editing,
+        # and emacs keymap matches what most non-interactive automation
+        # expects (Ctrl+L = clear, Ctrl+H = backspace, no mode flicker).
+        "enableVimMode": False,
     },
     "custom": {
         # Alias for "no overrides applied" — user ticks everything themselves.

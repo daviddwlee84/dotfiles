@@ -77,7 +77,7 @@ reference_highlighting = false
 
 [keymap]
 destructive_delete = true
-preset = "vim"
+preset = "{{ if .enableVimMode }}vim{{ else }}default{{ end }}"
 
 [keymap.overrides]
 

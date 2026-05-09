@@ -1,5 +1,8 @@
 # 05_vi_mode.bash - vi-style command-line editing.
 # Sourced from dot_bashrc.tmpl via load_modular_dir "$BASH_CONFIG_DIR" bash.
+# Templated on the chezmoi `enableVimMode` prompt (default true). When
+# disabled, this file is a no-op so readline + ble.sh stay in default
+# emacs keymap. Catalog: docs/this_repo/vim-mode.md.
 #
 # `set -o vi` enables readline vi mode — modal editing with ESC entering
 # normal mode and `i` returning to insert. Less feature-rich than
@@ -9,4 +12,8 @@
 # ble.sh detects `set -o vi` is set, so this line is the trigger for
 # both plain bash and ble.sh paths.
 
+{{ if .enableVimMode -}}
 set -o vi
+{{- else -}}
+: # vim mode disabled by chezmoi enableVimMode=false; readline/ble.sh use emacs keymap
+{{- end }}

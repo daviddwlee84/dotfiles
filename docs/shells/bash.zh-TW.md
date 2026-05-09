@@ -53,7 +53,7 @@ chezmoi apply                       # ansible bash role 接手執行 chsh
 | oh-my-bash `git` plugin（gst/ga/...）   | ✓                                      | ✓ 透過 OMZ git plugin |
 | 自動建議（ghost text）                  | ✓ 透過 ble.sh                           | ✓ 透過 zsh-autosuggestions |
 | 語法高亮（即時）                        | ✓ 透過 ble.sh                           | ✓ 透過 zsh-syntax-highlighting |
-| Vi-mode                                 | ✓ readline + ble.sh                    | ✓ zsh-vi-mode |
+| Vi-mode                                 | ✓ readline + ble.sh*                   | ✓ zsh-vi-mode* |
 | `aisuggest` widget（Alt+;）             | ⚠ 僅 CLI 形式；widget 移植延後          | ✓ |
 | tmux capture / AI capture 函式          | ⚠ 子集（CLI 形式），無 ZLE widget       | ✓ |
 | Television channel widgets（Alt+R/P/G/E/A/I） | ✗（僅 CLI `tv <channel>`）        | ✓ |
@@ -63,6 +63,11 @@ chezmoi apply                       # ansible bash role 接手執行 chsh
 
 延後欄位中僅 zsh 才有的項目，皆已於 `TODO.md` 中以 `[P3]` 追蹤；
 ble.sh 的 `ble-bind` API 多數能承載這些功能，但每一項都需各自移植。
+
+\* Vi-mode（兩欄）受 chezmoi `enableVimMode` prompt 控制（預設
+`true`）。設為 `false` 時，bash 的 `set -o vi` 會替換為 no-op、
+ble.sh 的 vi_imap/vi_nmap 綁定改用預設（emacs）keymap、
+zsh-vi-mode 不再載入。完整清單見 [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md)。
 
 ## 初始化順序（具關鍵相依性）
 

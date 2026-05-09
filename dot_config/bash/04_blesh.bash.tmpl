@@ -17,6 +17,10 @@ bleopt prompt_eol_mark=
 
 # Vi-mode keymap: ble.sh auto-detects `set -o vi` (set in 05_vi_mode.bash)
 # and activates its full vi-mode. No additional config needed.
+# Note: when chezmoi `enableVimMode = false`, the C-RET / S-RET / C-c
+# binds below switch from `-m vi_imap`/`-m vi_nmap` to the default
+# (emacs) keymap so multi-line submit and Ctrl+C cancel still work.
+# See docs/this_repo/vim-mode.md.
 
 # Custom keybindings below. Reminder: `bindkey -M viins` in zsh →
 # `ble-bind -m vi_imap -x` in ble.sh; `bindkey -M vicmd` → `vi_nmap`.
@@ -39,10 +43,16 @@ bleopt prompt_eol_mark=
 #
 # Collision check: tmux C-j (vim-tmux-navigator pane nav) eats plain
 # C-j; C-RET and S-RET use distinct CSI-u codes that tmux forwards intact.
+{{ if .enableVimMode -}}
 ble-bind -m vi_imap -f 'C-RET' accept-line
 ble-bind -m vi_nmap -f 'C-RET' accept-line
 ble-bind -m vi_imap -f 'S-RET' accept-line
 ble-bind -m vi_nmap -f 'S-RET' accept-line
+{{- else -}}
+# enableVimMode = false: bind on default (emacs) keymap; no -m needed.
+ble-bind -f 'C-RET' accept-line
+ble-bind -f 'S-RET' accept-line
+{{- end }}
 
 # === Suppress mouse keyseq warnings ===
 #
@@ -68,5 +78,11 @@ ble-bind -f 'mouse_xterm' nop 2>/dev/null
 # Override both: cancel the line, keep old text visible in the scroll
 # buffer (still copyable), show a fresh prompt — matching zsh insert-mode
 # C-c behaviour. Escape still handles insert → normal mode for vi use.
+{{ if .enableVimMode -}}
 ble-bind -m vi_imap -f 'C-c' discard-line
 ble-bind -m vi_nmap -f 'C-c' discard-line
+{{- else -}}
+# enableVimMode = false: emacs keymap default for C-c is already
+# kill-line-ish; override to discard-line for parity with vim-mode behavior.
+ble-bind -f 'C-c' discard-line
+{{- end }}

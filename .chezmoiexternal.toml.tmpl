@@ -52,6 +52,7 @@
     [".oh-my-zsh/custom/plugins/zsh-completions".pull]
         args = ["--ff-only"]
 
+{{ if .enableVimMode -}}
 [".oh-my-zsh/custom/plugins/zsh-vi-mode"]
     type = "git-repo"
     url = "https://github.com/jeffreytse/zsh-vi-mode.git"
@@ -60,6 +61,7 @@
         args = ["--depth", "1"]
     [".oh-my-zsh/custom/plugins/zsh-vi-mode".pull]
         args = ["--ff-only"]
+{{- end }}
 
 # -----------------------------------------------------------------------------
 # Oh-My-Bash core (sister of oh-my-zsh; all platforms).

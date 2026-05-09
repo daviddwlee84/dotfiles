@@ -232,7 +232,7 @@ SSH files are managed as create-only templates: if `~/.ssh/config` already exist
 
 Vendored upstream sources are declared in [`.chezmoiexternal.toml.tmpl`](.chezmoiexternal.toml.tmpl) and auto-refreshed weekly by chezmoi (`refreshPeriod = "168h"`). Force an immediate pull with `chezmoi apply --refresh-externals`.
 
-- `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
+- `~/.oh-my-zsh` + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`*) — *`zsh-vi-mode` is conditional on the `enableVimMode` chezmoi prompt (default `true`); see [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).
 - `~/.tmux/plugins/tpm` (TPM)
 - `~/.fzf` (Linux only; apt version lacks `--zsh`)
 - `~/.local/share/toolkami/toolkami.rb`

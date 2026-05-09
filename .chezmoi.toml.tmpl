@@ -101,6 +101,14 @@ motdStyle = {{ promptChoiceOnce . "motdStyle" "SSH login banner style (figlet|fa
 # the bash role also brew-installs bash 5.x (system bash 3.2 is too old for
 # OMB plugins) when bash is selected. See docs/shells/bash.md.
 primaryShell = {{ promptChoiceOnce . "primaryShell" "Primary interactive shell (zsh|bash)" (list "zsh" "bash") "zsh" | quote }}
+# Enable vim-style modal editing in shells (zsh-vi-mode plugin, bash `set -o vi`,
+# ble.sh vi_imap/vi_nmap keymap) and tmux vim navigation (mode-keys vi,
+# copy-mode-vi table, vim-tmux-navigator C-h/j/k/l). Default true (this repo's
+# historical behavior). Set false for non-vim users / CI / Docker.
+# Does NOT touch Neovim (~/.config/nvim/) — Neovim is always vim-flavored.
+# Editor configs (VSCode/Cursor/Antigravity/Codex/OpenCode) are also not gated.
+# Full catalog of what changes: docs/this_repo/vim-mode.md
+enableVimMode = {{ promptBoolOnce . "enableVimMode" "Enable vim-style modal editing in shells (zsh-vi-mode, set -o vi, ble.sh vi-mode) and tmux vim navigation (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim" true }}
 
 # https://www.chezmoi.io/user-guide/use-scripts-to-perform-actions/#dont-show-scripts-that-would-run-in-chezmoi-diffchezmoi-status
 [diff]

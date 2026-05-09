@@ -47,9 +47,13 @@ Zsh 沒有真正等同於 `which-key` 的機制——該模式需要「leader �
 | # | 層級 | 來源 | cheatsheet 中的範例 |
 |---|-------|--------|------------------------|
 | 1 | **ZLE 內建** (emacs keymap) | zsh 內建提供 | `Ctrl+A`、`Ctrl+E`、`Ctrl+W`、`Alt+.`、`Ctrl+X Ctrl+E` |
-| 2 | **OMZ / 第三方外掛** | `dot_zshrc.tmpl:21-26`（`zsh-autosuggestions`、`zsh-syntax-highlighting`、`zsh-vi-mode`）+ fzf shell 整合 | `Ctrl+R` → fzf、`Ctrl+T` → fzf、`Alt+C` → fzf、`End` → autosuggest-accept |
+| 2 | **OMZ / 第三方外掛** | `dot_zshrc.tmpl:21-26`（`zsh-autosuggestions`、`zsh-syntax-highlighting`、`zsh-vi-mode`*）+ fzf shell 整合 | `Ctrl+R` → fzf、`Ctrl+T` → fzf、`Alt+C` → fzf、`End` → autosuggest-accept |
 | 3 | **本 repo 的自訂 widgets** | `dot_config/zsh/tools/{05_aisuggest,11_tools_picker,12_television,22_sesh,13_keys_picker}.zsh` + `dot_config/shell/15_atuin.sh` | 所有 `Alt+*` pickers + `Tab` / `→` aisuggest swap + `Alt+R` atuin |
-| 4 | **模式切換 (vi)** | `zsh-vi-mode` 外掛 | 刻意**不列出**——`Esc` / `i` / `:` 屬於模式轉換，並非綁定 |
+| 4 | **模式切換 (vi)** | `zsh-vi-mode` 外掛* | 刻意**不列出**——`Esc` / `i` / `:` 屬於模式轉換，並非綁定 |
+
+\* 受 chezmoi `enableVimMode` prompt 控制（預設 `true`）。當設為 `false`
+時，`zsh-vi-mode` 不會加入 OMZ plugin array，模式切換隨之消失。完整
+受影響清單見 [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md)。
 
 第 4 層按設計規格刻意省略：列出每一個 `vicmd` 模式的鍵會讓 picker
 膨脹到 200+ 列，稀釋訊號 (signal)。

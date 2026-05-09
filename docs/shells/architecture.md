@@ -49,7 +49,7 @@ portable) see [`posix.md`](posix.md).
   ├── 02_history.bash          HISTSIZE / HISTCONTROL / shopt
   ├── 03_completion.bash       bash-completion v2 with dynamic Homebrew prefix
   ├── 04_blesh.bash            bleopt tweaks (sourced after ble-attach)
-  ├── 05_vi_mode.bash          set -o vi (ble.sh auto-detects + upgrades)
+  ├── 05_vi_mode.bash          set -o vi (ble.sh auto-detects + upgrades) — gated on chezmoi `enableVimMode` (default true; see [vim-mode.md](../this_repo/vim-mode.md))
   └── 10_aliases.bash          bash-only aliases (bash-profile, reload)
 ```
 

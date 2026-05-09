@@ -22,9 +22,12 @@ plugins=(
     git
     zsh-autosuggestions
     zsh-syntax-highlighting
+{{- if .enableVimMode }}
     zsh-vi-mode
+{{- end }}
 )
 
+{{ if .enableVimMode -}}
 # zsh-vi-mode overrides all keybindings on init; re-source fzf bindings afterward
 # so that Ctrl+R (history search), Ctrl+T (file search), Alt+C still work.
 # fzf config moved to dot_config/shell/10_fzf.sh (shared with bash) — re-source
@@ -51,6 +54,12 @@ zvm_after_init() {
         bindkey -M emacs '\e/' keys-picker
     fi
 }
+{{- else }}
+# enableVimMode = false: no zsh-vi-mode plugin loaded → no keymap-wiping
+# behavior to compensate for. The picker tools (atuin/aisuggest/keys-picker/
+# fzf) call `bindkey -M emacs` at source-time and stick on first source —
+# no zvm_after_init rebind hook needed. See docs/this_repo/vim-mode.md.
+{{- end }}
 
 # Oh-My-Zsh path
 export ZSH="$HOME/.oh-my-zsh"

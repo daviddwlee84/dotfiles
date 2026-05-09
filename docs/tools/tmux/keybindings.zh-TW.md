@@ -38,13 +38,20 @@
 |------------|--------|
 | `Ctrl + 1..9` | 切換到視窗 1–9（需要 CSI-u 終端機 (terminal)：Ghostty、Alacritty、Kitty）|
 | `Ctrl + 0` | 為當前窗格在 repo root 建立輕量 sesh session（對應 `prefix + 0`）|
-| `Ctrl + h/j/k/l` | 在窗格之間移動 — 可跨入 Neovim splits（vim-tmux-navigator）|
-| `Ctrl + \` | 聚焦上一個 pane/split（vim-tmux-navigator）|
+| `Ctrl + h/j/k/l` | 在窗格之間移動 — 可跨入 Neovim splits（vim-tmux-navigator）* |
+| `Ctrl + \` | 聚焦上一個 pane/split（vim-tmux-navigator）* |
 | `prefix + h/j/k/l` | 在窗格之間移動（備援，僅 tmux）|
 | `prefix + H/J/K/L` | 調整窗格大小（5 cells，可重複）|
 | `prefix + M-h/j/k/l` | 微調窗格大小（1 cell，可重複）|
 | `prefix + +` | 將當前窗格設為 75% 寬度 |
 | `prefix + \|` | 左右分頁 (split)（垂直分隔線）|
+
+\* `Ctrl + h/j/k/l` 與 `Ctrl + \` (vim-tmux-navigator) 受 chezmoi
+`enableVimMode` prompt 控制（預設 `true`）。設為 `false` 時，這些
+綁定整段省略 —— `Ctrl+L` 會傳至內層 shell 清螢幕、`Ctrl+H` 為
+backspace 等。改用 `prefix + h/j/k/l`（永遠保留）或 `prefix + Arrow`
+進行 pane 導覽。詳見
+[`docs/this_repo/vim-mode.md`](../../this_repo/vim-mode.md)。
 | `prefix + -` | 上下分頁（水平分隔線）|
 | `prefix + c` | 在當前路徑開新視窗 |
 | `prefix + x` | 終止窗格（需確認）|

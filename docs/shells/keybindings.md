@@ -43,9 +43,14 @@ selected for "frequently forgotten" rather than "every widget exists".
 | # | Layer | Source | Examples in cheatsheet |
 |---|-------|--------|------------------------|
 | 1 | **ZLE built-in** (emacs keymap) | Ships with zsh | `Ctrl+A`, `Ctrl+E`, `Ctrl+W`, `Alt+.`, `Ctrl+X Ctrl+E` |
-| 2 | **OMZ / third-party plugins** | `dot_zshrc.tmpl:21-26` (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-vi-mode`) + fzf shell integration | `Ctrl+R` → fzf, `Ctrl+T` → fzf, `Alt+C` → fzf, `End` → autosuggest-accept |
+| 2 | **OMZ / third-party plugins** | `dot_zshrc.tmpl:21-26` (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-vi-mode`*) + fzf shell integration | `Ctrl+R` → fzf, `Ctrl+T` → fzf, `Alt+C` → fzf, `End` → autosuggest-accept |
 | 3 | **Custom widgets in this repo** | `dot_config/zsh/tools/{05_aisuggest,11_tools_picker,12_television,22_sesh,13_keys_picker}.zsh` + `dot_config/shell/15_atuin.sh` | All `Alt+*` pickers + `Tab`/`→` aisuggest swap + `Alt+R` atuin |
-| 4 | **Mode switches (vi)** | `zsh-vi-mode` plugin | Intentionally **not listed** — `Esc` / `i` / `:` are mode transitions, not bindings |
+| 4 | **Mode switches (vi)** | `zsh-vi-mode` plugin* | Intentionally **not listed** — `Esc` / `i` / `:` are mode transitions, not bindings |
+
+\* Conditional on the chezmoi `enableVimMode` prompt (default `true`).
+When `false`, `zsh-vi-mode` is omitted from the OMZ plugin array and
+mode switches go away. See [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md)
+for the full catalog of what changes.
 
 Layer 4 omitted on purpose (per the design spec): listing every
 `vicmd`-mode key would balloon the picker to 200+ rows and dilute signal.

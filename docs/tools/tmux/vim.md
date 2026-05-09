@@ -1,8 +1,15 @@
 # tmux × Vim / Neovim
 
-## Vi copy / scroll — already on
+> **Note**: Everything on this page is gated by the chezmoi `enableVimMode`
+> prompt (default `true`). When `false`: `mode-keys vi` becomes
+> `mode-keys emacs`, the `copy-mode-vi` table swaps to `copy-mode`, and
+> the vim-tmux-navigator block (`Ctrl+h/j/k/l`) is omitted entirely.
+> See [`docs/this_repo/vim-mode.md`](../../this_repo/vim-mode.md) for
+> the full catalog. Neovim is unaffected.
 
-The current config sets `mode-keys vi`, so scroll and copy mode behave vim-style out of the box:
+## Vi copy / scroll — already on (when `enableVimMode = true`)
+
+The default config sets `mode-keys vi`, so scroll and copy mode behave vim-style out of the box:
 
 | Key | Action |
 |-----|--------|

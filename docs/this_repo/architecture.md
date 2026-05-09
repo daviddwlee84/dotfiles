@@ -42,7 +42,7 @@ See [sudo-session.md](sudo-session.md) for the shared sudo cache used by all thr
 
 Upstream git repos / single-file downloads that used to be cloned by Ansible are declared in `.chezmoiexternal.toml.tmpl` at the repo root. chezmoi fetches them during `chezmoi apply` and re-pulls weekly (`refreshPeriod = "168h"`):
 
-- oh-my-zsh core + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`)
+- oh-my-zsh core + 4 custom plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode` — last one conditional on chezmoi `enableVimMode`, see [vim-mode.md](vim-mode.md))
 - TPM (tmux plugin manager, `~/.tmux/plugins/tpm`)
 - fzf git source (Linux only, `~/.fzf`; apt version lacks `--zsh`)
 - toolkami.rb (`~/.local/share/toolkami/toolkami.rb`)

@@ -1,5 +1,10 @@
 # Emacs 風格行編輯 — 起源與必知子集
 
+> **給非 vim 使用者**：本 repo 提供 chezmoi `enableVimMode` prompt
+> （預設 `true`）。設為 `false` 後，你的 shells（zsh + bash）會
+> 徹底放棄 vi 模態編輯——行為完全符合本文描述（純 emacs keymap）。
+> 停用流程詳見 [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md)。
+
 !!! note "Terminology rule (zh-TW pages)"
     技術名詞首次出現以「中文 (English original)」格式呈現，例：依賴注入
     (dependency injection)。**不自創翻譯**——若無公認譯名直接保留英文

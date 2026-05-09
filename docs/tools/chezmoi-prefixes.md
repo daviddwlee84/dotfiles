@@ -282,7 +282,7 @@ Source of truth for upstream clones that used to live in ansible roles. Entries 
 | `~/.oh-my-zsh/custom/plugins/zsh-autosuggestions` | `git-repo` | `zsh-users/zsh-autosuggestions` | `dot_ansible/roles/zsh` |
 | `~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting` | `git-repo` | `zsh-users/zsh-syntax-highlighting` | `dot_ansible/roles/zsh` |
 | `~/.oh-my-zsh/custom/plugins/zsh-completions` | `git-repo` | `zsh-users/zsh-completions` | `dot_ansible/roles/zsh` |
-| `~/.oh-my-zsh/custom/plugins/zsh-vi-mode` | `git-repo` | `jeffreytse/zsh-vi-mode` | `dot_ansible/roles/zsh` |
+| `~/.oh-my-zsh/custom/plugins/zsh-vi-mode` | `git-repo` | `jeffreytse/zsh-vi-mode` | `dot_ansible/roles/zsh` (gated on chezmoi `enableVimMode`, default true; see [vim-mode.md](../this_repo/vim-mode.md)) |
 | `~/.tmux/plugins/tpm` | `git-repo` | `tmux-plugins/tpm` | `dot_ansible/roles/devtools` |
 | `~/.fzf` (Linux only) | `git-repo` | `junegunn/fzf` | `dot_ansible/roles/lazyvim_deps` |
 | `~/.local/share/toolkami/toolkami.rb` | `file` | `aperoc/toolkami/main/toolkami.rb` | `dot_ansible/roles/ruby_gem_tools` |

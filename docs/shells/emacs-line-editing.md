@@ -1,5 +1,12 @@
 # Emacs-style Line Editing — origin & must-know subset
 
+> **For non-vim users**: this repo provides a chezmoi `enableVimMode`
+> prompt (default `true`). Set it to `false` and your shells (zsh +
+> bash) drop modal vi editing entirely — they behave exactly the way
+> this guide describes (pure emacs keymap). See
+> [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md) for the
+> opt-out flow.
+
 (stub — sections filled in by subsequent edits)
 
 ## TL;DR

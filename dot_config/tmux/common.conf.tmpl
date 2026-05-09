@@ -64,8 +64,9 @@ set -sg escape-time 0
 # Enable mouse support
 setw -g mouse on
 
-# Use vi mode keys in copy mode
-setw -g mode-keys vi
+# Use vi mode keys in copy mode (gated on chezmoi `enableVimMode` —
+# default true; false → emacs copy-mode keymap. See docs/this_repo/vim-mode.md.)
+setw -g mode-keys {{ if .enableVimMode }}vi{{ else }}emacs{{ end }}
 
 # Larger scrollback buffer
 set -g history-limit 50000

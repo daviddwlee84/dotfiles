@@ -93,7 +93,7 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 
 | Tool | Config file | Conflict risk |
 |------|-------------|---------------|
-| tmux (root-table) | `dot_config/tmux/keybindings.conf` | `C-h/j/k/l` (vim-tmux-navigator), `C-1..9` (window switch); `prefix + a` (live agent panes picker — `tv agent-panes`, see [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)) |
+| tmux (root-table) | `dot_config/tmux/keybindings.conf.tmpl` | `C-h/j/k/l` (vim-tmux-navigator — gated on `enableVimMode`, default on; see [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md)), `C-1..9` (window switch); `prefix + a` (live agent panes picker — `tv agent-panes`, see [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)) |
 | Television (global) | `dot_config/television/config.toml` | `Ctrl+S/F/R/Y/T/X/O` (built-in actions) |
 | Television (channels) | `dot_config/television/cable/*.toml` | Per-channel `[keybindings]` overrides global |
 | Zellij | `dot_config/zellij/config.kdl` | Mitigated by `default_mode "locked"` |
@@ -102,7 +102,7 @@ When adding/modifying keybindings in any tool config, cross-check against other 
 | bash + ble.sh | `dot_config/bash/04_blesh.bash` + `dot_config/shell/15_atuin.sh` + `~/.bashrc.adhoc` | ble.sh provides zsh-style autosuggest / syntax-highlight / vi-mode but NO ZLE-widget ports yet — aisuggest / tools_picker / television / sesh widgets are zsh-only on bash. CLI fallbacks work (`tv <channel>`, `sesh-connect`, `aisuggest "<text>"`, `atuin search`). Custom `ble-bind` calls go in `~/.bashrc.adhoc` (sourced AFTER `ble-attach`). atuin's `--disable-up-arrow` is mandatory because ble.sh owns up-arrow for history navigation; **`Ctrl+R` = atuin** (long-standing) and **`Alt+R` = atuin** also (cross-shell parity with zsh, deferred-bind via PROMPT_COMMAND in `15_atuin.sh`) |
 | Claude Code (TUI) | `dot_claude/modify_keybindings.json` (overlay) + `~/.claude/keybindings.json` (live); see [docs/tools/claude-code-keybindings.md](docs/tools/claude-code-keybindings.md) | `Ctrl+R` (history:search — collides with atuin / zsh-history-substring at the prompt outside Claude), `Ctrl+T` (toggleTodos — Television's `Ctrl+T` is shadowed when Claude has focus), `Ctrl+G` (chat:externalEditor), `Ctrl+S` (chat:stash), `Shift+Tab` (chat:cycleMode — only known mode-switch action, no jump-to-plan) |
 
-Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator; removed in TV global), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
+Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator when `enableVimMode = true`; removed in TV global regardless), `Ctrl+S/F/R` (TV built-in cycling/reload — avoid in channel actions), `Alt+*` (safe namespace for channel-specific actions; requires terminal to send Option as Meta). Free Alt slots in this repo: `Alt+/`, `Alt+\`, and most letters not listed above (B/D/F/H/J/K/L/M/N/O/Q/U/V/W/X/Y/Z) — but check `dot_config/zsh/tools/*.zsh` first before claiming a new one.
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 
@@ -206,6 +206,30 @@ The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi
 | Bash-only | `dot_config/bash/` | `bind -x` / `ble-bind`, OMB plugin arrays, bash-specific `shopt`s. |
 
 ble.sh + oh-my-bash on bash side: see [docs/shells/bash.md](docs/shells/bash.md) for the load-bearing 12-step init order in `dot_bashrc.tmpl`. Key invariants — `ble.sh --attach=none` MUST source before bash-preexec/starship; `ble-attach` MUST be the last call before secrets/adhoc; OMB's `autosuggestions` / `syntax-highlighting` / `history-substring-search` plugins MUST be excluded (ble.sh provides better natives, double-init causes flicker).
+
+### `enableVimMode` gates shell + tmux vim, NOT Neovim
+
+The `enableVimMode` chezmoi prompt (`bool`, default `true`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) gates **shell modal editing + tmux vim navigation only**. Neovim and editor configs (VSCode/Cursor/Antigravity/Codex/OpenCode/Cursor-CLI) are **never** affected, regardless of this flag. Full catalog of every gated touch-point: [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).
+
+**Six templated files are gated** (any new vim-touched config must be added to this list AND to the catalog table in `docs/this_repo/vim-mode.md`):
+
+1. [`dot_zshrc.tmpl`](dot_zshrc.tmpl) — OMZ `plugins=(... zsh-vi-mode)` entry + `zvm_after_init` rebind hook.
+2. [`.chezmoiexternal.toml.tmpl`](.chezmoiexternal.toml.tmpl) — git-repo clone of `jeffreytse/zsh-vi-mode` into `~/.oh-my-zsh/custom/plugins/`.
+3. [`dot_config/bash/05_vi_mode.bash.tmpl`](dot_config/bash/05_vi_mode.bash.tmpl) — `set -o vi` (single line; trigger for ble.sh's vi-mode auto-detect).
+4. [`dot_config/bash/04_blesh.bash.tmpl`](dot_config/bash/04_blesh.bash.tmpl) — `ble-bind -m vi_imap`/`-m vi_nmap` for `C-RET` / `S-RET` / `C-c`; switches to default emacs keymap binds when off.
+5. [`dot_config/tmux/common.conf.tmpl`](dot_config/tmux/common.conf.tmpl) — `setw -g mode-keys vi|emacs`.
+6. [`dot_config/tmux/keybindings.conf.tmpl`](dot_config/tmux/keybindings.conf.tmpl) — `bind -T copy-mode-vi|copy-mode` table swap (via `$copyTable` template var) + the entire vim-tmux-navigator block (`bind-key -n C-h/j/k/l if-shell ...` + 4 copy-mode-vi mirrors).
+
+Plus one **first-seed-only** gate: [`dot_config/marimo/create_marimo.toml.tmpl`](dot_config/marimo/create_marimo.toml.tmpl) — `[keymap] preset = "vim"|"default"` (the `create_` prefix means existing installs do NOT auto-migrate; that's documented as a known limitation, not a bug to fix).
+
+**Hard rules**:
+
+- Do **not** gate any file under `dot_config/nvim/` on `enableVimMode`. Neovim is inherently vim and stays so by design — opt-out users still get a working Neovim.
+- Do **not** gate any editor config (VSCode/Cursor/Antigravity overlay in `.chezmoitemplates/editor/`, `dot_codex/modify_config.toml.tmpl`, `dot_config/opencode/modify_*.json.tmpl`, `dot_cursor/modify_cli-config.json`) on `enableVimMode`. The flag's semantic is **shells + tmux only** — expanding case-by-case dilutes the contract. If a user wants vim in their editor, they install the editor's vim extension manually.
+- Do **not** unify the `prefix + h/j/k/l` / `prefix + H/J/K/L` / `prefix + M-h/j/k/l` tmux bindings under this gate — they're prefix-gated, no conflict for non-vim users, and removing them gives nothing back.
+- Do **not** broaden the gate to cover the `bindkey -M viins` / `bindkey -M vicmd` calls inside `dot_config/zsh/tools/{05_aisuggest,11_tools_picker,12_television,13_keys_picker,22_sesh}.zsh` — those are harmless no-ops without zsh-vi-mode loaded, and templating each tool file would clutter all five for nothing.
+- When adding a new vim-touched config, follow the "Yes, gate it" / "No, leave it alone" decision flow in [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md) → "For maintainers" before reaching for the flag.
+- The `minimal` bundle in [`scripts/init/dotfiles_init.py`](scripts/init/dotfiles_init.py) `BUNDLES` explicitly forces `enableVimMode = False` because CI / Docker shells don't benefit from modal editing. All other bundles fall through to default `True`. Don't change minimal's value without explicit user request.
 
 ### Install vs upgrade is split on purpose
 

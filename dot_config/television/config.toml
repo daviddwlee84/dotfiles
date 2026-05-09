@@ -2,7 +2,9 @@
 # Managed by chezmoi — edit the source at dot_config/television/config.toml
 #
 # Based on tv's auto-generated defaults. Key customization:
-# - Removed ctrl-j/k (conflict with tmux vim-tmux-navigator C-h/j/k/l)
+# - Removed ctrl-j/k (kept removed regardless of chezmoi `enableVimMode`:
+#   collides with tmux vim-tmux-navigator C-j/C-k when vim mode is on,
+#   and ctrl-n/ctrl-p already cover next/prev navigation when off)
 # - Remapped ctrl-h (toggle_help) → alt-h
 # - Remapped ctrl-l (toggle_layout) → alt-l
 # Navigation alternatives: down/up arrows, ctrl-n/ctrl-p
@@ -53,8 +55,10 @@ ctrl-c = "quit"
 
 # Navigation and selection
 # NOTE: ctrl-j/k removed to avoid conflict with tmux vim-tmux-navigator
-# (C-h/j/k/l are bound in tmux root table for pane navigation).
-# Use down/up arrows or ctrl-n/ctrl-p instead.
+# (C-h/j/k/l bound in tmux root table for pane navigation when chezmoi
+# `enableVimMode = true` — the default). Kept removed even when vim mode
+# is off because ctrl-n/ctrl-p already cover next/prev. Down/up arrows
+# also work in both modes. See docs/this_repo/vim-mode.md.
 down = "select_next_entry"
 ctrl-n = "select_next_entry"
 up = "select_prev_entry"

@@ -49,7 +49,7 @@ chezmoi apply                       # ansible bash role takes over the chsh
 | oh-my-bash `git` plugin (gst/ga/...) | ✓                                      | ✓ via OMZ git plugin |
 | Autosuggestions (ghost text)         | ✓ via ble.sh                           | ✓ via zsh-autosuggestions |
 | Syntax highlighting (live)           | ✓ via ble.sh                           | ✓ via zsh-syntax-highlighting |
-| Vi-mode                              | ✓ readline + ble.sh                    | ✓ zsh-vi-mode |
+| Vi-mode                              | ✓ readline + ble.sh*                   | ✓ zsh-vi-mode* |
 | `aisuggest` widget (Alt+;)           | ⚠ CLI form only; widget port deferred  | ✓ |
 | tmux capture / AI capture functions  | ⚠ subset (CLI form), no ZLE widget     | ✓ |
 | Television channel widgets (Alt+R/P/G/E/A/I) | ✗ (CLI `tv <channel>` only)    | ✓ |
@@ -60,6 +60,11 @@ chezmoi apply                       # ansible bash role takes over the chsh
 The zsh-only items in the deferred column are tracked in `TODO.md` as
 `[P3]` follow-ups; ble.sh's `ble-bind` API can host most of them but
 each is its own porting effort.
+
+\* Vi-mode (both rows) is gated by the chezmoi `enableVimMode` prompt
+(default `true`). When `false`, bash's `set -o vi` is replaced with a
+no-op, ble.sh's vi_imap/vi_nmap binds switch to default (emacs) keymap,
+and zsh-vi-mode is omitted. Catalog: [`docs/this_repo/vim-mode.md`](../this_repo/vim-mode.md).
 
 ## Init order (load-bearing)
 

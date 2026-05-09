@@ -52,7 +52,7 @@
   ├── 02_history.bash          HISTSIZE / HISTCONTROL / shopt
   ├── 03_completion.bash       bash-completion v2，動態解析 Homebrew prefix
   ├── 04_blesh.bash            bleopt 微調（在 ble-attach 之後 source）
-  ├── 05_vi_mode.bash          set -o vi（ble.sh 自動偵測並升級）
+  ├── 05_vi_mode.bash          set -o vi（ble.sh 自動偵測並升級）— 受 chezmoi `enableVimMode` 控制（預設 true；見 [vim-mode.md](../this_repo/vim-mode.md)）
   └── 10_aliases.bash          僅 bash 的 alias（bash-profile、reload）
 ```
 
