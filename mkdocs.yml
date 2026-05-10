@@ -290,6 +290,7 @@ nav:
           - Super Productivity: tools/super-productivity.md
           - Web reader: tools/web-reader.md
           - Log tools: tools/log-tools.md
+          - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md
           - pqsum: tools/pqsum.md
           - direnv: tools/direnv.md
