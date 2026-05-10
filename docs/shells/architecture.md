@@ -112,7 +112,9 @@ config, the `chezmoi apply` after pulling these commits will:
   hosts. Existing system `~/.bashrc` (Ubuntu / Debian skel) gets
   backed up via chezmoi's `backupMode` (`smart` by default). After
   the apply, `~/.bashrc.adhoc` is auto-created if missing — sister of
-  `~/.zshrc.adhoc`. **Pre-existing `~/.bash_aliases` is preserved**:
+  `~/.zshrc.adhoc`, plus the shared `~/.shellrc.adhoc` (sourced by both
+  shells). Full override-layer matrix:
+  [adhoc-and-secrets.md](adhoc-and-secrets.md). **Pre-existing `~/.bash_aliases` is preserved**:
   the new bashrc explicitly sources it (step 11), so any aliases the
   user accumulated there over the years keep working.
 - **Run `chsh`** to zsh (default `primaryShell=zsh`) only if not

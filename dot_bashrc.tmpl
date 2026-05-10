@@ -126,7 +126,14 @@ if command -v atuin >/dev/null 2>&1; then
 fi
 
 # 9. ============================================================
-# Load secrets (not tracked by chezmoi). Mirrors zsh's secrets pattern.
+# Load secrets (not tracked by chezmoi). Two-layer pattern mirrors zsh:
+#   9a. ~/.shellrc.secrets — shared POSIX layer, sourced by BOTH shells.
+#       Canonical home for API keys / tokens that both shells need.
+#   9b. ~/.config/bash/secrets.sh — bash-only secrets, layered on top so
+#       it can use bash-only syntax and overrides shared on conflict.
+# Both run BEFORE ble-attach so vars are available to ble.sh / starship.
+# Full design: docs/shells/adhoc-and-secrets.md
+[ -r "$HOME/.shellrc.secrets" ] && . "$HOME/.shellrc.secrets"
 [ -r "$BASH_CONFIG_DIR/secrets.sh" ] && . "$BASH_CONFIG_DIR/secrets.sh"
 
 # 10. ===========================================================
@@ -163,21 +170,67 @@ if [ -d "$HOME/.bashrc.d" ]; then
 fi
 
 # 12. ===========================================================
-# Adhoc Configuration (not tracked by chezmoi)
+# Adhoc Configuration (not tracked by chezmoi). Two-layer pattern:
+#   12a. ~/.shellrc.adhoc — shared POSIX layer, sourced by BOTH shells.
+#        Use this for anything portable so you don't duplicate it in
+#        ~/.zshrc.adhoc and ~/.bashrc.adhoc.
+#   12b. ~/.bashrc.adhoc — bash-only adhoc; can use `bind -x` / `ble-bind`,
+#        OMB plugin tweaks, `shopt`. Layered on top — wins on conflict.
+# Both run AFTER ble-attach + after ~/.bash_aliases / ~/.bashrc.d/*, so
+# ble-bind / readline `bind -x` in either file takes effect.
+# Full design: docs/shells/adhoc-and-secrets.md
+
+# 12a. Create shared adhoc file if it doesn't exist (sourced by both zsh+bash).
+if [[ ! -f "$HOME/.shellrc.adhoc" ]]; then
+    cat > "$HOME/.shellrc.adhoc" << 'SHELLRC_ADHOC_EOF'
+# ~/.shellrc.adhoc - Personal SHARED shell customizations (not tracked by chezmoi)
+#
+# This file is sourced by BOTH ~/.zshrc AND ~/.bashrc. Put anything POSIX-
+# portable here so you don't have to duplicate it in ~/.zshrc.adhoc and
+# ~/.bashrc.adhoc.
+#
+# HARD RULE: POSIX-only.
+#   - No zsh-isms: no `setopt`, `compdef`, ZLE widgets, `read -q`, `${m:t}`,
+#     glob qualifiers, `bindkey`. Put those in ~/.zshrc.adhoc instead.
+#   - No bash-isms: no `bind -x`, `ble-bind`, `shopt`, `complete -F`. Put
+#     those in ~/.bashrc.adhoc instead.
+#   - If you need shell-specific logic, dispatch via $ZSH_VERSION /
+#     $BASH_VERSION (same convention as ~/.config/shell/*.sh):
+#       if [ -n "$ZSH_VERSION" ]; then ...
+#       elif [ -n "$BASH_VERSION" ]; then ...
+#       fi
+#
+# Sourced AFTER ~/.shellrc.secrets, BEFORE the per-shell ~/.{zsh,bash}rc.adhoc
+# (per-shell wins on conflict). See docs/shells/adhoc-and-secrets.md.
+#
+# Example:
+# export MY_SHARED_VAR="hello from both shells"
+# alias ll='ls -lah'
+
+SHELLRC_ADHOC_EOF
+fi
+
+# Source shared adhoc (POSIX, both shells).
+[ -r "$HOME/.shellrc.adhoc" ] && . "$HOME/.shellrc.adhoc"
+
+# 12b. Create bash-only adhoc file if it doesn't exist.
 if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
     cat > "$HOME/.bashrc.adhoc" << 'ADHOC_EOF'
-# ~/.bashrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+# ~/.bashrc.adhoc - Personal BASH-ONLY shell customizations (not tracked by chezmoi)
 #
 # Use this file for:
-#   - Quick experiments with new aliases/functions
-#   - Machine-specific configurations
-#   - Temporary PATH modifications
+#   - Quick experiments with bash-only constructs (`bind -x`, `ble-bind`,
+#     `shopt`, `complete -F`, OMB plugin tweaks)
+#   - Machine-specific bash-only configurations
 #   - Testing before adding to chezmoi-managed configs
 #
+# For anything POSIX-portable that should also affect zsh, prefer
+# ~/.shellrc.adhoc instead. See docs/shells/adhoc-and-secrets.md.
+#
 # This file is sourced at the end of ~/.bashrc (AFTER ble-attach + after
-# ~/.bash_aliases), so ble-bind / readline `bind -x` calls here will
-# take effect, and anything you set here overrides the older
-# ~/.bash_aliases on conflict.
+# ~/.bash_aliases + AFTER ~/.shellrc.adhoc), so ble-bind / readline
+# `bind -x` calls here will take effect, and anything you set here
+# overrides the shared ~/.shellrc.adhoc on conflict.
 # Changes here apply to new shell sessions (or run: source ~/.bashrc.adhoc)
 
 # Example:
@@ -189,5 +242,5 @@ if [[ ! -f "$HOME/.bashrc.adhoc" ]]; then
 ADHOC_EOF
 fi
 
-# Source adhoc config
+# Source bash-only adhoc (per-shell wins over ~/.shellrc.adhoc on conflict).
 [ -r "$HOME/.bashrc.adhoc" ] && . "$HOME/.bashrc.adhoc"

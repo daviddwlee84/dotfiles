@@ -313,6 +313,7 @@ nav:
       - Cookbook (scenario recipes): sysadmin/cookbook.md
       - Helpers in this repo: sysadmin/helpers.md
   - Shells:
+      - "Adhoc & secrets (user-local override layer)": shells/adhoc-and-secrets.md
       - Architecture (3-tier shell/zsh/bash + future fish/powershell): shells/architecture.md
       - "POSIX, sh, bash, zsh: what's portable": shells/posix.md
       - Bash bootstrap (oh-my-bash + ble.sh): shells/bash.md

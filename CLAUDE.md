@@ -207,6 +207,41 @@ The `primaryShell` chezmoi prompt (`zsh` | `bash`, default `zsh`, see [`.chezmoi
 
 ble.sh + oh-my-bash on bash side: see [docs/shells/bash.md](docs/shells/bash.md) for the load-bearing 12-step init order in `dot_bashrc.tmpl`. Key invariants — `ble.sh --attach=none` MUST source before bash-preexec/starship; `ble-attach` MUST be the last call before secrets/adhoc; OMB's `autosuggestions` / `syntax-highlighting` / `history-substring-search` plugins MUST be excluded (ble.sh provides better natives, double-init causes flicker).
 
+### Three-tier user-local override layer (shared / per-shell × adhoc / secrets)
+
+User-local overrides live in **six** files: shared POSIX (`~/.shellrc.adhoc`,
+`~/.shellrc.secrets`) and per-shell (`~/.zshrc.adhoc`, `~/.bashrc.adhoc`,
+`~/.config/zsh/secrets.zsh`, `~/.config/bash/secrets.sh`). All six are listed
+in [`.chezmoiignore.tmpl`](.chezmoiignore.tmpl) and never tracked. Default
+target for new overrides is the **shared** file; drop down to per-shell only
+when shell-specific syntax is required.
+
+**Load order** in both `dot_zshrc.tmpl` and `dot_bashrc.tmpl`:
+
+```
+managed modules → shared secrets → per-shell secrets → shared adhoc → per-shell adhoc
+```
+
+Two precedence rules: (1) secrets sourced before adhoc (so adhoc files can
+read secret vars); (2) shared sourced before per-shell (so per-shell wins on
+conflict, mirroring the existing `~/.bash_aliases` → `~/.bashrc.adhoc` rule).
+
+**Hard rules**:
+
+- Do **not** add the shared files (`~/.shellrc.adhoc`, `~/.shellrc.secrets`)
+  to chezmoi management. They are user-local by design.
+- Do **not** auto-stub the shared adhoc with shell-specific syntax. The stub
+  heredoc must contain a POSIX-only warning and `$ZSH_VERSION` / `$BASH_VERSION`
+  dispatch advice. Stub is generated in BOTH `dot_zshrc.tmpl` AND
+  `dot_bashrc.tmpl` (whichever shell starts first wins; the second sees the
+  file already exists and skips). Keep the heredoc bodies in sync.
+- Do **not** auto-stub the `*.secrets` files. An empty secrets file is a
+  footgun; users create them on first need.
+- When adding a new override surface in this category, also add its path to
+  `.chezmoiignore.tmpl` and update [docs/shells/adhoc-and-secrets.md](docs/shells/adhoc-and-secrets.md).
+
+Full matrix, decision flow, and worked examples: [docs/shells/adhoc-and-secrets.md](docs/shells/adhoc-and-secrets.md).
+
 ### `enableVimMode` gates shell + tmux vim, NOT Neovim
 
 The `enableVimMode` chezmoi prompt (`bool`, default `true`, see [`.chezmoi.toml.tmpl`](.chezmoi.toml.tmpl)) gates **shell modal editing + tmux vim navigation only**. Neovim and editor configs (VSCode/Cursor/Antigravity/Codex/OpenCode/Cursor-CLI) are **never** affected, regardless of this flag. Full catalog of every gated touch-point: [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).

@@ -125,25 +125,68 @@ load_modular_dir "$XDG_CONFIG_HOME/shell" sh
 load_modular_dir "$ZSH_CONFIG_DIR" zsh
 load_modular_dir "$ZSH_CONFIG_DIR/tools" zsh
 
-# Load secrets (not tracked by chezmoi)
+# Load secrets (not tracked by chezmoi).
+# Shared shell secrets (~/.shellrc.secrets) are POSIX-only and sourced by
+# BOTH ~/.zshrc and ~/.bashrc — the canonical home for API keys / tokens
+# that both shells need. Per-shell secrets (~/.config/zsh/secrets.zsh)
+# layer on top for zsh-only constructs and override on conflict.
+# Full design: docs/shells/adhoc-and-secrets.md
+[[ -r "$HOME/.shellrc.secrets" ]] && source "$HOME/.shellrc.secrets" || true
 [[ -r "$ZSH_CONFIG_DIR/secrets.zsh" ]] && source "$ZSH_CONFIG_DIR/secrets.zsh" || true
 
 # =============================================================================
 # Adhoc Configuration (not tracked by chezmoi)
 # =============================================================================
 
-# Create adhoc file if it doesn't exist
+# Create shared adhoc file if it doesn't exist (sourced by both zsh and bash).
+if [[ ! -f "$HOME/.shellrc.adhoc" ]]; then
+    cat > "$HOME/.shellrc.adhoc" << 'SHELLRC_ADHOC_EOF'
+# ~/.shellrc.adhoc - Personal SHARED shell customizations (not tracked by chezmoi)
+#
+# This file is sourced by BOTH ~/.zshrc AND ~/.bashrc. Put anything POSIX-
+# portable here so you don't have to duplicate it in ~/.zshrc.adhoc and
+# ~/.bashrc.adhoc.
+#
+# HARD RULE: POSIX-only.
+#   - No zsh-isms: no `setopt`, `compdef`, ZLE widgets, `read -q`, `${m:t}`,
+#     glob qualifiers, `bindkey`. Put those in ~/.zshrc.adhoc instead.
+#   - No bash-isms: no `bind -x`, `ble-bind`, `shopt`, `complete -F`. Put
+#     those in ~/.bashrc.adhoc instead.
+#   - If you need shell-specific logic, dispatch via $ZSH_VERSION /
+#     $BASH_VERSION (same convention as ~/.config/shell/*.sh):
+#       if [ -n "$ZSH_VERSION" ]; then ...
+#       elif [ -n "$BASH_VERSION" ]; then ...
+#       fi
+#
+# Sourced AFTER ~/.shellrc.secrets, BEFORE the per-shell ~/.{zsh,bash}rc.adhoc
+# (per-shell wins on conflict). See docs/shells/adhoc-and-secrets.md.
+#
+# Example:
+# export MY_SHARED_VAR="hello from both shells"
+# alias ll='ls -lah'
+
+SHELLRC_ADHOC_EOF
+fi
+
+# Source shared adhoc (POSIX, both shells).
+[[ -r "$HOME/.shellrc.adhoc" ]] && source "$HOME/.shellrc.adhoc"
+
+# Create zsh-only adhoc file if it doesn't exist
 if [[ ! -f "$HOME/.zshrc.adhoc" ]]; then
     cat > "$HOME/.zshrc.adhoc" << 'ADHOC_EOF'
-# ~/.zshrc.adhoc - Personal shell customizations (not tracked by chezmoi)
+# ~/.zshrc.adhoc - Personal ZSH-ONLY shell customizations (not tracked by chezmoi)
 #
 # Use this file for:
-#   - Quick experiments with new aliases/functions
-#   - Machine-specific configurations
-#   - Temporary PATH modifications
+#   - Quick experiments with zsh-only constructs (ZLE widgets, `bindkey`,
+#     `setopt`, `compdef`, `read -q`, `${m:t}`, glob qualifiers)
+#   - Machine-specific zsh-only configurations
 #   - Testing before adding to chezmoi-managed configs
 #
-# This file is sourced at the end of ~/.zshrc
+# For anything POSIX-portable that should also affect bash, prefer
+# ~/.shellrc.adhoc instead. See docs/shells/adhoc-and-secrets.md.
+#
+# This file is sourced at the end of ~/.zshrc, AFTER ~/.shellrc.adhoc, so
+# settings here override the shared layer on conflict.
 # Changes here take effect on new shell sessions (or run: source ~/.zshrc.adhoc)
 
 # Example:
@@ -153,7 +196,7 @@ if [[ ! -f "$HOME/.zshrc.adhoc" ]]; then
 ADHOC_EOF
 fi
 
-# Source adhoc config
+# Source zsh-only adhoc (per-shell wins over ~/.shellrc.adhoc on conflict).
 [[ -r "$HOME/.zshrc.adhoc" ]] && source "$HOME/.zshrc.adhoc"
 
 # Profiling: output results

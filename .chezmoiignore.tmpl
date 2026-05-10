@@ -94,6 +94,14 @@ pyrightconfig.json
 # take effect.
 .bashrc.adhoc
 
+# Shared shell adhoc/secrets layer — POSIX-only files sourced by BOTH
+# ~/.zshrc and ~/.bashrc. Live at $HOME root (not $XDG_CONFIG_HOME) to
+# mirror the .{zsh,bash}rc.adhoc naming. .shellrc.adhoc is auto-stubbed
+# on first shell launch; .shellrc.secrets is user-created only.
+# Full design: docs/shells/adhoc-and-secrets.md
+.shellrc.adhoc
+.shellrc.secrets
+
 # Per-machine git overrides (host-specific [safe], [credential],
 # [http.proxy], etc.). Same self-managed pattern as .zshrc.adhoc:
 # silently included by ~/.gitconfig (`[include] path = ~/.gitconfig.local`)
