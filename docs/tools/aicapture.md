@@ -65,7 +65,7 @@ Same positional `[N]` as the capture helpers, plus flags:
 
 Both accept:
 
-- `-a AGENT` — `claude` / `opencode` / `codex` / `cursor-agent`. Default: auto-detect (first one found on `$PATH`).
+- `-a AGENT` — `claude` / `opencode` / `codex` / `cursor-agent` / `http`. Default: auto-detect (first one found on `$PATH`; `http` is opt-in, see [Provider routing](#provider-routing-openrouter--ollama)).
 - `-p PROMPT` — override the default prompt.
 - `--raw` — skip glow/bat prettify; print the agent's raw Markdown text.
 - `--no-meta` — suppress the stderr metadata line (model / tokens / cost / duration).
@@ -134,7 +134,10 @@ aifix-rerun -y   # skip confirm
 Put any of these in `~/.zshrc`, a `99_local_*.zsh` override, or export them per-session:
 
 ```sh
-# Model per agent (auto-detected order: claude → opencode → codex → cursor-agent)
+# Pin an agent (otherwise auto-detect: claude → opencode → codex → cursor-agent)
+export AICAP_AGENT=                                           # empty = auto-detect; set to claude|opencode|codex|cursor-agent|http to force
+
+# Model per agent
 export AICAP_CLAUDE_MODEL=haiku                              # alias or full name (e.g. claude-sonnet-4-6)
 export AICAP_OPENCODE_MODEL=github-copilot/claude-haiku-4.5  # provider/model format
 export AICAP_CODEX_MODEL=gpt-5-mini
@@ -145,6 +148,46 @@ export AICAP_SHOW_METADATA=1   # 0 to mute the stderr "claude (...) | in=... cos
 export AICAP_PRETTIFY=1        # 0 to always print raw Markdown (skip glow/bat)
 export AICAP_SPINNER=1         # 0 to disable the stderr spinner animation
 ```
+
+### Provider routing: OpenRouter / Ollama
+
+The `http` agent talks an OpenAI-compatible chat-completions endpoint directly via `curl` + `jq` — no agent CLI required. The same code path handles **OpenRouter free models** (Bearer key) and **local Ollama** (no auth) since both speak the same schema. `http` is never auto-detected; opt in with `AICAP_AGENT=http` or `-a http`.
+
+```sh
+# OpenRouter — free Gemini Flash, ~5s round-trip, requires a (free) account
+export OPENROUTER_API_KEY=sk-or-v1-...
+export AICAP_AGENT=http
+# defaults already point at OpenRouter + Gemini Flash free; no other vars needed
+aifix
+# Switch model:
+AICAP_HTTP_MODEL=meta-llama/llama-3.3-70b-instruct:free aifix
+
+# Ollama — fully offline / privacy-sensitive
+ollama serve &                          # or `brew services start ollama`
+ollama pull qwen2.5-coder:7b
+export AICAP_AGENT=http
+export AICAP_HTTP_URL=http://localhost:11434/v1/chat/completions
+export AICAP_HTTP_MODEL=qwen2.5-coder:7b
+aifix
+```
+
+Per-call override (no exports needed):
+
+```sh
+AICAP_AGENT=http AICAP_HTTP_MODEL=google/gemini-2.0-flash-exp:free aifix 3
+```
+
+Tunables:
+
+| Var | Default | Notes |
+|---|---|---|
+| `AICAP_HTTP_URL` | `https://openrouter.ai/api/v1/chat/completions` | Full chat-completions URL. Ollama's is `http://localhost:11434/v1/chat/completions`. |
+| `AICAP_HTTP_MODEL` | `google/gemini-2.0-flash-exp:free` | Provider-specific model name. |
+| `AICAP_HTTP_API_KEY` | `${OPENROUTER_API_KEY:-}` | Bearer token. Empty = no `Authorization` header (Ollama). |
+
+The `http` agent has the same metadata line shape as the others (`http (model @ host) | in=N out=N`) and reuses the same spinner / prettify / `--raw` / `--no-meta` plumbing. Errors are surfaced verbatim from `.error.message` in the JSON response.
+
+> **Why not just use opencode?** OpenCode supports `openrouter/...` and `ollama/...` model strings natively. If you already have opencode installed, `AICAP_OPENCODE_MODEL=ollama/qwen2.5-coder:7b aifix -a opencode` works and is supported. The `http` agent is for hosts where no CLI is installed (minimal SSH boxes, CI runners) and for users who prefer one less moving part.
 
 Check current settings any time with `aifix --help`.
 
@@ -164,7 +207,8 @@ AICAP_CLAUDE_MODEL=sonnet aifix 3
 | At least one coding-agent CLI | `claude` (recommended), `opencode`, `codex`, or `cursor-agent` — install via your usual channel |
 | `glow` (optional) | Markdown prettify on agent replies |
 | `bat` (optional) | Prettify fallback when `glow` isn't present |
-| `jq` (optional) | Parses Claude's `--output-format json` for the metadata line (tokens / cost) |
+| `jq` (optional) | Parses Claude's `--output-format json` for the metadata line (tokens / cost). Required (not optional) when using the `http` agent. |
+| `curl` | Required when using the `http` agent (OpenRouter / Ollama). Universally present on macOS / Linux. |
 | `uv` (optional) | Needed only for the `aiblock` TUI — installs its Python deps lazily |
 
 ## Standalone setup (no chezmoi)

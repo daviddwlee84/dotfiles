@@ -7,18 +7,36 @@
 #   aiblock                                                    # Python TUI
 #
 # Agent auto-detection order: claude → opencode → codex → cursor-agent.
-# Override via -a AGENT. Advisory-only by design; there is no --execute flag.
+# Override via -a AGENT (per-call) or AICAP_AGENT env var (per-shell).
+# Advisory-only by design; there is no --execute flag.
 # For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+#
+# A fifth agent type `http` talks an OpenAI-compatible chat-completions endpoint
+# directly via curl + jq. Use it for OpenRouter free models or local Ollama
+# without depending on any agent CLI being installed:
+#
+#   AICAP_AGENT=http aifix              # OpenRouter (free Gemini Flash by default)
+#   AICAP_AGENT=http \
+#     AICAP_HTTP_URL=http://localhost:11434/v1/chat/completions \
+#     AICAP_HTTP_MODEL=qwen2.5-coder:7b aifix
+#
+# `http` is opt-in: it is never auto-detected (nothing on PATH to probe).
 #
 # Env-var defaults (set in ~/.zshrc or a 99_local_*.zsh to override):
 #
+#   AICAP_AGENT            default: (unset — auto-detect)
+#                                        force a specific agent: claude | opencode |
+#                                        codex | cursor-agent | http
 #   AICAP_CLAUDE_MODEL     default: haiku           (claude --model alias)
 #   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5
 #   AICAP_CODEX_MODEL      default: gpt-5-mini
 #   AICAP_CURSOR_MODEL     default: (unset — let cursor-agent pick)
+#   AICAP_HTTP_URL         default: https://openrouter.ai/api/v1/chat/completions
+#   AICAP_HTTP_MODEL       default: google/gemini-2.0-flash-exp:free
+#   AICAP_HTTP_API_KEY     default: $OPENROUTER_API_KEY (empty = no auth header)
 #   AICAP_SHOW_METADATA    default: 1  (tokens / cost / model on stderr)
-#                                        only extracted from claude JSON output
-#                                        for now; other agents print agent
+#                                        extracted from JSON output for claude
+#                                        and http agents; others print agent
 #                                        name + model only.
 #   AICAP_PRETTIFY         default: 1  (auto: glow → bat → raw; non-tty = raw)
 #
@@ -29,6 +47,10 @@
 : "${AICAP_OPENCODE_MODEL:=github-copilot/claude-haiku-4.5}"
 : "${AICAP_CODEX_MODEL:=gpt-5-mini}"
 : "${AICAP_CURSOR_MODEL:=}"
+: "${AICAP_HTTP_URL:=https://openrouter.ai/api/v1/chat/completions}"
+: "${AICAP_HTTP_MODEL:=google/gemini-2.0-flash-exp:free}"
+# AICAP_AGENT and AICAP_HTTP_API_KEY are intentionally NOT given `:` defaults —
+# unset means "auto-detect" / "fall back to $OPENROUTER_API_KEY" respectively.
 : "${AICAP_SHOW_METADATA:=1}"
 : "${AICAP_PRETTIFY:=1}"
 : "${AICAP_SPINNER:=1}"
@@ -159,7 +181,54 @@ _aiagent_invoke() {
       _aicap_spinner_stop
       return $rc
       ;;
-    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent)"; return 1 ;;
+    http)
+      # OpenAI-compatible chat-completions over curl. Covers OpenRouter (with
+      # API key) and local Ollama (no auth) with the same code path. Never
+      # auto-detected — opt in via AICAP_AGENT=http or `-a http`.
+      local url="$AICAP_HTTP_URL" model="$AICAP_HTTP_MODEL"
+      local key="${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}"
+      if ! command -v jq &>/dev/null; then
+        print -u2 "aifix: jq is required for the http agent"
+        return 1
+      fi
+      if ! command -v curl &>/dev/null; then
+        print -u2 "aifix: curl is required for the http agent"
+        return 1
+      fi
+      local host="${${url#*://}%%/*}"
+      [[ "$AICAP_SHOW_METADATA" != "1" ]] && print -u2 "http ($model @ $host)"
+      _aicap_spinner_start "http $model…"
+      local payload response
+      payload=$(jq -n --arg m "$model" --arg p "$prompt" \
+        '{model: $m, messages: [{role: "user", content: $p}], stream: false}')
+      local -a curl_args=(-sS -X POST "$url" -H 'Content-Type: application/json' -d "$payload")
+      [[ -n "$key" ]] && curl_args+=(-H "Authorization: Bearer $key")
+      response=$(curl "${curl_args[@]}")
+      rc=$?
+      _aicap_spinner_stop
+      if (( rc != 0 )); then
+        print -u2 "http: curl failed (rc=$rc) — check AICAP_HTTP_URL ($url)"
+        return $rc
+      fi
+      local err
+      err=$(print -r -- "$response" | jq -r '.error.message // (.error | strings) // empty' 2>/dev/null)
+      if [[ -n "$err" ]]; then
+        print -u2 "http: API error: $err"
+        return 1
+      fi
+      reply=$(print -r -- "$response" | jq -r '.choices[0].message.content // empty')
+      if [[ -z "$reply" ]]; then
+        print -u2 "http: empty reply (raw response: $response)"
+        return 1
+      fi
+      if [[ "$AICAP_SHOW_METADATA" == "1" ]]; then
+        tokens_in=$(print -r -- "$response" | jq -r '.usage.prompt_tokens // "?"')
+        tokens_out=$(print -r -- "$response" | jq -r '.usage.completion_tokens // "?"')
+        print -u2 "http ($model @ $host) | in=$tokens_in out=$tokens_out"
+      fi
+      print -r -- "$reply"
+      ;;
+    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent, http)"; return 1 ;;
   esac
 }
 
@@ -204,16 +273,24 @@ $block"
 _ai_print_help() {
   local name=$1 usage=$2
   print -r -- "usage: $name $usage"
-  print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent (default: auto-detect)"
+  print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)"
   print -r -- "  -p PROMPT  override default prompt"
   print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
   print -r -- "  --no-meta  suppress the stderr metadata line"
   print -r -- ""
   print -r -- "env vars:"
+  print -r -- "  AICAP_AGENT          = ${AICAP_AGENT:-<unset = auto-detect>}"
   print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
   print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
   print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
   print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+  print -r -- "  AICAP_HTTP_URL       = ${AICAP_HTTP_URL}"
+  print -r -- "  AICAP_HTTP_MODEL     = ${AICAP_HTTP_MODEL}"
+  if [[ -n "${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}" ]]; then
+    print -r -- "  AICAP_HTTP_API_KEY   = <set>"
+  else
+    print -r -- "  AICAP_HTTP_API_KEY   = <unset>"
+  fi
   print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
   print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
   print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
@@ -244,10 +321,15 @@ _ai_capture_dispatch() {
     return 1
   fi
   if [[ -z "$agent" ]]; then
-    agent=$(_aiagent_autodetect) || {
-      print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
-      return 1
-    }
+    if [[ -n "$AICAP_AGENT" ]]; then
+      agent=$AICAP_AGENT
+    else
+      agent=$(_aiagent_autodetect) || {
+        print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+        print -u2 "$name: hint — set AICAP_AGENT=http to use OpenRouter / Ollama directly"
+        return 1
+      }
+    fi
   fi
   local block
   block=$(cpblock "$n" 2>/dev/null) || {
@@ -301,10 +383,14 @@ aifix-stdin() {
     esac
   done
   if [[ -z "$agent" ]]; then
-    agent=$(_aiagent_autodetect) || {
-      print -u2 "$name: no coding-agent CLI found on PATH"
-      return 1
-    }
+    if [[ -n "$AICAP_AGENT" ]]; then
+      agent=$AICAP_AGENT
+    else
+      agent=$(_aiagent_autodetect) || {
+        print -u2 "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)"
+        return 1
+      }
+    fi
   fi
   # -t 0 checks if stdin is a terminal. If it is, user likely forgot to pipe.
   if [[ -t 0 ]]; then
@@ -349,10 +435,14 @@ aifix-run() {
     return 1
   fi
   if [[ -z "$agent" ]]; then
-    agent=$(_aiagent_autodetect) || {
-      print -u2 "$name: no coding-agent CLI found on PATH"
-      return 1
-    }
+    if [[ -n "$AICAP_AGENT" ]]; then
+      agent=$AICAP_AGENT
+    else
+      agent=$(_aiagent_autodetect) || {
+        print -u2 "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)"
+        return 1
+      }
+    fi
   fi
   local log
   log=$(mktemp -t aifix-run.XXXXXX) || { print -u2 "$name: mktemp failed"; return 1; }

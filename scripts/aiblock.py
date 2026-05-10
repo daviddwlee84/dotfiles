@@ -28,6 +28,7 @@ Depends on:
   - zsh on PATH (wrapper runs `fc -ln -30` in the caller's shell)
   - tmux (we run inside a pane)
   - at least one of: claude / opencode / codex / cursor-agent
+  - or: AICAP_AGENT=http for direct OpenRouter / Ollama (no agent CLI needed)
 """
 from __future__ import annotations
 
@@ -35,6 +36,8 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 
 import json
@@ -50,21 +53,28 @@ DEFAULT_FIX_PROMPT = (
 
 # Env-var defaults mirror 04_ai_capture.zsh. If the shell has exported
 # AICAP_*, os.environ picks them up; otherwise these defaults kick in.
+AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
 AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
 AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
 AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "gpt-5-mini")
 AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
+AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
+AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
+AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
 AICAP_SHOW_METADATA = os.environ.get("AICAP_SHOW_METADATA", "1") == "1"
 AICAP_PRETTIFY = os.environ.get("AICAP_PRETTIFY", "1") == "1"
 
 # Each agent's non-interactive invocation args (model-aware). The Claude
 # entry is special-cased in invoke_agent_oneshot because we optionally
-# use --output-format json for metadata extraction.
+# use --output-format json for metadata extraction. The `http` entry has
+# no `base` because it talks to a chat-completions endpoint via urllib —
+# see invoke_agent_oneshot's http branch.
 AGENT_CONFIG = {
     "claude":       {"base": ["claude", "-p", "--model", AICAP_CLAUDE_MODEL]},
     "opencode":     {"base": ["opencode", "run", "-m", AICAP_OPENCODE_MODEL]},
     "codex":        {"base": ["codex", "exec", "-m", AICAP_CODEX_MODEL]},
     "cursor-agent": {"base": ["cursor-agent", "-p"] + (["--model", AICAP_CURSOR_MODEL] if AICAP_CURSOR_MODEL else [])},
+    "http":         {"base": []},  # opt-in only; no PATH probe
 }
 
 console = Console(stderr=False)
@@ -77,8 +87,16 @@ class HistoryEntry:
 
 
 def detect_agents() -> list[str]:
-    """Return the subset of known agents found on PATH, in preference order."""
-    return [a for a in AGENT_CONFIG if shutil.which(a)]
+    """Return the subset of known agents found on PATH, in preference order.
+
+    The `http` agent has nothing to probe on PATH; it's only included when
+    AICAP_AGENT=http is explicitly set (so the user opted in via the same
+    env var the zsh wrappers honour).
+    """
+    found = [a for a in AGENT_CONFIG if a != "http" and shutil.which(a)]
+    if AICAP_AGENT == "http":
+        found.insert(0, "http")
+    return found
 
 
 def zsh_run(code: str, timeout: float = 5.0) -> str:
@@ -154,6 +172,9 @@ def invoke_agent_oneshot(agent: str, prompt: str) -> tuple[str, dict]:
     base = AGENT_CONFIG[agent]["base"]
     meta: dict = {"agent": agent, "model": _model_for(agent)}
 
+    if agent == "http":
+        return _invoke_http_oneshot(prompt, meta)
+
     if agent == "claude" and AICAP_SHOW_METADATA:
         result = subprocess.run(
             [*base, "--output-format", "json", prompt],
@@ -203,7 +224,55 @@ def _model_for(agent: str) -> str:
         "opencode": AICAP_OPENCODE_MODEL,
         "codex": AICAP_CODEX_MODEL,
         "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
+        "http": AICAP_HTTP_MODEL,
     }[agent]
+
+
+def _invoke_http_oneshot(prompt: str, meta: dict) -> tuple[str, dict]:
+    """Talk an OpenAI-compatible chat-completions endpoint via urllib.
+
+    Same code path serves OpenRouter (with Bearer key) and local Ollama
+    (no auth). Mirrors the zsh `http` branch in 04_ai_capture.zsh.
+    """
+    payload = json.dumps({
+        "model": AICAP_HTTP_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if AICAP_HTTP_API_KEY:
+        headers["Authorization"] = f"Bearer {AICAP_HTTP_API_KEY}"
+    req = urllib.request.Request(AICAP_HTTP_URL, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=180.0) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        console.print(f"[red]http: HTTP {e.code} from {AICAP_HTTP_URL}[/red]")
+        if err_body:
+            console.print(f"[dim]{err_body[:500]}[/dim]")
+        return "", meta
+    except urllib.error.URLError as e:
+        console.print(f"[red]http: connection failed: {e.reason}[/red]")
+        return "", meta
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        console.print(f"[red]http: non-JSON response[/red] [dim]{body[:300]}[/dim]")
+        return "", meta
+    if isinstance(parsed.get("error"), dict):
+        msg = parsed["error"].get("message", str(parsed["error"]))
+        console.print(f"[red]http: API error: {msg}[/red]")
+        return "", meta
+    try:
+        reply = parsed["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        console.print(f"[red]http: unexpected response shape[/red] [dim]{body[:300]}[/dim]")
+        return "", meta
+    usage = parsed.get("usage") or {}
+    meta["input_tokens"] = usage.get("prompt_tokens")
+    meta["output_tokens"] = usage.get("completion_tokens")
+    return reply, meta
 
 
 def format_metadata(meta: dict) -> str:
@@ -242,6 +311,12 @@ def spawn_interactive_agent(agent: str, context: str, prompt: str) -> None:
     then execs the interactive agent. This gives the user an ongoing session
     seeded with the context.
     """
+    if agent == "http":
+        console.print(
+            "[red]Cannot spawn an interactive session for the http agent — "
+            "it talks to a chat-completions endpoint, not a CLI.[/red]"
+        )
+        return
     if not os.environ.get("TMUX"):
         console.print("[red]Spawn requires tmux.[/red]")
         return
@@ -283,7 +358,8 @@ def main() -> int:
     if not agents:
         console.print(
             "[red]No coding-agent CLI on PATH.[/red]\n"
-            "[dim]Install one of: claude, opencode, codex, cursor-agent.[/dim]"
+            "[dim]Install one of: claude, opencode, codex, cursor-agent — "
+            "or set AICAP_AGENT=http for direct OpenRouter / Ollama.[/dim]"
         )
         return 1
 
