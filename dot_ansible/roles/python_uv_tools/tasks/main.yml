@@ -32,6 +32,7 @@
     uv tool install {{ item.name }}
     {% if item.python is defined %}--python {{ item.python }} {% endif %}
     {% if item.with is defined %}{% for dep in item.with %}--with {{ dep }} {% endfor %}{% endif %}
+    {% if item.with_executables_from is defined %}{% for dep in item.with_executables_from %}--with-executables-from {{ dep }} {% endfor %}{% endif %}
   register: python_uv_tool_install
   until: python_uv_tool_install is succeeded
   retries: 3

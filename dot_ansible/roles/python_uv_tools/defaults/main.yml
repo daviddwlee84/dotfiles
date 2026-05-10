@@ -4,6 +4,9 @@
 #   - name: package name (can include extras like [cli])
 #   - binary: executable name to check for idempotency
 #   - with: (optional) additional dependency to install with --with
+#   - with_executables_from: (optional) list of packages to install AND
+#     expose their entry points in ~/.local/bin (e.g. jupyter-core to get
+#     the `jupyter` meta-CLI; `notebook` to get `jupyter-notebook`)
 #   - python: (optional) pin Python version (e.g. "3.11" for thefuck)
 #   - needs_modern_gcc: (optional, default false) tool transitively pulls
 #     numpy 2.x / pandas 3.x / pyarrow which require GCC ≥ 9.3 to compile
@@ -46,3 +49,17 @@ python_uv_tools:
     binary: copyparty
   - name: trafilatura
     binary: trafilatura
+  - name: marimo[recommended,mcp]
+    binary: marimo
+    with:
+      - httpx[socks]
+  - name: jupyterlab
+    binary: jupyter-lab
+    with:
+      - marimo[sandbox]
+      - marimo-jupyter-extension
+      - ipykernel
+      - ipywidgets
+    with_executables_from:
+      - notebook       # exposes jupyter-notebook (classic UI, Notebook 7)
+      - jupyter-core   # exposes the `jupyter` meta-CLI dispatcher
