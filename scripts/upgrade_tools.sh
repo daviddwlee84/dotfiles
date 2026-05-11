@@ -362,19 +362,62 @@ cat_mise() {
 # ============================================================================
 # Category: uv — self-update + upgrade all uv tools
 # ============================================================================
+# Detect uv install style by binary path + brew formula registry. Mirrors
+# the same dispatch in dot_ansible/roles/python_uv_tools/tasks/main.yml so
+# both surfaces speak the same language. See:
+#   - docs/this_repo/uv-bootstrap.md
+#   - pitfalls/uv-self-update-homebrew-noop.md
+_uv_install_style() {
+  local p
+  p="$(command -v uv 2>/dev/null)" || return 1
+  case "$p" in
+    */homebrew/* | */Cellar/* | */linuxbrew/*) echo brew ;;
+    /usr/local/bin/uv)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula uv >/dev/null 2>&1; then
+        echo brew
+      else
+        echo curl
+      fi
+      ;;
+    "$HOME"/.local/bin/uv | "$HOME"/.cargo/bin/uv) echo curl ;;
+    *)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula uv >/dev/null 2>&1; then
+        echo brew
+      else
+        echo curl
+      fi
+      ;;
+  esac
+}
+
 cat_uv() {
   if ! command -v uv >/dev/null 2>&1; then
     warn "uv not found — skipping"
     return $SKIP_RC
   fi
 
-  local any_fail=0
-  info "Updating uv itself"
-  # `uv self update` only works when installed via curl/installer. Homebrew-
-  # installed uv refuses; treat non-zero as warning, not failure.
-  if ! _run uv self update; then
-    warn "uv self update failed (possibly installed via brew — upgrade via that channel)"
-  fi
+  local any_fail=0 style
+  style="$(_uv_install_style)"
+  info "Updating uv itself (install style: $style)"
+
+  case "$style" in
+    brew)
+      # Homebrew-installed uv refuses `uv self update` ("self-update is
+      # disabled for this build"). Use the right channel instead.
+      if ! _run brew upgrade uv; then
+        warn "brew upgrade uv failed — leaving uv at current version"
+      fi
+      ;;
+    curl | *)
+      # `uv self update` works for the standalone curl-installer and any
+      # binary that wasn't built with self-update disabled.
+      if ! _run uv self update; then
+        warn "uv self update failed (style=$style); falling back to no-op"
+      fi
+      ;;
+  esac
 
   info "Upgrading all uv tools"
   _run uv tool upgrade --all || any_fail=1

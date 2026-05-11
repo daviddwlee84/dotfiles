@@ -50,7 +50,7 @@ just upgrade-<category>   # 單獨執行一個類別
 | `externals` | `chezmoi upgrade`（chezmoi 二進位檔本身）+ `chezmoi apply --refresh-externals`（強制刷新 168h externals：oh-my-zsh、TPM、toolkami.rb、fzf）。放在最前面是因為 chezmoi 版本提升可能改變後續步驟的行為。 |
 | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile`（**不**加 `--no-upgrade`）→ `Brewfile.{darwin,linux}` → `brew cleanup`。macOS 透過 [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) 預先暖機共享 sudo 會話 (session)，讓會 shell out 到 `sudo /usr/sbin/installer` 的 cask pkg 安裝程式能找到有效的 sudo ticket。 |
 | `mise` | `mise self-update --yes` + `mise upgrade`（遵守 `~/.config/mise/config.toml` 中的版本約束 (constraint)）。當 mise 是透過 brew/apt 安裝時，`self-update` 會發出警示 (warning) 而非失敗。 |
-| `uv` | `uv self update` + `uv tool upgrade --all`。涵蓋 [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) 與 [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml) 中列出的每個工具。 |
+| `uv` | 依 binary 路徑偵測安裝方式（Homebrew vs curl 安裝器），分派到對應通道：Homebrew/Linuxbrew 安裝走 `brew upgrade uv`，curl standalone 安裝走 `uv self update`。接著執行 `uv tool upgrade --all`。涵蓋 [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) 與 [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml) 中列出的每個工具。當 uv 低於 `min_uv_version` 時，`python_uv_tools` ansible role 會自動做相同分派 — 詳見 [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md)。 |
 | `npm` | `npm -g update`，當 `npm` 不在 PATH 上時退回 `mise exec -- npm -g update`（與 [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml) 相同的偵測邏輯）。 |
 | `cargo` | 若不存在則先 bootstrap `cargo-update` crate，再執行 `cargo install-update -a`。涵蓋 pueue（Linux）以及 [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml) 中未來的條目。 |
 | `dotnet` | 從 [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) 解析工具名，逐一執行 `dotnet tool update --global <name>`（透過 mise 的 dotnet shim）。若解析不到任何結果，退回 `dotnet tool list --global`。 |
@@ -137,7 +137,8 @@ flowchart LR
 ## 疑難排解
 
 - **`chezmoi upgrade` 失敗。** `chezmoi upgrade` 只在 chezmoi 是透過官方安裝腳本或 `go install` 安裝時才能用。Homebrew/apt 安裝會出錯 — 改從那個管道升級。腳本會把這視為警示而非失敗。
-- **`mise self-update` / `uv self update` 失敗。** 模式相同 — 兩者在透過系統套件管理員安裝時都會拒絕。視為警示。
+- **`mise self-update` 失敗。** mise 在透過系統套件管理員安裝時會拒絕自動更新。視為警示。
+- **`uv self update` 在 Homebrew uv 上 silent no-op。** 已自動處理 — `cat_uv()` 偵測安裝方式並改執行 `brew upgrade uv`。詳見 [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md) 與 [`pitfalls/uv-self-update-homebrew-noop.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/uv-self-update-homebrew-noop.md)。
 - **macOS cask pkg 安裝程式卡在 sudo。** 腳本在 macOS 上會呼叫 `sudo_session_init "upgrade-brew"`，會提示一次並暖機 ticket。如果你透過沒有 TTY 的 SSH 執行腳本，那一步會變成 `non-interactive`，cask pkg 升級可能會卡住。修法：在本機執行、用 `ssh -t`、或在 `just upgrade-brew` 之前自己先 `sudo -v` 暖機。
 - **`cargo install-update -a` 執行到一半失敗。** 一個 crate 壞掉不會中止其餘的（盡力而為）。重新執行 `just upgrade-cargo` — 如果 cargo-update 缺失它自己會被重建。
 - **`pre-commit autoupdate` 升級了某個 hook 結果現在會出錯。** 那是 repo 檔案變更，不是環境變更。檢視 `.pre-commit-config.yaml` 的 diff；必要時 `git checkout -p .pre-commit-config.yaml` 部分還原。

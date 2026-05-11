@@ -7,6 +7,7 @@
 #   - with_executables_from: (optional) list of packages to install AND
 #     expose their entry points in ~/.local/bin (e.g. jupyter-core to get
 #     the `jupyter` meta-CLI; `notebook` to get `jupyter-notebook`)
+#     NOTE: requires uv >= 0.8.5 (--with-executables-from added in that release)
 #   - python: (optional) pin Python version (e.g. "3.11" for thefuck)
 #   - needs_modern_gcc: (optional, default false) tool transitively pulls
 #     numpy 2.x / pandas 3.x / pyarrow which require GCC ≥ 9.3 to compile

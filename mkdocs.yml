@@ -334,6 +334,7 @@ nav:
       - Bootstrap (curl|sh): this_repo/bootstrap.md
       - Ansible customization: this_repo/ansible_customization.md
       - Upgrades: this_repo/upgrades.md
+      - uv bootstrap & per-machine upgrade dispatch: this_repo/uv-bootstrap.md
       - Testing: this_repo/testing.md
       - Sudo session: this_repo/sudo-session.md
       - Vim mode (catalog + opt-out): this_repo/vim-mode.md

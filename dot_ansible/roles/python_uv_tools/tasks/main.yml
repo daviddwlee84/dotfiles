@@ -1,11 +1,174 @@
 ---
 # Python CLI tools via uv
-# uv is bootstrapped before ansible runs
+# uv is bootstrapped before ansible runs (run_once_before_00_bootstrap.sh.tmpl
+# curls the official installer to ~/.local/bin/uv when missing). This role
+# additionally guarantees that uv is recent enough for the flags it uses.
 
-# Detect whether the system has a modern-enough GCC for numpy 2.x / pandas
-# 3.x / pyarrow source builds. Modern wheel ecosystem dropped manylinux_2_17
-# (CentOS 7 baseline) so older glibc hosts fall back to compiling these from
-# source — and the build now requires GCC >= 9.3 (numpy meson build asserts).
+# -----------------------------------------------------------------------------
+# Minimum-uv-version gate (auto-upgrade aware)
+# -----------------------------------------------------------------------------
+#
+# The role's `defaults/main.yml` uses `with_executables_from:` for the
+# jupyterlab entry to expose `jupyter` / `jupyter-notebook` shims from
+# jupyter-core / notebook. That is the `--with-executables-from` flag of
+# `uv tool install`, added in uv 0.8.5 (PR astral-sh/uv#14014, released
+# 2025-08-xx). Older uv aborts the install loop with:
+#   error: unexpected argument '--with-executables-from' found
+#
+# The user's fleet currently spans:
+#   * macOS w/ Homebrew uv  → /opt/homebrew/bin/uv         (`brew upgrade uv`)
+#   * macOS w/ curl install → ~/.local/bin/uv              (`uv self update`)
+#   * Ubuntu w/ curl install → ~/.local/bin/uv             (`uv self update`)
+#   * Linuxbrew              → /home/linuxbrew/.linuxbrew/bin/uv (`brew upgrade uv`)
+#
+# `uv self update` REFUSES on brew installs ("self-update is disabled for
+# this build"). So we detect the install style and dispatch to the right
+# upgrade command rather than blindly trying one. See
+# `pitfalls/uv-self-update-homebrew-noop.md` and
+# `pitfalls/ansible-when-regex-replace-backslash-strip.md`.
+- name: Set minimum required uv version
+  ansible.builtin.set_fact:
+    min_uv_version: "0.8.5"
+
+# Probe current uv version. `uv --version` prints e.g.:
+#   "uv 0.7.4 (6fbcd09b5 2025-05-15)"
+#   "uv 0.10.2 (Homebrew 2026-02-10)"
+#   "uv 0.7.18"
+# We take field 2 with awk to avoid `regex_replace` inside `when:` clauses,
+# which silently strips one layer of backslashes (\S → S, \1 → 1) and makes
+# the regex never match — `regex_replace` then returns the original string,
+# and the version test fails with a misleading
+#   "'<' not supported between instances of 'str' and 'int'".
+# See pitfalls/ansible-when-regex-replace-backslash-strip.md.
+- name: Probe current uv version
+  ansible.builtin.shell: |
+    set -e
+    uv --version | awk '{print $2}'
+  args:
+    executable: /bin/bash
+  register: _uv_initial
+  changed_when: false
+
+- name: Set initial uv_version fact (clean string, safe for `is version()`)
+  ansible.builtin.set_fact:
+    _uv_initial_version: "{{ _uv_initial.stdout | trim }}"
+
+# Detect install style by binary path + brew formula registry.
+# Order matters: a path under */homebrew/* or */linuxbrew/* is
+# unambiguous. /usr/local/bin/uv is shared between Intel-mac brew and the
+# curl installer — disambiguate by asking brew if it owns the formula.
+- name: Detect uv install style (brew vs curl-installer vs other)
+  ansible.builtin.shell: |
+    set -e
+    p="$(command -v uv)"
+    case "$p" in
+      */homebrew/*|*/Cellar/*|*/linuxbrew/*)
+        echo brew
+        ;;
+      /usr/local/bin/uv)
+        if command -v brew >/dev/null 2>&1 \
+           && brew list --formula uv >/dev/null 2>&1; then
+          echo brew
+        else
+          echo curl
+        fi
+        ;;
+      "$HOME"/.local/bin/uv|"$HOME"/.cargo/bin/uv)
+        echo curl
+        ;;
+      *)
+        # Best-effort fallback: if brew owns the formula, treat as brew;
+        # else assume self-update-capable (curl style or stand-alone binary).
+        if command -v brew >/dev/null 2>&1 \
+           && brew list --formula uv >/dev/null 2>&1; then
+          echo brew
+        else
+          echo curl
+        fi
+        ;;
+    esac
+  args:
+    executable: /bin/bash
+  register: _uv_install_style
+  changed_when: false
+
+- name: Show detected uv state
+  ansible.builtin.debug:
+    msg: >-
+      uv {{ _uv_initial_version }}
+      (install style: {{ _uv_install_style.stdout }};
+      minimum required: {{ min_uv_version }})
+
+# --- Upgrade dispatch (only fires when uv is too old) ---
+
+# `community.general.homebrew state=latest` is idempotent and runs as the
+# invoking user (no become). Covers macOS Homebrew + Linuxbrew.
+- name: Upgrade uv via Homebrew (brew install detected, version too old)
+  community.general.homebrew:
+    name: uv
+    state: latest
+  when:
+    - _uv_initial_version is version(min_uv_version, '<')
+    - _uv_install_style.stdout == 'brew'
+  register: _uv_brew_upgrade
+  until: _uv_brew_upgrade is succeeded
+  retries: 3
+  delay: 10
+
+# `uv self update` is the canonical refresh for the curl/standalone install.
+# Network-dependent so retried; treat "already up to date" stdout as not-changed.
+- name: Upgrade uv via self-update (curl install detected, version too old)
+  ansible.builtin.command: uv self update
+  register: _uv_self_update
+  changed_when: >-
+    'updated to' in (_uv_self_update.stdout | default(''))
+    or 'updated to' in (_uv_self_update.stderr | default(''))
+  until: _uv_self_update is succeeded
+  retries: 3
+  delay: 10
+  when:
+    - _uv_initial_version is version(min_uv_version, '<')
+    - _uv_install_style.stdout == 'curl'
+
+# Re-probe unconditionally — cheap, and gives us a clean post-upgrade fact
+# regardless of which (or no) upgrade branch fired.
+- name: Re-probe uv version after upgrade attempt
+  ansible.builtin.shell: |
+    set -e
+    uv --version | awk '{print $2}'
+  args:
+    executable: /bin/bash
+  register: _uv_final
+  changed_when: false
+
+- name: Set final uv_version fact
+  ansible.builtin.set_fact:
+    uv_version: "{{ _uv_final.stdout | trim }}"
+
+- name: Fail if uv is still too old after auto-upgrade attempt
+  ansible.builtin.fail:
+    msg: |
+      uv {{ uv_version }} is below the required minimum {{ min_uv_version }},
+      and the auto-upgrade attempt did not help (install style detected:
+      {{ _uv_install_style.stdout }}).
+
+      Manual fix by install style:
+        macOS Homebrew     →  brew upgrade uv
+        Linuxbrew          →  brew upgrade uv
+        curl/standalone    →  uv self update     (or: just upgrade-tools uv)
+        unknown / other    →  reinstall via https://docs.astral.sh/uv/getting-started/installation/
+
+      The --with-executables-from flag (used by the jupyterlab entry in
+      this role's defaults/main.yml) was added in uv 0.8.5
+      (PR astral-sh/uv#14014).
+  when: uv_version is version(min_uv_version, '<')
+
+# -----------------------------------------------------------------------------
+# GCC capability gate (for tools that fall back to source builds)
+# -----------------------------------------------------------------------------
+# Modern wheel ecosystem dropped manylinux_2_17 (CentOS 7 baseline) so older
+# glibc hosts fall back to compiling numpy / pandas / pyarrow from source —
+# and the build now requires GCC >= 9.3 (numpy meson build asserts).
 # CentOS 7 ships gcc 4.8.5; the tools tagged `needs_modern_gcc: true` get
 # skipped there. See pitfalls/centos7-numpy-pandas-source-build.md.
 - name: Detect host C compiler (gcc) version

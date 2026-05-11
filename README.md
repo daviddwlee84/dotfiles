@@ -317,7 +317,7 @@ just upgrade-dry-run      # preview without executing
 # Per category (compose as you like):
 just upgrade-brew         # formulas + casks (--greedy) + Brewfile (no --no-upgrade) + cleanup
 just upgrade-mise         # mise self-update + `mise upgrade`
-just upgrade-uv           # Python CLI tools (apprise, mlflow, sqlit-tui, ...)
+just upgrade-uv           # uv itself (auto-dispatches: brew vs self update) + `uv tool upgrade --all` (apprise, mlflow, sqlit-tui, ...)
 just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
 just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
 just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
