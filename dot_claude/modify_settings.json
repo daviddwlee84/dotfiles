@@ -5,17 +5,29 @@
 # Why hook-aware? Claude Code rewrites this file at runtime AND CodeIsland
 # (https://github.com/wxtsky/CodeIsland, macOS notch HUD) auto-installs its
 # own entries into hooks.Notification / hooks.PermissionRequest / hooks.Stop
-# / hooks.PreToolUse / etc. A naive `jq '. * $overlay'` deep-merge replaces
-# arrays wholesale, so declaring our notify.sh hook in the overlay would
-# silently delete every CodeIsland entry on each `chezmoi apply` (and
-# CodeIsland would re-install on next launch — endless ping-pong).
+# / hooks.PreToolUse / etc. workmux's `wm setup` ALSO writes Stop /
+# UserPromptSubmit / Notification hook entries (see docs/tools/workmux.md
+# → "Claude leak"). A naive `jq '. * $overlay'` deep-merge replaces arrays
+# wholesale, so declaring our notify.sh hook in the overlay would silently
+# delete every CodeIsland / workmux entry on each `chezmoi apply` (and the
+# tools would re-install on next launch — endless ping-pong).
 #
 # How: For all keys EXCEPT .hooks, do the normal recursive object merge.
 # For .hooks.<event> arrays, additively merge — append overlay entries that
 # aren't already present (matched by .hooks[0].command), preserving every
 # entry the live file already contains. This lets our overlay enforce
-# notify.sh while CodeIsland (or any other tool) freely manages its own
-# parallel entries in the same event arrays.
+# notify.sh + workmux status updates while CodeIsland / workmux setup /
+# any other tool freely manage their own parallel entries in the same
+# event arrays.
+#
+# Workmux integration: We declare the workmux Stop / SubagentStop /
+# UserPromptSubmit / Notification hooks here directly so they're enforced
+# on every chezmoi apply WITHOUT requiring users to also run `wm setup`.
+# The `command -v workmux` guard lets the hook no-op silently on machines
+# where workmux isn't installed yet (fresh box, Linux without ansible run,
+# etc.). This patches Claude's by-design 🤖-leak: Anthropic's Stop hook
+# fires on every turn end, but workmux's `working` state never auto-clears
+# without an explicit `done` set.
 #
 # To manage an additional hook event: add it to $overlay.hooks below.
 # To manage an additional non-hook key: add it to $overlay.
@@ -38,6 +50,26 @@ overlay=$(cat <<'JSON'
             "command": "~/.claude/hooks/notify.sh"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v workmux >/dev/null 2>&1 && workmux set-window-status waiting || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v workmux >/dev/null 2>&1 && workmux set-window-status working || true"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -46,6 +78,24 @@ overlay=$(cat <<'JSON'
           {
             "type": "command",
             "command": "~/.claude/hooks/notify.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v workmux >/dev/null 2>&1 && workmux set-window-status done || true"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v workmux >/dev/null 2>&1 && workmux set-window-status done || true"
           }
         ]
       }

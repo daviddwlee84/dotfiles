@@ -259,6 +259,7 @@ nav:
       - Sessions & worktrees:
           - Sesh: tools/sesh.md
           - Worktrunk: tools/worktrunk.md
+          - Workmux: tools/workmux.md
           - SSH agent: tools/ssh-agent.md
       - Editor & agents:
           - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md

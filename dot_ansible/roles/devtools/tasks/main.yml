@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -10,6 +10,16 @@
   when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew_tap:
     name: dlvhdr/formulae
+    state: present
+
+- name: Tap raine/workmux formula (macOS)
+  # workmux is a tmux + git-worktree orchestrator with first-class agent
+  # status icons (🤖 working / 💬 waiting / ✅ done) rendered into the tmux
+  # window list. Coexists with worktrunk (`wt`); see docs/tools/workmux.md
+  # for the wt-vs-wm split.
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_tap:
+    name: raine/workmux
     state: present
 
 - name: Install developer CLI tools (macOS)
@@ -37,6 +47,7 @@
       - tmux
       - sesh
       - worktrunk
+      - workmux
       - zellij
       - btop
       - htop
@@ -2955,6 +2966,149 @@
       loop:
         - /tmp/worktrunk.tar.xz
         - /tmp/worktrunk
+
+# --- workmux (tmux + git-worktree orchestrator with agent status icons) ---
+# Coexists with worktrunk (`wt`); see docs/tools/workmux.md.
+# Releases ship plain `.tar.gz` (NOT `.tar.xz` like worktrunk), so no xz dep.
+- name: Check if workmux is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: wm --version
+  register: workmux_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install workmux from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - workmux_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (workmux)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest workmux release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/raine/workmux/releases/latest
+        return_content: true
+      register: workmux_release
+
+    - name: Set workmux architecture mapping
+      ansible.builtin.set_fact:
+        workmux_arch: >-
+          {{
+            'amd64' if target_architecture in ['x86_64', 'amd64']
+            else 'arm64' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Skip workmux on unsupported architecture
+      when: workmux_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "workmux skipped: no release for {{ target_architecture }}"
+
+    - name: Set workmux download URL fact
+      ansible.builtin.set_fact:
+        workmux_download_url: >-
+          {{
+            (
+              workmux_release.json.assets
+              | selectattr('name', 'equalto', 'workmux-linux-' ~ workmux_arch ~ '.tar.gz')
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip workmux if download URL could not be determined
+      when: workmux_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "workmux skipped: could not determine download URL for architecture {{ workmux_arch }}"
+
+    - name: Download workmux tarball
+      when: workmux_download_url | trim != ''
+      ansible.builtin.get_url:
+        url: "{{ workmux_download_url }}"
+        dest: /tmp/workmux.tar.gz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create workmux temp directory
+      when: workmux_download_url | trim != ''
+      ansible.builtin.file:
+        path: /tmp/workmux
+        state: directory
+        mode: '0755'
+
+    - name: Extract workmux
+      when: workmux_download_url | trim != ''
+      ansible.builtin.unarchive:
+        src: /tmp/workmux.tar.gz
+        dest: /tmp/workmux
+        remote_src: true
+
+    - name: Find workmux binary
+      when: workmux_download_url | trim != ''
+      ansible.builtin.find:
+        paths: /tmp/workmux
+        patterns: workmux
+        file_type: file
+        recurse: true
+      register: workmux_find
+
+    - name: Fail if workmux binary was not found in extracted archive
+      when:
+        - workmux_download_url | trim != ''
+        - workmux_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "workmux binary not found under /tmp/workmux after extraction"
+
+    - name: Install workmux to ~/.local/bin
+      when:
+        - workmux_download_url | trim != ''
+        - workmux_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ workmux_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/workmux"
+        mode: '0755'
+        remote_src: true
+
+    - name: Symlink wm -> workmux for short alias
+      when:
+        - workmux_download_url | trim != ''
+        - workmux_find.matched | default(0) | int > 0
+      ansible.builtin.file:
+        src: "{{ ansible_facts['env']['HOME'] }}/.local/bin/workmux"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/wm"
+        state: link
+        force: true
+
+    - name: Clean up workmux temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/workmux.tar.gz
+        - /tmp/workmux
+
+  rescue:
+    - name: Warn workmux installation failed
+      ansible.builtin.debug:
+        msg: "workmux installation failed (likely network timeout) - skipping"
+
+    - name: Clean up workmux temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/workmux.tar.gz
+        - /tmp/workmux
 
 # --- taplo (TOML language server / formatter) ---
 - name: Check if taplo is installed

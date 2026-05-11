@@ -467,14 +467,19 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## Worktree Management
 
-> Requires `worktrunk` (`wt`). `wtcd` also requires `jq` + `fzf`.
+> Requires `worktrunk` (`wt`) and/or `workmux` (`wm`). `wtcd` also requires `jq` + `fzf`.
 >
 > Worktrunk's own aliases (`wt sw`, `wt ls`, `wt rm`, `wt cc`, `wt oc`) are defined in `dot_config/worktrunk/config.toml`, not in zsh — they work from any shell and from the interactive picker.
+>
+> Workmux (`wm`) is a separate tool that coexists with worktrunk; it's the source of the 🤖/💬/✅ icons in the tmux window list. See [docs/tools/workmux.md](../tools/workmux.md) for the wt-vs-wm split.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `wt` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
 | `wtcd` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
+| `wm` | alias | `dot_config/zsh/tools/38_workmux.zsh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
+| `wmsb` | alias | `dot_config/zsh/tools/38_workmux.zsh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
+| `wmclear` | function | `dot_config/zsh/tools/38_workmux.zsh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
 
 ---
 

@@ -294,19 +294,29 @@ websocket_connect_timeout_ms = 5000
   run bash -c "printf '%s' \"\$1\" | sh '$SOURCE_DIR/dot_claude/modify_settings.json'" _ "$live"
   [ "$status" -eq 0 ]
 
-  # Notification: CodeIsland entry preserved + notify.sh appended.
-  echo "$output" | jq -e '.hooks.Notification | length == 2' >/dev/null
+  # Notification: CodeIsland entry preserved + notify.sh + workmux waiting appended.
+  echo "$output" | jq -e '.hooks.Notification | length == 3' >/dev/null
   echo "$output" | jq -e '.hooks.Notification | map(.hooks[0].command) | index("~/.codeisland/codeisland-hook.sh") != null' >/dev/null
   echo "$output" | jq -e '.hooks.Notification | map(.hooks[0].command) | index("~/.claude/hooks/notify.sh") != null' >/dev/null
-  # Stop: same.
-  echo "$output" | jq -e '.hooks.Stop | length == 2' >/dev/null
+  echo "$output" | jq -e '.hooks.Notification | map(.hooks[0].command) | any(. | test("workmux set-window-status waiting"))' >/dev/null
+  # Stop: CodeIsland + notify.sh + workmux done.
+  echo "$output" | jq -e '.hooks.Stop | length == 3' >/dev/null
   echo "$output" | jq -e '.hooks.Stop | map(.hooks[0].command) | index("~/.claude/hooks/notify.sh") != null' >/dev/null
+  echo "$output" | jq -e '.hooks.Stop | map(.hooks[0].command) | index("~/.codeisland/codeisland-hook.sh") != null' >/dev/null
+  echo "$output" | jq -e '.hooks.Stop | map(.hooks[0].command) | any(. | test("workmux set-window-status done"))' >/dev/null
+  # SubagentStop: workmux done injected (live had nothing).
+  echo "$output" | jq -e '.hooks.SubagentStop | length == 1' >/dev/null
+  echo "$output" | jq -e '.hooks.SubagentStop[0].hooks[0].command | test("workmux set-window-status done")' >/dev/null
+  # UserPromptSubmit: workmux working injected.
+  echo "$output" | jq -e '.hooks.UserPromptSubmit | length == 1' >/dev/null
+  echo "$output" | jq -e '.hooks.UserPromptSubmit[0].hooks[0].command | test("workmux set-window-status working")' >/dev/null
   # PreToolUse: only CodeIsland entry (not in our overlay), must survive untouched.
   echo "$output" | jq -e '.hooks.PreToolUse | length == 1' >/dev/null
   echo "$output" | jq -e '.hooks.PreToolUse[0].hooks[0].command == "~/.codeisland/codeisland-hook.sh"' >/dev/null
-  # Non-hook keys: live values preserved + overlay keys enforced.
+  # Non-hook keys: live values preserved EXCEPT where overlay scalars override.
   echo "$output" | jq -e '.model == "sonnet"' >/dev/null
-  echo "$output" | jq -e '.permissions.defaultMode == "auto"' >/dev/null
+  # `permissions.defaultMode` is enforced by overlay → live "auto" loses to overlay "bypassPermissions".
+  echo "$output" | jq -e '.permissions.defaultMode == "bypassPermissions"' >/dev/null
   echo "$output" | jq -e '.skipDangerousModePermissionPrompt == true' >/dev/null
   echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
 }

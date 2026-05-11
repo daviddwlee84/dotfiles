@@ -1,0 +1,38 @@
+#!/bin/sh
+# chezmoi modify_ script: deep-merge a managed overlay into ~/.config/opencode/package.json.
+#
+# Why: OpenCode's plugin loader reads this package.json to resolve plugin
+# imports (e.g. `@opencode-ai/plugin` for our chezmoi-managed
+# plugins/workmux-status.ts). `wm setup` also writes this file with the same
+# dependency, so we manage it here to avoid drift across machines. Merge
+# (not overwrite) preserves any extra `dependencies` / `devDependencies`
+# entries that other OpenCode plugins or `npm install` may add at runtime.
+#
+# Source: dot_config/opencode/modify_package.json
+# Target: ~/.config/opencode/package.json
+# Requires: jq (installed by the `base` ansible role).
+set -eu
+
+overlay=$(cat <<'JSON'
+{
+  "private": true,
+  "dependencies": {
+    "@opencode-ai/plugin": "1.4.3"
+  }
+}
+JSON
+)
+
+base=$(cat)
+[ -z "$base" ] && base='{}'
+
+# Cold-start fallback: jq is installed by the `base` ansible role, which
+# runs AFTER this file-apply phase. Pass the live file through unchanged
+# and warn — the next apply (after ansible) does the real merge.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "modify_package.json: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+  printf '%s' "$base"
+  exit 0
+fi
+
+printf '%s' "$base" | jq --argjson overlay "$overlay" '. * $overlay'

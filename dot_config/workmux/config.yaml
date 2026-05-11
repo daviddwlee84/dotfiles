@@ -1,0 +1,33 @@
+# ~/.config/workmux/config.yaml — global workmux defaults.
+# Source:  dot_config/workmux/config.yaml  (managed by chezmoi)
+# Target:  ~/.config/workmux/config.yaml
+# Docs:    https://workmux.raine.dev/guide/configuration
+#
+# This repo's workmux integration is the "self-managed" path: tmux's
+# window-status-format is patched in dot_config/tmux/theme.catppuccin.conf
+# (gated on `#{?@workmux_status, ...}`) instead of letting `workmux setup`
+# rewrite per-tmux-session. That makes the icon visible across every tmux
+# session consistently, survives chezmoi diffs, and avoids the per-session
+# drift we hit on Hanrus-Mac-mini.local where the format only appeared
+# inside sessions where wm had been invoked.
+#
+# Status emoji (working / waiting / done) are upstream defaults — see
+# docs/tools/workmux.md for the leak-on-crash story and how Claude/OpenCode
+# hooks compensate for the working-status-is-sticky design.
+
+# Use plain emoji icons (not nerdfont). Set true if you adopt nerdfonts
+# everywhere AND want workmux's compact glyph set instead.
+nerdfont: false
+
+# Disable workmux's per-session window-status-format rewriter. We manage the
+# format ourselves in dot_config/tmux/theme.catppuccin.conf via the
+# @catppuccin_window_text / @catppuccin_window_current_text overrides.
+# See docs/tools/workmux.md → "Self-managed status format" for rationale.
+status_format: false
+
+# Custom status icons (uncomment to override upstream defaults). Tmux style
+# codes are supported, e.g. `done: "#[fg=#a6e3a1]✅#[fg=default]"`.
+# status_icons:
+#   working: "🤖"
+#   waiting: "💬"
+#   done: "✅"

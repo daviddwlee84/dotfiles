@@ -1,6 +1,10 @@
 # tmux window status indicators (running / idle / error)
 
-**Status**: option A shipped (2026-04) · **discovery primitive shipped 2026-04** (`tv agent-panes` + recon — see `docs/tools/agent-panes-discovery.md`) · option C still scoped, blocked on user signal
+**Status**: ✅ **RESOLVED 2026-05-11** via [workmux](https://github.com/raine/workmux) integration — see [docs/tools/workmux.md](../docs/tools/workmux.md) and [pitfalls/workmux-status-leak.md](../pitfalls/workmux-status-leak.md). Original option-A (monitor-activity) shipped 2026-04 stays in place; options B/C superseded by upstream tool. Notes below preserved for design history.
+
+---
+
+**Status (historical)**: option A shipped (2026-04) · **discovery primitive shipped 2026-04** (`tv agent-panes` + recon — see `docs/tools/agent-panes-discovery.md`) · option C still scoped, blocked on user signal
 **Effort**: ~~S (option A)~~ done · S (option B) · M (option C)
 **Related**: `TODO.md` · `dot_config/tmux/common.conf` (monitor-activity block) · `dot_config/tmux/theme.catppuccin.conf` · `dot_claude/modify_settings.json` + `dot_claude/hooks/executable_notify.sh.tmpl` · `dot_config/opencode/modify_opencode.json.tmpl` + `.chezmoitemplates/agents/opencode.overlay.json` · `docs/tools/agent-overlays.md` · `dot_config/television/executable_agent-sessions.py` `_panes()` mode (PID→pane resolver — reusable when option C lands)
 

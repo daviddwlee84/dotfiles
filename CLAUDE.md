@@ -106,6 +106,28 @@ Known conflict zones: `Ctrl+H/J/K/L` (tmux vim-tmux-navigator when `enableVimMod
 
 **Resolution precedence**: tmux root-table bindings intercept keys before they reach the inner application. Inside tmux, any `bind-key -n C-*` shadows the same `ctrl-*` in TV. Prefer `Alt+` for custom actions.
 
+### Workmux status icon integration spans 5 files
+
+The `🤖`/`💬`/`✅` icons in tmux window names come from [workmux](https://github.com/raine/workmux) — a tmux + git-worktree orchestrator that coexists with `worktrunk` (`wt`). Adding/modifying any agent's status hooks requires updating files in 5 places to keep behaviour consistent across machines (full story: [docs/tools/workmux.md](docs/tools/workmux.md), pitfall: [pitfalls/workmux-status-leak.md](pitfalls/workmux-status-leak.md)):
+
+| Surface | Path | Why |
+|---|---|---|
+| Binary install | `dot_ansible/roles/devtools/tasks/main.yml` (workmux block + tap + brew name list) | macOS via `raine/workmux` brew tap; Linux via GitHub release `.tar.gz` (`workmux-linux-{amd64,arm64}.tar.gz` — NOT `.tar.xz` like worktrunk, no xz dep needed) |
+| Global config | `dot_config/workmux/config.yaml` | `status_format: false` is load-bearing — tells `wm` NOT to do its per-tmux-session format rewrite |
+| Tmux window text | `dot_config/tmux/theme.catppuccin.conf` | Appends `#{?@workmux_status, #{@workmux_status},}` to `@catppuccin_window_text` and `@catppuccin_window_current_text`. Without this the per-window user-var renders nothing |
+| Claude hooks | `dot_claude/modify_settings.json` | Adds `Stop`/`SubagentStop`/`UserPromptSubmit`/`Notification` entries calling `workmux set-window-status`. Hook-aware merger (top of file) preserves CodeIsland + workmux-setup parallel entries |
+| OpenCode plugin | `dot_config/opencode/plugins/workmux-status.ts` + `dot_config/opencode/modify_package.json` | Vendored upstream plugin + jq-merged `@opencode-ai/plugin: 1.4.3` dep |
+
+**Hard rules**:
+
+- Do **NOT** run `workmux setup` on managed machines — it would write parallel hook entries to `~/.claude/settings.json` and `~/.config/opencode/plugins/`. The hook-aware merger would dedupe them but cleaner to skip. The chezmoi layer installs everything `wm setup` would have done.
+- Do **NOT** flip `status_format: true` in `dot_config/workmux/config.yaml` — that re-enables `wm`'s per-tmux-session format rewriter, which fights catppuccin's `@catppuccin_window_text` override and only sets the format in sessions where `wm` was invoked (so older sessions silently never get icons).
+- Do **NOT** remove the `command -v workmux >/dev/null 2>&1 && ... || true` guard in Claude hooks — without it, fresh boxes (where ansible hasn't installed `wm` yet) will spam errors into Claude's hook log.
+- Do **NOT** drop the explicit `workmux set-window-status done` calls from Claude `Stop`/`SubagentStop` hooks — Anthropic's upstream design has Claude only `set` `working` and never `done` (the by-design leak documented in `pitfalls/workmux-status-leak.md`). Removing our hooks brings the leak back.
+- Adding a new agent's status integration: model after the Claude or OpenCode pattern, ALWAYS guard with `command -v workmux`, update [docs/tools/workmux.md](docs/tools/workmux.md) → "What this repo manages" table in the same commit.
+
+`wt` (worktrunk) and `wm` (workmux) are distinct tools and live in separate shell-helper files (`dot_config/zsh/tools/37_worktrunk.zsh` vs `38_workmux.zsh`). Don't merge them — they have different aliases (`wt cc` / `wt sw` vs `wm add` / `wm dashboard`), different config formats (TOML vs YAML), and target different killer features.
+
 ### Long-term backlog + past pitfalls → use the `project-knowledge-harness` skill
 
 This repo uses the `project-knowledge-harness` agent skill (managed via
