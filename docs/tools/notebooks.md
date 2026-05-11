@@ -50,12 +50,63 @@ Once a kernel is registered at the user level (`~/.local/share/jupyter/kernels/`
 
 The dotfiles install two notebook frontends via `uv tool` (defined in [`dot_ansible/roles/python_uv_tools/defaults/main.yml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_ansible/roles/python_uv_tools/defaults/main.yml)):
 
-| Tool | Primary package | Extras / `--with` | Exposes |
-|------|-----------------|-------------------|---------|
-| `marimo` | `marimo[recommended,mcp]` | `httpx[socks]` | `marimo` (binary) — completion auto-loads via [`dot_config/shell/29_marimo.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/shell/29_marimo.sh) |
-| `jupyterlab` | `jupyterlab` | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets` | `jupyter-lab`, `jupyter-notebook`, `jupyter` (meta-CLI), `jupyter-server`, `jupyter-kernelspec`, ... — all four invocation forms work: `jupyter-lab` / `jupyter lab` / `jupyter-notebook` / `jupyter notebook` |
+| Tool | Primary package | Extras / `--with` | `--with-executables-from` | Exposes |
+|------|-----------------|-------------------|---------------------------|---------|
+| `marimo` | `marimo[recommended,mcp]` | `httpx[socks]` | — | `marimo` (binary) — completion auto-loads via [`dot_config/shell/29_marimo.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/shell/29_marimo.sh) |
+| `jupyterlab` | `jupyterlab` | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets` | `notebook`, `jupyter-core` | `jupyter-lab`, `jupyter-notebook`, `jupyter` (meta-CLI), `jlpm`, `jupyter-labextension`, `jupyter-labhub`, `jupyter-migrate`, `jupyter-troubleshoot` — all four invocation forms work: `jupyter-lab` / `jupyter lab` / `jupyter-notebook` / `jupyter notebook` |
 
 The two are **separate uv tool envs** (each lives under `~/.local/share/uv/tools/<name>/`), so their dependency trees don't collide. Marimo's reactive-DAG runtime never touches Jupyter; the JupyterLab env hosts both Lab and Notebook frontends behind one shared message protocol.
+
+The `--with-executables-from` flag requires uv ≥ 0.8.5 — the role auto-upgrades older uv before installing. Full bootstrap + dispatch matrix: [`docs/this_repo/uv-bootstrap.md`](../this_repo/uv-bootstrap.md).
+
+### Verifying the install
+
+After `chezmoi apply` (or `ansible-playbook ... --tags python_uv_tools`), every shim should be a symlink under `~/.local/bin/` pointing into the JupyterLab tool env:
+
+```sh
+$ ls -la ~/.local/bin/ | grep -E '(jupyter|jlpm)'
+jlpm                   → ~/.local/share/uv/tools/jupyterlab/bin/jlpm
+jupyter                → ~/.local/share/uv/tools/jupyterlab/bin/jupyter             # meta-CLI (from jupyter-core)
+jupyter-lab            → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-lab          # JupyterLab itself
+jupyter-labextension   → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-labextension
+jupyter-labhub         → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-labhub
+jupyter-migrate        → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-migrate
+jupyter-notebook       → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-notebook     # Notebook 7 (from notebook pkg)
+jupyter-troubleshoot   → ~/.local/share/uv/tools/jupyterlab/bin/jupyter-troubleshoot
+
+$ uv tool list | grep -A8 '^jupyterlab'
+jupyterlab v4.5.7
+- jlpm
+- jupyter
+- jupyter-lab
+- jupyter-labextension
+- jupyter-labhub
+- jupyter-migrate
+- jupyter-notebook
+- jupyter-troubleshoot
+```
+
+Quick smoke tests for each entry point:
+
+```sh
+$ jupyter --version       # the meta-CLI dispatcher prints all bundled core packages
+Selected Jupyter core packages...
+IPython          : 9.x
+ipykernel        : 7.x
+ipywidgets       : 8.x
+jupyter_client   : 8.x
+jupyter_core     : 5.x
+jupyter_server   : 2.x
+jupyterlab       : 4.x
+nbclient         : 0.x
+nbconvert        : 7.x
+
+$ jupyter-lab --version       # → 4.5.x
+$ jupyter-notebook --version  # → 7.5.x  (Notebook 7, the rebuilt classic UI)
+$ jupyter kernelspec list     # initially: just `python3` (the env's bundled ipykernel)
+```
+
+The `jupyter kernelspec list` output is the canonical check that Jupyter can find Python kernels. Other-language kernels register themselves into `~/.local/share/jupyter/kernels/` and show up the same way (see [Kernels](#kernels--what-actually-runs-the-code) above).
 
 Marimo first-run config: [`dot_config/marimo/create_marimo.toml.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/marimo/create_marimo.toml.tmpl) (uses chezmoi `create_` prefix — seeded once, then user-owned). Vim mode is gated on the `enableVimMode` chezmoi prompt, see [vim-mode.md](../this_repo/vim-mode.md).
 
@@ -69,6 +120,23 @@ Marimo first-run config: [`dot_config/marimo/create_marimo.toml.tmpl`](https://g
 
 `jupyter` (the command you type) is a **dispatcher** from [`jupyter-core`](https://github.com/jupyter/jupyter_core), not its own application. It scans `$PATH` and `<sys.prefix>/bin/` for executables named `jupyter-<subcommand>` and forwards arguments. So `jupyter lab` literally execs `jupyter-lab`. Both invocation forms are equivalent — the dispatcher is just sugar.
 
+You can see the dispatch table at runtime with `jupyter --help`:
+
+```sh
+$ jupyter --help
+usage: jupyter [-h] [--version] [--config-dir] [--data-dir] [--runtime-dir]
+               [--paths] [--json] [--debug]
+               [subcommand]
+
+Jupyter: Interactive Computing
+…
+Available subcommands:
+  console  events  execute  kernel  kernelspec  lab  labextension  labhub
+  migrate  nbconvert  notebook  run  server  troubleshoot  trust
+```
+
+Every `Available subcommand` corresponds to an executable named `jupyter-<sub>` somewhere on `$PATH` (for this repo, all eight live in `~/.local/share/uv/tools/jupyterlab/bin/` with symlinks in `~/.local/bin/`). `jupyter lab → jupyter-lab → JupyterLab process`. `jupyter kernelspec list → jupyter-kernelspec list → kernelspec discovery`. The dispatcher itself does almost nothing besides find-and-exec — most subcommand-discovery logic lives in `jupyter_core.command.list_subcommands()`, which globs `$PATH`.
+
 This matters for **how you install things**:
 
 | Install method | `jupyter` | `jupyter-lab` | `jupyter-notebook` | `jupyter kernelspec` |
@@ -77,12 +145,34 @@ This matters for **how you install things**:
 | `pip install jupyter` (meta-package) | ✓ | ✓ | ✓ | ✓ — pulls all components |
 | `uv tool install jupyterlab` | ✗ | ✓ | ✗ | ✗ |
 | `uv tool install jupyterlab --with notebook` | ✗ | ✓ | ✗ (installed but hidden) | ✗ |
-| `uv tool install jupyterlab --with-executables-from notebook --with-executables-from jupyter-core` | ✓ | ✓ | ✓ | ✓ |
+| `uv tool install jupyterlab --with-executables-from notebook --with-executables-from jupyter-core` ← **this repo** | ✓ | ✓ | ✓ | ✓ |
 | `uv tool install jupyter` (meta-package) | ✗ | ✗ | ✗ | ✗ — empty stub, no scripts |
 
-**Why uv tool is different from pip**: `uv tool install <pkg>` is designed to expose only the *primary* package's `[project.scripts]` entry points to `~/.local/bin`. `--with <dep>` adds runtime deps but hides their executables. The opt-in flag [`--with-executables-from <pkg>`](https://docs.astral.sh/uv/concepts/tools/) installs **and** exposes the executables of an extra package — that's how this repo gets `jupyter-notebook` and the `jupyter` dispatcher onto PATH from a single `uv tool install jupyterlab` invocation.
+**Why uv tool is different from pip**: `uv tool install <pkg>` is designed to expose only the *primary* package's `[project.scripts]` entry points to `~/.local/bin`. `--with <dep>` adds runtime deps but hides their executables. The opt-in flag [`--with-executables-from <pkg>`](https://docs.astral.sh/uv/concepts/tools/) installs **and** exposes the executables of an extra package — that's how this repo gets `jupyter-notebook` and the `jupyter` dispatcher onto PATH from a single `uv tool install jupyterlab` invocation. The flag was added in uv 0.8.5 (PR [astral-sh/uv#14014](https://github.com/astral-sh/uv/pull/14014)) — older uv would error with `unexpected argument '--with-executables-from'`. The `python_uv_tools` ansible role auto-upgrades uv before installing; full dispatch matrix in [`docs/this_repo/uv-bootstrap.md`](../this_repo/uv-bootstrap.md).
 
 **Don't use `uv tool install jupyter`** (the meta-package). Inspecting its PyPI metadata: `provides_extra=[]`, `[project.scripts]={}`. It's an empty stub that just declares deps on `notebook + jupyterlab + ipykernel + ...`. uv would install the deps in an env but expose **zero** binaries because the primary package has no entry points of its own.
+
+### Troubleshooting: `jupyter: command not found` after `chezmoi apply`
+
+If `jupyter-lab` works but bare `jupyter` (or `jupyter-notebook`) is missing, the most common cause is a **partial install** from before this repo grew the `--with-executables-from` support: an older `uv tool install jupyterlab` left `~/.local/bin/jupyter-lab` in place, and the role's `creates: ~/.local/bin/{{ item.binary }}` idempotency check then short-circuits — never re-running the install with the new flags.
+
+Verify and fix:
+
+```sh
+# Check what jupyterlab actually exposes today
+uv tool list | grep -A8 '^jupyterlab'
+
+# If only `jupyter-lab` (and `jlpm` / `jupyter-labextension` / etc.) appear,
+# but no `jupyter` or `jupyter-notebook` — force a clean reinstall:
+uv tool uninstall jupyterlab
+chezmoi apply
+# (or: ansible-playbook ~/.ansible/playbooks/macos.yml --tags python_uv_tools)
+
+# Verify all 8 shims appear:
+ls ~/.local/bin/ | grep -E '(jupyter|jlpm)'
+```
+
+The role's `creates:` check is intentional — it keeps re-applies cheap. But it does mean changes to the `with_executables_from:` list in `defaults/main.yml` only affect **fresh** installs; existing tool envs need an explicit `uv tool uninstall` before re-applying. This is the same pattern as any `creates:`-gated ansible task, but worth knowing about for jupyterlab specifically because the symptom (`jupyter` missing while `jupyter-lab` works) is non-obvious.
 
 ## Where does `!pip install <pkg>` actually go?
 

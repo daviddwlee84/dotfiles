@@ -51,7 +51,7 @@ The repo never proactively `brew install`s uv. There's no `brew "uv"` line in an
 
 ## Why a minimum version is enforced
 
-`dot_ansible/roles/python_uv_tools/defaults/main.yml` uses the `with_executables_from:` key on the `jupyterlab` entry to expose `jupyter` and `jupyter-notebook` shims from the `jupyter-core` and `notebook` packages:
+`dot_ansible/roles/python_uv_tools/defaults/main.yml` uses the `with_executables_from:` key on the `jupyterlab` entry to expose `jupyter` and `jupyter-notebook` shims from the `jupyter-core` and `notebook` packages. The full meta-CLI dispatch model (why `jupyter` is just sugar for `jupyter-<sub>`, what each of the 8 exposed binaries does, and a "command not found" troubleshooting recipe) lives in [`docs/tools/notebooks.md`](../tools/notebooks.md). The relevant role excerpt:
 
 ```yaml
 - name: jupyterlab

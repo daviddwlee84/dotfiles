@@ -8,6 +8,9 @@
 #     expose their entry points in ~/.local/bin (e.g. jupyter-core to get
 #     the `jupyter` meta-CLI; `notebook` to get `jupyter-notebook`)
 #     NOTE: requires uv >= 0.8.5 (--with-executables-from added in that release)
+#     For the meta-CLI dispatch model + the 8 jupyter binaries this exposes,
+#     see docs/tools/notebooks.md "The `jupyter` meta-CLI vs standalone binaries".
+#     For the auto-upgrade dispatch when uv is too old, see docs/this_repo/uv-bootstrap.md.
 #   - python: (optional) pin Python version (e.g. "3.11" for thefuck)
 #   - needs_modern_gcc: (optional, default false) tool transitively pulls
 #     numpy 2.x / pandas 3.x / pyarrow which require GCC ≥ 9.3 to compile
