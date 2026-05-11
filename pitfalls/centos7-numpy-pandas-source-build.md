@@ -38,6 +38,8 @@ ok: [localhost] => (item=trafilatura)
 | `sqlit-tui[ssh]` | `textual-fastdatatable` → `pandas` → `numpy 2.x` (needs gcc 9.3+) |
 | `visidata` | explicit `--with pandas pyarrow` → `pandas` → `numpy 2.x` |
 | `mlflow` | `sqlalchemy` → `greenlet` (C++ ext; CentOS 7 gcc 4.8.5 supports C++11 only with explicit `-std=c++11`, which greenlet's setup.py doesn't pass) |
+| `marimo[recommended,mcp]` | `marimo[recommended]` → `polars[pyarrow]` → `pyarrow` → `numpy 2.x` (the `[recommended]` extra adds polars for the dataframe preview UI; bare `marimo` is pure-Python) |
+| `jupyterlab` | `ipykernel` → `pyzmq 27.x` (Cython 3 emits C99 `for (int i = 0; …)` — gcc 4.8.5 defaults to `-std=gnu89` and rejects it; pyzmq's CMake doesn't force `-std=c99`. Same root family as numpy: pyzmq 27.x dropped manylinux_2_17 wheels for cp313 → fall back to source build) |
 
 ## Root cause
 
@@ -98,9 +100,10 @@ and defeats `uv tool install`'s automatic Python management.
    when: not (item.needs_modern_gcc | default(false) and gcc_too_old)
    ```
 
-CentOS 7 (gcc 4.8.5) skips `sqlit-tui[ssh]` and `visidata`; everything
-else installs as before. Rocky 9 / Ubuntu 22.04+ have gcc ≥ 11 so
-`gcc_too_old=false` and the loop runs unchanged.
+CentOS 7 (gcc 4.8.5) skips `sqlit-tui[ssh]`, `visidata`, `mlflow`,
+`marimo[recommended,mcp]`, and `jupyterlab`; everything else installs
+as before. Rocky 9 / Ubuntu 22.04+ have gcc ≥ 11 so `gcc_too_old=false`
+and the loop runs unchanged.
 
 ## Manual fallback if you really want them
 

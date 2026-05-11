@@ -181,4 +181,14 @@
     enabled: true
     state: started
     daemon_reload: true
-  ignore_errors: true  # May fail in containers without systemd
+  ignore_errors: true  # Fails when no user systemd instance is reachable:
+                       #   - containers without systemd (PID 1 != systemd)
+                       #   - SSH session before `loginctl enable-linger` took effect
+                       #   - CentOS 7 / RHEL 7: stock systemd 219 has NO user@.service
+                       #     template at all, so even with linger enabled there is no
+                       #     user instance to talk to. See
+                       #     pitfalls/centos7-systemd-user-instance-missing.md for the
+                       #     full failure mode + manual workaround (run pueued under
+                       #     tmux/nohup, or install as a system service with User=).
+                       # The unit file we wrote above stays on disk regardless,
+                       # ready for any of the manual paths.

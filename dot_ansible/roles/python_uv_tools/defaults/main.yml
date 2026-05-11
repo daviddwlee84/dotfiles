@@ -63,10 +63,12 @@ python_uv_tools:
     binary: trafilatura
   - name: marimo[recommended,mcp]
     binary: marimo
+    needs_modern_gcc: true  # marimo[recommended] -> polars[pyarrow] -> pyarrow -> numpy 2.x
     with:
       - httpx[socks]
   - name: jupyterlab
     binary: jupyter-lab
+    needs_modern_gcc: true  # ipykernel -> pyzmq -> Cython-generated C99 (gcc 4.8.5 defaults to gnu89); also marimo[sandbox]/[recommended] chains can pull pyarrow
     with:
       - marimo[sandbox]
       - marimo-jupyter-extension
