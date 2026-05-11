@@ -48,3 +48,9 @@ __pycache__/
 # a trailing newline. CI re-generates it during `mkdocs build`, so it's safe
 # to leave untracked. Referenced from mkdocs.yml:80 (extra_css).
 docs/assets/copy-to-llm/copy-to-llm-custom.css
+.sidecar-agent
+.sidecar-task
+.sidecar-pr
+.sidecar-start.sh
+.sidecar-base
+.td-root

@@ -11,6 +11,14 @@
 #     For the meta-CLI dispatch model + the 8 jupyter binaries this exposes,
 #     see docs/tools/notebooks.md "The `jupyter` meta-CLI vs standalone binaries".
 #     For the auto-upgrade dispatch when uv is too old, see docs/this_repo/uv-bootstrap.md.
+#   - extra_binaries: (optional) list of additional binary names that must
+#     also exist in ~/.local/bin for the install to be considered complete.
+#     Use this whenever `with_executables_from` is set, so adding a new
+#     entry-point package later triggers a `--force` reinstall on machines
+#     that already have `binary` present from a prior apply. Without this,
+#     ansible's `creates:` guard short-circuits the install command and the
+#     new exec shims are never written. See
+#     pitfalls/uv-tool-install-creates-guard-misses-executables-from.md.
 #   - python: (optional) pin Python version (e.g. "3.11" for thefuck)
 #   - needs_modern_gcc: (optional, default false) tool transitively pulls
 #     numpy 2.x / pandas 3.x / pyarrow which require GCC ≥ 9.3 to compile
@@ -67,3 +75,6 @@ python_uv_tools:
     with_executables_from:
       - notebook       # exposes jupyter-notebook (classic UI, Notebook 7)
       - jupyter-core   # exposes the `jupyter` meta-CLI dispatcher
+    extra_binaries:
+      - jupyter           # from jupyter-core
+      - jupyter-notebook  # from notebook
