@@ -480,6 +480,12 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `wm` | alias | `dot_config/zsh/tools/38_workmux.zsh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
 | `wmsb` | alias | `dot_config/zsh/tools/38_workmux.zsh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
 | `wmclear` | function | `dot_config/zsh/tools/38_workmux.zsh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
+| `tmux_status_set` | function | `dot_config/shell/60_tmux_status.sh` | Generic per-window tmux badge: `tmux_status_set my_build 🔨 [target]` writes `@my_build_status`. POSIX, sourced by both zsh + bash. See [workmux.md → Reusing the per-window status mechanism](../tools/workmux.md#reusing-the-per-window-status-mechanism-without-workmux) |
+| `tmux_status_get` | function | `dot_config/shell/60_tmux_status.sh` | Read back a `@<name>_status` marker (empty + nonzero exit if unset) |
+| `tmux_status_clear` | function | `dot_config/shell/60_tmux_status.sh` | Unset a marker on current or `target` window |
+| `tmux_status_clear_all` | function | `dot_config/shell/60_tmux_status.sh` | Walk every window in every session, unset `@<name>_status` |
+| `tmux_status_list` | function | `dot_config/shell/60_tmux_status.sh` | Audit all `@*_status` user-vars across all windows |
+| `tmux_status_run` | function | `dot_config/shell/60_tmux_status.sh` | Wrap a command with `working`/`ok`/`fail` badge transitions, traps Ctrl+C: `tmux_status_run my_build 🔨 ✅ ❌ -- npm run build` |
 
 ---
 

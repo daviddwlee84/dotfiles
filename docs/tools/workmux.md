@@ -28,6 +28,7 @@ problems but each has a unique killer feature, so we keep both managed.
 - [Sidebar daemon (optional)](#sidebar-daemon-optional)
 - [Adding a new agent](#adding-a-new-agent)
 - [Reusing the per-window status mechanism (without workmux)](#reusing-the-per-window-status-mechanism-without-workmux)
+  - [Shell helpers: `tmux_status_*`](#shell-helpers-tmux_status_)
 - [Cross-references](#cross-references)
 
 ---
@@ -306,6 +307,23 @@ producer; you can add more.
    tmux set-option -w -u '@my_status'
    ```
 
+   …or use the **POSIX shell helpers** managed by this repo
+   ([`dot_config/shell/60_tmux_status.sh`](../../dot_config/shell/60_tmux_status.sh)),
+   which wrap the raw tmux calls with name validation, list/audit, and
+   a `run` helper that traps Ctrl+C so badges don't leak. Both zsh and
+   bash auto-source this file. See the [shell helpers reference
+   below](#shell-helpers-tmux_status_) for the full API.
+
+   ```bash
+   tmux_status_set my_build 🔨           # tag current window
+   tmux_status_set my_build 🔨 mysess:3  # tag specific window
+   tmux_status_clear my_build            # unset (current window)
+   tmux_status_run my_build 🔨 ✅ ❌ -- npm run build
+                                         # set 🔨, run cmd, set ✅/❌
+                                         # by exit code, auto-clear on
+                                         # signal trap (Ctrl+C safe)
+   ```
+
 2. **Render** it conditionally in `window-status-format` so windows
    without the option set don't render anything extra. This repo's
    catppuccin theme already appends one such conditional in
@@ -344,33 +362,75 @@ Invent a new `@<something>_status` user-var when:
 
 ### Worked example: build watcher
 
-Spawn a script that watches `npm run dev` output and tags the window:
+The simplest case — wrap any command and get start/success/failure
+badges with one line, courtesy of `tmux_status_run`:
+
+```bash
+tmux_status_run my_build 🔨 ✅ ❌ -- npm run build
+```
+
+This sets `@my_build_status = 🔨` before the command, swaps to ✅ on
+exit code 0 or ❌ on non-zero, and traps Ctrl+C / SIGTERM so the badge
+clears instead of leaking. Wire it into a tmuxinator pre-command, a git
+hook, a Makefile target, anywhere.
+
+For more nuanced lifecycles (multiple intermediate states like
+`compiling` / `tests` / `bundling`), drop down to the raw helpers and
+add the conditionals manually. Stream-parsing example:
 
 ```bash
 # ~/.local/bin/dev-watch.sh
+. ~/.config/shell/60_tmux_status.sh
+trap 'tmux_status_clear my_dev' EXIT INT TERM
 npm run dev 2>&1 | while IFS= read -r line; do
   printf '%s\n' "$line"
   case "$line" in
-    *"compiled successfully"*)
-      tmux set-option -w '@build_status' '✅' ;;
-    *"failed to compile"*|*"error"*)
-      tmux set-option -w '@build_status' '❌' ;;
-    *"compiling"*)
-      tmux set-option -w '@build_status' '🔨' ;;
+    *"compiled successfully"*) tmux_status_set my_dev ✅ ;;
+    *"failed to compile"*|*"error"*) tmux_status_set my_dev ❌ ;;
+    *"compiling"*) tmux_status_set my_dev 🔨 ;;
   esac
 done
-trap 'tmux set-option -w -u "@build_status" 2>/dev/null' EXIT INT TERM
 ```
 
-Append the conditional to the catppuccin format (in
-`dot_config/tmux/theme.catppuccin.conf`, alongside the workmux one):
+For BOTH approaches you must register the producer in the catppuccin
+format ONCE (no wildcard support in tmux's `#{?...}` syntax). Append
+your conditional to
+[`dot_config/tmux/theme.catppuccin.conf`](../../dot_config/tmux/theme.catppuccin.conf)
+alongside the workmux one:
+
 ```tmux
-set -g @catppuccin_window_text ' #W#{?@workmux_status, #{@workmux_status},}#{?@build_status, #{@build_status},}'
+set -g @catppuccin_window_text ' #W#{?@workmux_status, #{@workmux_status},}#{?@my_dev_status, #{@my_dev_status},}'
 ```
 
 `tmux source-file ~/.tmux.conf` (or new tmux session) and your window
 shows `dev 🔨` while building, `dev ✅` when green, `dev ❌` on failure,
 nothing when the script isn't running.
+
+### Shell helpers: `tmux_status_*`
+
+[`dot_config/shell/60_tmux_status.sh`](../../dot_config/shell/60_tmux_status.sh)
+ships POSIX functions sourced by both zsh and bash (no zsh-only syntax,
+safe to call from `#!/bin/sh` scripts too). All take a logical `name`
+argument (no `@` prefix, no `_status` suffix — the helpers add them) so
+the resulting tmux user-var is `@<name>_status`.
+
+| Function | Purpose |
+|---|---|
+| `tmux_status_set <name> <glyph> [target]` | Set marker on current window or `session:window` target |
+| `tmux_status_get <name> [target]` | Read marker (empty + nonzero exit if unset) |
+| `tmux_status_clear <name> [target]` | Unset marker on one window |
+| `tmux_status_clear_all <name>` | Walk every window in every session, unset |
+| `tmux_status_list` | Audit: print every `@*_status` user-var across all windows |
+| `tmux_status_run <name> <working> <ok> <fail> -- <cmd>` | Wrap a command with badge transitions, trap-safe on Ctrl+C |
+
+Validation guards:
+
+- Empty / non-`[A-Za-z0-9_-]+` names → rejected with stderr diagnostic.
+- Names starting with `workmux*` → rejected (reserved for the agent
+  path; use `workmux set-window-status` for that).
+- File silently no-ops the entire module when `tmux` isn't on PATH (cron,
+  headless SSH, fresh box pre-ansible) — producers can call them
+  unconditionally.
 
 ### Lifecycle hard rules (learned the hard way)
 

@@ -117,6 +117,7 @@ The `🤖`/`💬`/`✅` icons in tmux window names come from [workmux](https://g
 | Tmux window text | `dot_config/tmux/theme.catppuccin.conf` | Appends `#{?@workmux_status, #{@workmux_status},}` to `@catppuccin_window_text` and `@catppuccin_window_current_text`. Without this the per-window user-var renders nothing |
 | Claude hooks | `dot_claude/modify_settings.json` | Adds `Stop`/`SubagentStop`/`UserPromptSubmit`/`Notification` entries calling `workmux set-window-status`. Hook-aware merger (top of file) preserves CodeIsland + workmux-setup parallel entries |
 | OpenCode plugin | `dot_config/opencode/plugins/workmux-status.ts` + `dot_config/opencode/modify_package.json` | Vendored upstream plugin + jq-merged `@opencode-ai/plugin: 1.4.3` dep |
+| Generic shell helpers | `dot_config/shell/60_tmux_status.sh` | POSIX `tmux_status_set/get/clear/clear_all/list/run` for non-agent producers (build watchers, deploy progress, alert badges) wanting to set their own `@<name>_status` user-var. See `docs/tools/workmux.md` → "Reusing the per-window status mechanism" |
 
 **Hard rules**:
 
