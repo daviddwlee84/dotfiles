@@ -2305,6 +2305,63 @@
 #   1. install the apt package as a baseline (when sudo is available),
 #   2. check the resulting version, and
 #   3. upgrade via Linuxbrew (preferred) or tmux-appimage (user-level) if too old.
+#
+# Decision tree (matches the task ordering below):
+#
+#   ┌───────────────────────────────────────────────────────┐
+#   │ sudo available?                                       │
+#   └────────────────────┬──────────────────────────────────┘
+#                        │
+#              ┌── yes ──┴── no (noRoot) ──┐
+#              ▼                            │
+#   ┌──────────────────┐                    │
+#   │ apt install tmux │ ← baseline         │
+#   │   + ncurses-term │   (always runs     │
+#   └────────┬─────────┘    when sudo OK)   │
+#            │                              │
+#            ▼                              │
+#   ┌──────────────────┐                    │
+#   │ tmux -V >= 3.3 ? │                    │
+#   └────────┬─────────┘                    │
+#            │                              │
+#       ┌── yes ──┐                         │
+#       ▼         ▼ no                      ▼
+#   (DONE,    ┌────────────────────────────────────┐
+#    use apt) │ command -v brew ?                  │
+#             └──────────────────┬─────────────────┘
+#                                │
+#                       ┌── yes ─┴── no ──┐
+#                       ▼                 ▼
+#             ┌──────────────────┐  ┌──────────────────────┐
+#             │ brew install tmux│  │ x86_64 / amd64 ?     │
+#             │ (preferred —     │  └──────────┬───────────┘
+#             │  rolling, shared │             │
+#             │  with macOS)     │     ┌── yes ┴── no ──┐
+#             └──────────────────┘     ▼                ▼
+#                              ┌────────────────┐  ┌────────────────┐
+#                              │ tmux-appimage  │  │ WARN: cannot   │
+#                              │ → ~/.local/bin │  │ upgrade auto;  │
+#                              │   /tmux wrapper│  │ build from src │
+#                              │ (sets          │  │ or enable brew │
+#                              │  TERMINFO_DIRS;│  └────────────────┘
+#                              │  see pitfalls/ │
+#                              │  tmux-appimage-│
+#                              │  terminfo-not- │
+#                              │  found.md)     │
+#                              └────────────────┘
+#
+# This means: HAVING SUDO IS NOT ENOUGH to skip the upgrade. The trigger is
+# `apt version < tmux_min_version`, not the absence of sudo. On Ubuntu 22.04
+# (apt tmux 3.2a) every host upgrades; on Ubuntu 24.04 (apt tmux 3.4) the
+# baseline already meets the bar and steps 3+ short-circuit.
+#
+# Linuxbrew is preferred over tmux-appimage when both are viable because:
+#   - same formula name as macOS (Brewfile.darwin), shared mental model
+#   - ships rolling latest upstream, not a frozen AppImage snapshot
+#   - no terminfo-path workaround needed (brew tmux uses brew's ncurses
+#     with sane RPATH; the AppImage's bundled ncurses has a hardcoded
+#     compile-time terminfo path that breaks on extraction — see the
+#     tmux-appimage-terminfo-not-found.md pitfall for the gory details).
 - name: Install tmux (Debian/Ubuntu, apt baseline)
   when: ansible_facts["os_family"] == "Debian"
   become: true
