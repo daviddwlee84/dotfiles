@@ -48,6 +48,10 @@ shell rc to override globally):
   AICAP_HTTP_API_KEY      default: $OPENROUTER_API_KEY
   TSUM_CACHE_TTL          seconds, default 600 (10 min)
   TSUM_TIMEOUT            seconds, default 60 (LLM call timeout)
+  TSUM_TMUX_BIN           full path to tmux binary, default "tmux" — set this
+                          when multiple tmux versions are on PATH and the
+                          server you want runs from a specific one (apt vs
+                          appimage protocol mismatch). E.g. /bin/tmux.
 
 Cache:
   $XDG_CACHE_HOME/tmux-session-summary/<hostname>.json
@@ -146,6 +150,13 @@ AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPE
 AICAP_AGENT_PRIORITY = _env_or_ssot("AICAP_AGENT_PRIORITY", "opencode claude codex cursor-agent").split()
 TSUM_CACHE_TTL = int(os.environ.get("TSUM_CACHE_TTL", "600"))
 TSUM_TIMEOUT = float(os.environ.get("TSUM_TIMEOUT", "60"))
+# Pin a specific tmux binary if multiple are on PATH (e.g. /bin/tmux 3.2a
+# from apt vs ~/.local/bin/tmux 3.5+ from the appimage). Different major
+# versions can't talk to each other's server — the newer client returns
+# "no sessions" against an older server's socket and the error is silent.
+# Setting this resolves both the binary AND, transitively, the matching
+# server. Default "tmux" → first on PATH.
+TSUM_TMUX_BIN = os.environ.get("TSUM_TMUX_BIN", "tmux")
 
 
 def _with_model(*model_flag_and_value: str) -> list[str]:
@@ -204,18 +215,31 @@ _DEEP_MIN_LINES = 20
 _DEEP_MAX_LINES = 100
 
 
+# Most recent stderr from a non-zero `tmux` exit. Surfaced by the
+# "no sessions found" path so multi-binary / version-mismatch failures
+# stop being silent.
+_LAST_TMUX_STDERR: str = ""
+
+
 def _tmux(*args: str, timeout: float = 5.0) -> str:
-    """Run `tmux ARGS...` and return stdout. Empty string on failure."""
+    """Run `$TSUM_TMUX_BIN ARGS...` and return stdout. Empty string on failure
+    (stderr captured in _LAST_TMUX_STDERR for diagnostic surfacing)."""
+    global _LAST_TMUX_STDERR
     try:
         result = subprocess.run(
-            ["tmux", *args],
+            [TSUM_TMUX_BIN, *args],
             capture_output=True,
             text=True,
             timeout=timeout,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError:
+        _LAST_TMUX_STDERR = f"{TSUM_TMUX_BIN}: command not found"
+        return ""
+    except subprocess.TimeoutExpired:
+        _LAST_TMUX_STDERR = f"{TSUM_TMUX_BIN}: timed out after {timeout}s"
         return ""
     if result.returncode != 0:
+        _LAST_TMUX_STDERR = (result.stderr or "").strip()
         return ""
     return result.stdout
 
@@ -785,7 +809,21 @@ def main() -> int:
 
     sessions = collect_sessions(deep=args.deep)
     if not sessions:
-        err.print("[red]tmux-session-summary: no tmux sessions found (server not running?)[/red]")
+        resolved = shutil.which(TSUM_TMUX_BIN) or TSUM_TMUX_BIN
+        err.print(
+            f"[red]tmux-session-summary: no tmux sessions found via "
+            f"{TSUM_TMUX_BIN!r} ({resolved}).[/red]"
+        )
+        if _LAST_TMUX_STDERR:
+            err.print(f"[dim]tmux stderr: {_LAST_TMUX_STDERR}[/dim]")
+        err.print(
+            "[yellow]Possible causes:[/yellow]\n"
+            "  - server not running → start a session first.\n"
+            "  - multiple tmux binaries on PATH (apt vs appimage vs brew) and the\n"
+            "    one we resolved talks a different protocol than the running server.\n"
+            "    Fix: [cyan]export TSUM_TMUX_BIN=/path/to/correct-tmux[/cyan]\n"
+            "    (e.g. [cyan]/bin/tmux[/cyan] if your sessions live there)."
+        )
         return 1
 
     if args.dry_run:

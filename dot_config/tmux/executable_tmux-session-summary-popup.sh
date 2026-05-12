@@ -12,6 +12,12 @@
 #   - dot_config/tmux/executable_menu-session.sh          (the calling menu)
 set -euo pipefail
 
+# Honour TSUM_TMUX_BIN for the switch-client call too — on machines with
+# multiple tmux binaries (apt vs appimage), the script needs to invoke the
+# SAME binary that's running the host server, else `switch-client` either
+# fails or targets the wrong server.
+tmux_bin="${TSUM_TMUX_BIN:-tmux}"
+
 script="$HOME/.config/tmux/tmux-session-summary.py"
 
 if [ ! -x "$script" ]; then
@@ -42,4 +48,4 @@ selected=$(
 [ -z "$selected" ] && exit 0
 
 # First TAB-delimited field is the session name.
-tmux switch-client -t "${selected%%	*}"
+"$tmux_bin" switch-client -t "${selected%%	*}"

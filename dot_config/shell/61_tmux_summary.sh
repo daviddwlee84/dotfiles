@@ -67,6 +67,10 @@ ENV
     TSUM_DEEP_DEFAULT=1         make --deep implicit (override per-call with --shallow)
     TSUM_CACHE_TTL              seconds, default 600
     TSUM_TIMEOUT                seconds, default 60
+    TSUM_TMUX_BIN               full path to tmux binary, default "tmux" (use this
+                                when multiple tmux binaries are on PATH and the
+                                server you care about runs from a specific one,
+                                e.g. TSUM_TMUX_BIN=/bin/tmux)
 
 CACHE
     $XDG_CACHE_HOME/tmux-session-summary/<hostname>.json
@@ -115,10 +119,14 @@ EOF
     # First TAB-delimited field is the session name.
     _tsum_target="${_tsum_selected%%	*}"
 
+    # Honour TSUM_TMUX_BIN — see dot_config/tmux/executable_tmux-session-summary.py
+    # for the version-mismatch rationale. switch-client / attach-session MUST
+    # use the same binary that owns the running server.
+    _tsum_tmux_bin="${TSUM_TMUX_BIN:-tmux}"
     if [ -z "${TMUX:-}" ]; then
         # Outside tmux: attach to the chosen session instead of switch-client.
-        tmux attach-session -t "$_tsum_target"
+        "$_tsum_tmux_bin" attach-session -t "$_tsum_target"
     else
-        tmux switch-client -t "$_tsum_target"
+        "$_tsum_tmux_bin" switch-client -t "$_tsum_target"
     fi
 }
