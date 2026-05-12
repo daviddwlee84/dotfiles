@@ -654,6 +654,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `cpout [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's output** (default N=1). Accepts positional integer for lookback |
 | `cpcmd [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's input line** (default N=1). Reads zsh history so works outside tmux too |
 | `cpblock [N]` | function | `dot_config/zsh/tools/03_tmux_capture.zsh` | Print + copy the **Nth-latest command's full block** (prompt + input + output). Default N=1 |
+| `tsum [-d\|--shallow] [-r] [-i] [--dry-run]` | function | `dot_config/shell/61_tmux_summary.sh` | AI-summarize every tmux session — one-glance "what is this session". Reuses the AI Capture agent fallback (claude / opencode / codex / cursor-agent); 10-min cached in `$XDG_CACHE_HOME/tmux-session-summary/`. `-d` includes the visible area of each session's active pane (20-100 lines, self-capture skipped); set `TSUM_DEEP_DEFAULT=1` in `~/.shellrc.adhoc` to make `-d` implicit (override with `--shallow`). `-r` bypasses cache; `-i` opens fzf picker that switches client on Enter (also reachable via tmux `prefix + Space → Sessions → AI session summary`); `--dry-run` prints the prompt without calling the LLM |
 
 ---
 

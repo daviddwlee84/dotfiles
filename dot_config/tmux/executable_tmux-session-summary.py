@@ -1,0 +1,683 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "rich>=13.9",
+# ]
+# ///
+"""tmux-session-summary — AI-powered overview of every tmux session.
+
+Subcommands:
+  list      Human-readable summary, one block per session (default).
+  picker    TSV `<session>\\t<one-line>` for fzf. Used by `tsum -i` and the
+            tmux popup menu entry.
+
+Flags:
+  -d, --deep        Include the visible area (20-100 lines) of each session's
+                    active pane in the LLM prompt. More context, more tokens,
+                    may include scrollback content. Self-capture is skipped
+                    automatically (the pane running tsum is excluded).
+  --shallow         Force metadata-only mode (overrides TSUM_DEEP_DEFAULT).
+  -r, --refresh     Bypass the 10-min cache; force a fresh LLM call.
+  --dry-run         Print the constructed prompt to stdout and exit (no API
+                    call). Lets you audit what would be sent.
+  --no-cache        Don't read or write the cache (one-off invocation).
+
+Deep-by-default:
+  Set `TSUM_DEEP_DEFAULT=1` (e.g. in ~/.shellrc.adhoc) to make --deep implicit;
+  override per-invocation with --shallow. CLI flags always win over the env
+  var: --deep beats --shallow beats TSUM_DEEP_DEFAULT beats metadata-only.
+
+Env vars (mirrors dot_config/zsh/tools/04_ai_capture.zsh — set in your
+shell rc to override globally):
+
+  AICAP_AGENT             auto | claude | opencode | codex | cursor-agent | http
+  AICAP_CLAUDE_MODEL      default: haiku
+  AICAP_OPENCODE_MODEL    default: github-copilot/claude-haiku-4.5
+  AICAP_CODEX_MODEL       default: gpt-5-mini
+  AICAP_CURSOR_MODEL      default: (let cursor-agent pick)
+  AICAP_HTTP_URL          default: https://openrouter.ai/api/v1/chat/completions
+  AICAP_HTTP_MODEL        default: google/gemini-2.0-flash-exp:free
+  AICAP_HTTP_API_KEY      default: $OPENROUTER_API_KEY
+  TSUM_CACHE_TTL          seconds, default 600 (10 min)
+  TSUM_TIMEOUT            seconds, default 60 (LLM call timeout)
+
+Cache:
+  $XDG_CACHE_HOME/tmux-session-summary/<hostname>.json
+  (falls back to ~/.cache/tmux-session-summary/)
+
+Companion docs: docs/shells/aliases.md row, plan in
+.claude/plans/ldw-in-eventual-wall.md.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from rich.console import Console
+from rich.text import Text
+
+# ---------------------------------------------------------------------------
+# Env defaults — mirror 04_ai_capture.zsh so user overrides carry across.
+# ---------------------------------------------------------------------------
+AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
+AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
+AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
+AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "gpt-5-mini")
+AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
+AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
+AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
+AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+TSUM_CACHE_TTL = int(os.environ.get("TSUM_CACHE_TTL", "600"))
+TSUM_TIMEOUT = float(os.environ.get("TSUM_TIMEOUT", "60"))
+
+AGENT_CONFIG = {
+    "claude":       {"base": ["claude", "-p", "--model", AICAP_CLAUDE_MODEL]},
+    "opencode":     {"base": ["opencode", "run", "-m", AICAP_OPENCODE_MODEL]},
+    "codex":        {"base": ["codex", "exec", "-m", AICAP_CODEX_MODEL]},
+    "cursor-agent": {"base": ["cursor-agent", "-p"] + (["--model", AICAP_CURSOR_MODEL] if AICAP_CURSOR_MODEL else [])},
+    "http":         {"base": []},
+}
+
+# Diagnostic console goes to stderr so `tsum | grep ...` and `tsum picker | fzf`
+# stay clean on stdout.
+err = Console(stderr=True)
+
+
+# ---------------------------------------------------------------------------
+# Tmux capture
+# ---------------------------------------------------------------------------
+@dataclass
+class Window:
+    index: int
+    name: str
+    active: bool
+    cwd: str
+    cmd: str
+    panes: int
+
+
+@dataclass
+class Session:
+    name: str
+    created: int        # unix epoch
+    attached: bool
+    last_attached: int  # unix epoch, 0 if never
+    windows: list[Window] = field(default_factory=list)
+    active_pane_tail: str = ""  # populated when --deep
+    active_pane_skipped: bool = False  # True if we skipped self-capture (this is `tsum`'s own pane)
+
+
+# Bounds for --deep capture window. Lower bound so tiny SSH panes (e.g. 12-row
+# popups) still get useful context; upper bound so a maximised pane doesn't
+# dominate the LLM prompt budget.
+_DEEP_MIN_LINES = 20
+_DEEP_MAX_LINES = 100
+
+
+def _tmux(*args: str, timeout: float = 5.0) -> str:
+    """Run `tmux ARGS...` and return stdout. Empty string on failure."""
+    try:
+        result = subprocess.run(
+            ["tmux", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout
+
+
+def collect_sessions(deep: bool = False) -> list[Session]:
+    """Query the tmux server for every session + its windows.
+
+    Returns empty list if the tmux server is unreachable.
+    """
+    raw = _tmux(
+        "list-sessions",
+        "-F",
+        "#{session_name}\t#{session_created}\t#{session_attached}\t#{session_last_attached}",
+    )
+    if not raw.strip():
+        return []
+    my_pane = os.environ.get("TMUX_PANE", "")  # the pane running THIS script, if any
+    sessions: list[Session] = []
+    for line in raw.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        name, created, attached, last_attached = parts[:4]
+        sess = Session(
+            name=name,
+            created=int(created) if created.isdigit() else 0,
+            attached=attached not in ("", "0"),
+            last_attached=int(last_attached) if last_attached.isdigit() else 0,
+        )
+        sess.windows = _collect_windows(name)
+        if deep:
+            sess.active_pane_tail, sess.active_pane_skipped = _capture_active_pane(
+                name, sess.windows, my_pane
+            )
+        sessions.append(sess)
+    return sessions
+
+
+def _collect_windows(session: str) -> list[Window]:
+    raw = _tmux(
+        "list-windows",
+        "-t",
+        session,
+        "-F",
+        "#{window_index}\t#{window_name}\t#{window_active}\t#{pane_current_path}\t#{pane_current_command}\t#{window_panes}",
+    )
+    wins: list[Window] = []
+    for line in raw.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 6:
+            continue
+        idx, wname, active, cwd, cmd, panes = parts[:6]
+        wins.append(
+            Window(
+                index=int(idx) if idx.isdigit() else 0,
+                name=wname,
+                active=active == "1",
+                cwd=cwd,
+                cmd=cmd,
+                panes=int(panes) if panes.isdigit() else 1,
+            )
+        )
+    return wins
+
+
+def _capture_active_pane(session: str, wins: list[Window], my_pane: str) -> tuple[str, bool]:
+    """Visible-area capture of the session's active window's active pane.
+
+    Returns (text, skipped). `skipped=True` when the target pane is the one
+    running this script — capturing it would include `tsum`'s own output
+    (the prompt, the previous summary if any), which pollutes the LLM input
+    and produces a recursive-looking session description.
+
+    Capture window is sized to the pane's actual height, clamped to
+    [_DEEP_MIN_LINES, _DEEP_MAX_LINES]. Smaller than ~20 lines is usually
+    useless; larger than ~100 dominates the prompt and risks leaking lots
+    of scrollback content.
+    """
+    active = next((w for w in wins if w.active), wins[0] if wins else None)
+    if active is None:
+        return "", False
+    target = f"{session}:{active.index}"
+
+    # Self-capture guard. `tmux display-message -p '#{pane_id}'` returns
+    # the active pane of the target; compare against $TMUX_PANE.
+    if my_pane:
+        target_pane = _tmux(
+            "display-message", "-p", "-t", target, "#{pane_id}"
+        ).strip()
+        if target_pane and target_pane == my_pane:
+            return "", True
+
+    # Size the capture to the pane's actual visible height.
+    height_str = _tmux(
+        "display-message", "-p", "-t", target, "#{pane_height}"
+    ).strip()
+    try:
+        height = int(height_str)
+    except ValueError:
+        height = 40  # reasonable fallback
+    lines = max(_DEEP_MIN_LINES, min(height, _DEEP_MAX_LINES))
+
+    text = _tmux(
+        "capture-pane", "-p", "-S", f"-{lines}", "-t", target
+    ).rstrip()
+    return text, False
+
+
+# ---------------------------------------------------------------------------
+# Signature + cache
+# ---------------------------------------------------------------------------
+def session_signature(sessions: list[Session], deep: bool) -> str:
+    """Stable hash over the (session_name, window_count, window_indices,
+    pane_current_command-of-active-window) tuple — invalidates the cache when
+    structure changes but not when the user just navigates around.
+
+    `deep` participates in the sig so a `--deep` run is cached separately
+    from a metadata-only run (different prompt → different summaries).
+    """
+    parts: list[str] = ["deep" if deep else "shallow"]
+    for s in sorted(sessions, key=lambda x: x.name):
+        win_sig = ",".join(f"{w.index}:{w.cmd}" for w in s.windows)
+        parts.append(f"{s.name}|{len(s.windows)}|{win_sig}")
+    blob = "\n".join(parts).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:16]
+
+
+def cache_path() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    d = Path(base) / "tmux-session-summary"
+    d.mkdir(parents=True, exist_ok=True)
+    host = socket.gethostname().split(".")[0] or "host"
+    return d / f"{host}.json"
+
+
+def load_cache(sig: str) -> list[dict] | None:
+    p = cache_path()
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if data.get("sig") != sig:
+        return None
+    age = time.time() - float(data.get("generated_at_epoch", 0))
+    if age > TSUM_CACHE_TTL:
+        return None
+    summaries = data.get("sessions")
+    return summaries if isinstance(summaries, list) else None
+
+
+def save_cache(sig: str, summaries: list[dict]) -> None:
+    p = cache_path()
+    try:
+        p.write_text(
+            json.dumps(
+                {
+                    "sig": sig,
+                    "generated_at_epoch": time.time(),
+                    "ttl_seconds": TSUM_CACHE_TTL,
+                    "sessions": summaries,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        err.print(f"[yellow]tmux-session-summary: cache write failed: {e}[/yellow]")
+
+
+# ---------------------------------------------------------------------------
+# Prompt construction
+# ---------------------------------------------------------------------------
+PROMPT_PREAMBLE = """\
+You are summarizing a developer's tmux sessions so they can quickly remember \
+what each one is for. The data below is from `tmux list-sessions` + \
+`tmux list-windows`. The user has many cryptically-named sessions (numbers, \
+dates, project slugs) and wants a one-glance refresher.
+
+For EACH session, infer:
+  - A concise one-line summary (<= 70 chars) describing what the user is \
+doing there. Be specific: name the project, the running task, the file being \
+edited. Avoid generic phrases like "a session" or "various work".
+  - 1-3 "important_windows": the editor window, the long-running process, \
+the primary terminal — whichever stand out as load-bearing. Skip if nothing \
+really stands out.
+
+Heuristics:
+  - `nvim`, `vim`, `code` → likely an editor; the filename in cmd matters.
+  - `python`, `node`, `npm`, `cargo`, `make`, `pytest`, `docker` → likely a \
+running build/server/test. Note it.
+  - `zsh`, `bash`, `fish` alone → idle shell; usually NOT important.
+  - `claude`, `codex`, `opencode`, `aider` → coding agent session.
+  - Same cwd across many windows → that cwd is the project root.
+  - `wt` / `worktree` / `tries/` / `coding-agent/` in session name → git \
+worktree experiment, often short-lived.
+
+Respond with STRICT JSON only, no prose, no code fences:
+[
+  {"session": "<name>", "summary": "<<=70 chars>", "important_windows": [
+    {"index": <int>, "name": "<window_name>", "why": "<<=40 chars>"}
+  ]}
+]
+"""
+
+
+def build_prompt(sessions: list[Session], deep: bool) -> str:
+    parts = [PROMPT_PREAMBLE, "", "--- SESSIONS ---", ""]
+    for s in sessions:
+        attached_marker = "(attached)" if s.attached else ""
+        parts.append(f"session: {s.name} [{len(s.windows)} windows] {attached_marker}".rstrip())
+        for w in s.windows:
+            active = " ACTIVE" if w.active else ""
+            pane_note = f" ({w.panes} panes)" if w.panes > 1 else ""
+            parts.append(f"  {w.index}: {w.name:<14} {w.cwd}    {w.cmd}{pane_note}{active}")
+        if deep:
+            if s.active_pane_skipped:
+                parts.append(
+                    "  (skipped active-pane capture: this is the pane running tsum)"
+                )
+            elif s.active_pane_tail:
+                tail_lines = s.active_pane_tail.splitlines()
+                parts.append(
+                    f"  recent output (visible area, {len(tail_lines)} lines, active pane):"
+                )
+                for line in tail_lines:
+                    # Per-line clip so a pathological line doesn't blow tokens.
+                    parts.append(f"    {line[:200]}")
+        parts.append("")
+    parts.append("Return JSON now.")
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Agent invocation
+# ---------------------------------------------------------------------------
+def detect_agent() -> str | None:
+    """Pick an agent: explicit override > first available on PATH.
+
+    Order matches dot_config/zsh/tools/04_ai_capture.zsh:58-67.
+    """
+    if AICAP_AGENT:
+        if AICAP_AGENT == "http" or shutil.which(AICAP_AGENT):
+            return AICAP_AGENT
+        err.print(
+            f"[red]AICAP_AGENT={AICAP_AGENT!r} but that CLI isn't on PATH.[/red]"
+        )
+        return None
+    for cand in ("claude", "opencode", "codex", "cursor-agent"):
+        if shutil.which(cand):
+            return cand
+    return None
+
+
+def model_for(agent: str) -> str:
+    return {
+        "claude": AICAP_CLAUDE_MODEL,
+        "opencode": AICAP_OPENCODE_MODEL,
+        "codex": AICAP_CODEX_MODEL,
+        "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
+        "http": AICAP_HTTP_MODEL,
+    }.get(agent, "?")
+
+
+def invoke_agent(agent: str, prompt: str, timeout: float) -> str:
+    """Run the agent in one-shot mode and return raw reply text.
+
+    Returns empty string on failure (caller falls back to metadata-only
+    rendering).
+    """
+    if agent == "http":
+        return _invoke_http(prompt, timeout)
+    base = AGENT_CONFIG[agent]["base"]
+    try:
+        result = subprocess.run(
+            [*base, prompt],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        err.print(f"[red]{agent} timed out after {timeout:.0f}s[/red]")
+        return ""
+    except FileNotFoundError:
+        err.print(f"[red]{agent} not on PATH (race vs detect_agent)[/red]")
+        return ""
+    if result.returncode != 0:
+        err.print(f"[red]{agent} exited {result.returncode}[/red]")
+        if result.stderr.strip():
+            err.print(f"[dim]{result.stderr.strip()[:500]}[/dim]")
+        return ""
+    return result.stdout
+
+
+def _invoke_http(prompt: str, timeout: float) -> str:
+    payload = json.dumps({
+        "model": AICAP_HTTP_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if AICAP_HTTP_API_KEY:
+        headers["Authorization"] = f"Bearer {AICAP_HTTP_API_KEY}"
+    req = urllib.request.Request(AICAP_HTTP_URL, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+        err.print(f"[red]http: {e}[/red]")
+        return ""
+    try:
+        parsed = json.loads(body)
+        return parsed["choices"][0]["message"]["content"]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+        err.print(f"[red]http: unexpected response shape[/red] [dim]{body[:300]}[/dim]")
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Response parsing
+# ---------------------------------------------------------------------------
+def parse_reply(reply: str) -> list[dict] | None:
+    """Extract the JSON array of session summaries from the agent's reply.
+
+    Agents sometimes wrap JSON in ``` fences or add a preamble despite
+    instructions. We tolerate that by finding the first `[` and last `]`.
+    """
+    if not reply.strip():
+        return None
+    # Strip code fences if present.
+    stripped = reply.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[1] if "\n" in stripped else stripped
+        if stripped.endswith("```"):
+            stripped = stripped.rsplit("```", 1)[0]
+        stripped = stripped.strip()
+    # Find outer JSON array.
+    start = stripped.find("[")
+    end = stripped.rfind("]")
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        parsed = json.loads(stripped[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, list):
+        return None
+    # Coerce minimal shape.
+    out: list[dict] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        sess = str(item.get("session", "")).strip()
+        if not sess:
+            continue
+        out.append({
+            "session": sess,
+            "summary": str(item.get("summary", "")).strip()[:140],
+            "important_windows": [
+                {
+                    "index": int(w.get("index", 0)) if str(w.get("index", "")).lstrip("-").isdigit() else 0,
+                    "name": str(w.get("name", "")).strip()[:30],
+                    "why": str(w.get("why", "")).strip()[:80],
+                }
+                for w in (item.get("important_windows") or [])
+                if isinstance(w, dict)
+            ][:3],
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Rendering
+# ---------------------------------------------------------------------------
+def _summary_by_session(summaries: list[dict]) -> dict[str, dict]:
+    return {s["session"]: s for s in summaries}
+
+
+def render_list(sessions: list[Session], summaries: list[dict], use_color: bool) -> None:
+    """Human-readable: one block per session to stdout."""
+    out = Console(force_terminal=use_color, no_color=not use_color, soft_wrap=True)
+    by_name = _summary_by_session(summaries)
+    name_width = max((len(s.name) for s in sessions), default=4)
+    for s in sessions:
+        info = by_name.get(s.name, {})
+        summary = info.get("summary") or "(no summary)"
+        attached = " *" if s.attached else "  "
+        line = Text()
+        line.append(f"{s.name:<{name_width}}{attached} ", style="bold cyan")
+        line.append(f"[{len(s.windows):>2}w] ", style="dim")
+        line.append(summary, style="white")
+        out.print(line)
+        for w_info in info.get("important_windows", []):
+            why = f"  — {w_info['why']}" if w_info.get("why") else ""
+            idx = w_info.get("index", 0)
+            wname = w_info.get("name", "")
+            sub = Text()
+            sub.append("    └ ", style="dim")
+            sub.append(f"w{idx}: {wname}", style="green")
+            sub.append(why, style="dim")
+            out.print(sub)
+
+
+def render_picker(sessions: list[Session], summaries: list[dict]) -> None:
+    """TSV `<session>\\t<one-line>` for fzf consumption.
+
+    Always plain text (no ANSI), always stdout. fzf will display the second
+    column via --with-nth=2.
+    """
+    by_name = _summary_by_session(summaries)
+    for s in sessions:
+        info = by_name.get(s.name, {})
+        summary = info.get("summary") or "(no summary)"
+        attached = "*" if s.attached else " "
+        win_count = f"[{len(s.windows):>2}w]"
+        print(f"{s.name}\t{attached} {win_count} {summary}")
+
+
+def render_fallback_list(sessions: list[Session], use_color: bool) -> None:
+    """Used when the LLM failed: print bare metadata so the user still sees something."""
+    out = Console(force_terminal=use_color, no_color=not use_color, soft_wrap=True)
+    name_width = max((len(s.name) for s in sessions), default=4)
+    for s in sessions:
+        attached = " *" if s.attached else "  "
+        line = Text()
+        line.append(f"{s.name:<{name_width}}{attached} ", style="bold cyan")
+        line.append(f"[{len(s.windows):>2}w] ", style="dim")
+        # Best-effort tag: most-common cwd basename + active window's cmd
+        cwds = [w.cwd for w in s.windows]
+        common = max(set(cwds), key=cwds.count) if cwds else ""
+        basename = os.path.basename(common.rstrip("/")) or common
+        active = next((w for w in s.windows if w.active), None)
+        active_str = f" — {active.cmd}" if active else ""
+        line.append(f"{basename}{active_str}", style="white")
+        out.print(line)
+
+
+def render_fallback_picker(sessions: list[Session]) -> None:
+    """Picker fallback when LLM failed."""
+    for s in sessions:
+        attached = "*" if s.attached else " "
+        cwds = [w.cwd for w in s.windows]
+        common = max(set(cwds), key=cwds.count) if cwds else ""
+        basename = os.path.basename(common.rstrip("/")) or common
+        active = next((w for w in s.windows if w.active), None)
+        active_str = f" — {active.cmd}" if active else ""
+        print(f"{s.name}\t{attached} [{len(s.windows):>2}w] {basename}{active_str}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def _env_truthy(val: str) -> bool:
+    return val.strip().lower() not in ("", "0", "false", "no", "off")
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="tmux-session-summary",
+        description="AI-powered overview of every tmux session.",
+    )
+    p.add_argument("mode", nargs="?", default="list", choices=["list", "picker"])
+    # --deep and --shallow are mutually-resolved later (--deep wins). default
+    # is None so we can tell "user did not pass either flag" apart from
+    # "user explicitly chose shallow" and consult TSUM_DEEP_DEFAULT only in
+    # the former case.
+    p.add_argument(
+        "-d", "--deep",
+        dest="deep", action="store_true", default=None,
+        help="Include visible area of each session's active pane (overrides TSUM_DEEP_DEFAULT=0).",
+    )
+    p.add_argument(
+        "--shallow",
+        dest="deep", action="store_false",
+        help="Force metadata-only (overrides TSUM_DEEP_DEFAULT=1).",
+    )
+    p.add_argument("-r", "--refresh", action="store_true", help="Bypass cache.")
+    p.add_argument("--dry-run", action="store_true", help="Print the prompt that would be sent; no API call.")
+    p.add_argument("--no-cache", action="store_true", help="Don't read or write the cache.")
+    args = p.parse_args()
+    # Three-state resolution: flag explicit > env var > False.
+    if args.deep is None:
+        args.deep = _env_truthy(os.environ.get("TSUM_DEEP_DEFAULT", ""))
+    return args
+
+
+def main() -> int:
+    args = parse_args()
+
+    sessions = collect_sessions(deep=args.deep)
+    if not sessions:
+        err.print("[red]tmux-session-summary: no tmux sessions found (server not running?)[/red]")
+        return 1
+
+    if args.dry_run:
+        print(build_prompt(sessions, deep=args.deep))
+        return 0
+
+    sig = session_signature(sessions, deep=args.deep)
+    cached: list[dict] | None = None
+    if not args.refresh and not args.no_cache:
+        cached = load_cache(sig)
+
+    if cached is not None:
+        summaries = cached
+    else:
+        agent = detect_agent()
+        if agent is None:
+            err.print(
+                "[red]No coding-agent CLI on PATH (tried: claude, opencode, codex, cursor-agent).[/red]\n"
+                "[dim]Install one, or set AICAP_AGENT=http with AICAP_HTTP_API_KEY.[/dim]\n"
+                "[yellow]Falling back to metadata-only output (no AI summaries).[/yellow]"
+            )
+            if args.mode == "picker":
+                render_fallback_picker(sessions)
+            else:
+                render_fallback_list(sessions, use_color=sys.stdout.isatty())
+            return 0  # not an error from the user's perspective — they still got output
+
+        prompt = build_prompt(sessions, deep=args.deep)
+        with err.status(f"[dim]{agent} ({model_for(agent)}) thinking…[/dim]", spinner="dots"):
+            reply = invoke_agent(agent, prompt, TSUM_TIMEOUT)
+        summaries = parse_reply(reply) or []
+        if not summaries:
+            err.print("[yellow]LLM returned no parseable JSON; falling back to metadata-only.[/yellow]")
+            if args.mode == "picker":
+                render_fallback_picker(sessions)
+            else:
+                render_fallback_list(sessions, use_color=sys.stdout.isatty())
+            return 0
+        if not args.no_cache:
+            save_cache(sig, summaries)
+
+    if args.mode == "picker":
+        render_picker(sessions, summaries)
+    else:
+        render_list(sessions, summaries, use_color=sys.stdout.isatty())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
