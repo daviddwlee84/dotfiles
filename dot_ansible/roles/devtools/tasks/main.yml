@@ -2442,9 +2442,22 @@
         content: |
           #!/bin/bash
           # Wrapper around tmux-appimage extracted at ~/.local/share/tmux-appimage.
-          # Calls the bundled tmux binary directly so system terminfo is preserved;
-          # RPATH in the binary pulls bundled libevent/libncurses automatically.
-          exec "$HOME/.local/share/tmux-appimage/squashfs-root/usr/bin/tmux" "$@"
+          # Calls the bundled tmux binary directly so RPATH pulls bundled
+          # libevent/libncurses.
+          #
+          # TERMINFO_DIRS is required: the bundled libncurses was built with a
+          # compile-time terminfo path that points inside the original AppImage
+          # mount; once squashfs-root is extracted to a different location, that
+          # path is broken and `tmux` aborts with
+          #   missing or unsuitable terminal: xterm-256color
+          # at client/attach time (server creation can succeed without
+          # terminfo, which is why `tmux ls` works but `tmux` / `tmux attach`
+          # fails). Point ncurses at the system terminfo dirs explicitly; the
+          # bundled copy under squashfs-root is kept last as a safety net.
+          # See pitfalls/tmux-appimage-terminfo-not-found.md.
+          appimage_root="$HOME/.local/share/tmux-appimage/squashfs-root"
+          export TERMINFO_DIRS="${TERMINFO_DIRS:-/etc/terminfo:/lib/terminfo:/usr/share/terminfo}:$appimage_root/usr/share/terminfo"
+          exec "$appimage_root/usr/bin/tmux" "$@"
 
     - name: Clean up tmux-appimage download
       ansible.builtin.file:
