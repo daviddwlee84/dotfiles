@@ -4,8 +4,8 @@
 # accepts; any other keypress dismisses.
 #
 # Integrates with 04_ai_capture.zsh (_aiagent_invoke / _aiagent_autodetect) so
-# the same agent autodetect (claude → opencode → codex → cursor-agent) and the
-# same AICAP_*_MODEL defaults apply. No API key needed when claude / opencode /
+# the same agent autodetect (opencode → claude → codex → cursor-agent) and the
+# same AICAP_*_MODEL defaults apply. No API key needed when opencode / claude /
 # codex / cursor-agent CLIs are authenticated.
 #
 # Env-var defaults (set in ~/.zshrc.adhoc or ~/.config/zsh/secrets.zsh to
@@ -484,7 +484,7 @@ USAGE
 
   local input="$*"
   local agent="${AISUGGEST_AGENT:-$(_aiagent_autodetect)}" || {
-    print -u2 "aisuggest: no agent on PATH (need claude / opencode / codex / cursor-agent)"
+    print -u2 "aisuggest: no agent on PATH (need opencode / claude / codex / cursor-agent)"
     return 1
   }
 

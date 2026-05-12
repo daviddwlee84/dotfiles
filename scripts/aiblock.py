@@ -27,7 +27,7 @@ Depends on:
   - dot_config/zsh/tools/04_ai_capture.zsh (aiblock() wrapper dumps history)
   - zsh on PATH (wrapper runs `fc -ln -30` in the caller's shell)
   - tmux (we run inside a pane)
-  - at least one of: claude / opencode / codex / cursor-agent
+  - at least one of: opencode / claude / codex / cursor-agent
   - or: AICAP_AGENT=http for direct OpenRouter / Ollama (no agent CLI needed)
 """
 from __future__ import annotations
@@ -56,7 +56,7 @@ DEFAULT_FIX_PROMPT = (
 AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
 AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
 AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
-AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "gpt-5-mini")
+AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "")  # empty: ChatGPT-account auth rejects gpt-5-mini, let codex pick
 AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
 AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
 AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
@@ -64,16 +64,30 @@ AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPE
 AICAP_SHOW_METADATA = os.environ.get("AICAP_SHOW_METADATA", "1") == "1"
 AICAP_PRETTIFY = os.environ.get("AICAP_PRETTIFY", "1") == "1"
 
+def _with_model(flag: str, value: str) -> list[str]:
+    """Return [flag, value] only when value is non-empty, else []. Empty
+    AICAP_<AGENT>_MODEL → omit -m/--model so the agent CLI uses its own
+    default. Robustness fallback when a pinned model ID is retired by the
+    provider (e.g. ChatGPT-account auth rejects gpt-5-mini)."""
+    return [flag, value] if value else []
+
+
 # Each agent's non-interactive invocation args (model-aware). The Claude
 # entry is special-cased in invoke_agent_oneshot because we optionally
 # use --output-format json for metadata extraction. The `http` entry has
 # no `base` because it talks to a chat-completions endpoint via urllib —
 # see invoke_agent_oneshot's http branch.
+#
+# Dict order = autodetect priority (detect_agents iterates this dict).
+# Order is opencode-first per the 2026-05-12 benchmark — opencode was ~2-3x
+# faster than the others for tsum-style one-shot summarization. Keep this
+# in sync with dot_config/zsh/tools/04_ai_capture.zsh:_aiagent_autodetect
+# and dot_config/tmux/executable_tmux-session-summary.py:detect_agent.
 AGENT_CONFIG = {
-    "claude":       {"base": ["claude", "-p", "--model", AICAP_CLAUDE_MODEL]},
-    "opencode":     {"base": ["opencode", "run", "-m", AICAP_OPENCODE_MODEL]},
-    "codex":        {"base": ["codex", "exec", "-m", AICAP_CODEX_MODEL]},
-    "cursor-agent": {"base": ["cursor-agent", "-p"] + (["--model", AICAP_CURSOR_MODEL] if AICAP_CURSOR_MODEL else [])},
+    "opencode":     {"base": ["opencode", "run", *_with_model("-m", AICAP_OPENCODE_MODEL)]},
+    "claude":       {"base": ["claude", "-p", *_with_model("--model", AICAP_CLAUDE_MODEL)]},
+    "codex":        {"base": ["codex", "exec", *_with_model("-m", AICAP_CODEX_MODEL)]},
+    "cursor-agent": {"base": ["cursor-agent", "-p", *_with_model("--model", AICAP_CURSOR_MODEL)]},
     "http":         {"base": []},  # opt-in only; no PATH probe
 }
 
@@ -220,9 +234,9 @@ def invoke_agent_oneshot(agent: str, prompt: str) -> tuple[str, dict]:
 
 def _model_for(agent: str) -> str:
     return {
-        "claude": AICAP_CLAUDE_MODEL,
-        "opencode": AICAP_OPENCODE_MODEL,
-        "codex": AICAP_CODEX_MODEL,
+        "claude": AICAP_CLAUDE_MODEL or "(default)",
+        "opencode": AICAP_OPENCODE_MODEL or "(default)",
+        "codex": AICAP_CODEX_MODEL or "(default)",
         "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
         "http": AICAP_HTTP_MODEL,
     }[agent]
@@ -358,7 +372,7 @@ def main() -> int:
     if not agents:
         console.print(
             "[red]No coding-agent CLI on PATH.[/red]\n"
-            "[dim]Install one of: claude, opencode, codex, cursor-agent — "
+            "[dim]Install one of: opencode, claude, codex, cursor-agent — "
             "or set AICAP_AGENT=http for direct OpenRouter / Ollama.[/dim]"
         )
         return 1

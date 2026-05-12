@@ -6,7 +6,12 @@
 #   aiexplain [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
 #   aiblock                                                    # Python TUI
 #
-# Agent auto-detection order: claude → opencode → codex → cursor-agent.
+# Agent auto-detection order: opencode → claude → codex → cursor-agent.
+# (Reordered 2026-05-12 — opencode benchmarked ~2-3x faster than the others
+# for short multi-session prompts.) Mirrored in three files; keep in sync:
+#   - dot_config/zsh/tools/04_ai_capture.zsh: _aiagent_autodetect (this file)
+#   - dot_config/tmux/executable_tmux-session-summary.py: detect_agent
+#   - scripts/aiblock.py: AGENT_CONFIG dict insertion order
 # Override via -a AGENT (per-call) or AICAP_AGENT env var (per-shell).
 # Advisory-only by design; there is no --execute flag.
 # For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
@@ -29,7 +34,10 @@
 #                                        codex | cursor-agent | http
 #   AICAP_CLAUDE_MODEL     default: haiku           (claude --model alias)
 #   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5
-#   AICAP_CODEX_MODEL      default: gpt-5-mini
+#   AICAP_CODEX_MODEL      default: (unset — let codex pick the account
+#                                        default; gpt-5-mini errors out on
+#                                        ChatGPT-account auth, so pinning a
+#                                        specific model is opt-in only)
 #   AICAP_CURSOR_MODEL     default: (unset — let cursor-agent pick)
 #   AICAP_HTTP_URL         default: https://openrouter.ai/api/v1/chat/completions
 #   AICAP_HTTP_MODEL       default: google/gemini-2.0-flash-exp:free
@@ -45,7 +53,7 @@
 
 : "${AICAP_CLAUDE_MODEL:=haiku}"
 : "${AICAP_OPENCODE_MODEL:=github-copilot/claude-haiku-4.5}"
-: "${AICAP_CODEX_MODEL:=gpt-5-mini}"
+: "${AICAP_CODEX_MODEL:=}"
 : "${AICAP_CURSOR_MODEL:=}"
 : "${AICAP_HTTP_URL:=https://openrouter.ai/api/v1/chat/completions}"
 : "${AICAP_HTTP_MODEL:=google/gemini-2.0-flash-exp:free}"
@@ -57,7 +65,7 @@
 
 _aiagent_autodetect() {
   local cand
-  for cand in claude opencode codex cursor-agent; do
+  for cand in opencode claude codex cursor-agent; do
     if command -v "$cand" &>/dev/null; then
       print -r -- "$cand"
       return 0
@@ -126,9 +134,14 @@ _aiagent_invoke() {
 
   case "$agent" in
     claude)
+      # Conditional --model: empty AICAP_CLAUDE_MODEL → claude picks its
+      # own default (robust if the pinned alias is ever retired).
+      local -a claude_model_args=()
+      [[ -n "$AICAP_CLAUDE_MODEL" ]] && claude_model_args=(--model "$AICAP_CLAUDE_MODEL")
+      local claude_model_label="${AICAP_CLAUDE_MODEL:-(default)}"
       if [[ "$AICAP_SHOW_METADATA" == "1" ]] && command -v jq &>/dev/null; then
-        _aicap_spinner_start "claude $AICAP_CLAUDE_MODEL (json)…"
-        json=$(claude -p --model "$AICAP_CLAUDE_MODEL" --output-format json "$prompt")
+        _aicap_spinner_start "claude $claude_model_label (json)…"
+        json=$(claude -p "${claude_model_args[@]}" --output-format json "$prompt")
         rc=$?
         _aicap_spinner_stop
         (( rc != 0 )) && return $rc
@@ -143,26 +156,34 @@ _aiagent_invoke() {
         print -u2 "claude ($model_used) | in=$tokens_in out=$tokens_out cache=(r:$cache_read,w:$cache_create) | cost=\$$cost ${duration}ms"
         print -r -- "$reply"
       else
-        print -u2 "claude ($AICAP_CLAUDE_MODEL)"
-        _aicap_spinner_start "claude $AICAP_CLAUDE_MODEL…"
-        claude -p --model "$AICAP_CLAUDE_MODEL" "$prompt"
+        print -u2 "claude ($claude_model_label)"
+        _aicap_spinner_start "claude $claude_model_label…"
+        claude -p "${claude_model_args[@]}" "$prompt"
         rc=$?
         _aicap_spinner_stop
         return $rc
       fi
       ;;
     opencode)
-      print -u2 "opencode ($AICAP_OPENCODE_MODEL)"
-      _aicap_spinner_start "opencode $AICAP_OPENCODE_MODEL…"
-      opencode run -m "$AICAP_OPENCODE_MODEL" "$prompt"
+      local -a opencode_model_args=()
+      [[ -n "$AICAP_OPENCODE_MODEL" ]] && opencode_model_args=(-m "$AICAP_OPENCODE_MODEL")
+      local opencode_model_label="${AICAP_OPENCODE_MODEL:-(default)}"
+      print -u2 "opencode ($opencode_model_label)"
+      _aicap_spinner_start "opencode $opencode_model_label…"
+      opencode run "${opencode_model_args[@]}" "$prompt"
       rc=$?
       _aicap_spinner_stop
       return $rc
       ;;
     codex)
-      print -u2 "codex ($AICAP_CODEX_MODEL)"
-      _aicap_spinner_start "codex $AICAP_CODEX_MODEL…"
-      codex exec -m "$AICAP_CODEX_MODEL" "$prompt"
+      # AICAP_CODEX_MODEL defaults to empty since gpt-5-mini is rejected on
+      # ChatGPT-account auth. Users on API-key auth can re-pin via the env.
+      local -a codex_model_args=()
+      [[ -n "$AICAP_CODEX_MODEL" ]] && codex_model_args=(-m "$AICAP_CODEX_MODEL")
+      local codex_model_label="${AICAP_CODEX_MODEL:-(default)}"
+      print -u2 "codex ($codex_model_label)"
+      _aicap_spinner_start "codex $codex_model_label…"
+      codex exec "${codex_model_args[@]}" "$prompt"
       rc=$?
       _aicap_spinner_stop
       return $rc
@@ -228,7 +249,7 @@ _aiagent_invoke() {
       fi
       print -r -- "$reply"
       ;;
-    *) print -u2 "aifix: unknown agent '$agent' (supported: claude, opencode, codex, cursor-agent, http)"; return 1 ;;
+    *) print -u2 "aifix: unknown agent '$agent' (supported: opencode, claude, codex, cursor-agent, http)"; return 1 ;;
   esac
 }
 
@@ -325,7 +346,7 @@ _ai_capture_dispatch() {
       agent=$AICAP_AGENT
     else
       agent=$(_aiagent_autodetect) || {
-        print -u2 "$name: no coding-agent CLI found on PATH (tried: claude, opencode, codex, cursor-agent)"
+        print -u2 "$name: no coding-agent CLI found on PATH (tried: opencode, claude, codex, cursor-agent)"
         print -u2 "$name: hint — set AICAP_AGENT=http to use OpenRouter / Ollama directly"
         return 1
       }

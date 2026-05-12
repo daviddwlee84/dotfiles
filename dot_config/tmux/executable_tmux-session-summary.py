@@ -79,9 +79,14 @@ from rich.text import Text
 # Env defaults — mirror 04_ai_capture.zsh so user overrides carry across.
 # ---------------------------------------------------------------------------
 AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
-AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
+# Per-vendor lightweight model pins. Empty value → omit -m/--model so the agent
+# CLI uses its own default; that's the robustness fallback when a pinned model
+# is retired by the provider (e.g. `gpt-5-mini` rejected by ChatGPT-account
+# auth → empty default lets codex pick whatever the account supports). Power
+# users can re-pin by setting the env var.
+AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")  # "haiku" is a stable alias maintained by Anthropic
 AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
-AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "gpt-5-mini")
+AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "")  # empty: ChatGPT-account auth rejects gpt-5-mini, so let codex choose
 AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
 AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
 AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
@@ -89,11 +94,24 @@ AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPE
 TSUM_CACHE_TTL = int(os.environ.get("TSUM_CACHE_TTL", "600"))
 TSUM_TIMEOUT = float(os.environ.get("TSUM_TIMEOUT", "60"))
 
+
+def _with_model(*model_flag_and_value: str) -> list[str]:
+    """Return [flag, value] only when value is non-empty, else []. Lets each
+    agent fall back to its CLI default when AICAP_<AGENT>_MODEL is unset —
+    avoids hard-failing if the provider retires a pinned model ID."""
+    flag, value = model_flag_and_value
+    return [flag, value] if value else []
+
+
 AGENT_CONFIG = {
-    "claude":       {"base": ["claude", "-p", "--model", AICAP_CLAUDE_MODEL]},
-    "opencode":     {"base": ["opencode", "run", "-m", AICAP_OPENCODE_MODEL]},
-    "codex":        {"base": ["codex", "exec", "-m", AICAP_CODEX_MODEL]},
-    "cursor-agent": {"base": ["cursor-agent", "-p"] + (["--model", AICAP_CURSOR_MODEL] if AICAP_CURSOR_MODEL else [])},
+    # Order matters: detect_agent() iterates this dict and picks the first
+    # CLI it finds on PATH. opencode-first because benchmarking on 2026-05-12
+    # showed it's ~2x faster than cursor-agent and ~3x faster than claude
+    # for tsum-style multi-session summarization (one-shot, JSON output).
+    "opencode":     {"base": ["opencode", "run", *_with_model("-m", AICAP_OPENCODE_MODEL)]},
+    "claude":       {"base": ["claude", "-p", *_with_model("--model", AICAP_CLAUDE_MODEL)]},
+    "codex":        {"base": ["codex", "exec", *_with_model("-m", AICAP_CODEX_MODEL)]},
+    "cursor-agent": {"base": ["cursor-agent", "-p", *_with_model("--model", AICAP_CURSOR_MODEL)]},
     "http":         {"base": []},
 }
 
@@ -422,7 +440,10 @@ def build_prompt(sessions: list[Session], deep: bool) -> str:
 def detect_agent() -> str | None:
     """Pick an agent: explicit override > first available on PATH.
 
-    Order matches dot_config/zsh/tools/04_ai_capture.zsh:58-67.
+    Order is opencode-first per the benchmark (see AGENT_CONFIG comment).
+    Mirrored in dot_config/zsh/tools/04_ai_capture.zsh:_aiagent_autodetect
+    and scripts/aiblock.py:detect_agents (AGENT_CONFIG dict order). Keep in
+    sync — changes to one MUST land in all three.
     """
     if AICAP_AGENT:
         if AICAP_AGENT == "http" or shutil.which(AICAP_AGENT):
@@ -431,7 +452,7 @@ def detect_agent() -> str | None:
             f"[red]AICAP_AGENT={AICAP_AGENT!r} but that CLI isn't on PATH.[/red]"
         )
         return None
-    for cand in ("claude", "opencode", "codex", "cursor-agent"):
+    for cand in ("opencode", "claude", "codex", "cursor-agent"):
         if shutil.which(cand):
             return cand
     return None
@@ -439,9 +460,9 @@ def detect_agent() -> str | None:
 
 def model_for(agent: str) -> str:
     return {
-        "claude": AICAP_CLAUDE_MODEL,
-        "opencode": AICAP_OPENCODE_MODEL,
-        "codex": AICAP_CODEX_MODEL,
+        "claude": AICAP_CLAUDE_MODEL or "(default)",
+        "opencode": AICAP_OPENCODE_MODEL or "(default)",
+        "codex": AICAP_CODEX_MODEL or "(default)",
         "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
         "http": AICAP_HTTP_MODEL,
     }.get(agent, "?")
@@ -730,7 +751,7 @@ def main() -> int:
         agent = detect_agent()
         if agent is None:
             err.print(
-                "[red]No coding-agent CLI on PATH (tried: claude, opencode, codex, cursor-agent).[/red]\n"
+                "[red]No coding-agent CLI on PATH (tried: opencode, claude, codex, cursor-agent).[/red]\n"
                 "[dim]Install one, or set AICAP_AGENT=http with AICAP_HTTP_API_KEY.[/dim]\n"
                 "[yellow]Falling back to metadata-only output (no AI summaries).[/yellow]"
             )
