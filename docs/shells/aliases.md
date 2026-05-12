@@ -625,12 +625,12 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
-| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
-| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
-| `compress-image <input> [<mb>=1]` | function | `dot_config/zsh/tools/29_media.zsh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
-| `resize-image <input> <width_px>` | function | `dot_config/zsh/tools/29_media.zsh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
-| `media-pick` | function | `dot_config/zsh/tools/29_media.zsh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
+| `compress-video <input>` | function | `dot_config/shell/29_media.sh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+| `extract-audio <input>` | function | `dot_config/shell/29_media.sh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+| `to-wav16k <input>` | function | `dot_config/shell/29_media.sh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+| `compress-image <input> [<mb>=1]` | function | `dot_config/shell/29_media.sh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
+| `resize-image <input> <width_px>` | function | `dot_config/shell/29_media.sh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
+| `media-pick` | function | `dot_config/shell/29_media.sh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
 
 ---
 
@@ -664,12 +664,12 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
-| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to explain what happened |
-| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
-| `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
-| `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
-| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
+| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
+| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Capture Nth block (tmux), ask agent to explain what happened |
+| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
+| `aifix-run -- CMD [ARG...]` | function | `dot_config/shell/04_ai_capture.sh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
+| `aifix-rerun [-y]` | function | `dot_config/shell/04_ai_capture.sh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
+| `aiblock` | function | `dot_config/shell/04_ai_capture.sh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
 
 ---
 

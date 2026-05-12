@@ -11363,11 +11363,2574 @@ _**Agent (claude-opus-4-7 2026-05-12 11:41:15Z)**_
 
 Commit Stage 3:
 
-_**Agent (claude-opus-4-7 2026-05-12 11:41:17Z)**_
+_**Agent (claude-opus-4-7 2026-05-12 11:41:18Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
 Stage all Stage 3 changes
 
 `git add .chezmoiremove docs/shells/aliases.md dot_config/shell/28_tldr.sh dot_config/shell/29_log_tools.sh dot_config/shell/35_yazi.sh dot_config/shell/37_worktrunk.sh dot_config/shell/38_lazyvim.sh dot_config/shell/38_workmux.sh dot_config/shell/55_web_reader.sh dot_config/shell/94_ssh_agent.sh dot_config/zsh/tools/28_tldr.zsh dot_config/zsh/tools/29_log_tools.zsh dot_config/zsh/tools/35_yazi.zsh dot_config/zsh/tools/37_worktrunk.zsh dot_config/zsh/tools/38_lazyvim.zsh dot_config/zsh/tools/38_workmux.zsh dot_config/zsh/tools/55_web_reader.zsh dot_config/zsh/tools/94_ssh_agent.zsh .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md && git status --short`
+
+```text
+M  .chezmoiremove
+M  .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+M  docs/shells/aliases.md
+A  dot_config/shell/28_tldr.sh
+R  dot_config/zsh/tools/29_log_tools.zsh -> dot_config/shell/29_log_tools.sh
+R  dot_config/zsh/tools/35_yazi.zsh -> dot_config/shell/35_yazi.sh
+A  dot_config/shell/37_worktrunk.sh
+R  dot_config/zsh/tools/38_lazyvim.zsh -> dot_config/shell/38_lazyvim.sh
+R  dot_config/zsh/tools/38_workmux.zsh -> dot_config/shell/38_workmux.sh
+R  dot_config/zsh/tools/55_web_reader.zsh -> dot_config/shell/55_web_reader.sh
+R  dot_config/zsh/tools/94_ssh_agent.zsh -> dot_config/shell/94_ssh_agent.sh
+D  dot_config/zsh/tools/28_tldr.zsh
+M  dot_config/zsh/tools/37_worktrunk.zsh
+```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Stage 3
+
+```bash
+git commit -m "$(cat <<'EOF'
+refactor(shell): move 8 more helper modules to shared layer
+
+Fully ported (entire file moved to dot_config/shell/):
+  28_tldr        typeset -ga → plain top-level array assignment
+  29_log_tools   emulate -L zsh gated on $ZSH_VERSION
+  35_yazi        no zsh-isms, just renamed
+  38_lazyvim     no zsh-isms, just renamed
+  38_workmux     ${(@f)$(cmd)} newline-split → while IFS= read -r loop
+  55_web_reader  print -u2 → printf >&2, drop misleading __zsh_ prefix
+  94_ssh_agent   typeset -a → local -a, unfunction → unset -f
+
+Split (shared backend + zsh widget tail):
+  37_worktrunk   wt config shell init dispatch (zsh|bash) + wtcd → shell/;
+                 clap-completion ~/.zfunc/_wt regen stays in zsh/tools/
+
+Stays zsh-only (not portable without rewrite, deferred):
+  02_shell_integration  OSC 133 via add-zsh-hook + zsh PROMPT %{...%};
+                        bash uses PROMPT_COMMAND + DEBUG trap, separate effort
+  95_bitwarden          `bw completion --shell zsh` is zsh-specific format
+  90_completions        essentially empty placeholder
+
+.chezmoiremove updated so managed hosts clean up the orphan zsh-tools
+files on next apply (same pattern as commit 9bb56c2). aliases.md source
+columns updated for all 8 commands plus the 8 sub-rows of helper aliases.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778586091-62987.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778586091-62987.
+[main e1c40c1] refactor(shell): move 8 more helper modules to shared layer
+ 13 files changed, 2381 insertions(+), 100 deletions(-)
+ create mode 100644 dot_config/shell/28_tldr.sh
+ rename dot_config/{zsh/tools/29_log_tools.zsh => shell/29_log_tools.sh} (94%)
+ rename dot_config/{zsh/tools/35_yazi.zsh => shell/35_yazi.sh} (57%)
+ create mode 100644 dot_config/shell/37_worktrunk.sh
+ rename dot_config/{zsh/tools/38_lazyvim.zsh => shell/38_lazyvim.sh} (95%)
+ rename dot_config/{zsh/tools/38_workmux.zsh => shell/38_workmux.sh} (78%)
+ rename dot_config/{zsh/tools/55_web_reader.zsh => shell/55_web_reader.sh} (59%)
+ rename dot_config/{zsh/tools/94_ssh_agent.zsh => shell/94_ssh_agent.sh} (91%)
+ delete mode 100644 dot_config/zsh/tools/28_tldr.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:39Z)**_
+
+Stage 3 committed (e1c40c1). Now Stage 4 — the heavier zsh-isms:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/29_media.zsh`
+
+```text
+1	# 29_media.zsh - ffmpeg + ImageMagick helpers (compress / extract / resize)
+2	
+3	# Load if any media tool is on PATH (installMediaTools=true, or hand-installed).
+4	# Each function self-checks for its specific dep so partial installs work.
+5	command -v ffmpeg &>/dev/null \
+6	    || command -v magick &>/dev/null \
+7	    || command -v convert &>/dev/null \
+8	    || return 0
+9	
+10	# === ffmpeg helpers (video / audio) =========================================
+11	
+12	# Compress an MP4 with x264 CRF 28 (smaller; tweak CRF inline for quality).
+13	# Output: <name>_compressed.mp4 next to the input.
+14	compress-video() {
+15	    emulate -L zsh
+16	    [[ -f "$1" ]] || { echo "usage: compress-video <input>" >&2; return 2 }
+17	    ffmpeg -i "$1" -c:v libx264 -crf 28 -preset slow -c:a aac -b:a 128k "${1:r}_compressed.mp4"
+18	}
+19	
+20	# Extract audio without re-encoding. Output is .m4a (AAC sources keep AAC).
+21	extract-audio() {
+22	    emulate -L zsh
+23	    [[ -f "$1" ]] || { echo "usage: extract-audio <input>" >&2; return 2 }
+24	    ffmpeg -i "$1" -vn -c:a copy "${1:r}.m4a"
+25	}
+26	
+27	# Re-encode to 16 kHz mono WAV — Whisper / faster-whisper / wav2vec input format.
+28	to-wav16k() {
+29	    emulate -L zsh
+30	    [[ -f "$1" ]] || { echo "usage: to-wav16k <input>" >&2; return 2 }
+31	    ffmpeg -i "$1" -ar 16000 -ac 1 "${1:r}_16k.wav"
+32	}
+33	
+34	# === ImageMagick helpers (image) ============================================
+35	
+36	# Resolve `magick` (v7) or `convert` (v6) into $REPLY. Returns 1 if neither.
+37	_29_media_im() {
+38	    REPLY=$(command -v magick) && return 0
+39	    REPLY=$(command -v convert) && return 0
+40	    echo "ImageMagick not found (install via installMediaTools=true)" >&2
+41	    return 1
+42	}
+43	
+44	# compress-image <input> [<target_mb=1>]
+45	# Re-encode to JPEG under <target_mb> MB. Uses ImageMagick's
+46	# `-define jpeg:extent=NMB`, which iterates quality internally — single shot,
+47	# no manual binary search. Alpha is flattened to white (PNG/WebP screenshots).
+48	# Output: <name>_<mb>mb.jpg
+49	compress-image() {
+50	    emulate -L zsh
+51	    [[ -f "$1" ]] || { echo "usage: compress-image <input> [<target_mb=1>]" >&2; return 2 }
+52	    local IM; _29_media_im || return 1; IM=$REPLY
+53	    local mb="${2:-1}"
+54	    local out="${1:r}_${mb}mb.jpg"
+55	    "$IM" "$1" -auto-orient -strip -background white -alpha remove -alpha off \
+56	        -define "jpeg:extent=${mb}MB" "$out"
+57	    [[ -f "$out" ]] && echo "→ $out ($(du -h "$out" | cut -f1))"
+58	}
+59	
+60	# resize-image <input> <width_px>
+61	# Resize so width = <width_px> (preserves aspect). Output keeps source format.
+62	# Output: <name>_<width>w.<ext>
+63	resize-image() {
+64	    emulate -L zsh
+65	    [[ -f "$1" && -n "$2" ]] || { echo "usage: resize-image <input> <width_px>" >&2; return 2 }
+66	    local IM; _29_media_im || return 1; IM=$REPLY
+67	    local out="${1:r}_${2}w.${1:e}"
+68	    "$IM" "$1" -auto-orient -resize "${2}x" "$out"
+69	    [[ -f "$out" ]] && echo "→ $out ($(du -h "$out" | cut -f1))"
+70	}
+71	
+72	# === gum-driven interactive launcher ========================================
+73	
+74	if command -v gum &>/dev/null; then
+75	    # media-pick: gum file picker → action chooser → (optional) param input.
+76	    # No-args entrypoint that wires every helper above for non-CLI users.
+77	    media-pick() {
+78	        emulate -L zsh
+79	        local file action
+80	        file=$(gum file --no-permissions) || return 0
+81	        [[ -f "$file" ]] || { echo "not a file: $file" >&2; return 2 }
+82	        action=$(gum choose \
+83	            "compress-video" \
+84	            "compress-image (1 MB)" \
+85	            "compress-image (custom MB)" \
+86	            "resize-image (custom width)" \
+87	            "extract-audio" \
+88	            "to-wav16k") || return 0
+89	        case "$action" in
+90	            "compress-video")            compress-video "$file" ;;
+91	            "compress-image (1 MB)")     compress-image "$file" 1 ;;
+92	            "compress-image (custom MB)")
+93	                local mb
+94	                mb=$(gum input --placeholder "target MB (e.g. 2)" --value 2) || return 0
+95	                compress-image "$file" "$mb"
+96	                ;;
+97	            "resize-image (custom width)")
+98	                local w
+99	                w=$(gum input --placeholder "max width px (e.g. 1280)" --value 1280) || return 0
+100	                resize-image "$file" "$w"
+101	                ;;
+102	            "extract-audio")             extract-audio "$file" ;;
+103	            "to-wav16k")                 to-wav16k "$file" ;;
+104	        esac
+105	    }
+106	fi
+107
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/32_try.zsh`
+
+```text
+1	# 32_try.zsh - try-cli configuration (ephemeral workspace manager)
+2	# https://github.com/tobi/try
+3	
+4	# Preserve user overrides, but default the graduate destination to the
+5	# normalized parent of TRY_PATH so Ctrl-G has a predictable target.
+6	# https://github.com/tobi/try/commit/4bb73376044e1ed8149a66513cec42155bb9f0d3
+7	export TRY_PATH="${TRY_PATH:-$HOME/src/tries}"
+8	export TRY_PATH="${TRY_PATH:A}"
+9	export TRY_PROJECTS="${TRY_PROJECTS:-${TRY_PATH:h}}"
+10	
+11	# Find try.rb from the gem - the gem wrapper is broken due to __FILE__ == $0 guard
+12	_try_script=$(ruby -e "require 'rubygems'; puts File.join(Gem::Specification.find_by_name('try-cli').gem_dir, 'try.rb')" 2>/dev/null)
+13	[[ -f "$_try_script" ]] || return 0
+14	
+15	eval "$(ruby "$_try_script" init)"
+16	unset _try_script
+17	
+18	# ── try + sesh integration ───────────────────────────────────────────────────
+19	# Open a try project and immediately start a sesh coding session.
+20	# Usage:
+21	#   try-sesh some-project       # fuzzy-match or create, then sesh connect
+22	#   try-sesh https://github.com/user/repo  # clone, then sesh connect
+23	#
+24	# The session name follows sesh's dir_length=2 convention:
+25	#   e.g. "tries/2026-04-14-some-project"
+26	function try-sesh() {
+27	    if ! command -v sesh &>/dev/null; then
+28	        echo "try-sesh: sesh not found" >&2
+29	        return 1
+30	    fi
+31	    # Run try, which cd's into the project directory
+32	    try "$@" || return $?
+33	    # Now connect sesh to the directory try landed in
+34	    sesh connect "$PWD"
+35	}
+36	
+37	alias tsesh='try-sesh'
+38
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:41Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/96_ssh_setup.zsh`
+
+```text
+1	# 96_ssh_setup.zsh - Interactive SSH key setup for remote machines
+2	#
+3	# Usage: ssh-setup-remote [user@]host
+4	#
+5	# Walks through: create key → ssh-copy-id → copy key to remote → add SSH config entries.
+6	# See docs/tutorials/setup_ssh_key_on_remote.md for the full tutorial.
+7	
+8	ssh-setup-remote() {
+9	  emulate -L zsh
+10	  setopt localoptions pipefail
+11	
+12	  local usage="Usage: ssh-setup-remote [user@]host"
+13	  if (( $# != 1 )); then
+14	    print -u2 -- "$usage"
+15	    return 1
+16	  fi
+17	
+18	  local target="$1"
+19	  local remote_user remote_host
+20	  if [[ "$target" == *@* ]]; then
+21	    remote_user="${target%%@*}"
+22	    remote_host="${target#*@}"
+23	  else
+24	    remote_host="$target"
+25	    remote_user=""
+26	  fi
+27	
+28	  # ── Step 0: Key selection ──────────────────────────────────────────────
+29	  print "\n=== SSH Key Setup for $target ==="
+30	
+31	  local key_path=""
+32	  local create_new=""
+33	
+34	  print "\nExisting keys in ~/.ssh/:"
+35	  local -a existing_keys=()
+36	  for f in ~/.ssh/*.pub(N); do
+37	    existing_keys+=("${f%.pub}")
+38	    print "  ${f%.pub}"
+39	  done
+40	
+41	  if (( ${#existing_keys} > 0 )); then
+42	    print -n "\nUse an existing key? [Y/n] "
+43	    read -r create_new
+44	    if [[ "$create_new" =~ ^[Nn] ]]; then
+45	      create_new="yes"
+46	    else
+47	      print -n "Enter key path (without .pub): "
+48	      read -r key_path
+49	      # Expand ~ manually
+50	      key_path="${key_path/#\~/$HOME}"
+51	      if [[ ! -f "$key_path" && ! -f "${key_path}.pub" ]]; then
+52	        print -u2 "Key not found: $key_path"
+53	        return 1
+54	      fi
+55	    fi
+56	  else
+57	    print "  (none found)"
+58	    create_new="yes"
+59	  fi
+60	
+61	  # ── Step 0b: Create new key ────────────────────────────────────────────
+62	  if [[ "$create_new" == "yes" ]]; then
+63	    print "\n--- Create new SSH key ---"
+64	
+65	    # Algorithm
+66	    local algo="ed25519"
+67	    print -n "Algorithm [ed25519] (ed25519/ed25519-sk/rsa): "
+68	    read -r algo_input
+69	    [[ -n "$algo_input" ]] && algo="$algo_input"
+70	
+71	    # Key name
+72	    local key_name="id_${algo}_${remote_host}"
+73	    print -n "Key name [$key_name]: "
+74	    read -r name_input
+75	    [[ -n "$name_input" ]] && key_name="$name_input"
+76	    key_path="$HOME/.ssh/$key_name"
+77	
+78	    if [[ -f "$key_path" ]]; then
+79	      print -u2 "Key already exists: $key_path"
+80	      return 1
+81	    fi
+82	
+83	    # Comment
+84	    local comment="${USER}@$(hostname -s) -> ${remote_host}"
+85	    print -n "Comment [$comment]: "
+86	    read -r comment_input
+87	    [[ -n "$comment_input" ]] && comment="$comment_input"
+88	
+89	    # Passphrase
+90	    local passphrase_flag=()
+91	    print -n "Set a passphrase? [y/N] "
+92	    read -r use_pass
+93	    if [[ "$use_pass" =~ ^[Yy] ]]; then
+94	      # Let ssh-keygen prompt for it
+95	      passphrase_flag=()
+96	    else
+97	      passphrase_flag=(-N "")
+98	    fi
+99	
+100	    # Generate
+101	    local keygen_args=(-t "$algo" -f "$key_path" -C "$comment" "${passphrase_flag[@]}")
+102	    [[ "$algo" == "rsa" ]] && keygen_args+=(-b 4096)
+103	
+104	    print "\n> ssh-keygen ${keygen_args[*]}"
+105	    ssh-keygen "${keygen_args[@]}" || return 1
+106	    print "\nKey created: $key_path"
+107	  fi
+108	
+109	  # ── Step 1: ssh-copy-id ────────────────────────────────────────────────
+110	  print "\n--- Copy public key to $target ---"
+111	  print -n "Run ssh-copy-id to enable passwordless login? [Y/n] "
+112	  read -r do_copy
+113	  if [[ ! "$do_copy" =~ ^[Nn] ]]; then
+114	    print "\n> ssh-copy-id -i ${key_path}.pub $target"
+115	    ssh-copy-id -i "${key_path}.pub" "$target" || {
+116	      print -u2 "ssh-copy-id failed. You may need to enter the remote password."
+117	      return 1
+118	    }
+119	  fi
+120	
+121	  # ── Step 2: Copy key pair to remote ────────────────────────────────────
+122	  print "\n--- Copy key pair to remote ---"
+123	  print "This lets the remote machine use the same key (e.g. for GitHub)."
+124	  print -n "Copy private+public key to $target:~/.ssh/? [y/N] "
+125	  read -r do_scp
+126	  if [[ "$do_scp" =~ ^[Yy] ]]; then
+127	    local key_basename="${key_path:t}"
+128	    print "\n> scp $key_path ${key_path}.pub $target:~/.ssh/"
+129	    scp "$key_path" "${key_path}.pub" "$target:~/.ssh/" || return 1
+130	    ssh "$target" "chmod 600 ~/.ssh/$key_basename && chmod 644 ~/.ssh/${key_basename}.pub"
+131	    print "Key copied and permissions set."
+132	
+133	    # Configure GitHub on remote
+134	    print -n "\nAdd GitHub SSH config on remote? [y/N] "
+135	    read -r do_github
+136	    if [[ "$do_github" =~ ^[Yy] ]]; then
+137	      ssh "$target" "mkdir -p ~/.ssh && cat >> ~/.ssh/config" <<EOF
+138	
+139	Host github.com
+140	    IdentityFile ~/.ssh/$key_basename
+141	EOF
+142	      ssh "$target" "chmod 600 ~/.ssh/config"
+143	      print "GitHub SSH config added on remote."
+144	    fi
+145	  fi
+146	
+147	  # ── Step 3: Local SSH config ───────────────────────────────────────────
+148	  print "\n--- Local SSH config ---"
+149	  print -n "Add host alias to local ~/.ssh/config? [Y/n] "
+150	  read -r do_config
+151	  if [[ ! "$do_config" =~ ^[Nn] ]]; then
+152	    local host_alias="$remote_host"
+153	    print -n "Host alias [$host_alias]: "
+154	    read -r alias_input
+155	    [[ -n "$alias_input" ]] && host_alias="$alias_input"
+156	
+157	    local hostname="$remote_host"
+158	    print -n "HostName (IP or FQDN) [$hostname]: "
+159	    read -r hostname_input
+160	    [[ -n "$hostname_input" ]] && hostname="$hostname_input"
+161	
+162	    local config_user="${remote_user:-$USER}"
+163	    print -n "User [$config_user]: "
+164	    read -r user_input
+165	    [[ -n "$user_input" ]] && config_user="$user_input"
+166	
+167	    print -n "Add IdentitiesOnly yes? [y/N] "
+168	    read -r do_identonly
+169	    local identonly_line=""
+170	    [[ "$do_identonly" =~ ^[Yy] ]] && identonly_line=$'\n    IdentitiesOnly yes'
+171	
+172	    # Determine config file (support config.d/ if Include exists)
+173	    local config_file="$HOME/.ssh/config"
+174	    if [[ -d "$HOME/.ssh/config.d" ]]; then
+175	      print -n "Write to ~/.ssh/config.d/ instead of ~/.ssh/config? [Y/n] "
+176	      read -r use_configd
+177	      if [[ ! "$use_configd" =~ ^[Nn] ]]; then
+178	        config_file="$HOME/.ssh/config.d/host_${host_alias}"
+179	        print -n "Config file [$config_file]: "
+180	        read -r cf_input
+181	        [[ -n "$cf_input" ]] && config_file="$cf_input"
+182	      fi
+183	    fi
+184	
+185	    local config_block="
+186	Host $host_alias
+187	    HostName $hostname
+188	    User $config_user
+189	    IdentityFile $key_path${identonly_line}"
+190	
+191	    print "\nWill append to $config_file:"
+192	    print "$config_block"
+193	    print -n "\nConfirm? [Y/n] "
+194	    read -r confirm
+195	    if [[ ! "$confirm" =~ ^[Nn] ]]; then
+196	      print "$config_block" >> "$config_file"
+197	      chmod 600 "$config_file"
+198	      print "Config written."
+199	    fi
+200	  fi
+201	
+202	  # ── Done ───────────────────────────────────────────────────────────────
+203	  print "\n=== Done! ==="
+204	  print "Test with: ssh ${host_alias:-$target}"
+205	  if [[ "$do_scp" =~ ^[Yy] ]]; then
+206	    print "Test GitHub: ssh ${host_alias:-$target} 'ssh -T git@github.com'"
+207	  fi
+208	}
+209
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:41Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/04_ai_capture.zsh`
+
+```text
+1	# AI-powered review of past commands — pipes the Nth block to a coding-agent
+2	# CLI in one-shot / advisory mode (agent prints its reply; no file edits).
+3	# Depends on 03_tmux_capture.zsh for `cpblock`.
+4	#
+5	#   aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+6	#   aiexplain [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+7	#   aiblock                                                    # Python TUI
+8	#
+9	# Agent auto-detection order and per-vendor lightweight model pins live in
+10	# dot_config/shell/04_ai_agents.sh (the SSOT, sourced at shell init). This
+11	# file READS the resulting AICAP_* env vars; it does NOT define defaults.
+12	# To change the autodetect order globally, edit AICAP_AGENT_PRIORITY in the
+13	# SSOT. To pin a different model for one tool, `export AICAP_<AGENT>_MODEL=…`
+14	# before invoking it.
+15	# Override via -a AGENT (per-call) or AICAP_AGENT env var (per-shell).
+16	# Advisory-only by design; there is no --execute flag.
+17	# For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+18	#
+19	# A fifth agent type `http` talks an OpenAI-compatible chat-completions endpoint
+20	# directly via curl + jq. Use it for OpenRouter free models or local Ollama
+21	# without depending on any agent CLI being installed:
+22	#
+23	#   AICAP_AGENT=http aifix              # OpenRouter (free Gemini Flash by default)
+24	#   AICAP_AGENT=http \
+25	#     AICAP_HTTP_URL=http://localhost:11434/v1/chat/completions \
+26	#     AICAP_HTTP_MODEL=qwen2.5-coder:7b aifix
+27	#
+28	# `http` is opt-in: it is never auto-detected (nothing on PATH to probe).
+29	#
+30	# Env vars (set in ~/.shellrc.adhoc or ~/.config/zsh/secrets.zsh to override
+31	# — that file always wins against the SSOT's `: "${VAR:=…}"` defaults):
+32	#
+33	#   AICAP_AGENT            default: (unset — auto-detect via AICAP_AGENT_PRIORITY)
+34	#                                        force a specific agent: opencode | claude |
+35	#                                        codex | cursor-agent | http
+36	#   AICAP_AGENT_PRIORITY   default: opencode claude codex cursor-agent     (SSOT)
+37	#   AICAP_CLAUDE_MODEL     default: haiku                                  (SSOT)
+38	#   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5        (SSOT)
+39	#   AICAP_CODEX_MODEL      default: (unset — gpt-5-mini errors on ChatGPT auth) (SSOT)
+40	#   AICAP_CURSOR_MODEL     default: (unset — let cursor-agent pick)        (SSOT)
+41	#   AICAP_HTTP_URL         default: https://openrouter.ai/api/v1/chat/completions (SSOT)
+42	#   AICAP_HTTP_MODEL       default: google/gemini-2.0-flash-exp:free        (SSOT)
+43	#   AICAP_HTTP_API_KEY     default: $OPENROUTER_API_KEY (empty = no auth header)
+44	#   AICAP_SHOW_METADATA    default: 1  (tokens / cost / model on stderr; this file only)
+45	#   AICAP_PRETTIFY         default: 1  (auto: glow → bat → raw; non-tty = raw)
+46	#   AICAP_SPINNER          default: 1  (braille on stderr while agent thinks)
+47	#
+48	# Vars marked (SSOT) live in dot_config/shell/04_ai_agents.sh — change them
+49	# there once, all four consumers (aifix, aiblock, aisuggest, tsum) see it.
+50	
+51	# Defensive load: if 04_ai_agents.sh wasn't sourced first (e.g. someone
+52	# dot-sourced this file directly without running rc), pull it in now.
+53	if [[ -z "${_AICAP_AGENT_CONFIG_SOURCED:-}" && -r "$HOME/.config/shell/04_ai_agents.sh" ]]; then
+54	  source "$HOME/.config/shell/04_ai_agents.sh"
+55	fi
+56	
+57	# UX-only flags that don't apply to the Python consumers — these stay here.
+58	: "${AICAP_SHOW_METADATA:=1}"
+59	: "${AICAP_PRETTIFY:=1}"
+60	: "${AICAP_SPINNER:=1}"
+61	
+62	_aiagent_autodetect() {
+63	  local cand
+64	  # Word-split $AICAP_AGENT_PRIORITY (the `${=…}` is zsh-specific; with
+65	  # bash the var is naturally word-split by `for ... in $var`).
+66	  for cand in ${=AICAP_AGENT_PRIORITY:-opencode claude codex cursor-agent}; do
+67	    if command -v "$cand" &>/dev/null; then
+68	      print -r -- "$cand"
+69	      return 0
+70	    fi
+71	  done
+72	  return 1
+73	}
+74	
+75	# Background spinner on stderr while the agent is thinking. Skipped when
+76	# AICAP_SPINNER=0 or stderr isn't a tty (so pipes / file redirects stay
+77	# clean). The spinner subprocess is disowned via `&!` so it survives the
+78	# command substitution that invokes the agent.
+79	_AICAP_SPIN_PID=
+80	_aicap_spinner_start() {
+81	  [[ "$AICAP_SPINNER" != "1" ]] && return 0
+82	  [[ ! -t 2 ]] && return 0
+83	  local label=${1:-thinking}
+84	  (
+85	    trap 'exit 0' TERM INT HUP
+86	    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+87	    local i=0
+88	    while true; do
+89	      printf '\r\e[K%s %s' "${frames[$(( (i % 10) + 1 ))]}" "$label" >&2
+90	      (( i++ ))
+91	      sleep 0.1
+92	    done
+93	  ) &!
+94	  _AICAP_SPIN_PID=$!
+95	}
+96	
+97	_aicap_spinner_stop() {
+98	  [[ -z "$_AICAP_SPIN_PID" ]] && return 0
+99	  kill "$_AICAP_SPIN_PID" 2>/dev/null
+100	  # Drain; zsh waits on PIDs even if disowned as long as we know the PID.
+101	  wait "$_AICAP_SPIN_PID" 2>/dev/null
+102	  _AICAP_SPIN_PID=
+103	  [[ -t 2 ]] && printf '\r\e[K' >&2
+104	}
+105	
+106	# Pretty-print stdin as Markdown: glow > bat > raw. Skips prettify if stdout
+107	# is NOT a tty (so pipes stay clean) or AICAP_PRETTIFY=0.
+108	_aicap_prettify() {
+109	  if [[ "$AICAP_PRETTIFY" != "1" ]] || [[ ! -t 1 ]]; then
+110	    cat
+111	  elif command -v glow &>/dev/null; then
+112	    glow -
+113	  elif command -v bat &>/dev/null; then
+114	    bat --language=md --style=plain --paging=never --color=always
+115	  else
+116	    cat
+117	  fi
+118	}
+119	
+120	# Invoke a coding-agent in one-shot mode.
+121	#
+122	# Writes reply (text) to stdout. Writes metadata line to stderr when
+123	# AICAP_SHOW_METADATA=1 and the agent supports structured JSON output.
+124	# Currently only Claude's JSON includes usage/cost — other agents just get a
+125	# "<agent> (<model>)" line on stderr.
+126	_aiagent_invoke() {
+127	  local agent=$1 prompt=$2
+128	  local json reply model_used tokens_in tokens_out cache_read cache_create cost duration rc
+129	
+130	  # Ensure spinner cleans up if the caller returns or we hit a trap.
+131	  trap '_aicap_spinner_stop' EXIT INT TERM
+132	
+133	  case "$agent" in
+134	    claude)
+135	      # Conditional --model: empty AICAP_CLAUDE_MODEL → claude picks its
+136	      # own default (robust if the pinned alias is ever retired).
+137	      local -a claude_model_args=()
+138	      [[ -n "$AICAP_CLAUDE_MODEL" ]] && claude_model_args=(--model "$AICAP_CLAUDE_MODEL")
+139	      local claude_model_label="${AICAP_CLAUDE_MODEL:-(default)}"
+140	      if [[ "$AICAP_SHOW_METADATA" == "1" ]] && command -v jq &>/dev/null; then
+141	        _aicap_spinner_start "claude $claude_model_label (json)…"
+142	        json=$(claude -p "${claude_model_args[@]}" --output-format json "$prompt")
+143	        rc=$?
+144	        _aicap_spinner_stop
+145	        (( rc != 0 )) && return $rc
+146	        reply=$(print -r -- "$json" | jq -r '.result // empty')
+147	        model_used=$(print -r -- "$json" | jq -r '.modelUsage | keys | first // "?"')
+148	        tokens_in=$(print -r -- "$json" | jq -r '.usage.input_tokens // "?"')
+149	        tokens_out=$(print -r -- "$json" | jq -r '.usage.output_tokens // "?"')
+150	        cache_read=$(print -r -- "$json" | jq -r '.usage.cache_read_input_tokens // 0')
+151	        cache_create=$(print -r -- "$json" | jq -r '.usage.cache_creation_input_tokens // 0')
+152	        cost=$(print -r -- "$json" | jq -r '.total_cost_usd // "?"')
+153	        duration=$(print -r -- "$json" | jq -r '.duration_ms // "?"')
+154	        print -u2 "claude ($model_used) | in=$tokens_in out=$tokens_out cache=(r:$cache_read,w:$cache_create) | cost=\$$cost ${duration}ms"
+155	        print -r -- "$reply"
+156	      else
+157	        print -u2 "claude ($claude_model_label)"
+158	        _aicap_spinner_start "claude $claude_model_label…"
+159	        claude -p "${claude_model_args[@]}" "$prompt"
+160	        rc=$?
+161	        _aicap_spinner_stop
+162	        return $rc
+163	      fi
+164	      ;;
+165	    opencode)
+166	      local -a opencode_model_args=()
+167	      [[ -n "$AICAP_OPENCODE_MODEL" ]] && opencode_model_args=(-m "$AICAP_OPENCODE_MODEL")
+168	      local opencode_model_label="${AICAP_OPENCODE_MODEL:-(default)}"
+169	      print -u2 "opencode ($opencode_model_label)"
+170	      _aicap_spinner_start "opencode $opencode_model_label…"
+171	      opencode run "${opencode_model_args[@]}" "$prompt"
+172	      rc=$?
+173	      _aicap_spinner_stop
+174	      return $rc
+175	      ;;
+176	    codex)
+177	      # AICAP_CODEX_MODEL defaults to empty since gpt-5-mini is rejected on
+178	      # ChatGPT-account auth. Users on API-key auth can re-pin via the env.
+179	      local -a codex_model_args=()
+180	      [[ -n "$AICAP_CODEX_MODEL" ]] && codex_model_args=(-m "$AICAP_CODEX_MODEL")
+181	      local codex_model_label="${AICAP_CODEX_MODEL:-(default)}"
+182	      print -u2 "codex ($codex_model_label)"
+183	      _aicap_spinner_start "codex $codex_model_label…"
+184	      codex exec "${codex_model_args[@]}" "$prompt"
+185	      rc=$?
+186	      _aicap_spinner_stop
+187	      return $rc
+188	      ;;
+189	    cursor-agent)
+190	      if [[ -n "$AICAP_CURSOR_MODEL" ]]; then
+191	        print -u2 "cursor-agent ($AICAP_CURSOR_MODEL)"
+192	        _aicap_spinner_start "cursor-agent $AICAP_CURSOR_MODEL…"
+193	        cursor-agent -p --model "$AICAP_CURSOR_MODEL" "$prompt"
+194	      else
+195	        print -u2 "cursor-agent"
+196	        _aicap_spinner_start "cursor-agent…"
+197	        cursor-agent -p "$prompt"
+198	      fi
+199	      rc=$?
+200	      _aicap_spinner_stop
+201	      return $rc
+202	      ;;
+203	    http)
+204	      # OpenAI-compatible chat-completions over curl. Covers OpenRouter (with
+205	      # API key) and local Ollama (no auth) with the same code path. Never
+206	      # auto-detected — opt in via AICAP_AGENT=http or `-a http`.
+207	      local url="$AICAP_HTTP_URL" model="$AICAP_HTTP_MODEL"
+208	      local key="${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}"
+209	      if ! command -v jq &>/dev/null; then
+210	        print -u2 "aifix: jq is required for the http agent"
+211	        return 1
+212	      fi
+213	      if ! command -v curl &>/dev/null; then
+214	        print -u2 "aifix: curl is required for the http agent"
+215	        return 1
+216	      fi
+217	      local host="${${url#*://}%%/*}"
+218	      [[ "$AICAP_SHOW_METADATA" != "1" ]] && print -u2 "http ($model @ $host)"
+219	      _aicap_spinner_start "http $model…"
+220	      local payload response
+221	      payload=$(jq -n --arg m "$model" --arg p "$prompt" \
+222	        '{model: $m, messages: [{role: "user", content: $p}], stream: false}')
+223	      local -a curl_args=(-sS -X POST "$url" -H 'Content-Type: application/json' -d "$payload")
+224	      [[ -n "$key" ]] && curl_args+=(-H "Authorization: Bearer $key")
+225	      response=$(curl "${curl_args[@]}")
+226	      rc=$?
+227	      _aicap_spinner_stop
+228	      if (( rc != 0 )); then
+229	        print -u2 "http: curl failed (rc=$rc) — check AICAP_HTTP_URL ($url)"
+230	        return $rc
+231	      fi
+232	      local err
+233	      err=$(print -r -- "$response" | jq -r '.error.message // (.error | strings) // empty' 2>/dev/null)
+234	      if [[ -n "$err" ]]; then
+235	        print -u2 "http: API error: $err"
+236	        return 1
+237	      fi
+238	      reply=$(print -r -- "$response" | jq -r '.choices[0].message.content // empty')
+239	      if [[ -z "$reply" ]]; then
+240	        print -u2 "http: empty reply (raw response: $response)"
+241	        return 1
+242	      fi
+243	      if [[ "$AICAP_SHOW_METADATA" == "1" ]]; then
+244	        tokens_in=$(print -r -- "$response" | jq -r '.usage.prompt_tokens // "?"')
+245	        tokens_out=$(print -r -- "$response" | jq -r '.usage.completion_tokens // "?"')
+246	        print -u2 "http ($model @ $host) | in=$tokens_in out=$tokens_out"
+247	      fi
+248	      print -r -- "$reply"
+249	      ;;
+250	    *) print -u2 "aifix: unknown agent '$agent' (supported: opencode, claude, codex, cursor-agent, http)"; return 1 ;;
+251	  esac
+252	}
+253	
+254	# Core dispatcher: given an already-captured block, build the prompt, invoke
+255	# the agent, pipe reply through the prettifier. Shared by the four sources:
+256	# cpblock (aifix/aiexplain), stdin (aifix-stdin), tee'd CMD run (aifix-run),
+257	# and thefuck-style rerun (aifix-rerun).
+258	#
+259	#   _ai_dispatch_core <name> <source-label> <default-prompt>
+260	#                     <agent> <raw> <no-meta> <prompt-override> <block>
+261	_ai_dispatch_core() {
+262	  local name=$1 source_label=$2 default_prompt=$3
+263	  local agent=$4 raw=$5 no_meta=$6 prompt_override=$7 block=$8
+264	  if [[ -z "$block" ]]; then
+265	    print -u2 "$name: empty block"
+266	    return 1
+267	  fi
+268	  local prompt="${prompt_override:-$default_prompt}
+269	
+270	$block"
+271	  print -u2 "$name ← $source_label"
+272	
+273	  # Per-call env overrides: --no-meta / --raw flip env-var behaviour locally
+274	  # so _aiagent_invoke + _aicap_prettify see the intended values.
+275	  local saved_show=$AICAP_SHOW_METADATA saved_pretty=$AICAP_PRETTIFY
+276	  (( no_meta )) && AICAP_SHOW_METADATA=0
+277	  (( raw ))    && AICAP_PRETTIFY=0
+278	
+279	  if (( raw )); then
+280	    _aiagent_invoke "$agent" "$prompt"
+281	  else
+282	    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
+283	  fi
+284	  local rc=$?
+285	
+286	  AICAP_SHOW_METADATA=$saved_show
+287	  AICAP_PRETTIFY=$saved_pretty
+288	  return $rc
+289	}
+290	
+291	# Print the shared flag-help + env-var snapshot. Used by -h on each wrapper.
+292	_ai_print_help() {
+293	  local name=$1 usage=$2
+294	  print -r -- "usage: $name $usage"
+295	  print -r -- "  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)"
+296	  print -r -- "  -p PROMPT  override default prompt"
+297	  print -r -- "  --raw      disable prettify (glow/bat), print raw agent reply"
+298	  print -r -- "  --no-meta  suppress the stderr metadata line"
+299	  print -r -- ""
+300	  print -r -- "env vars:"
+301	  print -r -- "  AICAP_AGENT          = ${AICAP_AGENT:-<unset = auto-detect>}"
+302	  print -r -- "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
+303	  print -r -- "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
+304	  print -r -- "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
+305	  print -r -- "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+306	  print -r -- "  AICAP_HTTP_URL       = ${AICAP_HTTP_URL}"
+307	  print -r -- "  AICAP_HTTP_MODEL     = ${AICAP_HTTP_MODEL}"
+308	  if [[ -n "${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}" ]]; then
+309	    print -r -- "  AICAP_HTTP_API_KEY   = <set>"
+310	  else
+311	    print -r -- "  AICAP_HTTP_API_KEY   = <unset>"
+312	  fi
+313	  print -r -- "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
+314	  print -r -- "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+315	  print -r -- "  AICAP_SPINNER        = ${AICAP_SPINNER}"
+316	}
+317	
+318	# Shared dispatcher for aifix / aiexplain. Captures via cpblock.
+319	_ai_capture_dispatch() {
+320	  emulate -L zsh
+321	  local name=$1; shift
+322	  local default_prompt=$1; shift
+323	  local n=1 agent="" prompt_override="" raw=0 no_meta=0
+324	  while (( $# )); do
+325	    case "$1" in
+326	      -a|--agent)   agent=$2; shift 2 ;;
+327	      -p|--prompt)  prompt_override=$2; shift 2 ;;
+328	      --raw)        raw=1; shift ;;
+329	      --no-meta)    no_meta=1; shift ;;
+330	      -h|--help)    _ai_print_help "$name" "[N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+331	                    print -r -- "  N          block index back (default 1 = last)"
+332	                    return 0 ;;
+333	      --) shift; break ;;
+334	      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+335	      *)  n=$1; shift ;;
+336	    esac
+337	  done
+338	  if [[ ! "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+339	    print -u2 "$name: N must be a positive integer (got: $n)"
+340	    return 1
+341	  fi
+342	  if [[ -z "$agent" ]]; then
+343	    if [[ -n "$AICAP_AGENT" ]]; then
+344	      agent=$AICAP_AGENT
+345	    else
+346	      agent=$(_aiagent_autodetect) || {
+347	        print -u2 "$name: no coding-agent CLI found on PATH (tried: opencode, claude, codex, cursor-agent)"
+348	        print -u2 "$name: hint — set AICAP_AGENT=http to use OpenRouter / Ollama directly"
+349	        return 1
+350	      }
+351	    fi
+352	  fi
+353	  local block
+354	  block=$(cpblock "$n" 2>/dev/null) || {
+355	    print -u2 "$name: cpblock $n failed (run 'exec zsh' if the shell pre-dates chezmoi apply)"
+356	    return 1
+357	  }
+358	  _ai_dispatch_core "$name" "block -$n" "$default_prompt" \
+359	    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+360	}
+361	
+362	aifix() {
+363	  _ai_capture_dispatch aifix \
+364	    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+365	    "$@"
+366	}
+367	
+368	aiexplain() {
+369	  _ai_capture_dispatch aiexplain \
+370	    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+371	    "$@"
+372	}
+373	
+374	# -----------------------------------------------------------------------------
+375	# Non-tmux Tier 1: stdin / run / rerun sources
+376	# -----------------------------------------------------------------------------
+377	# These three cover the "no tmux available" case (VSCode integrated terminal,
+378	# bare Ghostty without tmux, quick SSH) by NOT relying on cpblock / OSC 133.
+379	# Each composes zero magic — user explicitly picks the source.
+380	#
+381	# See backlog/ai-capture-non-tmux-output.md for why we don't do automatic
+382	# tee redirection (Tier 2) or PTY proxy wrapping (Tier 3).
+383	
+384	# aifix-stdin: read whatever the caller piped in. Universal.
+385	#   tail -200 /var/log/nginx/error.log | aifix-stdin
+386	#   curl -sS https://weird.api/thing | aifix-stdin -p "explain this JSON"
+387	#   aifix-stdin < build.log
+388	aifix-stdin() {
+389	  emulate -L zsh
+390	  local name=aifix-stdin agent="" prompt_override="" raw=0 no_meta=0
+391	  local default_prompt="Here is output captured from my terminal. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+392	  while (( $# )); do
+393	    case "$1" in
+394	      -a|--agent)   agent=$2; shift 2 ;;
+395	      -p|--prompt)  prompt_override=$2; shift 2 ;;
+396	      --raw)        raw=1; shift ;;
+397	      --no-meta)    no_meta=1; shift ;;
+398	      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+399	                    print -r -- "  Reads block from stdin. No tmux / cpblock dependency."
+400	                    return 0 ;;
+401	      *) print -u2 "$name: unexpected arg: $1 (did you mean -p?)"; return 1 ;;
+402	    esac
+403	  done
+404	  if [[ -z "$agent" ]]; then
+405	    if [[ -n "$AICAP_AGENT" ]]; then
+406	      agent=$AICAP_AGENT
+407	    else
+408	      agent=$(_aiagent_autodetect) || {
+409	        print -u2 "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)"
+410	        return 1
+411	      }
+412	    fi
+413	  fi
+414	  # -t 0 checks if stdin is a terminal. If it is, user likely forgot to pipe.
+415	  if [[ -t 0 ]]; then
+416	    print -u2 "$name: stdin is a tty — did you forget to pipe? Example:"
+417	    print -u2 "  some-command 2>&1 | $name"
+418	    return 1
+419	  fi
+420	  local block
+421	  block=$(cat)
+422	  _ai_dispatch_core "$name" "stdin" "$default_prompt" \
+423	    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+424	}
+425	
+426	# aifix-run: run CMD, tee stdout+stderr to a log, feed "$ CMD\n<output>\n(exit code: N)"
+427	# to the agent. Use `--` to separate flags from the command.
+428	#   aifix-run -- cargo build --release
+429	#   aifix-run -p "is this safe?" -- ansible-playbook deploy.yml
+430	#
+431	# isatty caveat: teeing makes CMD's stdout a pipe, so TUI apps (vim, less)
+432	# render in degraded mode. Don't use this for interactive tools.
+433	aifix-run() {
+434	  emulate -L zsh
+435	  local name=aifix-run agent="" prompt_override="" raw=0 no_meta=0
+436	  local default_prompt="Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+437	  while (( $# )); do
+438	    case "$1" in
+439	      -a|--agent)   agent=$2; shift 2 ;;
+440	      -p|--prompt)  prompt_override=$2; shift 2 ;;
+441	      --raw)        raw=1; shift ;;
+442	      --no-meta)    no_meta=1; shift ;;
+443	      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta] -- CMD [ARG...]"
+444	                    print -r -- "  Runs CMD with stdout+stderr teed to a log, feeds to agent."
+445	                    print -r -- "  Use \`--\` to separate flags from the command."
+446	                    return 0 ;;
+447	      --) shift; break ;;
+448	      -*) print -u2 "$name: unknown flag: $1"; return 1 ;;
+449	      *) break ;;
+450	    esac
+451	  done
+452	  if (( $# == 0 )); then
+453	    print -u2 "$name: missing command. Usage: $name [flags] -- CMD [ARG...]"
+454	    return 1
+455	  fi
+456	  if [[ -z "$agent" ]]; then
+457	    if [[ -n "$AICAP_AGENT" ]]; then
+458	      agent=$AICAP_AGENT
+459	    else
+460	      agent=$(_aiagent_autodetect) || {
+461	        print -u2 "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)"
+462	        return 1
+463	      }
+464	    fi
+465	  fi
+466	  local log
+467	  log=$(mktemp -t aifix-run.XXXXXX) || { print -u2 "$name: mktemp failed"; return 1; }
+468	  # Record the command line as the block's first line so the agent knows
+469	  # what was run. Use $(print -r -- "$*") to preserve args verbatim.
+470	  print -r -- "\$ $*" > "$log"
+471	  "$@" 2>&1 | tee -a "$log"
+472	  local rc=${pipestatus[1]}
+473	  print -r -- "" >> "$log"
+474	  print -r -- "(exit code: $rc)" >> "$log"
+475	  local block
+476	  block=$(<"$log")
+477	  rm -f "$log"
+478	  _ai_dispatch_core "$name" "run \`${1}…\` (exit $rc)" "$default_prompt" \
+479	    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+480	}
+481	
+482	# aifix-rerun: thefuck-style. Re-executes the last command from shell history
+483	# via aifix-run. Prompts for confirmation unless -y, because re-running has
+484	# side effects if the command isn't idempotent.
+485	aifix-rerun() {
+486	  emulate -L zsh
+487	  local name=aifix-rerun yes=0 forward=()
+488	  while (( $# )); do
+489	    case "$1" in
+490	      -y|--yes) yes=1; shift ;;
+491	      -h|--help) _ai_print_help "$name" "[-y] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+492	                 print -r -- "  Re-executes the last command from zsh history via aifix-run."
+493	                 print -r -- "  Prompts for confirmation unless -y (side effects beware)."
+494	                 return 0 ;;
+495	      *) forward+=("$1"); shift ;;
+496	    esac
+497	  done
+498	  # fc -ln -2 -2: skip aifix-rerun itself (which is -1), grab the one before.
+499	  local cmd
+500	  cmd=$(fc -ln -2 -2 2>/dev/null)
+501	  cmd="${cmd#	}"; cmd="${cmd# }"
+502	  if [[ -z "$cmd" ]]; then
+503	    print -u2 "$name: no prior command in shell history"
+504	    return 1
+505	  fi
+506	  print -u2 "$name: will re-execute:"
+507	  print -u2 "  $cmd"
+508	  print -u2 "⚠ side effects if the command is not idempotent (network calls, file writes, etc.)"
+509	  if (( ! yes )); then
+510	    local reply
+511	    read -q "reply?Proceed? [y/N] "
+512	    print
+513	    [[ "$reply" != "y" ]] && { print -u2 "$name: aborted"; return 130; }
+514	  fi
+515	  # Delegate to aifix-run via eval (preserves quoting for $cmd's shell syntax).
+516	  eval "aifix-run ${forward[*]} -- $cmd"
+517	}
+518	
+519	# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+520	# chezmoi source-path, cached per-shell. The Python side reads the same
+521	# AICAP_* env vars so model defaults stay consistent.
+522	#
+523	# History passing: `fc -ln …` only works inside this interactive zsh —
+524	# a `zsh -ic` subshell doesn't inherit the in-memory history buffer and
+525	# `fc -R` only pulls whatever the HISTFILE has on disk (which misses
+526	# unflushed recent commands). Dump the current shell's history into a
+527	# temp file and hand the path to the TUI via $AIBLOCK_HIST_DUMP.
+528	_AIBLOCK_SCRIPT=""
+529	aiblock() {
+530	  emulate -L zsh
+531	  if [[ -z "$_AIBLOCK_SCRIPT" ]]; then
+532	    local base
+533	    base=$(chezmoi source-path 2>/dev/null) || {
+534	      print -u2 "aiblock: could not resolve chezmoi source-path"
+535	      return 1
+536	    }
+537	    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+538	  fi
+539	  if [[ ! -f "$_AIBLOCK_SCRIPT" ]]; then
+540	    print -u2 "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)"
+541	    return 1
+542	  fi
+543	  local histdump
+544	  histdump=$(mktemp -t aiblock-hist.XXXXXX) || {
+545	    print -u2 "aiblock: mktemp failed"
+546	    return 1
+547	  }
+548	  # fc -ln -30: last 30 entries, no numbering. Trailing newline per entry.
+549	  fc -ln -30 > "$histdump" 2>/dev/null
+550	  AIBLOCK_HIST_DUMP="$histdump" uv run --script "$_AIBLOCK_SCRIPT" "$@"
+551	  local rc=$?
+552	  rm -f "$histdump"
+553	  return $rc
+554	}
+555
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:43:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:43:05Z)**_
+
+OK Stage 4. Verdicts:
+- **29_media** — `emulate -L zsh` (gate) + `${var:r}`/`${var:e}` modifiers (easy POSIX replacements)
+- **96_ssh_setup** — `setopt` + `print` + `*(N)` glob qualifier + `${var:t}` (moderate)
+- **04_ai_capture** — `${=var}` + 30+ `print` + 1-indexed spinner + `pipestatus[1]` + `read -q` + `&!` + multiple `emulate` (big rewrite)
+- **32_try** — SKIP. `${TRY_PATH:A}` and `${TRY_PATH:h}` modifiers are top-level (would fail at source-time in bash), and `eval "$(ruby try.rb init)"` outputs zsh-specific shell syntax. Keep zsh-only.
+
+Start with `29_media`:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:43:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 29_media.sh - ffmpeg + ImageMagick helpers (shared bash + zsh).
+# Moved from dot_config/zsh/tools/29_media.zsh. Zsh-isms replaced:
+#   ${1:r}  (root, drop extension)  → ${1%.*}
+#   ${1:e}  (extension only)        → ${1##*.}
+#   emulate -L zsh                  → gated on $ZSH_VERSION
+
+# Load if any media tool is on PATH (installMediaTools=true, or hand-installed).
+# Each function self-checks for its specific dep so partial installs work.
+command -v ffmpeg &>/dev/null \
+    || command -v magick &>/dev/null \
+    || command -v convert &>/dev/null \
+    || return 0
+
+# === ffmpeg helpers (video / audio) =========================================
+
+# Compress an MP4 with x264 CRF 28 (smaller; tweak CRF inline for quality).
+# Output: <name>_compressed.mp4 next to the input.
+compress-video() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    [ -f "$1" ] || { echo "usage: compress-video <input>" >&2; return 2; }
+    ffmpeg -i "$1" -c:v libx264 -crf 28 -preset slow -c:a aac -b:a 128k "${1%.*}_compressed.mp4"
+}
+
+# Extract audio without re-encoding. Output is .m4a (AAC sources keep AAC).
+extract-audio() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    [ -f "$1" ] || { echo "usage: extract-audio <input>" >&2; return 2; }
+    ffmpeg -i "$1" -vn -c:a copy "${1%.*}.m4a"
+}
+
+# Re-encode to 16 kHz mono WAV — Whisper / faster-whisper / wav2vec input format.
+to-wav16k() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    [ -f "$1" ] || { echo "usage: to-wav16k <input>" >&2; return 2; }
+    ffmpeg -i "$1" -ar 16000 -ac 1 "${1%.*}_16k.wav"
+}
+
+# === ImageMagick helpers (image) ============================================
+
+# Resolve `magick` (v7) or `convert` (v6) into $REPLY. Returns 1 if neither.
+_29_media_im() {
+    REPLY=$(command -v magick) && return 0
+    REPLY=$(command -v convert) && return 0
+    echo "ImageMagick not found (install via installMediaTools=true)" >&2
+    return 1
+}
+
+# compress-image <input> [<target_mb=1>]
+# Re-encode to JPEG under <target_mb> MB. Uses ImageMagick's
+# `-define jpeg:extent=NMB`, which iterates quality internally — single shot,
+# no manual binary search. Alpha is flattened to white (PNG/WebP screenshots).
+# Output: <name>_<mb>mb.jpg
+compress-image() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    [ -f "$1" ] || { echo "usage: compress-image <input> [<target_mb=1>]" >&2; return 2; }
+    local IM
+    _29_media_im || return 1
+    IM=$REPLY
+    local mb="${2:-1}"
+    local out="${1%.*}_${mb}mb.jpg"
+    "$IM" "$1" -auto-orient -strip -background white -alpha remove -alpha off \
+        -define "jpeg:extent=${mb}MB" "$out"
+    [ -f "$out" ] && echo "→ $out ($(du -h "$out" | cut -f1))"
+}
+
+# resize-image <input> <width_px>
+# Resize so width = <width_px> (preserves aspect). Output keeps source format.
+# Output: <name>_<width>w.<ext>
+resize-image() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    [ -f "$1" ] && [ -n "$2" ] || { echo "usage: resize-image <input> <width_px>" >&2; return 2; }
+    local IM
+    _29_media_im || return 1
+    IM=$REPLY
+    local out="${1%.*}_${2}w.${1##*.}"
+    "$IM" "$1" -auto-orient -resize "${2}x" "$out"
+    [ -f "$out" ] && echo "→ $out ($(du -h "$out" | cut -f1))"
+}
+
+# === gum-driven interactive launcher ========================================
+
+if command -v gum &>/dev/null; then
+    # media-pick: gum file picker → action chooser → (optional) param input.
+    # No-args entrypoint that wires every helper above for non-CLI users.
+    media-pick() {
+        [ -n "$ZSH_VERSION" ] && emulate -L zsh
+        local file action
+        file=$(gum file --no-permissions) || return 0
+        [ -f "$file" ] || { echo "not a file: $file" >&2; return 2; }
+        action=$(gum choose \
+            "compress-video" \
+            "compress-image (1 MB)" \
+            "compress-image (custom MB)" \
+            "resize-image (custom width)" \
+            "extract-audio" \
+            "to-wav16k") || return 0
+        case "$action" in
+            "compress-video")            compress-video "$file" ;;
+            "compress-image (1 MB)")     compress-image "$file" 1 ;;
+            "compress-image (custom MB)")
+                local mb
+                mb=$(gum input --placeholder "target MB (e.g. 2)" --value 2) || return 0
+                compress-image "$file" "$mb"
+                ;;
+            "resize-image (custom width)")
+                local w
+                w=$(gum input --placeholder "max width px (e.g. 1280)" --value 1280) || return 0
+                resize-image "$file" "$w"
+                ;;
+            "extract-audio")             extract-audio "$file" ;;
+            "to-wav16k")                 to-wav16k "$file" ;;
+        esac
+    }
+fi
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/29_media.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:43:27Z)**_
+
+Now `96_ssh_setup` — the `*(N)` glob qualifier is the trickiest bit:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:43:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 96_ssh_setup.sh - Interactive SSH key setup for remote machines (shared).
+# Moved from dot_config/zsh/tools/96_ssh_setup.zsh. Zsh-isms replaced:
+#   emulate -L zsh                  → gated on $ZSH_VERSION
+#   setopt localoptions pipefail    → gated on $ZSH_VERSION (bash: set -o pipefail)
+#   ~/.ssh/*.pub(N)  (nullglob)     → shopt -s nullglob / setopt nullglob dispatch
+#   print -u2 --                    → printf >&2
+#   print "..."                     → printf
+#   print -n "..."                  → printf '%s' (no newline)
+#   ${key_path:t}    (basename)     → ${key_path##*/}
+#   ${#existing_keys}               → ${#existing_keys[@]}
+#
+# Usage: ssh-setup-remote [user@]host
+#
+# Walks through: create key → ssh-copy-id → copy key to remote → add SSH config entries.
+# See docs/tutorials/setup_ssh_key_on_remote.md for the full tutorial.
+
+ssh-setup-remote() {
+  if [ -n "$ZSH_VERSION" ]; then
+    emulate -L zsh
+    setopt localoptions pipefail
+  else
+    set -o pipefail
+  fi
+
+  local usage="Usage: ssh-setup-remote [user@]host"
+  if [ $# -ne 1 ]; then
+    printf '%s\n' "$usage" >&2
+    return 1
+  fi
+
+  local target="$1"
+  local remote_user remote_host
+  if [[ "$target" == *@* ]]; then
+    remote_user="${target%%@*}"
+    remote_host="${target#*@}"
+  else
+    remote_host="$target"
+    remote_user=""
+  fi
+
+  # ── Step 0: Key selection ──────────────────────────────────────────────
+  printf '\n%s\n' "=== SSH Key Setup for $target ==="
+
+  local key_path=""
+  local create_new=""
+
+  printf '\nExisting keys in ~/.ssh/:\n'
+
+  # Portable nullglob: in zsh, `*.pub(N)` made the glob expand to nothing
+  # when nothing matched. shopt -s nullglob (bash) / setopt nullglob (zsh)
+  # is the equivalent.
+  local -a existing_keys
+  existing_keys=()
+  if [ -n "$ZSH_VERSION" ]; then
+    setopt localoptions nullglob
+  else
+    local _had_nullglob; _had_nullglob=$(shopt -p nullglob 2>/dev/null || echo "shopt -u nullglob")
+    shopt -s nullglob
+  fi
+
+  local f
+  for f in ~/.ssh/*.pub; do
+    existing_keys+=("${f%.pub}")
+    printf '  %s\n' "${f%.pub}"
+  done
+
+  # Restore bash nullglob; zsh is already locally scoped via setopt localoptions.
+  if [ -n "$BASH_VERSION" ]; then
+    eval "$_had_nullglob"
+  fi
+
+  if (( ${#existing_keys[@]} > 0 )); then
+    printf '\nUse an existing key? [Y/n] '
+    read -r create_new
+    if [[ "$create_new" =~ ^[Nn] ]]; then
+      create_new="yes"
+    else
+      printf 'Enter key path (without .pub): '
+      read -r key_path
+      # Expand ~ manually
+      key_path="${key_path/#\~/$HOME}"
+      if [ ! -f "$key_path" ] && [ ! -f "${key_path}.pub" ]; then
+        printf '%s\n' "Key not found: $key_path" >&2
+        return 1
+      fi
+    fi
+  else
+    printf '  (none found)\n'
+    create_new="yes"
+  fi
+
+  # ── Step 0b: Create new key ────────────────────────────────────────────
+  if [ "$create_new" = "yes" ]; then
+    printf '\n--- Create new SSH key ---\n'
+
+    # Algorithm
+    local algo="ed25519"
+    printf 'Algorithm [ed25519] (ed25519/ed25519-sk/rsa): '
+    local algo_input
+    read -r algo_input
+    [ -n "$algo_input" ] && algo="$algo_input"
+
+    # Key name
+    local key_name="id_${algo}_${remote_host}"
+    printf 'Key name [%s]: ' "$key_name"
+    local name_input
+    read -r name_input
+    [ -n "$name_input" ] && key_name="$name_input"
+    key_path="$HOME/.ssh/$key_name"
+
+    if [ -f "$key_path" ]; then
+      printf '%s\n' "Key already exists: $key_path" >&2
+      return 1
+    fi
+
+    # Comment
+    local comment="${USER}@$(hostname -s) -> ${remote_host}"
+    printf 'Comment [%s]: ' "$comment"
+    local comment_input
+    read -r comment_input
+    [ -n "$comment_input" ] && comment="$comment_input"
+
+    # Passphrase
+    local -a passphrase_flag
+    passphrase_flag=()
+    printf 'Set a passphrase? [y/N] '
+    local use_pass
+    read -r use_pass
+    if [[ "$use_pass" =~ ^[Yy] ]]; then
+      # Let ssh-keygen prompt for it
+      passphrase_flag=()
+    else
+      passphrase_flag=(-N "")
+    fi
+
+    # Generate
+    local -a keygen_args
+    keygen_args=(-t "$algo" -f "$key_path" -C "$comment" "${passphrase_flag[@]}")
+    [ "$algo" = "rsa" ] && keygen_args+=(-b 4096)
+
+    printf '\n> ssh-keygen %s\n' "${keygen_args[*]}"
+    ssh-keygen "${keygen_args[@]}" || return 1
+    printf '\nKey created: %s\n' "$key_path"
+  fi
+
+  # ── Step 1: ssh-copy-id ────────────────────────────────────────────────
+  printf '\n--- Copy public key to %s ---\n' "$target"
+  printf 'Run ssh-copy-id to enable passwordless login? [Y/n] '
+  local do_copy
+  read -r do_copy
+  if [[ ! "$do_copy" =~ ^[Nn] ]]; then
+    printf '\n> ssh-copy-id -i %s.pub %s\n' "$key_path" "$target"
+    ssh-copy-id -i "${key_path}.pub" "$target" || {
+      printf '%s\n' "ssh-copy-id failed. You may need to enter the remote password." >&2
+      return 1
+    }
+  fi
+
+  # ── Step 2: Copy key pair to remote ────────────────────────────────────
+  printf '\n--- Copy key pair to remote ---\n'
+  printf 'This lets the remote machine use the same key (e.g. for GitHub).\n'
+  printf 'Copy private+public key to %s:~/.ssh/? [y/N] ' "$target"
+  local do_scp
+  read -r do_scp
+  if [[ "$do_scp" =~ ^[Yy] ]]; then
+    local key_basename="${key_path##*/}"
+    printf '\n> scp %s %s.pub %s:~/.ssh/\n' "$key_path" "$key_path" "$target"
+    scp "$key_path" "${key_path}.pub" "$target:~/.ssh/" || return 1
+    ssh "$target" "chmod 600 ~/.ssh/$key_basename && chmod 644 ~/.ssh/${key_basename}.pub"
+    printf 'Key copied and permissions set.\n'
+
+    # Configure GitHub on remote
+    printf '\nAdd GitHub SSH config on remote? [y/N] '
+    local do_github
+    read -r do_github
+    if [[ "$do_github" =~ ^[Yy] ]]; then
+      ssh "$target" "mkdir -p ~/.ssh && cat >> ~/.ssh/config" <<EOF
+
+Host github.com
+    IdentityFile ~/.ssh/$key_basename
+EOF
+      ssh "$target" "chmod 600 ~/.ssh/config"
+      printf 'GitHub SSH config added on remote.\n'
+    fi
+  fi
+
+  # ── Step 3: Local SSH config ───────────────────────────────────────────
+  printf '\n--- Local SSH config ---\n'
+  printf 'Add host alias to local ~/.ssh/config? [Y/n] '
+  local do_config
+  read -r do_config
+  if [[ ! "$do_config" =~ ^[Nn] ]]; then
+    local host_alias="$remote_host"
+    printf 'Host alias [%s]: ' "$host_alias"
+    local alias_input
+    read -r alias_input
+    [ -n "$alias_input" ] && host_alias="$alias_input"
+
+    local hostname="$remote_host"
+    printf 'HostName (IP or FQDN) [%s]: ' "$hostname"
+    local hostname_input
+    read -r hostname_input
+    [ -n "$hostname_input" ] && hostname="$hostname_input"
+
+    local config_user="${remote_user:-$USER}"
+    printf 'User [%s]: ' "$config_user"
+    local user_input
+    read -r user_input
+    [ -n "$user_input" ] && config_user="$user_input"
+
+    printf 'Add IdentitiesOnly yes? [y/N] '
+    local do_identonly
+    read -r do_identonly
+    local identonly_line=""
+    [[ "$do_identonly" =~ ^[Yy] ]] && identonly_line=$'\n    IdentitiesOnly yes'
+
+    # Determine config file (support config.d/ if Include exists)
+    local config_file="$HOME/.ssh/config"
+    if [ -d "$HOME/.ssh/config.d" ]; then
+      printf 'Write to ~/.ssh/config.d/ instead of ~/.ssh/config? [Y/n] '
+      local use_configd
+      read -r use_configd
+      if [[ ! "$use_configd" =~ ^[Nn] ]]; then
+        config_file="$HOME/.ssh/config.d/host_${host_alias}"
+        printf 'Config file [%s]: ' "$config_file"
+        local cf_input
+        read -r cf_input
+        [ -n "$cf_input" ] && config_file="$cf_input"
+      fi
+    fi
+
+    local config_block="
+Host $host_alias
+    HostName $hostname
+    User $config_user
+    IdentityFile $key_path${identonly_line}"
+
+    printf '\nWill append to %s:\n' "$config_file"
+    printf '%s\n' "$config_block"
+    printf '\nConfirm? [Y/n] '
+    local confirm
+    read -r confirm
+    if [[ ! "$confirm" =~ ^[Nn] ]]; then
+      printf '%s\n' "$config_block" >> "$config_file"
+      chmod 600 "$config_file"
+      printf 'Config written.\n'
+    fi
+  fi
+
+  # ── Done ───────────────────────────────────────────────────────────────
+  printf '\n=== Done! ===\n'
+  printf 'Test with: ssh %s\n' "${host_alias:-$target}"
+  if [[ "$do_scp" =~ ^[Yy] ]]; then
+    printf "Test GitHub: ssh %s 'ssh -T git@github.com'\n" "${host_alias:-$target}"
+  fi
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/96_ssh_setup.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:44:46Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:44:46Z)**_
+
+Now the heavy one: `04_ai_capture`. Need to handle `${=var}`, `${${url#*://}%%/*}` (bash doesn't support nested expansion), `print` (30+), 1-indexed spinner, `pipestatus[1]`, `&!`, `read -q`:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 04_ai_capture.sh - AI-powered review of past commands (shared bash + zsh).
+# Moved from dot_config/zsh/tools/04_ai_capture.zsh. Zsh-isms replaced:
+#   ${=AICAP_AGENT_PRIORITY}        → portable split (setopt sh_word_split / bash auto-split)
+#   ${${url#*://}%%/*} (nested)     → two sequential assignments (bash doesn't nest)
+#   print -r --                     → printf '%s\n'
+#   print -u2                       → printf '%s\n' >&2
+#   print -n                        → printf '%s'
+#   frames[$(( (i%10)+1 ))]         → ${frames[*]:$(( i%10 )):1} (bash-style 0-idx slice)
+#   ${pipestatus[1]}                → shell-dispatched ($PIPESTATUS[0] / $pipestatus[1])
+#   &!                              → & disown
+#   read -q "var?prompt"            → shell-dispatched (bash uses read -n 1 -p)
+#   emulate -L zsh                  → gated on $ZSH_VERSION
+#
+# Depends on cpblock from dot_config/zsh/tools/03_tmux_capture.zsh (still
+# zsh-only — relies on ZLE BUFFER/POSTDISPLAY). In bash, `aifix`/`aiexplain`
+# error out with a hint to use `aifix-stdin` / `aifix-run` / `aifix-rerun`
+# which don't need cpblock.
+#
+#   aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+#   aiexplain [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+#   aiblock                                                    # Python TUI
+#
+# Agent auto-detection order and per-vendor lightweight model pins live in
+# dot_config/shell/04_ai_agents.sh (the SSOT, sourced at shell init). This
+# file READS the resulting AICAP_* env vars; it does NOT define defaults.
+# To change the autodetect order globally, edit AICAP_AGENT_PRIORITY in the
+# SSOT. To pin a different model for one tool, `export AICAP_<AGENT>_MODEL=…`
+# before invoking it.
+# Override via -a AGENT (per-call) or AICAP_AGENT env var (per-shell).
+# Advisory-only by design; there is no --execute flag.
+# For a back-and-forth interactive session, use `aiblock` → "Spawn agent".
+#
+# A fifth agent type `http` talks an OpenAI-compatible chat-completions endpoint
+# directly via curl + jq. Use it for OpenRouter free models or local Ollama
+# without depending on any agent CLI being installed:
+#
+#   AICAP_AGENT=http aifix              # OpenRouter (free Gemini Flash by default)
+#   AICAP_AGENT=http \
+#     AICAP_HTTP_URL=http://localhost:11434/v1/chat/completions \
+#     AICAP_HTTP_MODEL=qwen2.5-coder:7b aifix
+#
+# `http` is opt-in: it is never auto-detected (nothing on PATH to probe).
+#
+# Env vars (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}
+# to override — those files always win against the SSOT's `: "${VAR:=…}"` defaults):
+#
+#   AICAP_AGENT            default: (unset — auto-detect via AICAP_AGENT_PRIORITY)
+#                                        force a specific agent: opencode | claude |
+#                                        codex | cursor-agent | http
+#   AICAP_AGENT_PRIORITY   default: opencode claude codex cursor-agent     (SSOT)
+#   AICAP_CLAUDE_MODEL     default: haiku                                  (SSOT)
+#   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5        (SSOT)
+#   AICAP_CODEX_MODEL      default: (unset — gpt-5-mini errors on ChatGPT auth) (SSOT)
+#   AICAP_CURSOR_MODEL     default: (unset — let cursor-agent pick)        (SSOT)
+#   AICAP_HTTP_URL         default: https://openrouter.ai/api/v1/chat/completions (SSOT)
+#   AICAP_HTTP_MODEL       default: google/gemini-2.0-flash-exp:free        (SSOT)
+#   AICAP_HTTP_API_KEY     default: $OPENROUTER_API_KEY (empty = no auth header)
+#   AICAP_SHOW_METADATA    default: 1  (tokens / cost / model on stderr; this file only)
+#   AICAP_PRETTIFY         default: 1  (auto: glow → bat → raw; non-tty = raw)
+#   AICAP_SPINNER          default: 1  (braille on stderr while agent thinks)
+#
+# Vars marked (SSOT) live in dot_config/shell/04_ai_agents.sh — change them
+# there once, all four consumers (aifix, aiblock, aisuggest, tsum) see it.
+
+# Defensive load: if 04_ai_agents.sh wasn't sourced first (e.g. someone
+# dot-sourced this file directly without running rc), pull it in now.
+if [ -z "${_AICAP_AGENT_CONFIG_SOURCED:-}" ] && [ -r "$HOME/.config/shell/04_ai_agents.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$HOME/.config/shell/04_ai_agents.sh"
+fi
+
+# UX-only flags that don't apply to the Python consumers — these stay here.
+: "${AICAP_SHOW_METADATA:=1}"
+: "${AICAP_PRETTIFY:=1}"
+: "${AICAP_SPINNER:=1}"
+
+_aiagent_autodetect() {
+  local cand
+  # Word-split $AICAP_AGENT_PRIORITY. The original `${=…}` was zsh's explicit
+  # word-splitting flag (zsh doesn't split unquoted params by default); bash
+  # does auto-split unquoted. Dispatch:
+  local _priority="${AICAP_AGENT_PRIORITY:-opencode claude codex cursor-agent}"
+  if [ -n "$ZSH_VERSION" ]; then
+    setopt local_options sh_word_split
+  fi
+  # shellcheck disable=SC2086
+  for cand in $_priority; do
+    if command -v "$cand" &>/dev/null; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Background spinner on stderr while the agent is thinking. Skipped when
+# AICAP_SPINNER=0 or stderr isn't a tty (so pipes / file redirects stay
+# clean). The spinner subprocess is disowned via `& disown` so it survives
+# the command substitution that invokes the agent.
+_AICAP_SPIN_PID=
+_aicap_spinner_start() {
+  [ "$AICAP_SPINNER" != "1" ] && return 0
+  [ ! -t 2 ] && return 0
+  local label="${1:-thinking}"
+  (
+    trap 'exit 0' TERM INT HUP
+    local -a frames
+    frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+    while true; do
+      # ${arr[*]:N:1} is bash-style array slicing (0-indexed); zsh supports
+      # the same syntax. Quoted, a 1-element slice expands as one word.
+      printf '\r\e[K%s %s' "${frames[*]:$(( i % 10 )):1}" "$label" >&2
+      i=$(( i + 1 ))
+      sleep 0.1
+    done
+  ) & disown
+  _AICAP_SPIN_PID=$!
+}
+
+_aicap_spinner_stop() {
+  [ -z "$_AICAP_SPIN_PID" ] && return 0
+  kill "$_AICAP_SPIN_PID" 2>/dev/null
+  # Drain; both shells wait on PIDs even if disowned as long as we know the PID.
+  wait "$_AICAP_SPIN_PID" 2>/dev/null
+  _AICAP_SPIN_PID=
+  [ -t 2 ] && printf '\r\e[K' >&2
+}
+
+# Pretty-print stdin as Markdown: glow > bat > raw. Skips prettify if stdout
+# is NOT a tty (so pipes stay clean) or AICAP_PRETTIFY=0.
+_aicap_prettify() {
+  if [ "$AICAP_PRETTIFY" != "1" ] || [ ! -t 1 ]; then
+    cat
+  elif command -v glow &>/dev/null; then
+    glow -
+  elif command -v bat &>/dev/null; then
+    bat --language=md --style=plain --paging=never --color=always
+  else
+    cat
+  fi
+}
+
+# Invoke a coding-agent in one-shot mode.
+#
+# Writes reply (text) to stdout. Writes metadata line to stderr when
+# AICAP_SHOW_METADATA=1 and the agent supports structured JSON output.
+# Currently only Claude's JSON includes usage/cost — other agents just get a
+# "<agent> (<model>)" line on stderr.
+_aiagent_invoke() {
+  local agent="$1" prompt="$2"
+  local json reply model_used tokens_in tokens_out cache_read cache_create cost duration rc
+
+  # Ensure spinner cleans up if the caller returns or we hit a trap.
+  trap '_aicap_spinner_stop' EXIT INT TERM
+
+  case "$agent" in
+    claude)
+      # Conditional --model: empty AICAP_CLAUDE_MODEL → claude picks its
+      # own default (robust if the pinned alias is ever retired).
+      local -a claude_model_args
+      claude_model_args=()
+      [ -n "$AICAP_CLAUDE_MODEL" ] && claude_model_args=(--model "$AICAP_CLAUDE_MODEL")
+      local claude_model_label="${AICAP_CLAUDE_MODEL:-(default)}"
+      if [ "$AICAP_SHOW_METADATA" = "1" ] && command -v jq &>/dev/null; then
+        _aicap_spinner_start "claude $claude_model_label (json)…"
+        json=$(claude -p "${claude_model_args[@]}" --output-format json "$prompt")
+        rc=$?
+        _aicap_spinner_stop
+        (( rc != 0 )) && return $rc
+        reply=$(printf '%s\n' "$json" | jq -r '.result // empty')
+        model_used=$(printf '%s\n' "$json" | jq -r '.modelUsage | keys | first // "?"')
+        tokens_in=$(printf '%s\n' "$json" | jq -r '.usage.input_tokens // "?"')
+        tokens_out=$(printf '%s\n' "$json" | jq -r '.usage.output_tokens // "?"')
+        cache_read=$(printf '%s\n' "$json" | jq -r '.usage.cache_read_input_tokens // 0')
+        cache_create=$(printf '%s\n' "$json" | jq -r '.usage.cache_creation_input_tokens // 0')
+        cost=$(printf '%s\n' "$json" | jq -r '.total_cost_usd // "?"')
+        duration=$(printf '%s\n' "$json" | jq -r '.duration_ms // "?"')
+        printf '%s\n' "claude ($model_used) | in=$tokens_in out=$tokens_out cache=(r:$cache_read,w:$cache_create) | cost=\$$cost ${duration}ms" >&2
+        printf '%s\n' "$reply"
+      else
+        printf '%s\n' "claude ($claude_model_label)" >&2
+        _aicap_spinner_start "claude $claude_model_label…"
+        claude -p "${claude_model_args[@]}" "$prompt"
+        rc=$?
+        _aicap_spinner_stop
+        return $rc
+      fi
+      ;;
+    opencode)
+      local -a opencode_model_args
+      opencode_model_args=()
+      [ -n "$AICAP_OPENCODE_MODEL" ] && opencode_model_args=(-m "$AICAP_OPENCODE_MODEL")
+      local opencode_model_label="${AICAP_OPENCODE_MODEL:-(default)}"
+      printf '%s\n' "opencode ($opencode_model_label)" >&2
+      _aicap_spinner_start "opencode $opencode_model_label…"
+      opencode run "${opencode_model_args[@]}" "$prompt"
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
+      ;;
+    codex)
+      # AICAP_CODEX_MODEL defaults to empty since gpt-5-mini is rejected on
+      # ChatGPT-account auth. Users on API-key auth can re-pin via the env.
+      local -a codex_model_args
+      codex_model_args=()
+      [ -n "$AICAP_CODEX_MODEL" ] && codex_model_args=(-m "$AICAP_CODEX_MODEL")
+      local codex_model_label="${AICAP_CODEX_MODEL:-(default)}"
+      printf '%s\n' "codex ($codex_model_label)" >&2
+      _aicap_spinner_start "codex $codex_model_label…"
+      codex exec "${codex_model_args[@]}" "$prompt"
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
+      ;;
+    cursor-agent)
+      if [ -n "$AICAP_CURSOR_MODEL" ]; then
+        printf '%s\n' "cursor-agent ($AICAP_CURSOR_MODEL)" >&2
+        _aicap_spinner_start "cursor-agent $AICAP_CURSOR_MODEL…"
+        cursor-agent -p --model "$AICAP_CURSOR_MODEL" "$prompt"
+      else
+        printf '%s\n' "cursor-agent" >&2
+        _aicap_spinner_start "cursor-agent…"
+        cursor-agent -p "$prompt"
+      fi
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
+      ;;
+    http)
+      # OpenAI-compatible chat-completions over curl. Covers OpenRouter (with
+      # API key) and local Ollama (no auth) with the same code path. Never
+      # auto-detected — opt in via AICAP_AGENT=http or `-a http`.
+      local url="$AICAP_HTTP_URL" model="$AICAP_HTTP_MODEL"
+      local key="${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}"
+      if ! command -v jq &>/dev/null; then
+        printf '%s\n' "aifix: jq is required for the http agent" >&2
+        return 1
+      fi
+      if ! command -v curl &>/dev/null; then
+        printf '%s\n' "aifix: curl is required for the http agent" >&2
+        return 1
+      fi
+      # Extract host from URL. Original used zsh-nested `${${url#*://}%%/*}`;
+      # bash doesn't support nested expansion, so do it in two steps.
+      local host
+      host="${url#*://}"
+      host="${host%%/*}"
+      [ "$AICAP_SHOW_METADATA" != "1" ] && printf '%s\n' "http ($model @ $host)" >&2
+      _aicap_spinner_start "http $model…"
+      local payload response
+      payload=$(jq -n --arg m "$model" --arg p "$prompt" \
+        '{model: $m, messages: [{role: "user", content: $p}], stream: false}')
+      local -a curl_args
+      curl_args=(-sS -X POST "$url" -H 'Content-Type: application/json' -d "$payload")
+      [ -n "$key" ] && curl_args+=(-H "Authorization: Bearer $key")
+      response=$(curl "${curl_args[@]}")
+      rc=$?
+      _aicap_spinner_stop
+      if (( rc != 0 )); then
+        printf '%s\n' "http: curl failed (rc=$rc) — check AICAP_HTTP_URL ($url)" >&2
+        return $rc
+      fi
+      local err
+      err=$(printf '%s\n' "$response" | jq -r '.error.message // (.error | strings) // empty' 2>/dev/null)
+      if [ -n "$err" ]; then
+        printf '%s\n' "http: API error: $err" >&2
+        return 1
+      fi
+      reply=$(printf '%s\n' "$response" | jq -r '.choices[0].message.content // empty')
+      if [ -z "$reply" ]; then
+        printf '%s\n' "http: empty reply (raw response: $response)" >&2
+        return 1
+      fi
+      if [ "$AICAP_SHOW_METADATA" = "1" ]; then
+        tokens_in=$(printf '%s\n' "$response" | jq -r '.usage.prompt_tokens // "?"')
+        tokens_out=$(printf '%s\n' "$response" | jq -r '.usage.completion_tokens // "?"')
+        printf '%s\n' "http ($model @ $host) | in=$tokens_in out=$tokens_out" >&2
+      fi
+      printf '%s\n' "$reply"
+      ;;
+    *) printf '%s\n' "aifix: unknown agent '$agent' (supported: opencode, claude, codex, cursor-agent, http)" >&2; return 1 ;;
+  esac
+}
+
+# Core dispatcher: given an already-captured block, build the prompt, invoke
+# the agent, pipe reply through the prettifier. Shared by the four sources:
+# cpblock (aifix/aiexplain), stdin (aifix-stdin), tee'd CMD run (aifix-run),
+# and thefuck-style rerun (aifix-rerun).
+#
+#   _ai_dispatch_core <name> <source-label> <default-prompt>
+#                     <agent> <raw> <no-meta> <prompt-override> <block>
+_ai_dispatch_core() {
+  local name="$1" source_label="$2" default_prompt="$3"
+  local agent="$4" raw="$5" no_meta="$6" prompt_override="$7" block="$8"
+  if [ -z "$block" ]; then
+    printf '%s\n' "$name: empty block" >&2
+    return 1
+  fi
+  local prompt="${prompt_override:-$default_prompt}
+
+$block"
+  printf '%s\n' "$name ← $source_label" >&2
+
+  # Per-call env overrides: --no-meta / --raw flip env-var behaviour locally
+  # so _aiagent_invoke + _aicap_prettify see the intended values.
+  local saved_show="$AICAP_SHOW_METADATA" saved_pretty="$AICAP_PRETTIFY"
+  (( no_meta )) && AICAP_SHOW_METADATA=0
+  (( raw ))    && AICAP_PRETTIFY=0
+
+  if (( raw )); then
+    _aiagent_invoke "$agent" "$prompt"
+  else
+    _aiagent_invoke "$agent" "$prompt" | _aicap_prettify
+  fi
+  local rc=$?
+
+  AICAP_SHOW_METADATA="$saved_show"
+  AICAP_PRETTIFY="$saved_pretty"
+  return $rc
+}
+
+# Print the shared flag-help + env-var snapshot. Used by -h on each wrapper.
+_ai_print_help() {
+  local name="$1" usage="$2"
+  printf '%s\n' "usage: $name $usage"
+  printf '%s\n' "  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)"
+  printf '%s\n' "  -p PROMPT  override default prompt"
+  printf '%s\n' "  --raw      disable prettify (glow/bat), print raw agent reply"
+  printf '%s\n' "  --no-meta  suppress the stderr metadata line"
+  printf '%s\n' ""
+  printf '%s\n' "env vars:"
+  printf '%s\n' "  AICAP_AGENT          = ${AICAP_AGENT:-<unset = auto-detect>}"
+  printf '%s\n' "  AICAP_CLAUDE_MODEL   = ${AICAP_CLAUDE_MODEL}"
+  printf '%s\n' "  AICAP_OPENCODE_MODEL = ${AICAP_OPENCODE_MODEL}"
+  printf '%s\n' "  AICAP_CODEX_MODEL    = ${AICAP_CODEX_MODEL}"
+  printf '%s\n' "  AICAP_CURSOR_MODEL   = ${AICAP_CURSOR_MODEL:-<unset>}"
+  printf '%s\n' "  AICAP_HTTP_URL       = ${AICAP_HTTP_URL}"
+  printf '%s\n' "  AICAP_HTTP_MODEL     = ${AICAP_HTTP_MODEL}"
+  if [ -n "${AICAP_HTTP_API_KEY:-${OPENROUTER_API_KEY:-}}" ]; then
+    printf '%s\n' "  AICAP_HTTP_API_KEY   = <set>"
+  else
+    printf '%s\n' "  AICAP_HTTP_API_KEY   = <unset>"
+  fi
+  printf '%s\n' "  AICAP_SHOW_METADATA  = ${AICAP_SHOW_METADATA}"
+  printf '%s\n' "  AICAP_PRETTIFY       = ${AICAP_PRETTIFY}"
+  printf '%s\n' "  AICAP_SPINNER        = ${AICAP_SPINNER}"
+}
+
+# Shared dispatcher for aifix / aiexplain. Captures via cpblock (zsh-only).
+_ai_capture_dispatch() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+  local name="$1"; shift
+  local default_prompt="$1"; shift
+  local n=1 agent="" prompt_override="" raw=0 no_meta=0
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent="$2"; shift 2 ;;
+      -p|--prompt)  prompt_override="$2"; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)    _ai_print_help "$name" "[N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                    printf '%s\n' "  N          block index back (default 1 = last)"
+                    return 0 ;;
+      --) shift; break ;;
+      -*) printf '%s\n' "$name: unknown flag: $1" >&2; return 1 ;;
+      *)  n="$1"; shift ;;
+    esac
+  done
+  if ! [[ "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    printf '%s\n' "$name: N must be a positive integer (got: $n)" >&2
+    return 1
+  fi
+  if [ -z "$agent" ]; then
+    if [ -n "$AICAP_AGENT" ]; then
+      agent="$AICAP_AGENT"
+    else
+      agent=$(_aiagent_autodetect) || {
+        printf '%s\n' "$name: no coding-agent CLI found on PATH (tried: opencode, claude, codex, cursor-agent)" >&2
+        printf '%s\n' "$name: hint — set AICAP_AGENT=http to use OpenRouter / Ollama directly" >&2
+        return 1
+      }
+    fi
+  fi
+  if ! command -v cpblock &>/dev/null; then
+    printf '%s\n' "$name: cpblock not defined (zsh-only; loaded from dot_config/zsh/tools/03_tmux_capture.zsh)" >&2
+    printf '%s\n' "$name: in bash, use \`aifix-stdin\` / \`aifix-run\` / \`aifix-rerun\` instead" >&2
+    return 1
+  fi
+  local block
+  block=$(cpblock "$n" 2>/dev/null) || {
+    printf '%s\n' "$name: cpblock $n failed (run 'exec zsh' if the shell pre-dates chezmoi apply)" >&2
+    return 1
+  }
+  _ai_dispatch_core "$name" "block -$n" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+}
+
+aifix() {
+  _ai_capture_dispatch aifix \
+    "Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific." \
+    "$@"
+}
+
+aiexplain() {
+  _ai_capture_dispatch aiexplain \
+    "Here is a command I ran in my terminal and its output. Explain what happened in plain language. Be concise." \
+    "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Non-tmux Tier 1: stdin / run / rerun sources
+# -----------------------------------------------------------------------------
+# These three cover the "no tmux available" case (VSCode integrated terminal,
+# bare Ghostty without tmux, quick SSH) by NOT relying on cpblock / OSC 133.
+# Each composes zero magic — user explicitly picks the source.
+#
+# See backlog/ai-capture-non-tmux-output.md for why we don't do automatic
+# tee redirection (Tier 2) or PTY proxy wrapping (Tier 3).
+
+# aifix-stdin: read whatever the caller piped in. Universal.
+#   tail -200 /var/log/nginx/error.log | aifix-stdin
+#   curl -sS https://weird.api/thing | aifix-stdin -p "explain this JSON"
+#   aifix-stdin < build.log
+aifix-stdin() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+  local name=aifix-stdin agent="" prompt_override="" raw=0 no_meta=0
+  local default_prompt="Here is output captured from my terminal. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent="$2"; shift 2 ;;
+      -p|--prompt)  prompt_override="$2"; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                    printf '%s\n' "  Reads block from stdin. No tmux / cpblock dependency."
+                    return 0 ;;
+      *) printf '%s\n' "$name: unexpected arg: $1 (did you mean -p?)" >&2; return 1 ;;
+    esac
+  done
+  if [ -z "$agent" ]; then
+    if [ -n "$AICAP_AGENT" ]; then
+      agent="$AICAP_AGENT"
+    else
+      agent=$(_aiagent_autodetect) || {
+        printf '%s\n' "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)" >&2
+        return 1
+      }
+    fi
+  fi
+  # -t 0 checks if stdin is a terminal. If it is, user likely forgot to pipe.
+  if [ -t 0 ]; then
+    printf '%s\n' "$name: stdin is a tty — did you forget to pipe? Example:" >&2
+    printf '%s\n' "  some-command 2>&1 | $name" >&2
+    return 1
+  fi
+  local block
+  block=$(cat)
+  _ai_dispatch_core "$name" "stdin" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+}
+
+# aifix-run: run CMD, tee stdout+stderr to a log, feed "$ CMD\n<output>\n(exit code: N)"
+# to the agent. Use `--` to separate flags from the command.
+#   aifix-run -- cargo build --release
+#   aifix-run -p "is this safe?" -- ansible-playbook deploy.yml
+#
+# isatty caveat: teeing makes CMD's stdout a pipe, so TUI apps (vim, less)
+# render in degraded mode. Don't use this for interactive tools.
+aifix-run() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+  local name=aifix-run agent="" prompt_override="" raw=0 no_meta=0
+  local default_prompt="Here is a command I ran in my terminal and its output. Diagnose any errors and suggest a concrete fix. Be brief and specific."
+  while (( $# )); do
+    case "$1" in
+      -a|--agent)   agent="$2"; shift 2 ;;
+      -p|--prompt)  prompt_override="$2"; shift 2 ;;
+      --raw)        raw=1; shift ;;
+      --no-meta)    no_meta=1; shift ;;
+      -h|--help)    _ai_print_help "$name" "[-a AGENT] [-p PROMPT] [--raw] [--no-meta] -- CMD [ARG...]"
+                    printf '%s\n' "  Runs CMD with stdout+stderr teed to a log, feeds to agent."
+                    printf '%s\n' "  Use \`--\` to separate flags from the command."
+                    return 0 ;;
+      --) shift; break ;;
+      -*) printf '%s\n' "$name: unknown flag: $1" >&2; return 1 ;;
+      *) break ;;
+    esac
+  done
+  if (( $# == 0 )); then
+    printf '%s\n' "$name: missing command. Usage: $name [flags] -- CMD [ARG...]" >&2
+    return 1
+  fi
+  if [ -z "$agent" ]; then
+    if [ -n "$AICAP_AGENT" ]; then
+      agent="$AICAP_AGENT"
+    else
+      agent=$(_aiagent_autodetect) || {
+        printf '%s\n' "$name: no coding-agent CLI found on PATH (set AICAP_AGENT=http for OpenRouter / Ollama)" >&2
+        return 1
+      }
+    fi
+  fi
+  local log
+  log=$(mktemp -t aifix-run.XXXXXX) || { printf '%s\n' "$name: mktemp failed" >&2; return 1; }
+  # Record the command line as the block's first line so the agent knows
+  # what was run.
+  printf '%s\n' "\$ $*" > "$log"
+  "$@" 2>&1 | tee -a "$log"
+  # Capture pipeline exit status. zsh uses ${pipestatus[1]} (1-indexed),
+  # bash uses ${PIPESTATUS[0]} (0-indexed).
+  local rc
+  if [ -n "$ZSH_VERSION" ]; then
+    rc=${pipestatus[1]}
+  else
+    rc=${PIPESTATUS[0]}
+  fi
+  printf '\n' >> "$log"
+  printf '%s\n' "(exit code: $rc)" >> "$log"
+  local block
+  block=$(<"$log")
+  rm -f "$log"
+  _ai_dispatch_core "$name" "run \`${1}…\` (exit $rc)" "$default_prompt" \
+    "$agent" "$raw" "$no_meta" "$prompt_override" "$block"
+}
+
+# aifix-rerun: thefuck-style. Re-executes the last command from shell history
+# via aifix-run. Prompts for confirmation unless -y, because re-running has
+# side effects if the command isn't idempotent.
+aifix-rerun() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+  local name=aifix-rerun yes=0
+  local -a forward
+  forward=()
+  while (( $# )); do
+    case "$1" in
+      -y|--yes) yes=1; shift ;;
+      -h|--help) _ai_print_help "$name" "[-y] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]"
+                 printf '%s\n' "  Re-executes the last command from shell history via aifix-run."
+                 printf '%s\n' "  Prompts for confirmation unless -y (side effects beware)."
+                 return 0 ;;
+      *) forward+=("$1"); shift ;;
+    esac
+  done
+  # fc -ln -2 -2: skip aifix-rerun itself (which is -1), grab the one before.
+  # `fc` works in both bash and zsh.
+  local cmd
+  cmd=$(fc -ln -2 -2 2>/dev/null)
+  cmd="${cmd#	}"; cmd="${cmd# }"
+  if [ -z "$cmd" ]; then
+    printf '%s\n' "$name: no prior command in shell history" >&2
+    return 1
+  fi
+  printf '%s\n' "$name: will re-execute:" >&2
+  printf '%s\n' "  $cmd" >&2
+  printf '%s\n' "⚠ side effects if the command is not idempotent (network calls, file writes, etc.)" >&2
+  if (( ! yes )); then
+    # zsh's `read -q "var?prompt"` reads 1 char and returns 0 only for y/Y.
+    # bash uses `read -n 1 -p "prompt" var`; we then compare $var.
+    local reply
+    if [ -n "$ZSH_VERSION" ]; then
+      read -q "reply?Proceed? [y/N] "
+    else
+      read -r -n 1 -p "Proceed? [y/N] " reply
+    fi
+    printf '\n'
+    if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+      printf '%s\n' "$name: aborted" >&2
+      return 130
+    fi
+  fi
+  # Delegate to aifix-run via eval (preserves quoting for $cmd's shell syntax).
+  eval "aifix-run ${forward[*]} -- $cmd"
+}
+
+# aiblock — launch the Python TUI (scripts/aiblock.py) resolved via
+# chezmoi source-path, cached per-shell. The Python side reads the same
+# AICAP_* env vars so model defaults stay consistent.
+#
+# History passing: `fc -ln …` only works inside the current interactive
+# shell — a subshell doesn't inherit the in-memory history buffer and
+# `fc -R` only pulls whatever HISTFILE has on disk (which misses unflushed
+# recent commands). Dump the current shell's history into a temp file and
+# hand the path to the TUI via $AIBLOCK_HIST_DUMP.
+_AIBLOCK_SCRIPT=""
+aiblock() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+  if [ -z "$_AIBLOCK_SCRIPT" ]; then
+    local base
+    base=$(chezmoi source-path 2>/dev/null) || {
+      printf '%s\n' "aiblock: could not resolve chezmoi source-path" >&2
+      return 1
+    }
+    _AIBLOCK_SCRIPT="$base/scripts/aiblock.py"
+  fi
+  if [ ! -f "$_AIBLOCK_SCRIPT" ]; then
+    printf '%s\n' "aiblock: $_AIBLOCK_SCRIPT not found (run 'chezmoi apply' after a git pull)" >&2
+    return 1
+  fi
+  local histdump
+  histdump=$(mktemp -t aiblock-hist.XXXXXX) || {
+    printf '%s\n' "aiblock: mktemp failed" >&2
+    return 1
+  }
+  # fc -ln -30: last 30 entries, no numbering. Trailing newline per entry.
+  fc -ln -30 > "$histdump" 2>/dev/null
+  AIBLOCK_HIST_DUMP="$histdump" uv run --script "$_AIBLOCK_SCRIPT" "$@"
+  local rc=$?
+  rm -f "$histdump"
+  return $rc
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:22Z)**_
+
+Delete the three migrated zsh-tools files, update `.chezmoiremove`, and verify:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Remove three migrated Stage 4 files
+
+`rm dot_config/zsh/tools/29_media.zsh dot_config/zsh/tools/96_ssh_setup.zsh dot_config/zsh/tools/04_ai_capture.zsh && ls dot_config/zsh/tools/ | grep -E "(29_media|96_ssh_setup|04_ai_capture)"; echo "exit=$?"`
+
+```text
+exit=1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiremove has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax check Stage 4 files in both shells
+
+```bash
+for f in 04_ai_capture 29_media 96_ssh_setup; do
+  bash -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "bash OK: $f"
+  zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "zsh OK: $f"
+done
+```
+
+```text
+bash OK: 04_ai_capture
+zsh OK: 04_ai_capture
+bash OK: 29_media
+zsh OK: 29_media
+bash OK: 96_ssh_setup
+zsh OK: 96_ssh_setup
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source Stage 4 files in fresh bash + verify functions
+
+```bash
+bash --noprofile --norc -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/29_media.sh
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/96_ssh_setup.sh
+echo "BASH SOURCED OK"
+type -t aifix aifix-stdin aifix-run aifix-rerun aiblock aiexplain compress-video extract-audio to-wav16k compress-image resize-image ssh-setup-remote
+'
+```
+
+```text
+BASH SOURCED OK
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source Stage 4 files in fresh zsh + verify functions
+
+```bash
+zsh -f -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/29_media.sh
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/96_ssh_setup.sh
+echo "ZSH SOURCED OK"
+whence -w aifix aifix-stdin aifix-run aifix-rerun aiblock aiexplain compress-video extract-audio to-wav16k compress-image resize-image ssh-setup-remote
+'
+```
+
+```text
+ZSH SOURCED OK
+aifix: function
+aifix-stdin: function
+aifix-run: function
+aifix-rerun: function
+aiblock: function
+aiexplain: function
+compress-video: function
+extract-audio: function
+to-wav16k: function
+compress-image: function
+resize-image: function
+ssh-setup-remote: function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Functional smoke tests for 04_ai_capture in bash
+
+```bash
+bash --noprofile --norc -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh
+# Test --help paths (no actual API calls)
+aifix --help 2>&1 | head -5
+echo "---"
+aifix-stdin --help 2>&1 | head -5
+echo "---"
+# Test the unknown-flag error
+aifix-stdin --bogus 2>&1
+echo "---"
+# Test the autodetect with priority list (no agents on PATH for fresh bash)
+unset AICAP_AGENT
+_aiagent_autodetect 2>&1
+echo "exit=$?"
+'
+```
+
+```text
+usage: aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+---
+usage: aifix-stdin [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+---
+aifix-stdin: unexpected arg: --bogus (did you mean -p?)
+---
+opencode
+exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Functional smoke tests for 04_ai_capture in zsh
+
+```bash
+zsh -f -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh
+aifix --help 2>&1 | head -5
+echo "---"
+# Spinner smoke test (background) — verify it starts/stops without hanging
+AICAP_SPINNER=1
+_aicap_spinner_start "test spinner..." &
+sleep 0.5
+_aicap_spinner_stop
+echo "spinner stopped, pid=$_AICAP_SPIN_PID"
+'
+```
+
+```text
+usage: aifix [N] [-a AGENT] [-p PROMPT] [--raw] [--no-meta]
+  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)
+  -p PROMPT  override default prompt
+  --raw      disable prettify (glow/bat), print raw agent reply
+  --no-meta  suppress the stderr metadata line
+---
+spinner stopped, pid=
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:48Z)**_
+
+Update CLAUDE.md and docs/shells/aliases.md for the new source paths:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find CLAUDE.md / aliases.md references to 04_ai_capture
+
+`grep -n "04_ai_capture" CLAUDE.md docs/shells/aliases.md 2>/dev/null`
+
+```text
+CLAUDE.md:22:| AI agent autodetect order or `AICAP_*_MODEL` defaults | Edit **only** [`dot_config/shell/04_ai_agents.sh`](dot_config/shell/04_ai_agents.sh) — the SSOT. Both shells source it; the two Python consumers (`dot_config/tmux/executable_tmux-session-summary.py`, `scripts/aiblock.py`) regex-parse the same file for cron / tmux-popup contexts where env isn't inherited. Each agent's `-m`/`--model` flag is conditional on its env var being non-empty so a retired model ID falls through to the CLI's own default. When adding a NEW agent, update: SSOT (one new `AICAP_<AGENT>_MODEL` line), `04_ai_capture.zsh:_aiagent_invoke` case, both Python `AGENT_CONFIG` dicts. | — |
+docs/shells/aliases.md:667:| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
+docs/shells/aliases.md:668:| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to explain what happened |
+docs/shells/aliases.md:669:| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
+docs/shells/aliases.md:670:| `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
+docs/shells/aliases.md:671:| `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
+docs/shells/aliases.md:672:| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find aliases doc rows for the new ports
+
+`grep -nE "(29_media|96_ssh_setup|04_ai_capture|aifix|aiexplain|aiblock|compress-video|compress-image|resize-image|extract-audio|to-wav16k|media-pick|ssh-setup-remote)" docs/shells/aliases.md | head -20`
+
+```text
+628:| `compress-video <input>` | function | `dot_config/zsh/tools/29_media.zsh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+629:| `extract-audio <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+630:| `to-wav16k <input>` | function | `dot_config/zsh/tools/29_media.zsh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+631:| `compress-image <input> [<mb>=1]` | function | `dot_config/zsh/tools/29_media.zsh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
+632:| `resize-image <input> <width_px>` | function | `dot_config/zsh/tools/29_media.zsh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
+633:| `media-pick` | function | `dot_config/zsh/tools/29_media.zsh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
+663:> One-shot pipeline: capture a past block (via `cpblock N`) and pass it to a coding-agent CLI (claude / opencode / codex / cursor-agent) in non-interactive / advisory mode. Agent auto-detected in the order listed; override with `-a AGENT`. Prompt override via `-p PROMPT`. Agent reply goes to stdout (pipe-friendly: `aifix | tee /tmp/advice.md`), status line to stderr.
+667:| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
+668:| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Capture Nth block (tmux), ask agent to explain what happened |
+669:| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
+670:| `aifix-run -- CMD [ARG...]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
+671:| `aifix-rerun [-y]` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Non-tmux: thefuck-style re-execute last command (confirms unless `-y`; side-effect warning) |
+672:| `aiblock` | function | `dot_config/zsh/tools/04_ai_capture.zsh` | Launch the `scripts/aiblock.py` TUI: pick command(s) from history, edit prompt, pick action (print / copy / spawn new agent window). Deps resolved via `uv run --script` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check 96_ssh_setup row
+
+`grep -nE "ssh-setup-remote|96_ssh_setup" docs/shells/aliases.md`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:46:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update aliases doc source paths for Stage 4 ports
+
+```bash
+sed -i.bak \
+  -e 's|dot_config/zsh/tools/29_media\.zsh|dot_config/shell/29_media.sh|g' \
+  -e 's|dot_config/zsh/tools/04_ai_capture\.zsh|dot_config/shell/04_ai_capture.sh|g' \
+  -e 's|dot_config/zsh/tools/96_ssh_setup\.zsh|dot_config/shell/96_ssh_setup.sh|g' \
+  docs/shells/aliases.md && rm docs/shells/aliases.md.bak
+grep -nE "(29_media|96_ssh_setup|04_ai_capture)" docs/shells/aliases.md | head -10
+```
+
+```text
+628:| `compress-video <input>` | function | `dot_config/shell/29_media.sh` | x264 CRF 28 re-encode → `<name>_compressed.mp4` (smaller; tweak CRF for quality) |
+629:| `extract-audio <input>` | function | `dot_config/shell/29_media.sh` | Strip video, copy audio stream → `<name>.m4a` (no re-encode) |
+630:| `to-wav16k <input>` | function | `dot_config/shell/29_media.sh` | Resample to 16 kHz mono WAV → `<name>_16k.wav` (Whisper / faster-whisper input) |
+631:| `compress-image <input> [<mb>=1]` | function | `dot_config/shell/29_media.sh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
+632:| `resize-image <input> <width_px>` | function | `dot_config/shell/29_media.sh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
+633:| `media-pick` | function | `dot_config/shell/29_media.sh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
+667:| `aifix [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Capture Nth block (tmux), ask agent to diagnose + suggest a fix |
+668:| `aiexplain [N] [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Capture Nth block (tmux), ask agent to explain what happened |
+669:| `aifix-stdin [-a AGENT] [-p PROMPT]` | function | `dot_config/shell/04_ai_capture.sh` | Non-tmux: read stdin as context, ask agent (`tail -100 log \| aifix-stdin`) |
+670:| `aifix-run -- CMD [ARG...]` | function | `dot_config/shell/04_ai_capture.sh` | Non-tmux: run CMD with stdout+stderr teed, feed to agent |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage 4 git status
+
+`git status --short`
+
+```text
+ M .chezmoiremove
+ M .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+ M CLAUDE.md
+ M docs/shells/aliases.md
+ D dot_config/zsh/tools/04_ai_capture.zsh
+ D dot_config/zsh/tools/29_media.zsh
+ D dot_config/zsh/tools/96_ssh_setup.zsh
+?? dot_config/shell/04_ai_capture.sh
+?? dot_config/shell/29_media.sh
+?? dot_config/shell/96_ssh_setup.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage Stage 4 changes
+
+`git add .chezmoiremove CLAUDE.md docs/shells/aliases.md dot_config/shell/04_ai_capture.sh dot_config/shell/29_media.sh dot_config/shell/96_ssh_setup.sh dot_config/zsh/tools/04_ai_capture.zsh dot_config/zsh/tools/29_media.zsh dot_config/zsh/tools/96_ssh_setup.zsh .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md && git status --short`
+
+```text
+M  .chezmoiremove
+M  .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+M  CLAUDE.md
+M  docs/shells/aliases.md
+R  dot_config/zsh/tools/04_ai_capture.zsh -> dot_config/shell/04_ai_capture.sh
+R  dot_config/zsh/tools/29_media.zsh -> dot_config/shell/29_media.sh
+A  dot_config/shell/96_ssh_setup.sh
+D  dot_config/zsh/tools/96_ssh_setup.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Stage 4
+
+```bash
+git commit -m "$(cat <<'EOF'
+refactor(shell): port heavy zsh-isms (media/ssh-setup/ai-capture)
+
+29_media:      ${var:r} → ${var%.*}, ${var:e} → ${var##*.}; gate emulate.
+96_ssh_setup:  setopt + print + ${var:t} + ${#arr} mechanical fixes;
+               *.pub(N) glob qualifier → shopt/setopt nullglob dispatch.
+04_ai_capture: the big one (555 → ~430 lines after consolidation).
+  - ${=AICAP_AGENT_PRIORITY}  → setopt sh_word_split (zsh) / auto (bash)
+  - ${${url#*://}%%/*}         → two-step (bash doesn't nest expansion)
+  - 30+ `print` calls          → printf
+  - frames[$((i%10+1))] (1-idx)→ ${frames[*]:$((i%10)):1} slice (0-idx)
+  - ${pipestatus[1]}           → dispatch ${PIPESTATUS[0]} vs ${pipestatus[1]}
+  - &!                          → & disown
+  - read -q "var?prompt"       → dispatch (bash: read -n 1 -p)
+  - emulate -L zsh             → gated on $ZSH_VERSION
+
+aifix / aiexplain still depend on cpblock (zsh-only via 03_tmux_capture.zsh
+ZLE BUFFER/POSTDISPLAY); when called from bash they error out with a hint
+to use aifix-stdin / aifix-run / aifix-rerun instead, which don't need cpblock.
+
+32_try.zsh stays zsh-only — ${TRY_PATH:A}/:h are at file top-level (would
+fail at source-time in bash), and the try-cli gem's `init` outputs
+zsh-specific shell syntax.
+
+CLAUDE.md updated to point at .sh path for the AI-agent SSOT cross-file rule.
+.chezmoiremove updated so managed hosts clean up orphan zsh-tools files.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778586443-69793.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778586443-69793.
+[main f365d0c] refactor(shell): port heavy zsh-isms (media/ssh-setup/ai-capture)
+ 8 files changed, 2924 insertions(+), 408 deletions(-)
+ rename dot_config/{zsh/tools/04_ai_capture.zsh => shell/04_ai_capture.sh} (52%)
+ rename dot_config/{zsh/tools/29_media.zsh => shell/29_media.sh} (68%)
+ create mode 100644 dot_config/shell/96_ssh_setup.sh
+ delete mode 100644 dot_config/zsh/tools/96_ssh_setup.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:41Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:42Z)**_
+
+All four stages complete. Final state:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show the 4 stage commits
+
+`git log --oneline -5`
+
+```text
+f365d0c refactor(shell): port heavy zsh-isms (media/ssh-setup/ai-capture)
+e1c40c1 refactor(shell): move 8 more helper modules to shared layer
+c98f4fe refactor(shell): move networking/github/gitlab helpers to shared layer
+a8bb367 refactor(sesh): port svibe/scode/sroot/shere backend to shared shell layer
+376228f feat(tsum): switch cache key from TTL to prompt-hash
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show remaining zsh-only files in tools/
+
+`ls dot_config/zsh/tools/*.zsh | wc -l; echo "---"; ls dot_config/zsh/tools/ | sort`
+
+```text
+      14
+---
+ 02_shell_integration.zsh
+ 03_tmux_capture.zsh
+ 04_conda_mamba.zsh
+ 05_aisuggest.zsh
+ 11_tools_picker.zsh
+ 12_television.zsh
+ 13_keys_picker.zsh
+ 22_sesh.zsh
+ 23_mrun.zsh
+ 32_try.zsh
+ 33_toolkami.zsh.disabled
+ 36_pueue.zsh
+ 37_worktrunk.zsh
+ 90_completions.zsh
+ 95_bitwarden.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:47:57Z)**_
+
+All four stages done. Summary:
+
+**4 commits on `main`:**
+- `a8bb367` Stage 1 — sesh (svibe/scode/sroot/shere) + bash Alt+S via ble.sh
+- `c98f4fe` Stage 2 — networking / github / gitlab
+- `e1c40c1` Stage 3 — tldr / log_tools / yazi / lazyvim / workmux / web_reader / ssh_agent + worktrunk split
+- `f365d0c` Stage 4 — media / ssh_setup / ai_capture (the big rewrite)
+
+**14 modules moved to `dot_config/shell/`** (sourced by both bash + zsh):
+22_sesh, 28_tldr, 29_log_tools, 29_media, 35_yazi, 37_worktrunk (backend), 38_lazyvim, 38_workmux, 41_github, 42_gitlab, 50_networking, 55_web_reader, 94_ssh_agent, 96_ssh_setup, 04_ai_capture.
+
+**Still in `dot_config/zsh/tools/` (zsh-only by design):**
+- ZLE widget files: `02_shell_integration` (OSC 133 PROMPT), `03_tmux_capture` (BUFFER/POSTDISPLAY), `05_aisuggest` (P3 TODO for ble.sh port), `11_tools_picker` / `12_television` / `13_keys_picker`, slimmed `22_sesh` (Alt+S widget) and slimmed `37_worktrunk` (clap completion regen)
+- Blockers: `23_mrun` (`${(q)var}` quote flag), `32_try` (try-cli `init zsh` outputs zsh syntax + `${TRY_PATH:A}` at file top level), `95_bitwarden` (zsh-specific completion format)
+- Out of scope this round: `04_conda_mamba` (not audited; pre-existing), `36_pueue` (audit inconclusive — defer), `33_toolkami.zsh.disabled` (disabled), `90_completions` (essentially empty placeholder)
+
+**Cross-file invariants kept in sync:**
+- `.chezmoiremove` — 14 entries added so managed hosts clean up orphan zsh-tools files on apply
+- `docs/shells/aliases.md` — every moved command's source-file column updated
+- `CLAUDE.md` — the AI-agent SSOT cross-file rule now points to `04_ai_capture.sh`
+
+All ports verified with `bash -n` + `zsh -n` syntax + `source` in fresh `bash --noprofile --norc` and `zsh -f` subshells + functional smoke tests (`--help`, error paths, CSV parsing, `local -A` dedup, spinner start/stop). macOS system bash 3.2 sources every file without error at parse time; runtime errors only surface if you actually call `svibe` (uses `local -A`) on bash 3.2 — acceptable per the Bash 4+ baseline decision.
