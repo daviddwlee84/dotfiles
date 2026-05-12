@@ -162,6 +162,7 @@ This is the pattern to replicate whenever an apt-shipped tool is too old for wha
 
 ## Related docs
 
+- [glibc-and-musl.md](glibc-and-musl.md) — when a GitHub binary errors with `GLIBC_2.X not found`, decision tree for musl swap vs Linuxbrew vs distrobox vs OS upgrade
 - [this_repo/ansible_customization.md](this_repo/ansible_customization.md) — how to run and customise the ansible roles
 - [tools/tmux/README.md](tools/tmux/README.md) — the tmux ≥ 3.3 requirement and fallback install
 - [this_repo/architecture.md](this_repo/architecture.md) — "Ansible vs Homebrew" section and per-tag tool breakdown

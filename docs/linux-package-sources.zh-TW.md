@@ -139,6 +139,7 @@ tv: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by
 
 ## 相關文件
 
+- [glibc-and-musl.zh-TW.md](glibc-and-musl.zh-TW.md) — GitHub binary 報 `GLIBC_2.X not found` 時，musl 替換 vs Linuxbrew vs distrobox vs OS 升級的決策樹
 - [this_repo/ansible_customization.md](this_repo/ansible_customization.md) — 如何執行與自訂 ansible role
 - [tools/tmux/README.md](tools/tmux/README.md) — tmux ≥ 3.3 需求與 fallback 安裝
 - [this_repo/architecture.md](this_repo/architecture.md) — 「Ansible vs Homebrew」段落、依 tag 的工具拆分

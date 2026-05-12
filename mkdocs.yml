@@ -163,6 +163,7 @@ plugins:
             # Input methods leaves
             macOS system switching: macOS 系統層切換
             # Misc leaves
+            GLIBC and musl (binary compat): GLIBC 與 musl (二進制相容性)
             Keyboard shortcuts (global): 鍵盤快捷鍵 (全域)
             Linux package sources: Linux 套件來源
             Locale: Locale
@@ -364,6 +365,7 @@ nav:
       - Overview: input_methods/README.md
       - macOS system switching: input_methods/macos-system-switching.md
   - Misc:
+      - GLIBC and musl (binary compat): glibc-and-musl.md
       - Keyboard shortcuts (global): keyboard-shortcuts.md
       - Linux package sources: linux-package-sources.md
       - Locale: locale.md
