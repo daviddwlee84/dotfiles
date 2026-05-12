@@ -23,6 +23,35 @@
 - **可預測的工具**：備份、同步、dotfile 管理工具（如 chezmoi）都受惠於單一已知的目錄樹。
 - **易於清除**：清掉 `~/.cache/foo` 不會動到設定；清掉 `~/.local/state/foo` 不會弄丟設定值。
 
+## 選擇正確的目錄
+
+寫新工具，或為既有工具的狀態重新安頓家時，用這份對照表。前四列屬於 XDG 規格 (specification)；後兩列是程式離開規格範圍後常用的位置。
+
+| 資料類型 | 放哪 | 預設路徑 | 備註 |
+|---|---|---|---|
+| 重要設定（使用者需備份） | `XDG_CONFIG_HOME` | `~/.config/mytool/` | 可編輯、宣告式 — `config.toml`、`keymap.json`。重裝後仍應保留；可放進 dotfiles repo 提交。 |
+| 重要資料（使用者需備份） | `XDG_DATA_HOME` | `~/.local/share/mytool/` | App 產生但不可替代：筆記資料庫、plugin 倉庫、下載的模型、生成的資產。 |
+| 持久狀態 (state)（機器本地、不可攜） | `XDG_STATE_HOME` | `~/.local/state/mytool/` | History、undo tree、last-opened files、游標位置、log 檔。弄丟會煩，但會自動重建。 |
+| 可重建的 cache | `XDG_CACHE_HOME` | `~/.cache/mytool/` | 編譯產物、下載的二進位、縮圖 tile。可隨時清除。 |
+| 每個 session 的 runtime 檔 | `XDG_RUNTIME_DIR` | `/run/user/$UID/mytool/` | Unix socket、lock 檔、named pipe。Mode `0700`、tmpfs、登出即刪。**僅限 Linux** — macOS 不設定此變數，需 fallback 到 `$TMPDIR`。 |
+| 一次性暫存 (ephemeral scratch) | `$TMPDIR`（或 `/tmp`） | `/tmp`（Linux）、`/var/folders/.../T/`（macOS） | 行程作用域的中介檔。**非 XDG 規範** — 屬於 POSIX/FHS。重開機後或被 `systemd-tmpfiles` / `tmpwatch` 清除。若 `$TMPDIR` 有設定，永遠優先用它；`mktemp -d -p "${TMPDIR:-/tmp}"`。 |
+
+**決策原則（依序套用）：**
+
+1. **「使用者弄丟了會難過嗎？」** — 會 → `CONFIG_HOME` 或 `DATA_HOME`；不會 → 進入下層分類。
+2. **「是使用者親手寫的嗎？」** — 是 → `CONFIG_HOME`；不是、但 app 產生且不可替代 → `DATA_HOME`。
+3. **「我能從原始碼/網路重生嗎？」** — 能 → `CACHE_HOME`；不能、且跨次執行保留會比較好 → `STATE_HOME`。
+4. **「需要其他 process 找得到的 Unix socket / lock 嗎？」** — `RUNTIME_DIR`（Linux）/ `$TMPDIR`（macOS）。用穩定名稱（`$XDG_RUNTIME_DIR/mytool.sock`）讓對端找得到。
+5. **「只在這次行程執行內有效嗎？」** — `mktemp -d -p "${TMPDIR:-/tmp}" mytool.XXXXXX` 並 `trap 'rm -rf "$tmp"' EXIT`。
+
+**常見陷阱 (gotcha)：**
+
+- `XDG_RUNTIME_DIR` 在 macOS 預設**不會**設定（沒有 systemd-logind）。硬寫此變數的工具會壞掉；跨平台慣用法是 `${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}`。
+- Linux 上的 `/tmp` 不一定是 tmpfs（取決於 distro 與 `systemd-tmpfiles`）。不要假設它撐得過重開機；也不要假設它撐不過。
+- XDG 規格**完全沒有**提到 `/tmp` — 那是 POSIX/FHS 的範疇。別把兩件事混在一起。
+- `XDG_STATE_HOME` 是 spec **v0.8（2021）** 才加入的；較舊的工具早於此規格出現，常把 state 倒在 `XDG_DATA_HOME` 或 `~/.local/share/` 中 — 是歷史包袱，不是要去上游「修」的 bug。
+- macOS 的 `~/Library/Application Support/` 是 `XDG_DATA_HOME` 的平台原生 (platform-native) 對應；許多跨平台 app 偵測到 Darwin 後改用它。這是預期行為，不算 regression。
+
 ## 各工具狀態（在本 repo 中）
 
 | 工具 | XDG 原生支援？ | 我們放在哪 |
