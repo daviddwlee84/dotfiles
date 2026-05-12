@@ -272,12 +272,17 @@ def session_signature(sessions: list[Session], deep: bool) -> str:
     return hashlib.sha256(blob).hexdigest()[:16]
 
 
-def cache_path() -> Path:
+def cache_path(deep: bool) -> Path:
+    """Per-host, per-mode cache file. Splitting deep / shallow into two slots
+    means toggling --deep / --shallow doesn't thrash the other mode's cache —
+    each TTL window can serve both depths from cache independently.
+    """
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     d = Path(base) / "tmux-session-summary"
     d.mkdir(parents=True, exist_ok=True)
     host = socket.gethostname().split(".")[0] or "host"
-    return d / f"{host}.json"
+    mode = "deep" if deep else "shallow"
+    return d / f"{host}-{mode}.json"
 
 
 # Bump when the per-session schema changes (e.g. v2 added closability fields).
@@ -286,8 +291,8 @@ def cache_path() -> Path:
 _CACHE_VERSION = "v2"
 
 
-def load_cache(sig: str) -> list[dict] | None:
-    p = cache_path()
+def load_cache(sig: str, deep: bool) -> list[dict] | None:
+    p = cache_path(deep)
     if not p.is_file():
         return None
     try:
@@ -305,8 +310,8 @@ def load_cache(sig: str) -> list[dict] | None:
     return summaries if isinstance(summaries, list) else None
 
 
-def save_cache(sig: str, summaries: list[dict]) -> None:
-    p = cache_path()
+def save_cache(sig: str, summaries: list[dict], deep: bool) -> None:
+    p = cache_path(deep)
     try:
         p.write_text(
             json.dumps(
@@ -717,7 +722,7 @@ def main() -> int:
     sig = session_signature(sessions, deep=args.deep)
     cached: list[dict] | None = None
     if not args.refresh and not args.no_cache:
-        cached = load_cache(sig)
+        cached = load_cache(sig, args.deep)
 
     if cached is not None:
         summaries = cached
@@ -739,7 +744,7 @@ def main() -> int:
             err.print("[yellow]LLM returned no parseable JSON; falling back to metadata-only.[/yellow]")
             return _render_fallback(sessions, args)
         if not args.no_cache:
-            save_cache(sig, summaries)
+            save_cache(sig, summaries, args.deep)
 
     # Apply --sort / --only between summary fetch and rendering. Cache is
     # untouched (we always save unsorted + unfiltered) so different views
