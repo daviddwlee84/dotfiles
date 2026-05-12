@@ -62,6 +62,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -75,22 +76,74 @@ from pathlib import Path
 from rich.console import Console
 from rich.text import Text
 
+
+# ---------------------------------------------------------------------------
+# SSOT loader — parse dot_config/shell/04_ai_agents.sh so this script gets
+# the same AICAP_* defaults as aifix/aiblock without redeclaring them. Used
+# only when env vars aren't already inherited (cron, tmux popup, etc.).
+# ---------------------------------------------------------------------------
+_SSOT_PATH_CANDIDATES = (
+    "~/.config/shell/04_ai_agents.sh",
+    # When run from the chezmoi source dir before `chezmoi apply`:
+    "~/.local/share/chezmoi/dot_config/shell/04_ai_agents.sh",
+)
+# Match `: "${VAR:=value}"` lines — value may be empty or contain spaces.
+# Captures: (var_name, raw_value)
+_SSOT_LINE = re.compile(r'^\s*:\s*"\$\{(AICAP_\w+):=([^}]*)\}"\s*$')
+
+
+def _load_ssot_defaults() -> dict[str, str]:
+    """Return AICAP_* defaults parsed from the first existing SSOT path.
+
+    Empty dict if no candidate exists — callers should fall back to the
+    hardcoded safety defaults below. Drift between this script and the
+    shell file is impossible because we read the file at process start.
+    """
+    for raw in _SSOT_PATH_CANDIDATES:
+        p = Path(os.path.expanduser(raw))
+        if not p.is_file():
+            continue
+        out: dict[str, str] = {}
+        try:
+            for line in p.read_text(encoding="utf-8").splitlines():
+                m = _SSOT_LINE.match(line)
+                if m:
+                    out[m.group(1)] = m.group(2)
+        except OSError:
+            return {}
+        return out
+    return {}
+
+
+_SSOT = _load_ssot_defaults()
+
+
+def _env_or_ssot(key: str, hardcoded_fallback: str = "") -> str:
+    """Resolution order: env var (live override) > SSOT file > hardcoded
+    safety default. The hardcoded value should only kick in on hosts that
+    have neither inherited the env nor deployed the SSOT — a rare edge."""
+    val = os.environ.get(key)
+    if val is not None:  # explicitly set (even to empty) wins
+        return val
+    return _SSOT.get(key, hardcoded_fallback)
+
 # ---------------------------------------------------------------------------
 # Env defaults — mirror 04_ai_capture.zsh so user overrides carry across.
 # ---------------------------------------------------------------------------
 AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
-# Per-vendor lightweight model pins. Empty value → omit -m/--model so the agent
-# CLI uses its own default; that's the robustness fallback when a pinned model
-# is retired by the provider (e.g. `gpt-5-mini` rejected by ChatGPT-account
-# auth → empty default lets codex pick whatever the account supports). Power
-# users can re-pin by setting the env var.
-AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")  # "haiku" is a stable alias maintained by Anthropic
-AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
-AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "")  # empty: ChatGPT-account auth rejects gpt-5-mini, so let codex choose
-AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
-AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
-AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
+# AICAP_* defaults come from dot_config/shell/04_ai_agents.sh (the SSOT).
+# Hardcoded values below are safety fallbacks only — they kick in when both
+# the env var is unset AND the SSOT file is missing (e.g. an unpacked
+# tarball without `chezmoi apply`). The drift risk vs the SSOT is contained
+# to that edge case.
+AICAP_CLAUDE_MODEL = _env_or_ssot("AICAP_CLAUDE_MODEL", "haiku")
+AICAP_OPENCODE_MODEL = _env_or_ssot("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
+AICAP_CODEX_MODEL = _env_or_ssot("AICAP_CODEX_MODEL", "")
+AICAP_CURSOR_MODEL = _env_or_ssot("AICAP_CURSOR_MODEL", "")
+AICAP_HTTP_URL = _env_or_ssot("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
+AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
 AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+AICAP_AGENT_PRIORITY = _env_or_ssot("AICAP_AGENT_PRIORITY", "opencode claude codex cursor-agent").split()
 TSUM_CACHE_TTL = int(os.environ.get("TSUM_CACHE_TTL", "600"))
 TSUM_TIMEOUT = float(os.environ.get("TSUM_TIMEOUT", "60"))
 
@@ -438,12 +491,11 @@ def build_prompt(sessions: list[Session], deep: bool) -> str:
 # Agent invocation
 # ---------------------------------------------------------------------------
 def detect_agent() -> str | None:
-    """Pick an agent: explicit override > first available on PATH.
+    """Pick an agent: explicit override > priority list from SSOT.
 
-    Order is opencode-first per the benchmark (see AGENT_CONFIG comment).
-    Mirrored in dot_config/zsh/tools/04_ai_capture.zsh:_aiagent_autodetect
-    and scripts/aiblock.py:detect_agents (AGENT_CONFIG dict order). Keep in
-    sync — changes to one MUST land in all three.
+    Priority list is `$AICAP_AGENT_PRIORITY` from
+    dot_config/shell/04_ai_agents.sh. Override globally by exporting that
+    var; override per-call by setting AICAP_AGENT.
     """
     if AICAP_AGENT:
         if AICAP_AGENT == "http" or shutil.which(AICAP_AGENT):
@@ -452,7 +504,7 @@ def detect_agent() -> str | None:
             f"[red]AICAP_AGENT={AICAP_AGENT!r} but that CLI isn't on PATH.[/red]"
         )
         return None
-    for cand in ("opencode", "claude", "codex", "cursor-agent"):
+    for cand in AICAP_AGENT_PRIORITY:
         if shutil.which(cand):
             return cand
     return None
@@ -750,8 +802,9 @@ def main() -> int:
     else:
         agent = detect_agent()
         if agent is None:
+            tried = ", ".join(AICAP_AGENT_PRIORITY)
             err.print(
-                "[red]No coding-agent CLI on PATH (tried: opencode, claude, codex, cursor-agent).[/red]\n"
+                f"[red]No coding-agent CLI on PATH (tried: {tried}).[/red]\n"
                 "[dim]Install one, or set AICAP_AGENT=http with AICAP_HTTP_API_KEY.[/dim]\n"
                 "[yellow]Falling back to metadata-only output (no AI summaries).[/yellow]"
             )

@@ -33,12 +33,14 @@ Depends on:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 
 import json
 import questionary
@@ -51,16 +53,62 @@ DEFAULT_FIX_PROMPT = (
     "Diagnose any errors and suggest a concrete fix. Be brief and specific."
 )
 
-# Env-var defaults mirror 04_ai_capture.zsh. If the shell has exported
-# AICAP_*, os.environ picks them up; otherwise these defaults kick in.
+
+# ---------------------------------------------------------------------------
+# SSOT loader — parse dot_config/shell/04_ai_agents.sh so this script gets
+# the same AICAP_* defaults as the zsh side without redeclaring them.
+# Mirrors the same loader in
+# dot_config/tmux/executable_tmux-session-summary.py — keep in sync.
+# ---------------------------------------------------------------------------
+_SSOT_PATH_CANDIDATES = (
+    "~/.config/shell/04_ai_agents.sh",
+    # Source-relative for when aiblock.py is invoked from the chezmoi tree
+    # before / without `chezmoi apply` (scripts/ is .chezmoiignore'd).
+    str(Path(__file__).resolve().parent.parent / "dot_config" / "shell" / "04_ai_agents.sh"),
+)
+_SSOT_LINE = re.compile(r'^\s*:\s*"\$\{(AICAP_\w+):=([^}]*)\}"\s*$')
+
+
+def _load_ssot_defaults() -> dict[str, str]:
+    for raw in _SSOT_PATH_CANDIDATES:
+        p = Path(os.path.expanduser(raw))
+        if not p.is_file():
+            continue
+        out: dict[str, str] = {}
+        try:
+            for line in p.read_text(encoding="utf-8").splitlines():
+                m = _SSOT_LINE.match(line)
+                if m:
+                    out[m.group(1)] = m.group(2)
+        except OSError:
+            return {}
+        return out
+    return {}
+
+
+_SSOT = _load_ssot_defaults()
+
+
+def _env_or_ssot(key: str, hardcoded_fallback: str = "") -> str:
+    val = os.environ.get(key)
+    if val is not None:
+        return val
+    return _SSOT.get(key, hardcoded_fallback)
+
+
+# AICAP_* defaults sourced from dot_config/shell/04_ai_agents.sh (the SSOT).
+# Hardcoded values below are safety fallbacks for when both env and SSOT
+# are missing.
 AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
-AICAP_CLAUDE_MODEL = os.environ.get("AICAP_CLAUDE_MODEL", "haiku")
-AICAP_OPENCODE_MODEL = os.environ.get("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
-AICAP_CODEX_MODEL = os.environ.get("AICAP_CODEX_MODEL", "")  # empty: ChatGPT-account auth rejects gpt-5-mini, let codex pick
-AICAP_CURSOR_MODEL = os.environ.get("AICAP_CURSOR_MODEL", "")
-AICAP_HTTP_URL = os.environ.get("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
-AICAP_HTTP_MODEL = os.environ.get("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
+AICAP_AGENT_PRIORITY = _env_or_ssot("AICAP_AGENT_PRIORITY", "opencode claude codex cursor-agent").split()
+AICAP_CLAUDE_MODEL = _env_or_ssot("AICAP_CLAUDE_MODEL", "haiku")
+AICAP_OPENCODE_MODEL = _env_or_ssot("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
+AICAP_CODEX_MODEL = _env_or_ssot("AICAP_CODEX_MODEL", "")
+AICAP_CURSOR_MODEL = _env_or_ssot("AICAP_CURSOR_MODEL", "")
+AICAP_HTTP_URL = _env_or_ssot("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
+AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
 AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+# UX-only flags (not in SSOT — only consumed by zsh aifix/aiblock UX, not shared)
 AICAP_SHOW_METADATA = os.environ.get("AICAP_SHOW_METADATA", "1") == "1"
 AICAP_PRETTIFY = os.environ.get("AICAP_PRETTIFY", "1") == "1"
 
@@ -103,11 +151,12 @@ class HistoryEntry:
 def detect_agents() -> list[str]:
     """Return the subset of known agents found on PATH, in preference order.
 
-    The `http` agent has nothing to probe on PATH; it's only included when
-    AICAP_AGENT=http is explicitly set (so the user opted in via the same
-    env var the zsh wrappers honour).
+    Order comes from $AICAP_AGENT_PRIORITY (the SSOT in
+    dot_config/shell/04_ai_agents.sh). The `http` agent has nothing to
+    probe on PATH; it's only included when AICAP_AGENT=http is explicitly
+    set (so the user opted in via the same env var the zsh wrappers honour).
     """
-    found = [a for a in AGENT_CONFIG if a != "http" and shutil.which(a)]
+    found = [a for a in AICAP_AGENT_PRIORITY if a in AGENT_CONFIG and a != "http" and shutil.which(a)]
     if AICAP_AGENT == "http":
         found.insert(0, "http")
     return found
