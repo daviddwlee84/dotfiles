@@ -85,12 +85,17 @@ bind-key -n MouseDown3StatusLeft \
     Next        n { switch-client -n } \
     Previous    p { switch-client -p } \
     "" \
+    "Choose session..." c { choose-tree -Zs } \
     Rename      N { command-prompt -I "#S" { rename-session "%%" } } \
     "" \
     "Move current window to..." m { choose-tree -Zs -F "#{session_name}" "move-window -s '#{window_id}' -t '%%'" } \
     "" \
     "New session" s { new-session } \
-    "New window"  w { new-window }
+    "New window"  w { new-window } \
+    "" \
+    "Kill session"        X { kill-session } \
+    "Kill session & exit" E { run-shell "~/.config/tmux/kill-session-exit.sh" } \
+    "Kill all sessions"   Q { confirm-before -p "Kill ALL sessions (tmux server)? (y/n)" kill-server }
 
 # =============================================================================
 # Vim-Style Copy Mode (prefix + [ to enter, q to exit)

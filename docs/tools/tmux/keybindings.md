@@ -161,7 +161,7 @@ Right-click opens a context menu depending on where you click:
 |--------|------------|
 | Pane body (`MouseDown3Pane`) | Split h/v, swap up/down/left/right, zoom, resize 75% / even, mark, swap marked, **join marked here (h/v)**, **send pane to window…**, **break to new window**, copy mode, respawn, kill |
 | Window list (`MouseDown3Status`) | Swap left/right, move/link to session, **merge into other window as pane (h/v)**, **even layout (horizontal / vertical / tiled)**, kill window, **renumber windows**, rename, new window |
-| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/rename session, move current window, new session/window |
+| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/choose/rename session, move current window, new session/window, kill session / kill-and-exit / kill-all-sessions |
 
 Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
 

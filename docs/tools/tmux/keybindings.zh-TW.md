@@ -166,7 +166,7 @@ Swap-pane 會交換**內容**但保留**大小**。所以如果你有 75%/25% �
 |--------|------------|
 | 窗格主體 (`MouseDown3Pane`) | Split h/v、swap up/down/left/right、zoom、resize 75% / even、mark、swap marked、**join marked here (h/v)**、**send pane to window…**、**break to new window**、copy mode、respawn、kill |
 | 視窗清單 (`MouseDown3Status`) | Swap left/right、move/link to session、**merge into other window as pane (h/v)**、**even layout (horizontal / vertical / tiled)**、kill window、**renumber windows**、rename、new window |
-| 左側 session 區 (`MouseDown3StatusLeft`) | Next/prev/rename session、move current window、new session/window |
+| 左側 session 區 (`MouseDown3StatusLeft`) | Next/prev/choose/rename session、move current window、new session/window、kill session / kill-and-exit / kill-all-sessions |
 
 我們的綁定使用 `display-menu -O`，所以滑鼠按鈕釋放後選單仍保持開啟 — 選一個項目或按 Escape 取消。（tmux 預設沒有 `-O`，按鈕釋放即關閉，這會讓選單無法使用。）
 
