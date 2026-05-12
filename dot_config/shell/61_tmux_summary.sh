@@ -51,9 +51,16 @@ USAGE
     tsum -d | --deep            include visible area (20-100 lines) of each
                                 session's active pane in the LLM prompt
     tsum --shallow              force metadata-only (overrides TSUM_DEEP_DEFAULT=1)
+    tsum --sort closability     order keep → check → safe (default: alphabetical)
+    tsum --only safe|check|keep filter to one closability tier
     tsum -r | --refresh         bypass the 10-min cache
     tsum --dry-run              print what would be sent to the LLM (no API call)
     tsum --no-cache             don't read or write the cache
+
+EXAMPLES
+    tsum --sort closability     active work surfaces first, idle stuff last
+    tsum --only safe            "what can I close right now?"
+    tsum picker --only safe -i  fzf-pick a safe-to-close session to switch to
 
 ENV
     AICAP_AGENT, AICAP_*_MODEL  pin / override the agent (shared with aifix/aiblock)

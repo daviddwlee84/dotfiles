@@ -22,6 +22,13 @@ Flags:
   --dry-run         Print the constructed prompt to stdout and exit (no API
                     call). Lets you audit what would be sent.
   --no-cache        Don't read or write the cache (one-off invocation).
+  --sort {alpha,closability}
+                    alpha (default): tmux's natural order (alphabetical).
+                    closability: keep → check → safe, so active work surfaces
+                    first.
+  --only {safe,check,keep}
+                    Filter to one tier only. Combine with picker mode to bulk
+                    inspect candidates: `tsum picker --only safe | fzf -m`.
 
 Deep-by-default:
   Set `TSUM_DEEP_DEFAULT=1` (e.g. in ~/.shellrc.adhoc) to make --deep implicit;
@@ -273,6 +280,12 @@ def cache_path() -> Path:
     return d / f"{host}.json"
 
 
+# Bump when the per-session schema changes (e.g. v2 added closability fields).
+# Cache files with a mismatched version are silently ignored and overwritten on
+# next refresh, so old caches degrade gracefully without manual cleanup.
+_CACHE_VERSION = "v2"
+
+
 def load_cache(sig: str) -> list[dict] | None:
     p = cache_path()
     if not p.is_file():
@@ -280,6 +293,8 @@ def load_cache(sig: str) -> list[dict] | None:
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
+        return None
+    if data.get("version") != _CACHE_VERSION:
         return None
     if data.get("sig") != sig:
         return None
@@ -296,6 +311,7 @@ def save_cache(sig: str, summaries: list[dict]) -> None:
         p.write_text(
             json.dumps(
                 {
+                    "version": _CACHE_VERSION,
                     "sig": sig,
                     "generated_at_epoch": time.time(),
                     "ttl_seconds": TSUM_CACHE_TTL,
@@ -314,9 +330,10 @@ def save_cache(sig: str, summaries: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 PROMPT_PREAMBLE = """\
 You are summarizing a developer's tmux sessions so they can quickly remember \
-what each one is for. The data below is from `tmux list-sessions` + \
-`tmux list-windows`. The user has many cryptically-named sessions (numbers, \
-dates, project slugs) and wants a one-glance refresher.
+what each one is for, AND decide which sessions are safe to close. The data \
+below is from `tmux list-sessions` + `tmux list-windows`. The user has many \
+cryptically-named sessions (numbers, dates, project slugs) and wants a \
+one-glance refresher + a clear closability rating.
 
 For EACH session, infer:
   - A concise one-line summary (<= 70 chars) describing what the user is \
@@ -325,8 +342,24 @@ edited. Avoid generic phrases like "a session" or "various work".
   - 1-3 "important_windows": the editor window, the long-running process, \
 the primary terminal — whichever stand out as load-bearing. Skip if nothing \
 really stands out.
+  - A "closability" rating — how safe it is to close this session RIGHT NOW \
+without losing work:
+      "safe"   → nothing important; close freely. Only idle shells \
+(zsh/bash/fish), lazygit browsers, monitoring (tail -f, htop, watch), or \
+detached sessions with last_attached >7 days ago and no running process.
+      "check"  → might lose work; review before closing. Editor open with a \
+filename (might have unsaved buffer), attached but currently idle, recent \
+activity, unclear state.
+      "keep"   → active in-progress work; do NOT close. Coding-agent CLI \
+running (claude/opencode/codex/aider/gemini), long-running process \
+(python/node/npm run dev/cargo run/docker compose up/pytest), \
+attached + currently editing, --deep output showing a build/test running.
+  - A one-line "closability_reason" (<= 50 chars) explaining the rating.
 
-Heuristics:
+When in doubt, pick "check" rather than "safe" — false safe is worse than \
+false check.
+
+Summary heuristics:
   - `nvim`, `vim`, `code` → likely an editor; the filename in cmd matters.
   - `python`, `node`, `npm`, `cargo`, `make`, `pytest`, `docker` → likely a \
 running build/server/test. Note it.
@@ -338,9 +371,15 @@ worktree experiment, often short-lived.
 
 Respond with STRICT JSON only, no prose, no code fences:
 [
-  {"session": "<name>", "summary": "<<=70 chars>", "important_windows": [
-    {"index": <int>, "name": "<window_name>", "why": "<<=40 chars>"}
-  ]}
+  {
+    "session": "<name>",
+    "summary": "<<=70 chars>",
+    "closability": "safe" | "check" | "keep",
+    "closability_reason": "<<=50 chars>",
+    "important_windows": [
+      {"index": <int>, "name": "<window_name>", "why": "<<=40 chars>"}
+    ]
+  }
 ]
 """
 
@@ -460,6 +499,9 @@ def _invoke_http(prompt: str, timeout: float) -> str:
 # ---------------------------------------------------------------------------
 # Response parsing
 # ---------------------------------------------------------------------------
+_CLOSABILITY_TIERS = ("safe", "check", "keep")
+
+
 def parse_reply(reply: str) -> list[dict] | None:
     """Extract the JSON array of session summaries from the agent's reply.
 
@@ -494,9 +536,15 @@ def parse_reply(reply: str) -> list[dict] | None:
         sess = str(item.get("session", "")).strip()
         if not sess:
             continue
+        raw_closability = str(item.get("closability", "")).strip().lower()
+        # Unknown / missing → "check" (conservative middle): per the prompt
+        # rule "when in doubt, pick check rather than safe."
+        closability = raw_closability if raw_closability in _CLOSABILITY_TIERS else "check"
         out.append({
             "session": sess,
             "summary": str(item.get("summary", "")).strip()[:140],
+            "closability": closability,
+            "closability_reason": str(item.get("closability_reason", "")).strip()[:80],
             "important_windows": [
                 {
                     "index": int(w.get("index", 0)) if str(w.get("index", "")).lstrip("-").isdigit() else 0,
@@ -517,6 +565,13 @@ def _summary_by_session(summaries: list[dict]) -> dict[str, dict]:
     return {s["session"]: s for s in summaries}
 
 
+# Visual mapping for the three closability tiers. The glyph is plain Unicode
+# so it survives no-color terminals; the colour is rich-styled in TTYs.
+_TIER_GLYPHS = {"safe": "🟢", "check": "🟡", "keep": "🔴"}
+_TIER_COLORS = {"safe": "green", "check": "yellow", "keep": "red"}
+_TIER_FALLBACK_GLYPH = "⚪"  # used when LLM output is missing (fallback renderers)
+
+
 def render_list(sessions: list[Session], summaries: list[dict], use_color: bool) -> None:
     """Human-readable: one block per session to stdout."""
     out = Console(force_terminal=use_color, no_color=not use_color, soft_wrap=True)
@@ -525,11 +580,22 @@ def render_list(sessions: list[Session], summaries: list[dict], use_color: bool)
     for s in sessions:
         info = by_name.get(s.name, {})
         summary = info.get("summary") or "(no summary)"
+        tier = info.get("closability", "check")
+        glyph = _TIER_GLYPHS.get(tier, _TIER_FALLBACK_GLYPH)
+        color = _TIER_COLORS.get(tier, "cyan")
         attached = " *" if s.attached else "  "
         line = Text()
-        line.append(f"{s.name:<{name_width}}{attached} ", style="bold cyan")
+        line.append(f"{glyph} ", style="bold")
+        # Underline the name when "keep" so the row pops even on glyph-blind terminals.
+        name_style = f"bold {color}"
+        if tier == "keep":
+            name_style += " underline"
+        line.append(f"{s.name:<{name_width}}{attached} ", style=name_style)
         line.append(f"[{len(s.windows):>2}w] ", style="dim")
         line.append(summary, style="white")
+        reason = info.get("closability_reason", "")
+        if reason:
+            line.append(f"  ({reason})", style="dim italic")
         out.print(line)
         for w_info in info.get("important_windows", []):
             why = f"  — {w_info['why']}" if w_info.get("why") else ""
@@ -552,9 +618,11 @@ def render_picker(sessions: list[Session], summaries: list[dict]) -> None:
     for s in sessions:
         info = by_name.get(s.name, {})
         summary = info.get("summary") or "(no summary)"
+        tier = info.get("closability", "check")
+        glyph = _TIER_GLYPHS.get(tier, _TIER_FALLBACK_GLYPH)
         attached = "*" if s.attached else " "
         win_count = f"[{len(s.windows):>2}w]"
-        print(f"{s.name}\t{attached} {win_count} {summary}")
+        print(f"{s.name}\t{glyph} {attached} {win_count} {summary}")
 
 
 def render_fallback_list(sessions: list[Session], use_color: bool) -> None:
@@ -564,6 +632,7 @@ def render_fallback_list(sessions: list[Session], use_color: bool) -> None:
     for s in sessions:
         attached = " *" if s.attached else "  "
         line = Text()
+        line.append(f"{_TIER_FALLBACK_GLYPH} ", style="bold")
         line.append(f"{s.name:<{name_width}}{attached} ", style="bold cyan")
         line.append(f"[{len(s.windows):>2}w] ", style="dim")
         # Best-effort tag: most-common cwd basename + active window's cmd
@@ -585,7 +654,7 @@ def render_fallback_picker(sessions: list[Session]) -> None:
         basename = os.path.basename(common.rstrip("/")) or common
         active = next((w for w in s.windows if w.active), None)
         active_str = f" — {active.cmd}" if active else ""
-        print(f"{s.name}\t{attached} [{len(s.windows):>2}w] {basename}{active_str}")
+        print(f"{s.name}\t{_TIER_FALLBACK_GLYPH} {attached} [{len(s.windows):>2}w] {basename}{active_str}")
 
 
 # ---------------------------------------------------------------------------
@@ -618,6 +687,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("-r", "--refresh", action="store_true", help="Bypass cache.")
     p.add_argument("--dry-run", action="store_true", help="Print the prompt that would be sent; no API call.")
     p.add_argument("--no-cache", action="store_true", help="Don't read or write the cache.")
+    p.add_argument(
+        "--sort", choices=["alpha", "closability"], default="alpha",
+        help="Order sessions: alpha (tmux's natural order) or closability (keep→check→safe).",
+    )
+    p.add_argument(
+        "--only", choices=_CLOSABILITY_TIERS, default=None,
+        help="Filter to one closability tier.",
+    )
     args = p.parse_args()
     # Three-state resolution: flag explicit > env var > False.
     if args.deep is None:
@@ -652,11 +729,7 @@ def main() -> int:
                 "[dim]Install one, or set AICAP_AGENT=http with AICAP_HTTP_API_KEY.[/dim]\n"
                 "[yellow]Falling back to metadata-only output (no AI summaries).[/yellow]"
             )
-            if args.mode == "picker":
-                render_fallback_picker(sessions)
-            else:
-                render_fallback_list(sessions, use_color=sys.stdout.isatty())
-            return 0  # not an error from the user's perspective — they still got output
+            return _render_fallback(sessions, args)
 
         prompt = build_prompt(sessions, deep=args.deep)
         with err.status(f"[dim]{agent} ({model_for(agent)}) thinking…[/dim]", spinner="dots"):
@@ -664,19 +737,69 @@ def main() -> int:
         summaries = parse_reply(reply) or []
         if not summaries:
             err.print("[yellow]LLM returned no parseable JSON; falling back to metadata-only.[/yellow]")
-            if args.mode == "picker":
-                render_fallback_picker(sessions)
-            else:
-                render_fallback_list(sessions, use_color=sys.stdout.isatty())
-            return 0
+            return _render_fallback(sessions, args)
         if not args.no_cache:
             save_cache(sig, summaries)
+
+    # Apply --sort / --only between summary fetch and rendering. Cache is
+    # untouched (we always save unsorted + unfiltered) so different views
+    # of the same summary set don't thrash the cache.
+    sessions = _apply_view(sessions, summaries, sort=args.sort, only=args.only)
+    if not sessions:
+        err.print(f"[yellow]No sessions match --only={args.only}.[/yellow]")
+        return 0
 
     if args.mode == "picker":
         render_picker(sessions, summaries)
     else:
         render_list(sessions, summaries, use_color=sys.stdout.isatty())
     return 0
+
+
+def _render_fallback(sessions: list[Session], args: argparse.Namespace) -> int:
+    """Fallback render path — used when the LLM is unavailable or unparseable.
+
+    --sort=closability and --only depend on LLM-derived tiers, so they're
+    no-ops here; warn the user instead of silently ignoring.
+    """
+    if args.only or args.sort == "closability":
+        err.print(
+            "[yellow]--sort=closability and --only need an LLM-rated tier;"
+            " ignoring in fallback mode.[/yellow]"
+        )
+    if args.mode == "picker":
+        render_fallback_picker(sessions)
+    else:
+        render_fallback_list(sessions, use_color=sys.stdout.isatty())
+    return 0
+
+
+# Sort order for --sort=closability: high-urgency first so the user sees
+# active work at the top and can scroll past safe-to-close sessions.
+_TIER_RANK = {"keep": 0, "check": 1, "safe": 2}
+
+
+def _apply_view(
+    sessions: list[Session],
+    summaries: list[dict],
+    *,
+    sort: str,
+    only: str | None,
+) -> list[Session]:
+    by_name = _summary_by_session(summaries)
+
+    def tier_of(s: Session) -> str:
+        return by_name.get(s.name, {}).get("closability", "check")
+
+    if only:
+        sessions = [s for s in sessions if tier_of(s) == only]
+
+    if sort == "closability":
+        # Stable secondary sort by name preserves alphabetical order within
+        # each tier so the listing is deterministic.
+        sessions = sorted(sessions, key=lambda s: (_TIER_RANK.get(tier_of(s), 1), s.name))
+
+    return sessions
 
 
 if __name__ == "__main__":
