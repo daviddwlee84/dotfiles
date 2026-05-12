@@ -18,7 +18,7 @@ Flags:
                     may include scrollback content. Self-capture is skipped
                     automatically (the pane running tsum is excluded).
   --shallow         Force metadata-only mode (overrides TSUM_DEEP_DEFAULT).
-  -r, --refresh     Bypass the 10-min cache; force a fresh LLM call.
+  -r, --refresh     Bypass the prompt-hash cache; force a fresh LLM call.
   --dry-run         Print the constructed prompt to stdout and exit (no API
                     call). Lets you audit what would be sent.
   --no-cache        Don't read or write the cache (one-off invocation).
@@ -46,7 +46,13 @@ shell rc to override globally):
   AICAP_HTTP_URL          default: https://openrouter.ai/api/v1/chat/completions
   AICAP_HTTP_MODEL        default: google/gemini-2.0-flash-exp:free
   AICAP_HTTP_API_KEY      default: $OPENROUTER_API_KEY
-  TSUM_CACHE_TTL          seconds, default 600 (10 min)
+  TSUM_MIN_REFRESH_INTERVAL  seconds, default 120. Throttle window when the
+                          prompt hash changes — within it, reuse the stale
+                          cache to absorb high-frequency churn (htop, watch,
+                          progress bars). Identical-prompt hits ignore this
+                          and reuse the cache regardless of age. Set to 0
+                          to disable throttling. TSUM_CACHE_TTL accepted as
+                          a fallback alias for back-compat.
   TSUM_TIMEOUT            seconds, default 60 (LLM call timeout)
   TSUM_TMUX_BIN           full path to tmux binary, default "tmux" — set this
                           when multiple tmux versions are on PATH and the
@@ -148,7 +154,19 @@ AICAP_HTTP_URL = _env_or_ssot("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/ch
 AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "openrouter/free")
 AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
 AICAP_AGENT_PRIORITY = _env_or_ssot("AICAP_AGENT_PRIORITY", "opencode claude codex cursor-agent").split()
-TSUM_CACHE_TTL = int(os.environ.get("TSUM_CACHE_TTL", "600"))
+# Throttle window for the hash-based cache. The cache key is a hash of the
+# full LLM prompt (build_prompt output), so identical prompts always hit
+# regardless of age — a stale session that hasn't changed costs zero tokens
+# forever. But in --deep mode the prompt embeds pane tail content, which
+# can churn every second under htop / watch / progress bars / clocks. To
+# avoid that pathology, when the prompt hash *differs* from the cached one
+# we still reuse the stale summary if it was generated within this window.
+# Set to 0 for pure hash-based behaviour (no throttling). TSUM_CACHE_TTL is
+# accepted as a fallback alias for back-compat with pre-hash-cache configs.
+TSUM_MIN_REFRESH_INTERVAL = int(
+    os.environ.get("TSUM_MIN_REFRESH_INTERVAL")
+    or os.environ.get("TSUM_CACHE_TTL", "120")
+)
 TSUM_TIMEOUT = float(os.environ.get("TSUM_TIMEOUT", "60"))
 # Pin a specific tmux binary if multiple are on PATH (e.g. /bin/tmux 3.2a
 # from apt vs ~/.local/bin/tmux 3.5+ from the appimage). Different major
@@ -349,28 +367,13 @@ def _capture_active_pane(session: str, wins: list[Window], my_pane: str) -> tupl
 
 
 # ---------------------------------------------------------------------------
-# Signature + cache
+# Cache (keyed by full-prompt hash)
 # ---------------------------------------------------------------------------
-def session_signature(sessions: list[Session], deep: bool) -> str:
-    """Stable hash over the (session_name, window_count, window_indices,
-    pane_current_command-of-active-window) tuple — invalidates the cache when
-    structure changes but not when the user just navigates around.
-
-    `deep` participates in the sig so a `--deep` run is cached separately
-    from a metadata-only run (different prompt → different summaries).
-    """
-    parts: list[str] = ["deep" if deep else "shallow"]
-    for s in sorted(sessions, key=lambda x: x.name):
-        win_sig = ",".join(f"{w.index}:{w.cmd}" for w in s.windows)
-        parts.append(f"{s.name}|{len(s.windows)}|{win_sig}")
-    blob = "\n".join(parts).encode("utf-8")
-    return hashlib.sha256(blob).hexdigest()[:16]
-
-
 def cache_path(deep: bool) -> Path:
     """Per-host, per-mode cache file. Splitting deep / shallow into two slots
-    means toggling --deep / --shallow doesn't thrash the other mode's cache —
-    each TTL window can serve both depths from cache independently.
+    means toggling --deep / --shallow doesn't overwrite the other mode's
+    latest cached summary — each can be served independently when its own
+    prompt-hash hits.
     """
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     d = Path(base) / "tmux-session-summary"
@@ -380,41 +383,57 @@ def cache_path(deep: bool) -> Path:
     return d / f"{host}-{mode}.json"
 
 
-# Bump when the per-session schema changes (e.g. v2 added closability fields).
-# Cache files with a mismatched version are silently ignored and overwritten on
-# next refresh, so old caches degrade gracefully without manual cleanup.
-_CACHE_VERSION = "v2"
+# Bump when the cache schema changes. Mismatched-version files are silently
+# ignored and overwritten on next refresh.
+#   v2 → v3: structure signature renamed to full-prompt hash (`sig` →
+#            `prompt_hash`); `ttl_seconds` dropped (no longer meaningful
+#            under hash-based invalidation).
+_CACHE_VERSION = "v3"
 
 
-def load_cache(sig: str, deep: bool) -> list[dict] | None:
+def lookup_cache(prompt_hash: str, deep: bool) -> tuple[list[dict] | None, str]:
+    """Return (summaries, reason) where reason ∈ {"hit", "throttled", "miss"}.
+
+    - "hit":       cached prompt_hash matches → identical LLM input,
+                   identical answer, reuse regardless of age.
+    - "throttled": prompt_hash differs but the cache is younger than
+                   TSUM_MIN_REFRESH_INTERVAL → reuse stale summary to
+                   absorb high-frequency churn (htop/watch/progress bars).
+    - "miss":      stale and out-of-throttle, or no cache at all → caller
+                   should hit the LLM.
+    """
     p = cache_path(deep)
     if not p.is_file():
-        return None
+        return None, "miss"
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return None
+        return None, "miss"
     if data.get("version") != _CACHE_VERSION:
-        return None
-    if data.get("sig") != sig:
-        return None
-    age = time.time() - float(data.get("generated_at_epoch", 0))
-    if age > TSUM_CACHE_TTL:
-        return None
+        return None, "miss"
     summaries = data.get("sessions")
-    return summaries if isinstance(summaries, list) else None
+    if not isinstance(summaries, list):
+        return None, "miss"
+
+    if data.get("prompt_hash") == prompt_hash:
+        return summaries, "hit"
+
+    age = time.time() - float(data.get("generated_at_epoch", 0))
+    if age < TSUM_MIN_REFRESH_INTERVAL:
+        return summaries, "throttled"
+
+    return None, "miss"
 
 
-def save_cache(sig: str, summaries: list[dict], deep: bool) -> None:
+def save_cache(prompt_hash: str, summaries: list[dict], deep: bool) -> None:
     p = cache_path(deep)
     try:
         p.write_text(
             json.dumps(
                 {
                     "version": _CACHE_VERSION,
-                    "sig": sig,
+                    "prompt_hash": prompt_hash,
                     "generated_at_epoch": time.time(),
-                    "ttl_seconds": TSUM_CACHE_TTL,
                     "sessions": summaries,
                 },
                 indent=2,
@@ -826,17 +845,29 @@ def main() -> int:
         )
         return 1
 
+    # Build the prompt up-front: it's both the LLM input (if we miss cache)
+    # and the cache key (its sha256). --dry-run continues to short-circuit
+    # before any cache I/O — the user explicitly wants to inspect, not run.
+    prompt = build_prompt(sessions, deep=args.deep)
+
     if args.dry_run:
-        print(build_prompt(sessions, deep=args.deep))
+        print(prompt)
         return 0
 
-    sig = session_signature(sessions, deep=args.deep)
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
     cached: list[dict] | None = None
+    cache_reason = "skipped"
     if not args.refresh and not args.no_cache:
-        cached = load_cache(sig, args.deep)
+        cached, cache_reason = lookup_cache(prompt_hash, args.deep)
 
     if cached is not None:
         summaries = cached
+        if cache_reason == "throttled":
+            err.print(
+                f"[dim]tsum: prompt changed but reusing cache "
+                f"(<{TSUM_MIN_REFRESH_INTERVAL}s since last refresh; "
+                f"set TSUM_MIN_REFRESH_INTERVAL=0 to disable, or --refresh to force).[/dim]"
+            )
     else:
         agent = detect_agent()
         if agent is None:
@@ -848,7 +879,6 @@ def main() -> int:
             )
             return _render_fallback(sessions, args)
 
-        prompt = build_prompt(sessions, deep=args.deep)
         with err.status(f"[dim]{agent} ({model_for(agent)}) thinking…[/dim]", spinner="dots"):
             reply = invoke_agent(agent, prompt, TSUM_TIMEOUT)
         summaries = parse_reply(reply) or []
@@ -856,7 +886,7 @@ def main() -> int:
             err.print("[yellow]LLM returned no parseable JSON; falling back to metadata-only.[/yellow]")
             return _render_fallback(sessions, args)
         if not args.no_cache:
-            save_cache(sig, summaries, args.deep)
+            save_cache(prompt_hash, summaries, args.deep)
 
     # Apply --sort / --only between summary fetch and rendering. Cache is
     # untouched (we always save unsorted + unfiltered) so different views

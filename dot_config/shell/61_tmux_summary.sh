@@ -53,7 +53,7 @@ USAGE
     tsum --shallow              force metadata-only (overrides TSUM_DEEP_DEFAULT=1)
     tsum --sort closability     order keep → check → safe (default: alphabetical)
     tsum --only safe|check|keep filter to one closability tier
-    tsum -r | --refresh         bypass the 10-min cache
+    tsum -r | --refresh         bypass the prompt-hash cache and force a fresh LLM call
     tsum --dry-run              print what would be sent to the LLM (no API call)
     tsum --no-cache             don't read or write the cache
 
@@ -65,7 +65,14 @@ EXAMPLES
 ENV
     AICAP_AGENT, AICAP_*_MODEL  pin / override the agent (shared with aifix/aiblock)
     TSUM_DEEP_DEFAULT=1         make --deep implicit (override per-call with --shallow)
-    TSUM_CACHE_TTL              seconds, default 600
+    TSUM_MIN_REFRESH_INTERVAL   seconds, default 120. Even when the prompt
+                                hash differs from the cached one, reuse the
+                                old summary if the previous LLM call was
+                                within this window (protects against high-
+                                volatility deep-mode panes like htop/watch).
+                                Identical prompts always hit, regardless of
+                                age. Set to 0 to disable throttling.
+                                TSUM_CACHE_TTL accepted as fallback alias.
     TSUM_TIMEOUT                seconds, default 60
     TSUM_TMUX_BIN               full path to tmux binary, default "tmux" (use this
                                 when multiple tmux binaries are on PATH and the
@@ -73,7 +80,10 @@ ENV
                                 e.g. TSUM_TMUX_BIN=/bin/tmux)
 
 CACHE
-    $XDG_CACHE_HOME/tmux-session-summary/<hostname>.json
+    $XDG_CACHE_HOME/tmux-session-summary/<hostname>-<mode>.json
+    (cache key is sha256(build_prompt)[:16] — identical prompts hit forever;
+     differing prompts trigger a fresh LLM call unless throttled by
+     TSUM_MIN_REFRESH_INTERVAL)
 EOF
                 return 0
                 ;;
