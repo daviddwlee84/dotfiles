@@ -9152,3 +9152,2222 @@ removed: .config/zsh/tools/50_networking.zsh
 │  1 │# 50_networking.zsh - Networking ↵│    │
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:05Z)**_
+
+Chezmoi sees: add 3 shell files, remove 3 zsh-tools files (via .chezmoiremove). Commit Stage 2:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:06Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:06Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #11 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage Stage 2 files
+
+`git add .chezmoiremove docs/shells/aliases.md dot_config/shell/41_github.sh dot_config/shell/42_gitlab.sh dot_config/shell/50_networking.sh dot_config/zsh/tools/41_github.zsh dot_config/zsh/tools/42_gitlab.zsh dot_config/zsh/tools/50_networking.zsh .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md && git status --short`
+
+```text
+M  .chezmoiremove
+M  .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+M  docs/shells/aliases.md
+A  dot_config/shell/41_github.sh
+R  dot_config/zsh/tools/42_gitlab.zsh -> dot_config/shell/42_gitlab.sh
+R  dot_config/zsh/tools/50_networking.zsh -> dot_config/shell/50_networking.sh
+D  dot_config/zsh/tools/41_github.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Stage 2
+
+```bash
+git commit -m "$(cat <<'EOF'
+refactor(shell): move networking/github/gitlab helpers to shared layer
+
+50_networking: print -r → printf, rename __ZSH_NET_* → __NET_*.
+42_gitlab: gate emulate -L zsh on $ZSH_VERSION (only zsh-ism in the file).
+41_github: full ghget rewrite — ${(s:/:)} split → tr+read loop, ${(j:/:)}
+join → IFS=/ + ${arr[*]}, 1-indexed ${parts[N]} → bash-style slice
+${parts[@]:N:1}, ${arr[5,-1]} → ${arr[@]:4}, :t modifier → ${var##*/},
+${#arr} → ${#arr[@]}. setopt pipefail gated on $ZSH_VERSION (bash falls
+through to `set -o pipefail`, leaks for the rest of the shell — benign).
+
+Old zsh-tools paths added to .chezmoiremove to clean up on managed hosts
+(same pattern as commit 9bb56c2). aliases.md source columns updated.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778585837-58617.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778585837-58617.
+[main c98f4fe] refactor(shell): move networking/github/gitlab helpers to shared layer
+ 7 files changed, 2126 insertions(+), 212 deletions(-)
+ create mode 100644 dot_config/shell/41_github.sh
+ rename dot_config/{zsh/tools/42_gitlab.zsh => shell/42_gitlab.sh} (85%)
+ rename dot_config/{zsh/tools/50_networking.zsh => shell/50_networking.sh} (63%)
+ delete mode 100644 dot_config/zsh/tools/41_github.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:21Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #11 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:29Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:30Z)**_
+
+Stage 2 committed (c98f4fe). Now Stage 3 — audit 11 files in parallel:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/28_tldr.zsh`
+
+```text
+1	# 28_tldr.zsh - tldr language preference helper
+2	
+3	# Language preference order for tldrf fallback.
+4	typeset -ga TLDR_LANGUAGES=(zh_TW zh en)
+5	
+6	tldrf() {
+7	    command -v tldr &>/dev/null || return 127
+8	
+9	    local -a lang_flags
+10	    local lang
+11	    for lang in "${TLDR_LANGUAGES[@]}"; do
+12	        lang_flags+=(-L "$lang")
+13	    done
+14	
+15	    command tldr "${lang_flags[@]}" "$@"
+16	}
+17
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:31Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/35_yazi.zsh`
+
+```text
+1	# 35_yazi.zsh - yazi file manager configuration
+2	
+3	# Check if yazi is installed
+4	command -v yazi &>/dev/null || return 0
+5	
+6	# Wrapper function to change directory on exit
+7	# When you quit yazi, it will cd to the directory you were browsing
+8	function y() {
+9	    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+10	    command yazi "$@" --cwd-file="$tmp"
+11	    IFS= read -r -d '' cwd < "$tmp"
+12	    [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
+13	    rm -f -- "$tmp"
+14	}
+15
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/37_worktrunk.zsh`
+
+```text
+1	# 37_worktrunk.zsh - Worktrunk (`wt`) git worktree manager
+2	# https://worktrunk.dev — github.com/max-sixty/worktrunk
+3	#
+4	# Companion config: ~/.config/worktrunk/config.toml (managed by chezmoi at
+5	# dot_config/worktrunk/config.toml). Aliases like `wt sw` / `wt cc` live
+6	# THERE, not here — keep this file focused on shell-level integration only.
+7	
+8	# Skip silently if not installed (Linux ansible install can fail offline)
+9	command -v wt &>/dev/null || return 0
+10	
+11	# ── Shell integration: cd-wrapping `wt` function ───────────────────────────
+12	#
+13	# `wt switch` needs to change the parent shell's $PWD, which a normal binary
+14	# can't do. Worktrunk solves this by writing a directive file that a wrapper
+15	# shell function reads and `cd`s to. We eval that wrapper at shell startup
+16	# rather than running `wt config shell install` (which edits ~/.zshrc with a
+17	# block chezmoi would fight over).
+18	#
+19	# Same pattern as starship / zoxide / direnv elsewhere in this directory.
+20	eval "$(wt config shell init zsh 2>/dev/null)"
+21	
+22	# ── Completion ─────────────────────────────────────────────────────────────
+23	#
+24	# macOS (Homebrew): `_wt` ships in /opt/homebrew/share/zsh/site-functions/
+25	# and is picked up automatically by compinit — nothing to do here.
+26	#
+27	# Linux (ansible drops the bare binary into ~/.local/bin/) has no system
+28	# completion path, so dump clap's auto-generated zsh completer into
+29	# ~/.zfunc/_wt (already on $fpath via dot_zshrc.tmpl). Same pattern as sesh /
+30	# television. Regenerate when wt's version changes.
+31	#
+32	# Worktrunk doesn't expose a `wt completion zsh` subcommand — clap's dynamic
+33	# completer is invoked via `COMPLETE=zsh wt` (with no args). Output is a
+34	# self-contained `#compdef wt` script that handles further completion
+35	# requests by re-invoking the binary with COMPLETE+_CLAP_COMPLETE_INDEX set.
+36	if [[ -d ~/.zfunc ]] && [[ ! -f /opt/homebrew/share/zsh/site-functions/_wt ]] \
+37	                    && [[ ! -f /usr/local/share/zsh/site-functions/_wt ]]; then
+38	    local _wt_ver="$(wt --version 2>/dev/null)"
+39	    if [[ ! -f ~/.zfunc/_wt ]] || ! grep -q "${_wt_ver}" ~/.zfunc/_wt 2>/dev/null; then
+40	        {
+41	            print -r -- "# Auto-generated by 37_worktrunk.zsh for ${_wt_ver}"
+42	            COMPLETE=zsh wt 2>/dev/null
+43	        } > ~/.zfunc/_wt
+44	    fi
+45	fi
+46	
+47	# ── Tiny zsh-side conveniences (NOT duplicating wt's own aliases) ─────────
+48	#
+49	# `wt`'s own aliases (sw / ls / rm / cc / oc) are defined in
+50	# ~/.config/worktrunk/config.toml so they work from any shell + the
+51	# interactive picker. Anything below is ZSH-ONLY niceness that wt's alias
+52	# system can't express.
+53	
+54	# `wtcd` — jump to a worktree path WITHOUT switching tmux/sesh session.
+55	# Useful when you want to peek at sibling worktree files (open in nvim split,
+56	# scp, etc.) without disturbing the current pane's session context.
+57	function wtcd() {
+58	    local target
+59	    target=$(wt list --format=json 2>/dev/null \
+60	        | jq -r '.worktrees[].path' \
+61	        | fzf-tmux -p 60%,40% --prompt='wt cd ❯ ' --header='Pick a worktree to cd into') \
+62	        || return
+63	    [[ -n "$target" ]] && cd -- "$target"
+64	}
+65
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/38_lazyvim.zsh`
+
+```text
+1	# 38_lazyvim.zsh - LazyVim / Neovim plugin management aliases
+2	#
+3	# All commands run nvim in headless mode and exit, so they can be chained
+4	# in scripts or used in CI. Output is piped through `tail` to keep the
+5	# terminal clean (nvim headless mode produces a lot of redraw noise).
+6	#
+7	# Usage examples:
+8	#   lazy-update                  # update all plugins
+9	#   lazy-update snacks.nvim      # update a single plugin
+10	#   mason-install lua-language-server stylua
+11	#   nvim-rollback                # restore plugins from lazy-lock.json
+12	
+13	command -v nvim &>/dev/null || return 0
+14	
+15	# --- Internal helper -------------------------------------------------------
+16	# Run a sequence of nvim ex-commands headlessly and trim noisy output.
+17	# Usage: _nvim_headless "<cmd1>" "<cmd2>" ...
+18	_nvim_headless() {
+19	  local args=()
+20	  for cmd in "$@"; do
+21	    args+=("+${cmd}")
+22	  done
+23	  args+=("+qa")
+24	  nvim --headless "${args[@]}" 2>&1 | tail -40
+25	}
+26	
+27	# --- Lazy.nvim (plugin manager) -------------------------------------------
+28	
+29	# Update plugins. With no args: update all. With args: update specific plugins.
+30	#   lazy-update
+31	#   lazy-update snacks.nvim telescope.nvim
+32	lazy-update() {
+33	  if [[ $# -eq 0 ]]; then
+34	    _nvim_headless "Lazy! sync"
+35	  else
+36	    _nvim_headless "Lazy! update $*"
+37	  fi
+38	}
+39	
+40	# Check which plugins have updates available (no install).
+41	alias lazy-check='_nvim_headless "Lazy! check"'
+42	
+43	# Install missing plugins (e.g., after editing config to add a new one).
+44	alias lazy-install='_nvim_headless "Lazy! install"'
+45	
+46	# Remove plugins that are no longer in your config.
+47	alias lazy-clean='_nvim_headless "Lazy! clean"'
+48	
+49	# Restore all plugins to the versions pinned in lazy-lock.json.
+50	# Useful for rolling back after a bad update.
+51	alias lazy-restore='_nvim_headless "Lazy! restore"'
+52	
+53	# Build plugins that have a build step (e.g., telescope-fzf-native).
+54	alias lazy-build='_nvim_headless "Lazy! build"'
+55	
+56	# Show plugin load times. Opens interactively (not headless).
+57	alias lazy-profile='nvim "+Lazy profile"'
+58	
+59	# Open the Lazy UI interactively.
+60	alias lazy='nvim "+Lazy"'
+61	
+62	# --- Mason (LSP / formatter / linter manager) ------------------------------
+63	
+64	# Update all Mason packages.
+65	alias mason-update='_nvim_headless "MasonUpdate"'
+66	
+67	# Install one or more Mason packages.
+68	#   mason-install lua-language-server stylua
+69	mason-install() {
+70	  if [[ $# -eq 0 ]]; then
+71	    echo "Usage: mason-install <package> [<package> ...]" >&2
+72	    echo "Example: mason-install lua-language-server stylua" >&2
+73	    return 1
+74	  fi
+75	  _nvim_headless "MasonInstall $*"
+76	}
+77	
+78	# Uninstall Mason packages.
+79	mason-uninstall() {
+80	  if [[ $# -eq 0 ]]; then
+81	    echo "Usage: mason-uninstall <package> [<package> ...]" >&2
+82	    return 1
+83	  fi
+84	  _nvim_headless "MasonUninstall $*"
+85	}
+86	
+87	# Open Mason UI interactively.
+88	alias mason='nvim "+Mason"'
+89	
+90	# Open Mason log (useful when an install fails).
+91	alias mason-log='nvim "+MasonLog"'
+92	
+93	# --- Treesitter ------------------------------------------------------------
+94	
+95	# Update all installed Treesitter parsers.
+96	alias treesitter-update='_nvim_headless "TSUpdateSync"'
+97	
+98	# Install Treesitter parsers for specific languages.
+99	#   treesitter-install python rust go
+100	treesitter-install() {
+101	  if [[ $# -eq 0 ]]; then
+102	    echo "Usage: treesitter-install <language> [<language> ...]" >&2
+103	    return 1
+104	  fi
+105	  for lang in "$@"; do
+106	    _nvim_headless "TSInstallSync! $lang"
+107	  done
+108	}
+109	
+110	# --- Health & diagnostics --------------------------------------------------
+111	
+112	# Run :checkhealth (interactive — output is too rich for headless).
+113	alias nvim-health='nvim "+checkhealth"'
+114	
+115	# Print Neovim version + build info.
+116	alias nvim-version='nvim --version | head -10'
+117	
+118	# Run a fresh nvim with NO plugins / NO config (debugging baseline).
+119	alias nvim-clean-startup='nvim --clean'
+120	
+121	# Tail the LSP log file.
+122	alias nvim-lsp-log='tail -f "${XDG_STATE_HOME:-$HOME/.local/state}/nvim/lsp.log"'
+123	
+124	# --- Cache / state management ---------------------------------------------
+125	
+126	# Show how much disk Neovim's plugin & state dirs are using.
+127	nvim-disk-usage() {
+128	  local share="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+129	  local state="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
+130	  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
+131	  echo "Neovim disk usage:"
+132	  for dir in "$share" "$state" "$cache"; do
+133	    if [[ -d "$dir" ]]; then
+134	      printf "  %-60s %s\n" "$dir" "$(du -sh "$dir" 2>/dev/null | awk '{print $1}')"
+135	    fi
+136	  done
+137	}
+138	
+139	# Nuclear option: remove plugin install dir + state. Config is untouched.
+140	# Will prompt for confirmation. After running, next `nvim` will reinstall everything.
+141	nvim-reset-plugins() {
+142	  local share="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+143	  local state="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
+144	  echo "This will delete:"
+145	  echo "  $share"
+146	  echo "  $state"
+147	  echo "Your config (~/.config/nvim) will NOT be touched."
+148	  printf "Continue? [y/N] "
+149	  read -r confirm
+150	  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+151	    echo "Aborted."
+152	    return 1
+153	  fi
+154	  rm -rf "$share" "$state"
+155	  echo "Done. Run \`nvim\` to reinstall plugins."
+156	}
+157	
+158	# --- Quick access ----------------------------------------------------------
+159	
+160	# Jump to nvim config dir (chezmoi-aware: edits source if config is managed).
+161	nvim-config-cd() {
+162	  cd "${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+163	}
+164
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/38_workmux.zsh`
+
+```text
+1	# 38_workmux.zsh - Workmux (`workmux` / `wm`) tmux + git-worktree orchestrator
+2	# https://workmux.raine.dev — github.com/raine/workmux
+3	#
+4	# Companion config: ~/.config/workmux/config.yaml (managed by chezmoi at
+5	# dot_config/workmux/config.yaml). See docs/tools/workmux.md for the full
+6	# story (worktrunk vs workmux split, status icon lifecycle, leak mitigation).
+7	#
+8	# Why a separate file from 37_worktrunk.zsh: the two tools coexist (worktrunk
+9	# = `wt` for git-worktree CLI / aliases, workmux = `wm` for status icons +
+10	# dashboard + sidebar). Separate files keep the rationale + helpers per-tool
+11	# and let users disable one independently.
+12	
+13	# Skip silently if not installed (Linux ansible install can fail offline,
+14	# Cargo path may not be present, etc.)
+15	command -v workmux &>/dev/null || return 0
+16	
+17	# ── Manual marker cleanup ──────────────────────────────────────────────────
+18	#
+19	# The `working` (🤖) status workmux sets is *sticky* — it never auto-clears
+20	# on its own. `waiting` (💬) and `done` (✅) auto-clear when you focus the
+21	# window, but `working` only goes away when:
+22	#   1. The agent's plugin/hook explicitly calls `workmux set-window-status done`
+23	#      (Claude Stop / OpenCode session.idle), OR
+24	#   2. `workmux sidebar` is running and detects 10s of pane silence
+25	#      (interrupted-agent detection), OR
+26	#   3. You manually clear it.
+27	#
+28	# Path #1 fails when the agent is killed before its Stop/idle handler fires
+29	# (Ctrl+C, terminal crash, OOM). Path #2 requires keeping a sidebar pane open.
+30	# `wmclear` is the manual escape hatch.
+31	#
+32	# Without arg: clears the marker for the current tmux window.
+33	# With arg:    `wmclear 5` clears window 5 in the current session.
+34	# Pass `--all` to nuke every workmux marker in the current session.
+35	function wmclear() {
+36	    if [[ "$1" == "--all" ]]; then
+37	        # Walk every window in the current session and unset the user-var
+38	        local sess
+39	        sess=$(tmux display -p '#{session_name}' 2>/dev/null) || return 1
+40	        local -a windows
+41	        windows=("${(@f)$(tmux list-windows -t "$sess" -F '#{window_index}' 2>/dev/null)}")
+42	        local w
+43	        for w in "${windows[@]}"; do
+44	            tmux set-option -w -t "${sess}:${w}" -u '@workmux_status' 2>/dev/null
+45	        done
+46	        echo "Cleared @workmux_status on ${#windows[@]} windows in session $sess"
+47	        return 0
+48	    fi
+49	
+50	    if [[ -n "$1" ]]; then
+51	        # Specific window: use workmux's own clear command (handles agent
+52	        # state too, not just the tmux user-var)
+53	        local sess win
+54	        sess=$(tmux display -p '#{session_name}' 2>/dev/null) || return 1
+55	        win="$1"
+56	        tmux set-option -w -t "${sess}:${win}" -u '@workmux_status' 2>/dev/null
+57	        echo "Cleared @workmux_status on ${sess}:${win}"
+58	        return 0
+59	    fi
+60	
+61	    # Current window: prefer workmux's clear so it also resets agent state
+62	    workmux set-window-status clear 2>/dev/null
+63	}
+64	
+65	# ── Sidebar daemon convenience ─────────────────────────────────────────────
+66	#
+67	# `workmux sidebar` is what enables the "interrupted agent" auto-clear (10s
+68	# pane-silence heuristic). Without it, `working` markers leak forever on
+69	# crashed agents. NOT auto-started here because it spawns a tmux pane and
+70	# many users want to opt-in. Use `wmsb` to toggle.
+71	alias wmsb='workmux sidebar'
+72	
+73	# ── Short aliases mirroring upstream's recommendation ──────────────────────
+74	# README explicitly suggests `alias wm='workmux'`. The Linux ansible install
+75	# also creates a `wm` symlink in ~/.local/bin so this alias is redundant on
+76	# Linux, but on macOS Homebrew installs only `workmux`, so define it here.
+77	if ! command -v wm &>/dev/null; then
+78	    alias wm='workmux'
+79	fi
+80
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:33Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/55_web_reader.zsh`
+
+```text
+1	# 55_web_reader.zsh - Render web pages as markdown in the terminal
+2	#
+3	# Four extractors, pick by function name:
+4	#   readurl   - jina.ai Reader (remote, zero local deps beyond glow)
+5	#   readlocal - trafilatura (local, Python; offline article extraction)
+6	#   readnode  - readability-cli / `readable` (local, Node; Mozilla Readability)
+7	#   readraw   - curl + pandoc (full page -> GFM; no article extraction)
+8	#
+9	# All wrap the underlying fetch in `try_direct_then_proxy` from 50_networking.zsh,
+10	# so non-GFW'd URLs pay zero proxy overhead and only fall back if direct fetch fails.
+11	
+12	# Normalize URL: prepend https:// if scheme missing.
+13	_norm_url() {
+14	  local url="$1"
+15	  if [[ "$url" != http://* && "$url" != https://* ]]; then
+16	    url="https://$url"
+17	  fi
+18	  printf '%s\n' "$url"
+19	}
+20	
+21	# Missing-binary guard: print a one-line install hint and return 127.
+22	__zsh_reader_require() {
+23	  local bin="$1" hint="$2"
+24	  if ! command -v "$bin" &>/dev/null; then
+25	    print -u2 "$bin not found -- install: $hint"
+26	    return 127
+27	  fi
+28	  return 0
+29	}
+30	
+31	# readurl <url> - jina.ai Reader + glow. The default convenience.
+32	readurl() {
+33	  local raw="$1"
+34	  if [[ -z "$raw" ]]; then
+35	    print -u2 "usage: readurl <url>"
+36	    return 2
+37	  fi
+38	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+39	  local url; url="$(_norm_url "$raw")"
+40	  try_direct_then_proxy glow -p "https://r.jina.ai/$url"
+41	}
+42	
+43	# readlocal <url> - trafilatura (offline article extraction) + glow.
+44	readlocal() {
+45	  local raw="$1"
+46	  if [[ -z "$raw" ]]; then
+47	    print -u2 "usage: readlocal <url>"
+48	    return 2
+49	  fi
+50	  __zsh_reader_require trafilatura "uv tool install trafilatura  (or enable the python_uv_tools ansible role)" || return
+51	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+52	  local url; url="$(_norm_url "$raw")"
+53	  try_direct_then_proxy trafilatura -u "$url" --markdown | glow -
+54	}
+55	
+56	# readnode <url> - readability-cli (`readable`) + glow.
+57	readnode() {
+58	  local raw="$1"
+59	  if [[ -z "$raw" ]]; then
+60	    print -u2 "usage: readnode <url>"
+61	    return 2
+62	  fi
+63	  __zsh_reader_require readable "npm install -g readability-cli  (or enable the js_cli_tools ansible role)" || return
+64	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+65	  local url; url="$(_norm_url "$raw")"
+66	  try_direct_then_proxy readable "$url" | glow -
+67	}
+68	
+69	# readraw <url> - full-page HTML -> markdown via pandoc (no article extraction).
+70	readraw() {
+71	  local raw="$1"
+72	  if [[ -z "$raw" ]]; then
+73	    print -u2 "usage: readraw <url>"
+74	    return 2
+75	  fi
+76	  __zsh_reader_require curl "apt install curl  (usually preinstalled)" || return
+77	  __zsh_reader_require pandoc "brew install pandoc  (or apt install pandoc)" || return
+78	  __zsh_reader_require glow "brew install glow  (or the devtools ansible role)" || return
+79	  local url; url="$(_norm_url "$raw")"
+80	  try_direct_then_proxy curl -fsSL "$url" | pandoc -f html -t gfm | glow -
+81	}
+82
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:34Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/94_ssh_agent.zsh`
+
+```text
+1	# 94_ssh_agent.zsh - SSH agent with Bitwarden-first fallback to ssh-agent
+2	#
+3	# Priority order:
+4	#   1. Bitwarden SSH agent (desktop app socket)
+5	#   2. Existing SSH_AUTH_SOCK (e.g. forwarded agent, systemd, gnome-keyring)
+6	#   3. Persistent ssh-agent (spawned once per user, reused across shells)
+7	#
+8	# The fallback ssh-agent uses a fixed socket path so multiple shells share
+9	# one agent instead of spawning a new one each time.
+10	
+11	# Probe timeout (seconds) — keeps shell startup fast even when an agent
+12	# socket exists but the daemon behind it is hung or locked.
+13	_SSH_AGENT_PROBE_TIMEOUT=2
+14	
+15	# Wrapper: ssh-add -l with a timeout to avoid hanging on unresponsive sockets.
+16	# Returns the same exit codes as ssh-add -l (0, 1, 2) plus 124 for timeout.
+17	_ssh_add_probe() {
+18	    if command -v timeout &>/dev/null; then
+19	        timeout "$_SSH_AGENT_PROBE_TIMEOUT" ssh-add -l "$@" 2>&1
+20	    else
+21	        # No timeout command (rare) — run directly and hope for the best
+22	        ssh-add -l "$@" 2>&1
+23	    fi
+24	}
+25	
+26	# ---------------------------------------------------------------------------
+27	# 1. Try Bitwarden SSH agent
+28	# ---------------------------------------------------------------------------
+29	_try_bitwarden_agent() {
+30	    typeset -a _bw_candidates
+31	
+32	    if [[ "$OSTYPE" == darwin* ]]; then
+33	        _bw_candidates=(
+34	            "$HOME/Library/Application Support/Bitwarden/.bitwarden-ssh-agent.sock"
+35	            "$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+36	            "$HOME/.bitwarden-ssh-agent.sock"
+37	        )
+38	    else
+39	        _bw_candidates=(
+40	            "$HOME/.bitwarden-ssh-agent.sock"
+41	            "$HOME/snap/bitwarden/current/.bitwarden-ssh-agent.sock"
+42	            "$HOME/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock"
+43	        )
+44	    fi
+45	
+46	    for _sock in "${_bw_candidates[@]}"; do
+47	        if [[ -S "$_sock" ]]; then
+48	            # Socket file exists — verify the agent actually responds
+49	            local _out
+50	            _out="$(SSH_AUTH_SOCK="$_sock" _ssh_add_probe)"
+51	            local rc=$?
+52	            # rc=0: keys listed  → usable
+53	            # rc=1 + "no identities": agent ok, no keys loaded → usable
+54	            # rc=1 + "refused": Bitwarden locked/agent disabled → skip
+55	            # rc=2: agent unreachable → skip
+56	            # rc=124: timed out → skip
+57	            if (( rc == 0 )); then
+58	                export SSH_AUTH_SOCK="$_sock"
+59	                return 0
+60	            elif (( rc == 1 )) && [[ "$_out" != *"refused"* ]]; then
+61	                export SSH_AUTH_SOCK="$_sock"
+62	                return 0
+63	            fi
+64	        fi
+65	    done
+66	    return 1
+67	}
+68	
+69	# ---------------------------------------------------------------------------
+70	# 2. Check if the current SSH_AUTH_SOCK is already usable
+71	# ---------------------------------------------------------------------------
+72	_existing_agent_works() {
+73	    [[ -n "$SSH_AUTH_SOCK" && -S "$SSH_AUTH_SOCK" ]] || return 1
+74	    local _out
+75	    _out="$(_ssh_add_probe)"
+76	    local rc=$?
+77	    # Accept rc=0 (keys) or rc=1 without "refused" (empty but alive)
+78	    if (( rc == 0 )); then
+79	        return 0
+80	    elif (( rc == 1 )) && [[ "$_out" != *"refused"* ]]; then
+81	        return 0
+82	    fi
+83	    return 1
+84	}
+85	
+86	# ---------------------------------------------------------------------------
+87	# 3. Fallback: persistent ssh-agent with a well-known socket
+88	# ---------------------------------------------------------------------------
+89	_fallback_ssh_agent() {
+90	    local agent_dir="${XDG_RUNTIME_DIR:-$HOME/.cache}/ssh-agent"
+91	    local agent_sock="$agent_dir/agent.sock"
+92	    local agent_pid_file="$agent_dir/agent.pid"
+93	
+94	    # Reuse existing persistent agent if it's alive
+95	    if [[ -S "$agent_sock" ]]; then
+96	        export SSH_AUTH_SOCK="$agent_sock"
+97	        if [[ -f "$agent_pid_file" ]]; then
+98	            export SSH_AGENT_PID="$(< "$agent_pid_file")"
+99	        fi
+100	        # Verify it actually works
+101	        _ssh_add_probe &>/dev/null
+102	        local rc=$?
+103	        if (( rc == 0 || rc == 1 )); then
+104	            _maybe_add_keys
+105	            return 0
+106	        fi
+107	        # Stale socket — clean up and respawn below
+108	        rm -f "$agent_sock" "$agent_pid_file"
+109	    fi
+110	
+111	    # Spawn a new agent with a fixed socket path
+112	    mkdir -p "$agent_dir"
+113	    chmod 700 "$agent_dir"
+114	    eval "$(ssh-agent -a "$agent_sock" 2>/dev/null)" &>/dev/null
+115	    if [[ -n "$SSH_AGENT_PID" ]]; then
+116	        echo "$SSH_AGENT_PID" > "$agent_pid_file"
+117	        export SSH_AUTH_SOCK="$agent_sock"
+118	        _maybe_add_keys
+119	        return 0
+120	    fi
+121	    return 1
+122	}
+123	
+124	# ---------------------------------------------------------------------------
+125	# Auto-add keys that exist on disk (only when agent has no identities)
+126	# ---------------------------------------------------------------------------
+127	_maybe_add_keys() {
+128	    # Only add if agent is empty
+129	    ssh-add -l &>/dev/null
+130	    (( $? == 1 )) || return 0  # rc=1 means "agent ok, no identities"
+131	
+132	    # Common private key names (add more as needed)
+133	    local -a key_names=(id_ed25519 id_rsa id_ecdsa jingle)
+134	    for k in "${key_names[@]}"; do
+135	        local kf="$HOME/.ssh/$k"
+136	        [[ -f "$kf" ]] && SSH_ASKPASS_REQUIRE=never ssh-add -q "$kf" 2>/dev/null
+137	    done
+138	}
+139	
+140	# ---------------------------------------------------------------------------
+141	# Main: try each strategy in order
+142	# ---------------------------------------------------------------------------
+143	_try_bitwarden_agent || _existing_agent_works || _fallback_ssh_agent
+144	
+145	# Clean up helper functions (they pollute the namespace)
+146	unfunction _try_bitwarden_agent _existing_agent_works _fallback_ssh_agent _maybe_add_keys _ssh_add_probe 2>/dev/null
+147	unset _SSH_AGENT_PROBE_TIMEOUT
+148
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:34Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/02_shell_integration.zsh`
+
+```text
+1	# OSC 133 shell integration — emits prompt/command markers so tmux can
+2	# navigate command boundaries (next-prompt / previous-prompt in copy-mode)
+3	# and the prefix + M-y binding in dot_config/tmux/keybindings.conf can
+4	# copy the last command's output (Warp-style).
+5	#
+6	# Protocol: https://gitlab.freedesktop.org/Per_Bothner/specifications/blob/master/proposals/semantic-prompts.md
+7	#
+8	#   OSC 133 ; A ST             before prompt (start of prompt)
+9	#   OSC 133 ; B ST             between prompt and command input (end of prompt)
+10	#   OSC 133 ; C ST             after Enter, before command output (start of output)
+11	#   OSC 133 ; D ; exit_code ST after command finishes (end of output)
+12	#
+13	# Uses add-zsh-hook so it chains cleanly after starship / zsh-vi-mode / oh-my-zsh
+14	# (they all also use add-zsh-hook — no clobbering).
+15	#
+16	# Opt-out: export DISABLE_OSC133=1 before starting zsh.
+17	
+18	[[ -n "$DISABLE_OSC133" ]] && return
+19	[[ "$TERM" == "dumb" ]] && return
+20	
+21	autoload -Uz add-zsh-hook
+22	
+23	_osc133_precmd() {
+24	  local ec=$?
+25	  # Wrap the (already-rendered-by-starship) PROMPT with D + A markers using
+26	  # %{...%} so zsh treats them as zero-width. This runs AFTER starship's
+27	  # own precmd (add-zsh-hook chains in registration order; 01_starship.zsh
+28	  # loads before 02_shell_integration.zsh).
+29	  #
+30	  # Why in PROMPT, not printf? An earlier version printf'd A from precmd
+31	  # directly. tmux's OSC 133 line-attr tracking was unreliable — ZLE's
+32	  # cursor management between precmd and prompt-paint caused the A flag
+33	  # to land on the wrong grid line (next-prompt navigation found zero A
+34	  # markers even though the bytes were sent). Embedding via PROMPT
+35	  # guarantees the markers render at the exact spatial location tmux
+36	  # expects (start of the prompt line).
+37	  #
+38	  # D marker carries the previous command's exit code; A marks start of
+39	  # new prompt. Neither is strictly required for next-prompt/previous-prompt
+40	  # navigation (A is, D isn't), but both are cheap.
+41	  PROMPT=$'%{\e]133;D;'"${ec}"$';\a\e]133;A\a%}'"${PROMPT}"
+42	}
+43	
+44	_osc133_preexec() {
+45	  # Skip C for our own tmux capture helpers — otherwise their copy-mode
+46	  # `previous-prompt -o` chain lands on their own (empty) output start
+47	  # instead of the previous command's real output. Coupling is documented
+48	  # in 03_tmux_capture.zsh.
+49	  case "${1%% *}" in
+50	    cpout|cpcmd|cpblock) return ;;
+51	  esac
+52	  # C: start of command output (Enter was just pressed, before exec).
+53	  printf '\e]133;C\a'
+54	}
+55	
+56	add-zsh-hook precmd _osc133_precmd
+57	add-zsh-hook preexec _osc133_preexec
+58	
+59	# B (end-of-prompt marker) would naturally append to PROMPT tail. tmux's
+60	# next-prompt / previous-prompt only needs A and C, so we skip B. Revisit if
+61	# a future consumer (Ghostty semantic shell integration, Warp) requires it.
+62
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:35Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/29_log_tools.zsh`
+
+```text
+1	# 29_log_tools.zsh - Log viewer helpers (tailspin / ccze)
+2	#
+3	# See docs/tools/log-tools.md for the full toolbelt rationale. These thin
+4	# wrappers give the "bat for logs" feel without forcing users to remember
+5	# each tool's exact flag set.
+6	
+7	# --- catl: colorful cat for logs (tailspin in stdout mode) ---
+8	# Usage: catl app.log | less -R
+9	#        catl app.log err.log       (concatenates like cat, colors both)
+10	# Requires: tspin (from the tailspin homebrew/GitHub binary, see devtools role).
+11	if command -v tspin &>/dev/null; then
+12	    catl() {
+13	        # `tspin --print` reads from stdin and from positional file args,
+14	        # and writes ANSI-colored output to stdout (no pager). That is the
+15	        # composition-friendly mode we want for pipes.
+16	        command tspin --print "$@"
+17	    }
+18	fi
+19	
+20	# --- lessl: classic ccze + less pipeline ---
+21	# Usage: lessl app.log
+22	#        tail -f app.log | lessl
+23	# Requires: ccze, less. Uses -A (raw ANSI) so `less -R` can render colors.
+24	if command -v ccze &>/dev/null; then
+25	    lessl() {
+26	        if (( $# == 0 )); then
+27	            command ccze -A | command less -RSFX
+28	        else
+29	            command ccze -A < "$1" | command less -RSFX
+30	        fi
+31	    }
+32	fi
+33	
+34	# --- logtail: tail -f with live tailspin highlighting ---
+35	# Usage: logtail app.log
+36	# Prefers `tspin --follow` (native watch mode) when available; otherwise
+37	# falls back to `tail -F | tspin --print` so the highlighting still works on
+38	# older tailspin builds that lack --follow.
+39	logtail() {
+40	    if [[ $# -eq 0 ]]; then
+41	        echo "Usage: logtail <file>" >&2
+42	        return 2
+43	    fi
+44	    if command -v tspin &>/dev/null; then
+45	        if command tspin --help 2>/dev/null | grep -q -- '--follow'; then
+46	            command tspin --follow "$1"
+47	        else
+48	            command tail -F "$1" | command tspin --print
+49	        fi
+50	    else
+51	        command tail -F "$1"
+52	    fi
+53	}
+54	
+55	# --- svclog: follow a service log, cross-platform (systemd / launchd) ---
+56	# Usage: svclog SERVICE              (system scope by default)
+57	#        svclog --user SERVICE       (systemd user scope on Linux)
+58	# On Linux: journalctl -fu SERVICE | tspin
+59	# On macOS: tail -F the plist's StdoutPath | tspin, else log stream by process
+60	svclog() {
+61	    emulate -L zsh
+62	    local scope=system
+63	    if [[ "$1" == "--user" ]]; then
+64	        scope=user
+65	        shift
+66	    fi
+67	    if [[ $# -eq 0 ]]; then
+68	        echo "Usage: svclog [--user] <service>" >&2
+69	        return 2
+70	    fi
+71	    local name="$1"
+72	    local os
+73	    os="$(uname -s)"
+74	    local colorize='if command -v tspin &>/dev/null; then tspin --print; else cat; fi'
+75	
+76	    if [[ "$os" == "Linux" ]]; then
+77	        if [[ "$scope" == user ]]; then
+78	            journalctl --user -fu "$name" | eval "$colorize"
+79	        else
+80	            if sudo -n true 2>/dev/null; then
+81	                sudo journalctl -fu "$name" | eval "$colorize"
+82	            else
+83	                journalctl -fu "$name" | eval "$colorize"
+84	            fi
+85	        fi
+86	    elif [[ "$os" == "Darwin" ]]; then
+87	        local dom
+88	        if [[ "$scope" == user ]]; then
+89	            dom="gui/${UID:-$(id -u)}"
+90	        else
+91	            dom="system"
+92	        fi
+93	        local path
+94	        path="$(launchctl print "$dom/$name" 2>/dev/null \
+95	            | awk -F'= ' '/^[ \t]+stdout path / || /^[ \t]+standard out path /{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2; exit}')"
+96	        if [[ -n "$path" && -f "$path" ]]; then
+97	            tail -F "$path" | eval "$colorize"
+98	        else
+99	            echo "[svclog] No StdoutPath for $dom/$name — streaming via log stream..."
+100	            log stream --predicate "process == \"$name\"" --style syslog | eval "$colorize"
+101	        fi
+102	    else
+103	        echo "svclog: unsupported OS: $os" >&2
+104	        return 1
+105	    fi
+106	}
+107	
+108	# --- svcstat: show full status / launchctl print for a service ---
+109	# Usage: svcstat SERVICE           (system scope on both OSes)
+110	#        svcstat --user SERVICE    (systemd user scope / macOS gui domain)
+111	svcstat() {
+112	    emulate -L zsh
+113	    local scope=system
+114	    if [[ "$1" == "--user" ]]; then
+115	        scope=user
+116	        shift
+117	    fi
+118	    if [[ $# -eq 0 ]]; then
+119	        echo "Usage: svcstat [--user] <service>" >&2
+120	        return 2
+121	    fi
+122	    local name="$1"
+123	    local os
+124	    os="$(uname -s)"
+125	    if [[ "$os" == "Linux" ]]; then
+126	        if [[ "$scope" == user ]]; then
+127	            systemctl --user status "$name" --no-pager -l
+128	        else
+129	            systemctl status "$name" --no-pager -l
+130	        fi
+131	    elif [[ "$os" == "Darwin" ]]; then
+132	        local dom
+133	        if [[ "$scope" == user ]]; then
+134	            dom="gui/${UID:-$(id -u)}"
+135	        else
+136	            dom="system"
+137	        fi
+138	        launchctl print "$dom/$name" 2>/dev/null \
+139	            || { [[ "$scope" == system ]] && sudo launchctl print "system/$name"; } \
+140	            || echo "No launchctl print output for $dom/$name"
+141	    else
+142	        echo "svcstat: unsupported OS: $os" >&2
+143	        return 1
+144	    fi
+145	}
+146
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:35Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/90_completions.zsh`
+
+```text
+1	# 90_completions.zsh - Autocompletion setup
+2	#
+3	# NOTE: fpath additions and compinit are handled in .zshrc before oh-my-zsh
+4	# is sourced. This file is kept for any additional completion configuration.
+5	
+6	# Additional completion settings can go here
+7	# e.g., zstyle ':completion:*' ...
+8
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:36Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/95_bitwarden.zsh`
+
+```text
+1	# 95_bitwarden.zsh - Bitwarden CLI zsh completion
+2	#
+3	# SSH agent integration has moved to 94_ssh_agent.zsh which provides
+4	# Bitwarden-first detection with automatic fallback to ssh-agent.
+5	
+6	# Check if Bitwarden CLI is installed
+7	command -v bw &>/dev/null || return 0
+8	
+9	# Enable Bitwarden zsh completion (cached — bw is a slow Node.js app)
+10	# Run `bw-update-completion` to regenerate after updating bw
+11	_bw_comp_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/bw_completion.zsh"
+12	if [[ ! -f "$_bw_comp_cache" ]]; then
+13	    mkdir -p "${_bw_comp_cache:h}"
+14	    bw completion --shell zsh 2>/dev/null > "$_bw_comp_cache"
+15	fi
+16	[[ -s "$_bw_comp_cache" ]] && source "$_bw_comp_cache"
+17	unset _bw_comp_cache
+18
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:38:24Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:38:27Z)**_
+
+Audit done. Verdict per file:
+- **PORTABLE (just move)**: 35_yazi, 38_lazyvim
+- **PORTABLE with mechanical fixes**: 28_tldr (typeset -ga→plain assign), 29_log_tools (gate emulate), 55_web_reader (print -u2→printf), 94_ssh_agent (typeset -a→local -a, unfunction→unset -f)
+- **MIXED (split)**: 37_worktrunk (wt init + wtcd → shared; completion stays zsh), 38_workmux (rewrite `${(@f)$(...)}` newline-split)
+- **ZSH-ONLY (skip)**: 02_shell_integration (OSC 133 via zsh PROMPT + add-zsh-hook is fundamentally different from bash's PROMPT_COMMAND), 95_bitwarden (zsh completion only), 90_completions (essentially empty placeholder)
+
+Let me batch the 6 straightforward ports first:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:38:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 28_tldr.sh - tldr language preference helper (shared bash + zsh).
+# Moved from dot_config/zsh/tools/28_tldr.zsh; `typeset -ga` (zsh global
+# array declaration) replaced with a plain top-level array assignment that
+# works in both shells.
+
+# Language preference order for tldrf fallback.
+TLDR_LANGUAGES=(zh_TW zh en)
+
+tldrf() {
+    command -v tldr &>/dev/null || return 127
+
+    local -a lang_flags
+    lang_flags=()
+    local lang
+    for lang in "${TLDR_LANGUAGES[@]}"; do
+        lang_flags+=(-L "$lang")
+    done
+
+    command tldr "${lang_flags[@]}" "$@"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/28_tldr.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:38:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 35_yazi.sh - yazi file manager configuration (shared bash + zsh).
+# Moved from dot_config/zsh/tools/35_yazi.zsh; file already used only
+# POSIX-portable constructs (mktemp, IFS= read -r -d '', builtin cd).
+
+# Check if yazi is installed
+command -v yazi &>/dev/null || return 0
+
+# Wrapper function to change directory on exit
+# When you quit yazi, it will cd to the directory you were browsing
+function y() {
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+    command yazi "$@" --cwd-file="$tmp"
+    IFS= read -r -d '' cwd < "$tmp"
+    [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
+    rm -f -- "$tmp"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/35_yazi.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:38:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 38_lazyvim.sh - LazyVim / Neovim plugin management aliases (shared bash + zsh).
+# Moved from dot_config/zsh/tools/38_lazyvim.zsh; file already used only
+# POSIX-portable constructs.
+#
+# All commands run nvim in headless mode and exit, so they can be chained
+# in scripts or used in CI. Output is piped through `tail` to keep the
+# terminal clean (nvim headless mode produces a lot of redraw noise).
+#
+# Usage examples:
+#   lazy-update                  # update all plugins
+#   lazy-update snacks.nvim      # update a single plugin
+#   mason-install lua-language-server stylua
+#   nvim-rollback                # restore plugins from lazy-lock.json
+
+command -v nvim &>/dev/null || return 0
+
+# --- Internal helper -------------------------------------------------------
+# Run a sequence of nvim ex-commands headlessly and trim noisy output.
+# Usage: _nvim_headless "<cmd1>" "<cmd2>" ...
+_nvim_headless() {
+  local args=()
+  local cmd
+  for cmd in "$@"; do
+    args+=("+${cmd}")
+  done
+  args+=("+qa")
+  nvim --headless "${args[@]}" 2>&1 | tail -40
+}
+
+# --- Lazy.nvim (plugin manager) -------------------------------------------
+
+# Update plugins. With no args: update all. With args: update specific plugins.
+#   lazy-update
+#   lazy-update snacks.nvim telescope.nvim
+lazy-update() {
+  if [[ $# -eq 0 ]]; then
+    _nvim_headless "Lazy! sync"
+  else
+    _nvim_headless "Lazy! update $*"
+  fi
+}
+
+# Check which plugins have updates available (no install).
+alias lazy-check='_nvim_headless "Lazy! check"'
+
+# Install missing plugins (e.g., after editing config to add a new one).
+alias lazy-install='_nvim_headless "Lazy! install"'
+
+# Remove plugins that are no longer in your config.
+alias lazy-clean='_nvim_headless "Lazy! clean"'
+
+# Restore all plugins to the versions pinned in lazy-lock.json.
+# Useful for rolling back after a bad update.
+alias lazy-restore='_nvim_headless "Lazy! restore"'
+
+# Build plugins that have a build step (e.g., telescope-fzf-native).
+alias lazy-build='_nvim_headless "Lazy! build"'
+
+# Show plugin load times. Opens interactively (not headless).
+alias lazy-profile='nvim "+Lazy profile"'
+
+# Open the Lazy UI interactively.
+alias lazy='nvim "+Lazy"'
+
+# --- Mason (LSP / formatter / linter manager) ------------------------------
+
+# Update all Mason packages.
+alias mason-update='_nvim_headless "MasonUpdate"'
+
+# Install one or more Mason packages.
+#   mason-install lua-language-server stylua
+mason-install() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: mason-install <package> [<package> ...]" >&2
+    echo "Example: mason-install lua-language-server stylua" >&2
+    return 1
+  fi
+  _nvim_headless "MasonInstall $*"
+}
+
+# Uninstall Mason packages.
+mason-uninstall() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: mason-uninstall <package> [<package> ...]" >&2
+    return 1
+  fi
+  _nvim_headless "MasonUninstall $*"
+}
+
+# Open Mason UI interactively.
+alias mason='nvim "+Mason"'
+
+# Open Mason log (useful when an install fails).
+alias mason-log='nvim "+MasonLog"'
+
+# --- Treesitter ------------------------------------------------------------
+
+# Update all installed Treesitter parsers.
+alias treesitter-update='_nvim_headless "TSUpdateSync"'
+
+# Install Treesitter parsers for specific languages.
+#   treesitter-install python rust go
+treesitter-install() {
+  if [[ $# -eq 0 ]]; then
+    echo "Usage: treesitter-install <language> [<language> ...]" >&2
+    return 1
+  fi
+  local lang
+  for lang in "$@"; do
+    _nvim_headless "TSInstallSync! $lang"
+  done
+}
+
+# --- Health & diagnostics --------------------------------------------------
+
+# Run :checkhealth (interactive — output is too rich for headless).
+alias nvim-health='nvim "+checkhealth"'
+
+# Print Neovim version + build info.
+alias nvim-version='nvim --version | head -10'
+
+# Run a fresh nvim with NO plugins / NO config (debugging baseline).
+alias nvim-clean-startup='nvim --clean'
+
+# Tail the LSP log file.
+alias nvim-lsp-log='tail -f "${XDG_STATE_HOME:-$HOME/.local/state}/nvim/lsp.log"'
+
+# --- Cache / state management ---------------------------------------------
+
+# Show how much disk Neovim's plugin & state dirs are using.
+nvim-disk-usage() {
+  local share="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+  local state="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
+  echo "Neovim disk usage:"
+  local dir
+  for dir in "$share" "$state" "$cache"; do
+    if [[ -d "$dir" ]]; then
+      printf "  %-60s %s\n" "$dir" "$(du -sh "$dir" 2>/dev/null | awk '{print $1}')"
+    fi
+  done
+}
+
+# Nuclear option: remove plugin install dir + state. Config is untouched.
+# Will prompt for confirmation. After running, next `nvim` will reinstall everything.
+nvim-reset-plugins() {
+  local share="${XDG_DATA_HOME:-$HOME/.local/share}/nvim"
+  local state="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
+  echo "This will delete:"
+  echo "  $share"
+  echo "  $state"
+  echo "Your config (~/.config/nvim) will NOT be touched."
+  printf "Continue? [y/N] "
+  local confirm
+  read -r confirm
+  if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+    echo "Aborted."
+    return 1
+  fi
+  rm -rf "$share" "$state"
+  echo "Done. Run \`nvim\` to reinstall plugins."
+}
+
+# --- Quick access ----------------------------------------------------------
+
+# Jump to nvim config dir (chezmoi-aware: edits source if config is managed).
+nvim-config-cd() {
+  cd "${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/38_lazyvim.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:39:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 94_ssh_agent.sh - SSH agent with Bitwarden-first fallback to ssh-agent.
+# Moved from dot_config/zsh/tools/94_ssh_agent.zsh. Zsh-isms replaced:
+#   typeset -a → local -a  (bash 4+ supports both)
+#   unfunction → unset -f
+#
+# Priority order:
+#   1. Bitwarden SSH agent (desktop app socket)
+#   2. Existing SSH_AUTH_SOCK (e.g. forwarded agent, systemd, gnome-keyring)
+#   3. Persistent ssh-agent (spawned once per user, reused across shells)
+#
+# The fallback ssh-agent uses a fixed socket path so multiple shells share
+# one agent instead of spawning a new one each time.
+
+# Probe timeout (seconds) — keeps shell startup fast even when an agent
+# socket exists but the daemon behind it is hung or locked.
+_SSH_AGENT_PROBE_TIMEOUT=2
+
+# Wrapper: ssh-add -l with a timeout to avoid hanging on unresponsive sockets.
+# Returns the same exit codes as ssh-add -l (0, 1, 2) plus 124 for timeout.
+_ssh_add_probe() {
+    if command -v timeout &>/dev/null; then
+        timeout "$_SSH_AGENT_PROBE_TIMEOUT" ssh-add -l "$@" 2>&1
+    else
+        # No timeout command (rare) — run directly and hope for the best
+        ssh-add -l "$@" 2>&1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# 1. Try Bitwarden SSH agent
+# ---------------------------------------------------------------------------
+_try_bitwarden_agent() {
+    local -a _bw_candidates
+    _bw_candidates=()
+
+    if [[ "$OSTYPE" == darwin* ]]; then
+        _bw_candidates=(
+            "$HOME/Library/Application Support/Bitwarden/.bitwarden-ssh-agent.sock"
+            "$HOME/Library/Containers/com.bitwarden.desktop/Data/.bitwarden-ssh-agent.sock"
+            "$HOME/.bitwarden-ssh-agent.sock"
+        )
+    else
+        _bw_candidates=(
+            "$HOME/.bitwarden-ssh-agent.sock"
+            "$HOME/snap/bitwarden/current/.bitwarden-ssh-agent.sock"
+            "$HOME/.var/app/com.bitwarden.desktop/data/.bitwarden-ssh-agent.sock"
+        )
+    fi
+
+    local _sock
+    for _sock in "${_bw_candidates[@]}"; do
+        if [[ -S "$_sock" ]]; then
+            # Socket file exists — verify the agent actually responds
+            local _out
+            _out="$(SSH_AUTH_SOCK="$_sock" _ssh_add_probe)"
+            local rc=$?
+            # rc=0: keys listed  → usable
+            # rc=1 + "no identities": agent ok, no keys loaded → usable
+            # rc=1 + "refused": Bitwarden locked/agent disabled → skip
+            # rc=2: agent unreachable → skip
+            # rc=124: timed out → skip
+            if (( rc == 0 )); then
+                export SSH_AUTH_SOCK="$_sock"
+                return 0
+            elif (( rc == 1 )) && [[ "$_out" != *"refused"* ]]; then
+                export SSH_AUTH_SOCK="$_sock"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# 2. Check if the current SSH_AUTH_SOCK is already usable
+# ---------------------------------------------------------------------------
+_existing_agent_works() {
+    [[ -n "$SSH_AUTH_SOCK" && -S "$SSH_AUTH_SOCK" ]] || return 1
+    local _out
+    _out="$(_ssh_add_probe)"
+    local rc=$?
+    # Accept rc=0 (keys) or rc=1 without "refused" (empty but alive)
+    if (( rc == 0 )); then
+        return 0
+    elif (( rc == 1 )) && [[ "$_out" != *"refused"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# 3. Fallback: persistent ssh-agent with a well-known socket
+# ---------------------------------------------------------------------------
+_fallback_ssh_agent() {
+    local agent_dir="${XDG_RUNTIME_DIR:-$HOME/.cache}/ssh-agent"
+    local agent_sock="$agent_dir/agent.sock"
+    local agent_pid_file="$agent_dir/agent.pid"
+
+    # Reuse existing persistent agent if it's alive
+    if [[ -S "$agent_sock" ]]; then
+        export SSH_AUTH_SOCK="$agent_sock"
+        if [[ -f "$agent_pid_file" ]]; then
+            export SSH_AGENT_PID="$(< "$agent_pid_file")"
+        fi
+        # Verify it actually works
+        _ssh_add_probe &>/dev/null
+        local rc=$?
+        if (( rc == 0 || rc == 1 )); then
+            _maybe_add_keys
+            return 0
+        fi
+        # Stale socket — clean up and respawn below
+        rm -f "$agent_sock" "$agent_pid_file"
+    fi
+
+    # Spawn a new agent with a fixed socket path
+    mkdir -p "$agent_dir"
+    chmod 700 "$agent_dir"
+    eval "$(ssh-agent -a "$agent_sock" 2>/dev/null)" &>/dev/null
+    if [[ -n "$SSH_AGENT_PID" ]]; then
+        echo "$SSH_AGENT_PID" > "$agent_pid_file"
+        export SSH_AUTH_SOCK="$agent_sock"
+        _maybe_add_keys
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
+# Auto-add keys that exist on disk (only when agent has no identities)
+# ---------------------------------------------------------------------------
+_maybe_add_keys() {
+    # Only add if agent is empty
+    ssh-add -l &>/dev/null
+    (( $? == 1 )) || return 0  # rc=1 means "agent ok, no identities"
+
+    # Common private key names (add more as needed)
+    local -a key_names
+    key_names=(id_ed25519 id_rsa id_ecdsa jingle)
+    local k
+    for k in "${key_names[@]}"; do
+        local kf="$HOME/.ssh/$k"
+        [[ -f "$kf" ]] && SSH_ASKPASS_REQUIRE=never ssh-add -q "$kf" 2>/dev/null
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Main: try each strategy in order
+# ---------------------------------------------------------------------------
+_try_bitwarden_agent || _existing_agent_works || _fallback_ssh_agent
+
+# Clean up helper functions (they pollute the namespace)
+unset -f _try_bitwarden_agent _existing_agent_works _fallback_ssh_agent _maybe_add_keys _ssh_add_probe 2>/dev/null
+unset _SSH_AGENT_PROBE_TIMEOUT
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/94_ssh_agent.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:39:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 29_log_tools.sh - Log viewer helpers (tailspin / ccze) (shared bash + zsh).
+# Moved from dot_config/zsh/tools/29_log_tools.zsh; `emulate -L zsh` gated
+# on $ZSH_VERSION (no-op in bash where it would error).
+#
+# See docs/tools/log-tools.md for the full toolbelt rationale. These thin
+# wrappers give the "bat for logs" feel without forcing users to remember
+# each tool's exact flag set.
+
+# --- catl: colorful cat for logs (tailspin in stdout mode) ---
+# Usage: catl app.log | less -R
+#        catl app.log err.log       (concatenates like cat, colors both)
+# Requires: tspin (from the tailspin homebrew/GitHub binary, see devtools role).
+if command -v tspin &>/dev/null; then
+    catl() {
+        # `tspin --print` reads from stdin and from positional file args,
+        # and writes ANSI-colored output to stdout (no pager). That is the
+        # composition-friendly mode we want for pipes.
+        command tspin --print "$@"
+    }
+fi
+
+# --- lessl: classic ccze + less pipeline ---
+# Usage: lessl app.log
+#        tail -f app.log | lessl
+# Requires: ccze, less. Uses -A (raw ANSI) so `less -R` can render colors.
+if command -v ccze &>/dev/null; then
+    lessl() {
+        if (( $# == 0 )); then
+            command ccze -A | command less -RSFX
+        else
+            command ccze -A < "$1" | command less -RSFX
+        fi
+    }
+fi
+
+# --- logtail: tail -f with live tailspin highlighting ---
+# Usage: logtail app.log
+# Prefers `tspin --follow` (native watch mode) when available; otherwise
+# falls back to `tail -F | tspin --print` so the highlighting still works on
+# older tailspin builds that lack --follow.
+logtail() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: logtail <file>" >&2
+        return 2
+    fi
+    if command -v tspin &>/dev/null; then
+        if command tspin --help 2>/dev/null | grep -q -- '--follow'; then
+            command tspin --follow "$1"
+        else
+            command tail -F "$1" | command tspin --print
+        fi
+    else
+        command tail -F "$1"
+    fi
+}
+
+# --- svclog: follow a service log, cross-platform (systemd / launchd) ---
+# Usage: svclog SERVICE              (system scope by default)
+#        svclog --user SERVICE       (systemd user scope on Linux)
+# On Linux: journalctl -fu SERVICE | tspin
+# On macOS: tail -F the plist's StdoutPath | tspin, else log stream by process
+svclog() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    local scope=system
+    if [[ "$1" == "--user" ]]; then
+        scope=user
+        shift
+    fi
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: svclog [--user] <service>" >&2
+        return 2
+    fi
+    local name="$1"
+    local os
+    os="$(uname -s)"
+    local colorize='if command -v tspin &>/dev/null; then tspin --print; else cat; fi'
+
+    if [[ "$os" == "Linux" ]]; then
+        if [[ "$scope" == user ]]; then
+            journalctl --user -fu "$name" | eval "$colorize"
+        else
+            if sudo -n true 2>/dev/null; then
+                sudo journalctl -fu "$name" | eval "$colorize"
+            else
+                journalctl -fu "$name" | eval "$colorize"
+            fi
+        fi
+    elif [[ "$os" == "Darwin" ]]; then
+        local dom
+        if [[ "$scope" == user ]]; then
+            dom="gui/${UID:-$(id -u)}"
+        else
+            dom="system"
+        fi
+        local path
+        path="$(launchctl print "$dom/$name" 2>/dev/null \
+            | awk -F'= ' '/^[ \t]+stdout path / || /^[ \t]+standard out path /{gsub(/^[ \t]+|[ \t]+$/,"",$2); print $2; exit}')"
+        if [[ -n "$path" && -f "$path" ]]; then
+            tail -F "$path" | eval "$colorize"
+        else
+            echo "[svclog] No StdoutPath for $dom/$name — streaming via log stream..."
+            log stream --predicate "process == \"$name\"" --style syslog | eval "$colorize"
+        fi
+    else
+        echo "svclog: unsupported OS: $os" >&2
+        return 1
+    fi
+}
+
+# --- svcstat: show full status / launchctl print for a service ---
+# Usage: svcstat SERVICE           (system scope on both OSes)
+#        svcstat --user SERVICE    (systemd user scope / macOS gui domain)
+svcstat() {
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
+    local scope=system
+    if [[ "$1" == "--user" ]]; then
+        scope=user
+        shift
+    fi
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: svcstat [--user] <service>" >&2
+        return 2
+    fi
+    local name="$1"
+    local os
+    os="$(uname -s)"
+    if [[ "$os" == "Linux" ]]; then
+        if [[ "$scope" == user ]]; then
+            systemctl --user status "$name" --no-pager -l
+        else
+            systemctl status "$name" --no-pager -l
+        fi
+    elif [[ "$os" == "Darwin" ]]; then
+        local dom
+        if [[ "$scope" == user ]]; then
+            dom="gui/${UID:-$(id -u)}"
+        else
+            dom="system"
+        fi
+        launchctl print "$dom/$name" 2>/dev/null \
+            || { [[ "$scope" == system ]] && sudo launchctl print "system/$name"; } \
+            || echo "No launchctl print output for $dom/$name"
+    else
+        echo "svcstat: unsupported OS: $os" >&2
+        return 1
+    fi
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/29_log_tools.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:39:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 55_web_reader.sh - Render web pages as markdown in the terminal (shared).
+# Moved from dot_config/zsh/tools/55_web_reader.zsh; `print -u2` → `printf >&2`
+# and `__zsh_reader_require` renamed to `__reader_require` to drop the
+# misleading zsh prefix.
+#
+# Four extractors, pick by function name:
+#   readurl   - jina.ai Reader (remote, zero local deps beyond glow)
+#   readlocal - trafilatura (local, Python; offline article extraction)
+#   readnode  - readability-cli / `readable` (local, Node; Mozilla Readability)
+#   readraw   - curl + pandoc (full page -> GFM; no article extraction)
+#
+# All wrap the underlying fetch in `try_direct_then_proxy` from 50_networking.sh,
+# so non-GFW'd URLs pay zero proxy overhead and only fall back if direct fetch fails.
+
+# Normalize URL: prepend https:// if scheme missing.
+_norm_url() {
+  local url="$1"
+  if [[ "$url" != http://* && "$url" != https://* ]]; then
+    url="https://$url"
+  fi
+  printf '%s\n' "$url"
+}
+
+# Missing-binary guard: print a one-line install hint and return 127.
+__reader_require() {
+  local bin="$1" hint="$2"
+  if ! command -v "$bin" &>/dev/null; then
+    printf '%s\n' "$bin not found -- install: $hint" >&2
+    return 127
+  fi
+  return 0
+}
+
+# readurl <url> - jina.ai Reader + glow. The default convenience.
+readurl() {
+  local raw="$1"
+  if [[ -z "$raw" ]]; then
+    printf '%s\n' "usage: readurl <url>" >&2
+    return 2
+  fi
+  __reader_require glow "brew install glow  (or the devtools ansible role)" || return
+  local url; url="$(_norm_url "$raw")"
+  try_direct_then_proxy glow -p "https://r.jina.ai/$url"
+}
+
+# readlocal <url> - trafilatura (offline article extraction) + glow.
+readlocal() {
+  local raw="$1"
+  if [[ -z "$raw" ]]; then
+    printf '%s\n' "usage: readlocal <url>" >&2
+    return 2
+  fi
+  __reader_require trafilatura "uv tool install trafilatura  (or enable the python_uv_tools ansible role)" || return
+  __reader_require glow "brew install glow  (or the devtools ansible role)" || return
+  local url; url="$(_norm_url "$raw")"
+  try_direct_then_proxy trafilatura -u "$url" --markdown | glow -
+}
+
+# readnode <url> - readability-cli (`readable`) + glow.
+readnode() {
+  local raw="$1"
+  if [[ -z "$raw" ]]; then
+    printf '%s\n' "usage: readnode <url>" >&2
+    return 2
+  fi
+  __reader_require readable "npm install -g readability-cli  (or enable the js_cli_tools ansible role)" || return
+  __reader_require glow "brew install glow  (or the devtools ansible role)" || return
+  local url; url="$(_norm_url "$raw")"
+  try_direct_then_proxy readable "$url" | glow -
+}
+
+# readraw <url> - full-page HTML -> markdown via pandoc (no article extraction).
+readraw() {
+  local raw="$1"
+  if [[ -z "$raw" ]]; then
+    printf '%s\n' "usage: readraw <url>" >&2
+    return 2
+  fi
+  __reader_require curl "apt install curl  (usually preinstalled)" || return
+  __reader_require pandoc "brew install pandoc  (or apt install pandoc)" || return
+  __reader_require glow "brew install glow  (or the devtools ansible role)" || return
+  local url; url="$(_norm_url "$raw")"
+  try_direct_then_proxy curl -fsSL "$url" | pandoc -f html -t gfm | glow -
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/55_web_reader.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:39:46Z)**_
+
+Now the two mixed cases. First `38_workmux.zsh` — rewrite the `${(@f)$(...)}` newline-split:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 38_workmux.sh - Workmux (`workmux` / `wm`) tmux + git-worktree orchestrator
+# (shared bash + zsh). Moved from dot_config/zsh/tools/38_workmux.zsh; the
+# only zsh-ism was `${(@f)$(cmd)}` (split-on-newlines flag), rewritten as a
+# `while IFS= read -r` loop.
+#
+# https://workmux.raine.dev — github.com/raine/workmux
+#
+# Companion config: ~/.config/workmux/config.yaml (managed by chezmoi at
+# dot_config/workmux/config.yaml). See docs/tools/workmux.md for the full
+# story (worktrunk vs workmux split, status icon lifecycle, leak mitigation).
+#
+# Why a separate file from 37_worktrunk.{sh,zsh}: the two tools coexist
+# (worktrunk = `wt` for git-worktree CLI / aliases, workmux = `wm` for status
+# icons + dashboard + sidebar). Separate files keep the rationale + helpers
+# per-tool and let users disable one independently.
+
+# Skip silently if not installed (Linux ansible install can fail offline,
+# Cargo path may not be present, etc.)
+command -v workmux &>/dev/null || return 0
+
+# ── Manual marker cleanup ──────────────────────────────────────────────────
+#
+# The `working` (🤖) status workmux sets is *sticky* — it never auto-clears
+# on its own. `waiting` (💬) and `done` (✅) auto-clear when you focus the
+# window, but `working` only goes away when:
+#   1. The agent's plugin/hook explicitly calls `workmux set-window-status done`
+#      (Claude Stop / OpenCode session.idle), OR
+#   2. `workmux sidebar` is running and detects 10s of pane silence
+#      (interrupted-agent detection), OR
+#   3. You manually clear it.
+#
+# Path #1 fails when the agent is killed before its Stop/idle handler fires
+# (Ctrl+C, terminal crash, OOM). Path #2 requires keeping a sidebar pane open.
+# `wmclear` is the manual escape hatch.
+#
+# Without arg: clears the marker for the current tmux window.
+# With arg:    `wmclear 5` clears window 5 in the current session.
+# Pass `--all` to nuke every workmux marker in the current session.
+function wmclear() {
+    if [[ "$1" == "--all" ]]; then
+        # Walk every window in the current session and unset the user-var.
+        # Original zsh code used `windows=("${(@f)$(...)}")` to split command
+        # output on newlines; the `while IFS= read -r` loop below is the
+        # portable equivalent (works in bash + zsh).
+        local sess
+        sess=$(tmux display -p '#{session_name}' 2>/dev/null) || return 1
+        local -a windows
+        windows=()
+        local w
+        while IFS= read -r w; do
+            [ -n "$w" ] && windows+=( "$w" )
+        done < <(tmux list-windows -t "$sess" -F '#{window_index}' 2>/dev/null)
+        for w in "${windows[@]}"; do
+            tmux set-option -w -t "${sess}:${w}" -u '@workmux_status' 2>/dev/null
+        done
+        echo "Cleared @workmux_status on ${#windows[@]} windows in session $sess"
+        return 0
+    fi
+
+    if [[ -n "$1" ]]; then
+        # Specific window: use workmux's own clear command (handles agent
+        # state too, not just the tmux user-var)
+        local sess win
+        sess=$(tmux display -p '#{session_name}' 2>/dev/null) || return 1
+        win="$1"
+        tmux set-option -w -t "${sess}:${win}" -u '@workmux_status' 2>/dev/null
+        echo "Cleared @workmux_status on ${sess}:${win}"
+        return 0
+    fi
+
+    # Current window: prefer workmux's clear so it also resets agent state
+    workmux set-window-status clear 2>/dev/null
+}
+
+# ── Sidebar daemon convenience ─────────────────────────────────────────────
+#
+# `workmux sidebar` is what enables the "interrupted agent" auto-clear (10s
+# pane-silence heuristic). Without it, `working` markers leak forever on
+# crashed agents. NOT auto-started here because it spawns a tmux pane and
+# many users want to opt-in. Use `wmsb` to toggle.
+alias wmsb='workmux sidebar'
+
+# ── Short aliases mirroring upstream's recommendation ──────────────────────
+# README explicitly suggests `alias wm='workmux'`. The Linux ansible install
+# also creates a `wm` symlink in ~/.local/bin so this alias is redundant on
+# Linux, but on macOS Homebrew installs only `workmux`, so define it here.
+if ! command -v wm &>/dev/null; then
+    alias wm='workmux'
+fi
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/38_workmux.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:09Z)**_
+
+Now `37_worktrunk` — split the shell-init+`wtcd` to shared, keep zsh completion in tools/:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 37_worktrunk.sh - Worktrunk (`wt`) shell integration (shared bash + zsh).
+# https://worktrunk.dev — github.com/max-sixty/worktrunk
+#
+# Backend half of the split: shell-init wrapper (so `wt switch` can change
+# the parent shell's $PWD) + the `wtcd` fzf picker. Zsh-only half lives in
+# dot_config/zsh/tools/37_worktrunk.zsh (clap-based completion generation
+# into ~/.zfunc/_wt).
+#
+# Companion config: ~/.config/worktrunk/config.toml (managed by chezmoi at
+# dot_config/worktrunk/config.toml). Aliases like `wt sw` / `wt cc` live
+# THERE, not here — keep this file focused on shell-level integration only.
+
+# Skip silently if not installed (Linux ansible install can fail offline)
+command -v wt &>/dev/null || return 0
+
+# ── Shell integration: cd-wrapping `wt` function ───────────────────────────
+#
+# `wt switch` needs to change the parent shell's $PWD, which a normal binary
+# can't do. Worktrunk solves this by writing a directive file that a wrapper
+# shell function reads and `cd`s to. We eval that wrapper at shell startup
+# rather than running `wt config shell install` (which edits ~/.zshrc with a
+# block chezmoi would fight over).
+#
+# Same pattern as starship / zoxide / direnv elsewhere. The `2>/dev/null`
+# swallows the error if wt doesn't support the requested shell (e.g. bash
+# wrapper not yet implemented in upstream) — the binary itself still works,
+# users just lose the cd-on-switch wrapper.
+if [ -n "$ZSH_VERSION" ]; then
+    eval "$(wt config shell init zsh 2>/dev/null)"
+elif [ -n "$BASH_VERSION" ]; then
+    eval "$(wt config shell init bash 2>/dev/null)"
+fi
+
+# ── Tiny shell-side conveniences (NOT duplicating wt's own aliases) ────────
+#
+# `wt`'s own aliases (sw / ls / rm / cc / oc) are defined in
+# ~/.config/worktrunk/config.toml so they work from any shell + the
+# interactive picker. Anything below is shell niceness that wt's alias
+# system can't express.
+
+# `wtcd` — jump to a worktree path WITHOUT switching tmux/sesh session.
+# Useful when you want to peek at sibling worktree files (open in nvim split,
+# scp, etc.) without disturbing the current pane's session context.
+function wtcd() {
+    local target
+    target=$(wt list --format=json 2>/dev/null \
+        | jq -r '.worktrees[].path' \
+        | fzf-tmux -p 60%,40% --prompt='wt cd ❯ ' --header='Pick a worktree to cd into') \
+        || return
+    [ -n "$target" ] && cd -- "$target"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/37_worktrunk.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```zsh
+# 37_worktrunk.zsh - Worktrunk (`wt`) zsh-only completion generation.
+# Shell-init wrapper + wtcd function live in dot_config/shell/37_worktrunk.sh
+# (shared bash + zsh). This file only handles ~/.zfunc/_wt completion regen,
+# which is zsh-specific.
+# https://worktrunk.dev — github.com/max-sixty/worktrunk
+
+# Skip silently if not installed
+command -v wt &>/dev/null || return 0
+
+# ── Completion ─────────────────────────────────────────────────────────────
+#
+# macOS (Homebrew): `_wt` ships in /opt/homebrew/share/zsh/site-functions/
+# and is picked up automatically by compinit — nothing to do here.
+#
+# Linux (ansible drops the bare binary into ~/.local/bin/) has no system
+# completion path, so dump clap's auto-generated zsh completer into
+# ~/.zfunc/_wt (already on $fpath via dot_zshrc.tmpl). Same pattern as sesh /
+# television. Regenerate when wt's version changes.
+#
+# Worktrunk doesn't expose a `wt completion zsh` subcommand — clap's dynamic
+# completer is invoked via `COMPLETE=zsh wt` (with no args). Output is a
+# self-contained `#compdef wt` script that handles further completion
+# requests by re-invoking the binary with COMPLETE+_CLAP_COMPLETE_INDEX set.
+if [[ -d ~/.zfunc ]] && [[ ! -f /opt/homebrew/share/zsh/site-functions/_wt ]] \
+                    && [[ ! -f /usr/local/share/zsh/site-functions/_wt ]]; then
+    local _wt_ver="$(wt --version 2>/dev/null)"
+    if [[ ! -f ~/.zfunc/_wt ]] || ! grep -q "${_wt_ver}" ~/.zfunc/_wt 2>/dev/null; then
+        {
+            print -r -- "# Auto-generated by 37_worktrunk.zsh for ${_wt_ver}"
+            COMPLETE=zsh wt 2>/dev/null
+        } > ~/.zfunc/_wt
+    fi
+fi
+
+```
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/37_worktrunk.zsh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:31Z)**_
+
+Delete the old zsh files for the 7 ports that are now fully shared, update `.chezmoiremove`, run cross-shell syntax + source tests:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Remove 7 fully-ported zsh-tools files
+
+`rm dot_config/zsh/tools/28_tldr.zsh dot_config/zsh/tools/29_log_tools.zsh dot_config/zsh/tools/35_yazi.zsh dot_config/zsh/tools/38_lazyvim.zsh dot_config/zsh/tools/38_workmux.zsh dot_config/zsh/tools/55_web_reader.zsh dot_config/zsh/tools/94_ssh_agent.zsh && ls dot_config/zsh/tools/ | wc -l`
+
+```text
+      18
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiremove has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax check all 8 new shared files + the slim zsh shim
+
+```bash
+for f in 28_tldr 29_log_tools 35_yazi 37_worktrunk 38_lazyvim 38_workmux 55_web_reader 94_ssh_agent; do
+  bash -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "bash OK: $f"
+  zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "zsh OK: $f"
+done
+zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/37_worktrunk.zsh && echo "zsh OK: 37_worktrunk shim"
+```
+
+```text
+bash OK: 28_tldr
+zsh OK: 28_tldr
+bash OK: 29_log_tools
+zsh OK: 29_log_tools
+bash OK: 35_yazi
+zsh OK: 35_yazi
+bash OK: 37_worktrunk
+zsh OK: 37_worktrunk
+bash OK: 38_lazyvim
+zsh OK: 38_lazyvim
+bash OK: 38_workmux
+zsh OK: 38_workmux
+bash OK: 55_web_reader
+zsh OK: 55_web_reader
+bash OK: 94_ssh_agent
+zsh OK: 94_ssh_agent
+zsh OK: 37_worktrunk shim
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:41Z)**_
+
+All clean. Now functional cross-shell source tests:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source 7 of 8 files in fresh bash, verify functions defined
+
+```bash
+bash --noprofile --norc -c '
+set -e
+for f in 28_tldr 29_log_tools 35_yazi 37_worktrunk 38_lazyvim 38_workmux 55_web_reader; do
+  source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh || { echo "FAIL: $f"; exit 1; }
+done
+# 94_ssh_agent runs side effects (tries to start agent); source in a way that does not pollute test env
+echo "BASH 7 SOURCED OK"
+type -t tldrf y _nvim_headless lazy-update mason-install treesitter-install wtcd wmclear readurl readlocal readnode readraw logtail svclog svcstat
+'
+```
+
+```text
+BASH 7 SOURCED OK
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source 7 of 8 in fresh zsh, verify functions defined
+
+```bash
+zsh -f -c '
+set -e
+for f in 28_tldr 29_log_tools 35_yazi 37_worktrunk 38_lazyvim 38_workmux 55_web_reader; do
+  source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh || { echo "FAIL: $f"; exit 1; }
+done
+echo "ZSH 7 SOURCED OK"
+whence -w tldrf y _nvim_headless lazy-update mason-install treesitter-install wtcd wmclear readurl readlocal readnode readraw logtail svclog svcstat
+'
+```
+
+```text
+ZSH 7 SOURCED OK
+tldrf: function
+y: function
+_nvim_headless: function
+lazy-update: function
+mason-install: function
+treesitter-install: function
+wtcd: function
+wmclear: function
+readurl: function
+readlocal: function
+readnode: function
+readraw: function
+logtail: function
+svclog: function
+svcstat: function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source 94_ssh_agent in isolation (runs agent detection — may print/output)
+
+```bash
+bash --noprofile --norc -c '
+# Test 94_ssh_agent in isolation (skip the auto-run of agents at file end so test stays fast).
+# Just verify it parses + helpers are defined when run.
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/94_ssh_agent.sh </dev/null 2>&1
+echo "94_ssh_agent: exit=$?"
+'
+```
+
+```text
+94_ssh_agent: exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:53Z)**_
+
+All 8 files load cleanly in both shells. Now update `docs/shells/aliases.md` source paths:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:40:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find rows in aliases doc referencing the migrated files
+
+`grep -nE "(28_tldr|29_log_tools|35_yazi|37_worktrunk|38_lazyvim|38_workmux|55_web_reader|94_ssh_agent)" docs/shells/aliases.md | head -30`
+
+```text
+478:| `wt` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
+479:| `wtcd` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
+480:| `wm` | alias | `dot_config/zsh/tools/38_workmux.zsh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
+481:| `wmsb` | alias | `dot_config/zsh/tools/38_workmux.zsh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
+482:| `wmclear` | function | `dot_config/zsh/tools/38_workmux.zsh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
+562:| `readurl` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via jina.ai Reader + glow (remote, zero local deps beyond glow) |
+563:| `readlocal` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
+564:| `readnode` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
+565:| `readraw` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
+575:| `catl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Colorful `cat` for logs via `tspin --print` (stdout mode; pipes cleanly) *(requires tspin)* |
+576:| `lessl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `ccze -A \| less -RSFX` pager for logs with ANSI colors *(requires ccze)* |
+577:| `logtail` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
+578:| `svclog` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
+579:| `svcstat` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
+644:| `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update aliases doc source paths for the 8 ports
+
+```bash
+sed -i.bak \
+  -e 's|dot_config/zsh/tools/28_tldr\.zsh|dot_config/shell/28_tldr.sh|g' \
+  -e 's|dot_config/zsh/tools/29_log_tools\.zsh|dot_config/shell/29_log_tools.sh|g' \
+  -e 's|dot_config/zsh/tools/35_yazi\.zsh|dot_config/shell/35_yazi.sh|g' \
+  -e 's|dot_config/zsh/tools/38_lazyvim\.zsh|dot_config/shell/38_lazyvim.sh|g' \
+  -e 's|dot_config/zsh/tools/38_workmux\.zsh|dot_config/shell/38_workmux.sh|g' \
+  -e 's|dot_config/zsh/tools/55_web_reader\.zsh|dot_config/shell/55_web_reader.sh|g' \
+  -e 's|dot_config/zsh/tools/94_ssh_agent\.zsh|dot_config/shell/94_ssh_agent.sh|g' \
+  docs/shells/aliases.md && rm docs/shells/aliases.md.bak
+
+# 37_worktrunk is split: wtcd lives in shell, wt wrapper init lives in shell, completion stays in zsh.
+# Update the 37_worktrunk rows to reflect the shared location:
+sed -i.bak \
+  -e 's|dot_config/zsh/tools/37_worktrunk\.zsh|dot_config/shell/37_worktrunk.sh|g' \
+  docs/shells/aliases.md && rm docs/shells/aliases.md.bak
+
+grep -nE "(28_tldr|29_log_tools|35_yazi|37_worktrunk|38_lazyvim|38_workmux|55_web_reader|94_ssh_agent)" docs/shells/aliases.md | head -20
+```
+
+```text
+478:| `wt` | function | `dot_config/shell/37_worktrunk.sh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
+479:| `wtcd` | function | `dot_config/shell/37_worktrunk.sh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
+480:| `wm` | alias | `dot_config/shell/38_workmux.sh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
+481:| `wmsb` | alias | `dot_config/shell/38_workmux.sh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
+482:| `wmclear` | function | `dot_config/shell/38_workmux.sh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
+562:| `readurl` | function | `dot_config/shell/55_web_reader.sh` | Read article via jina.ai Reader + glow (remote, zero local deps beyond glow) |
+563:| `readlocal` | function | `dot_config/shell/55_web_reader.sh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
+564:| `readnode` | function | `dot_config/shell/55_web_reader.sh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
+565:| `readraw` | function | `dot_config/shell/55_web_reader.sh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
+575:| `catl` | function | `dot_config/shell/29_log_tools.sh` | Colorful `cat` for logs via `tspin --print` (stdout mode; pipes cleanly) *(requires tspin)* |
+576:| `lessl` | function | `dot_config/shell/29_log_tools.sh` | `ccze -A \| less -RSFX` pager for logs with ANSI colors *(requires ccze)* |
+577:| `logtail` | function | `dot_config/shell/29_log_tools.sh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
+578:| `svclog` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
+579:| `svcstat` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
+644:| `tldrf` | function | `dot_config/shell/28_tldr.sh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage 3 git status
+
+`git status --short`
+
+```text
+ M .chezmoiremove
+ M .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+ M docs/shells/aliases.md
+ D dot_config/zsh/tools/28_tldr.zsh
+ D dot_config/zsh/tools/29_log_tools.zsh
+ D dot_config/zsh/tools/35_yazi.zsh
+ M dot_config/zsh/tools/37_worktrunk.zsh
+ D dot_config/zsh/tools/38_lazyvim.zsh
+ D dot_config/zsh/tools/38_workmux.zsh
+ D dot_config/zsh/tools/55_web_reader.zsh
+ D dot_config/zsh/tools/94_ssh_agent.zsh
+?? dot_config/shell/28_tldr.sh
+?? dot_config/shell/29_log_tools.sh
+?? dot_config/shell/35_yazi.sh
+?? dot_config/shell/37_worktrunk.sh
+?? dot_config/shell/38_lazyvim.sh
+?? dot_config/shell/38_workmux.sh
+?? dot_config/shell/55_web_reader.sh
+?? dot_config/shell/94_ssh_agent.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:15Z)**_
+
+Commit Stage 3:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:41:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage all Stage 3 changes
+
+`git add .chezmoiremove docs/shells/aliases.md dot_config/shell/28_tldr.sh dot_config/shell/29_log_tools.sh dot_config/shell/35_yazi.sh dot_config/shell/37_worktrunk.sh dot_config/shell/38_lazyvim.sh dot_config/shell/38_workmux.sh dot_config/shell/55_web_reader.sh dot_config/shell/94_ssh_agent.sh dot_config/zsh/tools/28_tldr.zsh dot_config/zsh/tools/29_log_tools.zsh dot_config/zsh/tools/35_yazi.zsh dot_config/zsh/tools/37_worktrunk.zsh dot_config/zsh/tools/38_lazyvim.zsh dot_config/zsh/tools/38_workmux.zsh dot_config/zsh/tools/55_web_reader.zsh dot_config/zsh/tools/94_ssh_agent.zsh .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md && git status --short`
+</details></tool-use>

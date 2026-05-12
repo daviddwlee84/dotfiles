@@ -1,4 +1,6 @@
-# 38_lazyvim.zsh - LazyVim / Neovim plugin management aliases
+# 38_lazyvim.sh - LazyVim / Neovim plugin management aliases (shared bash + zsh).
+# Moved from dot_config/zsh/tools/38_lazyvim.zsh; file already used only
+# POSIX-portable constructs.
 #
 # All commands run nvim in headless mode and exit, so they can be chained
 # in scripts or used in CI. Output is piped through `tail` to keep the
@@ -17,6 +19,7 @@ command -v nvim &>/dev/null || return 0
 # Usage: _nvim_headless "<cmd1>" "<cmd2>" ...
 _nvim_headless() {
   local args=()
+  local cmd
   for cmd in "$@"; do
     args+=("+${cmd}")
   done
@@ -102,6 +105,7 @@ treesitter-install() {
     echo "Usage: treesitter-install <language> [<language> ...]" >&2
     return 1
   fi
+  local lang
   for lang in "$@"; do
     _nvim_headless "TSInstallSync! $lang"
   done
@@ -129,6 +133,7 @@ nvim-disk-usage() {
   local state="${XDG_STATE_HOME:-$HOME/.local/state}/nvim"
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/nvim"
   echo "Neovim disk usage:"
+  local dir
   for dir in "$share" "$state" "$cache"; do
     if [[ -d "$dir" ]]; then
       printf "  %-60s %s\n" "$dir" "$(du -sh "$dir" 2>/dev/null | awk '{print $1}')"
@@ -146,6 +151,7 @@ nvim-reset-plugins() {
   echo "  $state"
   echo "Your config (~/.config/nvim) will NOT be touched."
   printf "Continue? [y/N] "
+  local confirm
   read -r confirm
   if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "Aborted."

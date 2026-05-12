@@ -1,23 +1,11 @@
-# 37_worktrunk.zsh - Worktrunk (`wt`) git worktree manager
+# 37_worktrunk.zsh - Worktrunk (`wt`) zsh-only completion generation.
+# Shell-init wrapper + wtcd function live in dot_config/shell/37_worktrunk.sh
+# (shared bash + zsh). This file only handles ~/.zfunc/_wt completion regen,
+# which is zsh-specific.
 # https://worktrunk.dev — github.com/max-sixty/worktrunk
-#
-# Companion config: ~/.config/worktrunk/config.toml (managed by chezmoi at
-# dot_config/worktrunk/config.toml). Aliases like `wt sw` / `wt cc` live
-# THERE, not here — keep this file focused on shell-level integration only.
 
-# Skip silently if not installed (Linux ansible install can fail offline)
+# Skip silently if not installed
 command -v wt &>/dev/null || return 0
-
-# ── Shell integration: cd-wrapping `wt` function ───────────────────────────
-#
-# `wt switch` needs to change the parent shell's $PWD, which a normal binary
-# can't do. Worktrunk solves this by writing a directive file that a wrapper
-# shell function reads and `cd`s to. We eval that wrapper at shell startup
-# rather than running `wt config shell install` (which edits ~/.zshrc with a
-# block chezmoi would fight over).
-#
-# Same pattern as starship / zoxide / direnv elsewhere in this directory.
-eval "$(wt config shell init zsh 2>/dev/null)"
 
 # ── Completion ─────────────────────────────────────────────────────────────
 #
@@ -43,22 +31,3 @@ if [[ -d ~/.zfunc ]] && [[ ! -f /opt/homebrew/share/zsh/site-functions/_wt ]] \
         } > ~/.zfunc/_wt
     fi
 fi
-
-# ── Tiny zsh-side conveniences (NOT duplicating wt's own aliases) ─────────
-#
-# `wt`'s own aliases (sw / ls / rm / cc / oc) are defined in
-# ~/.config/worktrunk/config.toml so they work from any shell + the
-# interactive picker. Anything below is ZSH-ONLY niceness that wt's alias
-# system can't express.
-
-# `wtcd` — jump to a worktree path WITHOUT switching tmux/sesh session.
-# Useful when you want to peek at sibling worktree files (open in nvim split,
-# scp, etc.) without disturbing the current pane's session context.
-function wtcd() {
-    local target
-    target=$(wt list --format=json 2>/dev/null \
-        | jq -r '.worktrees[].path' \
-        | fzf-tmux -p 60%,40% --prompt='wt cd ❯ ' --header='Pick a worktree to cd into') \
-        || return
-    [[ -n "$target" ]] && cd -- "$target"
-}

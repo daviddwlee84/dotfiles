@@ -36,3 +36,10 @@ once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 .config/zsh/tools/41_github.zsh
 .config/zsh/tools/42_gitlab.zsh
 .config/zsh/tools/50_networking.zsh
+.config/zsh/tools/28_tldr.zsh
+.config/zsh/tools/29_log_tools.zsh
+.config/zsh/tools/35_yazi.zsh
+.config/zsh/tools/38_lazyvim.zsh
+.config/zsh/tools/38_workmux.zsh
+.config/zsh/tools/55_web_reader.zsh
+.config/zsh/tools/94_ssh_agent.zsh

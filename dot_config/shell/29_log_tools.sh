@@ -1,4 +1,6 @@
-# 29_log_tools.zsh - Log viewer helpers (tailspin / ccze)
+# 29_log_tools.sh - Log viewer helpers (tailspin / ccze) (shared bash + zsh).
+# Moved from dot_config/zsh/tools/29_log_tools.zsh; `emulate -L zsh` gated
+# on $ZSH_VERSION (no-op in bash where it would error).
 #
 # See docs/tools/log-tools.md for the full toolbelt rationale. These thin
 # wrappers give the "bat for logs" feel without forcing users to remember
@@ -58,7 +60,7 @@ logtail() {
 # On Linux: journalctl -fu SERVICE | tspin
 # On macOS: tail -F the plist's StdoutPath | tspin, else log stream by process
 svclog() {
-    emulate -L zsh
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
     local scope=system
     if [[ "$1" == "--user" ]]; then
         scope=user
@@ -109,7 +111,7 @@ svclog() {
 # Usage: svcstat SERVICE           (system scope on both OSes)
 #        svcstat --user SERVICE    (systemd user scope / macOS gui domain)
 svcstat() {
-    emulate -L zsh
+    [ -n "$ZSH_VERSION" ] && emulate -L zsh
     local scope=system
     if [[ "$1" == "--user" ]]; then
         scope=user

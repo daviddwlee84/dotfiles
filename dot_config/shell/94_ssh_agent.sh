@@ -1,4 +1,7 @@
-# 94_ssh_agent.zsh - SSH agent with Bitwarden-first fallback to ssh-agent
+# 94_ssh_agent.sh - SSH agent with Bitwarden-first fallback to ssh-agent.
+# Moved from dot_config/zsh/tools/94_ssh_agent.zsh. Zsh-isms replaced:
+#   typeset -a → local -a  (bash 4+ supports both)
+#   unfunction → unset -f
 #
 # Priority order:
 #   1. Bitwarden SSH agent (desktop app socket)
@@ -27,7 +30,8 @@ _ssh_add_probe() {
 # 1. Try Bitwarden SSH agent
 # ---------------------------------------------------------------------------
 _try_bitwarden_agent() {
-    typeset -a _bw_candidates
+    local -a _bw_candidates
+    _bw_candidates=()
 
     if [[ "$OSTYPE" == darwin* ]]; then
         _bw_candidates=(
@@ -43,6 +47,7 @@ _try_bitwarden_agent() {
         )
     fi
 
+    local _sock
     for _sock in "${_bw_candidates[@]}"; do
         if [[ -S "$_sock" ]]; then
             # Socket file exists — verify the agent actually responds
@@ -130,7 +135,9 @@ _maybe_add_keys() {
     (( $? == 1 )) || return 0  # rc=1 means "agent ok, no identities"
 
     # Common private key names (add more as needed)
-    local -a key_names=(id_ed25519 id_rsa id_ecdsa jingle)
+    local -a key_names
+    key_names=(id_ed25519 id_rsa id_ecdsa jingle)
+    local k
     for k in "${key_names[@]}"; do
         local kf="$HOME/.ssh/$k"
         [[ -f "$kf" ]] && SSH_ASKPASS_REQUIRE=never ssh-add -q "$kf" 2>/dev/null
@@ -143,5 +150,5 @@ _maybe_add_keys() {
 _try_bitwarden_agent || _existing_agent_works || _fallback_ssh_agent
 
 # Clean up helper functions (they pollute the namespace)
-unfunction _try_bitwarden_agent _existing_agent_works _fallback_ssh_agent _maybe_add_keys _ssh_add_probe 2>/dev/null
+unset -f _try_bitwarden_agent _existing_agent_works _fallback_ssh_agent _maybe_add_keys _ssh_add_probe 2>/dev/null
 unset _SSH_AGENT_PROBE_TIMEOUT

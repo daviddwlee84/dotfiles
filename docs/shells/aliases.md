@@ -475,11 +475,11 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `wt` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
-| `wtcd` | function | `dot_config/zsh/tools/37_worktrunk.zsh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
-| `wm` | alias | `dot_config/zsh/tools/38_workmux.zsh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
-| `wmsb` | alias | `dot_config/zsh/tools/38_workmux.zsh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
-| `wmclear` | function | `dot_config/zsh/tools/38_workmux.zsh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
+| `wt` | function | `dot_config/shell/37_worktrunk.sh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
+| `wtcd` | function | `dot_config/shell/37_worktrunk.sh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
+| `wm` | alias | `dot_config/shell/38_workmux.sh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
+| `wmsb` | alias | `dot_config/shell/38_workmux.sh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
+| `wmclear` | function | `dot_config/shell/38_workmux.sh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
 | `tmux_status_set` | function | `dot_config/shell/60_tmux_status.sh` | Generic per-window tmux badge: `tmux_status_set my_build 🔨 [target]` writes `@my_build_status`. POSIX, sourced by both zsh + bash. See [workmux.md → Reusing the per-window status mechanism](../tools/workmux.md#reusing-the-per-window-status-mechanism-without-workmux) |
 | `tmux_status_get` | function | `dot_config/shell/60_tmux_status.sh` | Read back a `@<name>_status` marker (empty + nonzero exit if unset) |
 | `tmux_status_clear` | function | `dot_config/shell/60_tmux_status.sh` | Unset a marker on current or `target` window |
@@ -559,10 +559,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `readurl` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via jina.ai Reader + glow (remote, zero local deps beyond glow) |
-| `readlocal` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
-| `readnode` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
-| `readraw` | function | `dot_config/zsh/tools/55_web_reader.zsh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
+| `readurl` | function | `dot_config/shell/55_web_reader.sh` | Read article via jina.ai Reader + glow (remote, zero local deps beyond glow) |
+| `readlocal` | function | `dot_config/shell/55_web_reader.sh` | Read article via trafilatura + glow (local, offline) *(requires `trafilatura`)* |
+| `readnode` | function | `dot_config/shell/55_web_reader.sh` | Read article via readability-cli (`readable`) + glow (Mozilla Readability) *(requires `readable`)* |
+| `readraw` | function | `dot_config/shell/55_web_reader.sh` | Render full page: `curl | pandoc -f html -t gfm | glow -` (no article extraction) *(requires `pandoc`)* |
 
 ---
 
@@ -572,11 +572,11 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `catl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Colorful `cat` for logs via `tspin --print` (stdout mode; pipes cleanly) *(requires tspin)* |
-| `lessl` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `ccze -A \| less -RSFX` pager for logs with ANSI colors *(requires ccze)* |
-| `logtail` | function | `dot_config/zsh/tools/29_log_tools.zsh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
-| `svclog` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
-| `svcstat` | function | `dot_config/zsh/tools/29_log_tools.zsh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
+| `catl` | function | `dot_config/shell/29_log_tools.sh` | Colorful `cat` for logs via `tspin --print` (stdout mode; pipes cleanly) *(requires tspin)* |
+| `lessl` | function | `dot_config/shell/29_log_tools.sh` | `ccze -A \| less -RSFX` pager for logs with ANSI colors *(requires ccze)* |
+| `logtail` | function | `dot_config/shell/29_log_tools.sh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
+| `svclog` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
+| `svcstat` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
 
 ---
 
@@ -641,7 +641,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | Profile zsh startup time (`ZSH_PROF=1 zsh -i -c exit`) |
 | `bindings` | function | `dot_config/shell/10_aliases.sh` | View zsh keybindings cheatsheet (data source: `~/.config/docs/shells/keybindings.md`); pairs with the `Alt+/` ZLE picker — see [keybindings.md](keybindings.md) |
 | `ghostty-ssh-terminfo` | function | `dot_config/shell/10_aliases.sh` | Install `xterm-ghostty` terminfo on a remote host over SSH (unprivileged) |
-| `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
+| `tldrf` | function | `dot_config/shell/28_tldr.sh` | `tldr` with language fallback: zh_TW → zh → en *(requires tldr)* |
 
 ---
 
