@@ -1,0 +1,25 @@
+# 06_sesh.bash - bash wiring for the sesh tmux session manager.
+# Backend (sesh-sessions function + sesh-here/root/code/vibe + aliases) lives
+# in dot_config/shell/22_sesh.sh, sourced by ~/.bashrc's shared-layer loader
+# (step 7) AFTER this file (step 5). Registering a ble-bind here is fine
+# because the binding is resolved at keypress time, not at registration.
+#
+# Mirrors the keybinding side of dot_config/zsh/tools/22_sesh.zsh:
+#   zsh : `bindkey -M emacs '\es' sesh-sessions`
+#   bash: `ble-bind -m emacs   -x 'M-s' sesh-sessions` (here)
+
+# Skip if sesh isn't installed.
+command -v sesh >/dev/null 2>&1 || return 0
+
+# Require ble.sh — bare bash readline can't reasonably run an async widget.
+# (Plain bash users can still type `sesh-sessions` as a command.)
+[[ -z $BLE_VERSION ]] && return 0
+
+# Alt+S → fzf-tmux session picker. Bind on whichever keymap(s) match the
+# user's enableVimMode choice (mirrors dot_config/bash/04_blesh.bash.tmpl).
+{{ if .enableVimMode -}}
+ble-bind -m vi_imap -x 'M-s' 'sesh-sessions'
+ble-bind -m vi_nmap -x 'M-s' 'sesh-sessions'
+{{- else -}}
+ble-bind -x 'M-s' 'sesh-sessions'
+{{- end }}
