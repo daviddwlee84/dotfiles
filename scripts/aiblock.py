@@ -106,7 +106,7 @@ AICAP_OPENCODE_MODEL = _env_or_ssot("AICAP_OPENCODE_MODEL", "github-copilot/clau
 AICAP_CODEX_MODEL = _env_or_ssot("AICAP_CODEX_MODEL", "")
 AICAP_CURSOR_MODEL = _env_or_ssot("AICAP_CURSOR_MODEL", "")
 AICAP_HTTP_URL = _env_or_ssot("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
-AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "google/gemini-2.0-flash-exp:free")
+AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "openrouter/free")
 AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
 # UX-only flags (not in SSOT — only consumed by zsh aifix/aiblock UX, not shared)
 AICAP_SHOW_METADATA = os.environ.get("AICAP_SHOW_METADATA", "1") == "1"

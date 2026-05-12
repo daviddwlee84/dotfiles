@@ -42,8 +42,12 @@ _AICAP_AGENT_CONFIG_SOURCED=1
 : "${AICAP_CURSOR_MODEL:=}"                    # empty: cursor-agent picks composer-2-fast
 
 # HTTP fallback (opt-in only via AICAP_AGENT=http; never auto-detected).
+# `openrouter/free` is an auto-router across OpenRouter's free tier — when
+# one upstream is rate-limited or retired, it picks another transparently.
+# More robust than pinning a specific free model ID (those churn quarterly:
+# e.g. google/gemini-2.0-flash-exp:free was retired between 2025-Q1 and 2026-Q2).
 : "${AICAP_HTTP_URL:=https://openrouter.ai/api/v1/chat/completions}"
-: "${AICAP_HTTP_MODEL:=google/gemini-2.0-flash-exp:free}"
+: "${AICAP_HTTP_MODEL:=openrouter/free}"
 
 # Export so subprocess (Python tsum / aiblock) inherits.
 export AICAP_AGENT_PRIORITY \
