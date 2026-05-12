@@ -493,9 +493,9 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ghget` | function | `dot_config/zsh/tools/41_github.zsh` | Download a subdirectory from a GitHub tree URL |
-| `glcreate` | function | `dot_config/zsh/tools/42_gitlab.zsh` | Create a private GitLab repo under a group, set origin, and push |
-| `glcreate-ai` | function | `dot_config/zsh/tools/42_gitlab.zsh` | Same as `glcreate` but uses an AI agent to auto-generate the description |
+| `ghget` | function | `dot_config/shell/41_github.sh` | Download a subdirectory from a GitHub tree URL |
+| `glcreate` | function | `dot_config/shell/42_gitlab.sh` | Create a private GitLab repo under a group, set origin, and push |
+| `glcreate-ai` | function | `dot_config/shell/42_gitlab.sh` | Same as `glcreate` but uses an AI agent to auto-generate the description |
 
 ---
 
@@ -528,16 +528,16 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ports` | alias | `dot_config/zsh/tools/50_networking.zsh` | List all listening ports (`lsof -i -P -n \| grep LISTEN`) |
-| `myip` | alias | `dot_config/zsh/tools/50_networking.zsh` | Show public IP address |
-| `localip` | alias | `dot_config/zsh/tools/50_networking.zsh` | Show local IP address (platform-aware) |
-| `pingsweep` | function | `dot_config/zsh/tools/50_networking.zsh` | Ping sweep local `/24` subnet via `nmap -sn` *(requires nmap)* |
-| `arpscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | ARP scan local network (`sudo arp-scan -l`) *(requires arp-scan)* |
-| `dns` | alias | `dot_config/zsh/tools/50_networking.zsh` | DNS lookup via doggo (DoH/DoT/DoQ) *(requires doggo)* |
-| `bw-net` | alias | `dot_config/zsh/tools/50_networking.zsh` | Live bandwidth monitor (`sudo bandwhich`) *(requires bandwhich)* |
-| `portscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Fast port scanner via rustscan *(requires rustscan)* |
-| `lanscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Run full LAN device + port scan into `~/.cache/tv/` (feeds `tv lan-devices`) |
-| `tv-lan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Open the `lan-devices` Television channel |
+| `ports` | alias | `dot_config/shell/50_networking.sh` | List all listening ports (`lsof -i -P -n \| grep LISTEN`) |
+| `myip` | alias | `dot_config/shell/50_networking.sh` | Show public IP address |
+| `localip` | alias | `dot_config/shell/50_networking.sh` | Show local IP address (platform-aware) |
+| `pingsweep` | function | `dot_config/shell/50_networking.sh` | Ping sweep local `/24` subnet via `nmap -sn` *(requires nmap)* |
+| `arpscan` | alias | `dot_config/shell/50_networking.sh` | ARP scan local network (`sudo arp-scan -l`) *(requires arp-scan)* |
+| `dns` | alias | `dot_config/shell/50_networking.sh` | DNS lookup via doggo (DoH/DoT/DoQ) *(requires doggo)* |
+| `bw-net` | alias | `dot_config/shell/50_networking.sh` | Live bandwidth monitor (`sudo bandwhich`) *(requires bandwhich)* |
+| `portscan` | alias | `dot_config/shell/50_networking.sh` | Fast port scanner via rustscan *(requires rustscan)* |
+| `lanscan` | alias | `dot_config/shell/50_networking.sh` | Run full LAN device + port scan into `~/.cache/tv/` (feeds `tv lan-devices`) |
+| `tv-lan` | alias | `dot_config/shell/50_networking.sh` | Open the `lan-devices` Television channel |
 
 ### Proxy helpers
 
@@ -545,13 +545,13 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `withproxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a single command with proxy env vars exported to the child only (e.g. `withproxy curl ...`) |
-| `try_direct_then_proxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a command direct; on failure, retry via `withproxy`. Used as the default for reader functions. |
-| `proxy-on` | function | `dot_config/zsh/tools/50_networking.zsh` | Export `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` in the current shell |
-| `proxy-off` | function | `dot_config/zsh/tools/50_networking.zsh` | Unset all proxy env vars in the current shell |
-| `proxy-status` | function | `dot_config/zsh/tools/50_networking.zsh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
-| `proxy-test` | function | `dot_config/zsh/tools/50_networking.zsh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
-| `proxy-refresh` | function | `dot_config/zsh/tools/50_networking.zsh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
+| `withproxy` | function | `dot_config/shell/50_networking.sh` | Run a single command with proxy env vars exported to the child only (e.g. `withproxy curl ...`) |
+| `try_direct_then_proxy` | function | `dot_config/shell/50_networking.sh` | Run a command direct; on failure, retry via `withproxy`. Used as the default for reader functions. |
+| `proxy-on` | function | `dot_config/shell/50_networking.sh` | Export `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` in the current shell |
+| `proxy-off` | function | `dot_config/shell/50_networking.sh` | Unset all proxy env vars in the current shell |
+| `proxy-status` | function | `dot_config/shell/50_networking.sh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
+| `proxy-test` | function | `dot_config/shell/50_networking.sh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
+| `proxy-refresh` | function | `dot_config/shell/50_networking.sh` | Clear cached detection, re-probe, print status (use after toggling your proxy) |
 
 ### Web reader
 

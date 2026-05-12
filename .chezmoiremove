@@ -33,3 +33,6 @@ once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
 .config/zsh/tools/34_openclaw.zsh
 .config/zsh/tools/37_lazygit.zsh
 .config/zsh/tools/40_codexbar.zsh
+.config/zsh/tools/41_github.zsh
+.config/zsh/tools/42_gitlab.zsh
+.config/zsh/tools/50_networking.zsh

@@ -7300,3 +7300,1855 @@ Live key reminder: Alt+S keybinding will only register after you reopen the shel
 _**User (2026-05-12 11:32:08Z)**_
 
 git commit and continue following stages (finish all stage and create commit for each one, only stop when something need my confirmation)
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:17Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check git status
+
+`git status`
+
+```text
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   .claude/plans/dot-config-zsh-tools-22-sesh-zsh-svibe-snappy-scroll.md
+	new file:   .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+	modified:   docs/shells/aliases.md
+	new file:   dot_config/bash/06_sesh.bash.tmpl
+	new file:   dot_config/shell/22_sesh.sh
+	modified:   dot_config/zsh/tools/22_sesh.zsh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Recent commit style
+
+`git log --oneline -5`
+
+```text
+376228f feat(tsum): switch cache key from TTL to prompt-hash
+0290ef4 feat(ai-agent): benchmark harness + docs + openrouter/free default
+f05130b docs(tmux): inline ASCII decision tree for tmux install/upgrade flow
+33ce737 fix(tmux): set TERMINFO_DIRS in tmux-appimage wrapper
+f9c6ea1 feat(tsum): TSUM_TMUX_BIN env var for multi-tmux-binary hosts
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit Stage 1
+
+```bash
+git commit -m "$(cat <<'EOF'
+refactor(sesh): port svibe/scode/sroot/shere backend to shared shell layer
+
+Split dot_config/zsh/tools/22_sesh.zsh (664 lines) into a shared backend
+sourced by both shells plus thin per-shell keybinding wrappers. The zsh
+ZLE widget + bindkey stays in tools/; bash now gets Alt+S via ble.sh.
+
+Mechanical zsh→portable rewrites: print -r --→printf, ${=csv}→tr+read
+loop, ${#arr}→${#arr[@]}, ${arr[1]}→${arr[@]:0:1} slice + iter on
+${arr[@]:1}. Kept local -A (bash 4+ baseline).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778585548-53172.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778585548-53172.
+[main a8bb367] refactor(sesh): port svibe/scode/sroot/shere backend to shared shell layer
+ 6 files changed, 8196 insertions(+), 652 deletions(-)
+ create mode 100644 .claude/plans/dot-config-zsh-tools-22-sesh-zsh-svibe-snappy-scroll.md
+ create mode 100644 .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+ create mode 100644 dot_config/bash/06_sesh.bash.tmpl
+ create mode 100644 dot_config/shell/22_sesh.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:45Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check for chezmoiremove and chezmoi config files
+
+`find /Users/daviddwlee84/.local/share/chezmoi -name ".chezmoiremove*" -maxdepth 2 2>/dev/null; echo "---"; ls /Users/daviddwlee84/.local/share/chezmoi/.chezmoi* 2>/dev/null | head -20`
+
+```text
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoiremove
+---
+ /Users/daviddwlee84/.local/share/chezmoi/.chezmoi.toml.tmpl
+ /Users/daviddwlee84/.local/share/chezmoi/.chezmoiexternal.toml.tmpl
+ /Users/daviddwlee84/.local/share/chezmoi/.chezmoiignore.tmpl
+ /Users/daviddwlee84/.local/share/chezmoi/.chezmoiremove
+
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts:
+ **global
+ **repo
+
+/Users/daviddwlee84/.local/share/chezmoi/.chezmoitemplates:
+ **agents
+ **editor
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:51Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiremove`
+
+```text
+1	{{- /*
+2	.chezmoiremove — paths to delete from $HOME on each `chezmoi apply`.
+3	Templated; re-evaluated every apply (idempotent — chezmoi only acts
+4	when the path actually exists). One pattern per line.
+5	
+6	Currently used to clean up the zsh-side copies of files that were
+7	moved into the shared dot_config/shell/ POSIX layer (see commit
+8	9bb56c2 "shell: extract POSIX layer..." 2026-05). Without this, the
+9	orphan ~/.config/zsh/ files would still get sourced by
+10	load_modular_dir and double-load PATH/env on every shell start.
+11	
+12	Pruning policy: leave entries forever unless the file grows large
+13	(>50 lines). `stat()` on each non-existent path is a few µs per
+14	apply — negligible cost vs the safety of cleaning up any host that
+15	hasn't applied since the migration commit. After ~6-12 months on
+16	the fleet, individual entries can be pruned in a follow-up commit
+17	if the maintainer is confident every host has applied at least
+18	once. Tracked as a [P3/S] follow-up in TODO.md; not urgent.
+19	*/ -}}
+20	.config/zsh/00_exports.zsh
+21	.config/zsh/02_legacy_tools.zsh
+22	.config/zsh/tools/01_starship.zsh
+23	.config/zsh/tools/05_mise.zsh
+24	.config/zsh/tools/20_zoxide.zsh
+25	.config/zsh/tools/27_thefuck.zsh
+26	.config/zsh/tools/30_direnv.zsh
+27	.config/zsh/tools/10_fzf.zsh
+28	.config/zsh/tools/06_cargo.zsh
+29	.config/zsh/tools/07_bunx_cli.zsh
+30	.config/zsh/tools/25_bat.zsh
+31	.config/zsh/tools/26_eza.zsh
+32	.config/zsh/tools/29_marimo.zsh
+33	.config/zsh/tools/34_openclaw.zsh
+34	.config/zsh/tools/37_lazygit.zsh
+35	.config/zsh/tools/40_codexbar.zsh
+36
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:32:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/50_networking.zsh`
+
+```text
+1	# 50_networking.zsh - Networking tool aliases and helpers
+2	
+3	# --- Listening ports (works everywhere, no extra install needed) ---
+4	alias ports='lsof -i -P -n | grep LISTEN'
+5	
+6	# --- IP address helpers ---
+7	alias myip='curl -s https://ifconfig.me'
+8	if [[ "$OSTYPE" == darwin* ]]; then
+9	  alias localip='ipconfig getifaddr en0'
+10	else
+11	  alias localip='hostname -I | awk "{print \$1}"'
+12	fi
+13	
+14	# --- nmap shortcuts ---
+15	if command -v nmap &>/dev/null; then
+16	  # Quick ping sweep of local /24 subnet
+17	  pingsweep() {
+18	    local ip
+19	    if [[ "$OSTYPE" == darwin* ]]; then
+20	      ip=$(ipconfig getifaddr en0 2>/dev/null)
+21	    else
+22	      ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+23	    fi
+24	    local base="${ip%.*}.0/24"
+25	    echo "Scanning $base ..."
+26	    nmap -sn "$base"
+27	  }
+28	fi
+29	
+30	# --- arp-scan ---
+31	if command -v arp-scan &>/dev/null; then
+32	  alias arpscan='sudo arp-scan -l'
+33	fi
+34	
+35	# --- doggo (modern DNS lookup with DoH/DoT/DoQ) ---
+36	if command -v doggo &>/dev/null; then
+37	  alias dns='doggo'
+38	fi
+39	
+40	# --- gping (graphical ping) ---
+41	# gping is already short enough, no alias needed
+42	
+43	# --- trippy (TUI traceroute, binary is 'trip') ---
+44	# trip is already short enough, no alias needed
+45	
+46	# --- bandwhich (bandwidth monitor, needs sudo for packet capture) ---
+47	if command -v bandwhich &>/dev/null; then
+48	  alias bw-net='sudo bandwhich'
+49	fi
+50	
+51	# --- rustscan (fast port scanner -> nmap) ---
+52	if command -v rustscan &>/dev/null; then
+53	  alias portscan='rustscan'
+54	fi
+55	
+56	# --- speedtest (Ookla CLI) ---
+57	# speedtest is already short enough, no alias needed
+58	
+59	# --- LAN device scanner (feeds `tv lan-devices`) ---
+60	if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
+61	  alias lanscan="$HOME/.config/television/lan-scan.sh all"
+62	  alias tv-lan='tv lan-devices'
+63	fi
+64	
+65	# --- Proxy helpers (generic) ---
+66	# Portable proxy management: honor $LOCAL_PROXY_URL, else prefer an active
+67	# Clash config, else auto-probe common loopback ports (Clash 7890/7891,
+68	# ClashX 1087, Privoxy 8118, generic 8080). Detection result is cached
+69	# per-shell in _ZSH_NET_PROXY_CACHE; use `proxy-refresh` after
+70	# starting/stopping the proxy.
+71	#
+72	# Environment variables honored:
+73	#   LOCAL_PROXY_URL         HTTP/HTTPS proxy URL (e.g. http://127.0.0.1:7890).
+74	#                           If unset, ports are auto-probed.
+75	#   LOCAL_PROXY_SOCKS_URL   Optional separate SOCKS5 endpoint (e.g.
+76	#                           socks5://127.0.0.1:7891). Used for ALL_PROXY /
+77	#                           all_proxy when set; otherwise these fall back to
+78	#                           LOCAL_PROXY_URL / the probe result. Useful when
+79	#                           Clash is configured with split `port:` and
+80	#                           `socks-port:` instead of `mixed-port:`.
+81	#   LOCAL_PROXY_AUTO_ACTIVATE=1  Run `proxy-on` silently at shell startup
+82	#                           whenever a proxy is detected. Handy on machines
+83	#                           that always route through the local proxy.
+84	
+85	: "${_ZSH_NET_PROXY_CACHE:=}"
+86	: "${_ZSH_NET_PROXY_SOCKS_CACHE:=}"
+87	: "${_ZSH_NET_PROXY_SOURCE_CACHE:=}"
+88	__ZSH_NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
+89	__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES=(
+90	  "$HOME/.config/clash/config.yaml"
+91	  "$HOME/.config/clash/config.yml"
+92	  "$HOME/Library/Application Support/clash/config.yaml"
+93	  "$HOME/Library/Application Support/clash/config.yml"
+94	)
+95	
+96	__zsh_net_clear_proxy_cache() {
+97	  _ZSH_NET_PROXY_CACHE=""
+98	  _ZSH_NET_PROXY_SOCKS_CACHE=""
+99	  _ZSH_NET_PROXY_SOURCE_CACHE=""
+100	}
+101	
+102	__zsh_net_set_proxy_cache() {
+103	  _ZSH_NET_PROXY_CACHE="$1"
+104	  _ZSH_NET_PROXY_SOCKS_CACHE="$2"
+105	  _ZSH_NET_PROXY_SOURCE_CACHE="$3"
+106	}
+107	
+108	__zsh_net_port_open() {
+109	  nc -z -w1 127.0.0.1 "$1" 2>/dev/null
+110	}
+111	
+112	__zsh_net_find_clash_config() {
+113	  local candidate
+114	  for candidate in "${__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
+115	    if [[ -f "$candidate" ]]; then
+116	      print -r -- "$candidate"
+117	      return 0
+118	    fi
+119	  done
+120	  return 1
+121	}
+122	
+123	__zsh_net_yaml_scalar() {
+124	  local key="$1"
+125	  local config_path="$2"
+126	  awk -v key="$key" '
+127	    {
+128	      line = $0
+129	      sub(/\r$/, "", line)
+130	      if (line ~ /^[[:space:]]*#/) {
+131	        next
+132	      }
+133	      sub(/[[:space:]]+#.*/, "", line)
+134	      if (line ~ "^[[:space:]]*" key ":[[:space:]]*") {
+135	        sub("^[[:space:]]*" key ":[[:space:]]*", "", line)
+136	        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+137	        gsub(/^["'"'"']|["'"'"']$/, "", line)
+138	        print line
+139	        exit
+140	      }
+141	    }
+142	  ' "$config_path"
+143	}
+144	
+145	__zsh_net_detect_clash_proxy() {
+146	  local config_path mixed_port http_port socks_port socks_url=""
+147	  config_path="$(__zsh_net_find_clash_config)" || return 1
+148	
+149	  mixed_port="$(__zsh_net_yaml_scalar "mixed-port" "$config_path")"
+150	  if [[ -n "$mixed_port" ]] && __zsh_net_port_open "$mixed_port"; then
+151	    __zsh_net_set_proxy_cache \
+152	      "http://127.0.0.1:$mixed_port" \
+153	      "socks5://127.0.0.1:$mixed_port" \
+154	      "clash config"
+155	    return 0
+156	  fi
+157	
+158	  http_port="$(__zsh_net_yaml_scalar "port" "$config_path")"
+159	  socks_port="$(__zsh_net_yaml_scalar "socks-port" "$config_path")"
+160	  if [[ -n "$http_port" ]] && __zsh_net_port_open "$http_port"; then
+161	    if [[ -n "$socks_port" ]] && __zsh_net_port_open "$socks_port"; then
+162	      socks_url="socks5://127.0.0.1:$socks_port"
+163	    fi
+164	    __zsh_net_set_proxy_cache \
+165	      "http://127.0.0.1:$http_port" \
+166	      "$socks_url" \
+167	      "clash config"
+168	    return 0
+169	  fi
+170	
+171	  return 1
+172	}
+173	
+174	__zsh_net_detect_proxy() {
+175	  if [[ -n "$LOCAL_PROXY_URL" ]]; then
+176	    __zsh_net_set_proxy_cache \
+177	      "$LOCAL_PROXY_URL" \
+178	      "$LOCAL_PROXY_SOCKS_URL" \
+179	      "LOCAL_PROXY_URL env"
+180	    return 0
+181	  fi
+182	  if __zsh_net_detect_clash_proxy; then
+183	    return 0
+184	  fi
+185	  if [[ -n "$_ZSH_NET_PROXY_CACHE" ]]; then
+186	    [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]] && return 1
+187	    return 0
+188	  fi
+189	  local port
+190	  for port in "${__ZSH_NET_PROXY_PROBE_PORTS[@]}"; do
+191	    if __zsh_net_port_open "$port"; then
+192	      __zsh_net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
+193	      return 0
+194	    fi
+195	  done
+196	  __zsh_net_set_proxy_cache "none" "" "probe"
+197	  return 1
+198	}
+199	
+200	# Resolve the URL that should be used for ALL_PROXY / all_proxy.
+201	# Falls back to the HTTP proxy when no SOCKS-specific URL is set (works for
+202	# mixed-port Clash configs where one port serves both HTTP and SOCKS).
+203	__zsh_net_all_proxy_url() {
+204	  if [[ -n "$LOCAL_PROXY_SOCKS_URL" ]]; then
+205	    print -r -- "$LOCAL_PROXY_SOCKS_URL"
+206	  elif [[ -n "$_ZSH_NET_PROXY_SOCKS_CACHE" ]]; then
+207	    print -r -- "$_ZSH_NET_PROXY_SOCKS_CACHE"
+208	  else
+209	    print -r -- "$_ZSH_NET_PROXY_CACHE"
+210	  fi
+211	}
+212	
+213	# Run one command with proxy env applied to the child process only.
+214	withproxy() {
+215	  __zsh_net_detect_proxy
+216	  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+217	    "$@"
+218	    return
+219	  fi
+220	  local all_url
+221	  all_url="$(__zsh_net_all_proxy_url)"
+222	  http_proxy="$_ZSH_NET_PROXY_CACHE" \
+223	  https_proxy="$_ZSH_NET_PROXY_CACHE" \
+224	  HTTP_PROXY="$_ZSH_NET_PROXY_CACHE" \
+225	  HTTPS_PROXY="$_ZSH_NET_PROXY_CACHE" \
+226	  ALL_PROXY="$all_url" \
+227	  all_proxy="$all_url" \
+228	    "$@"
+229	}
+230	
+231	# Run direct first; on non-zero exit, retry via proxy if one is available.
+232	try_direct_then_proxy() {
+233	  "$@" && return 0
+234	  local rc=$?
+235	  __zsh_net_detect_proxy
+236	  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+237	    return $rc
+238	  fi
+239	  print -u2 "[retry via proxy $_ZSH_NET_PROXY_CACHE]"
+240	  withproxy "$@"
+241	}
+242	
+243	# Export proxy env vars to the current shell (all downstream commands inherit).
+244	# If $1 is "-q", suppress the success message (used by auto-activate).
+245	proxy-on() {
+246	  local quiet=0
+247	  [[ "$1" == "-q" ]] && quiet=1
+248	  __zsh_net_detect_proxy
+249	  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+250	    (( quiet )) || print -u2 "proxy-on: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)"
+251	    return 1
+252	  fi
+253	  local all_url
+254	  all_url="$(__zsh_net_all_proxy_url)"
+255	  export http_proxy="$_ZSH_NET_PROXY_CACHE" \
+256	         https_proxy="$_ZSH_NET_PROXY_CACHE" \
+257	         HTTP_PROXY="$_ZSH_NET_PROXY_CACHE" \
+258	         HTTPS_PROXY="$_ZSH_NET_PROXY_CACHE" \
+259	         ALL_PROXY="$all_url" \
+260	         all_proxy="$all_url"
+261	  if (( ! quiet )); then
+262	    if [[ "$all_url" == "$_ZSH_NET_PROXY_CACHE" ]]; then
+263	      print "proxy ON  ->  $_ZSH_NET_PROXY_CACHE"
+264	    else
+265	      print "proxy ON  ->  http/https=$_ZSH_NET_PROXY_CACHE  all/socks=$all_url"
+266	    fi
+267	  fi
+268	}
+269	
+270	# Unset all proxy env vars from the current shell.
+271	proxy-off() {
+272	  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy
+273	  __zsh_net_clear_proxy_cache
+274	  print "proxy OFF"
+275	}
+276	
+277	# Report current proxy state: active / available / unavailable.
+278	proxy-status() {
+279	  __zsh_net_detect_proxy
+280	  local shell_active=""
+281	  if [[ -n "$http_proxy$https_proxy$ALL_PROXY" ]]; then
+282	    shell_active="yes"
+283	  fi
+284	  local source="${_ZSH_NET_PROXY_SOURCE_CACHE:-probe}"
+285	
+286	  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+287	    print "proxy: unavailable (no \$LOCAL_PROXY_URL; no loopback port from ${__ZSH_NET_PROXY_PROBE_PORTS[*]} reachable)"
+288	    [[ -n "$shell_active" ]] && print "  note: shell env still has proxy vars set -- run \`proxy-off\` to clear"
+289	    return 1
+290	  fi
+291	
+292	  local state="available"
+293	  [[ -n "$shell_active" ]] && state="active   "
+294	  local hint="(not exported; use \`withproxy\`, \`try_direct_then_proxy\`, or \`proxy-on\`)"
+295	  [[ -n "$shell_active" ]] && hint="(exported in current shell)"
+296	  local all_url all_source
+297	  all_url="$(__zsh_net_all_proxy_url)"
+298	  all_source="$source"
+299	  [[ -n "$LOCAL_PROXY_SOCKS_URL" ]] && all_source="LOCAL_PROXY_SOCKS_URL env"
+300	
+301	  print "proxy: $state http=$_ZSH_NET_PROXY_CACHE  source=$source  $hint"
+302	  if [[ -n "$all_url" && "$all_url" != "$_ZSH_NET_PROXY_CACHE" ]]; then
+303	    print "  socks=$all_url  source=$all_source"
+304	  fi
+305	}
+306	
+307	# Validate that the detected proxy can actually reach the public internet.
+308	# ICMP ping does not honor proxy env vars, so use Google's HTTP 204 endpoint.
+309	proxy-test() {
+310	  local url="${1:-https://www.google.com/generate_204}"
+311	  if ! command -v curl >/dev/null 2>&1; then
+312	    print -u2 "proxy-test: curl not found"
+313	    return 127
+314	  fi
+315	
+316	  __zsh_net_detect_proxy
+317	  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+318	    print -u2 "proxy-test: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)"
+319	    return 1
+320	  fi
+321	
+322	  local all_url
+323	  all_url="$(__zsh_net_all_proxy_url)"
+324	  print "proxy-test: http=$_ZSH_NET_PROXY_CACHE  all=$all_url  url=$url"
+325	  withproxy curl -sS -o /dev/null \
+326	    -w 'proxy-test: http=%{http_code} remote=%{remote_ip} total=%{time_total}s\n' \
+327	    --max-time 10 "$url"
+328	}
+329	
+330	# Clear the cached detection and re-probe; call after toggling your proxy.
+331	proxy-refresh() {
+332	  __zsh_net_clear_proxy_cache
+333	  __zsh_net_detect_proxy
+334	  proxy-status
+335	}
+336	
+337	# Optional auto-activation: when $LOCAL_PROXY_AUTO_ACTIVATE=1 is set before
+338	# this file is sourced, silently call `proxy-on` if a proxy is detected.
+339	# Set the env var in a machine-local zsh file (or ~/.zshenv) on machines that
+340	# should always route through the loopback proxy.
+341	if [[ "$LOCAL_PROXY_AUTO_ACTIVATE" == "1" ]]; then
+342	  proxy-on -q
+343	fi
+344	
+345	# --- Rootless Docker socket ---
+346	# Point the Docker CLI at the user-scoped socket when rootless Docker is
+347	# installed. Without this, `docker` defaults to /var/run/docker.sock (the
+348	# rootful path) and fails with "Cannot connect to the Docker daemon".
+349	# Guarded on socket existence so this is a no-op on:
+350	#   - macOS (OrbStack / Docker Desktop publish their own sockets, don't need this)
+351	#   - Linux boxes still running rootful Docker (the rootful socket is under /var/run)
+352	# Respect a pre-existing $DOCKER_HOST so a user-set value wins.
+353	# See docs/tools/container-config-map.md for the full install-variant map.
+354	if [[ "$(uname -s)" == "Linux" && -z "$DOCKER_HOST" ]]; then
+355	  _zsh_net_xdg_runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+356	  if [[ -S "${_zsh_net_xdg_runtime}/docker.sock" ]]; then
+357	    export DOCKER_HOST="unix://${_zsh_net_xdg_runtime}/docker.sock"
+358	  fi
+359	  unset _zsh_net_xdg_runtime
+360	fi
+361
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:33:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/41_github.zsh`
+
+```text
+1	# 41_github.zsh - GitHub URL helpers
+2	
+3	# Download a subdirectory from a GitHub repository tree URL.
+4	# Example:
+5	#   ghget https://github.com/microsoft/qlib/tree/high-freq-execution/examples/trade/
+6	ghget() {
+7	  emulate -L zsh
+8	  setopt localoptions pipefail
+9	
+10	  local usage="Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>"
+11	  local branch_note="ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch)."
+12	
+13	  if (( $# != 1 )); then
+14	    print -u2 -- "$usage"
+15	    print -u2 -- "$branch_note"
+16	    return 1
+17	  fi
+18	
+19	  local url="$1"
+20	  local prefix="https://github.com/"
+21	  if [[ "$url" != ${prefix}* ]]; then
+22	    print -u2 -- "Invalid GitHub tree URL: $url"
+23	    print -u2 -- "$usage"
+24	    print -u2 -- "$branch_note"
+25	    return 1
+26	  fi
+27	
+28	  url="${url#$prefix}"
+29	  url="${url%%\?*}"
+30	  url="${url%%\#*}"
+31	  url="${url%/}"
+32	
+33	  local -a parts
+34	  parts=(${(s:/:)url})
+35	  if (( ${#parts} < 5 )) || [[ "${parts[3]}" != "tree" ]]; then
+36	    print -u2 -- "Invalid GitHub tree URL: $1"
+37	    print -u2 -- "$usage"
+38	    print -u2 -- "$branch_note"
+39	    return 1
+40	  fi
+41	
+42	  local owner="${parts[1]}"
+43	  local repo="${parts[2]}"
+44	  local branch="${parts[4]}"
+45	  local subdir_path="${(j:/:)parts[5,-1]}"
+46	  local leaf="${subdir_path:t}"
+47	
+48	  if [[ -z "$owner" || -z "$repo" || -z "$branch" || -z "$subdir_path" || -z "$leaf" ]]; then
+49	    print -u2 -- "Invalid GitHub tree URL: $1"
+50	    print -u2 -- "$usage"
+51	    print -u2 -- "$branch_note"
+52	    return 1
+53	  fi
+54	
+55	  if [[ -e "$leaf" ]]; then
+56	    print -u2 -- "Destination already exists: $PWD/$leaf"
+57	    return 1
+58	  fi
+59	
+60	  local -a path_parts
+61	  path_parts=(${(s:/:)subdir_path})
+62	  local strip="${#path_parts}"
+63	  local archive_root="${repo}-${branch}"
+64	  local tmpdir
+65	  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ghget.XXXXXX")" || {
+66	    print -u2 -- "Failed to create temporary directory"
+67	    return 1
+68	  }
+69	
+70	  print -- "Downloading $owner/$repo/$subdir_path (branch: $branch) ..."
+71	  if ! command curl -fsSL "https://github.com/$owner/$repo/archive/refs/heads/$branch.tar.gz" \
+72	    | command tar -xz -C "$tmpdir" --strip-components="$strip" -f - "$archive_root/$subdir_path"; then
+73	    command rm -rf -- "$tmpdir"
+74	    print -u2 -- "Failed to download or extract '$subdir_path' from '$owner/$repo' on branch '$branch'"
+75	    print -u2 -- "$branch_note"
+76	    return 1
+77	  fi
+78	
+79	  if [[ ! -d "$tmpdir/$leaf" ]]; then
+80	    command rm -rf -- "$tmpdir"
+81	    print -u2 -- "Expected extracted directory was not found: $leaf"
+82	    return 1
+83	  fi
+84	
+85	  if ! command mv -- "$tmpdir/$leaf" .; then
+86	    command rm -rf -- "$tmpdir"
+87	    print -u2 -- "Failed to move extracted directory into: $PWD"
+88	    return 1
+89	  fi
+90	
+91	  command rm -rf -- "$tmpdir"
+92	}
+93
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:33:00Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/zsh/tools/42_gitlab.zsh`
+
+```text
+1	# 42_gitlab.zsh - GitLab helpers using glab CLI
+2	
+3	# ==============================================================================
+4	# Method 1: Direct shell function (no AI agent needed)
+5	# ==============================================================================
+6	
+7	# Create a GitLab repo under a group from the current git repo, set origin, and push.
+8	# Detects current folder name as repo name and current branch automatically.
+9	#
+10	# Usage:
+11	#   glcreate <group> [description]
+12	#
+13	# Examples:
+14	#   glcreate david_quick_tries
+15	#   glcreate david_quick_tries "My awesome project"
+16	#
+17	# If no description is given, the repo is created without one.
+18	# The repo is created as private by default.
+19	glcreate() {
+20	  emulate -L zsh
+21	
+22	  local group="${1:?Usage: glcreate <group> [description]}"
+23	  local desc="${2:-}"
+24	  local name=$(basename "$(pwd)")
+25	  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+26	
+27	  echo "Creating: ${group}/${name} (branch: ${branch})"
+28	
+29	  glab repo create "${group}/${name}" \
+30	    --private \
+31	    --defaultBranch "$branch" \
+32	    --skipGitInit \
+33	    ${desc:+--description "$desc"} \
+34	  && {
+35	    # Add or update origin remote
+36	    git remote add origin "git@gitlab.com:${group}/${name}.git" 2>/dev/null \
+37	      || git remote set-url origin "git@gitlab.com:${group}/${name}.git"
+38	  } \
+39	  && git push -u origin "$branch"
+40	}
+41	
+42	# ==============================================================================
+43	# Method 2: AI agent assisted (summarizes description from project content)
+44	# ==============================================================================
+45	
+46	# Create a GitLab repo using an AI coding agent to inspect the project,
+47	# auto-generate a description, create the repo, set origin, and push.
+48	#
+49	# Supported agents: opencode (default), claude, codex, cursor-agent
+50	# Set GLCREATE_AGENT to change the default agent.
+51	# Set GLCREATE_LANG to change the default prompt language (zh or en, default: zh).
+52	#
+53	# Usage:
+54	#   glcreate-ai <group> [description] [--agent <name>] [--lang zh|en]
+55	#
+56	# Examples:
+57	#   glcreate-ai david_quick_tries
+58	#   glcreate-ai david_quick_tries "Override description"
+59	#   glcreate-ai david_quick_tries --agent claude
+60	#   glcreate-ai david_quick_tries --lang en
+61	#
+62	# If no description is given, the agent will summarize one from the project content.
+63	glcreate-ai() {
+64	  emulate -L zsh
+65	
+66	  local group="" desc="" agent="${GLCREATE_AGENT:-opencode}" lang="${GLCREATE_LANG:-zh}"
+67	
+68	  # Parse arguments
+69	  while [[ $# -gt 0 ]]; do
+70	    case "$1" in
+71	      --agent) agent="$2"; shift 2 ;;
+72	      --lang)  lang="$2"; shift 2 ;;
+73	      *) [[ -z "$group" ]] && group="$1" || desc="$1"; shift ;;
+74	    esac
+75	  done
+76	
+77	  if [[ -z "$group" ]]; then
+78	    echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent] [--lang zh|en]"
+79	    echo "  Set GLCREATE_AGENT env var to change default agent (default: opencode)"
+80	    echo "  Set GLCREATE_LANG  env var to change default language (default: zh)"
+81	    return 1
+82	  fi
+83	
+84	  local name=$(basename "$(pwd)")
+85	  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+86	  local prompt
+87	
+88	  case "$lang" in
+89	    en)
+90	      prompt="Use glab to create a private repo under gitlab.com/${group}, repo name: ${name}, default branch: ${branch}. Set the origin remote and push.${desc:+ Description: ${desc}.} If no description is provided, summarize one sentence from the project content."
+91	      ;;
+92	    zh|*)
+93	      prompt="用 glab 把這個 repo 建到 gitlab.com/${group} 底下，repo name: ${name}，private，default branch: ${branch}，設定 origin remote 並 push。${desc:+Description: ${desc}。}如果沒給 description 就根據項目內容總結一句。"
+94	      ;;
+95	  esac
+96	
+97	  echo "Agent: ${agent} | Lang: ${lang} | Repo: ${group}/${name} | Branch: ${branch}"
+98	
+99	  case "$agent" in
+100	    opencode)       opencode run "$prompt" ;;
+101	    claude)         claude -p "$prompt" ;;
+102	    codex)          codex exec "$prompt" ;;
+103	    cursor-agent)   cursor-agent -p "$prompt" ;;
+104	    *)              echo "Unknown agent: ${agent}"; return 1 ;;
+105	  esac
+106	}
+107
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:16Z)**_
+
+Now Stage 2. Let me check the `.chezmoiremove` policy and look at the three files for migration. I see `41_github.zsh` actually has heavier zsh-isms than the audit suggested (split flag `${(s:/:)}`, 1-indexed access, `:t` modifier, slice `[5,-1]`, join flag `${(j:/:)}`) — I'll do the full rewrite.
+
+Starting with the simplest, `42_gitlab.zsh`:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 42_gitlab.sh - GitLab helpers using glab CLI (shared bash + zsh).
+# Moved from dot_config/zsh/tools/42_gitlab.zsh; the only zsh-ism was
+# `emulate -L zsh` (gated below).
+
+# ==============================================================================
+# Method 1: Direct shell function (no AI agent needed)
+# ==============================================================================
+
+# Create a GitLab repo under a group from the current git repo, set origin, and push.
+# Detects current folder name as repo name and current branch automatically.
+#
+# Usage:
+#   glcreate <group> [description]
+#
+# Examples:
+#   glcreate david_quick_tries
+#   glcreate david_quick_tries "My awesome project"
+#
+# If no description is given, the repo is created without one.
+# The repo is created as private by default.
+glcreate() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+
+  local group="${1:?Usage: glcreate <group> [description]}"
+  local desc="${2:-}"
+  local name
+  name=$(basename "$(pwd)")
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+
+  echo "Creating: ${group}/${name} (branch: ${branch})"
+
+  glab repo create "${group}/${name}" \
+    --private \
+    --defaultBranch "$branch" \
+    --skipGitInit \
+    ${desc:+--description "$desc"} \
+  && {
+    # Add or update origin remote
+    git remote add origin "git@gitlab.com:${group}/${name}.git" 2>/dev/null \
+      || git remote set-url origin "git@gitlab.com:${group}/${name}.git"
+  } \
+  && git push -u origin "$branch"
+}
+
+# ==============================================================================
+# Method 2: AI agent assisted (summarizes description from project content)
+# ==============================================================================
+
+# Create a GitLab repo using an AI coding agent to inspect the project,
+# auto-generate a description, create the repo, set origin, and push.
+#
+# Supported agents: opencode (default), claude, codex, cursor-agent
+# Set GLCREATE_AGENT to change the default agent.
+# Set GLCREATE_LANG to change the default prompt language (zh or en, default: zh).
+#
+# Usage:
+#   glcreate-ai <group> [description] [--agent <name>] [--lang zh|en]
+#
+# Examples:
+#   glcreate-ai david_quick_tries
+#   glcreate-ai david_quick_tries "Override description"
+#   glcreate-ai david_quick_tries --agent claude
+#   glcreate-ai david_quick_tries --lang en
+#
+# If no description is given, the agent will summarize one from the project content.
+glcreate-ai() {
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
+
+  local group="" desc="" agent="${GLCREATE_AGENT:-opencode}" lang="${GLCREATE_LANG:-zh}"
+
+  # Parse arguments
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --agent) agent="$2"; shift 2 ;;
+      --lang)  lang="$2"; shift 2 ;;
+      *) [ -z "$group" ] && group="$1" || desc="$1"; shift ;;
+    esac
+  done
+
+  if [ -z "$group" ]; then
+    echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent] [--lang zh|en]"
+    echo "  Set GLCREATE_AGENT env var to change default agent (default: opencode)"
+    echo "  Set GLCREATE_LANG  env var to change default language (default: zh)"
+    return 1
+  fi
+
+  local name
+  name=$(basename "$(pwd)")
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+  local prompt
+
+  case "$lang" in
+    en)
+      prompt="Use glab to create a private repo under gitlab.com/${group}, repo name: ${name}, default branch: ${branch}. Set the origin remote and push.${desc:+ Description: ${desc}.} If no description is provided, summarize one sentence from the project content."
+      ;;
+    zh|*)
+      prompt="用 glab 把這個 repo 建到 gitlab.com/${group} 底下，repo name: ${name}，private，default branch: ${branch}，設定 origin remote 並 push。${desc:+Description: ${desc}。}如果沒給 description 就根據項目內容總結一句。"
+      ;;
+  esac
+
+  echo "Agent: ${agent} | Lang: ${lang} | Repo: ${group}/${name} | Branch: ${branch}"
+
+  case "$agent" in
+    opencode)       opencode run "$prompt" ;;
+    claude)         claude -p "$prompt" ;;
+    codex)          codex exec "$prompt" ;;
+    cursor-agent)   cursor-agent -p "$prompt" ;;
+    *)              echo "Unknown agent: ${agent}"; return 1 ;;
+  esac
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/42_gitlab.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Replace print -r / print -u2 with printf; rename __ZSH_NET_* prefix; keep zsh+bash compatibility.
+
+```text
+Task #7 created successfully: Port 50_networking.zsh → 50_networking.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:38Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Gate emulate -L zsh on $ZSH_VERSION; verify glcreate/glcreate-ai work in both shells.
+
+```text
+Task #8 created successfully: Port 42_gitlab.zsh → 42_gitlab.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:40Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Replace ${(s:/:)} split, 1-indexed array access, ${arr[5,-1]} slice, ${(j:/:)} join, :t modifier, ${#arr} → portable equivalents.
+
+```text
+Task #9 created successfully: Port 41_github.zsh → 41_github.sh (full rewrite)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:40Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Add the three ported paths to .chezmoiremove; rm the source zsh files; verify chezmoi diff.
+
+```text
+Task #10 created successfully: Update .chezmoiremove + delete old zsh-tools files (Stage 2)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Source the three new files in bash + zsh, smoke-test functions, commit Stage 2.
+
+```text
+Task #11 created successfully: Verify Stage 2 with cross-shell source + commit
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #8 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #7 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:34:46Z)**_
+
+Now `50_networking.zsh` → `50_networking.sh` (the only change is `print` → `printf`):
+
+_**Agent (claude-opus-4-7 2026-05-12 11:35:29Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 50_networking.sh - Networking tool aliases and helpers (shared bash + zsh).
+# Moved from dot_config/zsh/tools/50_networking.zsh; the only zsh-isms were
+# `print -r --` / `print -u2` / `print "..."` which all became `printf`.
+
+# --- Listening ports (works everywhere, no extra install needed) ---
+alias ports='lsof -i -P -n | grep LISTEN'
+
+# --- IP address helpers ---
+alias myip='curl -s https://ifconfig.me'
+if [[ "$OSTYPE" == darwin* ]]; then
+  alias localip='ipconfig getifaddr en0'
+else
+  alias localip='hostname -I | awk "{print \$1}"'
+fi
+
+# --- nmap shortcuts ---
+if command -v nmap &>/dev/null; then
+  # Quick ping sweep of local /24 subnet
+  pingsweep() {
+    local ip
+    if [[ "$OSTYPE" == darwin* ]]; then
+      ip=$(ipconfig getifaddr en0 2>/dev/null)
+    else
+      ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    local base="${ip%.*}.0/24"
+    echo "Scanning $base ..."
+    nmap -sn "$base"
+  }
+fi
+
+# --- arp-scan ---
+if command -v arp-scan &>/dev/null; then
+  alias arpscan='sudo arp-scan -l'
+fi
+
+# --- doggo (modern DNS lookup with DoH/DoT/DoQ) ---
+if command -v doggo &>/dev/null; then
+  alias dns='doggo'
+fi
+
+# --- gping (graphical ping) ---
+# gping is already short enough, no alias needed
+
+# --- trippy (TUI traceroute, binary is 'trip') ---
+# trip is already short enough, no alias needed
+
+# --- bandwhich (bandwidth monitor, needs sudo for packet capture) ---
+if command -v bandwhich &>/dev/null; then
+  alias bw-net='sudo bandwhich'
+fi
+
+# --- rustscan (fast port scanner -> nmap) ---
+if command -v rustscan &>/dev/null; then
+  alias portscan='rustscan'
+fi
+
+# --- speedtest (Ookla CLI) ---
+# speedtest is already short enough, no alias needed
+
+# --- LAN device scanner (feeds `tv lan-devices`) ---
+if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
+  alias lanscan="$HOME/.config/television/lan-scan.sh all"
+  alias tv-lan='tv lan-devices'
+fi
+
+# --- Proxy helpers (generic) ---
+# Portable proxy management: honor $LOCAL_PROXY_URL, else prefer an active
+# Clash config, else auto-probe common loopback ports (Clash 7890/7891,
+# ClashX 1087, Privoxy 8118, generic 8080). Detection result is cached
+# per-shell in _NET_PROXY_CACHE; use `proxy-refresh` after
+# starting/stopping the proxy.
+#
+# Environment variables honored:
+#   LOCAL_PROXY_URL         HTTP/HTTPS proxy URL (e.g. http://127.0.0.1:7890).
+#                           If unset, ports are auto-probed.
+#   LOCAL_PROXY_SOCKS_URL   Optional separate SOCKS5 endpoint (e.g.
+#                           socks5://127.0.0.1:7891). Used for ALL_PROXY /
+#                           all_proxy when set; otherwise these fall back to
+#                           LOCAL_PROXY_URL / the probe result. Useful when
+#                           Clash is configured with split `port:` and
+#                           `socks-port:` instead of `mixed-port:`.
+#   LOCAL_PROXY_AUTO_ACTIVATE=1  Run `proxy-on` silently at shell startup
+#                           whenever a proxy is detected. Handy on machines
+#                           that always route through the local proxy.
+
+: "${_NET_PROXY_CACHE:=}"
+: "${_NET_PROXY_SOCKS_CACHE:=}"
+: "${_NET_PROXY_SOURCE_CACHE:=}"
+__NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
+__NET_PROXY_CLASH_CONFIG_CANDIDATES=(
+  "$HOME/.config/clash/config.yaml"
+  "$HOME/.config/clash/config.yml"
+  "$HOME/Library/Application Support/clash/config.yaml"
+  "$HOME/Library/Application Support/clash/config.yml"
+)
+
+__net_clear_proxy_cache() {
+  _NET_PROXY_CACHE=""
+  _NET_PROXY_SOCKS_CACHE=""
+  _NET_PROXY_SOURCE_CACHE=""
+}
+
+__net_set_proxy_cache() {
+  _NET_PROXY_CACHE="$1"
+  _NET_PROXY_SOCKS_CACHE="$2"
+  _NET_PROXY_SOURCE_CACHE="$3"
+}
+
+__net_port_open() {
+  nc -z -w1 127.0.0.1 "$1" 2>/dev/null
+}
+
+__net_find_clash_config() {
+  local candidate
+  for candidate in "${__NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+__net_yaml_scalar() {
+  local key="$1"
+  local config_path="$2"
+  awk -v key="$key" '
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line ~ /^[[:space:]]*#/) {
+        next
+      }
+      sub(/[[:space:]]+#.*/, "", line)
+      if (line ~ "^[[:space:]]*" key ":[[:space:]]*") {
+        sub("^[[:space:]]*" key ":[[:space:]]*", "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        gsub(/^["'"'"']|["'"'"']$/, "", line)
+        print line
+        exit
+      }
+    }
+  ' "$config_path"
+}
+
+__net_detect_clash_proxy() {
+  local config_path mixed_port http_port socks_port socks_url=""
+  config_path="$(__net_find_clash_config)" || return 1
+
+  mixed_port="$(__net_yaml_scalar "mixed-port" "$config_path")"
+  if [[ -n "$mixed_port" ]] && __net_port_open "$mixed_port"; then
+    __net_set_proxy_cache \
+      "http://127.0.0.1:$mixed_port" \
+      "socks5://127.0.0.1:$mixed_port" \
+      "clash config"
+    return 0
+  fi
+
+  http_port="$(__net_yaml_scalar "port" "$config_path")"
+  socks_port="$(__net_yaml_scalar "socks-port" "$config_path")"
+  if [[ -n "$http_port" ]] && __net_port_open "$http_port"; then
+    if [[ -n "$socks_port" ]] && __net_port_open "$socks_port"; then
+      socks_url="socks5://127.0.0.1:$socks_port"
+    fi
+    __net_set_proxy_cache \
+      "http://127.0.0.1:$http_port" \
+      "$socks_url" \
+      "clash config"
+    return 0
+  fi
+
+  return 1
+}
+
+__net_detect_proxy() {
+  if [[ -n "$LOCAL_PROXY_URL" ]]; then
+    __net_set_proxy_cache \
+      "$LOCAL_PROXY_URL" \
+      "$LOCAL_PROXY_SOCKS_URL" \
+      "LOCAL_PROXY_URL env"
+    return 0
+  fi
+  if __net_detect_clash_proxy; then
+    return 0
+  fi
+  if [[ -n "$_NET_PROXY_CACHE" ]]; then
+    [[ "$_NET_PROXY_CACHE" == "none" ]] && return 1
+    return 0
+  fi
+  local port
+  for port in "${__NET_PROXY_PROBE_PORTS[@]}"; do
+    if __net_port_open "$port"; then
+      __net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
+      return 0
+    fi
+  done
+  __net_set_proxy_cache "none" "" "probe"
+  return 1
+}
+
+# Resolve the URL that should be used for ALL_PROXY / all_proxy.
+# Falls back to the HTTP proxy when no SOCKS-specific URL is set (works for
+# mixed-port Clash configs where one port serves both HTTP and SOCKS).
+__net_all_proxy_url() {
+  if [[ -n "$LOCAL_PROXY_SOCKS_URL" ]]; then
+    printf '%s\n' "$LOCAL_PROXY_SOCKS_URL"
+  elif [[ -n "$_NET_PROXY_SOCKS_CACHE" ]]; then
+    printf '%s\n' "$_NET_PROXY_SOCKS_CACHE"
+  else
+    printf '%s\n' "$_NET_PROXY_CACHE"
+  fi
+}
+
+# Run one command with proxy env applied to the child process only.
+withproxy() {
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    "$@"
+    return
+  fi
+  local all_url
+  all_url="$(__net_all_proxy_url)"
+  http_proxy="$_NET_PROXY_CACHE" \
+  https_proxy="$_NET_PROXY_CACHE" \
+  HTTP_PROXY="$_NET_PROXY_CACHE" \
+  HTTPS_PROXY="$_NET_PROXY_CACHE" \
+  ALL_PROXY="$all_url" \
+  all_proxy="$all_url" \
+    "$@"
+}
+
+# Run direct first; on non-zero exit, retry via proxy if one is available.
+try_direct_then_proxy() {
+  "$@" && return 0
+  local rc=$?
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    return $rc
+  fi
+  printf '%s\n' "[retry via proxy $_NET_PROXY_CACHE]" >&2
+  withproxy "$@"
+}
+
+# Export proxy env vars to the current shell (all downstream commands inherit).
+# If $1 is "-q", suppress the success message (used by auto-activate).
+proxy-on() {
+  local quiet=0
+  [[ "$1" == "-q" ]] && quiet=1
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    (( quiet )) || printf '%s\n' "proxy-on: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)" >&2
+    return 1
+  fi
+  local all_url
+  all_url="$(__net_all_proxy_url)"
+  export http_proxy="$_NET_PROXY_CACHE" \
+         https_proxy="$_NET_PROXY_CACHE" \
+         HTTP_PROXY="$_NET_PROXY_CACHE" \
+         HTTPS_PROXY="$_NET_PROXY_CACHE" \
+         ALL_PROXY="$all_url" \
+         all_proxy="$all_url"
+  if (( ! quiet )); then
+    if [[ "$all_url" == "$_NET_PROXY_CACHE" ]]; then
+      printf '%s\n' "proxy ON  ->  $_NET_PROXY_CACHE"
+    else
+      printf '%s\n' "proxy ON  ->  http/https=$_NET_PROXY_CACHE  all/socks=$all_url"
+    fi
+  fi
+}
+
+# Unset all proxy env vars from the current shell.
+proxy-off() {
+  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy
+  __net_clear_proxy_cache
+  printf '%s\n' "proxy OFF"
+}
+
+# Report current proxy state: active / available / unavailable.
+proxy-status() {
+  __net_detect_proxy
+  local shell_active=""
+  if [[ -n "$http_proxy$https_proxy$ALL_PROXY" ]]; then
+    shell_active="yes"
+  fi
+  local source="${_NET_PROXY_SOURCE_CACHE:-probe}"
+
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    printf '%s\n' "proxy: unavailable (no \$LOCAL_PROXY_URL; no loopback port from ${__NET_PROXY_PROBE_PORTS[*]} reachable)"
+    [[ -n "$shell_active" ]] && printf '%s\n' "  note: shell env still has proxy vars set -- run \`proxy-off\` to clear"
+    return 1
+  fi
+
+  local state="available"
+  [[ -n "$shell_active" ]] && state="active   "
+  local hint="(not exported; use \`withproxy\`, \`try_direct_then_proxy\`, or \`proxy-on\`)"
+  [[ -n "$shell_active" ]] && hint="(exported in current shell)"
+  local all_url all_source
+  all_url="$(__net_all_proxy_url)"
+  all_source="$source"
+  [[ -n "$LOCAL_PROXY_SOCKS_URL" ]] && all_source="LOCAL_PROXY_SOCKS_URL env"
+
+  printf '%s\n' "proxy: $state http=$_NET_PROXY_CACHE  source=$source  $hint"
+  if [[ -n "$all_url" && "$all_url" != "$_NET_PROXY_CACHE" ]]; then
+    printf '%s\n' "  socks=$all_url  source=$all_source"
+  fi
+}
+
+# Validate that the detected proxy can actually reach the public internet.
+# ICMP ping does not honor proxy env vars, so use Google's HTTP 204 endpoint.
+proxy-test() {
+  local url="${1:-https://www.google.com/generate_204}"
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s\n' "proxy-test: curl not found" >&2
+    return 127
+  fi
+
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    printf '%s\n' "proxy-test: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)" >&2
+    return 1
+  fi
+
+  local all_url
+  all_url="$(__net_all_proxy_url)"
+  printf '%s\n' "proxy-test: http=$_NET_PROXY_CACHE  all=$all_url  url=$url"
+  withproxy curl -sS -o /dev/null \
+    -w 'proxy-test: http=%{http_code} remote=%{remote_ip} total=%{time_total}s\n' \
+    --max-time 10 "$url"
+}
+
+# Clear the cached detection and re-probe; call after toggling your proxy.
+proxy-refresh() {
+  __net_clear_proxy_cache
+  __net_detect_proxy
+  proxy-status
+}
+
+# Optional auto-activation: when $LOCAL_PROXY_AUTO_ACTIVATE=1 is set before
+# this file is sourced, silently call `proxy-on` if a proxy is detected.
+# Set the env var in a machine-local shell file (or ~/.zshenv / ~/.profile) on
+# machines that should always route through the loopback proxy.
+if [[ "$LOCAL_PROXY_AUTO_ACTIVATE" == "1" ]]; then
+  proxy-on -q
+fi
+
+# --- Rootless Docker socket ---
+# Point the Docker CLI at the user-scoped socket when rootless Docker is
+# installed. Without this, `docker` defaults to /var/run/docker.sock (the
+# rootful path) and fails with "Cannot connect to the Docker daemon".
+# Guarded on socket existence so this is a no-op on:
+#   - macOS (OrbStack / Docker Desktop publish their own sockets, don't need this)
+#   - Linux boxes still running rootful Docker (the rootful socket is under /var/run)
+# Respect a pre-existing $DOCKER_HOST so a user-set value wins.
+# See docs/tools/container-config-map.md for the full install-variant map.
+if [[ "$(uname -s)" == "Linux" && -z "$DOCKER_HOST" ]]; then
+  _net_xdg_runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+  if [[ -S "${_net_xdg_runtime}/docker.sock" ]]; then
+    export DOCKER_HOST="unix://${_net_xdg_runtime}/docker.sock"
+  fi
+  unset _net_xdg_runtime
+fi
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/50_networking.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:35:33Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #7 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:35:33Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:35:37Z)**_
+
+Now the harder one — `41_github.zsh` needs a full rewrite of the URL parsing (split, slice, modifier, 1-indexed access):
+
+_**Agent (claude-opus-4-7 2026-05-12 11:35:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```sh
+# 41_github.sh - GitHub URL helpers (shared bash + zsh).
+# Moved from dot_config/zsh/tools/41_github.zsh. The original relied on
+# zsh-only constructs for the URL parsing:
+#   ${(s:/:)url}      → split on `/`        — replaced with tr + while-read
+#   ${(j:/:)slice}    → join with `/`       — replaced with IFS=/ + ${arr[*]}
+#   ${parts[N]}       → 1-indexed access    — replaced with bash-style slicing
+#                                              `${arr[@]:N-1:1}` (works in both)
+#   ${parts[5,-1]}    → slice               — replaced with `${arr[@]:4}`
+#   ${var:t}          → basename            — replaced with `${var##*/}`
+#   ${#arr}           → array length        — replaced with `${#arr[@]}`
+# setopt localoptions pipefail is gated on $ZSH_VERSION; bash falls back to
+# `set -o pipefail` (leaks for the rest of the shell — benign).
+
+# Download a subdirectory from a GitHub repository tree URL.
+# Example:
+#   ghget https://github.com/microsoft/qlib/tree/high-freq-execution/examples/trade/
+ghget() {
+  if [ -n "$ZSH_VERSION" ]; then
+    emulate -L zsh
+    setopt localoptions pipefail
+  else
+    # bash: no function-local options; setting pipefail leaks but is benign.
+    set -o pipefail
+  fi
+
+  local usage="Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>"
+  local branch_note="ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch)."
+
+  if [ $# -ne 1 ]; then
+    printf '%s\n' "$usage" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  local url="$1"
+  local prefix="https://github.com/"
+  if [[ "$url" != ${prefix}* ]]; then
+    printf '%s\n' "Invalid GitHub tree URL: $url" >&2
+    printf '%s\n' "$usage" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  url="${url#$prefix}"
+  url="${url%%\?*}"
+  url="${url%%\#*}"
+  url="${url%/}"
+
+  # Portable split-on-/: `tr / \n | while read` (mirrors the svibe pattern
+  # in dot_config/shell/22_sesh.sh — zsh disables word-splitting on
+  # unquoted parameters by default, so the original `${(s:/:)url}` flag is
+  # rewritten via tr + read).
+  local -a parts
+  parts=()
+  local tok
+  while IFS= read -r tok; do
+    parts+=( "$tok" )
+  done < <(printf '%s' "$url" | tr '/' '\n')
+
+  if [ "${#parts[@]}" -lt 5 ]; then
+    printf '%s\n' "Invalid GitHub tree URL: $1" >&2
+    printf '%s\n' "$usage" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  # ${parts[@]:N:1} is bash-style slicing (0-indexed); zsh supports it on
+  # `[@]`. Quoted, a 1-element slice expands to that element as a single word.
+  local owner repo tree_marker branch
+  owner="${parts[*]:0:1}"
+  repo="${parts[*]:1:1}"
+  tree_marker="${parts[*]:2:1}"
+  branch="${parts[*]:3:1}"
+
+  if [ "$tree_marker" != "tree" ]; then
+    printf '%s\n' "Invalid GitHub tree URL: $1" >&2
+    printf '%s\n' "$usage" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  # Subdir path = parts from index 4 onwards, joined with `/`.
+  # `${arr[*]}` joins with first char of IFS (zsh + bash both).
+  local subdir_path
+  local _oldifs="$IFS"
+  IFS='/'
+  subdir_path="${parts[*]:4}"
+  IFS="$_oldifs"
+
+  # Leaf basename via parameter expansion (replaces zsh's `${var:t}` modifier).
+  local leaf="${subdir_path##*/}"
+
+  if [ -z "$owner" ] || [ -z "$repo" ] || [ -z "$branch" ] || [ -z "$subdir_path" ] || [ -z "$leaf" ]; then
+    printf '%s\n' "Invalid GitHub tree URL: $1" >&2
+    printf '%s\n' "$usage" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  if [ -e "$leaf" ]; then
+    printf '%s\n' "Destination already exists: $PWD/$leaf" >&2
+    return 1
+  fi
+
+  # Count path components (subdir depth) for `tar --strip-components=N`.
+  local -a path_parts
+  path_parts=()
+  local p
+  while IFS= read -r p; do
+    [ -n "$p" ] && path_parts+=( "$p" )
+  done < <(printf '%s' "$subdir_path" | tr '/' '\n')
+  local strip="${#path_parts[@]}"
+
+  local archive_root="${repo}-${branch}"
+  local tmpdir
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/ghget.XXXXXX")" || {
+    printf '%s\n' "Failed to create temporary directory" >&2
+    return 1
+  }
+
+  printf '%s\n' "Downloading $owner/$repo/$subdir_path (branch: $branch) ..."
+  if ! command curl -fsSL "https://github.com/$owner/$repo/archive/refs/heads/$branch.tar.gz" \
+    | command tar -xz -C "$tmpdir" --strip-components="$strip" -f - "$archive_root/$subdir_path"; then
+    command rm -rf -- "$tmpdir"
+    printf '%s\n' "Failed to download or extract '$subdir_path' from '$owner/$repo' on branch '$branch'" >&2
+    printf '%s\n' "$branch_note" >&2
+    return 1
+  fi
+
+  if [ ! -d "$tmpdir/$leaf" ]; then
+    command rm -rf -- "$tmpdir"
+    printf '%s\n' "Expected extracted directory was not found: $leaf" >&2
+    return 1
+  fi
+
+  if ! command mv -- "$tmpdir/$leaf" .; then
+    command rm -rf -- "$tmpdir"
+    printf '%s\n' "Failed to move extracted directory into: $PWD" >&2
+    return 1
+  fi
+
+  command rm -rf -- "$tmpdir"
+}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/41_github.sh (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:05Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:06Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:10Z)**_
+
+Now clean up the old zsh-tools files and update `.chezmoiremove`:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Remove the three migrated zsh-tools files
+
+`rm /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/50_networking.zsh /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/41_github.zsh /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/42_gitlab.zsh && ls /Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/ | grep -E "(41_github|42_gitlab|50_networking)"; echo "exit=$?"`
+
+```text
+exit=1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiremove has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:18Z)**_
+
+Files removed. Now verify cross-shell sourcing + syntax:
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax check the three new shared files in both shells
+
+```bash
+for f in 50_networking 41_github 42_gitlab; do
+  bash -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "bash OK: $f"
+  zsh -n /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh && echo "zsh OK: $f"
+done
+```
+
+```text
+bash OK: 50_networking
+zsh OK: 50_networking
+bash OK: 41_github
+zsh OK: 41_github
+bash OK: 42_gitlab
+zsh OK: 42_gitlab
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source all three in fresh bash + verify functions defined
+
+```bash
+bash --noprofile --norc -c '
+for f in 50_networking 41_github 42_gitlab; do
+  source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh || { echo "FAIL: $f"; exit 1; }
+done
+echo "BASH ALL SOURCED OK"
+echo "ghget defined? $(type -t ghget)"
+echo "glcreate defined? $(type -t glcreate)"
+echo "proxy-status defined? $(type -t proxy-status)"
+'
+```
+
+```text
+BASH ALL SOURCED OK
+ghget defined? function
+glcreate defined? function
+proxy-status defined? function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Source all three in fresh zsh + verify functions defined
+
+```bash
+zsh -f -c '
+for f in 50_networking 41_github 42_gitlab; do
+  source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/${f}.sh || { echo "FAIL: $f"; exit 1; }
+done
+echo "ZSH ALL SOURCED OK"
+whence -w ghget glcreate proxy-status
+'
+```
+
+```text
+ZSH ALL SOURCED OK
+ghget: function
+glcreate: function
+proxy-status: function
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:27Z)**_
+
+All clean. Now functional smoke test of `ghget` URL-parsing path (without actually downloading):
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+ghget URL-parsing smoke test in bash (no network)
+
+```bash
+bash --noprofile --norc -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/41_github.sh
+# Trigger usage path (no args)
+ghget 2>&1
+echo "---"
+# Bad URL (no https://github.com/ prefix)
+ghget "ftp://not-github.com/foo/bar" 2>&1
+echo "---"
+# Bad URL (too few path components)
+ghget "https://github.com/owner/repo" 2>&1
+echo "---"
+# Bad URL (missing tree marker)
+ghget "https://github.com/owner/repo/blob/branch/file" 2>&1
+' 2>&1 | head -30
+```
+
+```text
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: ftp://not-github.com/foo/bar
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: https://github.com/owner/repo
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: https://github.com/owner/repo/blob/branch/file
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+ghget URL-parsing smoke test in zsh (no network)
+
+```bash
+zsh -f -c '
+source /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/41_github.sh
+ghget 2>&1
+echo "---"
+ghget "ftp://not-github.com/foo/bar" 2>&1
+echo "---"
+ghget "https://github.com/owner/repo" 2>&1
+echo "---"
+ghget "https://github.com/owner/repo/blob/branch/file" 2>&1
+' 2>&1 | head -30
+```
+
+```text
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: ftp://not-github.com/foo/bar
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: https://github.com/owner/repo
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+---
+Invalid GitHub tree URL: https://github.com/owner/repo/blob/branch/file
+Usage: ghget https://github.com/<owner>/<repo>/tree/<branch>/<path>
+ghget currently supports only GitHub tree URLs with a single-segment branch name (no '/' in branch).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check aliases doc for entries that need source-path update
+
+`grep -n -E "(50_networking|41_github|42_gitlab|ghget|glcreate|withproxy|proxy-on|proxy-off|proxy-status|pingsweep)" /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md | head -20`
+
+```text
+496:| `ghget` | function | `dot_config/zsh/tools/41_github.zsh` | Download a subdirectory from a GitHub tree URL |
+497:| `glcreate` | function | `dot_config/zsh/tools/42_gitlab.zsh` | Create a private GitLab repo under a group, set origin, and push |
+498:| `glcreate-ai` | function | `dot_config/zsh/tools/42_gitlab.zsh` | Same as `glcreate` but uses an AI agent to auto-generate the description |
+531:| `ports` | alias | `dot_config/zsh/tools/50_networking.zsh` | List all listening ports (`lsof -i -P -n \| grep LISTEN`) |
+532:| `myip` | alias | `dot_config/zsh/tools/50_networking.zsh` | Show public IP address |
+533:| `localip` | alias | `dot_config/zsh/tools/50_networking.zsh` | Show local IP address (platform-aware) |
+534:| `pingsweep` | function | `dot_config/zsh/tools/50_networking.zsh` | Ping sweep local `/24` subnet via `nmap -sn` *(requires nmap)* |
+535:| `arpscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | ARP scan local network (`sudo arp-scan -l`) *(requires arp-scan)* |
+536:| `dns` | alias | `dot_config/zsh/tools/50_networking.zsh` | DNS lookup via doggo (DoH/DoT/DoQ) *(requires doggo)* |
+537:| `bw-net` | alias | `dot_config/zsh/tools/50_networking.zsh` | Live bandwidth monitor (`sudo bandwhich`) *(requires bandwhich)* |
+538:| `portscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Fast port scanner via rustscan *(requires rustscan)* |
+539:| `lanscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Run full LAN device + port scan into `~/.cache/tv/` (feeds `tv lan-devices`) |
+540:| `tv-lan` | alias | `dot_config/zsh/tools/50_networking.zsh` | Open the `lan-devices` Television channel |
+544:> Portable loopback-proxy helpers. Honors `$LOCAL_PROXY_URL` (+ optional `$LOCAL_PROXY_SOCKS_URL` for split Clash `socks-port:` configs); otherwise prefers an active Clash config (`mixed-port:` or `port:`/`socks-port:` from `~/.config/clash/config.yaml` or `~/Library/Application Support/clash/config.yaml`) before falling back to probing ports 7890/7891/1087/8118/8080 with `nc -z -w1`. Detection is cached per shell; `proxy-off` and `proxy-refresh` clear that cache before the next lookup. Set `$LOCAL_PROXY_AUTO_ACTIVATE=1` to auto-export env vars on shell startup. Full guide: [docs/tools/web-reader.md](../tools/web-reader.md). See also: [docs/tools/containers.md](../tools/containers.md) for how `$LOCAL_PROXY_URL` feeds the chezmoi-managed `~/.docker/config.json` `proxies.default` block.
+548:| `withproxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a single command with proxy env vars exported to the child only (e.g. `withproxy curl ...`) |
+549:| `try_direct_then_proxy` | function | `dot_config/zsh/tools/50_networking.zsh` | Run a command direct; on failure, retry via `withproxy`. Used as the default for reader functions. |
+550:| `proxy-on` | function | `dot_config/zsh/tools/50_networking.zsh` | Export `http_proxy`/`https_proxy`/`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` in the current shell |
+551:| `proxy-off` | function | `dot_config/zsh/tools/50_networking.zsh` | Unset all proxy env vars in the current shell |
+552:| `proxy-status` | function | `dot_config/zsh/tools/50_networking.zsh` | Report state: **active** (exported), **available** (detected), or **unavailable** |
+553:| `proxy-test` | function | `dot_config/zsh/tools/50_networking.zsh` | Test detected proxy egress with `curl https://www.google.com/generate_204` (HTTP, not ICMP ping) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update source paths in aliases doc
+
+```bash
+sed -i.bak \
+  -e 's|dot_config/zsh/tools/41_github\.zsh|dot_config/shell/41_github.sh|g' \
+  -e 's|dot_config/zsh/tools/42_gitlab\.zsh|dot_config/shell/42_gitlab.sh|g' \
+  -e 's|dot_config/zsh/tools/50_networking\.zsh|dot_config/shell/50_networking.sh|g' \
+  docs/shells/aliases.md && rm docs/shells/aliases.md.bak && grep -nE "(50_networking|41_github|42_gitlab)" docs/shells/aliases.md | head -10
+```
+
+```text
+496:| `ghget` | function | `dot_config/shell/41_github.sh` | Download a subdirectory from a GitHub tree URL |
+497:| `glcreate` | function | `dot_config/shell/42_gitlab.sh` | Create a private GitLab repo under a group, set origin, and push |
+498:| `glcreate-ai` | function | `dot_config/shell/42_gitlab.sh` | Same as `glcreate` but uses an AI agent to auto-generate the description |
+531:| `ports` | alias | `dot_config/shell/50_networking.sh` | List all listening ports (`lsof -i -P -n \| grep LISTEN`) |
+532:| `myip` | alias | `dot_config/shell/50_networking.sh` | Show public IP address |
+533:| `localip` | alias | `dot_config/shell/50_networking.sh` | Show local IP address (platform-aware) |
+534:| `pingsweep` | function | `dot_config/shell/50_networking.sh` | Ping sweep local `/24` subnet via `nmap -sn` *(requires nmap)* |
+535:| `arpscan` | alias | `dot_config/shell/50_networking.sh` | ARP scan local network (`sudo arp-scan -l`) *(requires arp-scan)* |
+536:| `dns` | alias | `dot_config/shell/50_networking.sh` | DNS lookup via doggo (DoH/DoT/DoQ) *(requires doggo)* |
+537:| `bw-net` | alias | `dot_config/shell/50_networking.sh` | Live bandwidth monitor (`sudo bandwhich`) *(requires bandwhich)* |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:51Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-12 11:36:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check git status of all Stage 2 changes
+
+`git status --short | head -20`
+
+```text
+ M .chezmoiremove
+ M .specstory/history/2026-05-12_10-17-20Z-at-dot-config-zsh.md
+ M docs/shells/aliases.md
+ D dot_config/zsh/tools/41_github.zsh
+ D dot_config/zsh/tools/42_gitlab.zsh
+ D dot_config/zsh/tools/50_networking.zsh
+?? dot_config/shell/41_github.sh
+?? dot_config/shell/42_gitlab.sh
+?? dot_config/shell/50_networking.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-12 11:37:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm chezmoi sees Stage 2 changes
+
+`chezmoi apply --dry-run --verbose 2>&1 | grep -E "(50_networking|41_github|42_gitlab|chezmoiremove)" | head -20`
+
+```text
+added: .config/shell/41_github.sh
+│    │                                  │  1 │# 41_github.sh - GitHub URL helpe↵
+│    │                                  │    │/41_github.zsh. The original reli↵
+added: .config/shell/42_gitlab.sh
+│    │                                  │  1 │# 42_gitlab.sh - GitLab helpers u↵
+│    │                                  │    │/42_gitlab.zsh; the only zsh-ism ↵
+added: .config/shell/50_networking.sh
+│    │                                  │  1 │# 50_networking.sh - Networking t↵
+│    │                                  │    │/50_networking.zsh; the only zsh-↵
+removed: .config/zsh/tools/41_github.zsh
+│  1 │# 41_github.zsh - GitHub URL help↴│    │
+removed: .config/zsh/tools/42_gitlab.zsh
+│  1 │# 42_gitlab.zsh - GitLab helpers ↵│    │
+removed: .config/zsh/tools/50_networking.zsh
+│  1 │# 50_networking.zsh - Networking ↵│    │
+```
+</details></tool-use>

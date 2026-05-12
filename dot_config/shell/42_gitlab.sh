@@ -1,4 +1,6 @@
-# 42_gitlab.zsh - GitLab helpers using glab CLI
+# 42_gitlab.sh - GitLab helpers using glab CLI (shared bash + zsh).
+# Moved from dot_config/zsh/tools/42_gitlab.zsh; the only zsh-ism was
+# `emulate -L zsh` (gated below).
 
 # ==============================================================================
 # Method 1: Direct shell function (no AI agent needed)
@@ -17,12 +19,14 @@
 # If no description is given, the repo is created without one.
 # The repo is created as private by default.
 glcreate() {
-  emulate -L zsh
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
 
   local group="${1:?Usage: glcreate <group> [description]}"
   local desc="${2:-}"
-  local name=$(basename "$(pwd)")
-  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+  local name
+  name=$(basename "$(pwd)")
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
 
   echo "Creating: ${group}/${name} (branch: ${branch})"
 
@@ -61,28 +65,30 @@ glcreate() {
 #
 # If no description is given, the agent will summarize one from the project content.
 glcreate-ai() {
-  emulate -L zsh
+  [ -n "$ZSH_VERSION" ] && emulate -L zsh
 
   local group="" desc="" agent="${GLCREATE_AGENT:-opencode}" lang="${GLCREATE_LANG:-zh}"
 
   # Parse arguments
-  while [[ $# -gt 0 ]]; do
+  while [ $# -gt 0 ]; do
     case "$1" in
       --agent) agent="$2"; shift 2 ;;
       --lang)  lang="$2"; shift 2 ;;
-      *) [[ -z "$group" ]] && group="$1" || desc="$1"; shift ;;
+      *) [ -z "$group" ] && group="$1" || desc="$1"; shift ;;
     esac
   done
 
-  if [[ -z "$group" ]]; then
+  if [ -z "$group" ]; then
     echo "Usage: glcreate-ai <group> [description] [--agent opencode|claude|codex|cursor-agent] [--lang zh|en]"
     echo "  Set GLCREATE_AGENT env var to change default agent (default: opencode)"
     echo "  Set GLCREATE_LANG  env var to change default language (default: zh)"
     return 1
   fi
 
-  local name=$(basename "$(pwd)")
-  local branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
+  local name
+  name=$(basename "$(pwd)")
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "main")
   local prompt
 
   case "$lang" in

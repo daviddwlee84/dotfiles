@@ -1,4 +1,6 @@
-# 50_networking.zsh - Networking tool aliases and helpers
+# 50_networking.sh - Networking tool aliases and helpers (shared bash + zsh).
+# Moved from dot_config/zsh/tools/50_networking.zsh; the only zsh-isms were
+# `print -r --` / `print -u2` / `print "..."` which all became `printf`.
 
 # --- Listening ports (works everywhere, no extra install needed) ---
 alias ports='lsof -i -P -n | grep LISTEN'
@@ -66,7 +68,7 @@ fi
 # Portable proxy management: honor $LOCAL_PROXY_URL, else prefer an active
 # Clash config, else auto-probe common loopback ports (Clash 7890/7891,
 # ClashX 1087, Privoxy 8118, generic 8080). Detection result is cached
-# per-shell in _ZSH_NET_PROXY_CACHE; use `proxy-refresh` after
+# per-shell in _NET_PROXY_CACHE; use `proxy-refresh` after
 # starting/stopping the proxy.
 #
 # Environment variables honored:
@@ -82,45 +84,45 @@ fi
 #                           whenever a proxy is detected. Handy on machines
 #                           that always route through the local proxy.
 
-: "${_ZSH_NET_PROXY_CACHE:=}"
-: "${_ZSH_NET_PROXY_SOCKS_CACHE:=}"
-: "${_ZSH_NET_PROXY_SOURCE_CACHE:=}"
-__ZSH_NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
-__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES=(
+: "${_NET_PROXY_CACHE:=}"
+: "${_NET_PROXY_SOCKS_CACHE:=}"
+: "${_NET_PROXY_SOURCE_CACHE:=}"
+__NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
+__NET_PROXY_CLASH_CONFIG_CANDIDATES=(
   "$HOME/.config/clash/config.yaml"
   "$HOME/.config/clash/config.yml"
   "$HOME/Library/Application Support/clash/config.yaml"
   "$HOME/Library/Application Support/clash/config.yml"
 )
 
-__zsh_net_clear_proxy_cache() {
-  _ZSH_NET_PROXY_CACHE=""
-  _ZSH_NET_PROXY_SOCKS_CACHE=""
-  _ZSH_NET_PROXY_SOURCE_CACHE=""
+__net_clear_proxy_cache() {
+  _NET_PROXY_CACHE=""
+  _NET_PROXY_SOCKS_CACHE=""
+  _NET_PROXY_SOURCE_CACHE=""
 }
 
-__zsh_net_set_proxy_cache() {
-  _ZSH_NET_PROXY_CACHE="$1"
-  _ZSH_NET_PROXY_SOCKS_CACHE="$2"
-  _ZSH_NET_PROXY_SOURCE_CACHE="$3"
+__net_set_proxy_cache() {
+  _NET_PROXY_CACHE="$1"
+  _NET_PROXY_SOCKS_CACHE="$2"
+  _NET_PROXY_SOURCE_CACHE="$3"
 }
 
-__zsh_net_port_open() {
+__net_port_open() {
   nc -z -w1 127.0.0.1 "$1" 2>/dev/null
 }
 
-__zsh_net_find_clash_config() {
+__net_find_clash_config() {
   local candidate
-  for candidate in "${__ZSH_NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
+  for candidate in "${__NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
     if [[ -f "$candidate" ]]; then
-      print -r -- "$candidate"
+      printf '%s\n' "$candidate"
       return 0
     fi
   done
   return 1
 }
 
-__zsh_net_yaml_scalar() {
+__net_yaml_scalar() {
   local key="$1"
   local config_path="$2"
   awk -v key="$key" '
@@ -142,26 +144,26 @@ __zsh_net_yaml_scalar() {
   ' "$config_path"
 }
 
-__zsh_net_detect_clash_proxy() {
+__net_detect_clash_proxy() {
   local config_path mixed_port http_port socks_port socks_url=""
-  config_path="$(__zsh_net_find_clash_config)" || return 1
+  config_path="$(__net_find_clash_config)" || return 1
 
-  mixed_port="$(__zsh_net_yaml_scalar "mixed-port" "$config_path")"
-  if [[ -n "$mixed_port" ]] && __zsh_net_port_open "$mixed_port"; then
-    __zsh_net_set_proxy_cache \
+  mixed_port="$(__net_yaml_scalar "mixed-port" "$config_path")"
+  if [[ -n "$mixed_port" ]] && __net_port_open "$mixed_port"; then
+    __net_set_proxy_cache \
       "http://127.0.0.1:$mixed_port" \
       "socks5://127.0.0.1:$mixed_port" \
       "clash config"
     return 0
   fi
 
-  http_port="$(__zsh_net_yaml_scalar "port" "$config_path")"
-  socks_port="$(__zsh_net_yaml_scalar "socks-port" "$config_path")"
-  if [[ -n "$http_port" ]] && __zsh_net_port_open "$http_port"; then
-    if [[ -n "$socks_port" ]] && __zsh_net_port_open "$socks_port"; then
+  http_port="$(__net_yaml_scalar "port" "$config_path")"
+  socks_port="$(__net_yaml_scalar "socks-port" "$config_path")"
+  if [[ -n "$http_port" ]] && __net_port_open "$http_port"; then
+    if [[ -n "$socks_port" ]] && __net_port_open "$socks_port"; then
       socks_url="socks5://127.0.0.1:$socks_port"
     fi
-    __zsh_net_set_proxy_cache \
+    __net_set_proxy_cache \
       "http://127.0.0.1:$http_port" \
       "$socks_url" \
       "clash config"
@@ -171,58 +173,58 @@ __zsh_net_detect_clash_proxy() {
   return 1
 }
 
-__zsh_net_detect_proxy() {
+__net_detect_proxy() {
   if [[ -n "$LOCAL_PROXY_URL" ]]; then
-    __zsh_net_set_proxy_cache \
+    __net_set_proxy_cache \
       "$LOCAL_PROXY_URL" \
       "$LOCAL_PROXY_SOCKS_URL" \
       "LOCAL_PROXY_URL env"
     return 0
   fi
-  if __zsh_net_detect_clash_proxy; then
+  if __net_detect_clash_proxy; then
     return 0
   fi
-  if [[ -n "$_ZSH_NET_PROXY_CACHE" ]]; then
-    [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]] && return 1
+  if [[ -n "$_NET_PROXY_CACHE" ]]; then
+    [[ "$_NET_PROXY_CACHE" == "none" ]] && return 1
     return 0
   fi
   local port
-  for port in "${__ZSH_NET_PROXY_PROBE_PORTS[@]}"; do
-    if __zsh_net_port_open "$port"; then
-      __zsh_net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
+  for port in "${__NET_PROXY_PROBE_PORTS[@]}"; do
+    if __net_port_open "$port"; then
+      __net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
       return 0
     fi
   done
-  __zsh_net_set_proxy_cache "none" "" "probe"
+  __net_set_proxy_cache "none" "" "probe"
   return 1
 }
 
 # Resolve the URL that should be used for ALL_PROXY / all_proxy.
 # Falls back to the HTTP proxy when no SOCKS-specific URL is set (works for
 # mixed-port Clash configs where one port serves both HTTP and SOCKS).
-__zsh_net_all_proxy_url() {
+__net_all_proxy_url() {
   if [[ -n "$LOCAL_PROXY_SOCKS_URL" ]]; then
-    print -r -- "$LOCAL_PROXY_SOCKS_URL"
-  elif [[ -n "$_ZSH_NET_PROXY_SOCKS_CACHE" ]]; then
-    print -r -- "$_ZSH_NET_PROXY_SOCKS_CACHE"
+    printf '%s\n' "$LOCAL_PROXY_SOCKS_URL"
+  elif [[ -n "$_NET_PROXY_SOCKS_CACHE" ]]; then
+    printf '%s\n' "$_NET_PROXY_SOCKS_CACHE"
   else
-    print -r -- "$_ZSH_NET_PROXY_CACHE"
+    printf '%s\n' "$_NET_PROXY_CACHE"
   fi
 }
 
 # Run one command with proxy env applied to the child process only.
 withproxy() {
-  __zsh_net_detect_proxy
-  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
     "$@"
     return
   fi
   local all_url
-  all_url="$(__zsh_net_all_proxy_url)"
-  http_proxy="$_ZSH_NET_PROXY_CACHE" \
-  https_proxy="$_ZSH_NET_PROXY_CACHE" \
-  HTTP_PROXY="$_ZSH_NET_PROXY_CACHE" \
-  HTTPS_PROXY="$_ZSH_NET_PROXY_CACHE" \
+  all_url="$(__net_all_proxy_url)"
+  http_proxy="$_NET_PROXY_CACHE" \
+  https_proxy="$_NET_PROXY_CACHE" \
+  HTTP_PROXY="$_NET_PROXY_CACHE" \
+  HTTPS_PROXY="$_NET_PROXY_CACHE" \
   ALL_PROXY="$all_url" \
   all_proxy="$all_url" \
     "$@"
@@ -232,11 +234,11 @@ withproxy() {
 try_direct_then_proxy() {
   "$@" && return 0
   local rc=$?
-  __zsh_net_detect_proxy
-  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
     return $rc
   fi
-  print -u2 "[retry via proxy $_ZSH_NET_PROXY_CACHE]"
+  printf '%s\n' "[retry via proxy $_NET_PROXY_CACHE]" >&2
   withproxy "$@"
 }
 
@@ -245,24 +247,24 @@ try_direct_then_proxy() {
 proxy-on() {
   local quiet=0
   [[ "$1" == "-q" ]] && quiet=1
-  __zsh_net_detect_proxy
-  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
-    (( quiet )) || print -u2 "proxy-on: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)"
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    (( quiet )) || printf '%s\n' "proxy-on: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)" >&2
     return 1
   fi
   local all_url
-  all_url="$(__zsh_net_all_proxy_url)"
-  export http_proxy="$_ZSH_NET_PROXY_CACHE" \
-         https_proxy="$_ZSH_NET_PROXY_CACHE" \
-         HTTP_PROXY="$_ZSH_NET_PROXY_CACHE" \
-         HTTPS_PROXY="$_ZSH_NET_PROXY_CACHE" \
+  all_url="$(__net_all_proxy_url)"
+  export http_proxy="$_NET_PROXY_CACHE" \
+         https_proxy="$_NET_PROXY_CACHE" \
+         HTTP_PROXY="$_NET_PROXY_CACHE" \
+         HTTPS_PROXY="$_NET_PROXY_CACHE" \
          ALL_PROXY="$all_url" \
          all_proxy="$all_url"
   if (( ! quiet )); then
-    if [[ "$all_url" == "$_ZSH_NET_PROXY_CACHE" ]]; then
-      print "proxy ON  ->  $_ZSH_NET_PROXY_CACHE"
+    if [[ "$all_url" == "$_NET_PROXY_CACHE" ]]; then
+      printf '%s\n' "proxy ON  ->  $_NET_PROXY_CACHE"
     else
-      print "proxy ON  ->  http/https=$_ZSH_NET_PROXY_CACHE  all/socks=$all_url"
+      printf '%s\n' "proxy ON  ->  http/https=$_NET_PROXY_CACHE  all/socks=$all_url"
     fi
   fi
 }
@@ -270,22 +272,22 @@ proxy-on() {
 # Unset all proxy env vars from the current shell.
 proxy-off() {
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy
-  __zsh_net_clear_proxy_cache
-  print "proxy OFF"
+  __net_clear_proxy_cache
+  printf '%s\n' "proxy OFF"
 }
 
 # Report current proxy state: active / available / unavailable.
 proxy-status() {
-  __zsh_net_detect_proxy
+  __net_detect_proxy
   local shell_active=""
   if [[ -n "$http_proxy$https_proxy$ALL_PROXY" ]]; then
     shell_active="yes"
   fi
-  local source="${_ZSH_NET_PROXY_SOURCE_CACHE:-probe}"
+  local source="${_NET_PROXY_SOURCE_CACHE:-probe}"
 
-  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
-    print "proxy: unavailable (no \$LOCAL_PROXY_URL; no loopback port from ${__ZSH_NET_PROXY_PROBE_PORTS[*]} reachable)"
-    [[ -n "$shell_active" ]] && print "  note: shell env still has proxy vars set -- run \`proxy-off\` to clear"
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    printf '%s\n' "proxy: unavailable (no \$LOCAL_PROXY_URL; no loopback port from ${__NET_PROXY_PROBE_PORTS[*]} reachable)"
+    [[ -n "$shell_active" ]] && printf '%s\n' "  note: shell env still has proxy vars set -- run \`proxy-off\` to clear"
     return 1
   fi
 
@@ -294,13 +296,13 @@ proxy-status() {
   local hint="(not exported; use \`withproxy\`, \`try_direct_then_proxy\`, or \`proxy-on\`)"
   [[ -n "$shell_active" ]] && hint="(exported in current shell)"
   local all_url all_source
-  all_url="$(__zsh_net_all_proxy_url)"
+  all_url="$(__net_all_proxy_url)"
   all_source="$source"
   [[ -n "$LOCAL_PROXY_SOCKS_URL" ]] && all_source="LOCAL_PROXY_SOCKS_URL env"
 
-  print "proxy: $state http=$_ZSH_NET_PROXY_CACHE  source=$source  $hint"
-  if [[ -n "$all_url" && "$all_url" != "$_ZSH_NET_PROXY_CACHE" ]]; then
-    print "  socks=$all_url  source=$all_source"
+  printf '%s\n' "proxy: $state http=$_NET_PROXY_CACHE  source=$source  $hint"
+  if [[ -n "$all_url" && "$all_url" != "$_NET_PROXY_CACHE" ]]; then
+    printf '%s\n' "  socks=$all_url  source=$all_source"
   fi
 }
 
@@ -309,19 +311,19 @@ proxy-status() {
 proxy-test() {
   local url="${1:-https://www.google.com/generate_204}"
   if ! command -v curl >/dev/null 2>&1; then
-    print -u2 "proxy-test: curl not found"
+    printf '%s\n' "proxy-test: curl not found" >&2
     return 127
   fi
 
-  __zsh_net_detect_proxy
-  if [[ "$_ZSH_NET_PROXY_CACHE" == "none" ]]; then
-    print -u2 "proxy-test: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)"
+  __net_detect_proxy
+  if [[ "$_NET_PROXY_CACHE" == "none" ]]; then
+    printf '%s\n' "proxy-test: no proxy detected (set \$LOCAL_PROXY_URL or start your proxy, then \`proxy-refresh\`)" >&2
     return 1
   fi
 
   local all_url
-  all_url="$(__zsh_net_all_proxy_url)"
-  print "proxy-test: http=$_ZSH_NET_PROXY_CACHE  all=$all_url  url=$url"
+  all_url="$(__net_all_proxy_url)"
+  printf '%s\n' "proxy-test: http=$_NET_PROXY_CACHE  all=$all_url  url=$url"
   withproxy curl -sS -o /dev/null \
     -w 'proxy-test: http=%{http_code} remote=%{remote_ip} total=%{time_total}s\n' \
     --max-time 10 "$url"
@@ -329,15 +331,15 @@ proxy-test() {
 
 # Clear the cached detection and re-probe; call after toggling your proxy.
 proxy-refresh() {
-  __zsh_net_clear_proxy_cache
-  __zsh_net_detect_proxy
+  __net_clear_proxy_cache
+  __net_detect_proxy
   proxy-status
 }
 
 # Optional auto-activation: when $LOCAL_PROXY_AUTO_ACTIVATE=1 is set before
 # this file is sourced, silently call `proxy-on` if a proxy is detected.
-# Set the env var in a machine-local zsh file (or ~/.zshenv) on machines that
-# should always route through the loopback proxy.
+# Set the env var in a machine-local shell file (or ~/.zshenv / ~/.profile) on
+# machines that should always route through the loopback proxy.
 if [[ "$LOCAL_PROXY_AUTO_ACTIVATE" == "1" ]]; then
   proxy-on -q
 fi
@@ -352,9 +354,9 @@ fi
 # Respect a pre-existing $DOCKER_HOST so a user-set value wins.
 # See docs/tools/container-config-map.md for the full install-variant map.
 if [[ "$(uname -s)" == "Linux" && -z "$DOCKER_HOST" ]]; then
-  _zsh_net_xdg_runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
-  if [[ -S "${_zsh_net_xdg_runtime}/docker.sock" ]]; then
-    export DOCKER_HOST="unix://${_zsh_net_xdg_runtime}/docker.sock"
+  _net_xdg_runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+  if [[ -S "${_net_xdg_runtime}/docker.sock" ]]; then
+    export DOCKER_HOST="unix://${_net_xdg_runtime}/docker.sock"
   fi
-  unset _zsh_net_xdg_runtime
+  unset _net_xdg_runtime
 fi
