@@ -1,0 +1,11 @@
+# ~/.config/mi-router/config.toml
+#
+# Copy this file to config.toml and fill in the password, or let `mi-router`
+# prompt you on first run and save it automatically (chmod 600).
+#
+# Lookup order: --flag → config.toml → env var → interactive prompt.
+# Env overrides: MI_ROUTER_HOST, MI_ROUTER_USER, MI_ROUTER_PASS
+
+host = "192.168.31.1"
+user = "admin"
+password = ""

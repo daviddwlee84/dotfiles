@@ -1,0 +1,403 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "tyro>=0.8",
+#   "httpx>=0.27",
+#   "rich>=13",
+#   "platformdirs>=4",
+# ]
+# ///
+"""Read-only CLI for inspecting MiWiFi (Xiaomi) routers.
+
+Tested against Xiaomi AX9000 (RA70), MiWiFi firmware 1.0.168.
+
+Auth uses MiWiFi's SHA1 challenge handshake. Credentials come from (in order):
+  1. CLI flags (--host / --username / --password)
+  2. ~/.config/mi-router/config.toml
+  3. env vars (MI_ROUTER_HOST / MI_ROUTER_USER / MI_ROUTER_PASS)
+  4. interactive getpass prompt (TTY only; offers to save to config)
+
+Sister tool to ~/bin/sms (Huawei HiLink router SMS reader).
+"""
+from __future__ import annotations
+
+import getpass
+import hashlib
+import json
+import os
+import random
+import re
+import sys
+import time
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Union
+
+import httpx
+import tyro
+from platformdirs import user_config_dir
+from rich.console import Console
+from rich.table import Table
+
+APP = "mi-router"
+DEFAULT_HOST = "192.168.31.1"
+DEFAULT_USER = "admin"
+
+CONFIG_DIR = Path(user_config_dir(APP))
+CONFIG_FILE = CONFIG_DIR / "config.toml"
+
+KEY_RE = re.compile(r"key\s*[:=]\s*['\"]([0-9a-f]{32})['\"]")
+MAC_RE = re.compile(r"mac\s*[:=]\s*['\"]([0-9a-fA-F:]{17})['\"]")
+
+console = Console()
+err = Console(stderr=True, style="red")
+
+
+def die(msg: str, code: int = 1) -> None:
+    err.print(f"mi-router: {msg}")
+    sys.exit(code)
+
+
+# ----------------------------------------------------------------- config
+
+
+def load_config() -> dict[str, Any]:
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return tomllib.loads(CONFIG_FILE.read_text())
+    except Exception as e:
+        die(f"bad config {CONFIG_FILE}: {e}", 2)
+
+
+def resolve_creds(
+    cli_host: str | None,
+    cli_user: str | None,
+    cli_pw: str | None,
+) -> dict[str, str]:
+    cfg = load_config()
+    host = cli_host or cfg.get("host") or os.environ.get("MI_ROUTER_HOST") or DEFAULT_HOST
+    user = cli_user or cfg.get("user") or os.environ.get("MI_ROUTER_USER") or DEFAULT_USER
+    pw = cli_pw or cfg.get("password") or os.environ.get("MI_ROUTER_PASS") or ""
+    if not pw:
+        pw = prompt_and_save(host, user)
+    return {"host": host, "user": user, "password": pw}
+
+
+def prompt_and_save(host: str, user: str) -> str:
+    if not sys.stdin.isatty():
+        die(
+            "no password; pass --password, set MI_ROUTER_PASS, "
+            f"or populate {CONFIG_FILE}",
+            2,
+        )
+    err.print(
+        f"[yellow]mi-router:[/yellow] router http://{host}/  user={user}  "
+        "— password not configured"
+    )
+    pw = getpass.getpass("Router password: ")
+    if not pw:
+        die("empty password", 2)
+    ans = (
+        input(f"Save to {CONFIG_FILE} (chmod 600)? [Y/n] ").strip().lower()
+    )
+    if ans in ("", "y", "yes"):
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(
+            f'host = "{host}"\nuser = "{user}"\npassword = "{pw}"\n'
+        )
+        CONFIG_FILE.chmod(0o600)
+        err.print(f"[green]mi-router:[/green] saved {CONFIG_FILE}")
+    return pw
+
+
+# ----------------------------------------------------------------- HTTP client
+
+
+class MiRouter:
+    def __init__(self, host: str, username: str, password: str, timeout: float = 5.0):
+        self.base = f"http://{host}"
+        self.username = username
+        self.password = password
+        self.client = httpx.Client(timeout=timeout, follow_redirects=False)
+        self.stok: str | None = None
+
+    def login(self) -> None:
+        r = self.client.get(f"{self.base}/cgi-bin/luci/web")
+        r.raise_for_status()
+        m_key = KEY_RE.search(r.text)
+        m_mac = MAC_RE.search(r.text)
+        if not m_key or not m_mac:
+            raise RuntimeError("could not parse login key/mac from router page")
+        key = m_key.group(1)
+        mac = m_mac.group(1)
+        nonce = f"0_{mac}_{int(time.time())}_{random.randint(1000, 10000)}"
+        pwd_key = hashlib.sha1((self.password + key).encode()).hexdigest()
+        pwd_hash = hashlib.sha1((nonce + pwd_key).encode()).hexdigest()
+        r = self.client.post(
+            f"{self.base}/cgi-bin/luci/api/xqsystem/login",
+            data={
+                "username": self.username,
+                "password": pwd_hash,
+                "logtype": "2",
+                "nonce": nonce,
+            },
+        )
+        r.raise_for_status()
+        body = r.json()
+        if body.get("code") != 0 or not body.get("token"):
+            raise RuntimeError(f"login failed: {body}")
+        self.stok = body["token"]
+
+    def api(self, endpoint: str) -> Any:
+        if self.stok is None:
+            self.login()
+        url = (
+            f"{self.base}/cgi-bin/luci/;stok={self.stok}"
+            f"/api/{endpoint.lstrip('/')}"
+        )
+        r = self.client.get(url)
+        if r.status_code == 404:
+            return {"_error": "endpoint not registered (404)", "endpoint": endpoint}
+        r.raise_for_status()
+        try:
+            return r.json()
+        except ValueError:
+            return {"_unregistered_or_non_json": True, "preview": r.text[:200]}
+
+
+def _band(ifname: str) -> str:
+    return {"wl0": "5G", "wl1": "2.4G", "wl2": "5G-Game"}.get(ifname, ifname)
+
+
+def _first(lst, default=None):
+    return lst[0] if lst else (default if default is not None else {})
+
+
+# ----------------------------------------------------------------- subcommands
+
+
+@dataclass
+class Info:
+    """Show router identity, firmware, LAN/WAN."""
+
+
+@dataclass
+class Wifi:
+    """Show Wi-Fi radio configuration."""
+
+    show_passwords: bool = False
+    """Print Wi-Fi passwords in cleartext (off by default)."""
+
+
+@dataclass
+class Devices:
+    """List connected client devices."""
+
+    online_only: bool = True
+    """Only show currently-online clients."""
+
+
+@dataclass
+class Mdns:
+    """Show mDNS / multicast / discovery-related settings."""
+
+
+@dataclass
+class All:
+    """Run info + wifi + devices + mdns."""
+
+
+@dataclass
+class Raw:
+    """GET a raw MiWiFi API endpoint and pretty-print the JSON."""
+
+    endpoint: tyro.conf.Positional[str]
+    """Path under /api/, e.g. 'xqnetwork/wifi_detail_all'."""
+
+
+@dataclass
+class LoginTest:
+    """Verify credentials and connectivity (no other output)."""
+
+
+Cmd = Union[Info, Wifi, Devices, Mdns, All, Raw, LoginTest]
+
+
+# ------------------------------------------------------------------ renderers
+
+
+def show_info(r: MiRouter) -> None:
+    fac = r.api("xqsystem/fac_info")
+    name = r.api("misystem/router_name")
+    lan = r.api("xqnetwork/lan_info")
+    wan = r.api("xqnetwork/wan_info")
+    topo = r.api("misystem/topo_graph")
+
+    g = topo.get("graph", {})
+    li = lan.get("info", {})
+    wi = wan.get("info", {})
+    lan_ip = _first(li.get("ipv4") or [], {}).get("ip", "?")
+    lan_mask = _first(li.get("ipv4") or [], {}).get("mask", "?")
+    wan_ip = _first(wi.get("ipv4") or [], {}).get("ip", "?")
+
+    t = Table(title="Router", show_header=False, box=None, pad_edge=False)
+    t.add_column(style="bold cyan")
+    t.add_column()
+    t.add_row("Name", name.get("name", "?"))
+    t.add_row("Hardware", g.get("hardware", "?"))
+    t.add_row("Firmware", fac.get("version", "?"))
+    t.add_row("Mode", str(g.get("mode", "?")))
+    t.add_row("SSH/Telnet", f"ssh={fac.get('ssh')}  telnet={fac.get('telnet')}")
+    t.add_row("LAN", f"{lan_ip}/{lan_mask}  mac={li.get('mac', '?')}")
+    t.add_row(
+        "WAN",
+        f"{wan_ip}  type={wi.get('details', {}).get('wanType', '?')}  "
+        f"gw={wi.get('gateWay', '?')}",
+    )
+    t.add_row(
+        "WAN DNS",
+        ", ".join(filter(None, [wi.get("dnsAddrs"), wi.get("dnsAddrs1")])),
+    )
+    console.print(t)
+
+
+def show_wifi(r: MiRouter, show_passwords: bool) -> None:
+    data = r.api("xqnetwork/wifi_detail_all")
+    t = Table(title="Wi-Fi radios")
+    for col in ("band", "ifname", "ssid", "ch", "bw", "enc", "ax", "hidden", "status"):
+        t.add_column(col)
+    if show_passwords:
+        t.add_column("password", style="yellow")
+    for w in data.get("info", []):
+        row = [
+            _band(w.get("ifname", "")),
+            w.get("ifname", ""),
+            w.get("ssid", ""),
+            str(w.get("channelInfo", {}).get("channel", w.get("channel", "?"))),
+            w.get("bandwidth", "?"),
+            w.get("encryption", "?"),
+            w.get("ax", "?"),
+            w.get("hidden", "?"),
+            "on" if w.get("status") == "1" else "off",
+        ]
+        if show_passwords:
+            row.append(w.get("password", ""))
+        t.add_row(*row)
+    console.print(t)
+
+
+def show_devices(r: MiRouter, online_only: bool) -> None:
+    data = r.api("misystem/devicelist")
+    t = Table(title="Clients")
+    for col in ("name", "ip", "mac", "online", "uptime(s)"):
+        t.add_column(col)
+    for d in data.get("list", []):
+        if online_only and not d.get("online"):
+            continue
+        ip_info = _first(d.get("ip") or [], {})
+        t.add_row(
+            d.get("name", "?"),
+            ip_info.get("ip", "?"),
+            d.get("mac", "?"),
+            "yes" if d.get("online") else "no",
+            str(ip_info.get("online", "?")),
+        )
+    console.print(t)
+
+
+def show_mdns(r: MiRouter) -> None:
+    miot = r.api("xqnetwork/get_miotrelay_switch")
+    miscan = r.api("xqnetwork/get_miscan_switch")
+
+    t = Table(title="Discovery / multicast settings exposed by the web UI")
+    t.add_column("setting", style="bold cyan")
+    t.add_column("state")
+    t.add_column("description")
+    t.add_row(
+        "miotrelay (\u7545\u5feb\u8fde)",
+        "[green]ON[/green]" if miot.get("enabled") else "[red]OFF[/red]",
+        "Multicast/IoT discovery relay across radios",
+    )
+    t.add_row(
+        "miscan (AIoT scan)",
+        "[green]ON[/green]" if miscan.get("enabled") else "[red]OFF[/red]",
+        "Auto-scan for unprovisioned Mi smart devices on 5G",
+    )
+    console.print(t)
+    console.print()
+    console.print("[dim]Not exposed in the stock web UI on this firmware:[/dim]")
+    for line in (
+        "AP / client isolation",
+        "IGMP snooping toggle",
+        "Multicast-to-unicast / multicast rate",
+        "Generic mDNS reflector (Avahi / Bonjour)",
+        "Per-SSID firewall rules",
+    ):
+        console.print(f"[dim]  - {line}[/dim]")
+
+
+def show_raw(r: MiRouter, endpoint: str) -> None:
+    data = r.api(endpoint)
+    console.print_json(json.dumps(data, ensure_ascii=False))
+
+
+def show_login_test(r: MiRouter) -> None:
+    err.print(f"[green]ok:[/green] logged in to {r.base} as {r.username}")
+
+
+# ------------------------------------------------------------------- entrypoint
+
+
+@dataclass
+class Args:
+    """Read-only CLI for MiWiFi routers."""
+
+    cmd: Cmd
+    host: str | None = None
+    """Router IP / hostname (overrides config + env)."""
+    username: str | None = None
+    """Admin username (overrides config + env)."""
+    password: str | None = None
+    """Admin password (overrides config + env; will prompt if missing)."""
+    timeout: float = 5.0
+    """HTTP timeout in seconds."""
+
+
+def main() -> None:
+    args = tyro.cli(Args, config=(tyro.conf.OmitSubcommandPrefixes,))
+    creds = resolve_creds(args.host, args.username, args.password)
+
+    r = MiRouter(creds["host"], creds["user"], creds["password"], timeout=args.timeout)
+    try:
+        r.login()
+    except Exception as e:
+        die(f"login failed: {e}")
+
+    cmd = args.cmd
+    if isinstance(cmd, Info):
+        show_info(r)
+    elif isinstance(cmd, Wifi):
+        show_wifi(r, cmd.show_passwords)
+    elif isinstance(cmd, Devices):
+        show_devices(r, cmd.online_only)
+    elif isinstance(cmd, Mdns):
+        show_mdns(r)
+    elif isinstance(cmd, All):
+        show_info(r)
+        console.print()
+        show_wifi(r, False)
+        console.print()
+        show_devices(r, True)
+        console.print()
+        show_mdns(r)
+    elif isinstance(cmd, Raw):
+        show_raw(r, cmd.endpoint)
+    elif isinstance(cmd, LoginTest):
+        show_login_test(r)
+
+
+if __name__ == "__main__":
+    main()

@@ -189,6 +189,8 @@ To change options later: `chezmoi init --force`
 - `~/bin/sms` - Huawei router SMS reader (HiLink XML API; verification-code extraction, clipboard integration, TV channel) ([docs](docs/tools/sms.md))
 - `~/.config/sms/config.toml.example` - Starter config for the `sms` CLI (real `config.toml` is created at runtime, never committed)
 - `~/.config/television/cable/sms.toml` - Television channel for browsing router SMS inbox
+- `~/bin/mi-router` - Read-only inspector for Xiaomi / MiWiFi routers (LuCI JSON API; `info`/`wifi`/`devices`/`mdns`/`raw` subcommands; sister tool to `sms`) ([docs](docs/tools/mi-router.md))
+- `~/.config/mi-router/config.toml.example` - Starter config for the `mi-router` CLI (real `config.toml` is created at runtime, never committed)
 - `~/.config/sesh/sesh.toml` - Sesh session manager config (named sessions with windows, wildcards, defaults) ([docs](docs/tools/sesh.md))
 - `~/.config/worktrunk/config.toml` - Worktrunk (`wt`) git-worktree manager config — aliases (`wt sw`/`ls`/`rm`/`cc`/`oc`); hooks & LLM commit generation kept commented as opt-in ([workflow playbook](docs/tools/worktrunk.md))
 - `~/.config/workmux/config.yaml` - Workmux (`wm`) git-worktree + agent status orchestrator — `nerdfont:false` + `status_format:false` (we self-manage the tmux format in `theme.catppuccin.conf`); 🤖/💬/✅ icons fed by Claude/OpenCode hooks ([playbook](docs/tools/workmux.md))

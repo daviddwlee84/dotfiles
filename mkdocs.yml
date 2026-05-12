@@ -232,6 +232,7 @@ nav:
       - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
       - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
       - auditd role (opt-in): playbooks/auditd.md
+      - mDNS / Bonjour diagnostics: playbooks/mdns-diagnostics.md
   - Tools:
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
@@ -296,6 +297,7 @@ nav:
           - Log tools: tools/log-tools.md
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md
+          - mi-router (Xiaomi router): tools/mi-router.md
           - pqsum: tools/pqsum.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md

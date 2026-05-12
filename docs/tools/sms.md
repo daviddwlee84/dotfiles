@@ -3,6 +3,9 @@
 CLI and TV channel for reading SMS from a Huawei 4G/5G HiLink router's SIM
 card — primarily to grab verification codes without opening the web UI.
 
+Sister tool: [`mi-router`](mi-router.md) (read-only inspector for Xiaomi /
+MiWiFi routers — same uv-script pattern, different vendor).
+
 The CLI hits the router's XML API (`/api/sms/sms-list`, `/api/user/login`,
 etc.) via [`huawei-lte-api`](https://github.com/Salamek/huawei-lte-api),
 which handles CSRF tokens, SCRAM-SHA-256 login, and session cookies. This
