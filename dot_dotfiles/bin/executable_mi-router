@@ -176,6 +176,59 @@ def _first(lst, default=None):
     return lst[0] if lst else (default if default is not None else {})
 
 
+# Curated catalog of known-good GET endpoints, grouped by topic.
+# Verified against MiWiFi 1.0.168 / RA70. (category, endpoint, description)
+ENDPOINTS: list[tuple[str, str, str]] = [
+    # System / firmware
+    ("System",  "xqsystem/fac_info",         "Firmware version, ssh/telnet flags, factory SSIDs"),
+    ("System",  "xqsystem/country_code",     "Regulatory region code"),
+    ("System",  "xqsystem/get_languages",    "Available UI languages"),
+    ("System",  "xqsystem/check_rom_update", "Firmware-update check (no upgrade triggered)"),
+    ("System",  "xqsystem/upnp",             "UPnP daemon state + active port mappings"),
+    ("System",  "misystem/router_name",      "Router display name + locale"),
+    ("System",  "misystem/topo_graph",       "Hardware ID, mode, mesh topology"),
+    ("System",  "misystem/newstatus",        "Aggregated dashboard data (HW + counts)"),
+    ("System",  "misystem/status",           "Per-device traffic stats (up/down speed)"),
+    ("System",  "misystem/sys_time",         "Router clock + timezone"),
+    ("System",  "misystem/messages",         "System notifications inbox"),
+    ("System",  "misystem/r_ip_conflict",    "IP conflict detection state"),
+    ("System",  "misystem/web_access_info",  "Remote web-access (WAN admin) status"),
+    # Network — LAN / WAN
+    ("Network", "xqnetwork/lan_info",        "LAN IP / mask / MAC / uptime"),
+    ("Network", "xqnetwork/lan_dhcp",        "LAN DHCP pool + lease config"),
+    ("Network", "xqnetwork/wan_info",        "WAN config + status + DNS"),
+    ("Network", "xqnetwork/pppoe_status",    "WAN protocol detail (DHCP/PPPoE/static)"),
+    ("Network", "xqnetwork/mode",            "Router mode (0 = router)"),
+    ("Network", "xqnetwork/macbind_info",    "MAC ↔ IP bindings + device list"),
+    ("Network", "xqnetwork/portforward",     "Port-forwarding rules"),
+    ("Network", "xqnetwork/get_lanaggregation_switch", "LAN aggregation (link bonding) state"),
+    ("Network", "xqnetdetect/nettb",         "Network detect status"),
+    # Wi-Fi
+    ("Wi-Fi",   "xqnetwork/wifi_detail_all", "All radios — SSID, ch, BW, enc, AX, hidden"),
+    ("Wi-Fi",   "xqnetwork/wifi_macfilter_info", "MAC filter list + currently-connected wifi clients"),
+    ("Wi-Fi",   "xqnetwork/get_miotrelay_switch", "畅快连 (Mi multicast/IoT relay) state"),
+    ("Wi-Fi",   "xqnetwork/get_miscan_switch", "AIoT 5G unprovisioned-device scan state"),
+    ("Wi-Fi",   "xqnetwork/get_son_backhaul_mode", "Mesh backhaul mode"),
+    ("Wi-Fi",   "misns/wifi_share_info",     "Mi shared-WiFi feature ⚠ may include cleartext SSID/PSK"),
+    # Devices & QoS
+    ("Devices", "misystem/devicelist",       "All known clients (online + offline)"),
+    ("Devices", "misystem/qos_info",         "QoS state + per-client priorities"),
+]
+
+# Endpoints that exist but require POST or QoS-on / parameters — listed
+# separately so users know they exist but won't get useful output via 'raw'.
+POST_ONLY_NOTE = (
+    "POST-only / write endpoints (NOT supported by 'raw'): "
+    "xqsystem/{login,reboot,reset,shutdown,set_country_code,set_language,"
+    "set_mac_filter,set_name_password}, xqnetwork/{set_wifi,set_all_wifi,"
+    "set_wifi_ax,set_wifi_macfilter,set_wifi_txbf,set_wifi_txpwr,"
+    "set_lan_aggregation,set_lan_dhcp,set_lan_ip,set_management_ip,"
+    "set_son_backhaul_mode,miotrelay_switch,miscan_switch,add_mesh_node,"
+    "scan_mesh_node,edit_device,mac_bind,mac_unbind,manually_add}, "
+    "misystem/{set_router_name,set_band,web_access_opt}."
+)
+
+
 # ----------------------------------------------------------------- subcommands
 
 
@@ -211,11 +264,36 @@ class All:
 
 
 @dataclass
+class Endpoints:
+    """List known-good GET endpoints for use with 'raw'.
+
+    Without --check this is a static catalog (fast, no router round-trip).
+    With --check each endpoint is live-probed and shown with its HTTP
+    status + MiWiFi `code` field, so you can see what's actually responsive
+    on the firmware you're talking to.
+    """
+
+    check: bool = False
+    """Live-probe every endpoint and show HTTP status + MiWiFi response code."""
+
+
+@dataclass
 class Raw:
-    """GET a raw MiWiFi API endpoint and pretty-print the JSON."""
+    """GET a raw MiWiFi API endpoint and pretty-print the JSON.
+
+    See `mi-router endpoints` for the curated catalog of known-good GET
+    endpoints (add `--check` to live-probe each). Examples:
+    `mi-router raw xqnetwork/wifi_detail_all`,
+    `mi-router raw misystem/qos_info`,
+    `mi-router raw xqsystem/upnp`,
+    `mi-router raw xqnetwork/portforward`,
+    `mi-router raw misystem/devicelist`.
+    Write/POST endpoints (set_*, reboot, miotrelay_switch toggle, etc.)
+    are intentionally not supported — this CLI is read-only by design.
+    """
 
     endpoint: tyro.conf.Positional[str]
-    """Path under /api/, e.g. 'xqnetwork/wifi_detail_all'."""
+    """Path under /api/. Run `mi-router endpoints` to see what's available."""
 
 
 @dataclass
@@ -223,7 +301,7 @@ class LoginTest:
     """Verify credentials and connectivity (no other output)."""
 
 
-Cmd = Union[Info, Wifi, Devices, Mdns, All, Raw, LoginTest]
+Cmd = Union[Info, Wifi, Devices, Mdns, All, Endpoints, Raw, LoginTest]
 
 
 # ------------------------------------------------------------------ renderers
@@ -344,6 +422,51 @@ def show_raw(r: MiRouter, endpoint: str) -> None:
     console.print_json(json.dumps(data, ensure_ascii=False))
 
 
+def show_endpoints(r: "MiRouter | None", check: bool) -> None:
+    title = "Known-good MiWiFi GET endpoints"
+    if check:
+        title += " (live-probed)"
+        assert r is not None  # main() guarantees a logged-in client when check=True
+
+    t = Table(title=title)
+    t.add_column("category", style="bold cyan")
+    t.add_column("endpoint")
+    if check:
+        t.add_column("status")
+    t.add_column("description")
+
+    for cat, ep, desc in ENDPOINTS:
+        row = [cat, ep]
+        if check:
+            try:
+                url = f"{r.base}/cgi-bin/luci/;stok={r.stok}/api/{ep}"
+                resp = r.client.get(url, timeout=3)
+                code = resp.status_code
+                if code == 200:
+                    try:
+                        body = resp.json()
+                        api_code = body.get("code") if isinstance(body, dict) else None
+                        if api_code in (None, 0):
+                            status = f"[green]{code}[/green]"
+                        else:
+                            status = f"[yellow]{code}[/yellow] code={api_code}"
+                    except ValueError:
+                        status = f"[green]{code}[/green] non-json"
+                else:
+                    status = f"[red]{code}[/red]"
+            except Exception:
+                status = "[red]err[/red]"
+            row.append(status)
+        row.append(desc)
+        t.add_row(*row)
+
+    console.print(t)
+    console.print()
+    console.print("[dim]Usage:[/dim] mi-router raw <endpoint>")
+    console.print()
+    console.print(f"[dim]{POST_ONLY_NOTE}[/dim]")
+
+
 def show_login_test(r: MiRouter) -> None:
     err.print(f"[green]ok:[/green] logged in to {r.base} as {r.username}")
 
@@ -368,15 +491,21 @@ class Args:
 
 def main() -> None:
     args = tyro.cli(Args, config=(tyro.conf.OmitSubcommandPrefixes,))
-    creds = resolve_creds(args.host, args.username, args.password)
-
-    r = MiRouter(creds["host"], creds["user"], creds["password"], timeout=args.timeout)
-    try:
-        r.login()
-    except Exception as e:
-        die(f"login failed: {e}")
-
     cmd = args.cmd
+
+    # `endpoints` without --check is a static catalog — no router round-trip
+    # (and no credential prompt) needed.
+    needs_router = not (isinstance(cmd, Endpoints) and not cmd.check)
+
+    r: MiRouter | None = None
+    if needs_router:
+        creds = resolve_creds(args.host, args.username, args.password)
+        r = MiRouter(creds["host"], creds["user"], creds["password"], timeout=args.timeout)
+        try:
+            r.login()
+        except Exception as e:
+            die(f"login failed: {e}")
+
     if isinstance(cmd, Info):
         show_info(r)
     elif isinstance(cmd, Wifi):
@@ -395,6 +524,8 @@ def main() -> None:
         show_mdns(r)
     elif isinstance(cmd, Raw):
         show_raw(r, cmd.endpoint)
+    elif isinstance(cmd, Endpoints):
+        show_endpoints(r, cmd.check)
     elif isinstance(cmd, LoginTest):
         show_login_test(r)
 
