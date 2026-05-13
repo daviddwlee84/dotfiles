@@ -1,0 +1,128 @@
+{{- if eq .chezmoi.os "darwin" -}}
+# mac-apps channel — macOS GUI app control via Apple Events
+#
+# Pick a foreground GUI app, then choose a lifecycle action. Defaults are
+# safe: Enter brings the app to front; destructive actions are Alt-gated.
+#
+# Pairs with: dot_config/shell/54_macos_apps.sh.tmpl (sourced by every action
+#             to reuse appactivate / appquit / apprestart / appresponsive)
+#             dot_config/television/cable/mac-procs.toml.tmpl (process picker,
+#             sorted by compressed-aware memory — for profiling, not control)
+#             dot_config/television/cable/kill-process.toml (cross-platform
+#             process killer; default Enter = SIGTERM, no Apple Events)
+#
+# Why a separate channel from mac-procs / kill-process:
+#   - kill-process Enter = SIGTERM — destructive for apps with state
+#     (OrbStack VMs, Docker daemons, Slack drafts, unsaved buffers).
+#   - mac-procs Enter = passthrough — for analysis, not lifecycle.
+#   - mac-apps Enter = activate — non-destructive default; graceful Quit
+#     is one Alt-key away and uses Apple Events so apps tear down cleanly.
+#
+# Usage:
+#   tv mac-apps
+#
+# Keybindings:
+#   Enter      Activate (bring to front)
+#   Alt+Q      Graceful Quit (⌘Q-equivalent Apple Event) + reload
+#   Alt+R      Quit + poll until gone + relaunch + reload
+#   Alt+H      Hide app windows (System Events visible=false)
+#   Alt+K      Force kill by PID (SIGKILL; last resort) + reload
+#   Alt+I      Info pager: ps + full lsappinfo dump
+#   Alt+P      Probe responsiveness (5s Apple Event timeout)
+#   Ctrl+F     Cycle preview (metadata <-> responsiveness)
+#   Ctrl+/     Toggle preview panel
+#
+# Why Alt+ rather than Ctrl+: tmux root-table `bind -n C-*` shadows inner
+# apps. See CLAUDE.md "Keybinding" cross-file rule.
+
+[metadata]
+name = "mac-apps"
+description = "macOS apps — graceful quit / restart / activate / hide via Apple Events"
+requirements = []
+
+[source]
+# AppleScript exposes (unix id, name) for foreground GUI apps in one query.
+# `background only is false` filters out daemons / agents / loginwindow etc.
+# Output is "<pid>\t<name>\n" — matches `applist --pids` from the shell
+# helper, but inlined so this channel works even before chezmoi-apply
+# deploys the helper file.
+command = """osascript -e 'tell application "System Events"' -e 'set out to ""' -e 'repeat with p in (every application process whose background only is false)' -e 'set out to out & (unix id of p) & tab & (name of p) & linefeed' -e 'end repeat' -e 'return out' -e 'end tell' 2>/dev/null"""
+display = "{split:\\t:0}  {split:\\t:1}"
+# Default stdout when piping `tv mac-apps | ...` is the app NAME — what
+# every helper (appquit/applaunch/appactivate/apprestart) wants on argv.
+output = "{split:\\t:1}"
+
+[preview]
+# Cycle 1: ps + lsappinfo. Fast (<50 ms).
+# Cycle 2: responsiveness probe. ~2s per render — opt-in via Ctrl+F.
+command = [
+  """pid='{split:\\t:0}'
+ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,command 2>/dev/null
+echo
+lsappinfo info "$pid" 2>/dev/null | head -30""",
+  """name='{split:\\t:1}'
+. ~/.config/shell/54_macos_apps.sh 2>/dev/null
+printf 'App: %s\\n' "$name"
+if appresponsive "$name" 2>/dev/null; then
+  printf 'Status: responsive\\n'
+else
+  printf 'Status: NOT responding (or hung)\\n'
+fi
+printf '\\n(2s Apple Event timeout — false positives possible during launch)\\n'""",
+]
+header = "{split:\\t:1}  (pid {split:\\t:0})"
+
+[ui]
+input_header = "macOS Apps"
+
+[keybindings]
+enter = "actions:activate"
+alt-q = ["actions:quit", "reload_source"]
+alt-r = ["actions:restart", "reload_source"]
+alt-h = "actions:hide"
+alt-k = ["actions:force-kill", "reload_source"]
+alt-i = "actions:info"
+alt-p = "actions:probe"
+
+[actions.activate]
+description = "Bring app to front (Alt+Tab equivalent)"
+command = """. ~/.config/shell/54_macos_apps.sh && appactivate '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.quit]
+description = "Graceful Quit (⌘Q-equivalent Apple Event)"
+command = """. ~/.config/shell/54_macos_apps.sh && appquit '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.restart]
+description = "Quit + poll until process gone + relaunch"
+# `execute` (not `fork`) because apprestart polls for up to 15s; we want
+# the user to see "still quitting…" if it takes a moment.
+command = """. ~/.config/shell/54_macos_apps.sh && apprestart '{split:\\t:1}'"""
+mode = "execute"
+
+[actions.hide]
+description = "Hide app windows (System Events visible=false)"
+# Inlined rather than reusing the helper file because the shell helper
+# doesn't expose `hide` as a function — only the four lifecycle verbs.
+command = """osascript -e 'on run argv' -e 'tell application "System Events" to set visible of (first process whose name is (item 1 of argv)) to false' -e 'end run' -- '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.force-kill]
+description = "SIGKILL by PID (last resort; bypasses Apple Event)"
+# Uses PID column, not name. Apps with multiple processes (Chrome Helper,
+# Electron renderers) only have their main process listed in `applist`,
+# so SIGKILL here kills the parent — children are reaped by launchd.
+command = "kill -9 '{split:\\t:0}'"
+mode = "fork"
+
+[actions.info]
+description = "Detail pager: ps + full lsappinfo"
+command = """pid='{split:\\t:0}'; name='{split:\\t:1}'; { printf '=== %s (pid %s) ===\\n\\n' "$name" "$pid"; ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,command; printf '\\n'; lsappinfo info "$pid"; } 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.probe]
+description = "Probe app responsiveness (5s Apple Event timeout)"
+command = """. ~/.config/shell/54_macos_apps.sh && name='{split:\\t:1}' && (appresponsive "$name" 5 && printf '%s: responsive\\n' "$name" || printf '%s: NOT responding\\n' "$name"); sleep 2"""
+mode = "execute"
+{{ end -}}

@@ -446,6 +446,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `tv ssh-config` | tv channel | `dot_config/television/cable/ssh-config.toml` | SSH host picker with `Include config.d/*` support; Enter connects |
 | `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
 | `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
+| `tv mac-apps` | tv channel | `dot_config/television/cable/mac-apps.toml.tmpl` | **macOS-only.** GUI app picker; Enter = activate (front), Alt+Q = graceful Quit, Alt+R = restart, Alt+H = hide, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = responsiveness probe. Reuses `dot_config/shell/54_macos_apps.sh` helpers. |
 
 ---
 
