@@ -402,7 +402,7 @@ both surface and canonical entries.
 ### Custom multi-section preview
 
 The default `eza` preview only shows a file listing. The
-[`~/bin/sesh-preview`](../../bin/executable_sesh-preview) script renders a
+[`~/.dotfiles/bin/sesh-preview`](../../dot_dotfiles/bin/executable_sesh-preview) script renders a
 richer view in the fzf preview pane:
 
 1. **Header**: dir name, parent path, git branch + dirty count + ahead/behind, mtime
@@ -414,7 +414,7 @@ Wired in `sesh.toml`:
 
 ```toml
 [default_session]
-preview_command = "~/bin/sesh-preview {}"
+preview_command = "~/.dotfiles/bin/sesh-preview {}"
 ```
 
 Falls back to plain `head`/`ls` if `bat`/`eza` are missing, and gracefully

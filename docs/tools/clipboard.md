@@ -105,7 +105,7 @@ Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see th
 
 ### 4. Shell CLI — `x` (cross-platform clipboard wrapper)
 
-[`bin/executable_x`](../../bin/executable_x) (deployed to `~/.local/bin/x`) is a Bash wrapper with three subcommands:
+[`dot_dotfiles/bin/executable_x`](../../dot_dotfiles/bin/executable_x) (deployed to `~/.dotfiles/bin/x`) is a Bash wrapper with three subcommands:
 
 ```bash
 printf "hello" | x copy        # copy stdin to clipboard
@@ -169,7 +169,7 @@ If `tmux info` shows `clipboard: false` after editing `common.conf`, remember a 
 
 - [tmux](./tmux/README.md) — "OSC 52 Clipboard (SSH-friendly yank)" section
 - [Ghostty](./ghostty.md) — terminal-side notes
-- [`bin/executable_x`](../../bin/executable_x) — the `x` wrapper source
+- [`dot_dotfiles/bin/executable_x`](../../dot_dotfiles/bin/executable_x) — the `x` wrapper source
 
 ## External references
 

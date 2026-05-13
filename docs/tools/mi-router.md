@@ -18,8 +18,8 @@ not registered` instead of crashing).
 
 Deployed automatically by chezmoi:
 
-- `~/bin/mi-router` — the CLI (uv-script; first run resolves deps into uv's
-  cache)
+- `~/.dotfiles/bin/mi-router` — the CLI (uv-script; first run resolves deps
+  into uv's cache)
 - `~/.config/mi-router/config.toml.example` — starter config
 
 `uv` must be installed (it is, via the bootstrap script).

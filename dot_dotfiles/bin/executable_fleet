@@ -23,7 +23,7 @@ Subcommands:
 Discovers the chezmoi source dir at runtime via `chezmoi source-path` (falls
 back to ~/.local/share/chezmoi), so the binary works from any cwd.
 
-Deployed by chezmoi as ~/bin/fleet. See docs/this_repo/fleet-apply.md.
+Deployed by chezmoi as ~/.dotfiles/bin/fleet. See docs/this_repo/fleet-apply.md.
 """
 from __future__ import annotations
 

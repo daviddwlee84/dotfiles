@@ -17,7 +17,7 @@ CLI 透過 [`huawei-lte-api`](https://github.com/Salamek/huawei-lte-api)
 
 由 chezmoi 自動部署：
 
-- `~/bin/sms` — CLI（uv-script；首次執行時會把依賴解到 uv 的 cache）
+- `~/.dotfiles/bin/sms` — CLI（uv-script；首次執行時會把依賴解到 uv 的 cache）
 - `~/.config/television/cable/sms.toml` — `tv sms` channel
 - `~/.config/sms/config.toml.example` — 起始設定範本
 
@@ -74,7 +74,7 @@ tv sms
 
 ## 剪貼簿
 
-`sms code` 會 pipe 到既有的 `x copy` helper（見 `bin/executable_x`），
+`sms code` 會 pipe 到既有的 `x copy` helper（見 `dot_dotfiles/bin/executable_x`），
 所以剪貼簿在 macOS（`pbcopy`）、Linux Wayland（`wl-copy`）、Linux X11
 （`xclip`/`xsel`）、WSL（`clip.exe`）以及透過 SSH（OSC 52）都能一致運作。
 

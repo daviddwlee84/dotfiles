@@ -252,7 +252,8 @@ TL;DR:
 
 | Directory             | Convention | What lives there |
 | --------------------- | ---------- | ---------------- |
-| `~/bin/`              | Old POSIX  | User-written shell scripts (we have a few in `dot_bin/`) |
+| `~/.dotfiles/bin/`    | This repo  | chezmoi-managed user scripts (source: `dot_dotfiles/bin/executable_*`) — fleet, sms, mi-router, sesh-preview, x |
+| `~/bin/`              | Old POSIX  | Legacy / user-placed binaries (transitional; PATH entry will be removed once every host has cleaned up the old `~/bin/*` chezmoi-deployed copies) |
 | `~/.local/bin/`       | XDG-ish    | Auto-installed CLIs (uv, mise, chezmoi, just, fd, eza, …) |
 | `~/.cargo/bin/`       | Rust       | cargo-installed binaries |
 | `~/go/bin/`           | Go         | `go install` targets |

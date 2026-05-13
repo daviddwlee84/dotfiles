@@ -15,7 +15,7 @@ is far more reliable than scraping the JavaScript SPA.
 
 Deployed automatically by chezmoi:
 
-- `~/bin/sms` — the CLI (uv-script; first run resolves deps into uv's cache)
+- `~/.dotfiles/bin/sms` — the CLI (uv-script; first run resolves deps into uv's cache)
 - `~/.config/television/cable/sms.toml` — the `tv sms` channel
 - `~/.config/sms/config.toml.example` — starter config
 
@@ -72,7 +72,7 @@ tv sms
 
 ## Clipboard
 
-`sms code` pipes through the existing `x copy` helper (see `bin/executable_x`)
+`sms code` pipes through the existing `x copy` helper (see `dot_dotfiles/bin/executable_x`)
 so clipboard works uniformly on macOS (`pbcopy`), Linux Wayland (`wl-copy`),
 Linux X11 (`xclip`/`xsel`), WSL (`clip.exe`), and over SSH (OSC 52).
 

@@ -45,7 +45,7 @@ Each entry links to the relevant row in [Source state attributes](https://www.ch
 
 - **Effect**: Ensures the target has the executable bit on every apply.
 - **`chezmoi add`**: green-light. Auto-detected when adding a file that already has +x.
-- **Typical use**: personal scripts under `~/bin/` or `~/.local/bin/` (e.g. `executable_x`, `executable_sms`), helper wrappers, `~/.local/share/tmux-*` shims.
+- **Typical use**: personal scripts under `~/.dotfiles/bin/` (chezmoi-managed; see `dot_dotfiles/bin/executable_x`, `dot_dotfiles/bin/executable_sms`), helper wrappers, `~/.local/share/tmux-*` shims.
 
 ### `readonly_` — drop all write bits
 
@@ -195,9 +195,9 @@ Track normally, `chezmoi add` freely, let `chezmoi re-add` pick up drift.
 
 ### B. Personal scripts — `executable_` (+ `dot_` where needed)
 
-- `~/bin/sms` → `executable_sms` in source.
-- `~/.local/bin/x` → lives under `dot_local/bin/executable_x`.
-- Any helper shell script you want on PATH.
+- `~/.dotfiles/bin/sms` → `dot_dotfiles/bin/executable_sms` in source.
+- `~/.dotfiles/bin/x` → `dot_dotfiles/bin/executable_x` in source.
+- Any helper shell script you want on PATH — drop it under `dot_dotfiles/bin/` with the `executable_` prefix.
 
 ### C. Seed-once baselines — `create_`
 

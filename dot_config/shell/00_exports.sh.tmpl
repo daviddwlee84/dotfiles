@@ -19,8 +19,11 @@ export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 
 # PATH additions
-# ~/bin for custom scripts, ~/.local/bin for auto-installed tools (uv, npm, cargo)
-export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
+# ~/.dotfiles/bin: chezmoi-managed scripts (this repo's dot_dotfiles/bin/)
+# ~/bin: legacy / user-placed binaries (transitional, will be removed once
+#        every host has applied the new layout and old ~/bin/* cleaned up)
+# ~/.local/bin: auto-installed tools (uv tool, cargo install, mise, npm -g, ...)
+export PATH="$HOME/.dotfiles/bin:$HOME/bin:$HOME/.local/bin:$PATH"
 
 {{ if eq .chezmoi.os "linux" -}}
 # OpenCode's Linux installer writes the binary here. Keep PATH under dotfiles

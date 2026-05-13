@@ -460,13 +460,13 @@ bootstrap-skills:
 # Exit code = number of failed hosts.
 # See docs/this_repo/fleet-apply.md for full schema and troubleshooting.
 
-# Umbrella `fleet` CLI — same binary chezmoi deploys to ~/bin/fleet, but run
-# from the source tree (works before first `chezmoi apply`). Subcommands:
+# Umbrella `fleet` CLI — same binary chezmoi deploys to ~/.dotfiles/bin/fleet,
+# but run from the source tree (works before first `chezmoi apply`). Subcommands:
 # apply / status / diff / tail / kill / compact / edit / tmux / info.
 # Prefer this over `fleet-*` recipes when invoking from inside the repo;
 # the old recipes stay as muscle-memory aliases.
 fleet *ARGS:
-    @uv run --script ./bin/executable_fleet {{ARGS}}
+    @uv run --script ./dot_dotfiles/bin/executable_fleet {{ARGS}}
 
 # Apply chezmoi update to all configured hosts in parallel
 fleet-apply *ARGS:

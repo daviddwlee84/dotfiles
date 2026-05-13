@@ -63,10 +63,10 @@ just fleet-apply-compact
 
 ## Umbrella `fleet` binary
 
-`bin/executable_fleet` (deployed as `~/bin/fleet`) is a thin umbrella that
-exposes the same operations as the `just fleet-*` recipes plus the two new
-read-only probes `fleet tmux` / `fleet info`. The advantage over `just`: it
-works from any cwd, not just inside the chezmoi source tree.
+`dot_dotfiles/bin/executable_fleet` (deployed as `~/.dotfiles/bin/fleet`) is a
+thin umbrella that exposes the same operations as the `just fleet-*` recipes
+plus the two new read-only probes `fleet tmux` / `fleet info`. The advantage
+over `just`: it works from any cwd, not just inside the chezmoi source tree.
 
 | Umbrella subcommand | Equivalent `just` recipe |
 |---|---|
@@ -87,7 +87,7 @@ The umbrella discovers the chezmoi source dir at runtime via `chezmoi
 source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the
 shared `scripts/fleet/` package and the legacy `scripts/fleet_apply.py`. From
 inside the source tree, `just fleet *ARGS` invokes the same binary directly
-(works before the first `chezmoi apply` lands `~/bin/fleet`).
+(works before the first `chezmoi apply` lands `~/.dotfiles/bin/fleet`).
 
 The existing `just fleet-*` recipes still call `./scripts/fleet_apply.py`
 directly and are unaffected by the umbrella — they remain the muscle-memory

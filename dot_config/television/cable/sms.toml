@@ -17,7 +17,7 @@
 #   Alt+D      Delete selected message + reload
 #   Ctrl+O     Toggle preview panel (TV built-in)
 #
-# Uses the `sms` CLI (deployed by chezmoi to ~/bin/sms).
+# Uses the `sms` CLI (deployed by chezmoi to ~/.dotfiles/bin/sms).
 
 [metadata]
 name = "sms"

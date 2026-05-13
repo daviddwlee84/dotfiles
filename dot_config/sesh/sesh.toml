@@ -12,9 +12,10 @@ blacklist = ["^scratch$", "^_", "^float$"]
 [default_session]
 startup_command = "nvim"
 # Multi-section preview: header (name + git branch) + README + recent commits +
-# tree. Falls back to ls/head if bat/eza missing. See bin/executable_sesh-preview
-# in the chezmoi source for the script. Deployed to ~/bin/sesh-preview.
-preview_command = "~/bin/sesh-preview {}"
+# tree. Falls back to ls/head if bat/eza missing. See
+# dot_dotfiles/bin/executable_sesh-preview in the chezmoi source for the script.
+# Deployed to ~/.dotfiles/bin/sesh-preview.
+preview_command = "~/.dotfiles/bin/sesh-preview {}"
 
 # ── Named sessions ──────────────────────────────────────────────────────────
 

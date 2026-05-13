@@ -339,7 +339,7 @@ startup_command = "cd {} && tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmu
 
 ### 自訂多區塊預覽
 
-預設的 `eza` 預覽只顯示檔案列表。[`~/bin/sesh-preview`](../../bin/executable_sesh-preview) 腳本在 fzf 預覽窗格中呈現更豐富的視圖：
+預設的 `eza` 預覽只顯示檔案列表。[`~/.dotfiles/bin/sesh-preview`](../../dot_dotfiles/bin/executable_sesh-preview) 腳本在 fzf 預覽窗格中呈現更豐富的視圖：
 
 1. **標頭**：目錄名、上層路徑、git branch + dirty 計數 + ahead/behind、mtime
 2. **README**：前 25 行，若有 `bat` 則語法高亮
@@ -350,7 +350,7 @@ startup_command = "cd {} && tmuxp load -a -y ~/.config/tmuxp/project.yaml && tmu
 
 ```toml
 [default_session]
-preview_command = "~/bin/sesh-preview {}"
+preview_command = "~/.dotfiles/bin/sesh-preview {}"
 ```
 
 若 `bat`/`eza` 不存在，會退回 `head`/`ls`；對非目錄參數也能優雅處理（sesh 有時會把原始的會話字串而非路徑交給選擇器）。輸出限制在約 50 行以內，避免 fzf 預覽窗格在第一次繪製時就需要捲動。

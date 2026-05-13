@@ -110,7 +110,7 @@ end
 
 ### 4. Shell CLI — `x`（跨平台剪貼簿包裝）
 
-[`bin/executable_x`](../../bin/executable_x)（部署到 `~/.local/bin/x`）是一支 Bash 包裝，含三個子指令：
+[`dot_dotfiles/bin/executable_x`](../../dot_dotfiles/bin/executable_x)（部署到 `~/.dotfiles/bin/x`）是一支 Bash 包裝，含三個子指令：
 
 ```bash
 printf "hello" | x copy        # 把 stdin 複製到剪貼簿
@@ -174,7 +174,7 @@ nvim -c ':checkhealth provider.clipboard' -c ':only'
 
 - [tmux](./tmux/README.md) — 「OSC 52 Clipboard (SSH-friendly yank)」段落
 - [Ghostty](./ghostty.md) — 終端機端筆記
-- [`bin/executable_x`](../../bin/executable_x) — `x` 包裝原始碼
+- [`dot_dotfiles/bin/executable_x`](../../dot_dotfiles/bin/executable_x) — `x` 包裝原始碼
 
 ## 外部參考
 

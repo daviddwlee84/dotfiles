@@ -168,9 +168,9 @@ chezmoi chattr +private,+readonly ~/.config/foo/bar
 
 ### B. 個人腳本 — `executable_`（必要時加 `dot_`）
 
-- `~/bin/sms` → 來源中為 `executable_sms`。
-- `~/.local/bin/x` → 位於 `dot_local/bin/executable_x`。
-- 任何你希望放在 PATH 上的輔助 shell 腳本。
+- `~/.dotfiles/bin/sms` → 來源中為 `dot_dotfiles/bin/executable_sms`。
+- `~/.dotfiles/bin/x` → 來源中為 `dot_dotfiles/bin/executable_x`。
+- 任何你希望放在 PATH 上的輔助 shell 腳本 — 放在 `dot_dotfiles/bin/` 並加上 `executable_` 前綴。
 
 ### C. 一次性種子化基線 — `create_`
 

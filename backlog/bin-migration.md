@@ -1,10 +1,36 @@
 # Relocate `~/bin/` to a chezmoi-distinct path
 
-**Status**: P? / deferred
-**Effort**: M
-**Related**: `bin/`, `dot_config/shell/00_exports.sh.tmpl:23`, `docs/this_repo/fleet-apply.md`
+**Status**: Done 2026-05-13 — relocated to `~/.dotfiles/bin/` (namespace anchor variant, NOT the `~/.dotfiles-bin/` flat layout originally recommended below).
+**Effort**: M (actual: source rename + 12 doc/config references + transitional PATH)
+**Related**: `dot_dotfiles/bin/`, `dot_config/shell/00_exports.sh.tmpl:21-26`, `docs/this_repo/fleet-apply.md`, `docs/tools/chezmoi-prefixes.md`
 
-## Context
+## Resolution (2026-05-13)
+
+Chosen target: **`~/.dotfiles/bin/`** — `dot_dotfiles/bin/executable_*` in source.
+
+**Why the namespace variant won over the flat `~/.dotfiles-bin/`**: user signalled
+extensibility intent — "這種設計 可能也可以把一些通用的 scripts/ 放過去" — so
+future `~/.dotfiles/scripts/`, `~/.dotfiles/lib/`, etc. can grow as siblings inside
+the one namespace anchor instead of proliferating top-level hidden dirs
+(`~/.dotfiles-bin/`, `~/.dotfiles-lib/`, ...). The name is also tool-agnostic
+(no chezmoi-coupling) so renaming the toolchain later doesn't make the path lie.
+
+**Transitional PATH**: `$HOME/.dotfiles/bin:$HOME/bin:$HOME/.local/bin:$PATH`.
+`$HOME/bin` stays in PATH for one personal sync cycle so any hand-placed
+`~/bin/<x>` files keep resolving. After every host has applied the new layout
+AND the user has cleaned up old `~/bin/{sms,mi-router,x,sesh-preview,fleet}`,
+a follow-up commit drops `$HOME/bin` from PATH entirely.
+
+**Cleanup is manual** (intentionally not automated via run-script): chezmoi
+doesn't own non-chezmoi `~/bin/<x>` entries, and an auto-rm could surprise a
+user with a same-named binary they placed there. Per host:
+
+```
+rm ~/bin/{sms,mi-router,x,sesh-preview,fleet}
+rmdir ~/bin 2>/dev/null  # only succeeds if dir is empty
+```
+
+## Original context (preserved for reference)
 
 Surfaced 2026-05-13 while adding `bin/executable_fleet` (the umbrella `fleet`
 CLI). Currently `bin/executable_*` files in chezmoi deploy to `~/bin/`:
