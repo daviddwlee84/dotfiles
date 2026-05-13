@@ -24,6 +24,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Task Queue](#task-queue)
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
+- [macOS apps](#macos-apps)
 - [Media / AV](#media--av)
 - [Clipboard History](#clipboard-history)
 - [Shell Utilities](#shell-utilities)
@@ -617,6 +618,22 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `mac-mem-status` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Single-screen memory + swap + storage report: `vm.swapusage`, `memory_pressure`, parsed `vm_stat`, swapfile sizes (`/System/Volumes/VM/swapfile*`), top 10 by compressed-aware memory (`top -o mem`), TM local snapshot count, color-coded verdict. No sudo. See [tools/macos-swap.md](../tools/macos-swap.md). Short alias: `mms`. |
 | `mac-mem-reclaim [--dry-run] [--yes] [--force] [--include LIST]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Interactive cleanup. Always-safe: `sudo purge`. Opt-in via `--include`: `spotlight` (`killall mds_stores+mdworker_shared`), `snapshots` (`tmutil thinlocalsnapshots / 5GB 4`), `sleepimage` (delete `/private/var/vm/sleepimage` — laptop-unsafe), `windowserver` (`sudo killall -HUP WindowServer` — logs you out). Short alias: `mmr`. |
 | `mac-mem-watch [INTERVAL_SEC]` | function | `dot_config/shell/55_macos_mem.sh.tmpl` | **macOS-only.** Live one-line-per-tick tail: free/compressed/swap_used + pageins/pageouts/swapins/swapouts per second. Default 5s. Designed for tmux side panes. Short alias: `mmw`. |
+
+---
+
+## macOS apps
+
+> Graceful GUI app control via `osascript` + Apple Events. Prefer over `killall` for apps with state (OrbStack, Docker Desktop, Slack, etc.) — `quit` sends ⌘Q-equivalent, letting the app tear down cleanly. App NAME is the AppleScript name (e.g. `OrbStack`, `Google Chrome`), not bundle ID; passed via `osascript argv` so spaces/quotes are safe.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `appquit <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Send Quit Apple Event (graceful, equivalent to ⌘Q). |
+| `applaunch <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start in background (no focus steal). |
+| `appactivate <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start (if needed) and bring to front. |
+| `apprestart <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** `appquit` + poll until process gone (≤15s) + `applaunch`. |
+| `apprunning <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Silent predicate; exit 0 if running, 1 otherwise. |
+| `applist [--pids\|--all]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** List foreground GUI apps, one per line. `--pids` prepends PID + tab; `--all` includes background-only / agent processes. |
+| `appresponsive <AppName> [TIMEOUT_SEC]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Best-effort "Not Responding" detection: sends a no-op Apple Event with `with timeout` (default 2s). Exit 0 if app replies, 1 if hung / not running / scripting-disabled. False positives possible during launch. |
 
 ---
 

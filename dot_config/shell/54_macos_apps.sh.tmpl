@@ -1,0 +1,201 @@
+{{- if eq .chezmoi.os "darwin" -}}
+# shellcheck shell=sh
+# app-* helpers — graceful control of macOS GUI apps via osascript / Apple Events.
+#
+# Why not `killall`? `killall AppName` sends SIGTERM and most GUI apps don't
+# register a handler, so containers / unsaved buffers / background sync just
+# die. `osascript -e 'tell application "X" to quit'` sends the Quit Apple
+# Event — the same thing ⌘Q does — so the app tears down cleanly. Matters
+# for OrbStack / Docker Desktop / Slack / any app with state.
+#
+# Frozen-app detection (`appresponsive`) is best-effort: macOS exposes the
+# "Not Responding" flag only via Activity Monitor's private SPI. The public
+# proxy is "send a no-op Apple Event with a short timeout — if it throws,
+# the app is hung." False positives happen on apps mid-launch.
+#
+# All helpers take an app NAME (e.g. `OrbStack`, `Google Chrome`), not a
+# bundle ID. `$1` is passed via osascript's `argv` so spaces and quotes in
+# app names are handled correctly without shell-escaping gymnastics.
+
+_macapp_is_darwin() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
+
+_macapp_guard_darwin() {
+    if ! _macapp_is_darwin; then
+        printf 'app-helper: macOS-only (current OS: %s)\n' \
+            "$(uname -s 2>/dev/null || echo unknown)" >&2
+        return 1
+    fi
+}
+
+_macapp_need_name() {
+    if [ -z "$1" ]; then
+        printf 'usage: %s <AppName>\n  e.g. %s OrbStack\n' "$2" "$2" >&2
+        return 2
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Public: lifecycle
+# ---------------------------------------------------------------------------
+
+# appquit NAME — send Quit Apple Event (graceful, equivalent to ⌘Q).
+appquit() {
+    case "$1" in -h|--help)
+        printf 'usage: appquit <AppName>\n  Send Quit Apple Event (graceful shutdown).\n  Example: appquit OrbStack\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" appquit || return 2
+    osascript \
+        -e 'on run argv' \
+        -e 'tell application (item 1 of argv) to quit' \
+        -e 'end run' \
+        -- "$1"
+}
+
+# applaunch NAME — start the app in the background (no focus steal).
+applaunch() {
+    case "$1" in -h|--help)
+        printf 'usage: applaunch <AppName>\n  Launch in background (no focus steal). Use appactivate to bring to front.\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" applaunch || return 2
+    osascript \
+        -e 'on run argv' \
+        -e 'tell application (item 1 of argv) to launch' \
+        -e 'end run' \
+        -- "$1"
+}
+
+# appactivate NAME — start (if needed) and bring to front.
+appactivate() {
+    case "$1" in -h|--help)
+        printf 'usage: appactivate <AppName>\n  Launch + bring to front. Use applaunch for headless start.\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" appactivate || return 2
+    osascript \
+        -e 'on run argv' \
+        -e 'tell application (item 1 of argv) to activate' \
+        -e 'end run' \
+        -- "$1"
+}
+
+# apprestart NAME — quit, wait for shutdown, relaunch in background.
+apprestart() {
+    case "$1" in -h|--help)
+        printf 'usage: apprestart <AppName>\n  Graceful quit + background relaunch. Useful after config edits.\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" apprestart || return 2
+    appquit "$1" || return $?
+    # Poll until really gone — `quit` returns before the app process exits.
+    _macapp_i=0
+    while [ "$_macapp_i" -lt 30 ] && apprunning "$1"; do
+        sleep 0.5
+        _macapp_i=$((_macapp_i + 1))
+    done
+    unset _macapp_i
+    applaunch "$1"
+}
+
+# ---------------------------------------------------------------------------
+# Public: inspection
+# ---------------------------------------------------------------------------
+
+# apprunning NAME — exit 0 if app is running, 1 otherwise. Silent.
+apprunning() {
+    case "$1" in -h|--help)
+        printf 'usage: apprunning <AppName>\n  Exit 0 if running, 1 otherwise. Silent — use $? or && / ||.\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" apprunning || return 2
+    _macapp_out=$(osascript \
+        -e 'on run argv' \
+        -e 'tell application "System Events" to return (exists (processes where name is (item 1 of argv)))' \
+        -e 'end run' \
+        -- "$1" 2>/dev/null)
+    [ "$_macapp_out" = "true" ]
+}
+
+# applist [--pids] — list visible (foreground) GUI apps, one per line.
+# Default: just names. `--pids` adds PID + bundle path.
+applist() {
+    case "$1" in -h|--help)
+        printf 'usage: applist [--pids|--all]\n'
+        printf '  Default     names of visible foreground GUI apps, one per line.\n'
+        printf '  --pids      "<pid>\\t<name>" via lsappinfo (foreground only).\n'
+        printf '  --all       include background-only / agent processes.\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+
+    case "${1:-}" in
+        --pids)
+            # AppleScript exposes `unix id` directly — cleaner than parsing
+            # `lsappinfo list` (which is multi-line and includes background
+            # daemons mixed with foreground apps).
+            osascript \
+                -e 'tell application "System Events"' \
+                -e '  set out to ""' \
+                -e '  repeat with p in (every application process whose background only is false)' \
+                -e '    set out to out & (unix id of p) & tab & (name of p) & linefeed' \
+                -e '  end repeat' \
+                -e '  return out' \
+                -e 'end tell'
+            ;;
+        --all)
+            osascript \
+                -e 'tell application "System Events" to set procNames to name of every process' \
+                -e 'set AppleScript'\''s text item delimiters to linefeed' \
+                -e 'return procNames as text'
+            ;;
+        ""|*)
+            osascript \
+                -e 'tell application "System Events" to set procNames to name of every application process whose background only is false' \
+                -e 'set AppleScript'\''s text item delimiters to linefeed' \
+                -e 'return procNames as text'
+            ;;
+    esac
+}
+
+# appresponsive NAME [TIMEOUT_SEC] — exit 0 if app responds within timeout.
+# Sends a no-op Get-name Apple Event with `with timeout`. If AppleScript
+# throws (timeout or "isn't running"), exit 1.
+#
+# Best-effort: this is the public-API proxy for "Not Responding". An app
+# mid-launch may falsely fail; raise TIMEOUT (default 2s) to reduce noise.
+appresponsive() {
+    case "$1" in -h|--help)
+        printf 'usage: appresponsive <AppName> [TIMEOUT_SEC]\n'
+        printf '  Exit 0 if app answers an Apple Event within TIMEOUT (default 2s).\n'
+        printf '  Exit 1 if hung, not running, or scripting-disabled.\n'
+        printf '  Example: appresponsive OrbStack 5 || echo hung\n'
+        return 0 ;;
+    esac
+    _macapp_guard_darwin || return 1
+    _macapp_need_name "$1" appresponsive || return 2
+    _macapp_to=${2:-2}
+    apprunning "$1" || return 1
+    _macapp_out=$(osascript \
+        -e 'on run argv' \
+        -e 'set t to (item 2 of argv) as integer' \
+        -e 'with timeout of t seconds' \
+        -e '  try' \
+        -e '    tell application (item 1 of argv) to get name' \
+        -e '    return "yes"' \
+        -e '  on error' \
+        -e '    return "no"' \
+        -e '  end try' \
+        -e 'end timeout' \
+        -e 'end run' \
+        -- "$1" "$_macapp_to" 2>/dev/null)
+    unset _macapp_to
+    [ "$_macapp_out" = "yes" ]
+}
+
+{{ end -}}
