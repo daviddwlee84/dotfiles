@@ -57,9 +57,24 @@ from scripts.fleet import (
 # `/usr/local/bin` (Intel brew / Linux), `~/.cargo/bin` (Rust), `~/.local/bin`
 # (uv tool), `~/.dotfiles/bin` (chezmoi-deployed), or `~/bin` (legacy). Without
 # this prepend `command -v pueue` returns false on every host with a non-system
-# install, producing a fleetwide false-negative `not-installed`. Order: our
-# managed dirs first so user-deployed pqsum wraps win, then language-installer
-# dirs, then brew, then linuxbrew (system + per-user).
+# install, producing a fleetwide false-negative `not-installed`.
+#
+# Order rationale (DIFFERS from the user's interactive shell PATH on purpose):
+#   1. ~/.dotfiles/bin  — chezmoi-deployed wrappers; we own the version
+#   2. ~/.cargo/bin     — `cargo install pueue --locked`; tracks upstream releases
+#   3. ~/.local/bin     — uv-tool / pipx; same "fresh from package manager" tier
+#   4. ~/bin            — legacy user-placed (transitional per bin-migration);
+#                         deliberately ranked BELOW package-manager dirs so a
+#                         stale ~/bin/pueue (e.g. a 4.0.1 download lingering
+#                         after the user switched to cargo's 4.0.2) does not
+#                         shadow the fresher cargo binary and trigger a daemon-
+#                         client protocol-mismatch on every probe.
+#   5. /opt/homebrew/bin / /usr/local/bin / linuxbrew — system package managers
+# The user's interactive shell currently puts ~/bin at slot 2 (per
+# dot_config/shell/00_exports.sh.tmpl) — that PATH is for THEIR daily commands
+# where they might legitimately override the package-manager version. For
+# cross-host probing we want "best available", which is the package-manager
+# version.
 #
 # We also catch the pueue daemon/client version-mismatch case (`pueue` exits 0
 # but writes `Error: Couldn't deserialize message: ...` to stdout because the
@@ -67,7 +82,7 @@ from scripts.fleet import (
 # falling through to `PQSUM_SOURCE=ok` would feed garbage to pqsum's parser.
 _REMOTE_CMD = r"""
 set +e
-export PATH="$HOME/.dotfiles/bin:$HOME/bin:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.linuxbrew/bin:$PATH"
+export PATH="$HOME/.dotfiles/bin:$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.linuxbrew/bin:$PATH"
 if ! command -v pueue >/dev/null 2>&1; then
   printf 'PQSUM_SOURCE=missing\n'
   exit 0

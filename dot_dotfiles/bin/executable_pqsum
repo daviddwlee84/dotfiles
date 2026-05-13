@@ -310,9 +310,20 @@ def parse_pueue_json(raw: str, *, requested_group: str = "") -> HostSnapshot:
     durations = [t.duration_s for t in tasks if t.duration_s is not None]
     avg_done = sum(durations) / len(durations) if durations else None
     overall_pct = (done * 100 / total) if total else 0.0
+
+    def _breakdown_key(t: TaskRec) -> str:
+        # Finished tasks: split by result so Failed/Killed surface separately
+        # instead of being hidden under "Done=N". Matches pueue's own UI
+        # ("Failed (1)", "Killed", "Success"). Success keeps the "Done" label
+        # for backward-compat with the pre-migration zsh pqsum table.
+        if t.status == "Done" and t.result and t.result != "Success":
+            return t.result
+        return t.status
+
     status_breakdown: dict[str, int] = {}
     for t in tasks:
-        status_breakdown[t.status] = status_breakdown.get(t.status, 0) + 1
+        key = _breakdown_key(t)
+        status_breakdown[key] = status_breakdown.get(key, 0) + 1
 
     group_recs: list[GroupRec] = []
     for gname in group_names:
@@ -342,7 +353,8 @@ def parse_pueue_json(raw: str, *, requested_group: str = "") -> HostSnapshot:
 
         gbreakdown: dict[str, int] = {}
         for t in gtasks:
-            gbreakdown[t.status] = gbreakdown.get(t.status, 0) + 1
+            key = _breakdown_key(t)
+            gbreakdown[key] = gbreakdown.get(key, 0) + 1
         failed_ids = [t.id for t in gtasks if t.status == "Done" and t.result and t.result != "Success"]
 
         group_recs.append(GroupRec(
