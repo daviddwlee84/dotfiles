@@ -307,8 +307,147 @@ Always add a `rescue:` block that points the user at the manual
 fallback URL (cursor.com / discord.com / GitHub release page) so a
 failed automated install isn't a dead end.
 
+## Controlling installed apps from the shell
+
+The role installs apps; `dot_config/shell/56_linux_apps.sh.tmpl` controls
+them. Linux counterpart to the macOS `app-*` helpers in
+`dot_config/shell/54_macos_apps.sh.tmpl` — **same public function names**
+(`appquit` / `applaunch` / `appactivate` / `apprestart` / `apprunning` /
+`applist` / `appresponsive`) so users get cross-platform muscle memory.
+The `tv linux-apps` channel mirrors `tv mac-apps`.
+
+### Coverage on Wayland GNOME (no compositor extension)
+
+| Verb | Linux backend | Fidelity |
+|---|---|---|
+| `applaunch NAME` | `gtk-launch <desktop-id>` (no `DBusActivatable=true` required) | ✓ works for any `.desktop` file |
+| `apprunning NAME` | `pgrep -f <pattern>` (override or auto-derived) | ✓ silent boolean |
+| `appquit NAME` | `pkill -TERM -f <pattern>` | ✓ Electron + Firefox quit gracefully on SIGTERM |
+| `apprestart NAME` | quit + poll-gone (≤15s) + launch | ✓ launches even if not running |
+| `appactivate NAME` | D-Bus → GNOME `window-calls` ext; fallback `gtk-launch` | ⚠ full focus only with extension installed |
+| `applist [--pids\|--all]` | registry + `.desktop` scan, pgrep each | ⚠ "managed apps that are alive" — not every window |
+| `appresponsive NAME [T]` | `playerctl -p <mpris>` for media apps; degrades to `apprunning` | ⚠ MPRIS-only; no Linux analog to macOS Apple Events |
+
+### Why `gapplication` alone doesn't work
+
+The freedesktop `org.freedesktop.Application` D-Bus interface is the
+semantic match to macOS Apple Events — apps expose `quit` / `activate` /
+etc. and `gapplication action <id> quit` calls them. **In practice, almost
+no third-party app sets `DBusActivatable=true` in its `.desktop` file**:
+empirically, on a daily-driver Ubuntu 24.04 Wayland session,
+`gapplication list-apps` returned 13 entries — *all GNOME-core* (Calendar,
+Logs, Nautilus, …). Zero of the user's Zen / Cursor / Spotify / Discord /
+Frpc-Desktop showed up. See
+[`pitfalls/linux-app-control-gapplication-zero-coverage.md`](../../pitfalls/linux-app-control-gapplication-zero-coverage.md).
+
+Hybrid pivot: launch via `gtk-launch` (works for any `.desktop` file
+regardless of `DBusActivatable`); quit via `pkill -TERM` on a runtime
+pattern; focus via the optional `window-calls` GNOME extension.
+
+### Override file: `~/.config/shell/linux-apps.conf`
+
+Not auto-stubbed (mirrors `~/.shellrc.secrets` rule — empty-file footgun).
+Helper sources it if present. Register apps with `linux_app_register`:
+
+```sh
+# Cursor — apt install at /usr/share/cursor/cursor (NOT the AppImage residue)
+linux_app_register Cursor \
+  --desktop=cursor \
+  --pkill='^/usr/share/cursor/cursor( |$)' \
+  --wm-class=Cursor
+
+# Discord — apt install; ignore the Flatpak duplicate
+linux_app_register Discord \
+  --desktop=discord \
+  --pkill='^/usr/share/discord/Discord( |$)' \
+  --wm-class=discord
+
+# Spotify — snap-confined, MPRIS-aware
+linux_app_register Spotify \
+  --desktop=spotify_spotify \
+  --pkill='^/snap/spotify/[^/]+/usr/share/spotify/spotify' \
+  --wm-class=spotify \
+  --mpris=spotify
+
+# Zen Browser — AppImage, runtime path != .desktop Exec
+linux_app_register Zen \
+  --desktop=zen-browser \
+  --pkill='\.mount_.+/zen($| )' \
+  --wm-class=zen
+
+# Frpc-Desktop — AppImage, runtime path drifts on re-download
+linux_app_register Frpc-Desktop \
+  --desktop=appimagekit_557220393761292184db845cd26816c3-Frpc-Desktop \
+  --pkill='\.mount_.+/frpc-desktop($| )' \
+  --wm-class=Frpc-Desktop
+
+# ClashForWindows — manually-placed Electron app, NO .desktop file.
+# Use --exec= for the launch path; helper prefers --exec over --desktop.
+linux_app_register CFW \
+  --exec='~/Documents/ClashForWindows/cfw' \
+  --pkill='^/home/.+/Documents/ClashForWindows/cfw' \
+  --wm-class='Clash for Windows'
+```
+
+The `--exec=` flag covers apps with no `.desktop` (manually-placed
+Electron / hand-built binaries). The flag value is passed through `eval`
+to expand `~` and `$HOME`, and is executed via `setsid -f sh -c …` so
+the parent shell stays clean.
+
+`linux_app_register --list` prints the current registry; `--help` prints
+flag reference.
+
+**When to override vs let auto-derivation handle it**:
+
+- **Always override** for AppImage, Snap, and Flatpak apps. AppImage
+  runtime binary lives at `/tmp/.mount_<hash>/<inner>`, not the
+  `.desktop` `Exec=` path — `pkill` on the `Exec=` path only hits the
+  launcher wrapper. See
+  [`pitfalls/linux-app-control-appimage-runtime-path.md`](../../pitfalls/linux-app-control-appimage-runtime-path.md).
+- **Override when an app has multiple `.desktop` entries** (Zen with 4
+  AppImage residues, Cursor with AppImage residue + apt install, Discord
+  with apt + Flatpak both installed). Auto-derivation picks latest
+  mtime, which may not be the one that's actually running.
+- **Skip override** for clean apt-installed apps (their `Exec=` matches
+  the runtime path 1:1) — auto-derivation handles them correctly.
+
+### GNOME `window-calls` extension — manual install
+
+The helper detects the extension at first `appactivate` call. Without it,
+`appactivate` falls back to `applaunch`, which re-focuses for
+single-instance apps like Electron + Firefox but isn't reliable for all
+apps. Install once per host:
+
+```sh
+# Download from GitHub releases or extensions.gnome.org
+# https://github.com/ickyicky/window-calls (or hseliger/window-calls-extended
+# for GNOME 45+ if upstream is stale)
+gnome-extensions install ~/Downloads/window-calls@domandoman.xyz.zip
+gnome-extensions enable window-calls@domandoman.xyz
+```
+
+**Wayland sessions need a logout + login** for the extension to activate
+(no `Alt+F2 r` reload like X11). The user-consent dialog on GNOME 46+
+can't be suppressed, so this isn't ansible-automatable.
+
+### Known limits (mirror the backlog)
+
+- **No analog to macOS Apple Events' `with timeout`** for non-MPRIS apps.
+  `appresponsive` for Electron / Firefox / native GTK apps degrades to
+  `apprunning` with a stderr note.
+- **No "hide windows" verb** (mac-apps Alt+H has no Linux equivalent
+  without compositor IPC; deliberately omitted from `tv linux-apps`).
+- **`applist` is "registered + auto-derived running apps"**, not "every
+  GUI window". Auto-discovery filters to `.desktop` entries whose `Exec=`
+  is an absolute path (skips Flatpak/AppImage wrappers that would match
+  too loosely).
+- **Compositor support is GNOME Wayland only.** KDE / Sway / Hyprland
+  paths aren't wired — see `backlog/linux-desktop-app-control.md` for
+  the deferred matrix if a second compositor joins the fleet.
+
 ## Cross-references
 
 - [`docs/tools/appimage.md`](../tools/appimage.md) — AppImageLauncher install paths, `ail-cli`, libfuse2 / AppArmor gotchas on Ubuntu 24.04.
 - [`docs/this_repo/upgrades.md`](../this_repo/upgrades.md) — the install-vs-upgrade split: why `chezmoi apply` doesn't bump versions, what `just upgrade-*` covers, where each package manager fits in.
 - [`dot_ansible/roles/gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) — the actual ansible role, with the patterns you'd copy when adding a new app.
+- [`backlog/linux-desktop-app-control.md`](../../backlog/linux-desktop-app-control.md) — design history for the `app-*` helpers, options considered, and deferred follow-ups (KDE / Sway / Hyprland).

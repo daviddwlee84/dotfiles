@@ -1,0 +1,518 @@
+{{- if eq .chezmoi.os "linux" -}}
+# shellcheck shell=sh
+# app-* helpers — graceful control of Linux GUI apps.
+#
+# Linux counterpart to dot_config/shell/54_macos_apps.sh.tmpl. SAME public
+# verb names (appquit/applaunch/appactivate/apprestart/apprunning/applist/
+# appresponsive) so users get cross-platform muscle memory. Backends diverge
+# by necessity:
+#
+#   applaunch     gtk-launch <desktop-id>            works for any .desktop
+#   apprunning    pgrep -f <pattern>                 override or auto-derived
+#   appquit       pkill -TERM -f <pattern>           Electron/Firefox honour SIGTERM
+#   apprestart    appquit + poll-gone + applaunch
+#   appactivate   gdbus → GNOME window-calls ext     ⚠ ext not installed →
+#                 OR falls through to applaunch         apps' own re-focus
+#   applist       enumerate registered + .desktop    ⚠ "managed apps that
+#                                                       are alive"
+#   appresponsive playerctl MPRIS probe              ⚠ MPRIS apps only;
+#                 OR degrades to apprunning             no Linux analog to
+#                                                       macOS Apple Events
+#
+# Override file: ~/.config/shell/linux-apps.conf is sourced if present.
+# Define apps via `linux_app_register NAME --desktop=ID --pkill=REGEX
+# --wm-class=CLASS [--mpris=NAME]`. Auto-derivation handles unregistered
+# apps via .desktop scan + Exec basename, but fails for AppImage runtime
+# paths (see pitfalls/linux-app-control-appimage-runtime-path.md).
+#
+# Backlog: backlog/linux-desktop-app-control.md
+# Playbook: docs/playbooks/linux-gui-apps.md → "Controlling installed apps"
+
+# ---------------------------------------------------------------------------
+# Guards
+# ---------------------------------------------------------------------------
+
+_linuxapp_is_linux() { [ "$(uname -s 2>/dev/null)" = "Linux" ]; }
+
+_linuxapp_guard_linux() {
+    if ! _linuxapp_is_linux; then
+        printf 'app-helper: Linux-only (current OS: %s)\n' \
+            "$(uname -s 2>/dev/null || echo unknown)" >&2
+        return 1
+    fi
+}
+
+_linuxapp_need_name() {
+    if [ -z "$1" ]; then
+        printf 'usage: %s <AppName>\n  e.g. %s Cursor\n' "$2" "$2" >&2
+        return 2
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Override registry (zsh + bash associative arrays; POSIX sh: skip)
+# ---------------------------------------------------------------------------
+
+if [ -n "${ZSH_VERSION:-}" ]; then
+    typeset -gA _linuxapp_pkill _linuxapp_desktop _linuxapp_wmclass _linuxapp_mpris _linuxapp_exec
+elif [ -n "${BASH_VERSION:-}" ]; then
+    # shellcheck disable=SC3044
+    declare -gA _linuxapp_pkill _linuxapp_desktop _linuxapp_wmclass _linuxapp_mpris _linuxapp_exec 2>/dev/null || true
+fi
+
+_linuxapp_keys() {
+    # Echo registered NAMEs, one per line.
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        # shellcheck disable=SC2296
+        printf '%s\n' "${(@k)_linuxapp_pkill}" 2>/dev/null
+    elif [ -n "${BASH_VERSION:-}" ]; then
+        # shellcheck disable=SC3054
+        printf '%s\n' "${!_linuxapp_pkill[@]}" 2>/dev/null
+    fi
+}
+
+# linux_app_register NAME --desktop=ID --pkill=REGEX --wm-class=CLASS [--mpris=NAME]
+linux_app_register() {
+    case "$1" in
+        -h|--help)
+            cat >&2 <<'HELP'
+linux_app_register NAME [OPTIONS]    register an app for app-* helpers
+linux_app_register --list            print currently registered apps
+
+  --desktop=ID       .desktop file stem (zen-browser, cursor, discord)
+  --exec=PATH        explicit launch command for apps with NO .desktop file
+                     (manually-placed Electron apps, hand-built binaries).
+                     Used by applaunch in preference to --desktop when set;
+                     supports `~` expansion. Skip --desktop for these.
+  --pkill=REGEX      pgrep/pkill -f pattern matching the runtime command line
+  --wm-class=CLASS   WM_CLASS (matches StartupWMClass=); used by appactivate
+                     when the GNOME window-calls extension is installed
+  --mpris=NAME       playerctl -p name (spotify, vlc, mpv, firefox); used
+                     by appresponsive for the MPRIS probe
+
+  Typical call site: ~/.config/shell/linux-apps.conf (sourced at startup).
+
+  Example:
+    linux_app_register Spotify \
+      --desktop=spotify_spotify \
+      --pkill='^/snap/spotify/[^/]+/usr/share/spotify/spotify' \
+      --wm-class=spotify \
+      --mpris=spotify
+HELP
+            return 0
+            ;;
+        --list)
+            _linuxapp_keys | while IFS= read -r k; do
+                [ -z "$k" ] && continue
+                printf '%s\tdesktop=%s\texec=%s\tpkill=%s\twmclass=%s\tmpris=%s\n' \
+                    "$k" \
+                    "${_linuxapp_desktop[$k]:-}" \
+                    "${_linuxapp_exec[$k]:-}" \
+                    "${_linuxapp_pkill[$k]:-}" \
+                    "${_linuxapp_wmclass[$k]:-}" \
+                    "${_linuxapp_mpris[$k]:-}"
+            done
+            return 0
+            ;;
+    esac
+
+    _name=$1
+    [ -z "$_name" ] && { printf 'linux_app_register: NAME required (try --help)\n' >&2; return 2; }
+    shift
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --desktop=*)  _linuxapp_desktop[$_name]="${1#*=}" ;;
+            --exec=*)     _linuxapp_exec[$_name]="${1#*=}" ;;
+            --pkill=*)    _linuxapp_pkill[$_name]="${1#*=}" ;;
+            --wm-class=*) _linuxapp_wmclass[$_name]="${1#*=}" ;;
+            --mpris=*)    _linuxapp_mpris[$_name]="${1#*=}" ;;
+            *) printf 'linux_app_register: unknown option: %s\n' "$1" >&2
+               unset _name; return 2 ;;
+        esac
+        shift
+    done
+    unset _name
+}
+
+# ---------------------------------------------------------------------------
+# Load user overrides (~/.config/shell/linux-apps.conf — never auto-stubbed,
+# matches the .shellrc.secrets convention).
+# ---------------------------------------------------------------------------
+
+if [ -r "$HOME/.config/shell/linux-apps.conf" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.config/shell/linux-apps.conf"
+fi
+
+# ---------------------------------------------------------------------------
+# window-calls extension detection (lazy — first appactivate call)
+# ---------------------------------------------------------------------------
+
+_linuxapp_detect_winext() {
+    if [ -z "${_linuxapp_have_winext:-}" ]; then
+        if command -v gnome-extensions >/dev/null 2>&1 \
+           && gnome-extensions list 2>/dev/null \
+              | grep -qiE 'window-calls(-extended)?@'; then
+            _linuxapp_have_winext=1
+        else
+            _linuxapp_have_winext=0
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Private: .desktop lookup + resolvers
+# ---------------------------------------------------------------------------
+
+# Echo "<stem>\t<Name>\t<WMClass>\t<Exec-basename>\t<full-path>" of the
+# latest-mtime .desktop file matching NAME by stem / Name= / StartupWMClass=.
+_linuxapp_lookup_desktop() {
+    _want=$1
+    _want_lc=$(printf '%s' "$_want" | tr '[:upper:]' '[:lower:]')
+    {
+        for _d in /usr/share/applications "$HOME/.local/share/applications" \
+                  /var/lib/flatpak/exports/share/applications \
+                  "$HOME/.local/share/flatpak/exports/share/applications" \
+                  /var/lib/snapd/desktop/applications; do
+            [ -d "$_d" ] || continue
+            for _f in "$_d"/*.desktop; do
+                [ -f "$_f" ] || continue
+                _stem=${_f##*/}; _stem=${_stem%.desktop}
+                _nf=$(awk -F= '/^Name=/ {sub(/^Name=/,""); print; exit}' "$_f" 2>/dev/null)
+                _wf=$(awk -F= '/^StartupWMClass=/ {sub(/^StartupWMClass=/,""); print; exit}' "$_f" 2>/dev/null)
+                _ef=$(awk -F= '/^Exec=/ {sub(/^Exec=/,""); print; exit}' "$_f" 2>/dev/null)
+                _slc=$(printf '%s' "$_stem" | tr '[:upper:]' '[:lower:]')
+                _nlc=$(printf '%s' "$_nf"   | tr '[:upper:]' '[:lower:]')
+                _wlc=$(printf '%s' "$_wf"   | tr '[:upper:]' '[:lower:]')
+                if [ "$_slc" = "$_want_lc" ] || [ "$_nlc" = "$_want_lc" ] || [ "$_wlc" = "$_want_lc" ]; then
+                    _ec=$(printf '%s' "$_ef" | sed -E 's/[[:space:]]+%[a-zA-Z]+//g')
+                    _ep=${_ec%% *}
+                    _eb=${_ep##*/}
+                    _mt=$(stat -c %Y "$_f" 2>/dev/null || echo 0)
+                    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$_mt" "$_stem" "$_nf" "$_wf" "$_eb" "$_f"
+                fi
+            done
+        done
+    } | sort -rn -k1 | head -1 | cut -f2-
+    unset _want _want_lc _d _f _stem _nf _wf _ef _slc _nlc _wlc _ec _ep _eb _mt
+}
+
+# Echo path to the .desktop file for the given desktop-id stem (first hit).
+_linuxapp_find_desktop_file() {
+    _id=$1
+    for _d in "$HOME/.local/share/applications" /usr/share/applications \
+              "$HOME/.local/share/flatpak/exports/share/applications" \
+              /var/lib/flatpak/exports/share/applications \
+              /var/lib/snapd/desktop/applications; do
+        if [ -f "$_d/$_id.desktop" ]; then
+            printf '%s\n' "$_d/$_id.desktop"
+            unset _id _d
+            return 0
+        fi
+    done
+    unset _id _d
+    return 1
+}
+
+_linuxapp_resolve_pattern() {
+    # Echo pkill -f pattern for NAME; exit 1 if unresolved.
+    if [ -n "${_linuxapp_pkill[$1]:-}" ]; then
+        printf '%s\n' "${_linuxapp_pkill[$1]}"
+        return 0
+    fi
+    _row=$(_linuxapp_lookup_desktop "$1") || true
+    if [ -n "$_row" ]; then
+        _eb=$(printf '%s\n' "$_row" | cut -f4)
+        if [ -n "$_eb" ]; then
+            printf '%s\n' "$_eb"
+            unset _row _eb
+            return 0
+        fi
+    fi
+    unset _row _eb
+    return 1
+}
+
+_linuxapp_resolve_desktop() {
+    # Echo desktop-id stem for NAME; exit 1 if unresolved.
+    if [ -n "${_linuxapp_desktop[$1]:-}" ]; then
+        printf '%s\n' "${_linuxapp_desktop[$1]}"
+        return 0
+    fi
+    _row=$(_linuxapp_lookup_desktop "$1") || true
+    if [ -n "$_row" ]; then
+        printf '%s\n' "$_row" | cut -f1
+        [ -n "$_row" ] && { unset _row; return 0; }
+    fi
+    unset _row
+    return 1
+}
+
+_linuxapp_resolve_wmclass() {
+    if [ -n "${_linuxapp_wmclass[$1]:-}" ]; then
+        printf '%s\n' "${_linuxapp_wmclass[$1]}"
+        return 0
+    fi
+    _row=$(_linuxapp_lookup_desktop "$1") || true
+    if [ -n "$_row" ]; then
+        printf '%s\n' "$_row" | cut -f3
+    fi
+    unset _row
+}
+
+# ---------------------------------------------------------------------------
+# Public: lifecycle
+# ---------------------------------------------------------------------------
+
+# applaunch NAME — launch via --exec= override, gtk-launch, or gio in background.
+applaunch() {
+    case "$1" in -h|--help)
+        printf 'usage: applaunch <AppName>\n  Launch order:\n    1. --exec=PATH override (for apps without a .desktop file)\n    2. gtk-launch <desktop-id> resolved from override or .desktop scan\n    3. gio launch <full-desktop-path> as fallback\n  Example: applaunch Cursor\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" applaunch || return 2
+
+    # 1. --exec= override wins — for manually-placed binaries with no .desktop.
+    _ex=${_linuxapp_exec[$1]:-}
+    if [ -n "$_ex" ]; then
+        # eval to expand ~ and $HOME; treat the value as a shell-quoted command.
+        _ex_expanded=$(eval "printf '%s' \"$_ex\"")
+        (setsid -f sh -c "$_ex_expanded" >/dev/null 2>&1 &) 2>/dev/null \
+            || nohup sh -c "$_ex_expanded" >/dev/null 2>&1 &
+        unset _ex _ex_expanded
+        return 0
+    fi
+    unset _ex
+
+    # 2. + 3. gtk-launch / gio launch via .desktop resolution.
+    _id=$(_linuxapp_resolve_desktop "$1") || {
+        printf 'applaunch: no .desktop file resolved for %s\n  Hint: linux_app_register %s --desktop=<id> ... OR --exec=<command>\n' "$1" "$1" >&2
+        unset _id; return 3
+    }
+    if command -v gtk-launch >/dev/null 2>&1; then
+        (setsid -f gtk-launch "$_id" >/dev/null 2>&1 &) 2>/dev/null \
+            || nohup gtk-launch "$_id" >/dev/null 2>&1 &
+    elif command -v gio >/dev/null 2>&1; then
+        _f=$(_linuxapp_find_desktop_file "$_id") || {
+            printf 'applaunch: .desktop file path not found for id=%s\n' "$_id" >&2
+            unset _id _f; return 3
+        }
+        (setsid -f gio launch "$_f" >/dev/null 2>&1 &) 2>/dev/null \
+            || nohup gio launch "$_f" >/dev/null 2>&1 &
+        unset _f
+    else
+        printf 'applaunch: neither gtk-launch nor gio is installed\n' >&2
+        unset _id; return 4
+    fi
+    unset _id
+}
+
+# appquit NAME — SIGTERM the runtime process (graceful for Electron/Firefox).
+appquit() {
+    case "$1" in -h|--help)
+        printf 'usage: appquit <AppName>\n  Send SIGTERM to the matching process (Electron + Firefox quit gracefully).\n  Pattern: override (~/.config/shell/linux-apps.conf) or auto-derived from .desktop.\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" appquit || return 2
+    _pat=$(_linuxapp_resolve_pattern "$1") || {
+        printf 'appquit: could not resolve runtime pattern for %s\n  Hint: register an override in ~/.config/shell/linux-apps.conf\n' "$1" >&2
+        unset _pat; return 3
+    }
+    pkill -TERM -f -- "$_pat"
+    _rc=$?
+    unset _pat
+    return "$_rc"
+}
+
+# appactivate NAME — bring to front. Needs window-calls ext for true focus.
+appactivate() {
+    case "$1" in -h|--help)
+        printf 'usage: appactivate <AppName>\n  Bring app to front. With GNOME `window-calls` extension: D-Bus call by WM_CLASS.\n  Without it: falls through to applaunch (single-instance apps re-focus).\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" appactivate || return 2
+    _linuxapp_detect_winext
+    if [ "${_linuxapp_have_winext:-0}" = 1 ]; then
+        _wc=$(_linuxapp_resolve_wmclass "$1")
+        if [ -n "$_wc" ]; then
+            if gdbus call --session \
+                --dest org.gnome.Shell \
+                --object-path /org/gnome/Shell/Extensions/Windows \
+                --method org.gnome.Shell.Extensions.Windows.Activate \
+                "$_wc" >/dev/null 2>&1; then
+                unset _wc
+                return 0
+            fi
+        fi
+        unset _wc
+    fi
+    applaunch "$1"
+}
+
+# apprestart NAME — graceful quit + poll-gone (≤15s) + relaunch.
+# If the app isn't running, this just launches it (mirrors macOS semantics
+# where `tell app to quit` is silent on a non-running target).
+apprestart() {
+    case "$1" in -h|--help)
+        printf 'usage: apprestart <AppName>\n  appquit + poll until process gone (up to 15s) + applaunch.\n  Launches if not currently running.\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" apprestart || return 2
+    if apprunning "$1"; then
+        appquit "$1" || return $?
+        _i=0
+        while [ "$_i" -lt 30 ] && apprunning "$1"; do
+            sleep 0.5
+            _i=$((_i + 1))
+        done
+        unset _i
+    fi
+    applaunch "$1"
+}
+
+# ---------------------------------------------------------------------------
+# Public: inspection
+# ---------------------------------------------------------------------------
+
+# apprunning NAME — silent boolean.
+apprunning() {
+    case "$1" in -h|--help)
+        printf 'usage: apprunning <AppName>\n  Silent. Exit 0 if process matching pattern is found, 1 otherwise.\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" apprunning || return 2
+    _pat=$(_linuxapp_resolve_pattern "$1") || { unset _pat; return 1; }
+    pgrep -f -- "$_pat" >/dev/null 2>&1
+    _rc=$?
+    unset _pat
+    return "$_rc"
+}
+
+_linuxapp_first_pid() {
+    _pat=$(_linuxapp_resolve_pattern "$1") || { unset _pat; return 1; }
+    _out=$(pgrep -f -- "$_pat" 2>/dev/null | head -1)
+    unset _pat
+    [ -n "$_out" ] || { unset _out; return 1; }
+    printf '%s\n' "$_out"
+    unset _out
+}
+
+# applist [--pids|--all] — list registered + auto-derived running apps.
+applist() {
+    case "${1:-}" in -h|--help)
+        printf 'usage: applist [--pids|--all]\n'
+        printf '  Default     names of running registered+auto-derived apps, one per line.\n'
+        printf '  --pids      "<pid>\\t<name>" — used by tv linux-apps channel.\n'
+        printf '  --all       all .desktop entries the helper knows about (running or not),\n'
+        printf '              with "(running)" annotation.\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _mode=${1:-names}
+    case "$_mode" in
+        --pids) _mode=pids ;;
+        --all)  _mode=all ;;
+        names)  ;;
+        *) printf 'applist: unknown option %s\n' "$_mode" >&2; unset _mode; return 2 ;;
+    esac
+
+    # Set of names we've emitted (avoids dupes from both registry + auto scan).
+    _seen=$(mktemp 2>/dev/null) || _seen=/tmp/applist.$$
+    : > "$_seen"
+
+    # 1. Registered apps. Also write the registered NAME and its resolved
+    #    desktop-id to $_seen so auto-discovery doesn't emit duplicates.
+    _linuxapp_keys | while IFS= read -r _n; do
+        [ -z "$_n" ] && continue
+        _pid=$(_linuxapp_first_pid "$_n" 2>/dev/null)
+        printf '%s\n' "$_n" >> "$_seen"
+        _did=${_linuxapp_desktop[$_n]:-}
+        [ -n "$_did" ] && printf '%s\n' "$_did" >> "$_seen"
+        case "$_mode" in
+            names) [ -n "$_pid" ] && printf '%s\n' "$_n" ;;
+            pids)  [ -n "$_pid" ] && printf '%s\t%s\n' "$_pid" "$_n" ;;
+            all)
+                if [ -n "$_pid" ]; then
+                    printf '%s\t%s\t(running)\n' "$_pid" "$_n"
+                else
+                    printf '\t%s\t\n' "$_n"
+                fi
+                ;;
+        esac
+    done
+
+    # 2. Auto-derive: scan all .desktop stems, pgrep each by FULL Exec path
+    #    (NOT basename — basename match is too loose and emits false positives
+    #    for short words like "info" / "idle" / "flatpak"). Trade-off: misses
+    #    AppImage/snap runtime processes whose actual binary lives at a path
+    #    different from .desktop Exec — those apps must be explicitly
+    #    registered. Skip names already emitted from the registry.
+    for _d in /usr/share/applications "$HOME/.local/share/applications" \
+              /var/lib/flatpak/exports/share/applications \
+              "$HOME/.local/share/flatpak/exports/share/applications" \
+              /var/lib/snapd/desktop/applications; do
+        [ -d "$_d" ] || continue
+        for _f in "$_d"/*.desktop; do
+            [ -f "$_f" ] || continue
+            _stem=${_f##*/}; _stem=${_stem%.desktop}
+            if grep -Fxq "$_stem" "$_seen" 2>/dev/null; then continue; fi
+            _ef=$(awk -F= '/^Exec=/ {sub(/^Exec=/,""); print; exit}' "$_f" 2>/dev/null)
+            _ec=$(printf '%s' "$_ef" | sed -E 's/[[:space:]]+%[a-zA-Z]+//g')
+            _ep=${_ec%% *}
+            # Require absolute path for auto-discovery (rules out wrappers
+            # like "flatpak run ..." which would match every flatpak app).
+            case "$_ep" in /*) ;; *) continue ;; esac
+            _pid=$(pgrep -f -- "$_ep" 2>/dev/null | head -1)
+            case "$_mode" in
+                names) [ -n "$_pid" ] && printf '%s\n' "$_stem" ;;
+                pids)  [ -n "$_pid" ] && printf '%s\t%s\n' "$_pid" "$_stem" ;;
+                all)
+                    if [ -n "$_pid" ]; then
+                        printf '%s\t%s\t(running)\n' "$_pid" "$_stem"
+                    else
+                        printf '\t%s\t\n' "$_stem"
+                    fi
+                    ;;
+            esac
+        done
+    done
+
+    rm -f -- "$_seen"
+    unset _mode _seen _n _pid _d _f _stem _ef _ec _ep _eb
+}
+
+# appresponsive NAME [TIMEOUT_SEC] — best-effort MPRIS probe.
+# No public-API analog to macOS Apple Events for non-MPRIS apps.
+appresponsive() {
+    case "$1" in -h|--help)
+        printf 'usage: appresponsive <AppName> [TIMEOUT_SEC]\n'
+        printf '  Exit 0 if MPRIS probe succeeds within TIMEOUT (default 2s).\n'
+        printf '  Exit 1 if not running, or MPRIS probe times out.\n'
+        printf '  Apps without --mpris registered degrade to apprunning + stderr note\n'
+        printf '  (Linux has no public-API equivalent to macOS Apple Events for\n'
+        printf '  non-MPRIS apps; Electron/Firefox provide no responsiveness probe).\n'
+        return 0 ;;
+    esac
+    _linuxapp_guard_linux || return 1
+    _linuxapp_need_name "$1" appresponsive || return 2
+    apprunning "$1" || return 1
+    _to=${2:-2}
+    _mpris=${_linuxapp_mpris[$1]:-}
+    if [ -n "$_mpris" ] && command -v playerctl >/dev/null 2>&1; then
+        timeout "$_to" playerctl -p "$_mpris" status >/dev/null 2>&1
+        _rc=$?
+        unset _to _mpris
+        return "$_rc"
+    fi
+    printf 'appresponsive: %s has no --mpris handle; degrading to apprunning (no public Linux API for non-MPRIS apps)\n' "$1" >&2
+    unset _to _mpris
+    return 0
+}
+
+{{ end -}}

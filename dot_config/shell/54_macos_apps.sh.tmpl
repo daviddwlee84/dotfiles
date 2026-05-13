@@ -16,6 +16,14 @@
 # All helpers take an app NAME (e.g. `OrbStack`, `Google Chrome`), not a
 # bundle ID. `$1` is passed via osascript's `argv` so spaces and quotes in
 # app names are handled correctly without shell-escaping gymnastics.
+#
+# Linux counterpart: dot_config/shell/56_linux_apps.sh.tmpl. Same public
+# verb names (appquit / applaunch / appactivate / apprestart / apprunning /
+# applist / appresponsive) but a different backend — gtk-launch + pkill -TERM
+# + optional GNOME window-calls extension. Cross-platform muscle memory by
+# design; per-platform gaps documented in
+# backlog/linux-desktop-app-control.md (Alt+H "hide" is mac-only — Linux
+# can't hide windows without compositor IPC).
 
 _macapp_is_darwin() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
 

@@ -1,0 +1,126 @@
+{{- if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+# linux-apps channel — Linux GUI app control via gtk-launch + pkill -TERM
+#
+# Linux counterpart to dot_config/television/cable/mac-apps.toml.tmpl.
+# Pick a running GUI app (registered or auto-derived from .desktop scan),
+# then choose a lifecycle action. Same keybindings as mac-apps where the
+# verb exists on both sides — Alt+H is mac-only by design (Linux can't
+# hide windows without compositor IPC).
+#
+# Pairs with: dot_config/shell/56_linux_apps.sh.tmpl (sourced by every
+#             action to reuse appactivate / appquit / apprestart /
+#             appresponsive — and by [source] to drive `applist --pids`)
+#             ~/.config/shell/linux-apps.conf (user override file; lets
+#             users register per-app pkill patterns for AppImage/snap/
+#             Flatpak apps that auto-derivation can't resolve correctly)
+#
+# Coverage caveats (mirrors backlog/linux-desktop-app-control.md):
+#   - appactivate falls back to applaunch unless the GNOME window-calls
+#     extension is installed; documented as best-effort.
+#   - appresponsive only meaningful for apps registered with --mpris=NAME
+#     (Spotify, mpv, VLC, …); for Electron/Firefox apps it degrades to
+#     apprunning + stderr note. No public Linux API analog to macOS
+#     Apple Events' `with timeout`.
+#
+# Usage:
+#   tv linux-apps
+#
+# Keybindings:
+#   Enter      Activate (bring to front — best-effort without window-calls)
+#   Alt+Q      Graceful Quit (pkill -TERM via app's pkill pattern) + reload
+#   Alt+R      Quit + poll until process gone + relaunch + reload
+#   Alt+K      Force kill by PID (SIGKILL; last resort) + reload
+#   Alt+I      Info pager: ps + pgrep details
+#   Alt+P      Probe responsiveness (MPRIS-only; stderr note otherwise)
+#   Ctrl+F     Cycle preview (metadata <-> responsiveness)
+#   Ctrl+/     Toggle preview panel
+#
+# Why Alt+ rather than Ctrl+: tmux root-table `bind -n C-*` shadows inner
+# apps. See CLAUDE.md "Keybinding" cross-file rule.
+
+[metadata]
+name = "linux-apps"
+description = "Linux apps — graceful quit / restart / activate via gtk-launch + pkill"
+requirements = []
+
+[source]
+# Source the helper (which also sources ~/.config/shell/linux-apps.conf
+# to populate the user's overrides), then emit `<pid>\t<name>` for each
+# running app the helper recognises. Output format matches mac-apps for
+# preview / display / output split consistency.
+command = """sh -c '. ~/.config/shell/56_linux_apps.sh 2>/dev/null && applist --pids' 2>/dev/null"""
+display = "{split:\\t:0}  {split:\\t:1}"
+# Default stdout when piping `tv linux-apps | ...` is the app NAME — what
+# every helper (appquit/applaunch/appactivate/apprestart) wants on argv.
+output = "{split:\\t:1}"
+
+[preview]
+# Cycle 1: ps + pgrep tree. Fast (<50 ms).
+# Cycle 2: responsiveness probe — MPRIS-only meaningful response.
+command = [
+  """pid='{split:\\t:0}'
+name='{split:\\t:1}'
+ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,comm 2>/dev/null
+echo
+printf '=== child processes ===\\n'
+pgrep -P "$pid" -af 2>/dev/null | head -10
+echo
+printf '=== full command line ===\\n'
+tr '\\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | head -c 500
+echo""",
+  """name='{split:\\t:1}'
+. ~/.config/shell/56_linux_apps.sh 2>/dev/null
+printf 'App: %s\\n' "$name"
+if appresponsive "$name" 2>/dev/null; then
+  printf 'Status: responsive\\n'
+else
+  printf 'Status: NOT responding (or hung / not running / no MPRIS handle)\\n'
+fi
+printf '\\n(Linux has no public API for non-MPRIS responsiveness probe — see\\nbacklog/linux-desktop-app-control.md)\\n'""",
+]
+header = "{split:\\t:1}  (pid {split:\\t:0})"
+
+[ui]
+input_header = "Linux Apps"
+
+[keybindings]
+enter = "actions:activate"
+alt-q = ["actions:quit", "reload_source"]
+alt-r = ["actions:restart", "reload_source"]
+alt-k = ["actions:force-kill", "reload_source"]
+alt-i = "actions:info"
+alt-p = "actions:probe"
+
+[actions.activate]
+description = "Bring app to front (best-effort; needs window-calls ext for true focus)"
+command = """. ~/.config/shell/56_linux_apps.sh && appactivate '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.quit]
+description = "Graceful Quit (SIGTERM via app's pkill pattern)"
+command = """. ~/.config/shell/56_linux_apps.sh && appquit '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.restart]
+description = "Quit + poll until process gone + relaunch"
+# `execute` (not `fork`) because apprestart polls for up to 15s; we want
+# the user to see "still quitting…" if it takes a moment.
+command = """. ~/.config/shell/56_linux_apps.sh && apprestart '{split:\\t:1}'"""
+mode = "execute"
+
+[actions.force-kill]
+description = "SIGKILL by PID (last resort; bypasses pkill pattern)"
+# Uses PID column, not name. Children are reaped by systemd/init.
+command = "kill -9 '{split:\\t:0}'"
+mode = "fork"
+
+[actions.info]
+description = "Detail pager: ps + pgrep tree + cmdline"
+command = """pid='{split:\\t:0}'; name='{split:\\t:1}'; { printf '=== %s (pid %s) ===\\n\\n' "$name" "$pid"; ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,command 2>/dev/null; printf '\\n=== child processes ===\\n'; pgrep -P "$pid" -af 2>/dev/null; printf '\\n=== full command line ===\\n'; tr '\\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null; printf '\\n'; } 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.probe]
+description = "Probe app responsiveness (MPRIS-only; stderr note otherwise)"
+command = """. ~/.config/shell/56_linux_apps.sh && name='{split:\\t:1}' && (appresponsive "$name" 5 && printf '%s: responsive\\n' "$name" || printf '%s: NOT responding (or no MPRIS handle)\\n' "$name"); sleep 2"""
+mode = "execute"
+{{ end -}}

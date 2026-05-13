@@ -701,3 +701,35 @@
     name: copyq
     state: present
     update_cache: false
+
+# =============================================================================
+# App-control utilities — CLI tools used by `dot_config/shell/56_linux_apps.sh`
+# (the app-* helpers: appquit / applaunch / appactivate / apprestart /
+# apprunning / applist / appresponsive) and the `tv linux-apps` channel.
+#
+# Why each:
+#   - playerctl  MPRIS CLI — appresponsive's only meaningful probe for media
+#                players (Spotify, mpv, VLC, Firefox). The one cross-DE bright
+#                spot for "is this app actually alive and answering."
+#   - wmctrl     X11 window control. No-op on Wayland but cheap (~50KB) and
+#                still useful if the user falls back to an X11 session.
+#   - xdotool    X11 window + input control. Same Wayland caveat as wmctrl.
+#
+# GNOME `window-calls` extension is NOT automated here — it can't be silenced
+# on GNOME 46+ (user consent dialog) and is a one-time manual step documented
+# in docs/playbooks/linux-gui-apps.md → "Controlling installed apps".
+# =============================================================================
+
+- name: Install app-control CLI utilities (playerctl, wmctrl, xdotool)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  become: true
+  tags: [sudo, app_control]
+  ansible.builtin.apt:
+    name:
+      - playerctl
+      - wmctrl
+      - xdotool
+    state: present
+    update_cache: false

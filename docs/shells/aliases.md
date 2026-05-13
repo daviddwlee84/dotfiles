@@ -447,6 +447,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
 | `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
 | `tv mac-apps` | tv channel | `dot_config/television/cable/mac-apps.toml.tmpl` | **macOS-only.** GUI app picker; Enter = activate (front), Alt+Q = graceful Quit, Alt+R = restart, Alt+H = hide, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = responsiveness probe. Reuses `dot_config/shell/54_macos_apps.sh` helpers. |
+| `tv linux-apps` | tv channel | `dot_config/television/cable/linux-apps.toml.tmpl` | **Linux + `ubuntu_desktop` profile only.** GUI app picker; Enter = activate (gtk-launch / GNOME `window-calls` ext if installed), Alt+Q = SIGTERM via pkill pattern, Alt+R = restart, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = MPRIS responsiveness probe. **No Alt+H** — Linux can't hide windows without compositor IPC. Reuses `dot_config/shell/56_linux_apps.sh` helpers; user overrides in `~/.config/shell/linux-apps.conf`. |
 
 ---
 
@@ -628,13 +629,14 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `appquit <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Send Quit Apple Event (graceful, equivalent to ⌘Q). |
-| `applaunch <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start in background (no focus steal). |
-| `appactivate <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start (if needed) and bring to front. |
-| `apprestart <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** `appquit` + poll until process gone (≤15s) + `applaunch`. |
-| `apprunning <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Silent predicate; exit 0 if running, 1 otherwise. |
-| `applist [--pids\|--all]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** List foreground GUI apps, one per line. `--pids` prepends PID + tab; `--all` includes background-only / agent processes. |
-| `appresponsive <AppName> [TIMEOUT_SEC]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Best-effort "Not Responding" detection: sends a no-op Apple Event with `with timeout` (default 2s). Exit 0 if app replies, 1 if hung / not running / scripting-disabled. False positives possible during launch. |
+| `appquit <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` (macOS), `dot_config/shell/56_linux_apps.sh.tmpl` (Linux) | **Cross-platform.** macOS: Quit Apple Event (graceful, equivalent to ⌘Q). Linux: `pkill -TERM -f <pattern>` resolved from `~/.config/shell/linux-apps.conf` overrides or auto-derived from `.desktop` scan; Electron + Firefox honour SIGTERM as graceful quit. |
+| `applaunch <AppName>` | function | same as above | **Cross-platform.** macOS: launch in background (no focus steal). Linux: `gtk-launch <desktop-id>` via `setsid -f`. App-defined startup behaviour applies. |
+| `appactivate <AppName>` | function | same as above | **Cross-platform.** macOS: launch + bring to front. Linux: D-Bus call to GNOME `window-calls` extension if installed (best fidelity), otherwise falls back to `applaunch` (single-instance apps re-focus). |
+| `apprestart <AppName>` | function | same as above | **Cross-platform.** `appquit` + poll until process gone (≤15s) + `applaunch`. On Linux, launches the app even if it wasn't running (mirrors macOS silent-quit semantics). |
+| `apprunning <AppName>` | function | same as above | **Cross-platform.** Silent predicate; exit 0 if running, 1 otherwise. Linux backend: `pgrep -f <pattern>`. |
+| `applist [--pids\|--all]` | function | same as above | **Cross-platform.** Default: names of running apps the helper recognises. `--pids` adds `<pid>\t<name>` (used by `tv {mac,linux}-apps`). macOS lists foreground GUI apps via System Events; Linux enumerates registered overrides + auto-derived from `.desktop` scan filtered to running processes. Linux `--all` shows non-running entries too. |
+| `appresponsive <AppName> [TIMEOUT_SEC]` | function | same as above | **Cross-platform, divergent fidelity.** macOS: best-effort "Not Responding" via timed-out Apple Event. Linux: only meaningful for apps registered with `--mpris=NAME` (Spotify, mpv, VLC); for Electron/Firefox/most apps it degrades to `apprunning` with a stderr note — no public Linux API analog to macOS Apple Events. |
+| `linux_app_register NAME [OPTS]` | function | `dot_config/shell/56_linux_apps.sh.tmpl` | **Linux-only.** Register an app for the Linux `app-*` helpers — `--desktop=ID --pkill=REGEX --wm-class=CLASS [--mpris=NAME]`. Typical call site: `~/.config/shell/linux-apps.conf` (sourced at shell startup, never auto-stubbed). Override file matters for AppImage / Snap / Flatpak where auto-derivation can't resolve the runtime binary path — see `pitfalls/linux-app-control-appimage-runtime-path.md`. `linux_app_register --list` prints the current registry. |
 
 ---
 
