@@ -25,6 +25,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
 - [Media / AV](#media--av)
+- [Clipboard History](#clipboard-history)
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
 - [AI Capture](#ai-capture)
@@ -631,6 +632,18 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `compress-image <input> [<mb>=1]` | function | `dot_config/shell/29_media.sh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
 | `resize-image <input> <width_px>` | function | `dot_config/shell/29_media.sh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
 | `media-pick` | function | `dot_config/shell/29_media.sh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
+
+---
+
+## Clipboard History
+
+> Hybrid backend: **Maccy** on macOS (queries plaintext SQLite at `~/Library/Application Support/Maccy/Storage.sqlite`), **CopyQ** on Linux (uses the shipped `copyq` CLI). Autodetected at call time; override with `CLIP_BACKEND=copyq|maccy`. No-op with install hint on hosts without either tool (e.g. `ubuntu_server`). See [docs/tools/clipboard.md → Clipboard history](../tools/clipboard.md#clipboard-history-cb--cbl--cbe) for the why + threat-model notes.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `cbl [N]` | function | `dot_config/shell/56_clipboard_history.sh` | List recent N clipboard items (default 20), tab-separated `<idx>\t<first-line>` |
+| `cb` | function | `dot_config/shell/56_clipboard_history.sh` | fzf picker over `cbl 100` → copy selection to system clipboard |
+| `cbe` | function | `dot_config/shell/56_clipboard_history.sh` | fzf picker → open selection in `$EDITOR` → write edited text back to clipboard |
 
 ---
 

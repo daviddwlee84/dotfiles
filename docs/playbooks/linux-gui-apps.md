@@ -81,6 +81,7 @@ follows when a vendor ships in multiple formats:
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
 | **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
 | **Bitwarden Desktop** | Snap (`bitwarden`) → `.deb` fallback if `snap` unavailable; gated by `installBitwarden=true` AND `profile=ubuntu_desktop` | ✅ via `snapd` background refresh (or `apt upgrade` for fallback `.deb`) | same role | `/snap/bitwarden/current/` |
+| **CopyQ** | `.deb` via stock apt (`apt install copyq`); gated by `profile=ubuntu_desktop` via tag selection in [`run_onchange_after_20_ansible_roles.sh.tmpl`](../../.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl) | ✅ via `apt upgrade` | [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install CopyQ via apt" | `/usr/bin/copyq` + `/etc/xdg/autostart/com.github.hluk.copyq.desktop` |
 
 ### Manually managed (you installed these yourself, outside ansible)
 

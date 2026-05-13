@@ -674,3 +674,30 @@
     msg: >-
       TODO: when an official Antigravity Linux .deb or AppImage ships,
       add install tasks here mirroring the Cursor block above.
+
+# =============================================================================
+# CopyQ — clipboard manager with scriptable CLI (`copyq read/select/eval/...`)
+#
+# Stock Ubuntu apt repos ship copyq on 22.04 (15.0 since 24.04, 4.x on 22.04),
+# both new enough for the `cb`/`cbl`/`cbe` helper at
+# dot_config/shell/56_clipboard_history.sh. No third-party PPA or .deb needed.
+#
+# Daemon autostart is shipped by the package as
+# /etc/xdg/autostart/com.github.hluk.copyq.desktop — no systemd-user unit.
+#
+# macOS counterpart is Maccy (see Brewfile.darwin.tmpl); the helper detects
+# whichever backend is installed at shell-startup time. Reason for the split:
+# the CopyQ Homebrew cask is deprecated (disabled 2026-09-01) because
+# CopyQ.app isn't signed for Gatekeeper — only the cask, not the project.
+# =============================================================================
+
+- name: Install CopyQ via apt (stock repos)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'armv7l'
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: copyq
+    state: present
+    update_cache: false
