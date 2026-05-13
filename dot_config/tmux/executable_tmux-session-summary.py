@@ -80,7 +80,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from rich.console import Console
@@ -809,6 +809,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true", help="Print the prompt that would be sent; no API call.")
     p.add_argument("--no-cache", action="store_true", help="Don't read or write the cache.")
     p.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit raw Session/Window JSON to stdout; skip LLM + cache. Used by `fleet tmux`.",
+    )
+    p.add_argument(
         "--sort", choices=["alpha", "closability"], default="alpha",
         help="Order sessions: alpha (tmux's natural order) or closability (keep→check→safe).",
     )
@@ -827,6 +832,14 @@ def main() -> int:
     args = parse_args()
 
     sessions = collect_sessions(deep=args.deep)
+
+    # --json short-circuits before LLM + cache. Empty session list is valid
+    # output (`[]`), not an error — caller (e.g. `fleet tmux`) decides what
+    # an empty fleet means.
+    if args.json:
+        print(json.dumps([asdict(s) for s in sessions], default=str))
+        return 0
+
     if not sessions:
         resolved = shutil.which(TSUM_TMUX_BIN) or TSUM_TMUX_BIN
         err.print(

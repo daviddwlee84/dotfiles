@@ -61,6 +61,125 @@ just fleet-apply-kill          # nuke leftover orphans
 just fleet-apply-compact
 ```
 
+## Umbrella `fleet` binary
+
+`bin/executable_fleet` (deployed as `~/bin/fleet`) is a thin umbrella that
+exposes the same operations as the `just fleet-*` recipes plus the two new
+read-only probes `fleet tmux` / `fleet info`. The advantage over `just`: it
+works from any cwd, not just inside the chezmoi source tree.
+
+| Umbrella subcommand | Equivalent `just` recipe |
+|---|---|
+| `fleet apply [...]` | `just fleet-apply` (and `fleet-apply-dry-run`, `fleet-apply-one`, `fleet-apply-file`, `fleet-apply-branch[-force]`) |
+| `fleet status` | `just fleet-status` (readiness probe) |
+| `fleet status --quick` | `just fleet-status-quick` |
+| `fleet status --live` | `just fleet-apply-status` (process-liveness probe) |
+| `fleet status --live --watch 10` | `just fleet-apply-watch` |
+| `fleet diff HOST` | `just fleet-diff HOST` |
+| `fleet tail HOST[:RUN_ID]` | `just fleet-apply-tail HOST` |
+| `fleet kill` | `just fleet-apply-kill` |
+| `fleet compact` | `just fleet-apply-compact` |
+| `fleet edit` | `just fleet-edit` |
+| `fleet tmux [...]` | (new) — see below |
+| `fleet info [...]` | (new) — see below |
+
+The umbrella discovers the chezmoi source dir at runtime via `chezmoi
+source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the
+shared `scripts/fleet/` package and the legacy `scripts/fleet_apply.py`. From
+inside the source tree, `just fleet *ARGS` invokes the same binary directly
+(works before the first `chezmoi apply` lands `~/bin/fleet`).
+
+The existing `just fleet-*` recipes still call `./scripts/fleet_apply.py`
+directly and are unaffected by the umbrella — they remain the muscle-memory
+path for repo work. Pick whichever feels right: same code under the hood.
+
+### Note on `fleet status` overload
+
+`fleet status` has two modes. Default (`fleet status` / `--quick`) is the
+**pre-flight readiness probe** — read-only, ~1.5s/host, predicts what
+`fleet apply` would do. Adding `--live` flips it to the **process-liveness
+probe** — does each host have a chezmoi/ansible run in flight right now?
+The same overload is what `just fleet-status` vs `just fleet-apply-status`
+expresses across two recipe names; the umbrella collapses it under one
+subcommand because both flavors answer "what is the state of `apply` on
+each host" — just at different time horizons (would-it-succeed vs
+is-it-running).
+
+## `fleet tmux` — cross-host tmux session summary
+
+Quick "what's open where" across the fleet:
+
+```bash
+fleet tmux                                  # all hosts, default Rich table
+fleet tmux --hosts self,ts_nas              # subset
+fleet tmux --deep                           # include pane tails (slower)
+fleet tmux --json                           # pipeable per-host JSON
+```
+
+Per-host execution strategy (`scripts/fleet/tmux.py`):
+
+1. **Prefer**: invoke remote `~/.config/tmux/tmux-session-summary.py --json`
+   (chezmoi deploys this on every managed host). Emits the `Session` / `Window`
+   dataclasses as JSON — same schema `tsum` uses locally.
+2. **Fallback**: run raw `tmux list-sessions -F ...` + `tmux list-windows -a -F ...`
+   over SSH, then reconstruct the same JSON shape locally. Used when the `.py`
+   isn't deployed (e.g. minimal host) or fails (e.g. version mismatch).
+3. **None**: host has no tmux server / no tmux installed → row shows `0`
+   sessions with `source=none`.
+4. **N/A**: host unreachable → row renders `N/A` with the SSH error class,
+   and the rest of the fleet keeps going.
+
+Output columns: `HOST | SOURCE | SESSIONS | WINDOWS | ATTACHED | LAST_ATTACHED |
+TOP_SESSION | ms`. `SOURCE` colors hint at the path used: green=py,
+yellow=raw, dim=none, red=N/A.
+
+**Not yet implemented**: `--with-summary` (LLM aggregate across hosts). Stub
+that errors out with a hint to use `tsum` per-host or pipe `--json` to an
+external tool.
+
+**Cross-file invariant** (from `CLAUDE.md`): if you add a field to the
+`Session` / `Window` dataclass in
+`dot_config/tmux/executable_tmux-session-summary.py`, the raw-fallback parser
+in `scripts/fleet/tmux.py:_parse_raw` MUST be updated to reconstruct it.
+
+## `fleet info` — cross-host system status
+
+Curated 8-column snapshot of every host: OS, CPU, RAM, disk, load, uptime,
+docker containers, chezmoi drift.
+
+```bash
+fleet info                                   # default curated view, 8 modules
+fleet info --hosts self                      # subset
+fleet info --modules cpu,mem,disk            # only these
+fleet info --full                            # all modules (+ gpu, network)
+fleet info --ff                              # also dump fastfetch JSON per host
+fleet info --json | jq .                     # pipeable
+```
+
+**Module catalog** (each gracefully degrades to `—` when the underlying tool
+is missing — no GPU, no docker, no chezmoi on the host, etc.):
+
+| Module | Linux source | macOS source |
+|---|---|---|
+| `os` | `lsb_release -ds` or `/etc/os-release` `PRETTY_NAME` | `sw_vers` |
+| `cpu` | `/proc/cpuinfo` model name + `nproc` | `sysctl machdep.cpu.brand_string` + `hw.ncpu` |
+| `mem` | `/proc/meminfo` (`MemTotal` - `MemAvailable`) | `sysctl hw.memsize` + `vm_stat` pages |
+| `disk` | `df -k /` (root partition) | same (POSIX) |
+| `load` | `/proc/loadavg` | `sysctl vm.loadavg` |
+| `uptime` | `/proc/uptime` | `date +%s` - `sysctl kern.boottime` |
+| `docker` | `docker ps -q \| wc -l` (running + total) | same |
+| `chezmoi` | `chezmoi status` line count + commits behind | same |
+| `gpu` (extra) | `nvidia-smi --query-gpu=name,memory.used,memory.total` | `system_profiler SPDisplaysDataType` chipset |
+| `network` (extra) | `hostname -f` + `hostname -I` | `hostname` + `ipconfig getifaddr en0` |
+| (with `--ff`) | `fastfetch --format json` (full dump appended per host) | same |
+
+The probe is one bash blob per host: `MOD_<name>=<value>` (or `ERR:<msg>`)
+lines parsed back into structured Python objects. Per-module failure inside a
+host is isolated (row stays alive); per-host SSH failure renders the whole
+row as `N/A`.
+
+Exit code = number of hosts that failed end-to-end (capped at 125).
+
 ## When to use
 
 You edited dotfiles on the workstation, pushed to the repo's git remote, and

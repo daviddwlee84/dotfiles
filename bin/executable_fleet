@@ -1,0 +1,217 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "asyncssh>=2.18",
+#   "tyro>=0.9",
+#   "rich>=13.9",
+# ]
+# ///
+"""fleet — umbrella CLI for the chezmoi dotfiles fleet.
+
+Subcommands:
+  apply [...]                  Run chezmoi update --init across the fleet (delegates to scripts/fleet_apply.py)
+  status [--quick] [--live N]  Default: readiness probe.  --live: process-liveness probe (with optional --watch).
+  diff HOST                    Shortcut: apply --dry-run --hosts HOST --serial
+  tail HOST[:RUN_ID]           Live-tail a host's fleet-apply log
+  kill                         pkill chezmoi/ansible across the fleet
+  compact [--run-id ID]        Post-mortem summary across the fleet
+  edit                         $EDITOR ~/.config/fleet/machines.toml (seeds template on first run)
+  tmux [...]                   Cross-host tmux session summary (scripts/fleet/tmux.py)
+  info [...]                   Cross-host system status snapshot (scripts/fleet/info.py)
+
+Discovers the chezmoi source dir at runtime via `chezmoi source-path` (falls
+back to ~/.local/share/chezmoi), so the binary works from any cwd.
+
+Deployed by chezmoi as ~/bin/fleet. See docs/this_repo/fleet-apply.md.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+USAGE = """\
+Usage: fleet <subcommand> [args...]
+
+Subcommands:
+  apply [--hosts ...] [--dry-run] [--force] [...]
+                          Run chezmoi update --init across the fleet.
+  status                  Pre-flight readiness probe (predicts apply outcome).
+  status --quick          Skip remote `git fetch` (faster).
+  status --live           Process-liveness probe (use during/after apply).
+  status --live --watch N Poll every N seconds.
+  diff HOST [args...]     Shortcut: apply --dry-run --hosts HOST --serial.
+  tail HOST[:RUN_ID]      Live-tail a host's fleet-apply log.
+  kill [--hosts ...]      pkill chezmoi/ansible across the fleet.
+  compact [--run-id ID]   Post-mortem summary.
+  edit                    Open ~/.config/fleet/machines.toml in $EDITOR.
+  tmux [--hosts ...] [--json] [--deep]
+                          Cross-host tmux session summary.
+  info [--hosts ...] [--ff] [--full] [--modules a,b,c] [--json]
+                          Cross-host system status snapshot.
+
+Examples:
+  fleet status                       # readiness across all hosts
+  fleet apply --hosts ts_nas         # apply to one host
+  fleet diff hanru_mac               # dry-run diff against one host
+  fleet tmux --hosts self,ts_nas     # tmux sessions, 2 hosts
+  fleet info --full --json | jq .    # everything as JSON
+
+See docs/this_repo/fleet-apply.md for full mental model.
+"""
+
+
+def _source_path() -> Path:
+    """Locate the chezmoi source dir. Required to find scripts/fleet_*."""
+    chezmoi = shutil.which("chezmoi")
+    if chezmoi:
+        try:
+            out = subprocess.run(
+                [chezmoi, "source-path"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return Path(out.stdout.strip())
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    fallback = Path.home() / ".local" / "share" / "chezmoi"
+    if (fallback / "scripts" / "fleet_apply.py").is_file():
+        return fallback
+    print(
+        "fleet: cannot locate chezmoi source dir.\n"
+        "  Tried: `chezmoi source-path` and ~/.local/share/chezmoi.\n"
+        "  Install chezmoi or ensure the source dir exists.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+def _dispatch_apply(forwarded: list[str]) -> int:
+    """Forward to scripts.fleet_apply.main() with argv swap."""
+    sys.argv = ["fleet apply", *forwarded]
+    from scripts.fleet_apply import main as apply_main
+    return apply_main()
+
+
+def _dispatch_status(args: list[str]) -> int:
+    """`fleet status` overload:
+       default        → --readiness
+       --quick        → --readiness --readiness-no-fetch
+       --live         → --status
+       --live --watch → --status --watch N (default 10)
+    """
+    live = "--live" in args
+    quick = "--quick" in args
+    rest = [a for a in args if a not in ("--live", "--quick")]
+    if live:
+        flags = ["--status"]
+        # Default watch interval when --live is passed without a numeric --watch
+        if "--watch" not in rest:
+            pass  # one-shot probe
+    else:
+        flags = ["--readiness"]
+        if quick:
+            flags.append("--readiness-no-fetch")
+    return _dispatch_apply(flags + rest)
+
+
+def _dispatch_diff(args: list[str]) -> int:
+    if not args:
+        print("fleet diff: missing HOST argument", file=sys.stderr)
+        return 2
+    host = args[0]
+    rest = args[1:]
+    return _dispatch_apply(["--dry-run", "--hosts", host, "--serial", *rest])
+
+
+def _dispatch_tail(args: list[str]) -> int:
+    if not args:
+        print("fleet tail: missing HOST[:RUN_ID] argument", file=sys.stderr)
+        return 2
+    return _dispatch_apply(["--tail", args[0], *args[1:]])
+
+
+def _dispatch_kill(args: list[str]) -> int:
+    return _dispatch_apply(["--kill-orphans", *args])
+
+
+def _dispatch_compact(args: list[str]) -> int:
+    return _dispatch_apply(["--compact", *args])
+
+
+_SEED_TEMPLATE = """\
+# fleet-apply inventory — see docs/this_repo/fleet-apply.md
+# Schema reference: dot_config/fleet/create_private_machines.toml.tmpl
+
+[defaults]
+chezmoi_path    = "auto"
+connect_timeout = 30
+command_timeout = 7200
+
+# [[hosts]]
+# name      = "lab-box"
+# ssh_alias = "lab-box"
+# no_root_machine = false
+# password_source = { type = "prompt" }
+"""
+
+
+def _dispatch_edit(_args: list[str]) -> int:
+    """Open ~/.config/fleet/machines.toml in $EDITOR; seed it on first run."""
+    cfg = Path.home() / ".config" / "fleet" / "machines.toml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    if not cfg.exists():
+        print(f"[INFO] seeding empty {cfg} — add [[hosts]] entries below", file=sys.stderr)
+        cfg.write_text(_SEED_TEMPLATE)
+        os.chmod(cfg, 0o600)
+    editor = os.environ.get("EDITOR", "nvim")
+    return subprocess.call([editor, str(cfg)])
+
+
+def _dispatch_tmux(forwarded: list[str]) -> int:
+    sys.argv = ["fleet tmux", *forwarded]
+    from scripts.fleet.tmux import main as tmux_main
+    return tmux_main()
+
+
+def _dispatch_info(forwarded: list[str]) -> int:
+    sys.argv = ["fleet info", *forwarded]
+    from scripts.fleet.info import main as info_main
+    return info_main()
+
+
+def main() -> int:
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+
+    src = _source_path()
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+
+    dispatch = {
+        "apply": _dispatch_apply,
+        "status": _dispatch_status,
+        "diff": _dispatch_diff,
+        "tail": _dispatch_tail,
+        "kill": _dispatch_kill,
+        "compact": _dispatch_compact,
+        "edit": _dispatch_edit,
+        "tmux": _dispatch_tmux,
+        "info": _dispatch_info,
+    }
+    fn = dispatch.get(sub)
+    if fn is None:
+        print(f"fleet: unknown subcommand '{sub}'\n\n{USAGE}", file=sys.stderr)
+        return 2
+    return fn(rest)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

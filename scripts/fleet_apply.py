@@ -1362,8 +1362,8 @@ def cli(
         if readiness:
             console.print(f"[yellow]no fleet configured yet[/] — {e}")
             console.print(
-                "[dim]hint:[/] run [bold]just fleet-edit[/] to add machines, "
-                "then re-run [bold]just fleet-status[/]."
+                "[dim]hint:[/] run [bold]fleet edit[/] to add machines, "
+                "then re-run [bold]fleet status[/]."
             )
             return 0
         console.print(f"[red]error[/]: {e}")
@@ -1384,7 +1384,7 @@ def cli(
             console.print(
                 "[yellow]no hosts selected[/] — "
                 "edit [bold]~/.config/fleet/machines.toml[/] "
-                "(or run [bold]just fleet-edit[/])."
+                "(or run [bold]fleet edit[/])."
             )
             return 0
         console.print("[yellow]no hosts selected[/]")
@@ -1798,8 +1798,8 @@ def _run_status(
         if any_running:
             console.print(
                 "\n[dim]Reattach a live tail with: "
-                "[bold]just fleet-apply-tail HOST[/] · "
-                "force-stop with: [bold]just fleet-apply-kill --hosts HOST[/][/]"
+                "[bold]fleet tail HOST[/] · "
+                "force-stop with: [bold]fleet kill --hosts HOST[/][/]"
             )
         return any_running
 
@@ -2322,13 +2322,13 @@ _READINESS_HINT: dict[str, str] = {
     "not-init":      "ssh in & run `chezmoi init` interactively (one-off; needs TTY for prompts)",
     "no-source":     "ssh in: chezmoi source dir missing or not a git repo — re-init may be needed",
     "toml-mismatch": "ssh in & re-run `chezmoi init` to answer the new prompts (their default values are usually fine)",
-    "drift":         "`just fleet-apply --hosts HOST --force` (overwrite) OR migrate to a *.local override",
+    "drift":         "`fleet apply --hosts HOST --force` (overwrite) OR migrate to a *.local override",
     "dirty":         "ssh in & commit/stash uncommitted changes in the source dir before applying",
     "ahead":         "ssh in: source dir has unpushed local commits — `git push` or reset before applying",
-    "busy":          "wait for the running run, OR `just fleet-apply-status --hosts HOST` for live state",
+    "busy":          "wait for the running run, OR `fleet status --live --hosts HOST` for live state",
     "init-in-progress": "chezmoi is initializing the source dir (or paused at an interactive prompt in another SSH session) — wait or `ssh HOST` to check",
-    "behind":        "`just fleet-apply --hosts HOST` (or whole fleet)",
-    "ready-to-update": "`just fleet-apply --hosts HOST` (or whole fleet)",
+    "behind":        "`fleet apply --hosts HOST` (or whole fleet)",
+    "ready-to-update": "`fleet apply --hosts HOST` (or whole fleet)",
     "unreachable":   "check ssh_alias / network / sudo / 1Password agent",
     "up-to-date":    "",
 }
@@ -2382,7 +2382,7 @@ def _run_preflight(
         )
     console.print(
         "[dim]hint:[/] `ssh HOST` to check, "
-        "or `just fleet-apply --no-preflight` to skip this check.\n"
+        "or `fleet apply --no-preflight` to skip this check.\n"
         "[dim]continuing in 5s — Ctrl+C to abort[/]"
     )
 
@@ -2573,7 +2573,7 @@ def _run_readiness(
     blocked_count = len(rows) - ready_count
     console.print(
         f"\n[dim]Summary: {ready_count}/{len(rows)} hosts ready for "
-        f"`just fleet-apply`"
+        f"`fleet apply`"
         + (f", {blocked_count} need attention" if blocked_count else "")
         + "[/]"
     )
