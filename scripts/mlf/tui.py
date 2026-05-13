@@ -50,13 +50,16 @@ from scripts.mlf.list import STATUS_ICON, Row, _models
 
 
 class VimTree(Tree):
-    """`Tree` with vim-style hjkl/g/G bindings on top of the defaults.
+    """`Tree` with vim-style hjkl/g/G + arrow-key bindings.
 
-    Bindings layer ON TOP of Textual's built-ins (arrow keys, home/end,
-    page-up/down) — vim users get j/k/h/l/g/G; everyone else's habits
-    keep working.
+    Both navigation styles work side-by-side — vim users get j/k/h/l/g/G;
+    everyone else's reflexive arrow-key habits keep working. Textual's
+    parent `Tree.BINDINGS` already covers Up / Down / Enter / Space /
+    Home / End / PageUp / PageDown; we explicitly add Left / Right
+    (mapped the same as h / l, since Tree's defaults reserve those for
+    shift-left / shift-right).
 
-    Mapping (matches what `tree`-like nvim/lf/yazi UIs use):
+    Vim mapping (matches what `tree`-like nvim/lf/yazi UIs use):
       j / k      cursor down / up
       h          go to parent (or collapse current if expanded — Textual's
                  `cursor_parent` handles "move to parent" semantically)
@@ -70,6 +73,12 @@ class VimTree(Tree):
         Binding("k", "cursor_up", "Up", show=False),
         Binding("h", "cursor_parent", "Up-level", show=False),
         Binding("l", "toggle_node", "Expand", show=False),
+        # Plain arrow Up / Down are already in Tree.BINDINGS, but Tree
+        # leaves bare Left / Right unbound (only shift+left → parent etc).
+        # Add explicit hjkl-equivalent bindings on the bare arrow keys so
+        # non-vim users get full tree navigation from the arrow keys alone.
+        Binding("left", "cursor_parent", "Up-level", show=False),
+        Binding("right", "toggle_node", "Expand", show=False),
         Binding("g", "goto_top", "Top", show=False),
         Binding("G", "goto_bottom", "Bottom", show=False),
     ]
@@ -392,6 +401,7 @@ class MLflowApp(App):
         Binding("escape", "escape", "Esc", show=False),
         Binding("slash", "focus_filter", "Filter"),
         Binding("r", "refresh", "Refresh"),
+        Binding("t", "toggle_tree_mode", "Tree/Flat"),
         Binding("b", "open_browser", "Browser"),
         Binding("y", "copy_selection", "Copy"),
         Binding("p", "show_plot", "Plot"),
@@ -415,6 +425,10 @@ class MLflowApp(App):
         # to a different run that logs (a subset of) the same metrics, so they
         # don't have to re-open PlotDialog for every comparable run.
         self._last_plot_keys: Optional[list[str]] = None
+        # "nested" = experiments → runs → nested children (the default in
+        # commit 9584c55); "flat" = restore the original Experiments / Runs /
+        # Models siblings layout. Toggleable at runtime via the `t` key.
+        self._tree_mode: str = "nested"
 
     @property
     def client(self):
@@ -629,11 +643,25 @@ class MLflowApp(App):
         tree.root.remove_children()
         # On active filter expand aggressively; otherwise the top-level
         # branches are collapsed by default to keep the initial view scannable.
-        expand_top = True  # always show Experiments / Models headers expanded
         deep_expand = bool(f)
 
+        if self._tree_mode == "flat":
+            self._build_flat_layout(
+                tree, visible_exps, kept_run_ids, runs_by_exp, visible_models, f
+            )
+        else:
+            self._build_nested_layout(
+                tree, visible_exps, kept_run_ids, runs_by_exp,
+                children_by_parent, visible_models, f, deep_expand,
+            )
+
+    def _build_nested_layout(
+        self, tree, visible_exps, kept_run_ids, runs_by_exp,
+        children_by_parent, visible_models, f, deep_expand,
+    ) -> None:
+        """Experiments → runs → nested children. The default since 9584c55."""
         exp_top = tree.root.add(
-            f"Experiments ({len(visible_exps)})", expand=expand_top
+            f"Experiments ({len(visible_exps)})", expand=True
         )
         for e in visible_exps:
             exp_id = e.experiment_id
@@ -664,6 +692,46 @@ class MLflowApp(App):
         model_top = tree.root.add(
             f"Models ({len(visible_models)})", expand=deep_expand
         )
+        if not visible_models and not f and not self._models_rows:
+            model_top.add_leaf("(empty — file/sqlite backend?)", data=None)
+        for r in visible_models:
+            model_top.add_leaf(r.name, data=r)
+
+    def _build_flat_layout(
+        self, tree, visible_exps, kept_run_ids, runs_by_exp, visible_models, f,
+    ) -> None:
+        """Original sibling layout: Experiments / Runs (recent) / Models.
+
+        Useful when the user wants to scan the most-recent runs across all
+        experiments at once (the nested view buries them under per-experiment
+        nodes that need expanding).
+        """
+        # All visible runs across experiments, sorted by start_time DESC.
+        visible_runs: list = []
+        for e in visible_exps:
+            for r in runs_by_exp.get(e.experiment_id, []):
+                if r.info.run_id in kept_run_ids:
+                    visible_runs.append(r)
+        visible_runs.sort(key=lambda r: r.info.start_time or 0, reverse=True)
+
+        # Experiments — leaves only, no nested runs.
+        exp_top = tree.root.add(f"Experiments ({len(visible_exps)})", expand=bool(f))
+        for e in visible_exps:
+            exp_top.add_leaf(
+                f"{e.experiment_id}  {e.name or '(unnamed)'}",
+                data=self._exp_row(e),
+            )
+
+        # Runs (recent N) — flat list, what the v1 tree looked like.
+        run_top = tree.root.add(
+            f"Runs (loaded {len(visible_runs)} of {len(self._raw_runs)})",
+            expand=True,
+        )
+        for r in visible_runs:
+            row = self._run_row(r)
+            run_top.add_leaf(f"{row.name}  {row.status}", data=row)
+
+        model_top = tree.root.add(f"Models ({len(visible_models)})", expand=bool(f))
         if not visible_models and not f and not self._models_rows:
             model_top.add_leaf("(empty — file/sqlite backend?)", data=None)
         for r in visible_models:
@@ -946,6 +1014,11 @@ class MLflowApp(App):
 
     def action_refresh(self) -> None:
         self._populate_tree()
+
+    def action_toggle_tree_mode(self) -> None:
+        self._tree_mode = "flat" if self._tree_mode == "nested" else "nested"
+        self._rebuild_tree()
+        self._set_status(f"tree mode: {self._tree_mode}")
 
     def action_open_browser(self) -> None:
         if not self._selection:
