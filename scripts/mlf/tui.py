@@ -13,6 +13,7 @@ from __future__ import annotations
 import json as _json
 import os
 import subprocess
+from collections import defaultdict
 from typing import Any, Optional
 
 from rich.text import Text
@@ -45,7 +46,7 @@ from scripts.mlf import (
     tracking_uri,
     tracking_uri_is_http,
 )
-from scripts.mlf.list import STATUS_ICON, Row, _experiments, _models, _runs
+from scripts.mlf.list import STATUS_ICON, Row, _models
 
 
 class VimTree(Tree):
@@ -403,9 +404,13 @@ class MLflowApp(App):
         self._client = None
         self._selection: Optional[tuple[str, str, str]] = None  # (kind, id, name)
         self._selection_data: Optional[Any] = None  # cached Run/Experiment/Model
-        # Full lists kept in memory so the `/` filter rebuilds without
-        # re-hitting MLflow; refresh is explicit (`r`).
-        self._cache: dict[str, list] = {"experiments": [], "runs": [], "models": []}
+        # Raw mlflow entities — we need `experiment_id` (on Run.info) and the
+        # `mlflow.parentRunId` tag for the hierarchical tree build, which
+        # the flat `Row` dataclass doesn't expose. Raw objects also let us
+        # avoid double-fetching when an experiment is expanded.
+        self._raw_exps: list = []
+        self._raw_runs: list = []
+        self._models_rows: list[Row] = []
         # Last successfully-plotted metric keys; reused when the user switches
         # to a different run that logs (a subset of) the same metrics, so they
         # don't have to re-open PlotDialog for every comparable run.
@@ -479,24 +484,87 @@ class MLflowApp(App):
     def _populate_tree(self) -> None:
         self.call_from_thread(self._set_status, "loading tree…")
         try:
-            exps = _experiments(self.client, self.EXP_LIMIT)
-            runs = _runs(self.client, self.RUNS_LIMIT, None)
+            raw_exps = list(
+                self.client.search_experiments(max_results=self.EXP_LIMIT)
+            )
+            exp_ids = [e.experiment_id for e in raw_exps]
+            if exp_ids:
+                raw_runs = list(
+                    self.client.search_runs(
+                        experiment_ids=exp_ids,
+                        max_results=self.RUNS_LIMIT,
+                        order_by=["attributes.start_time DESC"],
+                    )
+                )
+            else:
+                raw_runs = []
+            # `_models` already handles the file-backend "no registry"
+            # friendly fallback; keep its Row output (we don't need
+            # raw RegisteredModel for tree structure — models are flat).
             models = _models(self.client, self.MODEL_LIMIT)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self._show_connection_error, repr(e))
             return
 
-        self._cache = {"experiments": exps, "runs": runs, "models": models}
-        # Read the current filter input value back on the main thread so we
-        # don't lose an active filter on refresh.
+        self._raw_exps = raw_exps
+        self._raw_runs = raw_runs
+        self._models_rows = models
+
         self.call_from_thread(self._rebuild_tree)
         self.call_from_thread(
             self._set_status,
-            f"loaded {len(exps)} exp / {len(runs)} runs / {len(models)} models",
+            f"loaded {len(raw_exps)} exp / {len(raw_runs)} runs / {len(models)} models",
+        )
+
+    # --- raw-mlflow → Row converters (Row is the tree-node data payload that
+    # `_on_tree_select` / `_fetch_detail` already know how to dispatch on).
+
+    @staticmethod
+    def _exp_row(e) -> Row:
+        return Row(
+            id=str(e.experiment_id),
+            kind="experiment",
+            name=e.name or "(unnamed)",
+            status="-",
+            lifecycle=e.lifecycle_stage or "-",
+            extra=e.artifact_location or "",
+            last_update=ms_to_iso(e.last_update_time),
+        )
+
+    @staticmethod
+    def _run_row(r) -> Row:
+        info = r.info
+        return Row(
+            id=info.run_id,
+            kind="run",
+            name=info.run_name or info.run_id[:8],
+            status=STATUS_ICON.get(info.status, info.status or "?"),
+            lifecycle=info.lifecycle_stage or "-",
+            extra=info.experiment_id,
+            last_update=ms_to_iso(info.start_time),
         )
 
     def _rebuild_tree(self) -> None:
-        """Rebuild tree from cache, applying the current filter input."""
+        """Rebuild the hierarchical tree from raw caches, with filter applied.
+
+        Layout:
+          ▾ Experiments (N)
+            ▾ <exp_id>  <exp_name>  (k runs)
+                <root_run>            (no mlflow.parentRunId)
+                ▾ <parent_run>        (has nested children in the loaded set)
+                    <child_run>
+                    <child_run>
+                <root_run>
+          ▸ Models (M)
+
+        Filter is applied substring-style across name + id of each entity.
+        An experiment is shown if it matches OR if it contains any matching
+        run (so a run-only filter still surfaces the parent experiment as
+        context). Run children inherit visibility — i.e. once a top-level
+        run is included we attach all of its loaded descendants regardless
+        of the filter, because the user's mental model is "show me this run
+        and its tree".
+        """
         tree = self.query_one("#src-tree", Tree)
         try:
             filter_text = self.query_one("#filter-input", Input).value
@@ -504,33 +572,127 @@ class MLflowApp(App):
             filter_text = ""
         f = filter_text.lower().strip()
 
-        def keep(r) -> bool:
+        def run_matches(r) -> bool:
             if not f:
                 return True
-            return f in (r.name or "").lower() or f in (r.id or "").lower()
+            name = r.info.run_name or ""
+            return f in name.lower() or f in r.info.run_id.lower()
 
-        exps = [r for r in self._cache["experiments"] if keep(r)]
-        runs = [r for r in self._cache["runs"] if keep(r)]
-        models = [r for r in self._cache["models"] if keep(r)]
+        def exp_matches(e) -> bool:
+            if not f:
+                return True
+            return f in (e.name or "").lower() or f in str(e.experiment_id).lower()
+
+        def model_matches(row) -> bool:
+            if not f:
+                return True
+            return f in (row.name or "").lower() or f in (row.id or "").lower()
+
+        # Index runs by experiment_id and by parent_run_id for tree assembly.
+        runs_by_exp: dict[str, list] = defaultdict(list)
+        children_by_parent: dict[Optional[str], list] = defaultdict(list)
+        for r in self._raw_runs:
+            runs_by_exp[r.info.experiment_id].append(r)
+            parent_id = (r.data.tags or {}).get("mlflow.parentRunId")
+            children_by_parent[parent_id].append(r)
+
+        # Visibility per experiment: keep if exp matches OR any of its runs match.
+        # When filtering, we must also know which RUN IDs survive — descendants
+        # of a kept run come along for free.
+        kept_run_ids: set[str] = set()
+        if f:
+            for r in self._raw_runs:
+                if run_matches(r):
+                    kept_run_ids.add(r.info.run_id)
+            # Promote ancestors of matched runs so the chain is visible.
+            id_to_run = {r.info.run_id: r for r in self._raw_runs}
+            for rid in list(kept_run_ids):
+                cur = id_to_run.get(rid)
+                while cur is not None:
+                    parent_id = (cur.data.tags or {}).get("mlflow.parentRunId")
+                    if not parent_id or parent_id in kept_run_ids:
+                        break
+                    kept_run_ids.add(parent_id)
+                    cur = id_to_run.get(parent_id)
+        else:
+            kept_run_ids = {r.info.run_id for r in self._raw_runs}
+
+        visible_exps = [
+            e for e in self._raw_exps
+            if exp_matches(e) or any(
+                r.info.run_id in kept_run_ids
+                for r in runs_by_exp.get(e.experiment_id, [])
+            )
+        ]
+        visible_models = [m for m in self._models_rows if model_matches(m)]
 
         tree.root.remove_children()
-        # Expand more aggressively when filtering so matches across nodes are
-        # immediately visible.
-        expand = bool(f)
-        exp_node = tree.root.add(f"Experiments ({len(exps)})", expand=expand)
-        for r in exps:
-            exp_node.add_leaf(f"{r.id}  {r.name}", data=r)
-        run_node = tree.root.add(
-            f"Runs (loaded {len(runs)} of {len(self._cache['runs'])})",
-            expand=True,
+        # On active filter expand aggressively; otherwise the top-level
+        # branches are collapsed by default to keep the initial view scannable.
+        expand_top = True  # always show Experiments / Models headers expanded
+        deep_expand = bool(f)
+
+        exp_top = tree.root.add(
+            f"Experiments ({len(visible_exps)})", expand=expand_top
         )
+        for e in visible_exps:
+            exp_id = e.experiment_id
+            exp_runs = [
+                r for r in runs_by_exp.get(exp_id, [])
+                if r.info.run_id in kept_run_ids
+            ]
+            # Top-level runs within this experiment: those whose parent is
+            # either absent, or not part of this experiment's loaded set
+            # (orphans get promoted to top so they don't go missing).
+            own_run_ids = {r.info.run_id for r in exp_runs}
+            top_runs = [
+                r for r in exp_runs
+                if (r.data.tags or {}).get("mlflow.parentRunId") not in own_run_ids
+            ]
+            top_runs.sort(key=lambda r: r.info.start_time or 0, reverse=True)
+
+            label = f"{exp_id}  {e.name or '(unnamed)'}  ({len(exp_runs)} runs)"
+            exp_row = self._exp_row(e)
+            if exp_runs:
+                exp_node = exp_top.add(label, data=exp_row, expand=deep_expand)
+                self._add_runs_recursive(
+                    exp_node, top_runs, children_by_parent, own_run_ids, deep_expand
+                )
+            else:
+                exp_top.add_leaf(label + "  (no recent runs)", data=exp_row)
+
+        model_top = tree.root.add(
+            f"Models ({len(visible_models)})", expand=deep_expand
+        )
+        if not visible_models and not f and not self._models_rows:
+            model_top.add_leaf("(empty — file/sqlite backend?)", data=None)
+        for r in visible_models:
+            model_top.add_leaf(r.name, data=r)
+
+    def _add_runs_recursive(
+        self,
+        parent_node,
+        runs: list,
+        children_by_parent: dict,
+        own_run_ids: set,
+        expand: bool,
+    ) -> None:
+        """Attach `runs` under `parent_node`; recurse for any with children."""
         for r in runs:
-            run_node.add_leaf(f"{r.name}  {r.status}", data=r)
-        model_node = tree.root.add(f"Models ({len(models)})", expand=expand)
-        if not models and not f and not self._cache["models"]:
-            model_node.add_leaf("(empty — file/sqlite backend?)", data=None)
-        for r in models:
-            model_node.add_leaf(r.name, data=r)
+            row = self._run_row(r)
+            label = f"{row.name}  {row.status}"
+            kids = [
+                c for c in children_by_parent.get(r.info.run_id, [])
+                if c.info.run_id in own_run_ids
+            ]
+            if kids:
+                kids.sort(key=lambda x: x.info.start_time or 0, reverse=True)
+                node = parent_node.add(label, data=row, expand=expand)
+                self._add_runs_recursive(
+                    node, kids, children_by_parent, own_run_ids, expand
+                )
+            else:
+                parent_node.add_leaf(label, data=row)
 
     def _show_connection_error(self, msg: str) -> None:
         tree = self.query_one("#src-tree", Tree)
