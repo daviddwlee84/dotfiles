@@ -65,20 +65,29 @@ just fleet-apply-compact
 
 `dot_dotfiles/bin/executable_fleet` (deployed as `~/.dotfiles/bin/fleet`) is a
 thin umbrella that exposes the same operations as the `just fleet-*` recipes
-plus the two new read-only probes `fleet tmux` / `fleet info`. The advantage
-over `just`: it works from any cwd, not just inside the chezmoi source tree.
+under a `fleet chezmoi <action>` namespace, plus generic primitives
+`fleet tmux` / `fleet info` / `fleet pueue` / `fleet exec` that work on
+any host regardless of deploy tool. The advantage over `just`: it works
+from any cwd, not just inside the chezmoi source tree.
+
+**The bare top-level forms `fleet apply` / `status` / `diff` / `tail` /
+`kill` / `compact` were removed on 2026-05-13** so the top level stays
+reserved for generic deploy-tool-agnostic primitives. Chezmoi-specific
+actions now live under `fleet chezmoi <action>`. The `just fleet-*`
+recipes are unaffected — they call `scripts/fleet/apply.py` directly
+with its underlying flags.
 
 | Umbrella subcommand | Equivalent `just` recipe |
 |---|---|
-| `fleet apply [...]` | `just fleet-apply` (and `fleet-apply-dry-run`, `fleet-apply-one`, `fleet-apply-file`, `fleet-apply-branch[-force]`) |
-| `fleet status` | `just fleet-status` (readiness probe) |
-| `fleet status --quick` | `just fleet-status-quick` |
-| `fleet status --live` | `just fleet-apply-status` (process-liveness probe) |
-| `fleet status --live --watch 10` | `just fleet-apply-watch` |
-| `fleet diff HOST` | `just fleet-diff HOST` |
-| `fleet tail HOST[:RUN_ID]` | `just fleet-apply-tail HOST` |
-| `fleet kill` | `just fleet-apply-kill` |
-| `fleet compact` | `just fleet-apply-compact` |
+| `fleet chezmoi apply [...]` | `just fleet-apply` (and `fleet-apply-dry-run`, `fleet-apply-one`, `fleet-apply-file`, `fleet-apply-branch[-force]`) |
+| `fleet chezmoi status` | `just fleet-status` (readiness probe) |
+| `fleet chezmoi status --quick` | `just fleet-status-quick` |
+| `fleet chezmoi status --live` | `just fleet-apply-status` (process-liveness probe) |
+| `fleet chezmoi status --live --watch 10` | `just fleet-apply-watch` |
+| `fleet chezmoi diff HOST` | `just fleet-diff HOST` |
+| `fleet chezmoi tail HOST[:RUN_ID]` | `just fleet-apply-tail HOST` |
+| `fleet chezmoi kill` | `just fleet-apply-kill` |
+| `fleet chezmoi compact` | `just fleet-apply-compact` |
 | `fleet edit` | `just fleet-edit` |
 | `fleet tmux [...]` | (new) — see below |
 | `fleet info [...]` | (new) — see below |
@@ -95,12 +104,13 @@ The existing `just fleet-*` recipes still call `./scripts/fleet/apply.py`
 directly and are unaffected by the umbrella — they remain the muscle-memory
 path for repo work. Pick whichever feels right: same code under the hood.
 
-### Note on `fleet status` overload
+### Note on `fleet chezmoi status` overload
 
-`fleet status` has two modes. Default (`fleet status` / `--quick`) is the
-**pre-flight readiness probe** — read-only, ~1.5s/host, predicts what
-`fleet apply` would do. Adding `--live` flips it to the **process-liveness
-probe** — does each host have a chezmoi/ansible run in flight right now?
+`fleet chezmoi status` has two modes. Default (`fleet chezmoi status` /
+`--quick`) is the **pre-flight readiness probe** — read-only, ~1.5s/host,
+predicts what `fleet chezmoi apply` would do. Adding `--live` flips it to
+the **process-liveness probe** — does each host have a chezmoi/ansible
+run in flight right now?
 The same overload is what `just fleet-status` vs `just fleet-apply-status`
 expresses across two recipe names; the umbrella collapses it under one
 subcommand because both flavors answer "what is the state of `apply` on

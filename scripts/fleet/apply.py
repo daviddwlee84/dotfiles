@@ -1365,7 +1365,7 @@ def cli(
             console.print(f"[yellow]no fleet configured yet[/] — {e}")
             console.print(
                 "[dim]hint:[/] run [bold]fleet edit[/] to add machines, "
-                "then re-run [bold]fleet status[/]."
+                "then re-run [bold]fleet chezmoi status[/]."
             )
             return 0
         console.print(f"[red]error[/]: {e}")
@@ -2324,13 +2324,13 @@ _READINESS_HINT: dict[str, str] = {
     "not-init":      "ssh in & run `chezmoi init` interactively (one-off; needs TTY for prompts)",
     "no-source":     "ssh in: chezmoi source dir missing or not a git repo — re-init may be needed",
     "toml-mismatch": "ssh in & re-run `chezmoi init` to answer the new prompts (their default values are usually fine)",
-    "drift":         "`fleet apply --hosts HOST --force` (overwrite) OR migrate to a *.local override",
+    "drift":         "`fleet chezmoi apply --hosts HOST --force` (overwrite) OR migrate to a *.local override",
     "dirty":         "ssh in & commit/stash uncommitted changes in the source dir before applying",
     "ahead":         "ssh in: source dir has unpushed local commits — `git push` or reset before applying",
-    "busy":          "wait for the running run, OR `fleet status --live --hosts HOST` for live state",
+    "busy":          "wait for the running run, OR `fleet chezmoi status --live --hosts HOST` for live state",
     "init-in-progress": "chezmoi is initializing the source dir (or paused at an interactive prompt in another SSH session) — wait or `ssh HOST` to check",
-    "behind":        "`fleet apply --hosts HOST` (or whole fleet)",
-    "ready-to-update": "`fleet apply --hosts HOST` (or whole fleet)",
+    "behind":        "`fleet chezmoi apply --hosts HOST` (or whole fleet)",
+    "ready-to-update": "`fleet chezmoi apply --hosts HOST` (or whole fleet)",
     "unreachable":   "check ssh_alias / network / sudo / 1Password agent",
     "up-to-date":    "",
 }
@@ -2384,7 +2384,7 @@ def _run_preflight(
         )
     console.print(
         "[dim]hint:[/] `ssh HOST` to check, "
-        "or `fleet apply --no-preflight` to skip this check.\n"
+        "or `fleet chezmoi apply --no-preflight` to skip this check.\n"
         "[dim]continuing in 5s — Ctrl+C to abort[/]"
     )
 
@@ -2417,6 +2417,10 @@ def _collect_readiness_rows(
     """
     expected_keys = _extract_expected_prompt_keys(Path.cwd())
     probe_cmd = _build_readiness_probe_cmd(no_fetch)
+    # stderr console for the spinner so stdout (machine-readable --json /
+    # piped output) stays uncontaminated. Matches scripts/fleet/{tmux,
+    # pueue,exec}.py's pattern.
+    err = Console(stderr=True)
 
     async def _probe_one(h: Host) -> dict:
         row: dict = {
@@ -2456,10 +2460,36 @@ def _collect_readiness_rows(
         row["notes"] = notes
         return row
 
-    async def _orchestrate() -> list[dict]:
-        return await asyncio.gather(*(_probe_one(h) for h in selected))
+    total = len(selected)
+    done_count = 0
 
-    return asyncio.run(_orchestrate())
+    async def _bounded(h: Host) -> dict:
+        nonlocal done_count
+        try:
+            return await _probe_one(h)
+        finally:
+            done_count += 1
+
+    async def _orchestrate(status: object | None) -> list[dict]:
+        async def _ticker() -> None:
+            while True:
+                if status is not None:
+                    status.update(f"probing readiness on {done_count}/{total} hosts...")
+                await asyncio.sleep(0.1)
+        tick = asyncio.create_task(_ticker()) if status is not None else None
+        try:
+            return await asyncio.gather(*(_bounded(h) for h in selected))
+        finally:
+            if tick is not None:
+                tick.cancel()
+
+    async def _run_with_status() -> list[dict]:
+        if err.is_terminal:
+            with err.status(f"probing readiness on {total} hosts...", spinner="dots") as status:
+                return await _orchestrate(status)
+        return await _orchestrate(None)
+
+    return asyncio.run(_run_with_status())
 
 
 def _run_readiness(
@@ -2575,7 +2605,7 @@ def _run_readiness(
     blocked_count = len(rows) - ready_count
     console.print(
         f"\n[dim]Summary: {ready_count}/{len(rows)} hosts ready for "
-        f"`fleet apply`"
+        f"`fleet chezmoi apply`"
         + (f", {blocked_count} need attention" if blocked_count else "")
         + "[/]"
     )

@@ -137,7 +137,7 @@ ssh_alias = "lab-box"          # ← 繼承上面所有設定，包括 ProxyJump
 
 ## 本機執行 (`local = true`)
 
-要把協調器自己也納入 fleet apply，加一個 `local = true` 的主機：
+要把協調器自己也納入 fleet chezmoi apply，加一個 `local = true` 的主機：
 
 ```toml
 [[hosts]]
@@ -246,7 +246,7 @@ Summary: 5 hosts, 3 ok, 1 failed, 1 drift, 0 skipped
 `[credential "https://gitlab.com"]`（glab CLI helper）、
 `[http] proxy = ...`（公司 proxy）等等。
 把這些放進由 chezmoi 管理的 `dot_gitconfig.tmpl` 是錯的（其他主機不適用）；
-逐台手動編輯到遠端也會失敗，因為每次 fleet apply 都會觸發
+逐台手動編輯到遠端也會失敗，因為每次 fleet chezmoi apply 都會觸發
 「drifted from template」的 prompt。
 
 因此 `dot_gitconfig.tmpl` 的結尾是：

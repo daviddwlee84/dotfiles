@@ -7,20 +7,26 @@
 #   "rich>=13.9",
 # ]
 # ///
-"""fleet — umbrella CLI for the chezmoi dotfiles fleet.
+"""fleet — umbrella CLI for the dotfiles fleet.
 
-Subcommands:
-  apply [...]                  Run chezmoi update --init across the fleet (delegates to scripts/fleet/apply.py)
-  status [--quick] [--live N]  Default: readiness probe.  --live: process-liveness probe (with optional --watch).
-  diff HOST                    Shortcut: apply --dry-run --hosts HOST --serial
-  tail HOST[:RUN_ID]           Live-tail a host's fleet-apply log
-  kill                         pkill chezmoi/ansible across the fleet
-  compact [--run-id ID]        Post-mortem summary across the fleet
-  edit                         $EDITOR ~/.config/fleet/machines.toml (seeds template on first run)
-  tmux [...]                   Cross-host tmux session summary (scripts/fleet/tmux.py)
-  info [...]                   Cross-host system status snapshot (scripts/fleet/info.py)
-  pueue [...]                  Cross-host pueue queue summary (scripts/fleet/pueue.py)
-  exec [OPTS] -- CMD [ARG...]  Cross-host ad-hoc command runner (scripts/fleet/exec.py)
+Top-level layout (2026-05-13):
+
+  fleet chezmoi <action>         Chezmoi-specific deploy ops (apply / status /
+                                 diff / tail / kill / compact). Backed by
+                                 scripts/fleet/apply.py.
+  fleet tmux [...]               Cross-host tmux session summary
+  fleet info [...]               Cross-host system status snapshot
+  fleet pueue [...]              Cross-host pueue queue summary
+  fleet exec [OPTS] -- CMD [...]  Cross-host ad-hoc command runner
+  fleet edit                     $EDITOR ~/.config/fleet/machines.toml
+                                 (fleet-meta — used by every subcommand)
+
+The `fleet chezmoi <action>` namespace was introduced to free the top
+level for generic primitives. `apply` / `status` / `diff` / etc. are NO
+LONGER top-level subcommands — they only exist under `chezmoi`. The
+`just fleet-*` recipes still call scripts/fleet/apply.py directly with
+its underlying flags (`--readiness`, `--status`, `--kill-orphans`,
+`--compact`, etc.) and continue to work unchanged.
 
 Discovers the chezmoi source dir at runtime via `chezmoi source-path` (falls
 back to ~/.local/share/chezmoi), so the binary works from any cwd.
@@ -38,17 +44,23 @@ from pathlib import Path
 USAGE = """\
 Usage: fleet <subcommand> [args...]
 
-Subcommands:
-  apply [--hosts ...] [--dry-run] [--force] [...]
+Chezmoi-specific deploy ops (under `chezmoi` namespace):
+  chezmoi apply [--hosts ...] [--dry-run] [--force] [...]
                           Run chezmoi update --init across the fleet.
-  status                  Pre-flight readiness probe (predicts apply outcome).
-  status --quick          Skip remote `git fetch` (faster).
-  status --live           Process-liveness probe (use during/after apply).
-  status --live --watch N Poll every N seconds.
-  diff HOST [args...]     Shortcut: apply --dry-run --hosts HOST --serial.
-  tail HOST[:RUN_ID]      Live-tail a host's fleet-apply log.
-  kill [--hosts ...]      pkill chezmoi/ansible across the fleet.
-  compact [--run-id ID]   Post-mortem summary.
+  chezmoi status          Pre-flight readiness probe (predicts apply outcome).
+  chezmoi status --quick  Skip remote `git fetch` (faster).
+  chezmoi status --live   Process-liveness probe (use during/after apply).
+  chezmoi status --live --watch N  Poll every N seconds.
+  chezmoi diff HOST [args...]
+                          Shortcut: chezmoi apply --dry-run --hosts HOST --serial.
+  chezmoi tail HOST[:RUN_ID]
+                          Live-tail a host's fleet-apply log.
+  chezmoi kill [--hosts ...]
+                          pkill chezmoi/ansible across the fleet.
+  chezmoi compact [--run-id ID]
+                          Post-mortem summary.
+
+Generic primitives (top-level — work regardless of deploy tool):
   edit                    Open ~/.config/fleet/machines.toml in $EDITOR.
   tmux [--hosts ...] [--json] [--deep]
                           Cross-host tmux session summary.
@@ -67,9 +79,9 @@ Subcommands:
                           classification across hosts.
 
 Examples:
-  fleet status                       # readiness across all hosts
-  fleet apply --hosts ts_nas         # apply to one host
-  fleet diff hanru_mac               # dry-run diff against one host
+  fleet chezmoi status               # readiness across all hosts
+  fleet chezmoi apply --hosts ts_nas # apply to one host
+  fleet chezmoi diff hanru_mac       # dry-run diff against one host
   fleet tmux --hosts self,ts_nas     # tmux sessions, 2 hosts
   fleet info --full --json | jq .    # everything as JSON
   fleet pueue --ai                   # AI summary of every host's queue
@@ -215,6 +227,47 @@ def _dispatch_exec(forwarded: list[str]) -> int:
     return exec_main()
 
 
+_CHEZMOI_ACTIONS = """\
+Subcommands under `fleet chezmoi`:
+  apply [...]      Run chezmoi update --init across the fleet
+  status           Pre-flight readiness probe
+  status --quick   Skip remote git fetch
+  status --live    Process-liveness probe
+  diff HOST        chezmoi diff on one host (--dry-run --hosts HOST --serial)
+  tail HOST[:RUN]  Live-tail remote fleet-apply log
+  kill             pkill chezmoi/ansible across the fleet
+  compact          Post-mortem summary
+"""
+
+
+def _dispatch_chezmoi(forwarded: list[str]) -> int:
+    """Route `fleet chezmoi <action> [args...]` to the chezmoi-backend helpers.
+
+    The top-level `apply`/`status`/`diff`/`tail`/`kill`/`compact` subcommands
+    were removed on 2026-05-13 to free the top level for generic primitives
+    (`tmux` / `info` / `pueue` / `exec`). All chezmoi-specific deploy ops
+    live under this namespace now.
+    """
+    if not forwarded or forwarded[0] in ("-h", "--help", "help"):
+        print(_CHEZMOI_ACTIONS)
+        return 0
+    action = forwarded[0]
+    rest = forwarded[1:]
+    nested = {
+        "apply": _dispatch_apply,
+        "status": _dispatch_status,
+        "diff": _dispatch_diff,
+        "tail": _dispatch_tail,
+        "kill": _dispatch_kill,
+        "compact": _dispatch_compact,
+    }
+    fn = nested.get(action)
+    if fn is None:
+        print(f"fleet chezmoi: unknown action '{action}'\n\n{_CHEZMOI_ACTIONS}", file=sys.stderr)
+        return 2
+    return fn(rest)
+
+
 def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
         print(USAGE)
@@ -228,13 +281,14 @@ def main() -> int:
         sys.path.insert(0, str(src))
 
     dispatch = {
-        "apply": _dispatch_apply,
-        "status": _dispatch_status,
-        "diff": _dispatch_diff,
-        "tail": _dispatch_tail,
-        "kill": _dispatch_kill,
-        "compact": _dispatch_compact,
+        # Chezmoi-specific deploy ops under `fleet chezmoi <action>`.
+        # The bare top-level names (apply/status/diff/tail/kill/compact) were
+        # removed on 2026-05-13 — `fleet apply` now errors with "unknown
+        # subcommand" by design so the namespace stays clean.
+        "chezmoi": _dispatch_chezmoi,
+        # Fleet-meta (inventory editor; no SSH).
         "edit": _dispatch_edit,
+        # Generic cross-host primitives (deploy-tool-agnostic).
         "tmux": _dispatch_tmux,
         "info": _dispatch_info,
         "pueue": _dispatch_pueue,
