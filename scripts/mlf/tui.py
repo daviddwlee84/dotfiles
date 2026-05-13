@@ -71,17 +71,59 @@ class VimTree(Tree):
     BINDINGS = [
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
-        Binding("h", "cursor_parent", "Up-level", show=False),
-        Binding("l", "toggle_node", "Expand", show=False),
+        Binding("h", "smart_left", "Up-level", show=False),
+        Binding("l", "smart_right", "Expand", show=False),
         # Plain arrow Up / Down are already in Tree.BINDINGS, but Tree
         # leaves bare Left / Right unbound (only shift+left → parent etc).
         # Add explicit hjkl-equivalent bindings on the bare arrow keys so
         # non-vim users get full tree navigation from the arrow keys alone.
-        Binding("left", "cursor_parent", "Up-level", show=False),
-        Binding("right", "toggle_node", "Expand", show=False),
+        Binding("left", "smart_left", "Up-level", show=False),
+        Binding("right", "smart_right", "Expand/Select", show=False),
         Binding("g", "goto_top", "Top", show=False),
         Binding("G", "goto_bottom", "Bottom", show=False),
     ]
+
+    def action_smart_right(self) -> None:
+        """Neo-tree-style `l` / `right`:
+
+          - leaf node              → select it (same as Enter)
+          - collapsed branch       → expand
+          - already-expanded branch with children → move cursor into first child
+
+        This matches the muscle memory of nvim-tree / Neo-tree users — `l`
+        is "open" if you're on a file (leaf), "expand" if you're on a folder,
+        and "descend" if the folder is already open.
+        """
+        node = self.cursor_node
+        if node is None:
+            return
+        if not node.allow_expand:
+            # Leaf → select (fires Tree.NodeSelected, which our App handles
+            # by loading the corresponding detail tab).
+            self.action_select_cursor()
+            return
+        if not node.is_expanded:
+            node.expand()
+            return
+        # Already expanded; descend to the first child if there is one.
+        if node.children:
+            self.action_cursor_down()
+
+    def action_smart_left(self) -> None:
+        """Neo-tree-style `h` / `left`:
+
+          - expanded branch        → collapse (stay in place)
+          - leaf or collapsed node → move cursor to parent
+
+        First press collapses, second press moves up — same as Neo-tree.
+        """
+        node = self.cursor_node
+        if node is None:
+            return
+        if node.allow_expand and node.is_expanded:
+            node.collapse()
+            return
+        self.action_cursor_parent()
 
     def action_goto_top(self) -> None:
         self.cursor_line = 0
@@ -407,6 +449,14 @@ class MLflowApp(App):
         Binding("p", "show_plot", "Plot"),
         Binding("d", "show_download", "Download"),
         Binding("j", "dump_json", "JSON"),
+        # Digit keys = direct tab switch. Non-priority so Input filter still
+        # captures digits when focused. Footer shows the first as the hint.
+        Binding("1", "show_tab('tab-overview')", "1-6: Tabs"),
+        Binding("2", "show_tab('tab-params')", "Params", show=False),
+        Binding("3", "show_tab('tab-metrics')", "Metrics", show=False),
+        Binding("4", "show_tab('tab-plot')", "Plot tab", show=False),
+        Binding("5", "show_tab('tab-artifacts')", "Artifacts", show=False),
+        Binding("6", "show_tab('tab-tags')", "Tags", show=False),
     ]
 
     def __init__(self) -> None:
@@ -1019,6 +1069,13 @@ class MLflowApp(App):
         self._tree_mode = "flat" if self._tree_mode == "nested" else "nested"
         self._rebuild_tree()
         self._set_status(f"tree mode: {self._tree_mode}")
+
+    def action_show_tab(self, tab_id: str) -> None:
+        """Direct tab switch via number keys (1=Overview … 6=Tags)."""
+        try:
+            self.query_one("#tabs", TabbedContent).active = tab_id
+        except Exception:  # noqa: BLE001
+            pass
 
     def action_open_browser(self) -> None:
         if not self._selection:
