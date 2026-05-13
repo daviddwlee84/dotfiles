@@ -82,6 +82,7 @@ over `just`: it works from any cwd, not just inside the chezmoi source tree.
 | `fleet edit` | `just fleet-edit` |
 | `fleet tmux [...]` | (new) — see below |
 | `fleet info [...]` | (new) — see below |
+| `fleet pueue [...]` | (new) — cross-host pueue queue summary; `--ai` for cleanability + recovery hints via local `pqsum`. See [docs/tools/pueue.md](../tools/pueue.md). |
 
 The umbrella discovers the chezmoi source dir at runtime via `chezmoi
 source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the

@@ -298,7 +298,7 @@ nav:
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md
           - mi-router (Xiaomi router): tools/mi-router.md
-          - pqsum: tools/pqsum.md
+          - "Pueue (pqsum + fleet pueue)": tools/pueue.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
       - chezmoi conventions:

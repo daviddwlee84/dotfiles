@@ -1,0 +1,1098 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "rich>=13.9",
+# ]
+# ///
+"""pqsum — pueue queue summary (text + AI + cleanup verdicts).
+
+Subcommands (positional, default `text`):
+  text                Tabular summary (overall + status breakdown + per-group).
+  ai                  AI summary with per-group cleanability + per-task recovery hints.
+  json                Raw parsed JSON to stdout (machine-readable).
+
+AI flags:
+  --report            Emit a markdown report (Summary / Cleanup Candidates /
+                      Failures Needing Action / Raw status) instead of Rich blocks.
+  --out PATH          Write the report to PATH (default: stdout).
+  --clean             Render report, then for each `safe-to-clean` group prompt y/N
+                      and run its cleanup_command. `review`/`keep` are NEVER touched.
+  --yes               Skip y/N prompts (still only acts on `safe-to-clean`).
+  --multi-host        Tell the LLM the input describes multiple hosts (used by `fleet pueue --ai`).
+  --stdin-json        Read pre-merged pueue JSON from stdin (fleet feeds this).
+                      Schema: list of host snapshots, each with the parsed shape this script emits.
+  --deep              Include the last ~20 lines of each Failed task's log in the prompt
+                      (more recovery context, more tokens).
+  -r, --refresh       Bypass the prompt-hash cache.
+  --no-cache          Don't read or write the cache.
+  --dry-run           Print the constructed prompt; no AI call.
+
+Shared / text flags:
+  -g GROUP, --group GROUP
+                      Restrict to one pueue group.
+
+Env (mirrors dot_config/shell/04_ai_agents.sh SSOT):
+  AICAP_AGENT, AICAP_{CLAUDE,OPENCODE,CODEX,CURSOR}_MODEL, AICAP_HTTP_*,
+  AICAP_AGENT_PRIORITY, PQSUM_MIN_REFRESH_INTERVAL (sec, default 120),
+  PQSUM_TIMEOUT (sec, default 60).
+
+Cache:
+  $XDG_CACHE_HOME/pqsum/<hostname>-<mode>.json
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+
+
+# ---------------------------------------------------------------------------
+# SSOT loader — same regex as tmux-session-summary.py / aiblock.py.
+# CLAUDE.md AI agent autodetect row treats this script as the THIRD Python
+# consumer of the AICAP_* SSOT; when adding a new agent there, update all three.
+# ---------------------------------------------------------------------------
+_SSOT_PATH_CANDIDATES = (
+    "~/.config/shell/04_ai_agents.sh",
+    "~/.local/share/chezmoi/dot_config/shell/04_ai_agents.sh",
+)
+_SSOT_LINE = re.compile(r'^\s*:\s*"\$\{(AICAP_\w+):=([^}]*)\}"\s*$')
+
+
+def _load_ssot_defaults() -> dict[str, str]:
+    for raw in _SSOT_PATH_CANDIDATES:
+        p = Path(os.path.expanduser(raw))
+        if not p.is_file():
+            continue
+        out: dict[str, str] = {}
+        try:
+            for line in p.read_text(encoding="utf-8").splitlines():
+                m = _SSOT_LINE.match(line)
+                if m:
+                    out[m.group(1)] = m.group(2)
+        except OSError:
+            return {}
+        return out
+    return {}
+
+
+_SSOT = _load_ssot_defaults()
+
+
+def _env_or_ssot(key: str, fallback: str = "") -> str:
+    val = os.environ.get(key)
+    if val is not None:
+        return val
+    return _SSOT.get(key, fallback)
+
+
+AICAP_AGENT = os.environ.get("AICAP_AGENT", "")
+AICAP_CLAUDE_MODEL = _env_or_ssot("AICAP_CLAUDE_MODEL", "haiku")
+AICAP_OPENCODE_MODEL = _env_or_ssot("AICAP_OPENCODE_MODEL", "github-copilot/claude-haiku-4.5")
+AICAP_CODEX_MODEL = _env_or_ssot("AICAP_CODEX_MODEL", "")
+AICAP_CURSOR_MODEL = _env_or_ssot("AICAP_CURSOR_MODEL", "")
+AICAP_HTTP_URL = _env_or_ssot("AICAP_HTTP_URL", "https://openrouter.ai/api/v1/chat/completions")
+AICAP_HTTP_MODEL = _env_or_ssot("AICAP_HTTP_MODEL", "openrouter/free")
+AICAP_HTTP_API_KEY = os.environ.get("AICAP_HTTP_API_KEY") or os.environ.get("OPENROUTER_API_KEY", "")
+AICAP_AGENT_PRIORITY = _env_or_ssot("AICAP_AGENT_PRIORITY", "opencode claude codex cursor-agent").split()
+PQSUM_MIN_REFRESH_INTERVAL = int(os.environ.get("PQSUM_MIN_REFRESH_INTERVAL", "120"))
+PQSUM_TIMEOUT = float(os.environ.get("PQSUM_TIMEOUT", "60"))
+
+
+def _with_model(flag: str, value: str) -> list[str]:
+    return [flag, value] if value else []
+
+
+AGENT_CONFIG = {
+    "opencode":     {"base": ["opencode", "run", *_with_model("-m", AICAP_OPENCODE_MODEL)]},
+    "claude":       {"base": ["claude", "-p", *_with_model("--model", AICAP_CLAUDE_MODEL)]},
+    "codex":        {"base": ["codex", "exec", *_with_model("-m", AICAP_CODEX_MODEL)]},
+    "cursor-agent": {"base": ["cursor-agent", "-p", *_with_model("--model", AICAP_CURSOR_MODEL)]},
+    "http":         {"base": []},
+}
+
+err = Console(stderr=True)
+
+
+# ---------------------------------------------------------------------------
+# Pueue JSON model + parsing
+# ---------------------------------------------------------------------------
+@dataclass
+class TaskRec:
+    id: int
+    status: str
+    result: str | None  # "Success" / "Failed" / "Killed" / etc.
+    exit_code: int | None
+    group: str
+    command: str
+    label: str | None
+    created_at: str | None
+    start: str | None
+    end: str | None
+    duration_s: float | None
+
+
+@dataclass
+class GroupRec:
+    name: str
+    daemon_status: str
+    parallel_tasks: int
+    total: int
+    done: int
+    pct: float
+    total_spent_s: float | None
+    avg_done_s: float | None
+    eta_s: float | None
+    status_breakdown: dict[str, int]
+    failed_task_ids: list[int]
+
+
+@dataclass
+class HostSnapshot:
+    host: str
+    daemon_reachable: bool
+    error: str | None
+    total_tasks: int
+    total_done: int
+    overall_pct: float
+    avg_done_s: float | None
+    eta_s: float | None
+    status_breakdown: dict[str, int]
+    groups: list[GroupRec] = field(default_factory=list)
+    # Tasks kept for AI recovery analysis (envs stripped at parse time).
+    # Limited to top-N most-recent or all-failed (build_ai_input filters).
+    tasks: list[TaskRec] = field(default_factory=list)
+
+
+_ISO_PAT = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(.*)$")
+
+
+def _parse_iso(ts: str | None) -> datetime | None:
+    if not ts:
+        return None
+    m = _ISO_PAT.match(ts)
+    if not m:
+        return None
+    head, tz = m.group(1), m.group(2)
+    if not tz:
+        normalised = head
+    elif tz == "Z":
+        normalised = head + "+00:00"
+    elif re.match(r"^[+-]\d{4}$", tz):
+        normalised = head + f"{tz[:3]}:{tz[3:]}"
+    else:
+        normalised = head + tz
+    try:
+        return datetime.fromisoformat(normalised)
+    except ValueError:
+        return None
+
+
+def _status_str(raw: object) -> str:
+    if isinstance(raw, dict):
+        keys = list(raw.keys())
+        return keys[0] if keys else "Unknown"
+    if isinstance(raw, str):
+        return raw
+    return "Unknown"
+
+
+def _result_str(task: dict) -> tuple[str | None, int | None]:
+    """Extract result name + exit code from either legacy nested-status or v4 result."""
+    status = task.get("status")
+    if isinstance(status, dict):
+        done_block = status.get("Done")
+        if isinstance(done_block, dict):
+            res = done_block.get("result")
+            if isinstance(res, str):
+                return res, None
+            if isinstance(res, dict):
+                if "Failed" in res:
+                    val = res["Failed"]
+                    if isinstance(val, dict) and "exit_code" in val:
+                        return "Failed", int(val.get("exit_code") or 0)
+                    return "Failed", None
+                keys = list(res.keys())
+                if keys:
+                    return keys[0], None
+    result = task.get("result")
+    if isinstance(result, str):
+        return result, task.get("exit_code") if isinstance(task.get("exit_code"), int) else None
+    if isinstance(result, dict):
+        if "Failed" in result:
+            val = result["Failed"]
+            if isinstance(val, dict):
+                return "Failed", int(val.get("exit_code") or 0)
+            return "Failed", None
+        keys = list(result.keys())
+        if keys:
+            return keys[0], None
+    return None, None
+
+
+def _task_times(task: dict) -> tuple[str | None, str | None]:
+    """Return (start, end) ISO strings, preferring legacy nested then v4 top-level."""
+    status = task.get("status")
+    if isinstance(status, dict):
+        block = next(iter(status.values()), None)
+        if isinstance(block, dict):
+            return block.get("start") or task.get("start"), block.get("end") or task.get("end")
+    return task.get("start"), task.get("end")
+
+
+def _done_seconds(task: dict) -> float | None:
+    if _status_str(task.get("status")) != "Done":
+        return None
+    start, end = _task_times(task)
+    s, e = _parse_iso(start), _parse_iso(end)
+    if not s or not e:
+        return None
+    return (e - s).total_seconds()
+
+
+def _task_to_rec(task: dict) -> TaskRec:
+    start, end = _task_times(task)
+    result, exit_code = _result_str(task)
+    return TaskRec(
+        id=int(task.get("id") or 0),
+        status=_status_str(task.get("status")),
+        result=result,
+        exit_code=exit_code,
+        group=str(task.get("group") or "default"),
+        command=str(task.get("command") or task.get("original_command") or ""),
+        label=task.get("label") if isinstance(task.get("label"), str) else None,
+        created_at=task.get("created_at"),
+        start=start,
+        end=end,
+        duration_s=_done_seconds(task),
+    )
+
+
+def parse_pueue_json(raw: str, *, requested_group: str = "") -> HostSnapshot:
+    data = json.loads(raw)
+    raw_tasks = data.get("tasks") or {}
+    groups_meta = data.get("groups") or {}
+    tasks: list[TaskRec] = []
+    for tid, t in raw_tasks.items():
+        if not isinstance(t, dict):
+            continue
+        t = {k: v for k, v in t.items() if k != "envs"}
+        if "id" not in t:
+            t = {**t, "id": tid}
+        tasks.append(_task_to_rec(t))
+
+    if requested_group:
+        if requested_group in groups_meta or any(t.group == requested_group for t in tasks):
+            group_names = [requested_group]
+        else:
+            group_names = []
+    else:
+        group_names = sorted({*groups_meta.keys(), *(t.group for t in tasks)})
+
+    total = len(tasks)
+    done = sum(1 for t in tasks if t.status == "Done")
+    durations = [t.duration_s for t in tasks if t.duration_s is not None]
+    avg_done = sum(durations) / len(durations) if durations else None
+    overall_pct = (done * 100 / total) if total else 0.0
+    status_breakdown: dict[str, int] = {}
+    for t in tasks:
+        status_breakdown[t.status] = status_breakdown.get(t.status, 0) + 1
+
+    group_recs: list[GroupRec] = []
+    for gname in group_names:
+        gtasks = [t for t in tasks if t.group == gname]
+        gtotal = len(gtasks)
+        gdone = sum(1 for t in gtasks if t.status == "Done")
+        gremaining = gtotal - gdone
+        gdurations = [t.duration_s for t in gtasks if t.duration_s is not None]
+        gavg = sum(gdurations) / len(gdurations) if gdurations else None
+
+        ts_epochs: list[float] = []
+        for t in gtasks:
+            for raw_ts in (t.created_at, t.start, t.end):
+                dt = _parse_iso(raw_ts)
+                if dt:
+                    ts_epochs.append(dt.timestamp())
+        spent = (max(ts_epochs) - min(ts_epochs)) if ts_epochs else None
+
+        meta = groups_meta.get(gname) or {}
+        parallel = meta.get("parallel_tasks") if isinstance(meta.get("parallel_tasks"), int) and meta["parallel_tasks"] > 0 else 1
+        if gremaining == 0:
+            eta = 0.0 if gtotal else None
+        elif gavg is None:
+            eta = None
+        else:
+            eta = (gremaining * gavg) / parallel
+
+        gbreakdown: dict[str, int] = {}
+        for t in gtasks:
+            gbreakdown[t.status] = gbreakdown.get(t.status, 0) + 1
+        failed_ids = [t.id for t in gtasks if t.status == "Done" and t.result and t.result != "Success"]
+
+        group_recs.append(GroupRec(
+            name=gname,
+            daemon_status=str(meta.get("status") or "N/A"),
+            parallel_tasks=int(meta.get("parallel_tasks") or 1),
+            total=gtotal,
+            done=gdone,
+            pct=(gdone * 100 / gtotal) if gtotal else 0.0,
+            total_spent_s=spent,
+            avg_done_s=gavg,
+            eta_s=eta,
+            status_breakdown=gbreakdown,
+            failed_task_ids=failed_ids,
+        ))
+
+    overall_eta_candidates = [g.eta_s for g in group_recs if g.eta_s is not None]
+    overall_eta = max(overall_eta_candidates) if overall_eta_candidates else None
+
+    host = socket.gethostname().split(".")[0] or "host"
+    return HostSnapshot(
+        host=host,
+        daemon_reachable=True,
+        error=None,
+        total_tasks=total,
+        total_done=done,
+        overall_pct=overall_pct,
+        avg_done_s=avg_done,
+        eta_s=overall_eta,
+        status_breakdown=status_breakdown,
+        groups=group_recs,
+        tasks=tasks,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Text rendering — ports 36_pueue.zsh
+# ---------------------------------------------------------------------------
+def _fmt_duration(s: float | None) -> str:
+    if s is None:
+        return "-"
+    s_int = int(s)
+    if s_int < 60:
+        return f"{s_int}s"
+    if s_int < 3600:
+        return f"{s_int // 60}m {s_int % 60}s"
+    return f"{s_int // 3600}h {(s_int % 3600) // 60}m {s_int % 60}s"
+
+
+def _fmt_pct(p: float) -> str:
+    return f"{round(p * 10) / 10:.1f}%"
+
+
+def _progress_bar(pct: float, width: int = 12) -> str:
+    p = max(0, min(100, int(round(pct))))
+    filled = p * width // 100
+    empty = width - filled
+    return "[" + "=" * filled + "-" * empty + "]"
+
+
+def _breakdown_str(b: dict[str, int]) -> str:
+    if not b:
+        return "-"
+    return ", ".join(f"{k}={v}" for k, v in sorted(b.items()))
+
+
+def render_text(snap: HostSnapshot, use_color: bool) -> None:
+    out = Console(force_terminal=use_color, no_color=not use_color, soft_wrap=True)
+    title = Text("Pueue Summary", style="bold cyan" if use_color else "")
+    out.print(title)
+    out.print(Text("Overall", style="bold cyan" if use_color else ""))
+    out.print(f"  Total tasks: {snap.total_tasks}")
+    bar = _progress_bar(snap.overall_pct)
+    out.print(f"  Done progress: {snap.total_done}/{snap.total_tasks}  {bar}  {_fmt_pct(snap.overall_pct)}")
+    out.print(f"  Avg done duration: {_fmt_duration(snap.avg_done_s)}")
+    out.print(f"  Est. remaining (ETA): {_fmt_duration(snap.eta_s)}")
+    out.print()
+    out.print(Text("Status Breakdown", style="bold cyan" if use_color else ""))
+    if not snap.status_breakdown:
+        out.print("  -")
+    else:
+        tbl = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
+        tbl.add_column("status")
+        tbl.add_column("count", justify="right")
+        tbl.add_column("progress", justify="right")
+        for k, v in sorted(snap.status_breakdown.items()):
+            pct = (v * 100 / snap.total_tasks) if snap.total_tasks else 0.0
+            tbl.add_row(k, str(v), _fmt_pct(pct))
+        out.print(tbl)
+    out.print()
+    out.print(Text("Group Summary", style="bold cyan" if use_color else ""))
+    if not snap.groups:
+        out.print("  -")
+        return
+    gtbl = Table(show_header=True, header_style="bold", box=None, pad_edge=False)
+    for col in ("group", "daemon", "parallel", "total", "done", "progress", "bar", "total_spent", "avg_done", "eta", "statuses"):
+        gtbl.add_column(col)
+    for g in snap.groups:
+        gtbl.add_row(
+            g.name,
+            g.daemon_status,
+            str(g.parallel_tasks),
+            str(g.total),
+            str(g.done),
+            _fmt_pct(g.pct),
+            _progress_bar(g.pct),
+            _fmt_duration(g.total_spent_s),
+            _fmt_duration(g.avg_done_s),
+            _fmt_duration(g.eta_s),
+            _breakdown_str(g.status_breakdown),
+        )
+    out.print(gtbl)
+
+
+# ---------------------------------------------------------------------------
+# AI prompt + cache
+# ---------------------------------------------------------------------------
+PROMPT_PREAMBLE = """\
+You are summarizing a developer's pueue (https://github.com/Nukesor/pueue) \
+task-queue state so they can quickly see what's running, what's safe to \
+clean up, and what failures need recovery action. Input: one or more host \
+snapshots from `pueue status --json`, post-parsed (envs stripped).
+
+For EACH host, and within it EACH group, infer:
+  1. summary (<= 80 chars): what kind of work the queue is doing. Name the \
+project or task pattern if visible from command strings (e.g. "3 sklearn \
+sweeps", "2 ffmpeg encodes"). Avoid generic "tasks running".
+  2. cleanability tier:
+     "safe-to-clean" → all tasks are Done with result Success, last task \
+ended >2 hours ago, no Running/Queued/Paused/Stashed. The user can run \
+`pueue clean -g <group>` to free the slate without losing useful state.
+     "review" → mixed Done+Failed, OR any Done with non-Success result, OR \
+last task ended <2h ago, OR Stashed/Paused present, OR uncertain. User \
+should look before cleaning.
+     "keep" → has Running/Queued, or fresh failure (<10 min) with no \
+recovery hint yet, or task list referenced by `--after` dependencies that \
+are still pending.
+  3. cleanability_reason (<= 60 chars): one-line WHY for the tier.
+  4. cleanup_command: an exact shell command. For safe-to-clean use \
+`pueue clean -g <group>`. For review/keep emit empty string.
+
+For EACH Failed task (status=Done with non-Success result, OR status=Killed):
+  - summary (<= 60 chars): what went wrong, e.g. "OOM at epoch 3", "exit 1 \
+on missing config file".
+  - recovery_hint (<= 100 chars): concrete advice. Apply these heuristics:
+     a. Same command as a successful later task in the same group → \
+"already covered by task N (succeeded with same args)".
+     b. Exit code 124 (timeout) → "increase --timeout, then pueue restart".
+     c. Exit code 137 (OOM-kill) → "increase memory; pueue restart with \
+larger limit".
+     d. Exit code 143 (SIGTERM) → "transient; pueue restart".
+     e. Multiple consecutive failures with same exit code → "group/env \
+misconfig, not per-task; investigate before retrying".
+     f. Stale Paused (>24h) → "stale; pueue start or pueue remove".
+     g. Otherwise → "inspect `pueue log <id>` for cause".
+  - recovery_command: the suggested shell command (or empty string).
+
+Be conservative. When in doubt between cleanability tiers, pick the \
+SAFER one (keep > review > safe-to-clean). False keep is recoverable; \
+false safe-to-clean destroys task history.
+
+Respond with STRICT JSON only (no prose, no fences):
+{
+  "hosts": [
+    {
+      "host": "<hostname>",
+      "daemon": "<Running|Paused|N/A>",
+      "groups": [
+        {
+          "name": "<group>",
+          "summary": "<<=80 chars>",
+          "cleanability": "safe-to-clean" | "review" | "keep",
+          "cleanability_reason": "<<=60 chars>",
+          "cleanup_command": "<exact shell or empty>",
+          "tasks_highlight": [
+            {"id": <int>, "status": "<Done|Failed|Running|...>",
+             "summary": "<<=60 chars>",
+             "recovery_hint": "<<=100 chars or empty>",
+             "recovery_command": "<exact shell or empty>"}
+          ]
+        }
+      ],
+      "overall_summary": "<<=120 chars one-line summary for this host>"
+    }
+  ],
+  "fleet_summary": "<<=160 chars one-line summary across all hosts; empty if single host>"
+}
+"""
+
+
+def _host_to_ai_input(snap: HostSnapshot) -> dict:
+    def task_brief(t: TaskRec) -> dict:
+        cmd = t.command if len(t.command) <= 200 else (t.command[:200] + "…")
+        return {
+            "id": t.id,
+            "status": t.status,
+            "result": t.result,
+            "exit_code": t.exit_code,
+            "group": t.group,
+            "command": cmd,
+            "label": t.label,
+            "created_at": t.created_at,
+            "start": t.start,
+            "end": t.end,
+            "duration_s": round(t.duration_s, 2) if t.duration_s is not None else None,
+        }
+    # Limit task volume sent to LLM: all non-Done tasks, plus last 5 Done per group.
+    selected: list[TaskRec] = []
+    by_group: dict[str, list[TaskRec]] = {}
+    for t in snap.tasks:
+        if t.status != "Done" or (t.result and t.result != "Success"):
+            selected.append(t)
+        else:
+            by_group.setdefault(t.group, []).append(t)
+    for g_tasks in by_group.values():
+        g_tasks.sort(key=lambda t: t.end or "")
+        selected.extend(g_tasks[-5:])
+    return {
+        "host": snap.host,
+        "daemon_reachable": snap.daemon_reachable,
+        "error": snap.error,
+        "groups": [
+            {
+                "name": g.name,
+                "daemon_status": g.daemon_status,
+                "parallel_tasks": g.parallel_tasks,
+                "total": g.total,
+                "done": g.done,
+                "pct": round(g.pct, 1),
+                "status_breakdown": g.status_breakdown,
+                "eta_s": round(g.eta_s, 1) if g.eta_s is not None else None,
+                "avg_done_s": round(g.avg_done_s, 1) if g.avg_done_s is not None else None,
+            }
+            for g in snap.groups
+        ],
+        "tasks": [task_brief(t) for t in selected],
+    }
+
+
+def build_prompt(snapshots: list[HostSnapshot], multi_host: bool) -> str:
+    payload = {
+        "multi_host": multi_host,
+        "hosts": [_host_to_ai_input(s) for s in snapshots],
+    }
+    return PROMPT_PREAMBLE + "\n--- INPUT ---\n" + json.dumps(payload, indent=2, default=str) + "\nReturn JSON now.\n"
+
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
+_CACHE_VERSION = "v1"
+
+
+def _cache_path(prompt_hash: str) -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    d = Path(base) / "pqsum"
+    d.mkdir(parents=True, exist_ok=True)
+    host = socket.gethostname().split(".")[0] or "host"
+    return d / f"{host}-{prompt_hash}.json"
+
+
+def _cache_lookup(prompt_hash: str) -> tuple[dict | None, str]:
+    p = _cache_path(prompt_hash)
+    if not p.is_file():
+        return None, "miss"
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None, "miss"
+    if data.get("version") != _CACHE_VERSION:
+        return None, "miss"
+    if data.get("prompt_hash") != prompt_hash:
+        return None, "miss"
+    age = time.time() - float(data.get("generated_at", 0))
+    parsed = data.get("parsed")
+    if not isinstance(parsed, dict):
+        return None, "miss"
+    if age > PQSUM_MIN_REFRESH_INTERVAL > 0:
+        return parsed, "stale-hit"
+    return parsed, "hit"
+
+
+def _cache_save(prompt_hash: str, parsed: dict) -> None:
+    p = _cache_path(prompt_hash)
+    try:
+        p.write_text(json.dumps({
+            "version": _CACHE_VERSION,
+            "prompt_hash": prompt_hash,
+            "generated_at": time.time(),
+            "parsed": parsed,
+        }, indent=2), encoding="utf-8")
+    except OSError as e:
+        err.print(f"[yellow]pqsum: cache write failed: {e}[/yellow]")
+
+
+# ---------------------------------------------------------------------------
+# Agent invocation
+# ---------------------------------------------------------------------------
+def detect_agent() -> str | None:
+    if AICAP_AGENT:
+        if AICAP_AGENT == "http" or shutil.which(AICAP_AGENT):
+            return AICAP_AGENT
+        err.print(f"[red]AICAP_AGENT={AICAP_AGENT!r} but that CLI isn't on PATH.[/red]")
+        return None
+    for cand in AICAP_AGENT_PRIORITY:
+        if shutil.which(cand):
+            return cand
+    return None
+
+
+def model_for(agent: str) -> str:
+    return {
+        "claude": AICAP_CLAUDE_MODEL or "(default)",
+        "opencode": AICAP_OPENCODE_MODEL or "(default)",
+        "codex": AICAP_CODEX_MODEL or "(default)",
+        "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
+        "http": AICAP_HTTP_MODEL,
+    }.get(agent, "?")
+
+
+def invoke_agent(agent: str, prompt: str, timeout: float) -> str:
+    if agent == "http":
+        return _invoke_http(prompt, timeout)
+    base = AGENT_CONFIG[agent]["base"]
+    try:
+        result = subprocess.run([*base, prompt], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        err.print(f"[red]{agent} timed out after {timeout:.0f}s[/red]")
+        return ""
+    except FileNotFoundError:
+        err.print(f"[red]{agent} not on PATH (race vs detect_agent)[/red]")
+        return ""
+    if result.returncode != 0:
+        err.print(f"[red]{agent} exited {result.returncode}[/red]")
+        if result.stderr.strip():
+            err.print(f"[dim]{result.stderr.strip()[:500]}[/dim]")
+        return ""
+    return result.stdout
+
+
+def _invoke_http(prompt: str, timeout: float) -> str:
+    payload = json.dumps({
+        "model": AICAP_HTTP_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if AICAP_HTTP_API_KEY:
+        headers["Authorization"] = f"Bearer {AICAP_HTTP_API_KEY}"
+    req = urllib.request.Request(AICAP_HTTP_URL, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+        err.print(f"[red]http: {e}[/red]")
+        return ""
+    try:
+        parsed = json.loads(body)
+        return parsed["choices"][0]["message"]["content"]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+        err.print(f"[red]http: unexpected response shape[/red] [dim]{body[:300]}[/dim]")
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# AI response parsing
+# ---------------------------------------------------------------------------
+_TIERS = ("safe-to-clean", "review", "keep")
+
+
+def parse_reply(reply: str) -> dict | None:
+    if not reply.strip():
+        return None
+    s = reply.strip()
+    if s.startswith("```"):
+        s = s.split("\n", 1)[1] if "\n" in s else s
+        if s.endswith("```"):
+            s = s.rsplit("```", 1)[0]
+        s = s.strip()
+    start, end = s.find("{"), s.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+    try:
+        parsed = json.loads(s[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("hosts"), list):
+        return None
+
+    cleaned_hosts: list[dict] = []
+    for h in parsed["hosts"]:
+        if not isinstance(h, dict):
+            continue
+        groups_out: list[dict] = []
+        for g in (h.get("groups") or []):
+            if not isinstance(g, dict):
+                continue
+            tier = str(g.get("cleanability", "")).strip().lower()
+            if tier not in _TIERS:
+                tier = "keep"
+            highlights: list[dict] = []
+            for t in (g.get("tasks_highlight") or []):
+                if not isinstance(t, dict):
+                    continue
+                tid_raw = t.get("id")
+                try:
+                    tid = int(tid_raw) if tid_raw is not None else -1
+                except (TypeError, ValueError):
+                    tid = -1
+                highlights.append({
+                    "id": tid,
+                    "status": str(t.get("status", "")).strip()[:30],
+                    "summary": str(t.get("summary", "")).strip()[:200],
+                    "recovery_hint": str(t.get("recovery_hint", "")).strip()[:200],
+                    "recovery_command": str(t.get("recovery_command", "")).strip()[:500],
+                })
+            groups_out.append({
+                "name": str(g.get("name", "")).strip()[:80],
+                "summary": str(g.get("summary", "")).strip()[:200],
+                "cleanability": tier,
+                "cleanability_reason": str(g.get("cleanability_reason", "")).strip()[:200],
+                "cleanup_command": str(g.get("cleanup_command", "")).strip()[:500],
+                "tasks_highlight": highlights[:5],
+            })
+        cleaned_hosts.append({
+            "host": str(h.get("host", "")).strip()[:80],
+            "daemon": str(h.get("daemon", "")).strip()[:30],
+            "groups": groups_out,
+            "overall_summary": str(h.get("overall_summary", "")).strip()[:300],
+        })
+    return {
+        "hosts": cleaned_hosts,
+        "fleet_summary": str(parsed.get("fleet_summary", "")).strip()[:400],
+    }
+
+
+# ---------------------------------------------------------------------------
+# AI rendering — Rich blocks
+# ---------------------------------------------------------------------------
+_TIER_GLYPHS = {"safe-to-clean": "🟢", "review": "🟡", "keep": "🔴"}
+_TIER_COLORS = {"safe-to-clean": "green", "review": "yellow", "keep": "red"}
+
+
+def render_ai(parsed: dict, use_color: bool) -> None:
+    out = Console(force_terminal=use_color, no_color=not use_color, soft_wrap=True)
+    fleet = parsed.get("fleet_summary") or ""
+    if fleet:
+        out.print(Text(f"🌐 {fleet}", style="bold cyan" if use_color else ""))
+        out.print()
+    for h in parsed.get("hosts", []):
+        host = h.get("host", "?")
+        daemon = h.get("daemon", "?")
+        header = Text()
+        header.append(f"▶ {host}", style="bold")
+        header.append(f"  daemon={daemon}", style="dim")
+        out.print(header)
+        ov = h.get("overall_summary", "")
+        if ov:
+            out.print(Text(f"  {ov}", style="dim italic"))
+        for g in h.get("groups", []):
+            tier = g.get("cleanability", "keep")
+            glyph = _TIER_GLYPHS.get(tier, "⚪")
+            color = _TIER_COLORS.get(tier, "white")
+            line = Text()
+            line.append(f"  {glyph} ", style="bold")
+            line.append(f"{g.get('name', '?')}", style=f"bold {color}")
+            line.append(f"  {g.get('summary', '')}", style="white")
+            reason = g.get("cleanability_reason", "")
+            if reason:
+                line.append(f"  ({reason})", style="dim italic")
+            out.print(line)
+            cmd = g.get("cleanup_command", "")
+            if cmd:
+                out.print(Text(f"      $ {cmd}", style=f"{color} dim"))
+            for t in g.get("tasks_highlight", []):
+                tline = Text()
+                tline.append("      └ ", style="dim")
+                tline.append(f"#{t['id']} ", style="bold")
+                tline.append(f"{t.get('status', '')}", style="yellow")
+                tline.append(f"  {t.get('summary', '')}", style="white")
+                out.print(tline)
+                hint = t.get("recovery_hint", "")
+                if hint:
+                    out.print(Text(f"          → {hint}", style="dim italic"))
+                rcmd = t.get("recovery_command", "")
+                if rcmd:
+                    out.print(Text(f"          $ {rcmd}", style="cyan dim"))
+        out.print()
+
+
+# ---------------------------------------------------------------------------
+# AI report (markdown)
+# ---------------------------------------------------------------------------
+def render_report(parsed: dict, snapshots: list[HostSnapshot]) -> str:
+    lines: list[str] = []
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines.append(f"# Pueue Report — {ts}")
+    lines.append("")
+    fleet = parsed.get("fleet_summary") or ""
+    if fleet:
+        lines.append(f"**Fleet:** {fleet}")
+        lines.append("")
+
+    lines.append("## Summary")
+    lines.append("")
+    for h in parsed.get("hosts", []):
+        lines.append(f"- **{h.get('host', '?')}** (daemon: {h.get('daemon', '?')}) — {h.get('overall_summary', '')}")
+    lines.append("")
+
+    lines.append("## Cleanup Candidates")
+    lines.append("")
+    any_clean = False
+    for h in parsed.get("hosts", []):
+        for g in h.get("groups", []):
+            if g.get("cleanability") == "safe-to-clean" and g.get("cleanup_command"):
+                any_clean = True
+                lines.append(f"- `{h.get('host', '?')}` / `{g.get('name', '?')}` — {g.get('cleanability_reason', '')}")
+                lines.append(f"  ```bash")
+                lines.append(f"  {g['cleanup_command']}")
+                lines.append(f"  ```")
+    if not any_clean:
+        lines.append("_None — nothing safely cleanable right now._")
+    lines.append("")
+
+    lines.append("## Failures Needing Action")
+    lines.append("")
+    any_fail = False
+    for h in parsed.get("hosts", []):
+        for g in h.get("groups", []):
+            for t in g.get("tasks_highlight", []):
+                status = t.get("status", "")
+                if status in ("Failed", "Killed") or t.get("recovery_hint"):
+                    any_fail = True
+                    lines.append(f"- `{h.get('host', '?')}` / `{g.get('name', '?')}` / **#{t['id']}** ({status}) — {t.get('summary', '')}")
+                    hint = t.get("recovery_hint", "")
+                    if hint:
+                        lines.append(f"  - Hint: {hint}")
+                    rcmd = t.get("recovery_command", "")
+                    if rcmd:
+                        lines.append(f"  - ```bash")
+                        lines.append(f"    {rcmd}")
+                        lines.append(f"    ```")
+    if not any_fail:
+        lines.append("_None — all failures (if any) already covered or none present._")
+    lines.append("")
+
+    lines.append("## Raw status")
+    lines.append("")
+    lines.append("<details>")
+    lines.append("<summary>per-host group breakdown</summary>")
+    lines.append("")
+    for snap in snapshots:
+        lines.append(f"### {snap.host}")
+        lines.append("")
+        lines.append("| group | daemon | parallel | total | done | progress | eta | statuses |")
+        lines.append("|---|---|---|---|---|---|---|---|")
+        for g in snap.groups:
+            lines.append(
+                f"| {g.name} | {g.daemon_status} | {g.parallel_tasks} | {g.total} | {g.done} | "
+                f"{_fmt_pct(g.pct)} | {_fmt_duration(g.eta_s)} | {_breakdown_str(g.status_breakdown)} |"
+            )
+        lines.append("")
+    lines.append("</details>")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Execute cleanup
+# ---------------------------------------------------------------------------
+def execute_cleanup(parsed: dict, yes: bool) -> int:
+    candidates: list[tuple[str, str, str, str]] = []
+    for h in parsed.get("hosts", []):
+        host = h.get("host", "?")
+        for g in h.get("groups", []):
+            if g.get("cleanability") == "safe-to-clean":
+                cmd = g.get("cleanup_command", "").strip()
+                if cmd:
+                    candidates.append((host, g.get("name", "?"), g.get("cleanability_reason", ""), cmd))
+    if not candidates:
+        err.print("[dim]pqsum: nothing safely cleanable right now.[/dim]")
+        return 0
+    rc = 0
+    for host, gname, reason, cmd in candidates:
+        err.print(f"[bold]{host}[/bold] / [bold]{gname}[/bold] — {reason}")
+        err.print(f"  [dim]$ {cmd}[/dim]")
+        if not yes:
+            try:
+                answer = input("  run? [y/N] ").strip().lower()
+            except EOFError:
+                answer = "n"
+            if answer not in ("y", "yes"):
+                err.print("  [dim]skipped[/dim]")
+                continue
+        try:
+            result = subprocess.run(cmd, shell=True, check=False, text=True)
+            if result.returncode != 0:
+                err.print(f"  [red]exit {result.returncode}[/red]")
+                rc = max(rc, result.returncode)
+        except OSError as e:
+            err.print(f"  [red]failed: {e}[/red]")
+            rc = max(rc, 1)
+    return rc
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def _load_snapshots(stdin_json: bool, raw_stdin: bool, host_override: str, requested_group: str) -> list[HostSnapshot]:
+    if stdin_json:
+        raw = sys.stdin.read()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            err.print(f"[red]pqsum: invalid stdin JSON: {e}[/red]")
+            sys.exit(2)
+        if not isinstance(data, list):
+            err.print("[red]pqsum: --stdin-json expects a JSON array of host snapshots[/red]")
+            sys.exit(2)
+        out: list[HostSnapshot] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            try:
+                groups = [GroupRec(**g) for g in item.get("groups", [])]
+                tasks = [TaskRec(**t) for t in item.get("tasks", [])]
+            except TypeError as e:
+                err.print(f"[red]pqsum: stdin host record missing fields: {e}[/red]")
+                sys.exit(2)
+            snap_kwargs = {k: v for k, v in item.items() if k not in ("groups", "tasks")}
+            out.append(HostSnapshot(groups=groups, tasks=tasks, **snap_kwargs))
+        return out
+
+    if raw_stdin:
+        raw = sys.stdin.read()
+        try:
+            snap = parse_pueue_json(raw, requested_group=requested_group)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            err.print(f"[red]pqsum: failed to parse raw stdin pueue JSON: {e}[/red]")
+            sys.exit(1)
+        if host_override:
+            snap.host = host_override
+        return [snap]
+
+    if not shutil.which("pueue"):
+        err.print("[red]pqsum: pueue not found in PATH[/red]")
+        sys.exit(127)
+    try:
+        result = subprocess.run(["pueue", "status", "--json"], capture_output=True, text=True, timeout=30)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        err.print(f"[red]pqsum: failed to run pueue status: {e}[/red]")
+        sys.exit(1)
+    if result.returncode != 0:
+        err.print(f"[red]pqsum: pueue status exited {result.returncode}[/red]")
+        if result.stderr.strip():
+            err.print(f"[dim]{result.stderr.strip()[:500]}[/dim]")
+        sys.exit(result.returncode)
+    try:
+        return [parse_pueue_json(result.stdout, requested_group=requested_group)]
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        err.print(f"[red]pqsum: failed to parse pueue JSON: {e}[/red]")
+        sys.exit(1)
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(prog="pqsum", description="pueue queue summary (text + AI + cleanup verdicts).")
+    p.add_argument("mode", nargs="?", default="text", choices=["text", "ai", "json"])
+    p.add_argument("-g", "--group", default="", help="Restrict to one pueue group.")
+    p.add_argument("--stdin-json", action="store_true", help="Read pre-merged host snapshots from stdin (used by `fleet pueue`).")
+    p.add_argument("--raw-stdin", action="store_true", help="Read raw `pueue status --json` from stdin (parse one host, used by `fleet pueue` per-host).")
+    p.add_argument("--host", default="", help="Override host name when --raw-stdin is set (default: local hostname).")
+    p.add_argument("--multi-host", action="store_true", help="Tell the LLM the input is cross-host.")
+    p.add_argument("--report", action="store_true", help="Emit markdown report (ai mode only).")
+    p.add_argument("--out", default="", help="Write report to PATH (default: stdout).")
+    p.add_argument("--clean", action="store_true", help="After AI report, execute cleanup commands on safe-to-clean groups.")
+    p.add_argument("--yes", action="store_true", help="Skip y/N prompts for --clean.")
+    p.add_argument("--deep", action="store_true", help="Include extra recovery context in prompt.")
+    p.add_argument("-r", "--refresh", action="store_true", help="Bypass cache.")
+    p.add_argument("--no-cache", action="store_true", help="Don't read or write the cache.")
+    p.add_argument("--dry-run", action="store_true", help="Print AI prompt; no AI call.")
+    return p.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    snapshots = _load_snapshots(args.stdin_json, args.raw_stdin, args.host, args.group)
+
+    if args.mode == "json":
+        print(json.dumps([asdict(s) for s in snapshots], indent=2, default=str))
+        return 0
+
+    if args.mode == "text":
+        for snap in snapshots:
+            if len(snapshots) > 1:
+                err.print(f"[bold]── {snap.host} ──[/bold]")
+            if snap.error:
+                err.print(f"[red]{snap.host}: {snap.error}[/red]")
+                continue
+            render_text(snap, use_color=sys.stdout.isatty())
+        return 0
+
+    # --- ai mode ---
+    prompt = build_prompt(snapshots, multi_host=args.multi_host or len(snapshots) > 1)
+    if args.dry_run:
+        print(prompt)
+        return 0
+
+    prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+    parsed: dict | None = None
+    if not args.refresh and not args.no_cache:
+        cached, reason = _cache_lookup(prompt_hash)
+        if cached is not None and reason == "hit":
+            parsed = cached
+
+    if parsed is None:
+        agent = detect_agent()
+        if agent is None:
+            tried = ", ".join(AICAP_AGENT_PRIORITY)
+            err.print(f"[red]No coding-agent CLI on PATH (tried: {tried}).[/red]")
+            err.print("[dim]Install one, or set AICAP_AGENT=http with AICAP_HTTP_API_KEY.[/dim]")
+            return 2
+        with err.status(f"[dim]{agent} ({model_for(agent)}) thinking…[/dim]", spinner="dots"):
+            reply = invoke_agent(agent, prompt, PQSUM_TIMEOUT)
+        parsed = parse_reply(reply)
+        if parsed is None:
+            err.print("[yellow]pqsum: LLM returned no parseable JSON[/yellow]")
+            if reply.strip():
+                err.print(f"[dim]{reply.strip()[:400]}[/dim]")
+            return 1
+        if not args.no_cache:
+            _cache_save(prompt_hash, parsed)
+
+    if args.report or args.out or args.clean:
+        report = render_report(parsed, snapshots)
+        if args.out:
+            try:
+                Path(args.out).write_text(report, encoding="utf-8")
+                err.print(f"[dim]pqsum: wrote {args.out}[/dim]")
+            except OSError as e:
+                err.print(f"[red]pqsum: failed to write {args.out}: {e}[/red]")
+                return 1
+        else:
+            print(report)
+        if args.clean:
+            return execute_cleanup(parsed, yes=args.yes)
+        return 0
+
+    render_ai(parsed, use_color=sys.stdout.isatty())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

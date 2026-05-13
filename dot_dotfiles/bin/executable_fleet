@@ -19,6 +19,7 @@ Subcommands:
   edit                         $EDITOR ~/.config/fleet/machines.toml (seeds template on first run)
   tmux [...]                   Cross-host tmux session summary (scripts/fleet/tmux.py)
   info [...]                   Cross-host system status snapshot (scripts/fleet/info.py)
+  pueue [...]                  Cross-host pueue queue summary (scripts/fleet/pueue.py)
 
 Discovers the chezmoi source dir at runtime via `chezmoi source-path` (falls
 back to ~/.local/share/chezmoi), so the binary works from any cwd.
@@ -52,6 +53,11 @@ Subcommands:
                           Cross-host tmux session summary.
   info [--hosts ...] [--ff] [--full] [--modules a,b,c] [--json]
                           Cross-host system status snapshot.
+  pueue [--hosts ...] [--group G] [--json] [--ai [--report [--out PATH]]]
+                          Cross-host pueue queue summary. --ai pipes the
+                          merged JSON to `pqsum` for cleanability + recovery
+                          analysis (one prompt template, shared with local
+                          `pqsum --ai`).
 
 Examples:
   fleet status                       # readiness across all hosts
@@ -59,6 +65,9 @@ Examples:
   fleet diff hanru_mac               # dry-run diff against one host
   fleet tmux --hosts self,ts_nas     # tmux sessions, 2 hosts
   fleet info --full --json | jq .    # everything as JSON
+  fleet pueue --ai                   # AI summary of every host's queue
+  fleet pueue --ai --report --out /tmp/q.md
+                                     # markdown report across the fleet
 
 See docs/this_repo/fleet-apply.md for full mental model.
 """
@@ -183,6 +192,12 @@ def _dispatch_info(forwarded: list[str]) -> int:
     return info_main()
 
 
+def _dispatch_pueue(forwarded: list[str]) -> int:
+    sys.argv = ["fleet pueue", *forwarded]
+    from scripts.fleet.pueue import main as pueue_main
+    return pueue_main()
+
+
 def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
         print(USAGE)
@@ -205,6 +220,7 @@ def main() -> int:
         "edit": _dispatch_edit,
         "tmux": _dispatch_tmux,
         "info": _dispatch_info,
+        "pueue": _dispatch_pueue,
     }
     fn = dispatch.get(sub)
     if fn is None:

@@ -462,7 +462,7 @@ bootstrap-skills:
 
 # Umbrella `fleet` CLI — same binary chezmoi deploys to ~/.dotfiles/bin/fleet,
 # but run from the source tree (works before first `chezmoi apply`). Subcommands:
-# apply / status / diff / tail / kill / compact / edit / tmux / info.
+# apply / status / diff / tail / kill / compact / edit / tmux / info / pueue.
 # Prefer this over `fleet-*` recipes when invoking from inside the repo;
 # the old recipes stay as muscle-memory aliases.
 fleet *ARGS:
