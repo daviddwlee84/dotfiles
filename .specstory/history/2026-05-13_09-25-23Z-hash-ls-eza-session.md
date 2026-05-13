@@ -7333,3 +7333,117 @@ no changes added to commit (use "git add" and/or "git commit -a")
  4 files changed, 859 insertions(+), 50 deletions(-)
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:02:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage and commit the opt-in adopt fix + pitfall update
+
+```bash
+git add \
+  .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl \
+  .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md \
+  pitfalls/README.md \
+  pitfalls/brew-bundle-redownloads-manually-installed-cask.md && \
+git commit -m "$(cat <<'EOF'
+fix(brew): make --adopt pre-flight opt-in; add mas detection + stderr capture
+
+Field testing on Hanrus-Mac-mini revealed `brew install --cask --adopt`
+isn't the clean win the upstream PR suggests. Four problems that combine
+to make the unconditional pre-flight net-negative for a typical user:
+
+1. --adopt does NOT fast-fail on missing artifact. brew calls
+   fetch_artifacts (download) BEFORE install_artifacts (where --adopt
+   branches), so a cask whose .app isn't in /Applications/ still
+   downloads (~150MB for cursor) only to then raise "no installed App
+   to adopt". Our filesystem pre-filter catches this case.
+
+2. --adopt is byte-exact strict. SHA256 of /Applications/Foo.app must
+   match the current brew-formula version. In a real apply: 8/19
+   filtered casks actually adopted; the other 11 hit version mismatch
+   (cursor v3.3.30 user-side vs v3.3.32 brew-side, etc.) and re-
+   downloaded anyway.
+
+3. Password storm. Each adopt invocation internally calls sudo
+   /usr/sbin/installer / sudo xattr / etc.; brew doesn't always reuse
+   our warmed TTY ticket, so the user gets one Password: prompt per
+   pkg-based cask with multi-second gaps.
+
+4. Mac App Store conflicts. Casks with App-Store-shipped equivalents
+   (e.g. tailscale-app) pop up an interactive "already installed via
+   Mac App Store" dialog mid-apply.
+
+Gate the pre-flight on CHEZMOI_BREW_ADOPT_PREFLIGHT=1 (default off).
+When enabled, also: (a) snapshot mas list and skip those casks
+explicitly, (b) capture brew stderr's first Error/Warning line on
+failure so the user can see *why* (version mismatch vs network vs
+pkg-conflict).
+
+The stale-.incomplete lockfile cleanup + HOMEBREW_NO_AUTO_UPDATE
+exports remain permanently on -- those are pure-win, no trade-offs.
+
+Pitfall doc updated with the field findings; index row now says
+"partial" instead of "fixed".
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+git status
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778670123-96806.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778670123-96806.
+[main 1bc3183] fix(brew): make --adopt pre-flight opt-in; add mas detection + stderr capture
+ 4 files changed, 891 insertions(+), 50 deletions(-)
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:02:08Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #15 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:02:19Z)**_
+
+Committed as `1bc3183`. Summary:
+
+- **adopt pre-flight is now opt-in** (`CHEZMOI_BREW_ADOPT_PREFLIGHT=1`). Default behaviour = no adopt, just normal `brew bundle` install (plus the always-on stale-lock cleanup + `HOMEBREW_NO_AUTO_UPDATE`).
+- **mas detection** added: when opted in, `mas list` is snapshotted and casks matching App Store apps get skipped (Tailscale-style dialog avoided).
+- **stderr capture** added: failed `--adopt` calls now log the first `Error:`/`Warning:` line so you can tell version-mismatch from pkg-conflict from network.
+- **pitfall doc** rewritten with the four field-tested limitations (`--adopt` doesn't skip download, byte-exact strict, password storm, mas conflicts) and the "when opting in IS worthwhile" guidance.
+- **index row** updated from "fixed" → "partial".
+
+Your next `chezmoi apply` will skip the pre-flight entirely — `brew bundle` will just download whatever isn't in Caskroom. To turn the pre-flight back on later, drop `export CHEZMOI_BREW_ADOPT_PREFLIGHT=1` into `~/.shellrc.adhoc`.
+
+The lingering modified specstory file is this conversation being live-appended; left alone.

@@ -1,0 +1,163 @@
+{{- /* Managed by chezmoi (dotfiles repo). Hand edits will be overwritten.
+       Gated by enableVimMode (currently {{ .enableVimMode }}).
+
+       Sources (yorukot/superfile @ main, snapshot 2026-05-13):
+         default: src/superfile_config/hotkeys.toml
+         vim:     src/superfile_config/vimHotkeys.toml
+       Re-sync manually by re-fetching the two files above.
+
+       Forbidden bindings (per upstream docs/configure/custom-hotkeys):
+         ctrl+m (Enter), ctrl+i (Tab), ctrl+? / ctrl+[ (Delete/Backspace) */ -}}
+{{ if .enableVimMode -}}
+# enableVimMode = true → upstream vimHotkeys.toml + four tweaks for
+# yazi-parity muscle memory:
+#   1. quit stays as q/esc (vs upstream vim ctrl+c) → close_file_panel moves to w
+#   2. parent_directory keeps h/left/backspace (vs upstream vim '-' only)
+#   3. confirm keeps right/l (vs upstream vim 'enter' only)
+#   4. change_panel_mode stays as v (vs upstream vim 'm')
+
+#-- Basic Actions
+confirm = ['enter', 'right', 'l']
+quit = ['q', 'esc']
+cd_quit = ['Q', '']
+
+#-- Navigation
+list_up = ['k', '']
+list_down = ['j', '']
+page_up = ['pgup', '']
+page_down = ['pgdown', '']
+
+#-- File Panel Controls
+create_new_file_panel = ['n', '']
+close_file_panel = ['w', '']
+next_file_panel = ['tab', '']
+previous_file_panel = ['shift+tab', '']
+split_file_panel = ['N', '']
+toggle_file_preview_panel = ['f', '']
+open_sort_options_menu = ['o', '']
+toggle_reverse_sort = ['R', '']
+
+#-- Focus Manipulation
+focus_on_process_bar = ['ctrl+p', '']
+focus_on_sidebar = ['ctrl+s', '']
+focus_on_metadata = ['ctrl+d', '']
+
+#-- File/Dir Creation/Renaming
+file_panel_item_create = ['a', '']
+file_panel_item_rename = ['r', '']
+
+#-- Main File Operations
+copy_items = ['y', '']
+cut_items = ['x', '']
+paste_items = ['p', '']
+delete_items = ['d', '']
+permanently_delete_items = ['D', '']
+
+#-- Archive Manipulation
+extract_file = ['ctrl+e', '']
+compress_file = ['ctrl+a', '']
+
+#-- Editor Actions
+open_file_with_editor = ['e', '']
+open_current_directory_with_editor = ['E', '']
+
+#-- Other Actions
+pinned_directory = ['P', '']
+toggle_dot_file = ['.', '']
+change_panel_mode = ['v', '']
+open_help_menu = ['?', '']
+open_spf_prompt = ['>', '']
+open_command_line = [':', '']
+open_zoxide = ['z', '']
+copy_path = ['Y', '']
+copy_present_working_directory = ['c', '']
+toggle_footer = ['ctrl+f', '']
+
+# Typing
+confirm_typing = ['enter', '']
+cancel_typing = ['esc', '']
+
+# Normal Mode
+parent_directory = ['h', 'left', 'backspace']
+search_bar = ['/', '']
+
+# Selection Mode
+file_panel_select_mode_items_select_down = ['J', '']
+file_panel_select_mode_items_select_up = ['K', '']
+file_panel_select_all_items = ['A', '']
+{{- else -}}
+# enableVimMode = false → upstream default hotkeys.toml verbatim.
+# Default already includes j/k/l/h as *secondary* nav bindings, so
+# non-vim users keep optional vim nav while losing the disruptive
+# single-letter file ops.
+
+#-- Basic Actions
+confirm = ['enter', 'right', 'l']
+cd_quit = ['Q', '']
+quit = ['q', 'esc']
+
+#-- Navigation
+list_down = ['down', 'j']
+list_up = ['up', 'k']
+page_down = ['pgdown', '']
+page_up = ['pgup', '']
+
+#-- File Panel Controls
+close_file_panel = ['w', '']
+create_new_file_panel = ['n', '']
+next_file_panel = ['tab', 'L']
+open_sort_options_menu = ['o', '']
+pinned_directory = ['P', '']
+previous_file_panel = ['shift+left', 'H']
+split_file_panel = ['N', '']
+toggle_file_preview_panel = ['f', '']
+toggle_reverse_sort = ['R', '']
+
+#-- Focus Manipulation
+focus_on_metadata = ['m', '']
+focus_on_process_bar = ['p', '']
+focus_on_sidebar = ['s', '']
+
+#-- File/Dir Creation/Renaming
+file_panel_item_create = ['ctrl+n', '']
+file_panel_item_rename = ['ctrl+r', '']
+
+#-- Main File Operations
+copy_items = ['ctrl+c', '']
+cut_items = ['ctrl+x', '']
+delete_items = ['ctrl+d', 'delete', '']
+paste_items = ['ctrl+v', 'ctrl+w', '']
+permanently_delete_items = ['D', '']
+
+#-- Archive Manipulation
+compress_file = ['ctrl+a', '']
+extract_file = ['ctrl+e', '']
+
+#-- Editor Actions
+open_current_directory_with_editor = ['E', '']
+open_file_with_editor = ['e', '']
+
+#-- Other Actions
+change_panel_mode = ['v', '']
+copy_path = ['ctrl+p', '']
+copy_present_working_directory = ['c', '']
+open_command_line = [':', '']
+open_help_menu = ['?', '']
+open_spf_prompt = ['>', '']
+open_zoxide = ['z', '']
+toggle_dot_file = ['.', '']
+toggle_footer = ['F', '']
+
+# Typing
+confirm_typing = ['enter', '']
+cancel_typing = ['ctrl+c', 'esc']
+
+# Normal Mode
+parent_directory = ['h', 'left', 'backspace']
+search_bar = ['/', '']
+
+# Selection Mode
+file_panel_select_mode_items_select_down = ['shift+down', 'J']
+file_panel_select_mode_items_select_up = ['shift+up', 'K']
+file_panel_select_all_items = ['A', '']
+{{- end }}

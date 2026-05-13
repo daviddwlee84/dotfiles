@@ -37,6 +37,7 @@ is wired into this dotfiles repo, gated by a single chezmoi prompt
 | tmux `prefix + H/J/K/L` resize 5 cells | bound | **bound** (kept) |
 | tmux `prefix + M-h/j/k/l` fine resize | bound | **bound** (kept) |
 | marimo `[keymap] preset` (`create_marimo.toml`) | `vim` | `default` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
+| superfile `hotkeys.toml` (`dot_config/superfile/`) | yazi-parity vim preset (`j`/`k` nav, `y`/`x`/`p`/`d` file ops, `h` parent, `l`/Enter open, `q` quit, `a` create, `r` rename, `v` panel mode, `?` help) — adapted from upstream `vimHotkeys.toml` with `q`/`esc` quit, `h`/`←`/`backspace` parent, `right`/`l` confirm, `v` panel-mode kept | upstream default preset (`ctrl+c`/`ctrl+x`/`ctrl+v` file ops, single-letter focus keys `m`/`p`/`s`) |
 | Neovim (`dot_config/nvim/`) | unchanged | **unchanged** (out of scope by design) |
 | VSCode / Cursor / Antigravity vim extension | not managed | **not managed** (out of scope) |
 | Codex / OpenCode / Cursor-CLI vim mode | not managed | **not managed** (out of scope) |
@@ -278,6 +279,48 @@ Why not `modify_` instead? Because marimo writes its own settings
 UI, and a `modify_` script would have to reconcile those — overkill
 for one keymap key.
 
+#### superfile — `hotkeys.toml` preset swap
+
+**File**: [`dot_config/superfile/hotkeys.toml.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/superfile/hotkeys.toml.tmpl).
+
+Superfile (`spf`) is a TUI file manager. There is no runtime
+`vim_mode` flag in `config.toml` — upstream ships **two** separate
+preset files (`hotkeys.toml` default, `vimHotkeys.toml`) and the
+README literally says "If you are vim/nvim user please change your
+default hotkeys config to vim version". The chezmoi template
+swaps the full body based on `enableVimMode`:
+
+- **`true`** → upstream `vimHotkeys.toml` body with four yazi-parity
+  tweaks: `quit = ['q', 'esc']` (vs upstream vim `ctrl+c`),
+  `parent_directory = ['h', 'left', 'backspace']` (vs upstream vim
+  `-` only), `confirm = ['enter', 'right', 'l']` (vs upstream vim
+  `enter` only), `change_panel_mode = ['v', '']` (vs upstream vim
+  `m`). `close_file_panel` lands on `w` since `q` is reclaimed for
+  quit.
+- **`false`** → upstream `hotkeys.toml` verbatim. File ops are
+  Ctrl-prefixed (`copy_items = ['ctrl+c', '']`,
+  `paste_items = ['ctrl+v', 'ctrl+w', '']`); the default already
+  includes `j`/`k`/`l`/`h` as *secondary* nav bindings, so non-vim
+  users keep optional vim nav without disruptive single-letter
+  file ops.
+
+**Path note**: superfile honors `XDG_CONFIG_HOME` on macOS too
+(verified via `spf pl` → `~/.config/superfile/hotkeys.toml`), so a
+single source path under `dot_config/superfile/` covers macOS and
+Linux. No `private_Library/private_Application Support/` branch
+needed despite Go's `os.UserConfigDir()` defaulting to
+`~/Library/Application Support` on Darwin — superfile resolves the
+path itself.
+
+**Forbidden bindings** (per upstream docs): `Ctrl+M` conflicts with
+Enter, `Ctrl+I` with Tab, `Ctrl+?` / `Ctrl+[` with Delete/Backspace.
+Both preset bodies in the template avoid these.
+
+**Re-sync**: bodies pinned via comment to
+`yorukot/superfile @ main` snapshot date. Re-fetch
+`src/superfile_config/hotkeys.toml` + `vimHotkeys.toml` when
+bumping.
+
 #### Other tools
 
 Spot-checked and confirmed **not** managed (or no vim keys present):
@@ -325,6 +368,8 @@ After `chezmoi apply`:
   bindings.
 - (FRESH installs only) `~/.config/marimo/marimo.toml` has
   `preset = "default"`.
+- `~/.config/superfile/hotkeys.toml` has upstream default body
+  (Ctrl-prefixed file ops, `j`/`k`/`l`/`h` as secondary nav).
 
 **Behavioral consequences inside tmux**:
 
@@ -360,7 +405,8 @@ committing to apply:
 ```bash
 chezmoi diff             # shows everything
 chezmoi diff dot_config/tmux dot_config/bash dot_zshrc \
-             .chezmoiexternal.toml dot_config/marimo
+             .chezmoiexternal.toml dot_config/marimo \
+             dot_config/superfile
 ```
 
 **Verify on a single host without affecting others**: this is the
