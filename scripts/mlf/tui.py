@@ -11,9 +11,11 @@ See `dot_dotfiles/bin/executable_mlf` for the umbrella entry point.
 from __future__ import annotations
 
 import json as _json
+import os
 import subprocess
 from typing import Any, Optional
 
+from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -74,6 +76,9 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
 
     BINDINGS = [
         Binding("escape", "dismiss_none", "Cancel"),
+        # SelectionList consumes Enter to toggle the highlighted item, so
+        # provide an explicit shortcut to confirm without tabbing to Apply.
+        Binding("ctrl+a", "apply", "Apply"),
     ]
 
     DEFAULT_CSS = """
@@ -106,7 +111,10 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Select metrics to plot — Enter to toggle, Tab to buttons:")
+            yield Label(
+                "Select metrics to plot — Enter to toggle, "
+                "[bold]Ctrl+A[/bold] to apply, Esc to cancel:"
+            )
             yield SelectionList[str](*self._items, id="plot-selection")
             with Horizontal(id="plot-buttons"):
                 yield Button("Apply", id="apply", variant="primary")
@@ -114,6 +122,9 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
 
     def action_dismiss_none(self) -> None:
         self.dismiss(None)
+
+    def action_apply(self) -> None:
+        self._apply()
 
     @on(Button.Pressed, "#apply")
     def _apply(self) -> None:
@@ -209,6 +220,16 @@ class DownloadDialog(ModalScreen[None]):
         self.dismiss(None)
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return default
+
+
 class MLflowApp(App):
     """mlf interactive dashboard — `mlf` (no args) entry point."""
 
@@ -217,6 +238,11 @@ class MLflowApp(App):
     #main { height: 1fr; }
     #src-tree { width: 38%; border-right: solid $accent; }
     TabbedContent { width: 1fr; }
+    #filter-input {
+        dock: top;
+        height: 3;
+        border: tall $accent;
+    }
     #status-bar {
         dock: bottom;
         height: 1;
@@ -228,9 +254,17 @@ class MLflowApp(App):
     #plot-static { padding: 1; }
     """
 
+    # Tunable list-fetch caps; raise via env on hosts with many runs/models.
+    EXP_LIMIT = _env_int("MLF_EXP_LIMIT", 500)
+    RUNS_LIMIT = _env_int("MLF_RUNS_LIMIT", 200)
+    MODEL_LIMIT = _env_int("MLF_MODEL_LIMIT", 500)
+
     BINDINGS = [
-        Binding("q", "quit", "Quit", priority=True),
-        Binding("escape", "quit", "Quit", show=False),
+        # `q` is non-priority so the user can type "q…" into the filter input
+        # without quitting the app mid-keystroke.
+        Binding("q", "quit", "Quit"),
+        Binding("escape", "escape", "Esc", show=False),
+        Binding("slash", "focus_filter", "Filter"),
         Binding("r", "refresh", "Refresh"),
         Binding("b", "open_browser", "Browser"),
         Binding("y", "copy_selection", "Copy"),
@@ -244,6 +278,9 @@ class MLflowApp(App):
         self._client = None
         self._selection: Optional[tuple[str, str, str]] = None  # (kind, id, name)
         self._selection_data: Optional[Any] = None  # cached Run/Experiment/Model
+        # Full lists kept in memory so the `/` filter rebuilds without
+        # re-hitting MLflow; refresh is explicit (`r`).
+        self._cache: dict[str, list] = {"experiments": [], "runs": [], "models": []}
 
     @property
     def client(self):
@@ -259,6 +296,10 @@ class MLflowApp(App):
         self.title = "MLflow"
         self.sub_title = f"{uri}  (mode: {backend})"
         yield Header(show_clock=False)
+        yield Input(
+            placeholder="filter… (substring match across name + id, Esc to clear)",
+            id="filter-input",
+        )
         with Horizontal(id="main"):
             tree: Tree = Tree("Sources", id="src-tree")
             tree.show_root = False
@@ -297,6 +338,10 @@ class MLflowApp(App):
             t = self.query_one(f"#{tbl_id}", DataTable)
             t.add_columns(*cols)
             t.zebra_stripes = True
+        # Filter input is hidden until `/` reveals it. Toggling .display
+        # works more reliably than juggling a CSS class — `remove_class`
+        # in headless tests sometimes doesn't re-trigger layout.
+        self.query_one("#filter-input", Input).display = False
         self._populate_tree()
 
     # ---------- Tree population ----------
@@ -304,33 +349,59 @@ class MLflowApp(App):
     @work(thread=True, exclusive=True, group="tree")
     def _populate_tree(self) -> None:
         self.call_from_thread(self._set_status, "loading tree…")
-        tree = self.query_one("#src-tree", Tree)
-
         try:
-            exps = _experiments(self.client, 200)
-            runs = _runs(self.client, 50, None)
-            models = _models(self.client, 200)
+            exps = _experiments(self.client, self.EXP_LIMIT)
+            runs = _runs(self.client, self.RUNS_LIMIT, None)
+            models = _models(self.client, self.MODEL_LIMIT)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self._show_connection_error, repr(e))
             return
 
-        def _build() -> None:
-            tree.root.remove_children()
-            exp_node = tree.root.add(f"Experiments ({len(exps)})", expand=False)
-            for r in exps:
-                exp_node.add_leaf(f"{r.id}  {r.name}", data=r)
-            run_node = tree.root.add(f"Runs (recent {len(runs)})", expand=True)
-            for r in runs:
-                lab = f"{r.name}  {r.status}"
-                run_node.add_leaf(lab, data=r)
-            model_node = tree.root.add(f"Models ({len(models)})", expand=False)
-            if not models:
-                model_node.add_leaf("(empty — file/sqlite backend?)", data=None)
-            for r in models:
-                model_node.add_leaf(r.name, data=r)
-            self._set_status("idle")
+        self._cache = {"experiments": exps, "runs": runs, "models": models}
+        # Read the current filter input value back on the main thread so we
+        # don't lose an active filter on refresh.
+        self.call_from_thread(self._rebuild_tree)
+        self.call_from_thread(
+            self._set_status,
+            f"loaded {len(exps)} exp / {len(runs)} runs / {len(models)} models",
+        )
 
-        self.call_from_thread(_build)
+    def _rebuild_tree(self) -> None:
+        """Rebuild tree from cache, applying the current filter input."""
+        tree = self.query_one("#src-tree", Tree)
+        try:
+            filter_text = self.query_one("#filter-input", Input).value
+        except Exception:  # noqa: BLE001
+            filter_text = ""
+        f = filter_text.lower().strip()
+
+        def keep(r) -> bool:
+            if not f:
+                return True
+            return f in (r.name or "").lower() or f in (r.id or "").lower()
+
+        exps = [r for r in self._cache["experiments"] if keep(r)]
+        runs = [r for r in self._cache["runs"] if keep(r)]
+        models = [r for r in self._cache["models"] if keep(r)]
+
+        tree.root.remove_children()
+        # Expand more aggressively when filtering so matches across nodes are
+        # immediately visible.
+        expand = bool(f)
+        exp_node = tree.root.add(f"Experiments ({len(exps)})", expand=expand)
+        for r in exps:
+            exp_node.add_leaf(f"{r.id}  {r.name}", data=r)
+        run_node = tree.root.add(
+            f"Runs (loaded {len(runs)} of {len(self._cache['runs'])})",
+            expand=True,
+        )
+        for r in runs:
+            run_node.add_leaf(f"{r.name}  {r.status}", data=r)
+        model_node = tree.root.add(f"Models ({len(models)})", expand=expand)
+        if not models and not f and not self._cache["models"]:
+            model_node.add_leaf("(empty — file/sqlite backend?)", data=None)
+        for r in models:
+            model_node.add_leaf(r.name, data=r)
 
     def _show_connection_error(self, msg: str) -> None:
         tree = self.query_one("#src-tree", Tree)
@@ -527,6 +598,42 @@ class MLflowApp(App):
         except Exception:  # noqa: BLE001
             pass  # status bar not mounted yet during early startup
 
+    # ---------- Filter ----------
+
+    def action_focus_filter(self) -> None:
+        inp = self.query_one("#filter-input", Input)
+        inp.display = True
+        inp.focus()
+
+    def action_escape(self) -> None:
+        """Esc: clear filter if it's visible, otherwise quit."""
+        try:
+            inp = self.query_one("#filter-input", Input)
+        except Exception:  # noqa: BLE001
+            inp = None
+        if inp is not None and inp.display:
+            had_value = bool(inp.value)
+            inp.value = ""
+            inp.display = False
+            if had_value:
+                self._rebuild_tree()
+            self.query_one("#src-tree", Tree).focus()
+            return
+        self.exit()
+
+    @on(Input.Changed, "#filter-input")
+    def _on_filter_changed(self, event: Input.Changed) -> None:
+        # Rebuild from cache on every keystroke; cheap because we don't hit
+        # the MLflow client — just walk the cached lists.
+        _ = event
+        self._rebuild_tree()
+
+    @on(Input.Submitted, "#filter-input")
+    def _on_filter_submitted(self, _: Input.Submitted) -> None:
+        # Enter in the filter input shifts focus back to the tree so the
+        # user can navigate matches with arrow keys.
+        self.query_one("#src-tree", Tree).focus()
+
     # ---------- Actions ----------
 
     def action_refresh(self) -> None:
@@ -580,10 +687,21 @@ class MLflowApp(App):
 
     @work(thread=True, exclusive=True, group="plot")
     def _render_plot(self, run_id: str, keys: list[str]) -> None:
+        # Update status to show progress while the (possibly slow) fetch runs.
+        self.call_from_thread(
+            self._set_status, f"fetching history for {len(keys)} metric(s)…"
+        )
         try:
             series, skipped = fetch_histories(self.client, run_id, keys)
         except Exception as e:  # noqa: BLE001
             self.call_from_thread(self._set_status, f"plot error: {str(e)[:60]}")
+            return
+
+        if not series:
+            msg = f"no metric history available for run {run_id[:8]}"
+            if skipped:
+                msg += f" ({len(skipped)} keys failed; first: {skipped[0][0]} — {skipped[0][1]})"
+            self.call_from_thread(self._plot_show_message, msg)
             return
 
         def _draw() -> None:
@@ -591,35 +709,57 @@ class MLflowApp(App):
 
             plt.clf()
             plt.theme("pro")
-            term_w = self.size.width
-            width = max(60, term_w - 50)
-            plt.plotsize(width, 18)
+            # `plotsize` needs explicit dims when called from a non-TTY
+            # process. We size to the Static widget's content area minus a
+            # safety margin so the chart doesn't overflow.
+            try:
+                ps = self.query_one("#plot-static", Static)
+                term_w = ps.size.width or self.size.width
+                term_h = max(12, min(ps.size.height - 4, 30))
+            except Exception:  # noqa: BLE001
+                term_w, term_h = self.size.width, 20
+            plt.plotsize(max(60, term_w - 4), term_h)
             plt.title(f"{run_id[:8]} — metrics")
             plt.xlabel("step")
             plt.ylabel("value")
             for key, (steps, values) in series.items():
                 plt.plot(steps, values, label=key)
-            chart = plt.build()
-            stats: list[str] = []
-            for k, (_, vs) in series.items():
-                if vs:
-                    stats.append(
-                        f"  {k}: min={min(vs):.4g}  max={max(vs):.4g}  "
-                        f"last={vs[-1]:.4g}  n={len(vs)}"
-                    )
-            body = chart
-            if stats:
-                body += "\n" + "\n".join(stats)
+            chart_ansi = plt.build()
+
+            # plotext.build() returns a raw ANSI string. Static.update()
+            # accepts a Rich renderable; Text.from_ansi parses the colour
+            # codes so the chart actually renders (vs. showing literal
+            # escape sequences). This is the load-bearing detail that made
+            # the v1 plot path silently "do nothing".
+            body = Text.from_ansi(chart_ansi)
+            if series:
+                body.append("\n\n")
+                for k, (_, vs) in series.items():
+                    if vs:
+                        body.append(
+                            f"  {k}: min={min(vs):.4g}  max={max(vs):.4g}  "
+                            f"last={vs[-1]:.4g}  n={len(vs)}\n"
+                        )
             if skipped:
-                body += (
-                    f"\n\n[yellow]skipped {len(skipped)} key(s) "
-                    f"(first: {skipped[0][0]} — {skipped[0][1]})[/yellow]"
+                body.append(
+                    f"\nskipped {len(skipped)} key(s) "
+                    f"(first: {skipped[0][0]} — {skipped[0][1]})\n",
+                    style="yellow",
                 )
+
             self.query_one("#plot-static", Static).update(body)
             self.query_one("#tabs", TabbedContent).active = "tab-plot"
-            self._set_status(f"plotted {len(series)} metric(s)")
+            self._set_status(
+                f"plotted {len(series)}/{len(keys)} metric(s)"
+                + (f"  •  {len(skipped)} skipped" if skipped else "")
+            )
 
         self.call_from_thread(_draw)
+
+    def _plot_show_message(self, msg: str) -> None:
+        self.query_one("#plot-static", Static).update(msg)
+        self.query_one("#tabs", TabbedContent).active = "tab-plot"
+        self._set_status(msg[:80])
 
     def action_show_download(self) -> None:
         if not self._selection:
