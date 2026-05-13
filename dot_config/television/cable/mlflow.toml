@@ -1,0 +1,159 @@
+# MLflow channel for television (tv).
+# Browse experiments, runs, and registered models against any MLflow tracking
+# backend (file:./mlruns, sqlite:///path/to/mlflow.db, or http://server:port).
+#
+# Usage:
+#   tv mlflow
+#   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 tv mlflow
+#   MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db tv mlflow
+#
+# Prerequisites:
+#   - `mlflow` installed (provided by dot_ansible/roles/python_uv_tools — the
+#     CLI binary is what we exec under the `uv run --script` shebang of the
+#     two helpers).
+#   - `uv` on PATH (installed by uv role; required to resolve the PEP 723
+#     inline-deps block in mlflow-source.py / mlflow-preview.py).
+#
+# Backend mode is resolved entirely from $MLFLOW_TRACKING_URI. When unset,
+# mlflow 3.12+ auto-detects from $PWD: an `mlflow.db` file picks sqlite, an
+# `mlruns/` dir picks file mode, otherwise it creates `mlruns/`. To pin a
+# backend at launch time:
+#   MLFLOW_TRACKING_URI=http://host:port tv mlflow
+#   MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db tv mlflow
+#
+# Source cycling (Ctrl+S):
+#   1. Experiments     all active experiments
+#   2. Recent runs     top 50 runs across all experiments, by start_time desc
+#   3. Runs (scoped)   runs in $MLFLOW_EXPERIMENT_ID (hint row when unset;
+#                      Alt+R on an experiment row sets it and re-launches tv)
+#   4. Models          registered models from the model registry
+#
+# Preview cycling (Ctrl+F):
+#   1. Full JSON       params, metrics, tags, artifact_uri, timestamps
+#   2. Metrics-only    sorted key=value table; or aggregated across recent
+#                      runs for an experiment row
+#
+# Keybindings:
+#   Enter      Context-aware:
+#                experiment row -> re-launch tv scoped to that experiment's
+#                                  runs (nested drill-in; Esc exits the
+#                                  drilled view back to the shell)
+#                run / model row -> open full JSON detail in pager
+#   Ctrl+Y     Copy id (experiment_id / run_id / model_name) to clipboard
+#   Ctrl+O     Open in browser (HTTP tracking URI only; prints a hint
+#              otherwise)
+#   Alt+R      Explicit drill — same as Enter on an experiment row,
+#              available as a backup binding for muscle memory
+#   Alt+J      Dump full JSON to terminal (paged)
+#   Ctrl+F     Cycle preview
+#   Ctrl+S     Cycle source
+#
+# No `watch` field: mlflow imports are heavy (~1s warm, several seconds cold);
+# experiments and runs change on the minute scale anyway. Press Ctrl+R to
+# refresh manually after logging a new run.
+#
+# Hint row sentinel: when the backend is unreachable or a source is unscoped,
+# the helper emits a single row with id `__hint__`. Real mlflow ids never
+# collide (experiment_ids are non-negative ints; run_ids are 32-hex; model
+# names cannot contain `__hint__` in practice).
+
+[metadata]
+name = "mlflow"
+description = "MLflow tracking: experiments, runs, registered models (file/sqlite/http backends)"
+requirements = ["mlflow", "uv"]
+
+[source]
+command = [
+  "~/.config/television/mlflow-source.py experiments",
+  "~/.config/television/mlflow-source.py runs-recent",
+  "~/.config/television/mlflow-source.py runs-experiment",
+  "~/.config/television/mlflow-source.py models",
+]
+display = "{split:\\t:1}  {split:\\t:2}  {split:\\t:3}  ({split:\\t:4})"
+output = "{split:\\t:0}"
+no_sort = true
+
+[preview]
+# Helper always emits valid JSON now; pipe through `bat -l json` so the
+# preview pane gets syntax highlighting (numbers, strings, keys). Same
+# trick super-productivity.toml plays with `jq -C`, but bat's truecolor
+# theme is easier on the eyes for nested objects.
+#
+# `--paging=never` is load-bearing: bat detects "not a TTY" inside TV's
+# preview pipe and would otherwise still buffer; we want streamed output.
+# `--plain` strips line numbers / decorations so the preview pane shows
+# only the rendered content.
+command = [
+  "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view full    | bat --color=always --plain --paging=never --language=json",
+  "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view metrics | bat --color=always --plain --paging=never --language=json",
+]
+header = "{split:\\t:1}  {split:\\t:3}"
+
+[ui]
+input_header = "MLflow"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:open-or-drill"
+# Override TV's default ctrl-y (which copies the entire display row) with
+# id-only copy. Matches super-productivity.toml's convention.
+ctrl-y = "actions:copy-id"
+ctrl-o = "actions:open-browser"
+alt-r = "actions:drill-runs"
+alt-j = "actions:dump-json"
+
+[actions.open-or-drill]
+description = "Drill into experiment runs (experiment row) / open JSON detail (others)"
+# Kind detection mirrors mlflow-preview.py's _detect_kind:
+#   __hint__       -> show the help JSON (helpful when MLFLOW_TRACKING_URI is
+#                     misconfigured: lets the user read the example URIs)
+#   digit-only id  -> drill: re-exec tv with MLFLOW_EXPERIMENT_ID + a
+#                     --source-command override so the nested view shows ONLY
+#                     this experiment's runs. Esc exits the drill back to
+#                     the shell (TV does not have a back-stack; rerun
+#                     `tv mlflow` for cross-experiment views).
+#   anything else  -> open JSON detail in pager
+#
+# The header is set to "MLflow / <exp_name>" inside the drilled view so it's
+# obvious you're in the nested context, not the top-level one. {split:\t:3}
+# carries the experiment name in the experiments source layout (cols are:
+# id, marker, lifecycle, name, last_update).
+command = """id='{split:\\t:0}'; name='{split:\\t:3}'; case "$id" in
+  __hint__) ~/.config/television/mlflow-preview.py auto "$id" --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _ ;;
+  *[!0-9]*) ~/.config/television/mlflow-preview.py auto "$id" --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _ ;;
+  *) MLFLOW_EXPERIMENT_ID="$id" tv mlflow --source-command "~/.config/television/mlflow-source.py runs-experiment" --input-header "MLflow / $name" ;;
+esac"""
+mode = "execute"
+
+[actions.copy-id]
+description = "Copy row id (experiment_id / run_id / model_name) to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:0}' | _clip"""
+mode = "fork"
+
+[actions.open-browser]
+description = "Open in browser (HTTP tracking URI only)"
+# Build the URL inside the action so we read the live env var rather than
+# baking it in. Inference mirrors mlflow-preview.py's _detect_kind:
+#   32-hex id -> need a roundtrip to find experiment_id, just open root
+#   all-digit -> /#/experiments/<id>
+#   else      -> /#/models/<name>
+command = """id='{split:\\t:0}'; uri="${MLFLOW_TRACKING_URI:-}"; case "$uri" in http://*|https://*) ;; *) printf '[open-browser] needs MLFLOW_TRACKING_URI=http(s)://… — current: %s\\n' "${uri:-(unset)}"; sleep 2; exit 0 ;; esac; case "$id" in __hint__) printf '[open-browser] no row selected\\n'; sleep 2; exit 0 ;; esac; url="$uri/"; if [ "${#id}" = "32" ] && printf '%s' "$id" | grep -Eq '^[0-9a-f]{32}$'; then url="$uri/#/experiments/0/runs/$id"; elif printf '%s' "$id" | grep -Eq '^[0-9]+$'; then url="$uri/#/experiments/$id"; else url="$uri/#/models/$id"; fi; if command -v open >/dev/null; then open "$url"; elif command -v xdg-open >/dev/null; then xdg-open "$url" >/dev/null 2>&1 & elif command -v wslview >/dev/null; then wslview "$url"; else printf '[open-browser] no opener (open/xdg-open/wslview) — URL was: %s\\n' "$url"; sleep 2; fi"""
+mode = "fork"
+
+[actions.drill-runs]
+description = "Re-launch tv scoped to the highlighted experiment (Alt+R)"
+# Same payload as the Enter drill branch — explicit binding for muscle
+# memory and discoverability. No-op + hint on non-experiment rows so the
+# user doesn't accidentally drill into an empty unscoped view.
+command = """id='{split:\\t:0}'; name='{split:\\t:3}'; case "$id" in
+  __hint__|*[!0-9]*) printf '[drill-runs] not an experiment row (id=%s). Move to the Experiments source (Ctrl+S) and try again.\\n' "$id"; sleep 2; exit 0 ;;
+esac
+MLFLOW_EXPERIMENT_ID="$id" tv mlflow --source-command "~/.config/television/mlflow-source.py runs-experiment" --input-header "MLflow / $name" """
+mode = "execute"
+
+[actions.dump-json]
+description = "Print full JSON detail to terminal, paged"
+command = "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"

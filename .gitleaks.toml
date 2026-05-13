@@ -21,6 +21,14 @@ useDefault = true
     # Already-redacted sentinels emitted by scripts/redact_secrets.py
     # (e.g. waka_REDACTED_WAKATIME_KEY) so history-rewrites stay clean.
     '''\b[A-Za-z0-9_-]+_REDACTED(?:_[A-Z_]+)?\b''',
+    # Pagination cursors used by MLflow / Google Cloud / many REST APIs.
+    # These are opaque session-scoped tokens (often base64-encoded JSON
+    # like {"offset": N} for MLflow's search endpoints), not credentials,
+    # but gitleaks' generic-api-key entropy heuristic flags them. False
+    # positives showed up in tv-channel smoke-test transcripts; safe to
+    # allowlist by JSON-field shape.
+    '''"next_page_token"\s*:\s*"[A-Za-z0-9+/=_-]*"''',
+    '''"nextPageToken"\s*:\s*"[A-Za-z0-9+/=_-]*"''',
   ]
 
 # Path-scoped allowlist: inside agent-artifact directories, tolerate
@@ -46,6 +54,11 @@ useDefault = true
     '''\bREDACTED\b''',
     '''sk-[a-zA-Z0-9]{3,8}\.\.\.''',
     '''your[-_]?(api[-_]?)?key[-_]?here''',
+    # Pagination cursor field name (REST API convention, not a credential).
+    # Path-scoped to agent transcripts only so the global allowlist stays
+    # narrow — a stray `next_page_token` in committed source/docs still
+    # gets the entropy check.
+    '''\bnext[-_]?[Pp]age[-_]?[Tt]oken\b''',
   ]
 
 # ---------------------------------------------------------------------------
