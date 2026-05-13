@@ -6584,3 +6584,752 @@ needs_adopt = casks_in_Brewfile
 `cursor` / `warp` 之類**沒手動裝的** cask 會直接被歸到「not in /Applications/」，跳過 adopt，留給 `brew bundle` 走正常下載流程。
 
 請按上面的「立即處理」步驟（Ctrl-C → kill brew cursor → rm incomplete → 確認 `/Applications/Cursor.app` 在不在），然後再跑一次 `chezmoi apply` 給我看新的輸出。
+
+---
+
+_**User (2026-05-13 10:40:00Z)**_
+
+[Image #4]
+有一些是 App Store 下載的 會有error (應該也要檢查mas不只cask？)
+
+然後基本上每次prompt Password都得手動輸入 且中間兩個因爲檢查時間間隔很久 都得等在那邊等輸入
+
+然後有許多app明明Applications有卻沒有配對到
+```
+chezmoi on  main [$!?⇡3] via  v3.14.4
+❯ chezmoi apply
+[brew] sudo password for daviddwlee84 (entered once, reused for this chezmoi apply):
+[INFO] Running brew bundle...
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+[INFO] Adopt pre-flight: 11 already tracked, 0 not in /Applications/, attempting --adopt on 19 cask(s) with matching .app...
+[INFO]   (1/19) trying warp...
+[INFO]     ✗ adopt failed (will retry via bundle): warp
+[INFO]   (2/19) trying cursor...
+
+[INFO]     ✗ adopt failed (will retry via bundle): cursor
+[INFO]   (3/19) trying visual-studio-code...
+Password:
+[INFO]     ✓ adopted: visual-studio-code
+[INFO]   (4/19) trying claude...
+Password:
+[INFO]     ✓ adopted: claude
+[INFO]   (5/19) trying chatgpt...
+Password:
+[INFO]     ✓ adopted: chatgpt
+[INFO]   (6/19) trying codex-app...
+Password:
+[INFO]     ✗ adopt failed (will retry via bundle): codex-app
+[INFO]   (7/19) trying ollama-app...
+[INFO]     ✓ adopted: ollama-app
+[INFO]   (8/19) trying aerospace...
+[INFO]     ✗ adopt failed (will retry via bundle): aerospace
+[INFO]   (9/19) trying raycast...
+Password:
+[INFO]     ✓ adopted: raycast
+[INFO]   (10/19) trying scroll-reverser...
+Password:
+[INFO]     ✓ adopted: scroll-reverser
+[INFO]   (11/19) trying the-unarchiver...
+Password:
+[INFO]     ✓ adopted: the-unarchiver
+[INFO]   (12/19) trying discord...
+[INFO]     ✗ adopt failed (will retry via bundle): discord
+[INFO]   (13/19) trying arc...
+[INFO]     ✗ adopt failed (will retry via bundle): arc
+[INFO]   (14/19) trying obsidian...
+Password:
+[INFO]     ✗ adopt failed (will retry via bundle): obsidian
+[INFO]   (15/19) trying google-drive...
+Password:
+[INFO]     ✓ adopted: google-drive
+[INFO]   (16/19) trying grammarly-desktop...
+Password:
+[INFO]     ✗ adopt failed (will retry via bundle): grammarly-desktop
+[INFO]   (17/19) trying anki...
+[INFO]     ✗ adopt failed (will retry via bundle): anki
+[INFO]   (18/19) trying tailscale-app...
+Password:
+[INFO]     ✗ adopt failed (will retry via bundle): tailscale-app
+[INFO]   (19/19) trying superset...
+[INFO]     ✗ adopt failed (will retry via bundle): superset
+[INFO] Adopt pre-flight: 8 newly adopted, 11 already tracked, 0 not in /Applications/, 11 adopt-failed
+[INFO] Installing shared packages from Brewfile...
+Using nikitabobko/tap
+Using mas
+Using tailscale
+`brew bundle` complete! 3 Brewfile dependencies now installed.
+[INFO] Installing macOS packages from Brewfile.darwin...
+Fetching warp, cursor, codex-app, codeisland, nikitabobko/tap/aerospace, discord, arc, grammarly-desktop, anki, tailscale-app, superset
+
+```
+
+_**User (2026-05-13 10:40:00Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/e0b04416-1a16-4832-a2c1-7e489f9d65a2/4.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:41:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:41:09Z)**_
+
+三個問題分開處理。先看 sudo warm-cache 為什麼沒效。
+
+_**Agent (claude-opus-4-7 2026-05-13 10:41:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read sudo_session_warm_cache implementation
+
+`grep -n -A 20 'sudo_session_warm_cache\(\)' /Users/daviddwlee84/.local/share/chezmoi/scripts/lib/sudo_shared.sh | head -60`
+
+```text
+ugrep: error: error at position 30
+(?m)sudo_session_warm_cache\(\)
+     empty (sub)expression___/
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:41:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read warm_cache
+
+`grep -n -A 20 'sudo_session_warm_cache' /Users/daviddwlee84/.local/share/chezmoi/scripts/lib/sudo_shared.sh | head -60`
+
+```text
+53:#   sudo_session_warm_cache     Best-effort: refresh the CURRENT TTY's sudo
+54-#                               timestamp using the cached password (for callers
+55-#                               like `brew bundle` whose cask pkg installers
+56-#                               invoke `sudo /usr/sbin/installer` internally).
+57-#
+58-# Exports on success:
+59-#   CHEZMOI_SUDO_STATE_DIR  CHEZMOI_SUDO_PASS_FILE
+60-#   CHEZMOI_ANSIBLE_BECOME_FILE  CHEZMOI_SUDO_KEEPALIVE_PID
+61-
+62-_sudo_state_dir_path() {
+63-    local base="${XDG_RUNTIME_DIR:-}"
+64-    if [[ -n "$base" && -d "$base" ]]; then
+65-        printf '%s/chezmoi-sudo-%s\n' "$base" "$(id -u)"
+66-    else
+67-        printf '%s/chezmoi-sudo-%s\n' "${TMPDIR:-/tmp}" "$(id -u)"
+68-    fi
+69-}
+70-
+71-# Walk the parent chain looking for a `chezmoi` process; prints its PID, or
+72-# empty on miss. Cross-platform: /proc on Linux, ps on macOS.
+73-_sudo_find_chezmoi_ancestor() {
+--
+318:sudo_session_warm_cache() {
+319-    # Refresh the CURRENT TTY's sudo timestamp with the cached password.
+320-    # Use before a child tool (e.g. `brew bundle` -> cask pkg installer)
+321-    # that spawns `sudo` internally and relies on timestamp cache rather
+322-    # than accepting a piped password.
+323-    [[ -z "${CHEZMOI_SUDO_PASS_FILE:-}" ]] && return 0
+324-    # shellcheck disable=SC2024
+325-    sudo -S -v -p '' <"$CHEZMOI_SUDO_PASS_FILE" 2>/dev/null || return 1
+326-    return 0
+327-}
+328-
+329-sudo_session_skip_reason() {
+330-    # Classify the current sudo state so callers can pick a branch without
+331-    # reimplementing the probe themselves:
+332-    #
+333-    #   "cached"           sudo_session_init already prompted (or reused a
+334-    #                      sibling script's prompt); the caller should pipe the
+335-    #                      password via sudo_run / use $CHEZMOI_ANSIBLE_BECOME_FILE.
+336-    #   "passwordless"     sudo works without any password at all; the caller
+337-    #                      can invoke plain `sudo` and must not pre-auth.
+338-    #   "non-interactive"  no cached password, no passwordless sudo, no TTY:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:41:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Caskroom ownership (sudo trigger hypothesis)
+
+`ls -la /opt/homebrew/Caskroom/ 2>&1 | head -10`
+
+```text
+drwxr-xr-x@ - daviddwlee84 14 Jan 14:43  **alacritty
+drwxr-xr-x@ - daviddwlee84 19 Dec  2024  **alt-tab
+drwxr-xr-x@ - daviddwlee84 13 May 17:49  **antigravity
+drwxr-xr-x@ - daviddwlee84 18 Dec  2024  **applite
+drwxr-xr-x@ - daviddwlee84  9 Feb 09:48  **bitwarden
+drwxr-xr-x@ - daviddwlee84 13 May 18:13  **chatgpt
+drwxr-xr-x@ - daviddwlee84 13 May 18:13  **claude
+drwxr-xr-x@ - daviddwlee84 17 Mar 17:24  **cmux
+drwxr-xr-x@ - daviddwlee84 27 Apr 16:47  **codeisland
+drwxr-xr-x@ - daviddwlee84  7 May 21:58  **codex
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:42:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:43:06Z)**_
+
+看完輸出有幾個分明的訊號，分開拆：
+
+## 三個獨立問題
+
+**1. App Store 安裝的 app（Tailscale 那個 dialog）**
+你的 `Brewfile.darwin` 裡有 `tailscale-app` (brew cask) 但你已經從 mas 裝過 Tailscale，所以 brew 試著裝 pkg installer 時跳出衝突警告。應該在 adopt 名單裡排除 mas-installed。
+
+**2. 11/19 adopt failed despite `.app` 存在**
+那不是我們配對失敗（`0 not in /Applications/` 證實 heuristic 找到了），是 **`brew --adopt` 對版本超嚴格**：它下載完 cask 之後比對 SHA256，發現你 `/Applications/Cursor.app` 的版本和 brew formula 預期的不一樣，就 raise error。`--adopt` 真正能用的只有「我手動裝的版本剛好等於 brew formula 那個版本」這種狀況——對手動 drag-install 的人來說大部分時候不成立。
+
+**3. 每次 `brew --cask --adopt` 都重新問密碼**
+即使我們先 `sudo_session_warm_cache`，brew 內部 `sudo /usr/sbin/installer`/`sudo xattr` 還是不 reuse 我們的 TTY ticket（猜測：brew 跑某些操作前會 `sudo -k` 或用了不同 timestamp_type）。這個我沒辦法從 script 端完全消掉。
+
+## 立即建議：把 adopt pre-flight 設成 opt-in，預設關掉
+
+`--adopt` 在你這種「手動裝的版本和 brew formula 預期不同」的環境下 net loss——8/19 命中率太低、且每次 prompt 11 次密碼。把它變成 opt-in (`CHEZMOI_BREW_ADOPT_PREFLIGHT=1`)，預設不跑，反而比較好。原本想解決的「parallel-fetch lock contention」其實主要靠 `clear_brew_download_locks` 那段就可以了。
+
+要不要我這樣改？三件事一起：
+
+1. **預設關閉 adopt pre-flight**，要用的人 `export CHEZMOI_BREW_ADOPT_PREFLIGHT=1` (寫進 `~/.shellrc.adhoc`)
+2. **開啟時加上 mas 檢查**：`mas list` 抓出 App Store apps，跳過那些 cask（不會再跳 Tailscale 對話框）
+3. **失敗時印出 brew 的 stderr 第一行**，這樣下次知道是「version mismatch」還是「pkg conflict」還是別的
+
+附帶 pitfall 紀錄這個 `--adopt` 的限制——下次別人想加類似 feature 時可以參考。
+
+要這樣做的話我就動工，或者你有別的想法？
+
+---
+
+_**User (2026-05-13 10:59:10Z)**_
+
+可以 那加一下吧 然後commit
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:25Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Default off; gate on CHEZMOI_BREW_ADOPT_PREFLIGHT=1. Reasons documented in pitfall.
+
+```text
+Task #11 created successfully: Make adopt pre-flight opt-in via env var
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:26Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Skip casks already installed via Mac App Store to avoid installer dialog conflicts (e.g. Tailscale).
+
+```text
+Task #12 created successfully: Add mas (App Store) conflict detection
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:27Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+On adopt failure, log the first line of brew's stderr so user can distinguish version-mismatch from other errors.
+
+```text
+Task #13 created successfully: Capture brew adopt stderr for better failure logging
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:28Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Document the version-strict behavior, password storm, mas conflicts, and the opt-in env var.
+
+```text
+Task #14 created successfully: Update pitfall doc with adopt limitations
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:28Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Stage modified files + new transcripts and commit.
+
+```text
+Task #15 created successfully: Commit the changes
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:29Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #11 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:59:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`
+
+```text
+119	export HOMEBREW_NO_INSTALL_UPGRADE=1
+120	
+121	{{ if eq .chezmoi.os "darwin" -}}
+122	# --- Adopt pre-flight (macOS only)
+123	# Casks installed manually (drag .app into /Applications) are invisible to brew
+124	# until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
+125	# the user already has, often failing on transient CDN errors.
+126	#
+127	# IMPORTANT non-obvious behavior of `brew install --cask --adopt`:
+128	#   `--adopt` does NOT fast-fail when the .app is absent. brew always calls
+129	#   `fetch_artifacts` (download) BEFORE `install_artifacts` (where --adopt
+130	#   decides adopt-or-error). So if /Applications/Cursor.app doesn't exist,
+131	#   `brew install --cask --adopt cursor` will download Cursor.zip from the
+132	#   CDN (~150MB) and only then raise "no installed App to adopt".
+133	#   `--adopt`'s only real win is "don't overwrite a matching .app", NOT
+134	#   "skip the download". We therefore have to filesystem-prefilter ourselves.
+135	#
+136	# Performance:
+137	#   1. "Already tracked by brew?" via `$Caskroom/<short>` filesystem check
+138	#      (not `brew list --cask`, which would pay ~1-2s Ruby startup per cask).
+139	#   2. ".app in /Applications/?" via heuristic name match against a one-shot
+140	#      `ls /Applications/` snapshot. Strips `-app` / `-desktop` cask-name
+141	#      suffixes; tries case-insensitive forms with and without dash→space.
+142	#   3. Only casks passing both filters reach `brew install --cask --adopt`,
+143	#      whose Ruby cost is real work (writing Caskroom metadata).
+144	adopt_existing_casks() {
+145	    local file="$1"
+146	    [[ -f "$file" ]] || return 0
+147	    command -v brew >/dev/null 2>&1 || return 0
+148	
+149	    # Resolve Caskroom path once (arm64 vs intel).
+150	    local caskroom=""
+151	    if [[ -d /opt/homebrew/Caskroom ]]; then
+152	        caskroom=/opt/homebrew/Caskroom
+153	    elif [[ -d /usr/local/Caskroom ]]; then
+154	        caskroom=/usr/local/Caskroom
+155	    fi
+156	
+157	    # Snapshot /Applications/ once (lowercased, newline-separated). Avoids
+158	    # forking ls/find per cask. Falls back to empty string if dir missing.
+159	    local apps_lc=""
+160	    if [[ -d /Applications ]]; then
+161	        apps_lc="$(/bin/ls -1 /Applications 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+162	    fi
+163	
+164	    # Heuristic: does /Applications/ have an .app whose name matches this
+165	    # cask? Tries a handful of candidate spellings derived from the cask
+166	    # short-name. Misses on weird capitalization (chatgpt → ChatGPT.app works
+167	    # because case-insensitive; aerospace → AeroSpace.app works too).
+168	    _has_app_for_cask() {
+169	        local short="$1"
+170	        local stem="${short%-app}"
+171	        stem="${stem%-desktop}"
+172	        local candidates=(
+173	            "${short}.app"
+174	            "${stem}.app"
+175	            "${short//-/ }.app"
+176	            "${stem//-/ }.app"
+177	            "${short//-/}.app"
+178	            "${stem//-/}.app"
+179	        )
+180	        local c c_lc
+181	        for c in "${candidates[@]}"; do
+182	            c_lc="$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]')"
+183	            if printf '%s\n' "$apps_lc" | grep -qFx -- "$c_lc"; then
+184	                return 0
+185	            fi
+186	        done
+187	        return 1
+188	    }
+189	
+190	    local cask_list
+191	    cask_list="$(brew bundle list --casks --file="$file" 2>/dev/null)" || return 0
+192	    [[ -n "$cask_list" ]] || return 0
+193	
+194	    # Two-stage filter: drop already-tracked, then drop casks whose .app
+195	    # isn't present (we can't safely --adopt those — brew would download).
+196	    local needs_adopt=() already=0 not_present=0 cask short
+197	    while IFS= read -r cask; do
+198	        [[ -n "$cask" ]] || continue
+199	        short="${cask##*/}"
+200	        if [[ -n "$caskroom" && -d "$caskroom/$short" ]]; then
+201	            already=$(( already + 1 ))
+202	            continue
+203	        fi
+204	        if ! _has_app_for_cask "$short"; then
+205	            not_present=$(( not_present + 1 ))
+206	            continue
+207	        fi
+208	        needs_adopt+=("$cask")
+209	    done <<< "$cask_list"
+210	
+211	    local total=${#needs_adopt[@]}
+212	    if (( total == 0 )); then
+213	        info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/ (will install via bundle), nothing to adopt"
+214	        return 0
+215	    fi
+216	
+217	    info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/, attempting --adopt on $total cask(s) with matching .app..."
+218	
+219	    local adopted=0 failed=0 idx=0
+220	    for cask in "${needs_adopt[@]}"; do
+221	        idx=$(( idx + 1 ))
+222	        short="${cask##*/}"
+223	        info "  ($idx/$total) trying $short..."
+224	        # Re-warm sudo TTY timestamp before each adopt call. Pkg-based casks
+225	        # (google-drive, etc.) shell out to `sudo /usr/sbin/installer` from a
+226	        # subshell that doesn't always inherit our controlling TTY; without a
+227	        # fresh warm-cache the user gets a raw `Password:` prompt. No-op for
+228	        # passwordless / non-interactive setups.
+229	        command -v sudo_session_warm_cache >/dev/null 2>&1 && \
+230	            sudo_session_warm_cache 2>/dev/null || true
+231	        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+232	            adopted=$(( adopted + 1 ))
+233	            info "    ✓ adopted: $short"
+234	        else
+235	            failed=$(( failed + 1 ))
+236	            info "    ✗ adopt failed (will retry via bundle): $short"
+237	        fi
+238	    done
+239	
+240	    info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $not_present not in /Applications/, $failed adopt-failed"
+241	}
+242	
+243	info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks..."
+244	adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+245	{{ end -}}
+246	
+247	# Run brew bundle up to N times. Subsequent attempts only retry items that
+248	# failed (already-installed packages are skipped quickly). This papers over
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax check rendered template
+
+`chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl > /tmp/brew_bundle_rendered.sh && bash -n /tmp/brew_bundle_rendered.sh && echo syntax-ok && grep -nE 'CHEZMOI_BREW_ADOPT_PREFLIGHT|_is_mas_installed|mas list' /tmp/brew_bundle_rendered.sh | head -10`
+
+```text
+syntax-ok
+457:# Why opt-in (CHEZMOI_BREW_ADOPT_PREFLIGHT=1 to enable):
+483:#      We detect this via `mas list` when opt-in is enabled.
+493:# To enable: `export CHEZMOI_BREW_ADOPT_PREFLIGHT=1` in ~/.shellrc.adhoc.
+517:    # `mas list` format: "<id>  <Name>  (<version>)"
+520:        mas_lc="$(mas list 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+550:    # Matches the cask stem against `mas list` output (case-insensitive).
+553:    _is_mas_installed() {
+587:        if _is_mas_installed "$short"; then
+637:# Gated on CHEZMOI_BREW_ADOPT_PREFLIGHT=1 (opt-in). See block comment above
+639:if [[ "${CHEZMOI_BREW_ADOPT_PREFLIGHT:-0}" = "1" ]]; then
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #11 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #12 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #13 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #14 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:36Z)**_
+
+Now update the pitfall doc with field-tested findings.
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:37Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./pitfalls/brew-bundle-redownloads-manually-installed-cask.md`
+
+```text
+1	# `brew bundle` re-downloads & fails on cask whose `.app` is already in `/Applications/`
+2	
+3	**Symptoms** (grep this section):
+4	
+5	- `brew bundle --file=~/.config/homebrew/Brewfile.darwin` prints `Fetching <cask>` for an app the user has already installed (e.g. by dragging the `.app` into `/Applications/` from a vendor DMG)
+6	- Logs include `A `brew fetch warp cursor ... discord ... ` process has already locked
+7	  /Users/<u>/Library/Caches/Homebrew/downloads/<sha>--<File>.dmg.incomplete. Please wait for it to finish or terminate it to continue.` for many casks at once
+8	- ``brew bundle` failed! Failed to fetch warp, cursor, visual-studio-code, claude, chatgpt, ...` at the end of the run
+9	- Same Brewfile applies cleanly on the **source** mac where the user `brew install --cask`'d things, but breaks on a **second** mac where many `.app`s were dragged in manually before `chezmoi apply` was first run
+10	- `brew list --cask <name>` exits non-zero even though `/Applications/<Name>.app` exists
+11	- `chezmoi apply` succeeds at the chezmoi level but `[WARN] Some packages in macOS packages from Brewfile.darwin still failed after 2 attempts (continuing...)` appears in the log
+12	
+13	**First seen**: 2026-05 on `Hanrus-Mac-mini` (mac-mini with many `.app`s pre-dragged into `/Applications/`, then `chezmoi update --init` from a different machine's `Brewfile.darwin`)
+14	**Affects**: any macOS host where casks declared in `~/.config/homebrew/Brewfile.darwin` have `.app` artifacts already present in `/Applications/` but no corresponding entry in `/opt/homebrew/Caskroom/<name>/.metadata/`
+15	**Status**: fixed in `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` via an `--adopt` pre-flight pass (lines 111-165). Upstream feature added in [Homebrew/brew#14033](https://github.com/Homebrew/brew/pull/14033) closing [#14006](https://github.com/Homebrew/brew/issues/14006) — `brew install --cask --adopt` "adopts" an existing artifact in-place without downloading.
+16	
+17	## Symptom
+18	
+19	```console
+20	$ chezmoi apply
+21	...
+22	[INFO] Installing macOS packages from Brewfile.darwin...
+23	Fetching warp, cursor, visual-studio-code, claude, chatgpt, antigravity, codex-app, codeisland, ollama-app, ...
+24	Fetching: warp, cursor, visual-studio-code, claude, ...
+25	✘ Cask warp (0.2026.05.06.15.42.stable_04)
+26	Error: A `brew fetch warp cursor visual-studio-code claude chatgpt ...` process has already locked /Users/<u>/Library/Caches/Homebrew/downloads/d7b851c68d6ffb0fc9008aa6d18ccb31feff009339ae656932de009c7057b1a3--Warp.dmg.incomplete.
+27	Please wait for it to finish or terminate it to continue.
+28	✘ Cask cursor (3.3.30,...)
+29	Error: A `brew fetch ...` process has already locked /Users/<u>/Library/Caches/Homebrew/downloads/7bf557fd...--Cursor-darwin-arm64.zip.incomplete.
+30	Please wait for it to finish or terminate it to continue.
+31	... (many more)
+32	`brew bundle` failed! Failed to fetch warp, cursor, visual-studio-code, claude, chatgpt, ...
+33	[INFO] Retrying macOS packages from Brewfile.darwin (attempt 2/2, only missing items)...
+34	... (retry hits identical .incomplete locks)
+35	[WARN] Some packages in macOS packages from Brewfile.darwin still failed after 2 attempts (continuing...)
+36	```
+37	
+38	```console
+39	$ ls /Applications/Discord.app                 # the app IS already there
+40	/Applications/Discord.app
+41	$ brew list --cask discord                     # but brew doesn't know about it
+42	Error: Cask 'discord' is not installed.
+43	$ ls /opt/homebrew/Caskroom/discord/.metadata/ # no metadata directory
+44	ls: /opt/homebrew/Caskroom/discord/.metadata/: No such file or directory
+45	```
+46	
+47	## Root cause
+48	
+49	Two cascading issues:
+50	
+51	1. **Drag-installed `.app` is invisible to Homebrew.** `brew bundle` checks `Caskroom/<name>/.metadata/<version>/` to decide "already installed." A `.app` you copied manually into `/Applications/` has no Caskroom entry, so brew thinks it's missing and queues it for download. There's no auto-detection of pre-existing `.app`s in `/Applications/` — by design, because brew can't safely assume the version matches what its cask definition expects.
+52	2. **Parallel-fetch lockfile contention.** When `brew bundle` schedules a re-download of many large casks at once, `brew fetch` runs them in parallel and each download claims `~/Library/Caches/Homebrew/downloads/<sha>--<file>.incomplete` plus a sibling lockfile. If any prior `brew fetch` was interrupted (Ctrl-C, terminated, previous failed `chezmoi apply`), the stale `.incomplete*` files cause every fresh attempt to error out instantly with `process has already locked …`. The bundle's own retry loop then hits the same stale locks on attempt 2 and gives up.
+53	
+54	The two failure modes are independent but co-occur: (1) makes brew try to re-download apps you already have, and (2) makes that re-download cascade into many parallel locked-file errors at once.
+55	
+56	## Workaround
+57	
+58	The repo's `chezmoi apply` now does this automatically. **If you need to do it manually** (one-off, or on a host that hasn't applied the latest `run_onchange_after_30_brew_bundle.sh.tmpl` yet):
+59	
+60	```bash
+61	# 1. Clear stale lockfiles from any interrupted prior fetch
+62	rm -f ~/Library/Caches/Homebrew/downloads/*.incomplete*
+63	
+64	# 2. Adopt every cask whose .app is in /Applications/ but isn't tracked by brew
+65	brew bundle list --casks --file=~/.config/homebrew/Brewfile.darwin | while IFS= read -r cask; do
+66	    brew list --cask "$cask" &>/dev/null && continue   # already tracked
+67	    brew install --cask --adopt "$cask" 2>/dev/null && echo "adopted: $cask"
+68	done
+69	
+70	# 3. Re-run brew bundle without auto-update noise
+71	HOMEBREW_NO_AUTO_UPDATE=1 brew bundle --file=~/.config/homebrew/Brewfile.darwin --no-upgrade
+72	```
+73	
+74	`brew install --cask --adopt <name>` writes the missing `Caskroom/<name>/.metadata/<version>/...` records pointing at the existing `/Applications/<Name>.app` — **no download happens** — so subsequent `brew bundle` runs see the cask as "already installed" and skip it.
+75	
+76	`--adopt` exits non-zero (silently in the script) when the cask's expected `.app` isn't in `/Applications/` at all; that's expected — the regular `brew bundle` pass will then install it normally.
+77	
+78	## Prevention
+79	
+80	- `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` now runs an `adopt_existing_casks` pre-flight before `brew bundle` on macOS (lines 121-165). It enumerates casks via `brew bundle list --casks --file=…`, skips ones brew already tracks, and runs `brew install --cask --adopt <name>` on the rest.
+81	- Between bundle retry attempts the script calls `clear_brew_download_locks` to wipe any `.incomplete*` files left over from a previous interrupted fetch (lines 174-182).
+82	- The script exports `HOMEBREW_NO_AUTO_UPDATE=1` + `HOMEBREW_NO_INSTALL_UPGRADE=1` so `brew bundle` doesn't trigger the implicit `brew update` that can transiently fail on Aliyun mirror sync lag (`Unable to find <sha> under https://mirrors.aliyun.com/homebrew/brew.git`). Upgrades go through `just upgrade-*`, per `AGENTS.md → "Install vs upgrade is split on purpose"`.
+83	- When adding a new cask to `dot_config/homebrew/Brewfile.darwin.tmpl`, don't pre-emptively delete any existing `/Applications/<Name>.app` — the adopt pre-flight handles it on next apply.
+84	
+85	## Related
+86	
+87	- [`pitfalls/brew-cask-slow-github-release-assets.md`](brew-cask-slow-github-release-assets.md) — different root cause (Azure CDN slowness on CN networks) but overlapping observable shape (brew downloads slowly / fails). The adopt pre-flight helps here too, because it skips the download entirely when the `.app` is already present.
+88	- [`pitfalls/ngrok-cask-download-flaky.md`](ngrok-cask-download-flaky.md) — another "brew cask download fails" pitfall.
+89	- [`docs/this_repo/upgrades.md`](../docs/this_repo/upgrades.md) — adopt fires during `chezmoi apply` (install path), not `just upgrade-*` (upgrade path).
+90	- [`.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`](../.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl) — where the fix lives.
+91	- Upstream: [Homebrew/brew#14006](https://github.com/Homebrew/brew/issues/14006) (feature request), [Homebrew/brew#14033](https://github.com/Homebrew/brew/pull/14033) (PR adding `--adopt`).
+92	- `AGENTS.md → "Install vs upgrade is split on purpose"` — explains why we don't `brew upgrade` during apply.
+93
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 11:00:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/pitfalls/brew-bundle-redownloads-manually-installed-cask.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/pitfalls/brew-bundle-redownloads-manually-installed-cask.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:28Z)**_
+
+Also update the pitfall index row since "fixed" is no longer accurate.
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/pitfalls/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:37Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #14 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:37Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #15 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Review changes pre-commit
+
+`git status`
+
+```text
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   pitfalls/README.md
+	modified:   pitfalls/brew-bundle-redownloads-manually-installed-cask.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check log to see if earlier commit was pushed
+
+`git log --oneline -5`
+
+```text
+9d2823b docs(backlog): research note — Linux Desktop app control equivalent
+80374a4 feat(tmux): right-click tab — bookmark icons + clear agent status
+2fc5031 feat(tv): mac-apps channel — picker + lifecycle actions for macOS GUI apps
+ce5e23a feat(shell): app-* helpers — graceful macOS GUI control via osascript
+697693f feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 11:01:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full status incl untracked files
+
+`git status -u && echo "---DIFF---" && git diff --stat`
+
+```text
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   pitfalls/README.md
+	modified:   pitfalls/brew-bundle-redownloads-manually-installed-cask.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---DIFF---
+ .../run_onchange_after_30_brew_bundle.sh.tmpl      | 134 +++-
+ .../2026-05-13_09-25-23Z-hash-ls-eza-session.md    | 717 +++++++++++++++++++++
+ pitfalls/README.md                                 |   2 +-
+ ...w-bundle-redownloads-manually-installed-cask.md |  56 +-
+ 4 files changed, 859 insertions(+), 50 deletions(-)
+```
+</details></tool-use>

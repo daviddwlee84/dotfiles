@@ -119,28 +119,48 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_UPGRADE=1
 
 {{ if eq .chezmoi.os "darwin" -}}
-# --- Adopt pre-flight (macOS only)
+# --- Adopt pre-flight (macOS only, OPT-IN)
 # Casks installed manually (drag .app into /Applications) are invisible to brew
-# until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
-# the user already has, often failing on transient CDN errors.
+# until "adopted". `brew install --cask --adopt <name>` writes Caskroom
+# metadata in-place so subsequent `brew bundle` runs skip the cask.
 #
-# IMPORTANT non-obvious behavior of `brew install --cask --adopt`:
-#   `--adopt` does NOT fast-fail when the .app is absent. brew always calls
-#   `fetch_artifacts` (download) BEFORE `install_artifacts` (where --adopt
-#   decides adopt-or-error). So if /Applications/Cursor.app doesn't exist,
-#   `brew install --cask --adopt cursor` will download Cursor.zip from the
-#   CDN (~150MB) and only then raise "no installed App to adopt".
-#   `--adopt`'s only real win is "don't overwrite a matching .app", NOT
-#   "skip the download". We therefore have to filesystem-prefilter ourselves.
+# Why opt-in (CHEZMOI_BREW_ADOPT_PREFLIGHT=1 to enable):
 #
-# Performance:
-#   1. "Already tracked by brew?" via `$Caskroom/<short>` filesystem check
-#      (not `brew list --cask`, which would pay ~1-2s Ruby startup per cask).
-#   2. ".app in /Applications/?" via heuristic name match against a one-shot
-#      `ls /Applications/` snapshot. Strips `-app` / `-desktop` cask-name
-#      suffixes; tries case-insensitive forms with and without dash→space.
-#   3. Only casks passing both filters reach `brew install --cask --adopt`,
-#      whose Ruby cost is real work (writing Caskroom metadata).
+#   1. **Version-strict**: `--adopt` compares SHA256 of /Applications/Foo.app
+#      against the SHA256 brew's formula expects. If your manually-installed
+#      version differs by even a single byte (different download date, vendor
+#      auto-update, etc.) brew raises "no installed App to adopt" and falls
+#      back to a full download. In a typical real-world `Brewfile.darwin`
+#      with 20+ casks, the hit rate observed was ~40% — the rest re-download
+#      anyway, defeating the point.
+#
+#   2. **Password storm**: each `brew install --cask --adopt` invocation
+#      internally calls `sudo /usr/sbin/installer` / `sudo xattr` / similar.
+#      Our `sudo_session_warm_cache` warms the TTY timestamp but brew's
+#      internal sudo invocations don't always reuse it (brew may `sudo -k`
+#      before pkg installs, or use a different timestamp_type). Result:
+#      one `Password:` prompt per pkg-based cask, often with multi-second
+#      gaps where the user has to babysit the terminal.
+#
+#   3. **`--adopt` doesn't skip download**: brew calls `fetch_artifacts`
+#      BEFORE `install_artifacts` (where --adopt branches), so casks whose
+#      `.app` isn't present (or whose SHA mismatches) still get downloaded.
+#      Even our filesystem pre-filter only catches the first case.
+#
+#   4. **Mac App Store conflicts**: if you have Tailscale (or others) from
+#      the App Store, the brew cask version's pkg installer pops up an
+#      interactive "already installed via Mac App Store" dialog mid-apply.
+#      We detect this via `mas list` when opt-in is enabled.
+#
+# When useful:
+#   - You're setting up a NEW mac, have just manually dragged some `.app`s
+#     into /Applications/ from vendor DMGs, AND those apps happen to be the
+#     CURRENT brew-formula versions (rare in practice). Most users should
+#     leave this off and let `brew bundle` install everything fresh on
+#     first apply — slower one-time download cost but no password storm and
+#     no version-mismatch failures.
+#
+# To enable: `export CHEZMOI_BREW_ADOPT_PREFLIGHT=1` in ~/.shellrc.adhoc.
 adopt_existing_casks() {
     local file="$1"
     [[ -f "$file" ]] || return 0
@@ -159,6 +179,15 @@ adopt_existing_casks() {
     local apps_lc=""
     if [[ -d /Applications ]]; then
         apps_lc="$(/bin/ls -1 /Applications 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    fi
+
+    # Snapshot mas-installed App Store apps (lowercased). Used to skip
+    # casks whose app the user has via App Store — adopting them would
+    # trigger a "Mac App Store Install Detected" dialog mid-apply.
+    # `mas list` format: "<id>  <Name>  (<version>)"
+    local mas_lc=""
+    if command -v mas >/dev/null 2>&1; then
+        mas_lc="$(mas list 2>/dev/null | tr '[:upper:]' '[:lower:]')"
     fi
 
     # Heuristic: does /Applications/ have an .app whose name matches this
@@ -187,13 +216,33 @@ adopt_existing_casks() {
         return 1
     }
 
+    # Heuristic: is this cask's app already installed via Mac App Store?
+    # Matches the cask stem against `mas list` output (case-insensitive).
+    # False positives possible (substring match) but the cost of a false
+    # positive is just "we don't try to adopt" — cheap.
+    _is_mas_installed() {
+        [[ -z "$mas_lc" ]] && return 1
+        local short="$1"
+        local stem="${short%-app}"
+        stem="${stem%-desktop}"
+        # Replace dashes with spaces for the search term (App Store names
+        # generally have spaces, e.g. "Tailscale" or "The Unarchiver").
+        local search="${stem//-/ }"
+        printf '%s\n' "$mas_lc" | grep -qF -- "$search" && return 0
+        return 1
+    }
+
     local cask_list
     cask_list="$(brew bundle list --casks --file="$file" 2>/dev/null)" || return 0
     [[ -n "$cask_list" ]] || return 0
 
-    # Two-stage filter: drop already-tracked, then drop casks whose .app
-    # isn't present (we can't safely --adopt those — brew would download).
-    local needs_adopt=() already=0 not_present=0 cask short
+    # Three-stage filter:
+    #   - drop already-tracked (cheap filesystem check)
+    #   - drop casks whose .app isn't in /Applications/ (no point — brew would
+    #     download anyway)
+    #   - drop casks already installed via Mac App Store (would trigger the
+    #     "already installed via Mac App Store" pkg-installer dialog)
+    local needs_adopt=() already=0 not_present=0 mas_conflict=0 cask short
     while IFS= read -r cask; do
         [[ -n "$cask" ]] || continue
         short="${cask##*/}"
@@ -205,43 +254,62 @@ adopt_existing_casks() {
             not_present=$(( not_present + 1 ))
             continue
         fi
+        if _is_mas_installed "$short"; then
+            mas_conflict=$(( mas_conflict + 1 ))
+            info "  skipping $short — also installed via Mac App Store (mas)"
+            continue
+        fi
         needs_adopt+=("$cask")
     done <<< "$cask_list"
 
     local total=${#needs_adopt[@]}
     if (( total == 0 )); then
-        info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/ (will install via bundle), nothing to adopt"
+        info "Adopt pre-flight: $already tracked, $not_present not in /Applications/, $mas_conflict mas-conflict, nothing to adopt"
         return 0
     fi
 
-    info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/, attempting --adopt on $total cask(s) with matching .app..."
+    info "Adopt pre-flight: $already tracked, $not_present not in /Applications/, $mas_conflict mas-conflict, attempting --adopt on $total cask(s)..."
 
-    local adopted=0 failed=0 idx=0
+    local adopted=0 failed=0 idx=0 err
+    local err_file
+    err_file="$(mktemp -t cz_adopt_err.XXXXXX)"
     for cask in "${needs_adopt[@]}"; do
         idx=$(( idx + 1 ))
         short="${cask##*/}"
         info "  ($idx/$total) trying $short..."
         # Re-warm sudo TTY timestamp before each adopt call. Pkg-based casks
         # (google-drive, etc.) shell out to `sudo /usr/sbin/installer` from a
-        # subshell that doesn't always inherit our controlling TTY; without a
-        # fresh warm-cache the user gets a raw `Password:` prompt. No-op for
-        # passwordless / non-interactive setups.
+        # subshell that doesn't always inherit our controlling TTY. Best-effort:
+        # brew may still re-prompt for its own sudo invocations.
         command -v sudo_session_warm_cache >/dev/null 2>&1 && \
             sudo_session_warm_cache 2>/dev/null || true
-        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+        if brew install --cask --adopt "$cask" >/dev/null 2>"$err_file"; then
             adopted=$(( adopted + 1 ))
             info "    ✓ adopted: $short"
         else
             failed=$(( failed + 1 ))
-            info "    ✗ adopt failed (will retry via bundle): $short"
+            # Surface the first non-blank brew stderr line so user can
+            # distinguish version-mismatch from pkg-conflict from network.
+            err="$(grep -m1 -E '^(Error|Warning):' "$err_file" 2>/dev/null \
+                    || head -n1 "$err_file" 2>/dev/null)"
+            if [[ -n "$err" ]]; then
+                info "    ✗ adopt failed: $short — ${err}"
+            else
+                info "    ✗ adopt failed (no brew stderr captured): $short"
+            fi
         fi
     done
+    rm -f "$err_file"
 
-    info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $not_present not in /Applications/, $failed adopt-failed"
+    info "Adopt pre-flight done: $adopted adopted, $already tracked, $not_present absent, $mas_conflict mas-conflict, $failed adopt-failed"
 }
 
-info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks..."
-adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+# Gated on CHEZMOI_BREW_ADOPT_PREFLIGHT=1 (opt-in). See block comment above
+# for the trade-offs that made this opt-in.
+if [[ "${CHEZMOI_BREW_ADOPT_PREFLIGHT:-0}" = "1" ]]; then
+    info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks (CHEZMOI_BREW_ADOPT_PREFLIGHT=1)..."
+    adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+fi
 {{ end -}}
 
 # Run brew bundle up to N times. Subsequent attempts only retry items that

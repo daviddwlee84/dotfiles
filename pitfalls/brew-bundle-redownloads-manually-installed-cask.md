@@ -12,7 +12,7 @@
 
 **First seen**: 2026-05 on `Hanrus-Mac-mini` (mac-mini with many `.app`s pre-dragged into `/Applications/`, then `chezmoi update --init` from a different machine's `Brewfile.darwin`)
 **Affects**: any macOS host where casks declared in `~/.config/homebrew/Brewfile.darwin` have `.app` artifacts already present in `/Applications/` but no corresponding entry in `/opt/homebrew/Caskroom/<name>/.metadata/`
-**Status**: fixed in `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` via an `--adopt` pre-flight pass (lines 111-165). Upstream feature added in [Homebrew/brew#14033](https://github.com/Homebrew/brew/pull/14033) closing [#14006](https://github.com/Homebrew/brew/issues/14006) — `brew install --cask --adopt` "adopts" an existing artifact in-place without downloading.
+**Status**: **partially mitigated** in `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`. The stale-lockfile half (`clear_brew_download_locks` + retry pass) is permanently on. The `--adopt` pre-flight half is **opt-in** via `CHEZMOI_BREW_ADOPT_PREFLIGHT=1` — see "Why `--adopt` is opt-in" below. Upstream `--adopt` was added in [Homebrew/brew#14033](https://github.com/Homebrew/brew/pull/14033) closing [#14006](https://github.com/Homebrew/brew/issues/14006).
 
 ## Symptom
 
@@ -53,34 +53,58 @@ Two cascading issues:
 
 The two failure modes are independent but co-occur: (1) makes brew try to re-download apps you already have, and (2) makes that re-download cascade into many parallel locked-file errors at once.
 
-## Workaround
+## Why `--adopt` is opt-in (the field-tested findings)
 
-The repo's `chezmoi apply` now does this automatically. **If you need to do it manually** (one-off, or on a host that hasn't applied the latest `run_onchange_after_30_brew_bundle.sh.tmpl` yet):
+The first implementation of the adopt pre-flight ran unconditionally. Real-world testing on `Hanrus-Mac-mini` (22 casks in `Brewfile.darwin`, ~half drag-installed) revealed four reasons `--adopt` isn't the clean win the upstream PR description suggests:
+
+1. **`--adopt` does NOT fast-fail on a missing artifact.** brew's cask installer always runs `fetch_artifacts` (download) BEFORE `install_artifacts` (where the `--adopt` branch decides adopt-or-error). So `brew install --cask --adopt cursor` when `/Applications/Cursor.app` doesn't exist will still download `Cursor-darwin-arm64.zip` (~150MB from cursor.com CDN, painfully slow on CN networks) and only THEN raise `Error: It seems there is no installed App at '/Applications/Cursor.app' to adopt`. Our script now filesystem-prefilters by `/Applications/*.app` presence to avoid this — but that only catches the "missing" case, not the "present-but-mismatched" case below.
+
+2. **`--adopt` is byte-exact strict.** brew compares the downloaded artifact's SHA256 against `/Applications/<App>.app`. If your manually-installed version is anything other than the *exact* current brew-formula version, brew raises an error and falls back to a full install (downloads, then overwrites). In one real-world apply, only **8 of 19** filtered casks actually adopted; the other 11 hit version mismatch (user had v3.3.30 of Cursor, brew expected v3.3.32, etc.) and re-downloaded anyway. Net win on first apply: ~36%.
+
+3. **Password storm.** Each `brew install --cask --adopt` invocation internally shells out to `sudo /usr/sbin/installer` (pkg-based casks) or `sudo xattr` (quarantine bit removal) or similar. Our `sudo_session_warm_cache` warms the TTY timestamp once, but brew's internal sudo invocations don't always reuse it — they may `sudo -k` first or use a different timestamp_type. Observed: one `Password:` prompt per pkg-based cask, with multi-second gaps where the user must babysit the terminal.
+
+4. **Mac App Store conflicts.** Casks whose vendor also ships via the App Store (e.g. `tailscale-app`) pop up an interactive *"Mac App Store Install Detected"* dialog mid-apply when brew runs the cask's pkg installer. The opt-in version detects this via `mas list` and skips those casks, but you'd never know to look for it otherwise.
+
+Combined, the unconditional pre-flight cost the user ~15 minutes of password-babysitting and re-downloads to save ~3 minutes of bundle-install work. Hence: opt-in.
+
+## When opting in IS worthwhile
+
+`export CHEZMOI_BREW_ADOPT_PREFLIGHT=1` in `~/.shellrc.adhoc` if:
+
+- You're setting up a new mac.
+- You have just `chezmoi init`'d from a source machine and are about to first-apply.
+- Most apps you've manually dragged into `/Applications/` happen to be the current brew-formula versions (rare in practice — vendor auto-updaters drift the .app forward faster than Brewfile gets refreshed).
+- You can tolerate sitting at the terminal to feed `Password:` prompts.
+
+Otherwise, leave it off. `brew bundle`'s normal download path is slower one-time but doesn't require babysitting, and once a cask is brew-tracked subsequent applies are fast.
+
+## Workaround (manual, no script)
+
+If you want to run adopt manually without enabling the env var:
 
 ```bash
 # 1. Clear stale lockfiles from any interrupted prior fetch
 rm -f ~/Library/Caches/Homebrew/downloads/*.incomplete*
 
-# 2. Adopt every cask whose .app is in /Applications/ but isn't tracked by brew
-brew bundle list --casks --file=~/.config/homebrew/Brewfile.darwin | while IFS= read -r cask; do
-    brew list --cask "$cask" &>/dev/null && continue   # already tracked
-    brew install --cask --adopt "$cask" 2>/dev/null && echo "adopted: $cask"
+# 2. Try adopting (slow + interactive — expect password prompts)
+HOMEBREW_NO_AUTO_UPDATE=1 brew bundle list --casks --file=~/.config/homebrew/Brewfile.darwin | while IFS= read -r cask; do
+    short="${cask##*/}"
+    [[ -d /opt/homebrew/Caskroom/$short ]] && continue   # already tracked
+    # Pre-filter: only try if /Applications/ has a likely match
+    /bin/ls -1 /Applications | grep -iqE "^${short//-/[ -]?}.*\.app$" || continue
+    brew install --cask --adopt "$cask" 2>&1 | head -2
 done
 
-# 3. Re-run brew bundle without auto-update noise
+# 3. Re-run brew bundle
 HOMEBREW_NO_AUTO_UPDATE=1 brew bundle --file=~/.config/homebrew/Brewfile.darwin --no-upgrade
 ```
 
-`brew install --cask --adopt <name>` writes the missing `Caskroom/<name>/.metadata/<version>/...` records pointing at the existing `/Applications/<Name>.app` — **no download happens** — so subsequent `brew bundle` runs see the cask as "already installed" and skip it.
-
-`--adopt` exits non-zero (silently in the script) when the cask's expected `.app` isn't in `/Applications/` at all; that's expected — the regular `brew bundle` pass will then install it normally.
-
 ## Prevention
 
-- `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` now runs an `adopt_existing_casks` pre-flight before `brew bundle` on macOS (lines 121-165). It enumerates casks via `brew bundle list --casks --file=…`, skips ones brew already tracks, and runs `brew install --cask --adopt <name>` on the rest.
-- Between bundle retry attempts the script calls `clear_brew_download_locks` to wipe any `.incomplete*` files left over from a previous interrupted fetch (lines 174-182).
-- The script exports `HOMEBREW_NO_AUTO_UPDATE=1` + `HOMEBREW_NO_INSTALL_UPGRADE=1` so `brew bundle` doesn't trigger the implicit `brew update` that can transiently fail on Aliyun mirror sync lag (`Unable to find <sha> under https://mirrors.aliyun.com/homebrew/brew.git`). Upgrades go through `just upgrade-*`, per `AGENTS.md → "Install vs upgrade is split on purpose"`.
-- When adding a new cask to `dot_config/homebrew/Brewfile.darwin.tmpl`, don't pre-emptively delete any existing `/Applications/<Name>.app` — the adopt pre-flight handles it on next apply.
+- `.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl` exports `HOMEBREW_NO_AUTO_UPDATE=1` + `HOMEBREW_NO_INSTALL_UPGRADE=1` to avoid the implicit `brew update` that can transiently fail on Aliyun mirror sync lag (`Unable to find <sha> under https://mirrors.aliyun.com/homebrew/brew.git`). Upgrades go through `just upgrade-*`, per `CLAUDE.md → "Install vs upgrade is split on purpose"`.
+- The bundle retry loop calls `clear_brew_download_locks` between attempts to wipe any `*.incomplete*` files left over from a previous interrupted fetch. This is permanently on (not opt-in) — it's pure win, no downsides.
+- The `adopt_existing_casks` pre-flight runs only when `CHEZMOI_BREW_ADOPT_PREFLIGHT=1` is set (see "Why opt-in" above). When enabled it also: (a) filesystem-pre-filters casks by `/Applications/*.app` presence so non-existent .apps don't trigger a download, (b) checks `mas list` to skip App Store conflicts, (c) captures brew's first stderr line on failure so you can see *why* an adopt failed.
+- When adding a new cask to `dot_config/homebrew/Brewfile.darwin.tmpl`, don't pre-emptively delete any existing `/Applications/<Name>.app` — even if adopt won't help (version mismatch), the cask will install correctly on first apply.
 
 ## Related
 
