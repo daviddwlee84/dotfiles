@@ -1,0 +1,78 @@
+# Custom fleet-hosts channel for television (tv).
+# Sourced from ~/.config/fleet/machines.toml — the same inventory used by
+# `fleet chezmoi apply` / `fleet tmux` / `fleet info` / `fleet pueue` /
+# `fleet exec`. Mirrors the `ssh-config` cable's UX but reads fleet's TOML
+# inventory instead of ~/.ssh/config, so hosts with explicit
+# hostname/user/port/identity_file (no ssh_alias) are reachable too.
+#
+# The actual TOML parsing lives in Python — this cable shells out to:
+#   fleet hosts --list-tsv      (source — `name<TAB>target<TAB>kind` lines)
+#   fleet hosts --describe N    (preview pane content)
+#   fleet hosts N               (Enter action — os.execvp("ssh", ...))
+# So this file stays small and the picker tracks any inventory changes
+# automatically (no parallel TOML parser to keep in sync).
+#
+# Usage:
+#   tv fleet-hosts
+#   fleet hosts          # same picker via the fleet umbrella
+#   fleet hosts lab-box  # skip the picker, SSH directly
+#
+# Keybindings (Alt+ namespace to avoid TV/tmux conflicts):
+#   Enter      SSH into the selected host
+#   Alt+T      BatchMode SSH probe (does passwordless login actually work?)
+#   Alt+S      fleet chezmoi status scoped to this host
+#   Alt+I      fleet info scoped to this host
+#   Alt+P      fleet pueue scoped to this host
+#   Ctrl+/     Toggle preview panel
+#
+# `local = true` hosts are intentionally hidden — they live on the
+# orchestrator and have no SSH endpoint. Run `fleet hosts --list-tsv
+# --include-local` to confirm one is in the inventory.
+
+[metadata]
+name = "fleet-hosts"
+description = "Fleet hosts (from ~/.config/fleet/machines.toml)"
+requirements = ["fleet", "ssh"]
+
+[source]
+command = "fleet hosts --list-tsv"
+# Lines look like:   name<TAB>target<TAB>kind
+# e.g.   lab-box <TAB> lab-box <TAB> alias:lab-box
+#        vps-tokyo <TAB> 203.0.113.42 <TAB> explicit:dwlee@203.0.113.42
+display = "{split:\\t:0}  ({split:\\t:2})"
+output = "{split:\\t:0}"
+
+[preview]
+command = "fleet hosts --describe '{split:\\t:0}'"
+
+[keybindings]
+enter = "actions:connect"
+alt-t = "actions:probe"
+alt-s = "actions:status"
+alt-i = "actions:info"
+alt-p = "actions:pueue"
+
+[actions.connect]
+description = "SSH into the selected fleet host"
+command = "fleet hosts '{split:\\t:0}'"
+mode = "execute"
+
+[actions.probe]
+description = "BatchMode SSH probe (passwordless login check)"
+command = "fleet hosts --probe '{split:\\t:0}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.status]
+description = "fleet chezmoi status for this host"
+command = "fleet chezmoi status --hosts '{split:\\t:0}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.info]
+description = "fleet info for this host"
+command = "fleet info --hosts '{split:\\t:0}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.pueue]
+description = "fleet pueue for this host"
+command = "fleet pueue --hosts '{split:\\t:0}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"

@@ -93,6 +93,7 @@ with its underlying flags.
 | `fleet info [...]` | (new) — see below |
 | `fleet pueue [...]` | (new) — cross-host pueue queue summary; `--ai` for cleanability + recovery hints via local `pqsum`. See [docs/tools/pueue.md](../tools/pueue.md). |
 | `fleet exec [OPTS] -- CMD [...]` | (new) — cross-host argv-list command runner. Argv after `--` is safe by default (no shell expansion). `--shell bash\|zsh` for pipes/globs, `--login` for rc-loaded env, `--ai` for succeeded/differed/failed classification. See [docs/tools/fleet-exec.md](../tools/fleet-exec.md). |
+| `fleet hosts [NAME\|--list*]` | (new) — TV-style picker for SSH'ing into a fleet host. Backed by `tv fleet-hosts` (cable shells out to `fleet hosts --list-tsv` / `--describe` / NAME). `fleet hosts NAME` skips the picker; `--list-tsv` / `--list-json` for scripts. See [docs/tools/fleet-hosts.md](../tools/fleet-hosts.md). |
 
 The umbrella discovers the chezmoi source dir at runtime via `chezmoi
 source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the

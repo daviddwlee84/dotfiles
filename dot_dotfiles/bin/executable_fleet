@@ -18,6 +18,9 @@ Top-level layout (2026-05-13):
   fleet info [...]               Cross-host system status snapshot
   fleet pueue [...]              Cross-host pueue queue summary
   fleet exec [OPTS] -- CMD [...]  Cross-host ad-hoc command runner
+  fleet hosts [NAME|--list*]     Interactive picker (via `tv fleet-hosts`)
+                                 for SSH'ing into a fleet-configured host.
+                                 Backed by scripts/fleet/hosts.py.
   fleet edit                     $EDITOR ~/.config/fleet/machines.toml
                                  (fleet-meta — used by every subcommand)
 
@@ -77,6 +80,12 @@ Generic primitives (top-level — work regardless of deploy tool):
                           --shell bash|zsh for pipes/globs; --login for full
                           rc-loaded env; --ai for succeeded/differed/failed
                           classification across hosts.
+  hosts [NAME] [--list|--list-tsv|--list-json|--describe N|--probe N]
+                          Interactive picker (via `tv fleet-hosts`) for
+                          SSH'ing into a fleet host. `fleet hosts NAME` skips
+                          the picker and SSHes directly. `--list*` modes are
+                          script-friendly inventory dumps; `--describe` /
+                          `--probe` back the TV cable's preview + Alt+T.
 
 Examples:
   fleet chezmoi status               # readiness across all hosts
@@ -91,6 +100,9 @@ Examples:
   fleet exec --ai -- df -h /         # AI summary of disk usage
   fleet exec --shell bash -- 'cat *.log | wc -l'
                                      # opt-in shell expansion (pipes/globs)
+  fleet hosts                        # TV picker → Enter to SSH
+  fleet hosts lab-box                # SSH straight into one host
+  fleet hosts --list-tsv             # name<TAB>target<TAB>kind (cable source)
 
 See docs/this_repo/fleet-apply.md for full mental model.
 """
@@ -227,6 +239,12 @@ def _dispatch_exec(forwarded: list[str]) -> int:
     return exec_main()
 
 
+def _dispatch_hosts(forwarded: list[str]) -> int:
+    sys.argv = ["fleet hosts", *forwarded]
+    from scripts.fleet.hosts import main as hosts_main
+    return hosts_main()
+
+
 _CHEZMOI_ACTIONS = """\
 Subcommands under `fleet chezmoi`:
   apply [...]      Run chezmoi update --init across the fleet
@@ -293,6 +311,7 @@ def main() -> int:
         "info": _dispatch_info,
         "pueue": _dispatch_pueue,
         "exec": _dispatch_exec,
+        "hosts": _dispatch_hosts,
     }
     fn = dispatch.get(sub)
     if fn is None:
