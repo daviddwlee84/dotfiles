@@ -915,3 +915,2480 @@ Inspect lsappinfo output format
     bundleID="org.alacritty"
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:10Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:11Z)**_
+
+The awk parser was naive — `lsappinfo` is multi-line. Let me swap `--pids` to AppleScript (which exposes `unix id` directly) — cleaner than parsing.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test AppleScript pid+name combo
+
+`osascript -e 'tell application "System Events"' -e 'set out to ""' -e 'repeat with p in (every application process whose background only is false)' -e 'set out to out & (unix id of p) & tab & (name of p) & linefeed' -e 'end repeat' -e 'return out' -e 'end tell' | head -5`
+
+```text
+703	alacritty
+708	Super Productivity
+710	Arc
+712	Tailscale
+715	ChatGPT
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:33Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/54_macos_apps.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-render and syntax-check
+
+`chezmoi execute-template --init < dot_config/shell/54_macos_apps.sh.tmpl > /tmp/54_macos_apps.sh && bash -n /tmp/54_macos_apps.sh && zsh -n /tmp/54_macos_apps.sh && echo 'syntax OK'`
+
+```text
+syntax OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-test all read-only helpers
+
+`bash -c '. /tmp/54_macos_apps.sh; echo "=== applist (first 5) ==="; applist | head -5; echo "=== applist --pids (first 5) ==="; applist --pids | head -5; echo "=== appquit --help ==="; appquit --help; echo "=== appquit (no arg) ==="; appquit 2>&1; echo "rc=$?"'`
+
+```text
+=== applist (first 5) ===
+alacritty
+Super Productivity
+Arc
+Tailscale
+ChatGPT
+=== applist --pids (first 5) ===
+703	alacritty
+708	Super Productivity
+710	Arc
+712	Tailscale
+715	ChatGPT
+=== appquit --help ===
+usage: appquit <AppName>
+  Send Quit Apple Event (graceful shutdown).
+  Example: appquit OrbStack
+=== appquit (no arg) ===
+usage: appquit <AppName>
+  e.g. appquit OrbStack
+rc=2
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:53Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:53Z)**_
+
+All read-only helpers work. Let me verify name-with-spaces handling (the argv-passing was specifically for this) and confirm zsh also works.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test under zsh with app names containing spaces
+
+`zsh -c '. /tmp/54_macos_apps.sh; apprunning "Super Productivity" && echo "yes" || echo "no"; apprunning "Google Chrome No Such App" && echo "yes" || echo "no"; appresponsive "Super Productivity" && echo responsive || echo hung'`
+
+```text
+yes
+no
+responsive
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:02Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:02Z)**_
+
+All working. Now updating `docs/shells/aliases.md` per the CLAUDE.md cross-file rule (TOC + new section).
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify docs build under strict mode
+
+`uv run mkdocs build --strict 2>&1 | tail -15`
+
+```text
+INFO    -  Doc file 'tools/tmux/themes.zh-TW.md' contains a link '#responsive-status-bar-catppuccin', but there is no such anchor on this page.
+INFO    -  Doc file 'tools/tmux/vim.zh-TW.md' contains a link './keybindings.md#copy-mode-vim-style', but the doc 'tools/tmux/keybindings.zh-TW.md' does not contain an anchor '#copy-mode-vim-style'.
+WARNING -  mkdocs_llmstxt: Page URI 'index.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/aicapture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/zsh-inline-ai.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/tmux/README.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/sesh.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/clipboard.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/agent-overlays.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'playbooks/workflow.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/architecture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/fleet-apply.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+
+Aborted with 11 warnings in strict mode!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:30Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:30Z)**_
+
+Pre-existing anchor-drift / llmstxt warnings — none mention my new content. Let me verify chezmoi planning is clean.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show chezmoi diff for the new file
+
+`chezmoi diff dot_config/shell/54_macos_apps.sh 2>&1 | head -10`
+
+```text
+chezmoi: timeout obtaining persistent state lock, is another instance of chezmoi running?
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check that chezmoi sees the new template as managed
+
+`chezmoi managed | grep '54_macos_apps' ; echo '---' ; ls -la "$(chezmoi target-path 2>/dev/null)/.config/shell/54_macos_apps.sh" 2>&1 | head -3`
+
+```text
+.config/shell/54_macos_apps.sh
+---
+"/.config/shell/54_macos_apps.sh": No such file or directory (os error 2)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:46:52Z)**_
+
+`chezmoi managed` sees it as `.config/shell/54_macos_apps.sh`. All good. Quick summary of what landed.
+
+## Done
+
+**New file**: `dot_config/shell/54_macos_apps.sh.tmpl` (used slot 54 since `55_macos_mem.sh.tmpl` is taken — proximity preserved).
+
+Chezmoi-template-gated on `darwin` + runtime `uname -s` guard (matches the `55_macos_mem` pattern), POSIX-portable so both bash + zsh source it.
+
+| Function | Effect |
+|---|---|
+| `appquit NAME` | Graceful ⌘Q-equivalent Quit Apple Event |
+| `applaunch NAME` | Background start (no focus steal) |
+| `appactivate NAME` | Start + bring to front |
+| `apprestart NAME` | `appquit` → poll until process gone (≤15s) → `applaunch` |
+| `apprunning NAME` | Silent predicate (`apprunning OrbStack && …`) |
+| `applist [--pids\|--all]` | Foreground GUI apps (default), `--pids` adds `pid\tname`, `--all` includes background daemons |
+| `appresponsive NAME [TIMEOUT]` | Best-effort "Not Responding" detection via Apple Event with `with timeout` (default 2s) |
+
+**Quoting safety**: every helper passes `$1` via `osascript ... -- "$1"` + `(item 1 of argv)` rather than embedding in `-e "tell application \"$1\""`. So `appquit "Google Chrome"` works without shell-injection hazards.
+
+**Frozen detection — honest caveat**: macOS does NOT expose "Not Responding" via public API. `appresponsive` uses the public proxy (send a no-op `get name` with `with timeout`; if AppleScript throws, it's hung). False positives possible during launch — bump `TIMEOUT` for slow-starting apps.
+
+## Verified
+- bash + zsh syntax check pass
+- `chezmoi execute-template` renders cleanly
+- Live tested under both shells against `Finder` (running) / `DefinitelyNotARealApp` (not) / `"Super Productivity"` (space in name)
+- `applist` and `applist --pids` both return correct output
+- `mkdocs build --strict` — no new warnings (only pre-existing anchor-drift)
+
+## Mirrored
+- `docs/shells/aliases.md` — added TOC entry + new `## macOS apps` section with all 7 functions
+- No new CLAUDE.md cross-file rule needed; the generic "Alias/function → `docs/shells/aliases.md`" row already covers it
+
+## Usage example
+```sh
+apprunning OrbStack || applaunch OrbStack       # idempotent ensure-running
+appresponsive OrbStack 5 || apprestart OrbStack # kick stuck VM
+applist --pids | grep -i docker                 # find Docker-flavored apps
+```
+
+---
+
+_**User (2026-05-13 09:55:40Z)**_
+
+git commit changes
+
+& 也許我們可以做一個 tv channel 用來先 applit 然後再看要不要做following action 等等
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 09:55:51Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:55:52Z)**_
+
+Two things — let me commit first (touching only the files I added/modified, not the unrelated changes from prior sessions), then design the tv channel.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:55:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show working tree status
+
+`git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+	modified:   docs/shells/aliases.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+	dot_config/shell/54_macos_apps.sh.tmpl
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:55:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show diff of aliases.md to confirm only my changes
+
+`git diff docs/shells/aliases.md`
+
+```text
+diff --git a/docs/shells/aliases.md b/docs/shells/aliases.md
+index f588883..5e1d089 100644
+--- a/docs/shells/aliases.md
++++ b/docs/shells/aliases.md
+@@ -24,6 +24,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles
+ - [Task Queue](#task-queue)
+ - [Networking](#networking)
+ - [Log Viewers](#log-viewers)
++- [macOS apps](#macos-apps)
+ - [Media / AV](#media--av)
+ - [Clipboard History](#clipboard-history)
+ - [Shell Utilities](#shell-utilities)
+@@ -620,6 +621,22 @@ Quick reference for custom aliases and shell functions defined in this dotfiles
+ 
+ ---
+ 
++## macOS apps
++
++> Graceful GUI app control via `osascript` + Apple Events. Prefer over `killall` for apps with state (OrbStack, Docker Desktop, Slack, etc.) — `quit` sends ⌘Q-equivalent, letting the app tear down cleanly. App NAME is the AppleScript name (e.g. `OrbStack`, `Google Chrome`), not bundle ID; passed via `osascript argv` so spaces/quotes are safe.
++
++| Command | Type | Source File | Description |
++|---------|------|-------------|-------------|
++| `appquit <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Send Quit Apple Event (graceful, equivalent to ⌘Q). |
++| `applaunch <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start in background (no focus steal). |
++| `appactivate <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Start (if needed) and bring to front. |
++| `apprestart <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** `appquit` + poll until process gone (≤15s) + `applaunch`. |
++| `apprunning <AppName>` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Silent predicate; exit 0 if running, 1 otherwise. |
++| `applist [--pids\|--all]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** List foreground GUI apps, one per line. `--pids` prepends PID + tab; `--all` includes background-only / agent processes. |
++| `appresponsive <AppName> [TIMEOUT_SEC]` | function | `dot_config/shell/54_macos_apps.sh.tmpl` | **macOS-only.** Best-effort "Not Responding" detection: sends a no-op Apple Event with `with timeout` (default 2s). Exit 0 if app replies, 1 if hung / not running / scripting-disabled. False positives possible during launch. |
++
++---
++
+ ## Media / AV
+ 
+ > Powered by `ffmpeg` (video / audio) and `ImageMagick` (image). Loaded when any media tool is on `$PATH` — typically via `installMediaTools=true`. Each function self-checks for its specific dep. See [docs/tools/ffmpeg.md](../tools/ffmpeg.md) and [docs/tools/imagemagick.md](../tools/imagemagick.md) for the underlying tools.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:55:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Recent commit message style
+
+`git log --oneline -8`
+
+```text
+697693f feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+c819d44 feat(fleet): fleet hosts — TV-style picker for SSH'ing into machines
+1939bff feat(fleet): namespace chezmoi ops under `fleet chezmoi <action>` + spinner
+602e511 refactor(fleet): move scripts/fleet_apply.py into scripts/fleet/
+7559477 feat(fleet): fleet exec — cross-host argv runner + AI summary
+f342965 docs(backlog): plan fleet exec — cross-host argv runner + AI summary
+03fcf09 fix(pueue): reorder PATH + split status breakdown by result
+bae1f48 fix(fleet): augment PATH on remote pueue probes
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:08Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:09Z)**_
+
+Clean — my changes are isolated from the other in-flight work. Staging only my two files and committing.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage only the app-helper feature files
+
+`git add dot_config/shell/54_macos_apps.sh.tmpl docs/shells/aliases.md && git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   docs/shells/aliases.md
+	new file:   dot_config/shell/54_macos_apps.sh.tmpl
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:15Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:16Z)**_
+
+`09-25-23Z-hash-ls-eza-session.md` is a prior session's transcript that was already staged from before — not mine. Unstaging it.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Unstage unrelated session transcript
+
+`git restore --staged .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md && git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   docs/shells/aliases.md
+	new file:   dot_config/shell/54_macos_apps.sh.tmpl
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the app-helpers feature
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat(shell): app-* helpers — graceful macOS GUI control via osascript
+
+Adds appquit / applaunch / appactivate / apprestart / apprunning / applist /
+appresponsive in a new dot_config/shell/54_macos_apps.sh.tmpl (chezmoi-gated
+on darwin + runtime uname guard). Wraps osascript Apple Events so apps with
+state (OrbStack, Docker Desktop, Slack) tear down cleanly instead of being
+SIGTERM'd by killall. App names pass via osascript argv to handle spaces /
+quotes safely. appresponsive uses AppleScript 'with timeout' as the public
+proxy for the private "Not Responding" SPI.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778666183-22350.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778666183-22350.
+[main ce5e23a] feat(shell): app-* helpers — graceful macOS GUI control via osascript
+ 2 files changed, 218 insertions(+)
+ create mode 100644 dot_config/shell/54_macos_apps.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:27Z)**_
+
+Commit `ce5e23a` landed. Now let me look at how existing tv channels are structured before designing the macOS apps channel.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List existing tv cable channels
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ | head -30`
+
+```text
+ agent-panes.toml
+ agent-sessions.toml
+ aliases.toml
+ ansible.toml
+ audit-events.toml
+ azure.toml
+ channels.toml
+ clash-api.toml
+ clash.toml
+ disk.toml.tmpl
+ firewall.toml.tmpl
+ fleet-hosts.toml
+ git-ops.toml
+ keybindings.toml
+ kill-process.toml
+ lan-devices.toml
+ logs.toml.tmpl
+ mac-procs.toml.tmpl
+ mlflow.toml
+ ports.toml
+ pueue.toml
+ scheduled-jobs.toml.tmpl
+ services-health.toml.tmpl
+ services.toml.tmpl
+ sesh.toml.reference
+ sessions.toml.tmpl
+ skills-walk.toml
+ skills.toml
+ sms.toml
+ ssh-config.toml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rest of the cable channels
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/ | tail -20`
+
+```text
+ lan-devices.toml
+ logs.toml.tmpl
+ mac-procs.toml.tmpl
+ mlflow.toml
+ ports.toml
+ pueue.toml
+ scheduled-jobs.toml.tmpl
+ services-health.toml.tmpl
+ services.toml.tmpl
+ sesh.toml.reference
+ sessions.toml.tmpl
+ skills-walk.toml
+ skills.toml
+ sms.toml
+ ssh-config.toml
+ sudo-history.toml
+ super-productivity.toml
+ sysadmin.toml.tmpl
+ tools.toml
+ users.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:32Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/mac-procs.toml.tmpl`
+
+```text
+1	{{- if eq .chezmoi.os "darwin" -}}
+2	# mac-procs channel for television (tv) — macOS-only
+3	# Fuzzy-pick the heaviest processes by memory (compressed-aware), with
+4	# previews showing per-process VM map and open files.
+5	#
+6	# Pairs with: dot_config/shell/55_macos_mem.sh.tmpl (mac-mem-*)
+7	#             docs/tools/macos-swap.md (full deep-dive)
+8	#
+9	# Why this exists vs the generic kill-process channel:
+10	#   - kill-process sorts by RSS (ps -axm). On Apple Silicon, RSS does
+11	#     NOT include compressed or swapped pages — a process leaking 2 GB
+12	#     of compressed data shows as 100 MB in RSS view.
+13	#   - This channel uses `top -l 1 -o mem`, whose mem column matches
+14	#     Activity Monitor's "Memory" column (compressed-aware).
+15	#   - Per-PID preview uses `vmmap -summary` for the VM region breakdown
+16	#     ps cannot show. (Apple Silicon also has `footprint -p PID` but it
+17	#     needs sudo to inspect other users' processes.)
+18	#
+19	# No Alt-key bindings yet — user wanted to start with Enter only, add
+20	# shortcuts after evaluating which actions are actually used. When
+21	# ready, candidates: Alt+K (kill -TERM), Alt+9 (kill -9), Alt+I
+22	# (footprint), Alt+V (vmmap full). Check AGENTS.md "Keyboard shortcuts"
+23	# matrix before claiming any new Alt slot.
+24	#
+25	# Usage:
+26	#   tv mac-procs
+27	#
+28	# Source cycling (Ctrl+S):
+29	#   1. Top by Memory (compressed-aware, default) — matches Activity Monitor
+30	#   2. Top by CPU                                — what's burning the fan
+31	#   3. Top by virtual size (ps -axm)             — fragmented apps / Electron
+32	#
+33	# Preview cycling (Ctrl+F):
+34	#   1. vmmap -summary  — VM region breakdown (no sudo)
+35	#   2. ps metadata     — pid/ppid/user/etime/state/full command
+36	#   3. lsof head       — top open files / sockets
+37	
+38	[metadata]
+39	name = "mac-procs"
+40	description = "macOS process picker — sorted by compressed-aware memory (top -o mem)"
+41	requirements = []
+42	
+43	[source]
+44	command = [
+45	  # Cycle 1: top by Memory (compressed-aware). Default. PID is field 1.
+46	  '''
+47	  top -l 1 -o mem -n 30 -stats pid,command,mem,cpu,threads,state 2>/dev/null \
+48	    | awk '/^PID/ {found=1; next}
+49	           found==1 && NF>=5 {
+50	               pid=$1; mem=$(NF-3); cpu=$(NF-2); thr=$(NF-1); st=$NF;
+51	               cmd=""; for (i=2;i<=NF-4;i++) cmd=cmd" "$i; sub(/^ /, "", cmd);
+52	               if (length(cmd) > 35) cmd=substr(cmd,1,32)"...";
+53	               printf "%-7s  %-35s  MEM %8s  CPU %5s%%  TH %4s  %s\n", pid, cmd, mem, cpu, thr, st;
+54	           }'
+55	  ''',
+56	  # Cycle 2: top by CPU. -l 2 because the first sample of `top -o cpu` is
+57	  # since-boot and useless; the second sample is the actual delta.
+58	  '''
+59	  top -l 2 -o cpu -n 30 -stats pid,command,mem,cpu,threads,state 2>/dev/null \
+60	    | awk '/^PID/ {found++; if(found==2) p=1; next}
+61	           p==1 && NF>=5 {
+62	               pid=$1; mem=$(NF-3); cpu=$(NF-2); thr=$(NF-1); st=$NF;
+63	               cmd=""; for (i=2;i<=NF-4;i++) cmd=cmd" "$i; sub(/^ /, "", cmd);
+64	               if (length(cmd) > 35) cmd=substr(cmd,1,32)"...";
+65	               printf "%-7s  %-35s  MEM %8s  CPU %5s%%  TH %4s  %s\n", pid, cmd, mem, cpu, thr, st;
+66	           }'
+67	  ''',
+68	  # Cycle 3: top by virtual size via ps. Catches Electron / fragmented apps
+69	  # whose VSZ dwarfs their compressed-aware mem.
+70	  '''
+71	  ps -axm -o pid,vsz,rss,comm 2>/dev/null \
+72	    | awk 'NR==1 {next}
+73	           NR<=31 {
+74	               pid=$1; vsz=$2/1024; rss=$3/1024;
+75	               cmd=$4; for (i=5;i<=NF;i++) cmd=cmd" "$i;
+76	               n=split(cmd,a,"/"); short=a[n];
+77	               if (length(short) > 35) short=substr(short,1,32)"...";
+78	               printf "%-7s  %-35s  VSZ %7.0fMB  RSS %7.0fMB\n", pid, short, vsz, rss;
+79	           }'
+80	  ''',
+81	]
+82	
+83	[preview]
+84	command = [
+85	  # Cycle 1: vmmap -summary. Always available without sudo for own-uid procs;
+86	  # for system procs you'll see "(parent's information not available)" — fine.
+87	  "vmmap -summary '{split: :0}' 2>/dev/null | head -80",
+88	  # Cycle 2: ps metadata in long form.
+89	  "ps -p '{split: :0}' -o pid,ppid,user,pgid,%cpu,%mem,etime,state,command 2>/dev/null",
+90	  # Cycle 3: lsof head — open files / sockets. Truncate to keep preview fast.
+91	  "lsof -p '{split: :0}' 2>/dev/null | head -40",
+92	]
+93	
+94	[keybindings]
+95	# Enter: select_passthrough emits the current row to stdout, so users can
+96	# pipe into other commands (e.g. `kill $(tv mac-procs | awk '{print $1}')`).
+97	# No Alt-key actions yet — see file header for rationale and future
+98	# candidates.
+99	{{ end -}}
+100
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:37Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:37Z)**_
+
+Let me look at a channel with action keybindings (like mlflow) and the channels manifest.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:39Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/mlflow.toml`
+
+```text
+1	# MLflow channel for television (tv).
+2	# Browse experiments, runs, and registered models against any MLflow tracking
+3	# backend (file:./mlruns, sqlite:///path/to/mlflow.db, or http://server:port).
+4	#
+5	# Usage:
+6	#   tv mlflow
+7	#   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 tv mlflow
+8	#   MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db tv mlflow
+9	#
+10	# Prerequisites:
+11	#   - `mlflow` installed (provided by dot_ansible/roles/python_uv_tools — the
+12	#     CLI binary is what we exec under the `uv run --script` shebang of the
+13	#     two helpers).
+14	#   - `uv` on PATH (installed by uv role; required to resolve the PEP 723
+15	#     inline-deps block in mlflow-source.py / mlflow-preview.py).
+16	#
+17	# Backend mode is resolved entirely from $MLFLOW_TRACKING_URI. When unset,
+18	# mlflow 3.12+ auto-detects from $PWD: an `mlflow.db` file picks sqlite, an
+19	# `mlruns/` dir picks file mode, otherwise it creates `mlruns/`. To pin a
+20	# backend at launch time:
+21	#   MLFLOW_TRACKING_URI=http://host:port tv mlflow
+22	#   MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db tv mlflow
+23	#
+24	# Source cycling (Ctrl+S):
+25	#   1. Experiments     all active experiments
+26	#   2. Recent runs     top 50 runs across all experiments, by start_time desc
+27	#   3. Runs (scoped)   runs in $MLFLOW_EXPERIMENT_ID (hint row when unset;
+28	#                      Alt+R on an experiment row sets it and re-launches tv)
+29	#   4. Models          registered models from the model registry
+30	#
+31	# Preview cycling (Ctrl+F):
+32	#   1. Full JSON       params, metrics, tags, artifact_uri, timestamps
+33	#   2. Metrics-only    sorted key=value table; or aggregated across recent
+34	#                      runs for an experiment row
+35	#
+36	# Keybindings:
+37	#   Enter      Context-aware:
+38	#                experiment row -> re-launch tv scoped to that experiment's
+39	#                                  runs (nested drill-in; Esc exits the
+40	#                                  drilled view back to the shell)
+41	#                run / model row -> open full JSON detail in pager
+42	#   Ctrl+Y     Copy id (experiment_id / run_id / model_name) to clipboard
+43	#   Ctrl+O     Open in browser (HTTP tracking URI only; prints a hint
+44	#              otherwise)
+45	#   Ctrl+B     Same as Ctrl+O — "B for browser" muscle-memory alias
+46	#   Alt+R      Explicit drill — same as Enter on an experiment row,
+47	#              available as a backup binding for muscle memory
+48	#   Alt+J      Dump full JSON to terminal (paged)
+49	#   Ctrl+F     Cycle preview
+50	#   Ctrl+S     Cycle source
+51	#
+52	# No `watch` field: mlflow imports are heavy (~1s warm, several seconds cold);
+53	# experiments and runs change on the minute scale anyway. Press Ctrl+R to
+54	# refresh manually after logging a new run.
+55	#
+56	# Hint row sentinel: when the backend is unreachable or a source is unscoped,
+57	# the helper emits a single row with id `__hint__`. Real mlflow ids never
+58	# collide (experiment_ids are non-negative ints; run_ids are 32-hex; model
+59	# names cannot contain `__hint__` in practice).
+60	
+61	[metadata]
+62	name = "mlflow"
+63	description = "MLflow tracking: experiments, runs, registered models (file/sqlite/http backends)"
+64	requirements = ["mlflow", "uv"]
+65	
+66	[source]
+67	command = [
+68	  "~/.config/television/mlflow-source.py experiments",
+69	  "~/.config/television/mlflow-source.py runs-recent",
+70	  "~/.config/television/mlflow-source.py runs-experiment",
+71	  "~/.config/television/mlflow-source.py models",
+72	]
+73	display = "{split:\\t:1}  {split:\\t:2}  {split:\\t:3}  ({split:\\t:4})"
+74	output = "{split:\\t:0}"
+75	no_sort = true
+76	
+77	[preview]
+78	# Helper always emits valid JSON now; pipe through `bat -l json` so the
+79	# preview pane gets syntax highlighting (numbers, strings, keys). Same
+80	# trick super-productivity.toml plays with `jq -C`, but bat's truecolor
+81	# theme is easier on the eyes for nested objects.
+82	#
+83	# `--paging=never` is load-bearing: bat detects "not a TTY" inside TV's
+84	# preview pipe and would otherwise still buffer; we want streamed output.
+85	# `--plain` strips line numbers / decorations so the preview pane shows
+86	# only the rendered content.
+87	command = [
+88	  "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view full    | bat --color=always --plain --paging=never --language=json",
+89	  "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view metrics | bat --color=always --plain --paging=never --language=json",
+90	]
+91	header = "{split:\\t:1}  {split:\\t:3}"
+92	
+93	[ui]
+94	input_header = "MLflow"
+95	
+96	[ui.preview_panel]
+97	size = 60
+98	
+99	[keybindings]
+100	enter = "actions:open-or-drill"
+101	# Override TV's default ctrl-y (which copies the entire display row) with
+102	# id-only copy. Matches super-productivity.toml's convention.
+103	ctrl-y = "actions:copy-id"
+104	ctrl-o = "actions:open-browser"
+105	# Ctrl+B is the muscle-memory alias — same action body as Ctrl+O. Reusing
+106	# the existing action keeps the channel self-contained even if `mlf` (the
+107	# umbrella CLI in dot_dotfiles/bin/) isn't installed.
+108	ctrl-b = "actions:open-browser"
+109	alt-r = "actions:drill-runs"
+110	alt-j = "actions:dump-json"
+111	
+112	[actions.open-or-drill]
+113	description = "Drill into experiment runs (experiment row) / open JSON detail (others)"
+114	# Kind detection mirrors mlflow-preview.py's _detect_kind:
+115	#   __hint__       -> show the help JSON (helpful when MLFLOW_TRACKING_URI is
+116	#                     misconfigured: lets the user read the example URIs)
+117	#   digit-only id  -> drill: re-exec tv with MLFLOW_EXPERIMENT_ID + a
+118	#                     --source-command override so the nested view shows ONLY
+119	#                     this experiment's runs. Esc exits the drill back to
+120	#                     the shell (TV does not have a back-stack; rerun
+121	#                     `tv mlflow` for cross-experiment views).
+122	#   anything else  -> open JSON detail in pager
+123	#
+124	# The header is set to "MLflow / <exp_name>" inside the drilled view so it's
+125	# obvious you're in the nested context, not the top-level one. {split:\t:3}
+126	# carries the experiment name in the experiments source layout (cols are:
+127	# id, marker, lifecycle, name, last_update).
+128	command = """id='{split:\\t:0}'; name='{split:\\t:3}'; case "$id" in
+129	  __hint__) ~/.config/television/mlflow-preview.py auto "$id" --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _ ;;
+130	  *[!0-9]*) ~/.config/television/mlflow-preview.py auto "$id" --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _ ;;
+131	  *) MLFLOW_EXPERIMENT_ID="$id" tv mlflow --source-command "~/.config/television/mlflow-source.py runs-experiment" --input-header "MLflow / $name" ;;
+132	esac"""
+133	mode = "execute"
+134	
+135	[actions.copy-id]
+136	description = "Copy row id (experiment_id / run_id / model_name) to clipboard"
+137	command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:0}' | _clip"""
+138	mode = "fork"
+139	
+140	[actions.open-browser]
+141	description = "Open in browser (HTTP tracking URI only)"
+142	# Build the URL inside the action so we read the live env var rather than
+143	# baking it in. Inference mirrors mlflow-preview.py's _detect_kind:
+144	#   32-hex id -> need a roundtrip to find experiment_id, just open root
+145	#   all-digit -> /#/experiments/<id>
+146	#   else      -> /#/models/<name>
+147	command = """id='{split:\\t:0}'; uri="${MLFLOW_TRACKING_URI:-}"; case "$uri" in http://*|https://*) ;; *) printf '[open-browser] needs MLFLOW_TRACKING_URI=http(s)://… — current: %s\\n' "${uri:-(unset)}"; sleep 2; exit 0 ;; esac; case "$id" in __hint__) printf '[open-browser] no row selected\\n'; sleep 2; exit 0 ;; esac; url="$uri/"; if [ "${#id}" = "32" ] && printf '%s' "$id" | grep -Eq '^[0-9a-f]{32}$'; then url="$uri/#/experiments/0/runs/$id"; elif printf '%s' "$id" | grep -Eq '^[0-9]+$'; then url="$uri/#/experiments/$id"; else url="$uri/#/models/$id"; fi; if command -v open >/dev/null; then open "$url"; elif command -v xdg-open >/dev/null; then xdg-open "$url" >/dev/null 2>&1 & elif command -v wslview >/dev/null; then wslview "$url"; else printf '[open-browser] no opener (open/xdg-open/wslview) — URL was: %s\\n' "$url"; sleep 2; fi"""
+148	mode = "fork"
+149	
+150	[actions.drill-runs]
+151	description = "Re-launch tv scoped to the highlighted experiment (Alt+R)"
+152	# Same payload as the Enter drill branch — explicit binding for muscle
+153	# memory and discoverability. No-op + hint on non-experiment rows so the
+154	# user doesn't accidentally drill into an empty unscoped view.
+155	command = """id='{split:\\t:0}'; name='{split:\\t:3}'; case "$id" in
+156	  __hint__|*[!0-9]*) printf '[drill-runs] not an experiment row (id=%s). Move to the Experiments source (Ctrl+S) and try again.\\n' "$id"; sleep 2; exit 0 ;;
+157	esac
+158	MLFLOW_EXPERIMENT_ID="$id" tv mlflow --source-command "~/.config/television/mlflow-source.py runs-experiment" --input-header "MLflow / $name" """
+159	mode = "execute"
+160	
+161	[actions.dump-json]
+162	description = "Print full JSON detail to terminal, paged"
+163	command = "~/.config/television/mlflow-preview.py auto '{split:\\t:0}' --view full | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+164	mode = "execute"
+165
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check channels.toml registration
+
+`grep -n "mac-procs\|mac-mem\|macos" /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/channels.toml 2>/dev/null | head -5`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:45Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/kill-process.toml`
+
+```text
+1	# Kill process channel for television (tv)
+2	# Raycast-style process killer: fuzzy search by name, see CPU/MEM, kill.
+3	#
+4	# Usage:
+5	#   tv kill-process
+6	#
+7	# Keybindings:
+8	#   Enter      Kill the selected process (SIGTERM)
+9	#   Ctrl+K     Kill and refresh list (stay in picker to kill more)
+10	#   Ctrl+D     Force kill (SIGKILL) and refresh
+11	#   Ctrl+/     Toggle preview panel
+12	#
+13	# Sorted by memory usage (descending), like Raycast.
+14	# Preview shows full process tree and open files.
+15	
+16	[metadata]
+17	name = "kill-process"
+18	description = "Kill process: fuzzy search by name with CPU/MEM stats"
+19	
+20	[source]
+21	command = """
+22	if [ "$(uname)" = "Darwin" ]; then
+23	  ps -eo pid,pcpu,pmem,rss,comm -m 2>/dev/null | tail -n +2 | awk '{
+24	    pid=$1; cpu=$2; mem=$3; rss=$4;
+25	    n=split($5,a,"/"); name=a[n];
+26	    mb=rss/1024;
+27	    printf "%-6s  %-30s  CPU %5s%%  MEM %6.0f MB\\n", pid, name, cpu, mb
+28	  }'
+29	else
+30	  ps -eo pid,pcpu,pmem,rss,comm --sort=-rss 2>/dev/null | tail -n +2 | awk '{
+31	    pid=$1; cpu=$2; mem=$3; rss=$4;
+32	    n=split($5,a,"/"); name=a[n];
+33	    mb=rss/1024;
+34	    printf "%-6s  %-30s  CPU %5s%%  MEM %6.0f MB\\n", pid, name, cpu, mb
+35	  }'
+36	fi
+37	"""
+38	
+39	[preview]
+40	command = "ps -p '{split: :0}' -o pid,ppid,user,pgid,%cpu,%mem,etime,command 2>/dev/null"
+41	
+42	[keybindings]
+43	enter = ["actions:kill", "reload_source"]
+44	ctrl-k = ["actions:kill", "reload_source"]
+45	ctrl-d = ["actions:force_kill", "reload_source"]
+46	
+47	[actions.kill]
+48	description = "Kill process (SIGTERM)"
+49	command = "kill '{split: :0}'"
+50	mode = "fork"
+51	
+52	[actions.force_kill]
+53	description = "Force kill (SIGKILL)"
+54	command = "kill -9 '{split: :0}'"
+55	mode = "fork"
+56
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:56:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check channels.toml manifest format
+
+`cat /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/channels.toml 2>/dev/null | head -40`
+
+```text
+# Cable channel: browse all tv channels with descriptions
+#
+# Usage:
+#   tv channels
+#
+# Keybindings:
+#   Enter      Open selected channel in tv
+#   Ctrl+/     Toggle preview panel
+#
+# Preview shows the full TOML configuration for the selected channel.
+
+[metadata]
+name = "channels"
+description = "Browse all available tv channels with descriptions"
+
+[source]
+command = """awk 'FILENAME!=prev{section=""; prev=FILENAME} /^\\[/{section=$0} section=="[metadata]" && /^name =/{name=$0; gsub(/.*= *"|"$/,"",name)} section=="[metadata]" && /^description =/{desc=$0; gsub(/.*= *"|"$/,"",desc); printf "%-30s │ %s\\n", name, desc}' ~/.config/television/cable/*.toml"""
+
+[preview]
+command = "bat -n --color=always ~/.config/television/cable/'{split: :0}'.toml 2>/dev/null || cat ~/.config/television/cable/'{split: :0}'.toml"
+
+[keybindings]
+enter = "actions:open"
+
+[actions.open]
+description = "Open selected channel in tv"
+command = "tv '{split: :0}'"
+mode = "execute"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:23Z)**_
+
+Now let me look at how channels are documented and check the Tools Picker section.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:25Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/shells/aliases.md`
+
+```text
+432	
+433	## Tools Picker
+434	
+435	> Requires `fzf`. Data file (`~/.config/docs/tools/cli-tools.md`) must be deployed via `chezmoi apply`.
+436	
+437	| Command | Type | Source File | Description |
+438	|---------|------|-------------|-------------|
+439	| `tools-picker` | function | `dot_config/zsh/tools/11_tools_picker.zsh` | fzf picker for installed CLI tools; Enter pastes invocation to buffer, Ctrl+E executes (bound to `Alt+T`) |
+440	| `tv tools` | tv channel | `dot_config/television/cable/tools.toml` | Television picker for CLI tools; Enter executes, Ctrl+T shows tldrf page |
+441	| `tv aliases` | tv channel | `dot_config/television/cable/aliases.toml` | Television picker for all runtime aliases & functions; Enter executes, Ctrl+Y copies name (bound to `Alt+A`) |
+442	| `tv files` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television file picker (bound to `Alt+P`) |
+443	| `tv history` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television shell history search (bound to `Alt+R`) |
+444	| `tv git-log` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television git log browser (bound to `Alt+G`) |
+445	| `tv env` | tv ZLE | `dot_config/zsh/tools/12_television.zsh` | Television environment variables picker (bound to `Alt+E`) |
+446	| `tv ssh-config` | tv channel | `dot_config/television/cable/ssh-config.toml` | SSH host picker with `Include config.d/*` support; Enter connects |
+447	| `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
+448	| `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
+449	
+450	---
+451	
+452	## Session Management
+453	
+454	> `sesh-*` requires `sesh` + `tmux`; `tsesh` also requires the `try-cli` Ruby gem. `mrun` / `tmrun` / `zjrun` only need tmux or zellij (whichever backend is selected) — no sesh dependency.
+455	
+456	| Command | Type | Source File | Description |
+457	|---------|------|-------------|-------------|
+458	| `sesh-sessions` | function | `dot_config/shell/22_sesh.sh` (zsh widget: `dot_config/zsh/tools/22_sesh.zsh`; bash ble.sh binding: `dot_config/bash/06_sesh.bash.tmpl`) | fzf popup picker for all sesh sessions (also bound to `Alt+S` in both shells) |
+459	| `sesh-here` / `shere` | function / alias | `dot_config/shell/22_sesh.sh` | Lightweight: bare shell session at `$PWD` (no nvim, no project layout). Pass args/`-c CMD` to override |
+460	| `sesh-root` / `sroot` | function / alias | `dot_config/shell/22_sesh.sh` | Connect sesh to current git root (falls back to `$PWD`); honors sesh.toml wildcards/default |
+461	| `sesh-code` / `scode` | function / alias | `dot_config/shell/22_sesh.sh` | Repo-scoped coding-agent layout: nvim 75% \| `specstory run [agent]` 25%, plus btop window. Session named `coding-agent/<repo>` (collision-safe). Refuses outside git repos. Flags: `--on-exit shell\|kill\|restart`, `--no-specstory` |
+462	| `sesh-vibe` / `svibe` | function / alias | `dot_config/shell/22_sesh.sh` | Parametric multi-agent layout: `svibe [N] [CLI]` (homogeneous) or `svibe --agents claude,codex,opencode,…` (heterogeneous). N tiled agent panes + lazygit window + nvim window. Session named `vibe/<repo>`. Same `--on-exit` / `--no-specstory` flags as scode. Requires bash 4+ when invoked from bash |
+463	| `try-sesh` / `tsesh` | function / alias | `dot_config/zsh/tools/32_try.zsh` | Open a `try` ephemeral workspace and immediately connect via sesh |
+464	| `mrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | Fire-and-forget: detached tmux/zellij session running CMD at `$PWD`, returns immediately. `mrun [-b tmux\|zellij] [-n NAME] [-d DIR] [-f] [--on-exit shell\|kill\|restart] [-k] [--] CMD [ARGS...]`. Default `--on-exit shell` keeps the session alive after CMD exits (drops to login shell, re-run via history-Up); `-k` restores fire-and-forget kill semantics. Backend default tmux (override via `$MRUN_BACKEND`). Soft-warns on TUI commands. Prints attach hint to stderr |
+465	| `tmrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b tmux`. Detached tmux session running CMD; attach with `tmux attach -t NAME` |
+466	| `zjrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b zellij`. Generates ephemeral KDL under `$TMPDIR/mrun-layout-*` (with `default_tab_template` so the standard tab-bar / status-bar plugins are restored), spawns detached zellij session; attach with `zellij attach NAME` |
+467	
+468	---
+469	
+470	## Worktree Management
+471	
+472	> Requires `worktrunk` (`wt`) and/or `workmux` (`wm`). `wtcd` also requires `jq` + `fzf`.
+473	>
+474	> Worktrunk's own aliases (`wt sw`, `wt ls`, `wt rm`, `wt cc`, `wt oc`) are defined in `dot_config/worktrunk/config.toml`, not in zsh — they work from any shell and from the interactive picker.
+475	>
+476	> Workmux (`wm`) is a separate tool that coexists with worktrunk; it's the source of the 🤖/💬/✅ icons in the tmux window list. See [docs/tools/workmux.md](../tools/workmux.md) for the wt-vs-wm split.
+477	
+478	| Command | Type | Source File | Description |
+479	|---------|------|-------------|-------------|
+480	| `wt` | function | `dot_config/shell/37_worktrunk.sh` | Wrapper around the `wt` binary that captures `cd`/`exec` directives so `wt switch` actually changes the parent shell's `$PWD` (eval'd from `wt config shell init zsh`) |
+481	| `wtcd` | function | `dot_config/shell/37_worktrunk.sh` | fzf-tmux picker over `wt list --format=json` paths; `cd`s into the chosen worktree WITHOUT switching tmux/sesh session — useful for peeking at sibling worktrees |
+482	| `wm` | alias | `dot_config/shell/38_workmux.sh` | Short alias for `workmux` (defined only on macOS — Linux ansible install creates a `wm` symlink in `~/.local/bin`). See [docs/tools/workmux.md](../tools/workmux.md) |
+483	| `wmsb` | alias | `dot_config/shell/38_workmux.sh` | `workmux sidebar` — toggle the always-visible agent status panel; also enables 10s pane-silence interrupted-agent detection |
+484	| `wmclear` | function | `dot_config/shell/38_workmux.sh` | Manual reset for stuck `@workmux_status` markers. `wmclear` clears current window; `wmclear N` clears window N; `wmclear --all` nukes every marker in current session. Workaround for the upstream sticky `working` (🤖) state |
+485	| `tmux_status_set` | function | `dot_config/shell/60_tmux_status.sh` | Generic per-window tmux badge: `tmux_status_set my_build 🔨 [target]` writes `@my_build_status`. POSIX, sourced by both zsh + bash. See [workmux.md → Reusing the per-window status mechanism](../tools/workmux.md#reusing-the-per-window-status-mechanism-without-workmux) |
+486	| `tmux_status_get` | function | `dot_config/shell/60_tmux_status.sh` | Read back a `@<name>_status` marker (empty + nonzero exit if unset) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:33Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:33Z)**_
+
+Now writing the channel. It'll reuse the shell helpers I just committed by sourcing the rendered file in each action.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:58:59Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```tmpl
+{{- if eq .chezmoi.os "darwin" -}}
+# mac-apps channel — macOS GUI app control via Apple Events
+#
+# Pick a foreground GUI app, then choose a lifecycle action. Defaults are
+# safe: Enter brings the app to front; destructive actions are Alt-gated.
+#
+# Pairs with: dot_config/shell/54_macos_apps.sh.tmpl (sourced by every action
+#             to reuse appactivate / appquit / apprestart / appresponsive)
+#             dot_config/television/cable/mac-procs.toml.tmpl (process picker,
+#             sorted by compressed-aware memory — for profiling, not control)
+#             dot_config/television/cable/kill-process.toml (cross-platform
+#             process killer; default Enter = SIGTERM, no Apple Events)
+#
+# Why a separate channel from mac-procs / kill-process:
+#   - kill-process Enter = SIGTERM — destructive for apps with state
+#     (OrbStack VMs, Docker daemons, Slack drafts, unsaved buffers).
+#   - mac-procs Enter = passthrough — for analysis, not lifecycle.
+#   - mac-apps Enter = activate — non-destructive default; graceful Quit
+#     is one Alt-key away and uses Apple Events so apps tear down cleanly.
+#
+# Usage:
+#   tv mac-apps
+#
+# Keybindings:
+#   Enter      Activate (bring to front)
+#   Alt+Q      Graceful Quit (⌘Q-equivalent Apple Event) + reload
+#   Alt+R      Quit + poll until gone + relaunch + reload
+#   Alt+H      Hide app windows (System Events visible=false)
+#   Alt+K      Force kill by PID (SIGKILL; last resort) + reload
+#   Alt+I      Info pager: ps + full lsappinfo dump
+#   Alt+P      Probe responsiveness (5s Apple Event timeout)
+#   Ctrl+F     Cycle preview (metadata <-> responsiveness)
+#   Ctrl+/     Toggle preview panel
+#
+# Why Alt+ rather than Ctrl+: tmux root-table `bind -n C-*` shadows inner
+# apps. See CLAUDE.md "Keybinding" cross-file rule.
+
+[metadata]
+name = "mac-apps"
+description = "macOS apps — graceful quit / restart / activate / hide via Apple Events"
+requirements = []
+
+[source]
+# AppleScript exposes (unix id, name) for foreground GUI apps in one query.
+# `background only is false` filters out daemons / agents / loginwindow etc.
+# Output is "<pid>\t<name>\n" — matches `applist --pids` from the shell
+# helper, but inlined so this channel works even before chezmoi-apply
+# deploys the helper file.
+command = """osascript -e 'tell application "System Events"' -e 'set out to ""' -e 'repeat with p in (every application process whose background only is false)' -e 'set out to out & (unix id of p) & tab & (name of p) & linefeed' -e 'end repeat' -e 'return out' -e 'end tell' 2>/dev/null"""
+display = "{split:\\t:0}  {split:\\t:1}"
+# Default stdout when piping `tv mac-apps | ...` is the app NAME — what
+# every helper (appquit/applaunch/appactivate/apprestart) wants on argv.
+output = "{split:\\t:1}"
+
+[preview]
+# Cycle 1: ps + lsappinfo. Fast (<50 ms).
+# Cycle 2: responsiveness probe. ~2s per render — opt-in via Ctrl+F.
+command = [
+  """pid='{split:\\t:0}'
+ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,command 2>/dev/null
+echo
+lsappinfo info "$pid" 2>/dev/null | head -30""",
+  """name='{split:\\t:1}'
+. ~/.config/shell/54_macos_apps.sh 2>/dev/null
+printf 'App: %s\\n' "$name"
+if appresponsive "$name" 2>/dev/null; then
+  printf 'Status: responsive\\n'
+else
+  printf 'Status: NOT responding (or hung)\\n'
+fi
+printf '\\n(2s Apple Event timeout — false positives possible during launch)\\n'""",
+]
+header = "{split:\\t:1}  (pid {split:\\t:0})"
+
+[ui]
+input_header = "macOS Apps"
+
+[keybindings]
+enter = "actions:activate"
+alt-q = ["actions:quit", "reload_source"]
+alt-r = ["actions:restart", "reload_source"]
+alt-h = "actions:hide"
+alt-k = ["actions:force-kill", "reload_source"]
+alt-i = "actions:info"
+alt-p = "actions:probe"
+
+[actions.activate]
+description = "Bring app to front (Alt+Tab equivalent)"
+command = """. ~/.config/shell/54_macos_apps.sh && appactivate '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.quit]
+description = "Graceful Quit (⌘Q-equivalent Apple Event)"
+command = """. ~/.config/shell/54_macos_apps.sh && appquit '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.restart]
+description = "Quit + poll until process gone + relaunch"
+# `execute` (not `fork`) because apprestart polls for up to 15s; we want
+# the user to see "still quitting…" if it takes a moment.
+command = """. ~/.config/shell/54_macos_apps.sh && apprestart '{split:\\t:1}'"""
+mode = "execute"
+
+[actions.hide]
+description = "Hide app windows (System Events visible=false)"
+# Inlined rather than reusing the helper file because the shell helper
+# doesn't expose `hide` as a function — only the four lifecycle verbs.
+command = """osascript -e 'on run argv' -e 'tell application "System Events" to set visible of (first process whose name is (item 1 of argv)) to false' -e 'end run' -- '{split:\\t:1}'"""
+mode = "fork"
+
+[actions.force-kill]
+description = "SIGKILL by PID (last resort; bypasses Apple Event)"
+# Uses PID column, not name. Apps with multiple processes (Chrome Helper,
+# Electron renderers) only have their main process listed in `applist`,
+# so SIGKILL here kills the parent — children are reaped by launchd.
+command = "kill -9 '{split:\\t:0}'"
+mode = "fork"
+
+[actions.info]
+description = "Detail pager: ps + full lsappinfo"
+command = """pid='{split:\\t:0}'; name='{split:\\t:1}'; { printf '=== %s (pid %s) ===\\n\\n' "$name" "$pid"; ps -p "$pid" -o pid,ppid,user,etime,pcpu,pmem,rss,command; printf '\\n'; lsappinfo info "$pid"; } 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.probe]
+description = "Probe app responsiveness (5s Apple Event timeout)"
+command = """. ~/.config/shell/54_macos_apps.sh && name='{split:\\t:1}' && (appresponsive "$name" 5 && printf '%s: responsive\\n' "$name" || printf '%s: NOT responding\\n' "$name"); sleep 2"""
+mode = "execute"
+{{ end -}}
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/dot_config/television/cable/mac-apps.toml.tmpl (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:02Z)**_
+
+Now validating: render the template, check TOML syntax with `tv`'s own parser, and dry-run the source command.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render the channel template
+
+`chezmoi execute-template --init < dot_config/television/cable/mac-apps.toml.tmpl > /tmp/mac-apps.toml && head -8 /tmp/mac-apps.toml && echo --- && wc -l /tmp/mac-apps.toml`
+
+```text
+# mac-apps channel — macOS GUI app control via Apple Events
+#
+# Pick a foreground GUI app, then choose a lifecycle action. Defaults are
+# safe: Enter brings the app to front; destructive actions are Alt-gated.
+#
+# Pairs with: dot_config/shell/54_macos_apps.sh.tmpl (sourced by every action
+#             to reuse appactivate / appquit / apprestart / appresponsive)
+#             dot_config/television/cable/mac-procs.toml.tmpl (process picker,
+---
+     126 /tmp/mac-apps.toml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate TOML syntax
+
+`python3 -c "import tomllib; tomllib.load(open('/tmp/mac-apps.toml','rb')); print('TOML parse OK')"`
+
+```text
+TOML parse OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tv version
+
+`command -v tv >/dev/null && tv --version 2>&1 | head -1 || echo "tv not on PATH"`
+
+```text
+television 0.15.6
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Install rendered file locally and verify tv discovers it
+
+`cp /tmp/mac-apps.toml ~/.config/television/cable/mac-apps.toml && tv list-channels 2>&1 | grep -i 'mac-apps' && echo --- && tv --no-preview --no-help --no-status-bar --no-input mac-apps --exact 2>&1 | head -5`
+
+```text
+mac-apps
+---
+error: unexpected argument '--no-help' found
+
+  tip: a similar argument exists: '--no-help-panel'
+
+Usage: tv --no-preview --no-help-panel [CHANNEL] [PATH]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm the inline source command works
+
+`osascript -e 'tell application "System Events"' -e 'set out to ""' -e 'repeat with p in (every application process whose background only is false)' -e 'set out to out & (unix id of p) & tab & (name of p) & linefeed' -e 'end repeat' -e 'return out' -e 'end tell' 2>/dev/null | head -5`
+
+```text
+703	alacritty
+708	Super Productivity
+710	Arc
+712	Tailscale
+715	ChatGPT
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm the preview command works on a real PID
+
+`PID=$(pgrep -x Finder | head -1) && ps -p "$PID" -o pid,ppid,user,etime,pcpu,pmem,rss,command 2>/dev/null && echo && lsappinfo info "$PID" 2>/dev/null | head -10`
+
+```text
+  PID  PPID USER             ELAPSED  %CPU %MEM    RSS COMMAND
+  892     1 daviddwlee84 01-05:19:38   0.0  0.2  38080 /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder
+
+"Finder" ASN:0x0-0x38038: 
+    bundleID="com.apple.finder"
+    bundle path="/System/Library/CoreServices/Finder.app"
+    executable path="/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder"
+    pid = 892 type="Foreground" flavor=3 Version="1828.2.3" fileType="FNDR" creator="MACS" Arch=ARM64 
+    coalition: 1045
+    checkin time = 2026/05/12 12:39:55 ( 1 days, 5 hours, 19 minutes, 36.9347 seconds ago )
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:48Z)**_
+
+All validation passes. Let me add the row to the docs "Tools Picker" section and deploy via chezmoi properly.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/shells/aliases.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify my manual copy matches what chezmoi would render
+
+`chezmoi diff ~/.config/television/cable/mac-apps.toml 2>&1 | head -20`
+
+```text
+chezmoi: timeout obtaining persistent state lock, is another instance of chezmoi running?
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:59:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Compare deployed file vs freshly rendered
+
+`diff ~/.config/television/cable/mac-apps.toml /tmp/mac-apps.toml && echo 'in-place file matches rendered template'`
+
+```text
+in-place file matches rendered template
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-validate docs build
+
+`uv run mkdocs build --strict 2>&1 | tail -3`
+
+```text
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+
+Aborted with 11 warnings in strict mode!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:12Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm aliases.md diff is only the new row
+
+`git diff docs/shells/aliases.md`
+
+```text
+diff --git a/docs/shells/aliases.md b/docs/shells/aliases.md
+index 5e1d089..a27df9c 100644
+--- a/docs/shells/aliases.md
++++ b/docs/shells/aliases.md
+@@ -446,6 +446,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles
+ | `tv ssh-config` | tv channel | `dot_config/television/cable/ssh-config.toml` | SSH host picker with `Include config.d/*` support; Enter connects |
+ | `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
+ | `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
++| `tv mac-apps` | tv channel | `dot_config/television/cable/mac-apps.toml.tmpl` | **macOS-only.** GUI app picker; Enter = activate (front), Alt+Q = graceful Quit, Alt+R = restart, Alt+H = hide, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = responsiveness probe. Reuses `dot_config/shell/54_macos_apps.sh` helpers. |
+ 
+ ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Working tree status
+
+`git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 2 commits.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	modified:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+	modified:   docs/shells/aliases.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/plans/tmux-tab-moonlit-cake.md
+	.specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+	dot_config/television/cable/mac-apps.toml.tmpl
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the tv channel
+
+```bash
+git add dot_config/television/cable/mac-apps.toml.tmpl docs/shells/aliases.md && git commit -m "$(cat <<'EOF'
+feat(tv): mac-apps channel — picker + lifecycle actions for macOS GUI apps
+
+Companion to 54_macos_apps.sh: lists foreground GUI apps (one AppleScript
+query, pid+name tab-separated) with safe-by-default Enter (activate, brings
+to front). Destructive actions are Alt-gated (Q=quit, R=restart, H=hide,
+K=SIGKILL) and `reload_source` after, so picker stays consistent. Alt+I
+opens a pager with full ps + lsappinfo, Alt+P probes responsiveness with a
+5s Apple Event timeout. Each action sources ~/.config/shell/54_macos_apps.sh
+to reuse the shell helpers rather than re-implementing osascript inline.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778666420-27732.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778666420-27732.
+[main 2fc5031] feat(tv): mac-apps channel — picker + lifecycle actions for macOS GUI apps
+ 2 files changed, 129 insertions(+)
+ create mode 100644 dot_config/television/cable/mac-apps.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify both commits landed
+
+`git log --oneline -3`
+
+```text
+2fc5031 feat(tv): mac-apps channel — picker + lifecycle actions for macOS GUI apps
+ce5e23a feat(shell): app-* helpers — graceful macOS GUI control via osascript
+697693f feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:00:38Z)**_
+
+Both commits landed clean. Summary:
+
+## Commits
+- `ce5e23a` — `app-*` shell helpers (the work from earlier in this session)
+- `2fc5031` — `tv mac-apps` channel (this round)
+
+## tv mac-apps — design
+
+**Source** (single AppleScript query, no per-app forking):
+```
+PID\tName
+```
+of every foreground GUI app (`background only is false` filters out daemons).
+
+**Preview** (Ctrl+F to cycle):
+1. `ps` metadata + `lsappinfo info` head (fast, <50ms)
+2. Live `appresponsive` probe (slower, opt-in)
+
+**Keybindings**:
+| Key | Action | Why this slot |
+|---|---|---|
+| **Enter** | `appactivate` | Safe default — bring to front, no state change |
+| **Alt+Q** | `appquit` + reload | Graceful ⌘Q Apple Event |
+| **Alt+R** | `apprestart` + reload | `execute` mode so you see the "still quitting…" poll |
+| **Alt+H** | hide windows | One-shot AppleScript, inlined |
+| **Alt+K** | `kill -9 PID` + reload | Last-resort escape hatch by PID |
+| **Alt+I** | pager: full `ps` + `lsappinfo` | `less -R`, press Enter to exit |
+| **Alt+P** | `appresponsive NAME 5` | 5s probe, prints status, `sleep 2` |
+
+**Helper reuse**: every action does `. ~/.config/shell/54_macos_apps.sh && <fn>` so the channel and CLI stay in lockstep — no inline osascript drift.
+
+**Why Alt+ throughout**: per CLAUDE.md keybinding rule — tmux root-table `bind -n C-*` would shadow inner apps.
+
+## Verified
+- `chezmoi execute-template` renders cleanly
+- `python tomllib` parses the rendered TOML
+- `tv list-channels | grep mac-apps` confirms registration (auto-discovered, no `channels.toml` edit needed)
+- Inline source command + preview commands tested against live `Finder`
+- Pre-commit hooks passed both commits
+- `mkdocs build --strict` — no new warnings
+
+Run `tv mac-apps` to try it (already deployed; matches what `chezmoi apply` would render).
+
+---
+
+_**User (2026-05-13 10:00:41Z)**_
+
+不知道Ubuntu的Desktop App有沒有類似的機制？幫我搜一下？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:01Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:02Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ToolSearch"><details>
+<summary>Tool use: **ToolSearch**</summary>
+
+**Input:**
+
+- max_results: `2`
+- query: `select:WebSearch,WebFetch`
+
+**Result:**
+
+```
+
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check repo for existing Linux Desktop app-control tooling
+
+`grep -rn "wmctrl\|xdotool\|playerctl\|swaymsg\|hyprctl\|gdbus\|qdbus\|dbus-send" /Users/daviddwlee84/.local/share/chezmoi/dot_config/ /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/ /Users/daviddwlee84/.local/share/chezmoi/scripts/ 2>/dev/null | head -20`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:09Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:18Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="WebSearch"><details>
+<summary>Tool use: **WebSearch**</summary>
+ `Ubuntu 24.04 Wayland wmctrl xdotool alternative window control 2026`
+
+```text
+Web search results for query: "Ubuntu 24.04 Wayland wmctrl xdotool alternative window control 2026"
+
+Links: [{"title":"Wlrctl: the best Wayland replacement to xdotool - Raspberry Pi Forums","url":"https://forums.raspberrypi.com/viewtopic.php?t=371406"},{"title":"Which tools can I use in place of wmctrl and xdotool ...","url":"https://ubuntuforums.org/showthread.php?t=2475972"},{"title":"[ubuntu] Which tools can I use in place of wmctrl and xdotool in Wayland? [Archive] - Ubuntu Forums","url":"https://ubuntuforums.org/archive/index.php/t-2475972.html"},{"title":"Xdotool on Ubuntu: Complete Guide, Alternatives & Best Practices 2026 - Xdotool on ubuntu complete guide alternatives","url":"https://copyprogramming.com/howto/alternative-to-xdotool-which-is-already-installed-on-ubuntu"},{"title":"Exploring the Fragmentation of Wayland, an xdotool adventure - semicomplete","url":"https://www.semicomplete.com/blog/xdotool-and-exploring-wayland-fragmentation/"},{"title":"Ubuntu Manpage: wtype - xdotool type for Wayland","url":"https://manpages.ubuntu.com/manpages/jammy/man1/wtype.1.html"},{"title":"Successor of wmctrl, xdotool, devilspie2, kpie - Fedora Discussion","url":"https://discussion.fedoraproject.org/t/successor-of-wmctrl-xdotool-devilspie2-kpie/79507"},{"title":"Xdotool equivalent for \"pure\" Wayland? - Support & Help Requests - Ubuntu MATE Community","url":"https://ubuntu-mate.community/t/xdotool-equivalent-for-pure-wayland/30692"},{"title":"Xdotool replacement on wayland - Help - KDE Discuss","url":"https://discuss.kde.org/t/xdotool-replacement-on-wayland/7242"},{"title":"[ubuntu] Which tools can I use in place of wmctrl and xdotool in Wayland? - Page 2","url":"https://ubuntuforums.org/showthread.php?t=2475972&page=2"}]
+
+Based on the search results, here's what I found regarding alternatives to wmctrl and xdotool for window control on Ubuntu 24.04 with Wayland:
+
+## Key Findings
+
+xdotool only functions with X11 applications on Ubuntu 24.04 Wayland, and native Wayland applications receive no input from xdotool.
+
+### Available Alternatives:
+
+1. **ydotool**: If you need Wayland support, use ydotool or dotool instead, though they offer fewer features than xdotool.
+
+2. **wtype**: wtype is a Wayland tool that allows you to simulate keyboard input like xdotool type for X11, accomplished via the virtual-keyboard Wayland protocol. However, wtype only allows for simulating keyboard events, and no support for selecting a window to send the events to.
+
+3. **wlrctl**: If your compositor is based on wlroots, it'll likely be usable with wlrctl, a command line tool similar to xdotool and wmctrl, though wlrctl only works if your compositor supports specific, non-default wayland protocols, such as wlr-foreign-toplevel-management.
+
+### Compositor-Specific Solutions:
+
+On Wayland, each compositor will need its own unique implementation as shown with kdotool which only works on Wayland+KDE, not GNOME or anything else. Procedures to manage windows now depend on the window manager/compositor, and differ between Gnome, KDE, Sway, etc., with the removal of Xorg removing a layer of standardization.
+
+### XWayland Option:
+
+Alternatively, run X11 via XWayland to use xdotool with legacy applications.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:18Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="WebSearch"><details>
+<summary>Tool use: **WebSearch**</summary>
+ `Linux D-Bus desktop application control quit launch graceful AppleScript equivalent`
+
+```text
+Web search results for query: "Linux D-Bus desktop application control quit launch graceful AppleScript equivalent"
+
+Links: [{"title":"Leftover dbus processes after launching a dbus-using application remotely and then closing the application - Red Hat Customer Portal","url":"https://access.redhat.com/solutions/3257651"},{"title":"D-Bus - Wikipedia","url":"https://en.wikipedia.org/wiki/D-Bus"},{"title":"Control Your Linux Desktop with D-Bus | Linux Journal","url":"https://www.linuxjournal.com/article/10455"},{"title":"dbus-daemon(1): Message bus daemon - Linux man page","url":"https://linux.die.net/man/1/dbus-daemon"},{"title":"kill dbus session on logout : how to?","url":"https://www.linuxquestions.org/questions/linux-desktop-74/kill-dbus-session-on-logout-how-to-4175655705/"},{"title":"What Is DBus Practically Useful For? | Baeldung on Linux","url":"https://www.baeldung.com/linux/dbus"},{"title":"dbus-daemon(1) — Arch manual pages","url":"https://man.archlinux.org/man/dbus-daemon.1.en"},{"title":"Mastering D-Bus: Essential Troubleshooting for Linux IPC Errors - Global Offshore VPS – Fast, Private, Bitcoin & Crypto Accepted","url":"https://www.virtvps.com/d-bus-mastering-d-bus-essential-troubleshootin/"},{"title":"gapplication: D-Bus application launcher - Linux Manuals (1)","url":"https://www.systutorials.com/docs/linux/man/1-gapplication/"},{"title":"D-Bus - Gentoo wiki","url":"https://wiki.gentoo.org/wiki/D-Bus"}]
+
+I've searched for information about Linux D-Bus desktop application control. Here's what I found:
+
+## D-Bus Overview
+
+D-Bus (Desktop Bus) is an interprocess communication (IPC) system, which provides a mechanism for applications to talk to each other. Every modern Linux desktop environment uses D-Bus, a system for allowing software applications to communicate with each other.
+
+## Using D-Bus to Control Applications
+
+Each application using D-Bus exposes some objects, which generally map to internal GObject, C++ or Python objects. One application can send a message to a specific object in another application. With qdbusviewer, qdbus, dbus-send and dbus-monitor, you can explore the possibilities yourself.
+
+For launching applications specifically, gapplication is used to launch an application. The first parameter is the application ID in the familiar "reverse DNS" style (eg: 'org.gnome.app') without the .desktop suffix. Optionally, if additional parameters are given, they are treated as the names of files to open and may be filenames or URIs. If no files are given then the application is simply activated.
+
+## Key Tools
+
+dbus-send can be used to send a message. This tool can be used to interact with running applications and call methods on their exposed D-Bus objects.
+
+Regarding graceful shutdown, the search results mention using signals and monitoring, but they don't contain specific information about AppleScript equivalents for quitting applications gracefully via D-Bus. For that comparison, you may want to explore the D-Bus methods exposed by specific applications using `qdbusviewer` or `dbus-send`.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:17Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="WebSearch"><details>
+<summary>Tool use: **WebSearch**</summary>
+ `GNOME Shell Wayland list windows command line 2026 extension`
+
+```text
+Web search results for query: "GNOME Shell Wayland list windows command line 2026 extension"
+
+Links: [{"title":"GitHub - ickyicky/window-calls: Gnome Extension for getting windows list in wayland · GitHub","url":"https://github.com/ickyicky/window-calls"},{"title":"GitHub - hseliger/window-calls-extended: Gnome Extension for getting windows list in wayland · GitHub","url":"https://github.com/hseliger/window-calls-extended"},{"title":"GitHub - timecamp-org/window-calls-extended: Gnome Extension for getting windows list in wayland","url":"https://github.com/timecamp-org/window-calls-extended"},{"title":"GitHub - dev-muhammad-adel/window-calls-extended: Gnome Extension for getting windows list in wayland","url":"https://github.com/dev-muhammad-adel/window-calls-extended"},{"title":"GitHub - ddterm/gnome-shell-extension-ddterm: Another drop down terminal extension for GNOME Shell. With tabs. Works on Wayland natively · GitHub","url":"https://github.com/ddterm/gnome-shell-extension-ddterm"},{"title":"The GNOME way to set/unset active window always on top from CLI. / Newbie Corner / Arch Linux Forums","url":"https://bbs.archlinux.org/viewtopic.php?id=285206"},{"title":"Window List - GNOME Shell Extensions","url":"https://extensions.gnome.org/extension/602/window-list/"},{"title":"Grab wmclass name or Window Name/Title under Wayland with Gnome 3.x · GitHub","url":"https://gist.github.com/rbreaves/257c3edfa301786e66e964d7ac036269"},{"title":"GNOME and Wayland — Victor Stinner's Notes 1.0 documentation","url":"https://vstinner.readthedocs.io/gnome.html"},{"title":"Extension: Get list of windows - Desktop - GNOME Discourse","url":"https://discourse.gnome.org/t/extension-get-list-of-windows/19455"}]
+
+The search results show several GNOME Shell extensions and approaches for listing windows on Wayland from the command line. Here's a summary of the key findings:
+
+## Main Extensions Available
+
+The window-calls extension allows you to list current windows with some of their properties from command line, which is useful for Wayland to get the current focused window.
+
+It also allows you to move given window to different workspace.
+
+## Command Line Usage
+
+You can use the command: `gdbus call --session --dest org.gnome.Shell --print-reply=literal --object-path /org/gnome/Shell/Extensions/Windows --method org.gnome.Shell.Extensions.Windows.List | jq -c '.'`
+
+There are additional methods available: Details (which returns detailed information about window in JSON format) and GetTitle (which returns the window's title), as well as GetFrameBounds (which returns the window's frame bounds in JSON dictionary).
+
+## Extended Variants
+
+The window-calls-extended extension also allows you to list current windows with some of their properties from command line, useful for Wayland to get the current focused window. This version has been updated to the new import methods for GNOME 45.
+
+Another variant (Window Monitor Pro) allows you to list current windows with some of their properties from command line, which is useful for Wayland to get the current focused window. This extension now supports D-Bus signals, allowing other applications to receive real-time notifications of window changes without polling.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:30Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="WebSearch"><details>
+<summary>Tool use: **WebSearch**</summary>
+ `gapplication launch quit Linux GNOME activate command line examples`
+
+```text
+Web search results for query: "gapplication launch quit Linux GNOME activate command line examples"
+
+Links: [{"title":"HowDoI/GtkApplication/CommandLine – GNOME Wiki Archive","url":"https://wiki.gnome.org/HowDoI(2f)GtkApplication(2f)CommandLine.html"},{"title":"gapplication: D-Bus application launcher - Linux Manuals (1)","url":"https://www.systutorials.com/docs/linux/man/1-gapplication/"},{"title":"gapplication(1) — Arch manual pages","url":"https://man.archlinux.org/man/core/glib2/gapplication.1.en"},{"title":"Chapter 2. Launching applications in GNOME | Getting started with the GNOME desktop environment | Red Hat Enterprise Linux | 9 | Red Hat Documentation","url":"https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/getting_started_with_the_gnome_desktop_environment/assembly_launching-applications-in-gnome_getting-started-with-the-gnome-desktop-environment"},{"title":"Using GtkApplication - GNOME Developer Documentation","url":"https://developer.gnome.org/documentation/tutorials/application.html"},{"title":"HowDoI/GtkApplication - GNOME Wiki!","url":"https://developer-old.gnome.org/GtkApplication/"},{"title":"gapplication: GIO Reference Manual","url":"https://developer-old.gnome.org/gio/stable/gapplication-tool.html"},{"title":"Handling command line options in GApplication","url":"https://developer-old.gnome.org/CommandLine/"},{"title":"Projects/GLib/GApplication/Introduction – GNOME Wiki Archive","url":"https://wiki.gnome.org/Projects/GLib/GApplication/Introduction"},{"title":"How to make gnome-shell always start with command line arguments at system launch? - Desktop - GNOME Discourse","url":"https://discourse.gnome.org/t/how-to-make-gnome-shell-always-start-with-command-line-arguments-at-system-launch/18906"}]
+
+Based on the search results, here's comprehensive information about `gapplication` command-line usage in Linux GNOME:
+
+## gapplication Commands Overview
+
+gapplication is a commandline implementation of the client-side of the org.freedesktop.Application interface, and can be used to start applications that have DBusActivatable set to true in their .desktop files and can be used to send messages to already-running instances of other applications.
+
+## Available Commands
+
+The available commands include: gapplication help [COMMAND], gapplication version, gapplication list-apps, gapplication launch <APP-ID>, gapplication launch <APP-ID> [FILE…], gapplication list-actions <APP-ID>, and gapplication action <APP-ID> <ACTION> [PARAMETER].
+
+## Launch Command
+
+The launch command launches an application. The first parameter is the application ID in the familiar "reverse DNS" style (eg: 'org.gnome.app') without the .desktop suffix. Optionally, if additional parameters are given, they are treated as the names of files to open and may be filenames or URIs. If no files are given then the application is simply activated.
+
+## Practical Examples
+
+Here is a simplified example, as may be installed in /usr/bin/fooview: a shell script showing gapplication action org.example.fooview gallery and gapplication action org.example.fooview create, as well as gapplication launch org.example.fooview "$@".
+
+A .desktop file example shows DBusActivatable=true and Exec=gapplication launch org.example.fooview %F with Desktop Actions using Exec=gapplication action org.example.fooview gallery.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:01:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:02:13Z)**_
+
+## TL;DR
+
+**No single equivalent** to `osascript`. Linux desktop control is fragmented across:
+- **Display server**: X11 (legacy) vs **Wayland** (Ubuntu 24.04+ default)
+- **Compositor / WM**: GNOME Shell / KWin / Sway / Hyprland / wlroots / …
+- **Desktop env**: GNOME / KDE / XFCE / …
+
+Each axis has different tools. Wayland intentionally restricts cross-app introspection for security — by design, there is no public API to "list all windows" or "send a quit event" from outside the compositor.
+
+## The three mechanism families
+
+### 1. D-Bus — the actual semantic analog to Apple Events
+
+D-Bus is the IPC bus that every modern Linux DE uses. It's the closest to macOS's Apple Events model: apps expose objects/interfaces, you call methods on them. CLI tools: **`gapplication`** (high-level), **`gdbus`** / **`qdbus`** / **`busctl`** / **`dbus-send`** (low-level).
+
+```bash
+gapplication list-apps                          # all DBusActivatable=true apps
+gapplication launch org.gnome.Calculator        # launch (or activate if running)
+gapplication launch org.gnome.gedit ./file.md   # open with file
+gapplication list-actions org.gnome.Calculator  # what methods does it expose?
+gapplication action org.gnome.gedit quit        # graceful quit — IF app exposes it
+```
+
+**Catch**: every app must opt-in by setting `DBusActivatable=true` in its `.desktop` file AND expose `quit`/`activate`/etc actions. Many third-party apps don't. So coverage is patchy — closer to "macOS apps with sane Apple-Event support" (~good) than "every app in /Applications" (~universal).
+
+Works on **both X11 and Wayland**. This is the future-proof bet.
+
+### 2. wmctrl / xdotool — X11 only, broken on Wayland
+
+`wmctrl -l` (list), `wmctrl -c "Firefox"` (close), `xdotool search --name`. These are the closest functional mirror to AppleScript's window targeting — but **only work on X11 windows**. On Ubuntu 24.04's default Wayland session, only legacy apps running under **XWayland** respond; native Wayland apps are invisible to them. They're dead-end tools going forward.
+
+### 3. Compositor-specific tools
+
+When you must control native Wayland windows, you drop down to whatever your compositor exposes:
+
+| Compositor | Tool | Notes |
+|---|---|---|
+| **GNOME Shell** | `gdbus call --session --dest org.gnome.Shell …` | Restricted in recent GNOME for security. Needs a Shell extension like [`window-calls`](https://github.com/ickyicky/window-calls) or [`window-calls-extended`](https://github.com/hseliger/window-calls-extended) to expose a `List/Details/Activate` D-Bus interface. Extension install can't be fully automated. |
+| **KDE / KWin** | `qdbus org.kde.KWin /KWin …` + `kdotool` | KDE-only. |
+| **Sway** (wlroots) | `swaymsg "[app_id=firefox] focus"` | Cleanest of the bunch — IPC is first-class, scriptable. |
+| **Hyprland** | `hyprctl dispatch killactive`, `hyprctl clients` | Hyprland's own JSON-RPC. |
+| **Generic wlroots** | `wlrctl` | Only works if compositor supports `wlr-foreign-toplevel-management`. |
+
+For input simulation across Wayland: `ydotool` (replaces `xdotool`, needs a root daemon `ydotoold` via systemd) or `wtype` (keyboard only). [`wlrctl`](https://forums.raspberrypi.com/viewtopic.php?t=371406) is the X11→Wayland port of wmctrl, wlroots-only.
+
+### Bonus: MPRIS for media players
+
+The one cross-desktop standard that *just works*: media players expose `org.mpris.MediaPlayer2.*` over D-Bus. **`playerctl play-pause`** works for Spotify, VLC, Firefox, Chromium, mpv, anything compliant. No compositor coupling. Closest thing Linux has to "AppleScript universal support."
+
+## What this means for your repo
+
+A faithful `54_macos_apps.sh` mirror for Linux would have to runtime-dispatch:
+
+```
+Detect $XDG_SESSION_TYPE          # x11 | wayland
+Detect $XDG_CURRENT_DESKTOP        # GNOME | KDE | sway | Hyprland | …
+Dispatch to the matching tool.
+```
+
+The honest options:
+
+| Option | Coverage | Effort | Footnote |
+|---|---|---|---|
+| **D-Bus-only (`gapplication` + `gdbus`)** | Apps that expose interfaces | Low | Cross-DE; works on X11+Wayland; misses many apps |
+| **Compositor-specific (Sway / Hyprland / KDE)** | Full window control on that compositor | Medium per compositor | Only useful if you commit to one |
+| **GNOME + `window-calls` extension** | Full control on GNOME Wayland | Low after the extension install (manual) | Extension install is not silent — defeats automation if rolled out via ansible |
+| **X11-only (`wmctrl` + `xdotool`)** | Everything on X11 | Low | Force users onto X11 session — backward step on Ubuntu 24.04+ |
+| **Skip — Ubuntu side stays manual** | — | Zero | Most pragmatic given fragmentation |
+
+My honest take: **build a `gapplication`-based subset** (launch / activate via `org.freedesktop.Application` interface) plus **`playerctl`-style MPRIS helpers if you care about media**, and accept that "graceful quit" coverage on Linux will be patchy. The `appquit`/`appactivate` mental model from macOS doesn't cleanly survive the Wayland sandbox.
+
+Want me to draft a `54_linux_apps.sh` skeleton with `gapplication` + `playerctl` + a compositor-detection stub? It'd be small (~80 lines), Ubuntu-desktop-only gated, and you can decide later whether to extend to KDE/Sway.
+
+Sources:
+- [Successor of wmctrl, xdotool, devilspie2, kpie — Fedora Discussion](https://discussion.fedoraproject.org/t/successor-of-wmctrl-xdotool-devilspie2-kpie/79507)
+- [Exploring the Fragmentation of Wayland, an xdotool adventure (semicomplete)](https://www.semicomplete.com/blog/xdotool-and-exploring-wayland-fragmentation/)
+- [Which tools can I use in place of wmctrl and xdotool? — Ubuntu Forums](https://ubuntuforums.org/showthread.php?t=2475972)
+- [Xdotool replacement on wayland — KDE Discuss](https://discuss.kde.org/t/xdotool-replacement-on-wayland/7242)
+- [Wlrctl: the best Wayland replacement to xdotool — Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=371406)
+- [Control Your Linux Desktop with D-Bus — Linux Journal](https://www.linuxjournal.com/article/10455)
+- [D-Bus — Wikipedia](https://en.wikipedia.org/wiki/D-Bus)
+- [gapplication: D-Bus application launcher — Arch man page](https://man.archlinux.org/man/core/glib2/gapplication.1.en)
+- [HowDoI/GtkApplication/CommandLine — GNOME Wiki Archive](https://wiki.gnome.org/HowDoI(2f)GtkApplication(2f)CommandLine.html)
+- [`window-calls` GNOME Shell extension (ickyicky)](https://github.com/ickyicky/window-calls)
+- [`window-calls-extended` GNOME Shell extension (hseliger)](https://github.com/hseliger/window-calls-extended)
+- [Extension: Get list of windows — GNOME Discourse](https://discourse.gnome.org/t/extension-get-list-of-windows/19455)
+
+---
+
+_**User (2026-05-13 10:02:52Z)**_
+
+這部分加到 backlog 裡面 方便我後面到Ubuntu Desktop上再實驗
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:02:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:02:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List existing backlog entries
+
+`ls /Users/daviddwlee84/.local/share/chezmoi/backlog/ | head -20`
+
+```text
+ **raycast-sync
+ ai-capture-non-tmux-output.md
+ audit-monitor-with-apprise.md
+ bin-migration.md
+ chezmoi-diff-pager-agent.md
+ chezmoiscripts-namespace-refactor.md
+ devtools-role-split.md
+ fish-shell-evaluation.md
+ fleet-exec.md
+ fleet-status-init-in-progress-state.md
+ mkdocs-anchor-drift.md
+ python-cli-tui-extraction.md
+ raycast-sync-non-pro.md
+󰂺 README.md
+ rtk-evaluation.md
+ specstory-opencode-support.md
+ starship-context-modules.md
+ svibe-multi-window-spillover.md
+ svibe-worktree-per-feature.md
+ tmux-window-status-indicators.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:02:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./backlog/README.md`
+
+```text
+1	# Backlog Research
+2	
+3	Long-form research, design notes, and paused troubleshooting for items listed in
+4	[`../TODO.md`](../TODO.md). One file per topic, named with a slug that matches
+5	the TODO entry.
+6	
+7	## Why this exists
+8	
+9	`TODO.md` is the **index** — short titles with priority/effort tags. This folder
+10	is the **knowledge base** — the actual investigation, options considered,
+11	benchmarks, error messages, and decisions that informed the TODO entry. The goal
+12	is **resume-friendliness**: when you (or an agent) come back to an item three
+13	months later, the doc here lets you pick up in 5 minutes instead of re-running
+14	30 minutes of investigation.
+15	
+16	This folder is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `backlog/**`) — it
+17	is repo metadata for maintainers, not user-facing config to deploy.
+18	
+19	## When to add a doc here
+20	
+21	Add a `backlog/<slug>.md` file when **any** of these apply:
+22	
+23	- The TODO item carries a `P?` tag (it requires evaluation; record what was tried)
+24	- You did meaningful troubleshooting but didn't ship a fix (capture the trace
+25	  before it evaporates)
+26	- Multiple options were considered (record the trade-offs, not just the winner)
+27	- An external blocker exists (waiting on upstream release, host availability)
+28	- The implementation is `[L]` or `[XL]` (architectural; needs design before code)
+29	
+30	`[S]` items rarely need a doc unless there's surprising context.
+31	
+32	## When NOT to add a doc here
+33	
+34	- Item is `[S]` and obvious (e.g., "change a TOML key") — just put the file path
+35	  in the TODO entry
+36	- Already covered by a `docs/this_repo/*.md` or `docs/tools/*.md` page
+37	  (cross-link instead, that's user-facing reference)
+38	- Speculation only ("would be cool to...") with no investigation — keep it as a
+39	  one-liner in `TODO.md` first; promote to a doc when you actually look into it
+40	
+41	## File template
+42	
+43	```markdown
+44	# <Topic title>
+45	
+46	**Status**: P? / P1 / P2 / P3 / blocked / deferred / superseded
+47	**Effort**: S / M / L / XL
+48	**Related**: `TODO.md` · code paths · related docs
+49	
+50	## Context
+51	
+52	Why this surfaced. Trigger (conversation, bug, new tool, recurring annoyance).
+53	Date helps — "2026-04, came up while reviewing starship prompt".
+54	
+55	## Investigation
+56	
+57	What's already been tried / read / measured. **This is the section that saves
+58	future-you time.** Be specific:
+59	
+60	- Commands run + relevant output
+61	- Docs/issue/SO links read
+62	- Benchmark numbers
+63	- Error messages copy-pasted in full (not paraphrased)
+64	
+65	## Options considered
+66	
+67	| Option | Pros | Cons |
+68	|---|---|---|
+69	| A. … | … | … |
+70	| B. … | … | … |
+71	
+72	## Current blocker / open questions
+73	
+74	Why this is still on the backlog. One of:
+75	
+76	- Waiting on upstream X (link)
+77	- Need host/data Y to verify
+78	- Trade-offs unclear, need user preference
+79	- Effort estimate exceeds current budget
+80	
+81	## Decision (if any)
+82	
+83	`2026-04 deferred — waiting for X release` or
+84	`2026-04 chose option B because …`
+85	
+86	Dates matter. A 6-month-old "decided to use mise" needs re-validation.
+87	
+88	## References
+89	
+90	Issues, PRs, SO links, related discussions.
+91	```
+92	
+93	## Index
+94	
+95	Add new entries here as you create them. Keep alphabetical.
+96	
+97	| Slug | Status | TODO entry |
+98	|---|---|---|
+99	| [`ai-capture-non-tmux-output`](ai-capture-non-tmux-output.md) | P2 deferred / P3 rejected | "aicapture: non-tmux output capture (Tier 2 tee / Tier 3 script/PTY)" |
+100	| [`chezmoi-diff-pager-agent`](chezmoi-diff-pager-agent.md) | P? deferred | "chezmoi diff pager: TTY-aware delta fallback" |
+101	| [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
+102	| [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
+103	| [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
+104	| [`rtk-evaluation`](rtk-evaluation.md) | P? declined 2026-05 | "rtk-ai/rtk evaluation" |
+105	| [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
+106	| [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
+107	| [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
+108	| [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
+109	| [`tv-agent-sessions-richer-preview`](tv-agent-sessions-richer-preview.md) | Done (batch 1) / P? deferred (Cursor) | "tv agent-sessions richer preview + SpecStory linkage" |
+110
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:03Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See TODO.md structure
+
+`grep -n "^##\|^- \[" /Users/daviddwlee84/.local/share/chezmoi/TODO.md | head -30`
+
+```text
+12:## How to read this
+28:## P1 — Likely next batch
+30:- [ ] **[S] Starship status-aware modules** — enable `status` / `cmd_duration` / `shlvl` / `container` in `dot_config/starship.toml`. Pure additive, no risk. → [research](backlog/starship-context-modules.md)
+31:- [ ] **[S] tmux2k bandwidth bug** — drop `bandwidth` from `@tmux2k-right-plugins` in `dot_config/tmux/theme.tmux2k.conf` (uint64 underflow already documented in the file's own comment). → [research](backlog/tmux2k-tuning.md)
+32:- [ ] **[S] tmux2k theme alignment** — switch `@tmux2k-theme` from `onedark` to `catppuccin` so the tmux2k layout matches Ghostty/Neovim's colour story. → [research](backlog/tmux2k-tuning.md)
+33:- [ ] **[M] Fix Claude Code hook on Ubuntu (headless)** — `Stop hook error: ... org.freedesktop.Notifications was not provided by any .service files`. Headless servers have no notification daemon; need either fallback in the hook or `libnotify` + lightweight daemon.
+35:## P2 — Worth doing, no rush
+37:- [ ] **[S] Migrate B-class zsh tools to shared shell layer** — A-class (8 pure-POSIX files: `06_cargo` `07_bunx_cli` `25_bat` `26_eza` `29_marimo` `34_openclaw` `37_lazygit` `40_codexbar`) already moved to `dot_config/shell/`, so bash users now get `lg` / `ls`/`la`/`ll`/`lt`/`llt` / `ccusage` / `cbu`/`cbc`/`cbca` / `BAT_THEME` / cargo PATH and per-shell `marimo` + `openclaw` completions. The five "B-class" files still need small rewrites before they can move:
+43:- [ ] **[M] bash conda/mamba lazy-init** — `dot_config/zsh/tools/04_conda_mamba.zsh` has zsh-specific `unfunction` + `shell.zsh hook` and is hard to share verbatim. Plan: extract the detection logic (which conda root / micromamba binary / `MAMBA_ROOT_PREFIX`) into `dot_config/shell/04_conda_mamba_detect.sh` so both shells reuse the search; then write `dot_config/bash/04_conda_mamba.bash` using `conda shell.bash hook` / `micromamba shell hook --shell bash`. Without this, bash-primary machines have to run `conda init bash` (which writes a duplicate-init block to `~/.bashrc` that chezmoi would fight). Out of scope for the A-class migration — defer until a bash-primary host actually needs conda. See also the existing P2 entry on the conda ansible role.
+44:- [ ] **[M] miniforge/conda ansible role** — `dot_config/zsh/tools/04_conda_mamba.zsh` already lazy-loads if conda is present, but no role installs it. Decide: ansible role vs delegate to `mise`/`brew install --cask miniforge`.
+45:- [ ] **[M] nvm ansible role** — `02_legacy_tools.zsh` wires PATH + provides `load-nvm` alias, but no role installs nvm itself. May be obviated by mise consolidation (see P? below).
+46:- [ ] **[S] bun / pnpm / go install via ansible** — PATH wiring already in `02_legacy_tools.zsh`; just need install steps (likely additions to `js_cli_tools` and a new `go_tools` role, or fold into `devtools`).
+47:- [ ] **[M] Pueue config via chezmoi** — manage `~/.config/pueue/pueue.yml` and decide macOS strategy (`PUEUE_CONFIG_PATH` env var vs path sync to `~/Library/Application Support/pueue/pueue.yml`). (Partial 2026-05-13: pqsum migrated to Python binary + `fleet pueue` SSH read-only view + AI cleanability/recovery analysis landed. Still pending: config templating + macOS daemon autostart.)
+48:- [ ] **[?/M] Pueue TLS remote-connect profiles** — `dot_config/pueue/pueue.yml.tmpl` per-host client profiles, daemon bind override (`0.0.0.0:port`), cert distribution, firewall opening via ansible. Enables `pueue -c HOST add/kill/status` natively → unlocks `fleet pueue --clean` and write-ops across the fleet. See [docs/tools/pueue.md](docs/tools/pueue.md) § Deferred. Upstream wiki: <https://github.com/Nukesor/pueue/wiki/Connect-to-remote>.
+49:- [ ] **[P2/M] Extract AICAP Python dispatch into shared module** — **four** Python consumers now read the SSOT at `dot_config/shell/04_ai_agents.sh` and reimplement `AGENT_CONFIG` + `detect_agent` + `invoke_agent` + SHA cache: `dot_config/tmux/executable_tmux-session-summary.py`, `scripts/aiblock.py`, `dot_dotfiles/bin/executable_pqsum`, `scripts/fleet/exec.py`. **Priority bumped from `?` to `P2` on 2026-05-13** when `fleet exec` landed as the 4th consumer — adding a new agent now means updating four AGENT_CONFIG dicts. Promote to a shared `scripts/aisum/__init__.py` module (`invoke_agent`, `detect_agent`, `cache_lookup`, `cache_save`, `load_ssot`, `parse_strict_json`) and migrate all four. Next AI-tooling change should land this refactor first.
+50:- [ ] **[?/S] Auto-archive `pqsum ai --report` to `~/notes/pueue-reports/`** — today the `--report` flag prints markdown to stdout or `--out PATH`. Optional rolling archive under `~/notes/pueue-reports/YYYY-MM-DD-HHMMSS.md` with retention policy (keep last N, prune older than M days). Requires user opt-in (don't write to `~/notes/` by default).
+51:- [ ] **[?/S] `pqsum ai --restart-failed`** — companion to `--clean`: execute the LLM's suggested `recovery_command` for Failed tasks with same y/N safeguards. Higher risk than `--clean` (restarts are not idempotent), so separate flag + always-prompt by default.
+52:- [x] **[?/M] `fleet exec` — cross-host argv-list command runner with AI summary** — **Done 2026-05-13**: shipped as `scripts/fleet/exec.py`. Argv-list default + `--shell bash|zsh` for pipes/globs + `--login` for rc-loaded env + `--no-augment-path` escape hatch + `--ai` succeeded/differed/failed classifier + `--report --out PATH` markdown + cache (TTL `FLEETEXEC_MIN_REFRESH_INTERVAL`, default 120s, excludes elapsed_ms from hash). Reused fleet's asyncssh+semaphore-8 + the PATH-augmentation lesson from `fleet pueue`. Copy-pasted AICAP from `executable_pqsum` (now 4th Python consumer of the SSOT). → [research](backlog/fleet-exec.md).
+53:- [ ] **[L] secrets.zsh encryption with age** — currently plaintext + chezmoi-ignored. Age-encrypted version could live in the source tree. Needs key distribution plan across machines.
+54:- [ ] **[M] aicapture: non-tmux output capture (Tier 2)** — Tier 1 (`aifix-stdin` / `aifix-run` / `aifix-rerun`) shipped; transparent preexec/precmd tee redirect would remove the "remember to prefix" friction for non-tmux daily users. Tier 3 (script(1) or PTY proxy) explicitly rejected. → [research](backlog/ai-capture-non-tmux-output.md)
+55:- [ ] **[S] mkdocs anchor drift cleanup** — first deploy uses `validation.links.anchors: info` so ~20 stale section-anchor links in existing docs don't fail CI strict. Batch-fix them, then raise back to `warn` in `mkdocs.yml`. → [research](backlog/mkdocs-anchor-drift.md)
+56:- [ ] **[S] devtools: gate `Install tmux plugins via TPM` on tmux being on PATH** — currently fatal on `centos_server` + `noRoot=true` boxes (and any RedHat-family box where the tmux yum branch hasn't run): `tmux source-file /home/devuser/.tmux.conf` exits with `tmux: command not found`. Surfaced by `just docker-test-rocky9`. The `dot_ansible/roles/devtools/tasks/main.yml:3371` task already registers `tmp_bin` from `~/.tmux/plugins/tpm/bin/install_plugins`; add a `when:` condition checking `command -v tmux` (mirror the `gh-dash` pattern already in this role). Once landed, flip `CHEZMOI_ALLOW_PARTIAL_FAILURE` back to `false` for the centos7-noroot / rocky9-noroot compose services.
+57:- [ ] **[L] devtools role: broaden remaining user-level fallbacks to RedHat** — `bats` and `neovim` user-level paths broadened in this batch; the rest of `dot_ansible/roles/devtools/tasks/main.yml` (bat, gh, glab, eza, delta, tldr, gum, vhs, fastfetch, taplo, television, sesh, zellij, btop, yazi, superfile, …) is still gated on `os_family == "Debian"`. Each is a separate `Re-check / user-level install` block; per `pitfalls/centos7-noroot.md` the broadening is mechanical (the user-level paths are `curl | tar | install`, no apt-specific behaviour) but there are ~30 tasks. Surfaced by `just docker-test-rocky9` smoke tests #4 / #6 (`command -v rg fd jq nvim starship zsh just bats` — many missing on RedHat noRoot). Batch-fix in one PR with the same gate-broadening pattern.
+58:- [ ] **[L] CentOS 7: pin ANSIBLE_PYTHON_INTERPRETER to uv-managed Python 3.13** — CentOS 7 ships Python 3.6.8 as `/usr/bin/python3`; ansible 2.18+ modules use `from __future__ import annotations` (Py3.7+) so every `gather_facts` call dies with `SyntaxError: future feature annotations is not defined`. The bootstrap already installs ansible-core under uv-managed Python 3.13; need to discover that path (e.g. `uv python find 3.13`) in `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl` and `export ANSIBLE_PYTHON_INTERPRETER=...` when system python3 is < 3.7. Until landed, `just docker-build-centos7-noroot` produces an image with all 9 ansible tags failed → only chezmoi/uv/mise/ansible/bootstrap-installed binaries present; smoke tests cannot run meaningfully. Tracked alongside the Linuxbrew/git<2.7 issue as the two CentOS-7-specific blockers.
+59:- [ ] **[S] base: ripgrep aarch64 fallback to gnu when musl 404s** — ripgrep 15.1.0+ stopped publishing `aarch64-unknown-linux-musl.tar.gz`; the `aarch64-unknown-linux-gnu.tar.gz` is still there. Surfaced by `just docker-test-rocky9` on Apple Silicon. Currently handled by `ignore_errors: true` so non-fatal but `command -v rg` returns nothing on arm64 RedHat. Either pin to a version that still has musl, or detect the 404 and retry with the gnu tarball.
+60:- [ ] **[M] bootstrap: skip Linuxbrew when git < 2.7.0 (CentOS 7 sudo path)** — `run_once_before_00_bootstrap.sh.tmpl:175` runs the Homebrew installer which hard-fails with `The version of Git that was found does not satisfy requirements for Homebrew. Please install Git 2.7.0 or newer.` on CentOS 7 (ships git 1.8.x). Surfaced by `just docker-build-centos7` (sudo flavor, currently broken). Either parse `git --version` and skip Linuxbrew with a warn, or `yum install -y rh-git227` from SCL before calling `brew`. Once landed, the `centos7` (sudo) compose service is testable; today only `centos7-noroot` works.
+61:- [ ] **[S] Dockerfile + dotfiles_init.py doctor: verify --prompt* flag text matches template** — current doctor only checks ARG names, missing the prompt-text-vs-key-name confusion that cost a debugging round when adding the centos7/rocky9 images. Add a regex extract of `--prompt(String|Bool|Choice)\s+"([^=]+)=` from the Dockerfile's `chezmoi init` block and assert it matches the corresponding template `promptXOnce` text. → [research](pitfalls/chezmoi-init-prompt-flag-mismatch.md)
+62:- [ ] **[S] docker test: revisit chezmoi source-path strategy** — fixed today by symlinking `~/.local/share/chezmoi` → `/tmp/dotfiles-source` after `chezmoi init` in all three Dockerfiles. The symlink is the minimum-invasive fix (matches what `chezmoi init https://...` would create when cloning a real repo). Open question for later: should `tests/smoke/docker_install.bats` use `chezmoi apply --source="$SOURCE_DIR"` explicitly instead, so the test works against any container layout including ones without the symlink? Decide once we add a second smoke test target (e.g. devbox vs prod-like). The current test was always going to fail without `~/.local/share/chezmoi` populated; the earlier "5/8 passing" reading on `dotfiles:test-rocky9` was a buildkit cache fluke.
+64:## P3 — Someday / nice to have
+66:- [ ] **[S] TA-Lib path management** — currently in `secrets.zsh` as machine-specific. Could move to a `99_local_*.zsh` create-only stub like the proxy pattern in `dot_config/zsh/99_local_proxy.zsh`.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:05Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./backlog/fish-shell-evaluation.md`
+
+```text
+1	# fish vs. current zsh setup — does fish still buy us anything?
+2	
+3	**Status**: P? deferred — evaluation only, no install
+4	**Effort**: L (full port estimated ~400 LOC translation + ansible role; see TODO `[P3/L] Add fish as a third primaryShell choice`)
+5	**Related**: [`TODO.md`](../TODO.md) → `[P3/L] Add fish as a third primaryShell choice` · [`docs/shells/architecture.md`](../docs/shells/architecture.md) · [`AGENTS.md`](../AGENTS.md) → "primaryShell choice gates chsh only"
+6	
+7	## Context
+8	
+9	2026-05, conversation prompt: *"fish vs. 我們現在的zsh配置能有什麼優勢嗎？還是也配得差不多了？"*
+10	
+11	The question came up while reviewing the current shell stack (zsh + bash dual-tier with `dot_config/shell/` POSIX shared layer). Goal of this doc: freeze the trade-off analysis so we don't re-litigate it next time fish comes up, and so the existing `[P3/L] Add fish as a third primaryShell choice` TODO has a real decision log to point at instead of just scoping notes.
+12	
+13	## Investigation
+14	
+15	### Feature parity — what fish ships by default vs what our zsh already has
+16	
+17	| fish out-of-the-box feature | Current zsh equivalent in this repo |
+18	|---|---|
+19	| Autosuggestion (grey inline preview) | `zsh-autosuggestions` + `aisuggest` (Alt+;, AI-powered — fish has no equivalent) |
+20	| Syntax highlighting | `fast-syntax-highlighting` |
+21	| fzf-style history search | `atuin` (cross-machine sync, SQLite, strictly stronger than fish's built-in history) |
+22	| Smart completions (auto-generated from man pages) | zsh `compinit` + `carapace` + per-tool completions |
+23	| Pretty prompt | `starship` (fish itself uses starship too) |
+24	| Directory jumping | `zoxide` |
+25	| Tab completion menu with arrow-key selection | zsh `menu-select` |
+26	
+27	Plus zsh-only surfaces in this repo that fish does NOT have equivalents for:
+28	
+29	- `sesh` + tmux integration ZLE widgets (Alt+S/G/E/A/I/T/R/P)
+30	- `tools_picker` / `television` ZLE widgets
+31	- `aisuggest` (AI completion)
+32	- `zsh-vi-mode` + custom `zvm_after_init` keybind restoration (rebinds Alt+* widgets after zsh-vi-mode wipes them)
+33	- Cross-shell `dot_config/shell/` POSIX shared tier (sourced by both zsh and bash)
+34	
+35	### Where fish still genuinely leads
+36	
+37	1. **Cleaner script syntax** — `if test -f foo` vs `[[ -f foo ]]`, no `$(())` quoting trap, function definitions don't need `()`, explicit variable scoping (`set -lx` / `-gx`). Less footgun-prone for new shell scripts.
+38	2. **Zero-config UX** — `brew install fish` and you're done; we spent significant time tuning zsh to get the same baseline. Lower ceiling though.
+39	3. **`fish_config` web UI** — browser-based prompt/colour/keybind editor. Cute, not load-bearing.
+40	4. **`abbr` (abbreviations)** — strictly better than aliases: expand to the real command at space/enter, editable inline, history records the expanded form. zsh has `zsh-abbr` plugin but it's not built-in.
+41	5. **POSIX-incompatibility as a feature** — forces you to not copy-paste random bash one-liners, fewer pitfalls.
+42	
+43	### Where fish is a regression for THIS repo
+44	
+45	1. **Not POSIX**. The `dot_config/shell/*.sh.tmpl` three-tier architecture (shared → zsh-only / bash-only) breaks. fish cannot source POSIX scripts; env vars, functions, aliases would all need a `.fish` rewrite. Going from "zsh + bash dual-tier" to "zsh + bash + fish triple-tier" — or dropping bash entirely.
+46	2. **Often missing on servers**. SSH into a customer's customer's box: bash always there, zsh usually there, fish usually not. Means another ansible role and a host-availability assumption that frequently fails.
+47	3. **Smaller ecosystem**. `zsh-vi-mode`, `atuin` ZLE integration, `zsh-autosuggestions` AI hooks, `carapace` completion quality — all more mature on the zsh side. `sesh`'s fish integration is sparse.
+48	4. **Cannot directly use shell snippets from the wild**. ~99% of Stack Overflow shell answers are bash/POSIX; every paste needs translation.
+49	5. **Massive sunk cost**. `docs/shells/`, `pitfalls/` shell entries, `AGENTS.md`'s shell-tier rules, the ble.sh + OMB 12-step init order, the `zvm_after_init` keybind fix — all redundant if we switch.
+50
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find P? section in TODO.md
+
+`grep -n "^## P\?\|^## P?" /Users/daviddwlee84/.local/share/chezmoi/TODO.md`
+
+```text
+12:## How to read this
+28:## P1 — Likely next batch
+35:## P2 — Worth doing, no rush
+64:## P3 — Someday / nice to have
+83:## P? — Needs evaluation before committing
+111:## Done (recent, kept for context — older items pruned)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:15Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+63	
+64	## P3 — Someday / nice to have
+65	
+66	- [ ] **[S] TA-Lib path management** — currently in `secrets.zsh` as machine-specific. Could move to a `99_local_*.zsh` create-only stub like the proxy pattern in `dot_config/zsh/99_local_proxy.zsh`.
+67	- [ ] **[S] Try / Toolkami custom tool aliases** — currently in `secrets.zsh`. Same `99_local_*.zsh` pattern as TA-Lib above; group together.
+68	- [ ] **[M] Super Productivity Linux install** — currently macOS-only via `dot_config/homebrew/Brewfile.darwin.tmpl:83` cask. For fleet parity (`fleet-apply` against Ubuntu desktops) need either AppImage in a new ansible task or snap. Defer until first Linux desktop host actually wants it. The `tv super-productivity` channel + REST API integration ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) are cross-platform; only the desktop install path is missing.
+69	- [ ] **[?/L] `spctl` + `super-productivity-mcp`** — wrap SP's local REST API ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) as a CLI for shell automation and an MCP server for coding agents. The TV channel (v0.1) intentionally exercises every read route first to validate behaviour. Phase 2 (mutations: start/stop/complete/archive) lands as Alt-key bindings on the same channel before extracting into a separate package. Open question: TypeScript monorepo vs. plain Python `uv` script — the latter matches the rest of this repo's `scripts/` style.
+70	- [ ] **[M] `js_cli_tools` / `coding_agents` ansible: gate on minimum Node version** — both roles call `npm install --global` against system npm without checking the version. On Ubuntu 22.04 jammy hosts (e.g. `ts_nas`) the apt-installed `/usr/bin/npm` is v8.5.1 / Node v12.22.9, which fails `EBADENGINE` on modern packages (`@openai/codex` requires Node ≥18) and `EACCES` on `/usr/local/lib/node_modules` for non-root users. Fix path A in [pitfalls/ansible-js-cli-tools-old-system-node.md](pitfalls/ansible-js-cli-tools-old-system-node.md) covers the role-side patch (`is version('v18.0.0', '<')` check that forces mise fallback).
+71	- [ ] **[M] fleet-apply long-run sudo session expiry** — `jingle207` ran for 7m50s under `just fleet-apply` and failed at task `Ensure xz is available for worktrunk extraction` with `sudo: a password is required` even though the run started with `CHEZMOI_SUDO_PASSWORD_FILE` populated. Either (a) the sudo password file gets cleaned up by the wrapper's `_cleanup` trap before late tasks need it, or (b) Linux sudo `timestamp_timeout` (default 5m for many distros, 15m for some) expires mid-run and `sudo -S` doesn't re-prompt automatically. Investigation needed: instrument `scripts/lib/sudo_shared.sh` to refresh the cache periodically, or have `sudo_session_init` re-validate via `sudo -S -v -p ''` before each privileged task. See AGENTS.md → "Sudo session is shared across all run-scripts" for the existing contract.
+72	- [ ] **[?/M] fleet-apply: optional `sshpass` / interactive-password SSH login support** — currently `password_source` only feeds remote sudo (`CHEZMOI_SUDO_PASSWORD_FILE`); SSH login itself is key-only, so password-only hosts classify as `unreachable` in `fleet-status`. Schema comment + new pitfall (`pitfalls/fleet-apply-password-source-not-for-ssh-login.md`) now document the limitation. Concrete trigger: `zyc_friend` (IDC server, 2026-05-08) has `Authentications that can continue: gssapi-keyex,gssapi-with-mic,keyboard-interactive` — sshd deliberately omits `publickey` AND uses `keyboard-interactive` (PAM) instead of plain `password`, so even after `ssh-copy-id` deposits the key, login still requires the IDC password. A real fix needs: (a) optional `sshpass -f` invocation when `password_source.ssh_login = true` (or a separate `ssh_password_source`), (b) `-o PreferredAuthentications=keyboard-interactive,password` to handle PAM-only sshds (sshpass defaults to `password` method only), (c) graceful fallback when `sshpass` not installed, (d) parallel-safe (no TTY prompts), (e) opt-in only — default stays key-only for security. Recommended user fix today: ask the IDC admin to enable `PubkeyAuthentication yes` in `/etc/ssh/sshd_config`, OR remove the host from the fleet and `ssh <host> chezmoi update --apply` manually. Promote when ≥2 hosts in the fleet legitimately can't accept a pubkey.
+73	- [ ] **[S] fleet-apply `--serial` mode misses drift downgrade** — `_classify_drift()` in `scripts/fleet/apply.py` correctly downgrades `chezmoi: <path>: could not open a new TTY: open /dev/tty:` to drift in parallel mode, but `just fleet-apply-one HOST` (which uses `--serial`) reports `rc=1` for the same condition instead of `drift`. Verified on `hanru_mac` 2026-04-24: only diff was `~/.config/worktrunk` directory mode (40700 → 40755), and serial-mode reported failed; identical condition under parallel was correctly classified. Likely a code path that bypasses `_classify_drift` when `--serial` is passed.
+74	- [ ] **[M] CentOS / RedHat: broaden user-level fallback gates in remaining roles** — the `centos_server` profile (added 2026-05-06) only ports the foundational subset of roles to `os_family in ["Debian", "RedHat"]`: `base`, `zsh`, `starship`, `ruby_gem_tools`, `security_tools`, `rust_cargo_tools`. Still gated `Debian`-only on user-level paths (so they no-op on CentOS even without sudo): `devtools` (~20 hits), `neovim` (8 hits), `lazyvim_deps` (~19 hits), `docker` (~10 hits). The broadening pattern is mechanical (`pitfalls/centos7-noroot.md` documents it); the cost is the audit + re-test. Pick up when a second CentOS user appears or when `idc-server104` reports concrete missing-tool symptoms.
+75	- [ ] **[M] CentOS / RedHat: full `yum:` / EPEL bootstrap for sudo-able RedHat hosts** — with the `centos_server` profile, parallel `RedHat` blocks were added only for trivial cases (zsh, ruby_gem_tools libffi-devel/libyaml-devel, base packages). For users with sudo on a RedHat-family box, a comprehensive port would need: `epel-release` enable as a pre-task, parallel yum blocks for `devtools` (~30 packages), `neovim` (EPEL has 0.9 — old; consider AppImage path), `lazygit` (no standard RedHat repo — use GitHub release path), and possibly `vault.centos.org` mirror configuration if running on EOL CentOS 7. Keep deferred until a sudo-capable RedHat user actually requests it. Design: piggyback on `useChineseMirror` for `mirrors.tuna.tsinghua.edu.cn` if any user reports Great-Firewall-side EPEL / vault access issues.
+76	- [ ] **[S] Auto-detect `centos_server` default in `.chezmoi.toml.tmpl`** — currently `$defaultProfile` defaults to `ubuntu_server` on every non-darwin OS, including CentOS. Could use `.chezmoi.osRelease.id` (or `.idLike`) to default to `centos_server` when chezmoi sees `id=centos|rhel|rocky|alma`. Mostly cosmetic — `dotfiles_init` prompts anyway — but worth a one-liner if/when adjacent prompt logic is touched.
+77	- [ ] **[S] Wire `upgrade-skills` into `scripts/upgrade_tools.sh` as a proper category** — recipe shipped 2026-04 as a standalone `just upgrade-skills` that calls `npx skills@latest update --global -y` directly. Promote to a real category so it gets picked up by `upgrade-all` (and `upgrade-dry-run`) and appears in the per-category matrix at [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md). Mechanical: add `skills` to the script's case statement, append to the `upgrade-all` comment in `justfile`, add a row to upgrades.md. No semantic change — `chezmoi apply` is still install-only for skills (the restore loop in `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` only fires when the merger's managed-set changes, which is the right behaviour).
+78	- [ ] **[L] Split `devtools` mega-role into focused per-tool roles** — [`dot_ansible/roles/devtools/tasks/main.yml`](dot_ansible/roles/devtools/tasks/main.yml) is a 166-task grab-bag installing ~50 unrelated tools (gh, glab, bat, btop, fastfetch, jnv, lnav, pandoc, rclone, sesh, tailspin, taplo, television, tldr, tmux, vhs, yazi, yq, zellij, zoxide, …). Sibling tools that get standalone roles (atuin, starship, neovim, docker, bitwarden) prove the standalone-role pattern is fine. Cost of the current shape: long apply times even when one tool changes, hard to skip individual tools per-host (e.g. headless server doesn't need yazi), and an oversized blast radius for any single edit. Proposed split into ~6 cohesive roles with a meta-role keeping playbook entries unchanged. → [research](backlog/devtools-role-split.md)
+79	- [ ] **[S] macOS: add Stats.app cask to `Brewfile.darwin.tmpl`** — [exelban/stats](https://github.com/exelban/stats), MIT-licensed native Swift menubar widget for memory pressure / swap / CPU / network. Documented in [docs/tools/macos-swap.md → Prevention & monitoring](docs/tools/macos-swap.md#prevention--monitoring) as the recommended free alternative to iStat Menus. Currently NOT installed by default — user evaluation needed for whether it crowds the menubar (Codexbar / Codex history / wuhrai / etc. already there). Add as `cask "stats"` once user opts in. Decision criteria: at least one menubar slot freed up, or user explicitly says "I want a swap meter visible at all times". One-line Brewfile change.
+80	- [ ] **[?/M] `tv mac-storage` channel** — `tv mac-procs` (shipped 2026-05) covers the per-process angle. A complementary `tv mac-storage` would visualise *what's eating my disk* in general: parsed `du -shx /*` + `system_profiler SPStorageDataType` + `tmutil listlocalsnapshots /` + `diskutil apfs listSnapshots /` rows in one fuzzy picker. Preview: `du -h --max-depth=1 <selected>` for dirs, `ls -lh <file>` for files. Actions: open in Finder, `rm -i`, copy path. Useful when "System Data" balloons but the cause isn't swap (e.g. Xcode DerivedData, Docker volumes, brew cleanup needed, `/Library/Caches`). Defer until a second "where did my disk go" investigation actually happens — the existing `tv files-ls`/`du-here` aliases may be enough.
+81	- [ ] **[?/L] Scheduled `audit-monitor` with apprise routing** — turn the ad-hoc `health-check` / `audit-failed-logins` / `audit-summary` helpers into a real monitoring story: scheduled (pueue or systemd timer), diff-aware (only alert on state change), routed via [apprise](https://github.com/caronc/apprise) (one CLI, ~80 notification backends incl. Slack/Discord/Telegram/ntfy/email). Hard part is secret management (apprise URLs contain auth tokens — must NOT sync via dotfiles); three patterns documented (Bitwarden CLI fetch / per-host 0600 env / systemd `LoadCredentialEncrypted=`). → [research](backlog/audit-monitor-with-apprise.md). Promote when at least 2 of these become true: (a) user runs a check 3+ days in a row manually, (b) user has an incident they wish they'd caught, (c) user already has a target apprise channel provisioned.
+82	- [ ] **[?/M] `linux-mem-status` / `linux-mem-reclaim` helpers** — mirror the macOS `mac-mem-*` ergonomics on the Linux side. Linux actually has *more* targeted reclaim primitives than macOS (`swapoff -a && swapon -a`, `journalctl --vacuum-*`, `systemd-tmpfiles --clean`, `docker system prune`, `echo 2 > /proc/sys/vm/drop_caches`), so `linux-mem-reclaim --include LIST` would have richer non-reboot options than its macOS sibling. `linux-mem-status` would surface `free -h` + `vmstat` + `journalctl --disk-usage` + `df -h` + top RSS in one screen. Source file: `dot_config/shell/56_linux_mem.sh.tmpl` gated on `eq .chezmoi.os "linux"`. Trigger: when the first IDC server in the fleet (e.g. `idc-server104`) shows memory bloat that this would have helped diagnose. Cross-link from [docs/tools/macos-swap.md → Practical implication for this repo's fleet](docs/tools/macos-swap.md). Doc page should explain the fundamentally different reclaim model (Linux: per-resource targeted tools; macOS: reboot or wait).
+83	## P? — Needs evaluation before committing
+84	
+85	- [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
+86	- [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
+87	- [ ] **[?/S] Audit `~/.config/zsh/tools/` for other pre-chezmoi orphans** — `02_legacy.zsh` was caught and removed manually on `Da-Weis-Mac-mini` 2026-04-27 (see [pitfall](pitfalls/zsh-nvm-lazy-loader-orphan.md)). Likely siblings exist on other hosts (`27_thefuck.zsh`, etc. — `chezmoi managed --include=files | grep tools/` does NOT account for every `tools/*.zsh` file we observe on disk). A content-aware audit script (diff `ls` against managed list, verify each unmanaged file matches a known stale signature, then prompt-and-rm) would handle this without `.chezmoiremove`'s blast radius. Skip until a second host shows the symptom — one-off `rm` per host is fine for now.
+88	- [ ] **[?/S] Switch macOS tmux from 3.6a bottle to `--HEAD`, then revert when 3.7 ships** — homebrew `tmux 3.6a` ships a copy-mode double-free that fires `[server exited unexpectedly]` after long-running sessions (slice UUID `1b2d8e7b-bb77-3465-8bab-73f5bbaffe49`). Fixed upstream in [`035a2f3`](https://github.com/tmux/tmux/commit/035a2f35d40628dcfe235179220fc0ede848a195) closing [tmux/tmux#4777](https://github.com/tmux/tmux/issues/4777) (2026-01-06) but not yet in any tagged release. Action **A** = `tmux kill-server && brew install --HEAD tmux` (interrupts every running session — defer until quiescent). Action **B** = once 3.7 (or 3.6b) hits homebrew-core, `tmux kill-server && brew uninstall tmux && brew install tmux` to return to the bottle. tmux is **not** in `Brewfile.darwin.tmpl` so this is host-local; no fleet broadcast. Linux side (Linuxbrew + tmux-appimage in `dot_ansible/roles/devtools/tasks/main.yml`) is unaffected — those install paths target the popup-clamp invariant (tmux ≥ 3.3), not this bug. → [pitfall](pitfalls/tmux-copy-mode-double-free-3.6a.md)
+89	- [ ] **[?/S] Replace global-skills restore loop with `npx skills experimental_install -g -y`** — current `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` hand-rolls restore by looping `npx skills add <source> -s <name> -g -y` for each entry in `~/.agents/.skill-lock.json` whose `~/.agents/skills/<name>/SKILL.md` is missing. Reason: upstream `experimental_install` only reads project lock (`src/install.ts:19` — no `-g`/`--global` branch), and `update --global` is refresh-in-place (skips entries where the on-disk skill is gone — `src/cli.ts:619`). [PR #743 "feat: add global restore/relink from .skill-lock.json"](https://github.com/vercel-labs/skills/pull/743) proposes exactly this; status as of 2026-04-27: open, `mergeable_state=dirty`, no progress since 2026-04-10. When it merges, collapse the restore script's loop body to a single `npx skills experimental_install -g -y` call (the merger script in `dot_agents/modify_dot_skill-lock.json.tmpl` stays — still need it to enforce the managed-set into the lock). Watch [#283](https://github.com/vercel-labs/skills/issues/283) and [#549](https://github.com/vercel-labs/skills/issues/549) for movement.
+90	- [ ] **[?/M] tv agent-sessions: Cursor Agent (`[cu]`) + Cursor IDE (`[ci]`) full transcript rendering** — the first round of richer preview (2026-04; see Done) shipped Claude / Codex / OpenCode full transcripts only. Cursor-side is deferred: `[cu]` needs blob decode + role guessing (fragile), `[ci]` needs a two-table `composerData` + `bubbleId:*` join (straightforward but ~50 LOC). Both keep the legacy "first 5 user messages" preview for now. Promote when the user actually browses Cursor sessions often. → [research](backlog/tv-agent-sessions-richer-preview.md)
+91	- [ ] **[?/L] Use mise to manage most runtime versions** — already used for Node (Neovim) and Rust (Cargo) per `README.md`. Question: extend to python/go/ruby and retire ad-hoc PATH wiring + nvm? Trade-off: another layer vs unified version pinning. Spike: pick one runtime currently outside mise (go?), try alongside current setup for two weeks.
+92	- [ ] **[?/L] Optimize zsh & tmux startup time** — needs profiling first (`zprof`, `time zsh -i -c exit`). Current state: conda/nvm are lazy-loaded already, so low-hanging fruit may be gone. Don't optimize blind.
+93	- [ ] **[?/M] User-level `zsh` install for noRoot RedHat-family boxes** — `pitfalls/centos7-noroot.md` currently hard-requires `command -v zsh` as a precondition (admin must `yum install zsh` first); without it the dotfiles deploy a `~/.zshrc` pointing at a binary the user can't run, and `just docker-test-rocky9` smoke tests #2/#3/#6/#8 all fail on this single missing binary. Three install paths surveyed (Miniforge+conda-forge primary on glibc 2.17, mise asdf-zsh fallback when ncurses-devel exists, manual ncurses+zsh source build last resort) plus the `chsh`-blocked-on-noRoot bash-profile auto-exec workaround with four-guard structure. Decision deferred until we know whether the target box is a daily-driver (worth the ~400 MB Miniforge cost) vs occasional-job-runner (bash + starship is fine and cheaper). → [research](backlog/zsh-noroot-fallback.md)
+94	- [ ] **[?/XL] CUDA / ML toolchain ansible role** — driver/cudnn/nccl version matrix is large; only relevant on Linux ML hosts. Defer until there's a concrete host that needs it. Likely belongs behind a new `ml_linux` profile.
+95	- [ ] **[?/XL] SLURM client config** — same shape as CUDA above: host-specific, likely a `dot_slurm/` template gated by profile. No machine currently needs it.
+96	- [ ] **[?/XL] Raycast config sync for non-Pro users** — git-tracked, redacted cross-machine sync for hotkeys / quicklinks / snippets / aliases / extensions. Full scaffold was built (key-name redactor, extensions-manifest walker, secrets.env.example emitter, chezmoi `syncRaycast` prompt with 3-file parity, `just raycast-*` recipes) but paused: Raycast's `.rayconfig` export is AES-encrypted with a non-public KDF that mixes in keychain-bound material — we brute-forced 150+ scheme combinations (PBKDF2/scrypt/SHA*/EVP_BytesToKey) against password `12345678` with zero plausible decodes, and Raycast forces a non-empty password field so even the empty-password bypass is closed. Cheapest revival spike: inspect the separate `Export Quicklinks` / `Export Snippets` commands for a plaintext format. Adjacent pitfall (`raycast-library-files-not-portable-across-machines.md`) stays live. → [research](backlog/raycast-sync-non-pro.md)
+97	- [ ] **[P3/L] Port `aisuggest` ZLE widget to ble.sh `ble-bind -x` form** — bash users currently get the CLI form (`aisuggest "<text>"`) only. The shell-agnostic backend (_aiagent_invoke / _aisuggest_query / _aisuggest_sanitize) lives in `dot_config/zsh/tools/05_aisuggest.zsh`; widget porting needs to extract the backend into `dot_config/shell/04_ai_agent.sh` and rewrite the `_aisuggest_widget()` ZLE-driven UI as ble.sh's `ble-bind -m vi_imap -x` + `_ble_edit_str` manipulation. Pre-req: ble.sh widget API study, sanitize-pipeline regression test.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:22Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:14Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Linux/Ubuntu equivalent of `54_macos_apps.sh` — graceful desktop app control
+
+**Status**: P? deferred — evaluation only, pending hands-on Ubuntu Desktop experimentation
+**Effort**: M (gapplication-only subset) → L (full compositor-aware dispatch)
+**Related**: [`dot_config/shell/54_macos_apps.sh.tmpl`](../dot_config/shell/54_macos_apps.sh.tmpl) (the macOS side we want to mirror) · [`dot_config/television/cable/mac-apps.toml.tmpl`](../dot_config/television/cable/mac-apps.toml.tmpl) (companion tv picker) · `TODO.md` → `[?/M] linux-mem-status / linux-mem-reclaim helpers` (sister Linux-mirror entry) · `[?/M] Linux Desktop app control equivalent of 54_macos_apps.sh` (this entry)
+
+## Context
+
+2026-05-13, conversation prompt: *"不知道 Ubuntu 的 Desktop App 有沒有類似的機制？幫我搜一下？"*
+
+Came up right after shipping `54_macos_apps.sh` + `tv mac-apps` channel (commits `ce5e23a` + `2fc5031`). The macOS side uses `osascript` to send Apple Events for graceful Quit / Launch / Activate / Restart / Hide, plus a best-effort responsiveness probe via `with timeout`. Question: what's the Linux/Ubuntu equivalent so we can mirror the `app-*` helpers + `tv mac-apps` picker on `ubuntu_desktop` hosts?
+
+Short answer from the research: **no single equivalent**. Linux desktop control is fragmented across (display server) × (compositor / WM) × (desktop env) × (per-app D-Bus support). Wayland intentionally restricts cross-app introspection for security — by design there is no public API to "list all windows" or "send a quit event" from outside the compositor.
+
+## Investigation
+
+Three mechanism families exist, none of them universal.
+
+### 1. D-Bus — the actual semantic analog to Apple Events
+
+D-Bus is the IPC bus that every modern Linux DE uses. **Closest model match to macOS Apple Events**: apps expose objects/interfaces, you call methods on them. Works on **both X11 and Wayland**.
+
+CLI tools:
+- `gapplication` — high-level, freedesktop `org.freedesktop.Application` interface
+- `gdbus` / `qdbus` / `busctl` / `dbus-send` — low-level
+- `dbus-monitor` — sniff bus events (debug)
+
+Practical examples:
+\```bash
+gapplication list-apps                          # all DBusActivatable=true apps
+gapplication launch org.gnome.Calculator        # launch (or activate if running)
+gapplication launch org.gnome.gedit ./file.md   # open with file
+gapplication list-actions org.gnome.Calculator  # what methods does it expose?
+gapplication action org.gnome.gedit quit        # graceful quit — IF app exposes it
+\```
+
+**Catch**: every app must opt-in by setting `DBusActivatable=true` in its `.desktop` file AND expose `quit`/`activate`/etc actions. Many third-party apps don't. Coverage is patchy — closer to "macOS apps with sane Apple-Event support" (~good) than "every app in /Applications" (~universal).
+
+### 2. wmctrl / xdotool — X11 only, broken on Wayland
+
+`wmctrl -l` (list), `wmctrl -c "Firefox"` (close), `xdotool search --name`. **Closest functional mirror to AppleScript's window targeting** but **only works on X11 windows**. On Ubuntu 24.04+ default Wayland session, only legacy apps running under XWayland respond; native Wayland apps are invisible.
+
+Dead-end for new code. Don't build on these.
+
+### 3. Compositor-specific tools
+
+When you must control native Wayland windows, you drop down to whatever your compositor exposes:
+
+| Compositor | Tool | Notes |
+|---|---|---|
+| **GNOME Shell** (Ubuntu default) | `gdbus call --session --dest org.gnome.Shell …` | Restricted in recent GNOME for security. Needs a Shell extension like [`window-calls`](https://github.com/ickyicky/window-calls) or [`window-calls-extended`](https://github.com/hseliger/window-calls-extended) to expose `List/Details/Activate` D-Bus interface. **Extension install can't be fully automated** — defeats `chezmoi apply` automation if rolled out via ansible. |
+| **KDE / KWin** | `qdbus org.kde.KWin /KWin …` + `kdotool` | KDE-only. |
+| **Sway** (wlroots) | `swaymsg "[app_id=firefox] focus"` | **Cleanest of the bunch** — IPC is first-class, scriptable. |
+| **Hyprland** | `hyprctl dispatch killactive`, `hyprctl clients` | Hyprland's own JSON-RPC. |
+| **Generic wlroots** | `wlrctl` | Only works if compositor supports `wlr-foreign-toplevel-management` protocol. |
+
+For input simulation across Wayland: `ydotool` (replaces `xdotool`, needs a root daemon `ydotoold` via systemd) or `wtype` (keyboard only).
+
+### Bonus: MPRIS for media players
+
+**The one cross-desktop standard that actually works universally**: media players expose `org.mpris.MediaPlayer2.*` over D-Bus. `playerctl play-pause` works for Spotify, VLC, Firefox, Chromium, mpv, anything compliant. No compositor coupling. Closest thing Linux has to "AppleScript universal support" — but only for media controls.
+
+### Mapping back to the macOS helper surface
+
+| macOS helper (`54_macos_apps.sh`) | Linux closest equivalent | Coverage |
+|---|---|---|
+| `appquit NAME` | `gapplication action <app-id> quit` | Good for GNOME apps, hit-or-miss for third-party |
+| `applaunch NAME` (background) | `gapplication launch <app-id>` | Good — bus-activated launch |
+| `appactivate NAME` (foreground) | `gapplication launch <app-id>` (same) OR compositor-specific focus | gapplication doesn't distinguish; needs compositor for true focus |
+| `apprestart NAME` | quit + launch (compose the above) | Inherits both sides' patchiness |
+| `apprunning NAME` | `gdbus introspect --session --dest <bus-name>` returns non-error | Works if app has a well-known bus name |
+| `applist` | `gapplication list-apps` (registered apps, NOT running) | **Semantic mismatch** — lists installable, not running |
+| `applist --pids` | GNOME `window-calls` ext, KDE qdbus, sway/hyprctl | Compositor-specific, no universal answer |
+| `appresponsive NAME` | No public API. Would need ping over the app's D-Bus interface with timeout | Best-effort, similar to macOS proxy |
+
+## Options considered
+
+| Option | Coverage | Effort | Notes |
+|---|---|---|---|
+| **A. D-Bus-only (`gapplication` + `gdbus`)** | Apps that expose interfaces (~good for GNOME, patchy elsewhere) | Low (~80 LOC) | Cross-DE, works on both X11 + Wayland. Misses many third-party apps. Honest first cut. |
+| **B. Compositor-specific (Sway / Hyprland / KDE)** | Full window control on that compositor | Medium per compositor | Only useful if you commit to one compositor. Unrealistic for `ubuntu_desktop` (defaults to GNOME). |
+| **C. GNOME + `window-calls` extension** | Full control on GNOME Wayland | Low after the extension install (which is manual) | Extension install is not silent — would need user consent step, can't ansible-deploy. Defeats automation. |
+| **D. X11-only (`wmctrl` + `xdotool`)** | Everything on X11 | Low | Forces users onto X11 session — backward step on Ubuntu 24.04+. Dead-end. |
+| **E. Hybrid: D-Bus core + `playerctl` + compositor-detection stub** | gapplication coverage + universal media + room to extend | Medium | Most pragmatic. `XDG_SESSION_TYPE` + `XDG_CURRENT_DESKTOP` runtime gates, dispatch to the right backend, document patchy coverage upfront. |
+| **F. Skip — Ubuntu side stays manual** | — | Zero | Most pragmatic given fragmentation. The `tv mac-apps` UX is macOS-specific; users on Ubuntu desktops would interact via the OS's own picker/wmctrl/keyboard shortcuts. |
+
+## Current blocker / open questions
+
+1. **No Ubuntu Desktop host to test against right now.** The user maintains `ubuntu_desktop` and `ubuntu_server` profiles but `ubuntu_server` is what most fleet hosts run today. Need a real `ubuntu_desktop` machine (Wayland session, GNOME default) to validate which apps actually expose `quit`/`activate` D-Bus actions — the research above is theory.
+
+2. **GNOME `window-calls` extension install is not automatable.** It would need:
+   - `gnome-extensions install --enable <extension.zip>` (CLI flow exists but requires `gnome-shell` reload + user consent dialog on recent GNOME)
+   - OR document a one-time manual install step in the playbook
+   - OR drop the window-listing requirement and only support gapplication-style lifecycle (no `applist`)
+
+3. **Coverage acceptance threshold unknown.** If only ~30% of GUI apps respond to `gapplication action <id> quit`, is it still worth shipping? Need empirical measurement on a real desktop session against the user's actual app set.
+
+4. **Compositor-detection complexity vs single-target focus.** Option E hedges across compositors; option C accepts the GNOME assumption upfront. The user's `ubuntu_desktop` Brewfile/role doesn't currently pin a compositor — open whether to enforce GNOME or leave it floating.
+
+## Decision (pending)
+
+**2026-05-13 deferred** — user wants to experiment on a real Ubuntu Desktop machine before committing to a path. Likely first spike when one of:
+
+- A second Ubuntu Desktop joins the fleet (currently most Linux hosts are `ubuntu_server` headless).
+- User explicitly wants `tv linux-apps` parity for daily driver workflow.
+- Concrete coverage measurement on a real desktop session reveals option A is "good enough" (≥50% of daily-use apps).
+
+When picking back up:
+1. Start from option A (gapplication subset) — smallest blast radius, no extension dependency.
+2. Measure coverage on the actual host's installed app set (`gapplication list-apps | wc -l` vs how many actually expose `quit`).
+3. Promote to option E only if a second compositor (KDE on a niche host, Sway on a power-user laptop) joins the fleet.
+4. File location: `dot_config/shell/56_linux_apps.sh.tmpl` (sibling to the deferred `56_linux_mem.sh.tmpl` per the `linux-mem-status` TODO entry), gated on `eq .chezmoi.os "linux"`.
+5. tv channel mirror: `dot_config/television/cable/linux-apps.toml.tmpl` would reuse the same `tv mac-apps` UX (Enter=activate, Alt+Q=quit, etc.) but call gapplication.
+
+## References
+
+- [Successor of wmctrl, xdotool, devilspie2, kpie — Fedora Discussion](https://discussion.fedoraproject.org/t/successor-of-wmctrl-xdotool-devilspie2-kpie/79507) — community survey of the post-Wayland tool landscape
+- [Exploring the Fragmentation of Wayland, an xdotool adventure (semicomplete)](https://www.semicomplete.com/blog/xdotool-and-exploring-wayland-fragmentation/) — root cause writeup of why no universal solution
+- [Which tools can I use in place of wmctrl and xdotool? — Ubuntu Forums](https://ubuntuforums.org/showthread.php?t=2475972)
+- [Xdotool replacement on wayland — KDE Discuss](https://discuss.kde.org/t/xdotool-replacement-on-wayland/7242)
+- [Wlrctl: Wayland replacement to xdotool — Raspberry Pi Forums](https://forums.raspberrypi.com/viewtopic.php?t=371406)
+- [Control Your Linux Desktop with D-Bus — Linux Journal](https://www.linuxjournal.com/article/10455)
+- [D-Bus — Wikipedia](https://en.wikipedia.org/wiki/D-Bus)
+- [gapplication: D-Bus application launcher — Arch man page](https://man.archlinux.org/man/core/glib2/gapplication.1.en)
+- [HowDoI/GtkApplication/CommandLine — GNOME Wiki Archive](https://wiki.gnome.org/HowDoI(2f)GtkApplication(2f)CommandLine.html)
+- [`window-calls` GNOME Shell extension (ickyicky)](https://github.com/ickyicky/window-calls) — GNOME Wayland window-listing via D-Bus
+- [`window-calls-extended` GNOME Shell extension (hseliger)](https://github.com/hseliger/window-calls-extended) — fork with GNOME 45 updates
+- [Extension: Get list of windows — GNOME Discourse](https://discourse.gnome.org/t/extension-get-list-of-windows/19455)
+- [playerctl (altdesktop) — MPRIS CLI](https://github.com/altdesktop/playerctl) — the one cross-DE bright spot
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/backlog/linux-desktop-app-control.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:19Z)**_
+
+Now adding the one-liner to `TODO.md` (P? section) and the index row in `backlog/README.md`.
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/TODO.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/backlog/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:44Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm staged surface area
+
+`git status --short ; echo --- ; git diff --stat backlog/ TODO.md`
+
+```text
+ M .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+ M .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+ M .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+ M TODO.md
+ M backlog/README.md
+ M docs/tools/workmux.md
+ M dot_config/tmux/keybindings.conf.tmpl
+ M dot_config/tmux/theme.catppuccin.conf
+?? .claude/plans/tmux-tab-moonlit-cake.md
+?? .specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+?? backlog/linux-desktop-app-control.md
+?? dot_config/tmux/executable_toggle-bookmark.sh
+---
+ TODO.md           | 1 +
+ backlog/README.md | 1 +
+ 2 files changed, 2 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:05:04Z)**_
+
+Done. Three files touched:
+
+- **New**: `backlog/linux-desktop-app-control.md` — full research dump (context, three mechanism families, mapping table per macOS helper, 6 options considered with trade-offs, 4 open questions, references list of 12 sources)
+- **`TODO.md`**: one-liner under `## P? — Needs evaluation before committing`, summarizing the option-A first cut (`gapplication`-only)
+- **`backlog/README.md`**: index row `[linux-desktop-app-control] P? deferred 2026-05`
+
+Resume strategy when you get to an Ubuntu Desktop machine (also captured in the doc):
+
+1. Start with **option A** (gapplication subset) — smallest surface, no extension dependency, works on both X11 + Wayland
+2. **Measure first**: `gapplication list-apps | wc -l` then probe how many actually expose `quit` via `gapplication list-actions <id>` — gives you a coverage % for your daily app set
+3. Only escalate to **option E** (hybrid compositor-aware) if a second-compositor host (KDE/Sway) joins the fleet
+4. File location: `dot_config/shell/56_linux_apps.sh.tmpl` (sibling to the deferred `56_linux_mem.sh.tmpl` from the `linux-mem-status` TODO)
+5. tv channel mirror: `dot_config/television/cable/linux-apps.toml.tmpl`, same `mac-apps` UX, gapplication backend
+
+I did **not** commit this round — you have parallel agent work in flight (tmux theme / keybindings / workmux.md / a new `toggle-bookmark.sh` script and a `.claude/plans/tmux-tab-moonlit-cake.md`) that would get tangled in the commit. Let me know when you want me to commit just the backlog three files, or hold off until you decide on the in-flight stuff first.
+
+---
+
+_**User (2026-05-13 10:07:33Z)**_
+
+please git commit changes
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:42Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm only my line additions, no co-mingled changes
+
+`git diff TODO.md backlog/README.md`
+
+```text
+diff --git a/TODO.md b/TODO.md
+index 6831379..5f4abfc 100644
+--- a/TODO.md
++++ b/TODO.md
+@@ -82,6 +82,7 @@ with a one-line summary of what shipped.
+ - [ ] **[?/M] `linux-mem-status` / `linux-mem-reclaim` helpers** — mirror the macOS `mac-mem-*` ergonomics on the Linux side. Linux actually has *more* targeted reclaim primitives than macOS (`swapoff -a && swapon -a`, `journalctl --vacuum-*`, `systemd-tmpfiles --clean`, `docker system prune`, `echo 2 > /proc/sys/vm/drop_caches`), so `linux-mem-reclaim --include LIST` would have richer non-reboot options than its macOS sibling. `linux-mem-status` would surface `free -h` + `vmstat` + `journalctl --disk-usage` + `df -h` + top RSS in one screen. Source file: `dot_config/shell/56_linux_mem.sh.tmpl` gated on `eq .chezmoi.os "linux"`. Trigger: when the first IDC server in the fleet (e.g. `idc-server104`) shows memory bloat that this would have helped diagnose. Cross-link from [docs/tools/macos-swap.md → Practical implication for this repo's fleet](docs/tools/macos-swap.md). Doc page should explain the fundamentally different reclaim model (Linux: per-resource targeted tools; macOS: reboot or wait).
+ ## P? — Needs evaluation before committing
+ 
++- [ ] **[?/M] Linux Desktop app control equivalent of `54_macos_apps.sh`** — mirror the macOS `appquit` / `applaunch` / `appactivate` / `apprestart` / `applist` / `appresponsive` helpers + `tv mac-apps` channel on `ubuntu_desktop` hosts. No universal Linux analog exists: macOS osascript/Apple Events fragment across (display server: X11/Wayland) × (compositor: GNOME Shell / KWin / Sway / Hyprland) × (per-app D-Bus opt-in). The pragmatic first cut is **option A — `gapplication`-only subset** (works on both X11 + Wayland, covers GNOME-native apps; misses third-party that don't set `DBusActivatable=true`). Compositor-specific fallbacks (sway/hyprctl/KDE qdbus, GNOME `window-calls` extension) only if a real second-compositor host joins the fleet. Skipped today — needs hands-on Ubuntu Desktop experimentation to measure coverage on a real app set before committing. → [research](backlog/linux-desktop-app-control.md)
+ - [ ] **[?/M] tmux window status indicators — option C (hook-based per-pane state)** — option A (built-in `monitor-activity`/`bell` flags) shipped 2026-04 in `dot_config/tmux/common.conf`. Option C (semantic running/idle/error glyphs driven by Claude hooks + OpenCode plugin writing per-pane state files) is fully scoped but deferred until option A's `#` flag proves insufficient or another feature also needs the per-pane state file. Claude side is additive to `dot_claude/hooks/executable_notify.sh.tmpl` (low risk); OpenCode side is a new JS plugin (new surface, more risk). → [research](backlog/tmux-window-status-indicators.md)
+ - [ ] **[?/S] specstory: enable opencode auto-wrap when upstream lands** — `_sesh_wrap_agent` in `dot_config/zsh/tools/22_sesh.zsh` currently passes `opencode` through raw because specstory doesn't support it as a provider. Add to the case statement (one-line change) once `specstoryai/getspecstory#156` merges + ships. → [research](backlog/specstory-opencode-support.md)
+ - [ ] **[?/S] Audit `~/.config/zsh/tools/` for other pre-chezmoi orphans** — `02_legacy.zsh` was caught and removed manually on `Da-Weis-Mac-mini` 2026-04-27 (see [pitfall](pitfalls/zsh-nvm-lazy-loader-orphan.md)). Likely siblings exist on other hosts (`27_thefuck.zsh`, etc. — `chezmoi managed --include=files | grep tools/` does NOT account for every `tools/*.zsh` file we observe on disk). A content-aware audit script (diff `ls` against managed list, verify each unmanaged file matches a known stale signature, then prompt-and-rm) would handle this without `.chezmoiremove`'s blast radius. Skip until a second host shows the symptom — one-off `rm` per host is fine for now.
+diff --git a/backlog/README.md b/backlog/README.md
+index 52c0630..68f9859 100644
+--- a/backlog/README.md
++++ b/backlog/README.md
+@@ -101,6 +101,7 @@ Add new entries here as you create them. Keep alphabetical.
+ | [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
+ | [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
+ | [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
++| [`linux-desktop-app-control`](linux-desktop-app-control.md) | P? deferred 2026-05 | "Linux Desktop app control equivalent of `54_macos_apps.sh`" |
+ | [`rtk-evaluation`](rtk-evaluation.md) | P? declined 2026-05 | "rtk-ai/rtk evaluation" |
+ | [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
+ | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:47Z)**_
+
+Clean — only my line additions. Staging just my three files and committing.
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage only the backlog feature files
+
+`git add TODO.md backlog/README.md backlog/linux-desktop-app-control.md && git status --short`
+
+```text
+ M .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+ M .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+ M .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+M  TODO.md
+M  backlog/README.md
+A  backlog/linux-desktop-app-control.md
+?? .specstory/history/2026-05-13_09-46-17Z-tmux-tab-image-hash.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the backlog research note
+
+```bash
+git commit -m "$(cat <<'EOF'
+docs(backlog): research note — Linux Desktop app control equivalent
+
+Freezes the 2026-05-13 research into how Ubuntu/Linux maps to the macOS
+54_macos_apps.sh helpers. Three mechanism families (D-Bus / wmctrl-xdotool
+X11-only / per-compositor) and the option-A gapplication subset as the
+honest first cut. Adds a P? TODO entry + backlog index row so the work
+resumes cleanly when the user reaches an Ubuntu Desktop host to measure
+real coverage on their installed app set.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778666876-48457.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778666876-48457.
+[main 4d5e470] docs(backlog): research note — Linux Desktop app control equivalent
+ 3 files changed, 131 insertions(+)
+ create mode 100644 backlog/linux-desktop-app-control.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:07:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show recent commits
+
+`git log --oneline -4`
+
+```text
+4d5e470 docs(backlog): research note — Linux Desktop app control equivalent
+80374a4 feat(tmux): right-click tab — bookmark icons + clear agent status
+2fc5031 feat(tv): mac-apps channel — picker + lifecycle actions for macOS GUI apps
+ce5e23a feat(shell): app-* helpers — graceful macOS GUI control via osascript
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:08:03Z)**_
+
+Committed `4d5e470`. The parallel tmux work landed cleanly in between (`80374a4`) — no overlap with mine.
+
+Three commits this session:
+- `ce5e23a` — shell `app-*` helpers (macOS)
+- `2fc5031` — `tv mac-apps` channel
+- `4d5e470` — backlog research note for the Linux mirror

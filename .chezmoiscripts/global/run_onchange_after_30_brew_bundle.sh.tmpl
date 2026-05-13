@@ -122,42 +122,122 @@ export HOMEBREW_NO_INSTALL_UPGRADE=1
 # --- Adopt pre-flight (macOS only)
 # Casks installed manually (drag .app into /Applications) are invisible to brew
 # until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
-# the user already has, often failing on transient CDN errors. `--adopt` writes
-# Caskroom metadata in-place without downloading. Skipped silently for casks
-# whose .app isn't present (the regular bundle pass will install them).
+# the user already has, often failing on transient CDN errors.
+#
+# IMPORTANT non-obvious behavior of `brew install --cask --adopt`:
+#   `--adopt` does NOT fast-fail when the .app is absent. brew always calls
+#   `fetch_artifacts` (download) BEFORE `install_artifacts` (where --adopt
+#   decides adopt-or-error). So if /Applications/Cursor.app doesn't exist,
+#   `brew install --cask --adopt cursor` will download Cursor.zip from the
+#   CDN (~150MB) and only then raise "no installed App to adopt".
+#   `--adopt`'s only real win is "don't overwrite a matching .app", NOT
+#   "skip the download". We therefore have to filesystem-prefilter ourselves.
+#
+# Performance:
+#   1. "Already tracked by brew?" via `$Caskroom/<short>` filesystem check
+#      (not `brew list --cask`, which would pay ~1-2s Ruby startup per cask).
+#   2. ".app in /Applications/?" via heuristic name match against a one-shot
+#      `ls /Applications/` snapshot. Strips `-app` / `-desktop` cask-name
+#      suffixes; tries case-insensitive forms with and without dash→space.
+#   3. Only casks passing both filters reach `brew install --cask --adopt`,
+#      whose Ruby cost is real work (writing Caskroom metadata).
 adopt_existing_casks() {
     local file="$1"
     [[ -f "$file" ]] || return 0
     command -v brew >/dev/null 2>&1 || return 0
 
+    # Resolve Caskroom path once (arm64 vs intel).
+    local caskroom=""
+    if [[ -d /opt/homebrew/Caskroom ]]; then
+        caskroom=/opt/homebrew/Caskroom
+    elif [[ -d /usr/local/Caskroom ]]; then
+        caskroom=/usr/local/Caskroom
+    fi
+
+    # Snapshot /Applications/ once (lowercased, newline-separated). Avoids
+    # forking ls/find per cask. Falls back to empty string if dir missing.
+    local apps_lc=""
+    if [[ -d /Applications ]]; then
+        apps_lc="$(/bin/ls -1 /Applications 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    fi
+
+    # Heuristic: does /Applications/ have an .app whose name matches this
+    # cask? Tries a handful of candidate spellings derived from the cask
+    # short-name. Misses on weird capitalization (chatgpt → ChatGPT.app works
+    # because case-insensitive; aerospace → AeroSpace.app works too).
+    _has_app_for_cask() {
+        local short="$1"
+        local stem="${short%-app}"
+        stem="${stem%-desktop}"
+        local candidates=(
+            "${short}.app"
+            "${stem}.app"
+            "${short//-/ }.app"
+            "${stem//-/ }.app"
+            "${short//-/}.app"
+            "${stem//-/}.app"
+        )
+        local c c_lc
+        for c in "${candidates[@]}"; do
+            c_lc="$(printf '%s' "$c" | tr '[:upper:]' '[:lower:]')"
+            if printf '%s\n' "$apps_lc" | grep -qFx -- "$c_lc"; then
+                return 0
+            fi
+        done
+        return 1
+    }
+
     local cask_list
     cask_list="$(brew bundle list --casks --file="$file" 2>/dev/null)" || return 0
     [[ -n "$cask_list" ]] || return 0
 
-    local adopted=0 already=0 skipped=0 failed=0 cask
+    # Two-stage filter: drop already-tracked, then drop casks whose .app
+    # isn't present (we can't safely --adopt those — brew would download).
+    local needs_adopt=() already=0 not_present=0 cask short
     while IFS= read -r cask; do
         [[ -n "$cask" ]] || continue
-        # Already tracked by brew? Nothing to do.
-        if brew list --cask "$cask" >/dev/null 2>&1; then
+        short="${cask##*/}"
+        if [[ -n "$caskroom" && -d "$caskroom/$short" ]]; then
             already=$(( already + 1 ))
             continue
         fi
-        # Try adopt; --adopt is a no-op-error when no matching artifact exists,
-        # so we suppress stderr and only count true failures.
-        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
-            adopted=$(( adopted + 1 ))
-            info "  adopted: $cask"
-        else
-            # Distinguish "no .app to adopt" (expected) from real errors by
-            # peeking at /Applications. Cheap heuristic; brew prints the
-            # exact .app name only when it actually attempts adoption.
-            skipped=$(( skipped + 1 ))
+        if ! _has_app_for_cask "$short"; then
+            not_present=$(( not_present + 1 ))
+            continue
         fi
+        needs_adopt+=("$cask")
     done <<< "$cask_list"
 
-    if (( adopted > 0 || already > 0 )); then
-        info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $skipped not present, $failed failed"
+    local total=${#needs_adopt[@]}
+    if (( total == 0 )); then
+        info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/ (will install via bundle), nothing to adopt"
+        return 0
     fi
+
+    info "Adopt pre-flight: $already already tracked, $not_present not in /Applications/, attempting --adopt on $total cask(s) with matching .app..."
+
+    local adopted=0 failed=0 idx=0
+    for cask in "${needs_adopt[@]}"; do
+        idx=$(( idx + 1 ))
+        short="${cask##*/}"
+        info "  ($idx/$total) trying $short..."
+        # Re-warm sudo TTY timestamp before each adopt call. Pkg-based casks
+        # (google-drive, etc.) shell out to `sudo /usr/sbin/installer` from a
+        # subshell that doesn't always inherit our controlling TTY; without a
+        # fresh warm-cache the user gets a raw `Password:` prompt. No-op for
+        # passwordless / non-interactive setups.
+        command -v sudo_session_warm_cache >/dev/null 2>&1 && \
+            sudo_session_warm_cache 2>/dev/null || true
+        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+            adopted=$(( adopted + 1 ))
+            info "    ✓ adopted: $short"
+        else
+            failed=$(( failed + 1 ))
+            info "    ✗ adopt failed (will retry via bundle): $short"
+        fi
+    done
+
+    info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $not_present not in /Applications/, $failed adopt-failed"
 }
 
 info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks..."

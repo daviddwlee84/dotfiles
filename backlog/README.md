@@ -101,6 +101,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
 | [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
 | [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
+| [`linux-desktop-app-control`](linux-desktop-app-control.md) | P? deferred 2026-05 | "Linux Desktop app control equivalent of `54_macos_apps.sh`" |
 | [`rtk-evaluation`](rtk-evaluation.md) | P? declined 2026-05 | "rtk-ai/rtk evaluation" |
 | [`specstory-opencode-support`](specstory-opencode-support.md) | P? deferred | "specstory: enable opencode auto-wrap when upstream lands" |
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |

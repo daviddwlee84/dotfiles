@@ -5908,3 +5908,679 @@ d9f1261 feat(clipboard): cb/cbl/cbe — Maccy+CopyQ hybrid history helpers
 3fbb5f6 refactor(sesh): port svibe/scode/sroot/shere backend to shared shell layer
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:25Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:26Z)**_
+
+I'll stage the 11 relevant files explicitly (avoiding `git add -A`/`.`) and write a multi-paragraph message covering the three feature areas.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage 11 files and commit with multi-paragraph message; check status
+
+```bash
+git add \
+  .chezmoiscripts/global/run_after_99_signal_reload.sh.tmpl \
+  .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl \
+  .claude/plans/ls-eager-dusk.md \
+  .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md \
+  .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md \
+  CLAUDE.md \
+  docs/shells/aliases.md \
+  dot_config/shell/26_eza.sh \
+  dot_config/shell/99_chezmoi_reload.sh \
+  pitfalls/README.md \
+  pitfalls/brew-bundle-redownloads-manually-installed-cask.md && \
+git commit -m "$(cat <<'EOF'
+feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+
+Three small ergonomic fixes landed in one session.
+
+eza aliases switched from --icons=always --color=always to auto so
+`ls | grep foo` and other pipes produce plain output instead of ANSI
++ icon-glyph soup. Interactive output is unchanged.
+
+chezmoi-apply reload hint: a run_after_99 script touches
+~/.cache/chezmoi/last-apply; the shared shell backend (sourced by
+both zsh and bash) registers a precmd hook that prints a one-shot
+"run exec $SHELL -l or source ~/.zshrc to reload" notice on the
+next prompt of any shell started before the apply. Adds cas/cau
+wrappers for the proactive case. Hook lives in the shared backend
+(not per-shell tier dirs) because dot_bashrc.tmpl loads
+\$BASH_CONFIG_DIR before \$XDG_CONFIG_HOME/shell. Opt out:
+export CHEZMOI_RELOAD_HINT=0.
+
+brew bundle gained an --adopt pre-flight on macOS plus stale-lock
+cleanup between retries: casks whose .app is already in
+/Applications/ are adopted in place instead of re-downloaded,
+which also avoids the cascading "process has already locked
+...incomplete" parallel-fetch contention. New pitfall doc captures
+the symptom for future debugging; references upstream
+Homebrew/brew#14006 / #14033 where --adopt was added.
+
+CLAUDE.md cross-file maintenance table gains a row for the new
+reload-hint mechanism + sentinel-path sync rule.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+git status
+```
+
+```text
+Auto-redact secrets in agent artifacts...................................Failed
+- hook id: redact-agent-secrets
+- files were modified by this hook
+
+Skipping missing path: .cursor/rules/
+Skipping missing path: .opencode/plans/
+Skipping missing path: .specify/
+Skipping missing path: .codex/
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   .chezmoiscripts/global/run_after_99_signal_reload.sh.tmpl
+	modified:   .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+	new file:   .claude/plans/ls-eager-dusk.md
+	new file:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+	new file:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+	modified:   CLAUDE.md
+	modified:   docs/shells/aliases.md
+	modified:   dot_config/shell/26_eza.sh
+	new file:   dot_config/shell/99_chezmoi_reload.sh
+	modified:   pitfalls/README.md
+	new file:   pitfalls/brew-bundle-redownloads-manually-installed-cask.md
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	dot_config/shell/54_macos_apps.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:41Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:42Z)**_
+
+Pre-commit `redact-agent-secrets` modified the specstory file (likely scrubbed something). Re-staging and retrying.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See what the redact hook changed
+
+`git diff .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md | head -30`
+
+```text
+diff --git a/.specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md b/.specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+index 054b670..ffc2a18 100644
+--- a/.specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
++++ b/.specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+@@ -570,3 +570,253 @@ _**Agent (claude-opus-4-7 2026-05-13 09:43:50Z)**_
+ 628	|---------|------|-------------|-------------|
+ ```
+ </details></tool-use>
++
++_**Agent (claude-opus-4-7 2026-05-13 09:44:03Z)**_
++
++_**Agent (claude-opus-4-7 2026-05-13 09:44:04Z)**_
++
++Got the pattern. Slot 55 is taken by `macos_mem`, so I'll use `54_macos_apps.sh.tmpl` (same chezmoi-template darwin gate). Writing the file now.
++
++_**Agent (claude-opus-4-7 2026-05-13 09:44:33Z)**_
++
++<tool-use data-tool-type="write" data-tool-name="Write"><details>
++<summary>Tool use: **Write**</summary>
++
++```tmpl
++{{- if eq .chezmoi.os "darwin" -}}
++# shellcheck shell=sh
++# app-* helpers — graceful control of macOS GUI apps via osascript / Apple Events.
++#
++# Why not `killall`? `killall AppName` sends SIGTERM and most GUI apps don't
++# register a handler, so containers / unsaved buffers / background sync just
++# die. `osascript -e 'tell application "X" to quit'` sends the Quit Apple
++# Event — the same thing ⌘Q does — so the app tears down cleanly. Matters
++# for OrbStack / Docker Desktop / Slack / any app with state.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:44:57Z)**_
+
+The specstory transcript was being written to while staged (another session's activity). The new `54_macos_apps.sh.tmpl` is from a different session — I'll leave it. Re-staging the updated transcript and retrying.
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-stage updated specstory file and commit; show status
+
+```bash
+git add .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md && \
+git commit -m "$(cat <<'EOF'
+feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+
+Three small ergonomic fixes landed in one session.
+
+eza aliases switched from --icons=always --color=always to auto so
+`ls | grep foo` and other pipes produce plain output instead of ANSI
++ icon-glyph soup. Interactive output is unchanged.
+
+chezmoi-apply reload hint: a run_after_99 script touches
+~/.cache/chezmoi/last-apply; the shared shell backend (sourced by
+both zsh and bash) registers a precmd hook that prints a one-shot
+"run exec $SHELL -l or source ~/.zshrc to reload" notice on the
+next prompt of any shell started before the apply. Adds cas/cau
+wrappers for the proactive case. Hook lives in the shared backend
+(not per-shell tier dirs) because dot_bashrc.tmpl loads
+\$BASH_CONFIG_DIR before \$XDG_CONFIG_HOME/shell. Opt out:
+export CHEZMOI_RELOAD_HINT=0.
+
+brew bundle gained an --adopt pre-flight on macOS plus stale-lock
+cleanup between retries: casks whose .app is already in
+/Applications/ are adopted in place instead of re-downloaded,
+which also avoids the cascading "process has already locked
+...incomplete" parallel-fetch contention. New pitfall doc captures
+the symptom for future debugging; references upstream
+Homebrew/brew#14006 / #14033 where --adopt was added.
+
+CLAUDE.md cross-file maintenance table gains a row for the new
+reload-hint mechanism + sentinel-path sync rule.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+git status
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778665505-85892.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778665505-85892.
+[main 697693f] feat(shell): chezmoi reload hint + eza pipe-safe + brew bundle adopt
+ 11 files changed, 7489 insertions(+), 13 deletions(-)
+ create mode 100644 .chezmoiscripts/global/run_after_99_signal_reload.sh.tmpl
+ create mode 100644 .claude/plans/ls-eager-dusk.md
+ create mode 100644 .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+ create mode 100644 .specstory/history/2026-05-13_09-38-22Z-osascript-e-quit-app.md
+ create mode 100644 dot_config/shell/99_chezmoi_reload.sh
+ create mode 100644 pitfalls/brew-bundle-redownloads-manually-installed-cask.md
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .specstory/history/2026-05-13_09-25-23Z-hash-ls-eza-session.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	dot_config/shell/54_macos_apps.sh.tmpl
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:45:11Z)**_
+
+Committed as `697693f` on `main`, ahead of `origin/main` by 1. 11 files / +7489 / -13 (most of the +lines are the two specstory transcripts).
+
+The remaining unstaged change to `2026-05-13_09-25-23Z-hash-ls-eza-session.md` is specstory live-appending this very conversation as it continues, and `54_macos_apps.sh.tmpl` belongs to a different session — both left alone. Run `git push` when ready.
+
+---
+
+_**User (2026-05-13 09:47:20Z)**_
+
+```
+chezmoi on  main [$!?] via  v3.14.4
+❯ chezmoi apply
+[brew] sudo password for daviddwlee84 (entered once, reused for this chezmoi apply):
+[INFO] Running brew bundle...
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+
+```
+
+我發現adopt preflight好像會跑蠻久的？這是正常的嗎？我還以爲就是快速scan一下？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 09:48:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:48:38Z)**_
+
+不正常 — 比預期慢。原因和建議：
+
+## 為什麼慢
+
+兩個瓶頸疊加：
+
+1. **`brew list --cask <name>` 不是 cheap scan**。它每次都會啟動 Ruby runtime（~1-2 秒），對 22 個 cask 就是 ~30-40 秒，光是「檢查哪些已被 brew 追蹤」這一步就慢爆。
+2. **`brew install --cask --adopt <name>` 本身也要載入 cask formula**。即使對「不在 `/Applications/` 的 cask」也會跑 Ruby 啟動 + formula 解析，每次 ~1-2 秒，才會 fast-fail。
+
+**首次 apply 在 Hanrus-Mac-mini 這種多手動裝 app 的機器上**，~40-60 秒是合理的（brew 真的在寫 Caskroom metadata）。但**之後每次 apply 都會跑這 30-40 秒的 precheck**——這就是 bug，因為一旦 cask 被 adopt 後，precheck 應該瞬間結束。
+
+## 建議
+
+**先別 Ctrl-C 中斷**：adopt 寫到一半被殺可能留下半個 `Caskroom/<name>/.metadata/` 目錄，下次 `--adopt` 會 error「already installed」。讓它跑完。
+
+然後我可以把 script 改成：
+
+```bash
+# 把 `brew list --cask "$cask"` 換成 filesystem check
+caskroom=/opt/homebrew/Caskroom    # arm; /usr/local/Caskroom for intel
+[[ -d "$caskroom/${cask##*/}" ]] && continue   # 已追蹤 → 跳過
+```
+
+`brew list --cask` 改成 `[[ -d /opt/homebrew/Caskroom/<name> ]]` —— 22 × 1ms 取代 22 × 1.5s。第二次 apply 之後 precheck 會在 ~50ms 內結束。
+
+要不要我現在改？順帶加：
+- 進度提示（`[INFO] (3/22) trying discord...`）這樣不會看起來「卡住」
+- 偵測 tap prefix（`nikitabobko/tap/aerospace` → `/opt/homebrew/Caskroom/aerospace`）
+
+---
+
+_**User (2026-05-13 09:49:23Z)**_
+
+好啊 加一下吧 然後我重跑
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 09:49:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:49:29Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`
+
+```text
+120	
+121	{{ if eq .chezmoi.os "darwin" -}}
+122	# --- Adopt pre-flight (macOS only)
+123	# Casks installed manually (drag .app into /Applications) are invisible to brew
+124	# until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
+125	# the user already has, often failing on transient CDN errors. `--adopt` writes
+126	# Caskroom metadata in-place without downloading. Skipped silently for casks
+127	# whose .app isn't present (the regular bundle pass will install them).
+128	adopt_existing_casks() {
+129	    local file="$1"
+130	    [[ -f "$file" ]] || return 0
+131	    command -v brew >/dev/null 2>&1 || return 0
+132	
+133	    local cask_list
+134	    cask_list="$(brew bundle list --casks --file="$file" 2>/dev/null)" || return 0
+135	    [[ -n "$cask_list" ]] || return 0
+136	
+137	    local adopted=0 already=0 skipped=0 failed=0 cask
+138	    while IFS= read -r cask; do
+139	        [[ -n "$cask" ]] || continue
+140	        # Already tracked by brew? Nothing to do.
+141	        if brew list --cask "$cask" >/dev/null 2>&1; then
+142	            already=$(( already + 1 ))
+143	            continue
+144	        fi
+145	        # Try adopt; --adopt is a no-op-error when no matching artifact exists,
+146	        # so we suppress stderr and only count true failures.
+147	        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+148	            adopted=$(( adopted + 1 ))
+149	            info "  adopted: $cask"
+150	        else
+151	            # Distinguish "no .app to adopt" (expected) from real errors by
+152	            # peeking at /Applications. Cheap heuristic; brew prints the
+153	            # exact .app name only when it actually attempts adoption.
+154	            skipped=$(( skipped + 1 ))
+155	        fi
+156	    done <<< "$cask_list"
+157	
+158	    if (( adopted > 0 || already > 0 )); then
+159	        info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $skipped not present, $failed failed"
+160	    fi
+161	}
+162	
+163	info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks..."
+164	adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+165	{{ end -}}
+166	
+167	# Run brew bundle up to N times. Subsequent attempts only retry items that
+168	# failed (already-installed packages are skipped quickly). This papers over
+169	# transient GitHub CDN / HTTP/2 errors that commonly hit large cask lists.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:49:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:49:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render template and syntax-check the new adopt function
+
+`chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl > /tmp/brew_bundle_rendered.sh && bash -n /tmp/brew_bundle_rendered.sh && echo syntax-ok && grep -n -E 'adopt|caskroom|brew install --cask --adopt' /tmp/brew_bundle_rendered.sh | head -25`
+
+```text
+syntax-ok
+93:#                               containing the password, the file is adopted
+257:    # to a 0600 file containing the password (one line), adopt it instead of
+454:# until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
+456:# --cask --adopt` writes Caskroom metadata in-place without downloading when
+464:# Only the actual `brew install --cask --adopt` calls (for casks not yet
+466:adopt_existing_casks() {
+472:    local caskroom=""
+474:        caskroom=/opt/homebrew/Caskroom
+476:        caskroom=/usr/local/Caskroom
+483:    # Build needs_adopt[] by filtering out already-tracked casks via filesystem.
+485:    local needs_adopt=() already=0 cask short
+489:        if [[ -n "$caskroom" && -d "$caskroom/$short" ]]; then
+493:        needs_adopt+=("$cask")
+496:    local total=${#needs_adopt[@]}
+502:    info "Adopt pre-flight: $already already tracked, attempting --adopt on $total cask(s) not yet in Caskroom..."
+504:    local adopted=0 missing=0 idx=0
+505:    for cask in "${needs_adopt[@]}"; do
+509:        # --adopt fast-fails when no matching .app is present in /Applications/;
+511:        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+512:            adopted=$(( adopted + 1 ))
+513:            info "    ✓ adopted: $short"
+519:    info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $missing not present (will install via bundle)"
+523:adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:50:04Z)**_
+
+改好了。重點變化：
+
+1. **`brew list --cask` → 檔案系統檢查**：用 `[[ -d /opt/homebrew/Caskroom/<short> ]]` 取代 Ruby 啟動，22 cask 從 ~33s 變 ~22ms。
+2. **Tap prefix 處理**：`${cask##*/}` 把 `nikitabobko/tap/aerospace` 拆成 `aerospace`，對應實際 Caskroom 路徑。
+3. **進度提示**：`  (3/22) trying aerospace...` + `    ✓ adopted: aerospace` 每個都會印，不會看起來卡住。
+4. **Caskroom 路徑自動切換**：arm64 用 `/opt/homebrew/Caskroom`，Intel 用 `/usr/local/Caskroom`。
+5. **早退**：如果全部 cask 都已 tracked，直接 `info` 一行返回，連一次 brew 都不跑。
+
+預期：
+- **第一次**（多 cask 要 adopt）：跟之前差不多慢，但有進度可看（22 × ~2s = ~40s）
+- **第二次之後**：< 100ms 直接過
+
+你那邊那個 `chezmoi apply` 跑完之後，再跑一次應該秒過 precheck。要不要 commit 這個修正？
+
+---
+
+_**User (2026-05-13 09:50:08Z)**_
+
+```
+chezmoi on  main [$!?⇡1] via  v3.14.4
+❯ chezmoi apply
+[brew] sudo password for daviddwlee84 (entered once, reused for this chezmoi apply):
+[INFO] Running brew bundle...
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+Password:
+Password:
+^C
+
+```
+
+另外好像又讓我重新輸密碼？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 09:51:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 09:51:57Z)**_
+
+那兩個 `Password:` 是 cask 安裝器內部的 sudo prompt，常見原因有兩個——其中第二個我可以順手修掉。
+
+## 診斷
+
+你這次跑的還是**舊版** adopt 函式（我給你寫好的新版有顯眼的進度行 `[INFO] Adopt pre-flight: N already tracked, attempting --adopt on M cask(s)...` 跟 `(1/M) trying xxx...`，你的輸出裡完全沒看到，所以你按 ⌘+R 觸發 `chezmoi apply` 應該是在我剛 Edit 之前）。
+
+`Password:` 是 cask 安裝器（特別是 pkg-based cask，例如 `google-drive` / `tailscale-app`）的內部 sudo 呼叫。script 開頭 `sudo_session_warm_cache` 是有 warm 過 TTY 時間戳的，但有些 cask 的 installer 會自己 `sudo -k` 或在沒繼承 TTY 的 subshell 跑，導致看不到 ticket。
+
+## 修正：每次 adopt 前重新 warm sudo
+
+_**Agent (claude-opus-4-7 2026-05-13 09:52:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:52:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check new rendered template
+
+`chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl > /tmp/brew_bundle_rendered.sh && bash -n /tmp/brew_bundle_rendered.sh && echo syntax-ok`
+
+```text
+syntax-ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 09:52:20Z)**_
+
+改好了。重跑：
+
+```zsh
+chezmoi apply
+```
+
+預期看到（範例，N/M 視你機器而定）：
+
+```
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+[INFO] Adopt pre-flight: 14 already tracked, attempting --adopt on 8 cask(s) not yet in Caskroom...
+[INFO]   (1/8) trying maccy...
+[INFO]     ✓ adopted: maccy
+[INFO]   (2/8) trying google-drive...
+[INFO]     ✓ adopted: google-drive
+...
+[INFO] Adopt pre-flight: 8 newly adopted, 14 already tracked, 0 not present (will install via bundle)
+```
+
+如果某個 cask 還是 prompt `Password:`，你會看到對應的 `(N/M) trying <cask>...` 行，這樣我們就知道是哪個 cask 不吃 warm-cache，可以針對它再處理（最差的 fallback 是把那個 cask 從 adopt 名單裡排除）。
+
+要 ⚠️ 注意：第一次跑因為真的有 adopt 工作要做，依然會花 ~20-40 秒；之後每次 apply 的 precheck 會在 ~50ms 內結束。
+
+---
+
+_**User (2026-05-13 10:01:24Z)**_
+
+```
+chezmoi on  main [$!?⇡1] via  v3.14.4
+❯ chezmoi apply
+[brew] sudo password for daviddwlee84 (entered once, reused for this chezmoi apply):
+[INFO] Running brew bundle...
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+[INFO] Adopt pre-flight: 11 already tracked, attempting --adopt on 19 cask(s) not yet in Caskroom...
+[INFO]   (1/19) trying warp...
+[INFO]   (2/19) trying cursor...
+
+
+
+```
+
+看起來卡在cursor特別久 要不單獨檢查一下什麼原因？
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 10:02:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:01Z)**_
+
+是的，找到原因了。
+
+## 為什麼卡在 cursor
+
+`brew install --cask --adopt` 其實**先下載再判斷**——它不是 fast-fail。看 brew 內部流程：
+
+1. `fetch_artifacts` 永遠先下載 cask 的 zip/dmg（不管有沒有 `--adopt`）
+2. 下載完之後 `install_artifacts` 才走 `--adopt` 邏輯：檢查 `/Applications/Cursor.app` 在不在
+3. 在 → 比對 SHA → 寫 Caskroom metadata（不複製）
+4. 不在 → raise `It seems there is no installed App ... to adopt`
+
+所以 `cursor`（150MB 從 cursor.com CDN）正在被下載，因為 `--adopt` 沒法阻止下載。**`--adopt` 救的是「不要覆蓋現有 .app」，不是「不要下載」。**
+
+我之前的 plan 對這點誤判了——以為 `--adopt` 會 fast-fail。實際上只有當 `.app` 真的在 `/Applications/` 才有 net win。
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:02Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Brew --adopt always downloads first then decides adopt-or-install. We need to filesystem-check for a matching .app in /Applications/ before invoking brew. Skip casks without a matching .app so brew bundle handles them normally.
+
+```text
+Task #9 created successfully: Pre-filter casks by /Applications/ presence before --adopt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:03Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+User needs to Ctrl-C, kill stuck brew cursor download, re-run apply with fix.
+
+```text
+Task #10 created successfully: Help user recover from stuck cursor adopt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:04Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:13Z)**_
+
+## 立即處理（你那邊）
+
+```zsh
+# 1. Ctrl-C 取消當前 chezmoi apply
+# 2. 殺掉還在下載的 brew (如果還在跑)
+pkill -f 'brew.*cursor' 2>/dev/null
+pkill -f 'curl.*cursor' 2>/dev/null
+# 3. 清掉 cursor 的半完成下載
+rm -f ~/Library/Caches/Homebrew/downloads/*Cursor*.incomplete*
+# 4. 確認 /Applications/Cursor.app 是不是存在
+ls -d /Applications/Cursor.app 2>/dev/null && echo "exists" || echo "not present"
+```
+
+如果回報 `not present`，那就是這個 cask 根本不該進 adopt 名單；應該讓正常的 `brew bundle` 流程裝它（而 `brew bundle` 的 `Brewfile`-driven download 本身就遇到一樣的 CN-network 慢，但至少不會走兩次）。
+
+## Script 修正
+
+新增 `.app` 預檢——用啟發式比對 cask 名跟 `/Applications/` 裡的 .app，沒有就跳過 `--adopt`，留給後續 `brew bundle`。
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render + syntax check
+
+`chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl > /tmp/brew_bundle_rendered.sh && bash -n /tmp/brew_bundle_rendered.sh && echo syntax-ok`
+
+```text
+syntax-ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:03:53Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 10:04:05Z)**_
+
+修好了。新邏輯：
+
+```
+needs_adopt = casks_in_Brewfile
+              - { already in Caskroom }            ← 上次 commit 加的
+              - { no matching .app in /Applications/ }  ← 這次新加
+```
+
+`.app` 比對是啟發式（lowercase / dash→space / strip `-app`/`-desktop` suffix），對你 Brewfile.darwin 裡那些 cask 應該都能命中。
+
+預期下次 `chezmoi apply` 看到：
+
+```
+[INFO] Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks...
+[INFO] Adopt pre-flight: 11 already tracked, X not in /Applications/, attempting --adopt on Y cask(s) with matching .app...
+[INFO]   (1/Y) trying maccy...
+[INFO]     ✓ adopted: maccy
+...
+```
+
+`cursor` / `warp` 之類**沒手動裝的** cask 會直接被歸到「not in /Applications/」，跳過 adopt，留給 `brew bundle` 走正常下載流程。
+
+請按上面的「立即處理」步驟（Ctrl-C → kill brew cursor → rm incomplete → 確認 `/Applications/Cursor.app` 在不在），然後再跑一次 `chezmoi apply` 給我看新的輸出。
