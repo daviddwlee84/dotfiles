@@ -72,13 +72,21 @@ def _duration(start_ms: Any, end_ms: Any) -> str:
 
 
 class PlotDialog(ModalScreen[Optional[list[str]]]):
-    """Multi-select which metrics to chart; returns the selected keys."""
+    """Multi-select which metrics to chart; returns the selected keys.
+
+    Filter input narrows the visible list as the user types. Selections
+    persist across filter changes (tracked in `self._selected` on the
+    dialog, not just in the SelectionList widget), so you can search
+    "corr", select both train_corr & valid_corr, search "loss", select
+    that, then Apply with all three.
+    """
 
     BINDINGS = [
         Binding("escape", "dismiss_none", "Cancel"),
-        # SelectionList consumes Enter to toggle the highlighted item, so
-        # provide explicit shortcuts for select-all / select-none / apply.
-        Binding("ctrl+a", "apply", "Apply"),
+        # SelectionList consumes Enter to toggle the highlighted item.
+        # priority=True for Ctrl+A so it still fires when focus is on the
+        # filter input (which by default maps Ctrl+A to "cursor home").
+        Binding("ctrl+a", "apply", "Apply", priority=True),
         Binding("ctrl+l", "select_all", "All"),
         Binding("ctrl+n", "select_none", "None"),
     ]
@@ -89,17 +97,15 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
     }
     PlotDialog > Vertical {
         width: 70%;
-        max-width: 90;
-        height: 70%;
-        max-height: 30;
+        max-width: 100;
+        height: 80%;
+        max-height: 40;
         border: tall $accent;
         background: $surface;
         padding: 1 2;
     }
-    PlotDialog SelectionList {
-        height: 1fr;
-        margin: 1 0;
-    }
+    PlotDialog #plot-filter { height: 3; margin: 1 0 0 0; }
+    PlotDialog SelectionList { height: 1fr; margin: 1 0; }
     PlotDialog #plot-buttons {
         height: 3;
         align: center middle;
@@ -108,25 +114,71 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
 
     def __init__(self, keys: list[str]) -> None:
         super().__init__()
+        self._all_keys: list[str] = sorted(keys)
+        # Source of truth for selection state — survives filter rebuilds.
         # Default: NOTHING pre-selected. MLflow runs commonly log metrics
         # at vastly different scales (loss=0.1 next to disk_usage=5e5);
         # auto-selecting "all non-system.*" produced charts where every
-        # training metric was a flat line at the bottom. Let the user pick.
-        self._items = [(k, k, False) for k in keys]
+        # training metric was a flat line at the bottom.
+        self._selected: set[str] = set()
+        self._filter: str = ""
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(
-                "Select metrics to plot — Enter toggles, "
+                "Select metrics to plot — type to filter, "
                 "[bold]Ctrl+L[/bold]=all  [bold]Ctrl+N[/bold]=none  "
                 "[bold]Ctrl+A[/bold]=apply  Esc=cancel:"
             )
-            yield SelectionList[str](*self._items, id="plot-selection")
+            yield Input(placeholder="filter metric names…", id="plot-filter")
+            yield SelectionList[str](*self._sel_items(), id="plot-selection")
             with Horizontal(id="plot-buttons"):
                 yield Button("Select All", id="select-all")
                 yield Button("Clear", id="clear-all")
                 yield Button("Apply", id="apply", variant="primary")
                 yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        # SelectionList focused by default so Ctrl+L / Ctrl+N work immediately;
+        # user clicks or Tab-keys into the filter input when they want to narrow.
+        self.query_one(SelectionList).focus()
+
+    # ---------- helpers ----------
+
+    def _visible_keys(self) -> list[str]:
+        f = self._filter.lower()
+        return [k for k in self._all_keys if not f or f in k.lower()]
+
+    def _sel_items(self) -> list[tuple[str, str, bool]]:
+        return [(k, k, k in self._selected) for k in self._visible_keys()]
+
+    def _rebuild_list(self) -> None:
+        sl = self.query_one(SelectionList)
+        sl.clear_options()
+        for tup in self._sel_items():
+            sl.add_option(tup)
+
+    # ---------- event handlers ----------
+
+    @on(Input.Changed, "#plot-filter")
+    def _on_filter(self, event: Input.Changed) -> None:
+        self._filter = event.value
+        self._rebuild_list()
+
+    @on(SelectionList.SelectedChanged)
+    def _on_selection_changed(self) -> None:
+        # Sync visible toggles into the persistent set. Items outside the
+        # current filter are left untouched so prior selections survive.
+        sl = self.query_one(SelectionList)
+        visible = set(self._visible_keys())
+        sel_in_view = set(sl.selected)
+        for k in visible:
+            if k in sel_in_view:
+                self._selected.add(k)
+            else:
+                self._selected.discard(k)
+
+    # ---------- actions ----------
 
     def action_dismiss_none(self) -> None:
         self.dismiss(None)
@@ -135,15 +187,25 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
         self._apply()
 
     def action_select_all(self) -> None:
-        self.query_one(SelectionList).select_all()
+        # "All" means all VISIBLE items (filter-scoped). Combined with
+        # filter-narrow + select-all, this gives "select every metric
+        # matching <substring>" as a single workflow.
+        sl = self.query_one(SelectionList)
+        sl.select_all()
+        for k in self._visible_keys():
+            self._selected.add(k)
 
     def action_select_none(self) -> None:
-        self.query_one(SelectionList).deselect_all()
+        sl = self.query_one(SelectionList)
+        sl.deselect_all()
+        for k in self._visible_keys():
+            self._selected.discard(k)
 
     @on(Button.Pressed, "#apply")
     def _apply(self) -> None:
-        sel = self.query_one(SelectionList).selected
-        self.dismiss(list(sel) if sel else None)
+        # Sync once more just in case a toggle event hasn't propagated yet.
+        self._on_selection_changed()
+        self.dismiss(sorted(self._selected) if self._selected else None)
 
     @on(Button.Pressed, "#cancel")
     def _cancel(self) -> None:
@@ -731,16 +793,21 @@ class MLflowApp(App):
 
             plt.clf()
             plt.theme("pro")
-            # `plotsize` needs explicit dims when called from a non-TTY
-            # process. We size to the Static widget's content area minus a
-            # safety margin so the chart doesn't overflow.
-            try:
-                ps = self.query_one("#plot-static", Static)
-                term_w = ps.size.width or self.size.width
-                term_h = max(12, min(ps.size.height - 4, 30))
-            except Exception:  # noqa: BLE001
-                term_w, term_h = self.size.width, 20
-            plt.plotsize(max(60, term_w - 4), term_h)
+            # Size from the App screen (always known) rather than the
+            # plot-static widget's size — the latter is stale here because
+            # we update the Static BEFORE switching to its tab, so its
+            # rendered height is still 0 or 1.
+            #
+            # Layout reserved rows:
+            #   header(1) + tab-strip(2) + status-bar(1) + footer(1)
+            #   + stats lines below the chart (~6) + safety(2) = 13
+            # Width: tree sidebar is 38%; subtract small padding for
+            # tab-pane borders.
+            screen_w = self.size.width or 120
+            screen_h = self.size.height or 40
+            plot_w = max(60, int(screen_w * 0.62) - 4)
+            plot_h = max(15, screen_h - 13)
+            plt.plotsize(plot_w, plot_h)
             plt.title(f"{run_id[:8]} — metrics")
             plt.xlabel("step")
             plt.ylabel("value")
