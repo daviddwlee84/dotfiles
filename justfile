@@ -468,6 +468,11 @@ bootstrap-skills:
 fleet *ARGS:
     @uv run --script ./dot_dotfiles/bin/executable_fleet {{ARGS}}
 
+# MLflow CLI umbrella — wraps `tv mlflow` plus open / copy / plot / list /
+# download subcommands. See dot_dotfiles/bin/executable_mlf for surface.
+mlf *ARGS:
+    @uv run --script ./dot_dotfiles/bin/executable_mlf {{ARGS}}
+
 # Apply chezmoi update to all configured hosts in parallel
 fleet-apply *ARGS:
     ./scripts/fleet_apply.py {{ARGS}}

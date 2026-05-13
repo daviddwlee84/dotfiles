@@ -1,130 +1,191 @@
-# Add an MLflow Television (tv) channel
+# Add an `mlf` umbrella CLI for MLflow
 
 ## Context
 
-The user runs experiments against three MLflow backends — local `./mlruns` files, a local `sqlite:///mlflow.db`, and a LAN server at `http://192.168.222.207:15002/`. There is no current way to fuzzy-search experiments or runs from the terminal: the MLflow web UI is one tab, and `mlflow runs list` only emits a Rich-formatted text table (no JSON). The `mlflow` CLI is already installed via `dot_ansible/roles/python_uv_tools/defaults/main.yml:49` and the `mlflow-tracking` agent skill documents the three deployment modes, so the missing piece is an interactive picker.
+The `tv mlflow` channel landed in commit `81358eb` and works well for fuzzy-search across the three backends (file / sqlite / http). But several MLflow workflows don't fit a picker:
 
-We will add a `tv mlflow` channel that lists experiments / recent runs / experiment-scoped runs / registered models, previews each entity as JSON, and supports copying IDs and opening them in the browser when the tracking URI is HTTP. The helper is a single Python script using `mlflow.MlflowClient`, because it is the only backend strategy that handles file, sqlite, and HTTP URIs uniformly (REST API alone would skip 2 of 3 modes; CLI list output is not JSON).
+- **Terminal metric plots** — quickly eyeball a loss curve without leaving the shell or spinning up `mlflow ui`.
+- **Browser deep-links** — given `MLFLOW_TRACKING_URI=http://192.168.222.207:15002`, jumping to `…/#/experiments/1/runs` or `…/#/experiments/1/runs/cb250b88…` should be one command, not a manual URL paste.
+- **Quick clipboard** — copying a run hash to paste into a notebook / PR description.
+- **Model download** — pulling a registered model's artifacts locally for inference or smoke-testing.
+- **One-shot listings** — piping experiments / runs / models through `jq` for scripted workflows.
+
+These all share a common substrate: `mlflow.MlflowClient` against the configured URI. The cleanest home is an umbrella CLI named **`mlf`** (short for mlflow, no collision with the real `mlflow` CLI or the Apple MLX framework) in `dot_dotfiles/bin/`, structured the same way as the existing `fleet` umbrella (commit `1db2807`). The umbrella also exposes a thin `mlf tv` subcommand so the tv channel is discoverable from one entry point.
+
+Separately, inside `tv mlflow`, **`Ctrl+B`** is added as a second binding for the existing `open-browser` action — `Ctrl+O` stays as the canonical key, but `Ctrl+B` is the muscle-memory default many users reach for ("B for browser"). Enter behavior is unchanged.
 
 ## Approach
 
 ### Design decisions
 
-- **Pure Python helper.** One `MlflowClient` against `MLFLOW_TRACKING_URI` (env-var-only, no aliases / no source-cycling presets). When the URI is unset, MLflow's own default (`file:./mlruns` in CWD) is used.
-- **Helper layout = same as `super-productivity-source.sh`.** Channel TOML stays lean; helper handles preflight, hint rows on failure, and TSV emission. Cycles via separate source commands (Ctrl+S inside TV).
-- **No `watch =`.** mlflow imports cost ~1–2s (pydantic + sqlalchemy); auto-refresh would be sluggish. Manual `Ctrl+R` reload is fine — experiments/runs change on the minute scale, not seconds.
-- **Pydantic deprecation noise is suppressed** in the helper via `PYTHONWARNINGS=ignore` env + `warnings.filterwarnings("ignore", category=DeprecationWarning)` so stderr doesn't leak into source rows.
-- **Drill-down via env var, not nested actions.** `runs-experiment` source reads `$MLFLOW_EXPERIMENT_ID`; if unset, it emits a single hint row pointing at the env var. An `alt-r` action re-execs `tv mlflow` with the highlighted experiment's id exported, giving a one-keystroke drill-down without state plumbing.
+1. **Name**: `mlf` — three letters, mnemonically maps to "mlflow" without shadowing the real `mlflow` CLI in `~/.local/bin/` (uv tool install).
+2. **Architecture**: mirror the `fleet` umbrella verbatim. Thin dispatcher in `dot_dotfiles/bin/executable_mlf` with `_dispatch_<sub>()` functions; heavier subcommands (`plot`, `list`, `download`) delegate to modules in `scripts/mlf/` using `tyro.cli()`. Lightweight wrappers (`tv`, `open`, `copy`) stay inline.
+3. **PEP 723 deps**: declared inline at the top of `executable_mlf`: `mlflow>=3.4`, `tyro>=0.9`, `rich>=13.9`, `plotext>=5.2`. No changes to `dot_ansible/roles/python_uv_tools/` — consistent with how `executable_fleet` declares `asyncssh`/`tyro`/`rich`.
+4. **Source-dir discovery**: copy `_source_path()` verbatim from `executable_fleet:67-89` (chezmoi source-path → `~/.local/share/chezmoi` fallback). Required to locate `scripts/mlf/` from any cwd.
+5. **Enter behavior in `tv mlflow`**: unchanged. The new `Ctrl+B` aliases the existing `[actions.open-browser]` action — both `Ctrl+O` and `Ctrl+B` trigger the same shell command.
+6. **No JSON-output gymnastics in the umbrella**: each `mlf list <kind>` subcommand has its own `--json` flag rather than threading one through the dispatcher.
+
+### Subcommand surface (v1)
+
+| Subcommand | Purpose | Lives in |
+|---|---|---|
+| `mlf tv [...]` | exec `tv mlflow` (passes argv + env through) | inline in `executable_mlf` |
+| `mlf open <id>` | open browser to the right URL (auto-detects kind) | inline in `executable_mlf` |
+| `mlf copy <id>` | copy id to clipboard (pbcopy / wl-copy / xclip / OSC52) | inline in `executable_mlf` |
+| `mlf plot <run_id> [metric...] [--width N] [--height N]` | plotext line plot of metric histories | `scripts/mlf/plot.py` |
+| `mlf list <experiments\|runs\|models> [--limit N] [--experiment ID] [--json]` | rich table or JSON listing | `scripts/mlf/list.py` |
+| `mlf download <model_name>[@<alias\|version>] [--dest DIR]` | resolve via registry + `mlflow.artifacts.download_artifacts()` | `scripts/mlf/download.py` |
+| `mlf -h` / `mlf <sub> -h` | usage | inline |
 
 ### Files to create
 
 | Path | Role |
 |---|---|
-| `dot_config/television/cable/mlflow.toml` | Channel definition — 4 source modes, 2 preview modes, 5 keybindings/actions |
-| `dot_config/television/executable_mlflow-source.py` | TSV emitter for source modes; preflight + hint-row on failure |
-| `dot_config/television/executable_mlflow-preview.py` | JSON detail / metrics summary for preview |
-
-Both helpers use `#!/usr/bin/env -S uv run --script` with PEP 723 inline deps pinning `mlflow>=3.4` (the version already installed). This keeps them invokable on any host where `uv` is present, even outside the `mlflow` uv tool's site-packages — consistent with how `executable_clash-parse.py` is structured (it's a `uv run --script` file too).
-
-### Helper script behavior
-
-`mlflow-source.py <mode>` where `<mode>` ∈ `experiments | runs-recent | runs-experiment | models`:
-
-1. `os.environ.setdefault("PYTHONWARNINGS", "ignore")` + `warnings.filterwarnings("ignore")`.
-2. Resolve `MLFLOW_TRACKING_URI`; if set, `mlflow.set_tracking_uri(...)`.
-3. Preflight: `MlflowClient().search_experiments(max_results=1)`. On any exception emit one hint row:
-   `0\t⚠ unreachable\t<scheme>\tCheck MLFLOW_TRACKING_URI=<uri> — <short err msg>` and exit 0.
-4. Emit TSV per mode:
-   - `experiments` → `<exp_id>\t📊\t<lifecycle>\t<name>\t<last_update_iso>`
-   - `runs-recent` → `<run_id>\t<status_icon>\t<exp_name>\t<run_name|short_id>\t<start_iso>` (top 50 by `start_time` desc, across all experiments)
-   - `runs-experiment` → same shape as `runs-recent` but filtered to `$MLFLOW_EXPERIMENT_ID`; hint row if env var unset
-   - `models` → `<model_name>\t📦\t<latest_version_stage>\t<description_first_line>\t<last_updated_iso>`
-5. Status icon mapping: `RUNNING`→`▶`, `FINISHED`→`✓`, `FAILED`→`✗`, `KILLED`→`■`, `SCHEDULED`→`○`.
-
-`mlflow-preview.py <kind> <id>` where `<kind>` ∈ `experiment | run | model`:
-
-- For `run`: pretty-print `client.get_run(run_id)` as JSON (params, metrics, tags, artifact_uri, status, timestamps). Two views via TV preview-cycle: full JSON, or metrics-only summary (last value per metric key).
-- For `experiment`: pretty-print `client.get_experiment(exp_id)` + a short tail of its 5 most recent runs.
-- For `model`: pretty-print `client.get_registered_model(name)` with latest versions.
-
-Hint row case (`id == "0"`): preview emits `Help: set MLFLOW_TRACKING_URI=http://... or sqlite:///path/to/mlflow.db, then Ctrl+R to reload.`
-
-### Channel TOML structure
-
-Mirror `dot_config/television/cable/super-productivity.toml:57-118` exactly — same `[metadata]`, `[source]` (array of commands → Ctrl+S cycles), `[preview]` (array → Ctrl+F cycles), `[ui.preview_panel].size = 60`, `[keybindings]`, and per-action `[actions.*]` tables.
-
-Source array (cycles in this order):
-
-```
-~/.config/television/mlflow-source.py experiments
-~/.config/television/mlflow-source.py runs-recent
-~/.config/television/mlflow-source.py runs-experiment
-~/.config/television/mlflow-source.py models
-```
-
-Preview array (cycles in this order):
-
-```
-~/.config/television/mlflow-preview.py auto '{split:\t:0}' --view full
-~/.config/television/mlflow-preview.py auto '{split:\t:0}' --view metrics
-```
-
-`auto` lets the preview script infer entity kind from id shape (uuid-like → run, integer → experiment, otherwise → model) — simpler than threading the source mode through.
-
-Keybindings:
-
-| Key | Action | Notes |
-|---|---|---|
-| `Enter` | `open-detail` | Full JSON in `less -R`, then "press Enter to exit" |
-| `Ctrl+Y` | `copy-id` | Overrides TV's default (which copies the whole display row) |
-| `Ctrl+O` | `open-browser` | No-op + message if URI is not `http(s)://` |
-| `Alt+R` | `drill-runs` | Re-exec `MLFLOW_EXPERIMENT_ID=<id> tv mlflow` (only meaningful on experiment rows) |
-| `Alt+J` | `dump-json` | Print JSON to terminal, paged |
-
-`requirements = ["mlflow", "uv"]` in `[metadata]`. `uv` because the helpers are `uv run --script`; `mlflow` because that's the import target. `jq` is NOT a hard requirement — the Python helper does its own JSON formatting via `json.dumps(..., indent=2)` and colorizes with `rich` if available, plain otherwise.
-
-### Reuse from the existing codebase
-
-- Clipboard helper pattern: lift the `_clip` shell function verbatim from `dot_config/television/cable/super-productivity.toml:107` (pbcopy / wl-copy / xclip / OSC52 fallback chain). Already battle-tested across mac/Linux/SSH.
-- Preflight / hint-row pattern: same shape as `executable_super-productivity-source.sh:55-70` — single row with id `0`, emoji marker, actionable hint.
-- `uv run --script` shebang + PEP 723 frontmatter: see `executable_clash-parse.py` for the convention used in this repo.
+| `dot_dotfiles/bin/executable_mlf` | Umbrella dispatcher (PEP 723 shebang, `_dispatch_<sub>` dict, `USAGE` string) |
+| `scripts/mlf/__init__.py` | Shared helpers: `make_client()`, `detect_kind(id)`, `ms_to_iso(ms)`, `tracking_uri_is_http()` |
+| `scripts/mlf/plot.py` | Terminal metric plot (tyro args dataclass + plotext) |
+| `scripts/mlf/list.py` | Rich-table / JSON listings (tyro args dataclass) |
+| `scripts/mlf/download.py` | Model + artifact download (tyro args dataclass) |
 
 ### Files to modify
 
-- `.claude/skills/mlflow-tracking/SKILL.md` — append a short "Browse from terminal: `tv mlflow`" pointer near the deployment-modes section. Optional, low priority.
+| Path | Change |
+|---|---|
+| `dot_config/television/cable/mlflow.toml` | Add `ctrl-b = "actions:open-browser"` in `[keybindings]`. No new action body. Update the top-comment keybinding table to mention `Ctrl+B`. |
+| `justfile` | Add `mlf *ARGS:` recipe wrapping `./dot_dotfiles/bin/executable_mlf`, placed adjacent to the existing `fleet *ARGS:` block (around `justfile:468`). |
+
+### Helper behavior (per subcommand)
+
+#### `mlf tv [args...]`
+```python
+def _dispatch_tv(args: list[str]) -> int:
+    tv = shutil.which("tv")
+    if not tv:
+        print("mlf: `tv` (television) not in PATH", file=sys.stderr)
+        return 2
+    return subprocess.call([tv, "mlflow", *args])
+```
+Pure exec; argv (e.g. `--source-command "…"`) and env (e.g. `MLFLOW_TRACKING_URI`) pass through untouched.
+
+#### `mlf open <id>`
+- Auto-detect kind via `detect_kind(id)` (32-hex → run; `.isdigit()` → experiment; else → model). Same regex / shape used by `executable_mlflow-preview.py:42-60`.
+- Read URI via `mlflow.get_tracking_uri()`; bail with friendly error to stderr (exit 1) when not `http(s)://`.
+- For runs: roundtrip `client.get_run(run_id).info.experiment_id` to construct `/#/experiments/<exp_id>/runs/<run_id>`.
+- For experiments: `/#/experiments/<exp_id>`.
+- For models: `/#/models/<name>`.
+- Open via `webbrowser.open(url)` (handles mac `open`, linux `xdg-open`, WSL). Print URL to stderr as a diagnostic fallback.
+
+#### `mlf copy <id>`
+- Pure Python clipboard chain: `pbcopy` → `wl-copy` → `xclip -selection clipboard` → OSC52 escape to `/dev/tty`. Mirrors the shell snippet at `mlflow.toml [actions.copy-id]:131` but in Python (`subprocess.run([...], input=ident, text=True, check=False)`), eliminating shell-quoting risk.
+- Stderr confirmation: `[mlf] copied: <first 12 chars>…`.
+
+#### `mlf plot <run_id> [metric...]`
+- `tyro` dataclass: `run_id: str`, `metrics: list[str] = []`, `width: int | None = None`, `height: int = 20`, `theme: str = "pro"`.
+- `client.get_run(run_id)` → fail with a helpful message if run lacks metrics.
+- For each requested key (or all keys if none specified): `client.get_metric_history(run_id, key)` → list of `Metric(value, timestamp, step)` objects.
+- plotext: `plt.theme(theme)`, `plt.title(f"{run_id[:8]} — {run.info.run_name or 'unnamed'}")`, one `plt.plot(steps, values, label=key)` per metric.
+- `--width`/`--height` map to `plt.plot_size(w, h)`; default → terminal-fit (omit the call).
+- For single-metric mode, also print a stats line under the plot: `min=… max=… last=… n=…`.
+
+#### `mlf list experiments|runs|models`
+- `tyro` dataclass with positional `kind: Literal["experiments", "runs", "models"]`.
+- Columns mirror the tv channel display layout for consistency (id, status, name, lifecycle, last_update). Status only for runs.
+- `--limit` default 50. For runs without `--experiment`, lists recent across all experiments via the same `search_runs` call pattern as `executable_mlflow-source.py:122-131`.
+- `--json` dumps `list[dict]` (using `dataclasses.asdict` on a small `Row` dataclass) to stdout for piping.
+- Default output: `rich.table.Table`.
+
+#### `mlf download <model_name>[@<alias|version>]`
+- Parse `model_name@version` or `model_name@alias` or bare `model_name` (defaults to `@latest`).
+- Resolve to a `ModelVersion`:
+  - Numeric version → `client.get_model_version(name, version)`.
+  - Alias → `client.get_model_version_by_alias(name, alias)`.
+  - `latest` → `sorted(client.search_model_versions(f"name='{name}'"), key=lambda v: v.creation_timestamp, reverse=True)[0]`.
+- Destination: `--dest DIR` or auto: `./<model_name>-<version>/` resolved against cwd.
+- `mlflow.artifacts.download_artifacts(artifact_uri=mv.source, dst_path=str(dest))`.
+- Print absolute resolved path + total size (recursive `os.walk` + `stat().st_size`). One-line hint on stderr about `mlflow models serve -m <path>` for HTTP serving, so stdout stays clean for piping.
+
+### Channel TOML change
+
+In `dot_config/television/cable/mlflow.toml`, two diffs:
+
+1. `[keybindings]` block (around line 98), add:
+   ```toml
+   ctrl-b = "actions:open-browser"
+   ```
+2. The keybinding table inside the top-comment header (around line 36-49), add a row:
+   ```
+   #   Ctrl+B     Same as Ctrl+O — "B for browser" muscle-memory alias
+   ```
+
+No action body changes. Both keys trigger the same existing `[actions.open-browser]` shell snippet (already handles HTTP-URI guard + URL building + cross-platform opener). Reusing the action keeps the channel self-contained — `tv mlflow` works even if `mlf` isn't installed yet.
+
+### justfile recipe
+
+Add near `justfile:468` (after the `fleet *ARGS:` block):
+```makefile
+# MLflow CLI umbrella — wraps tv mlflow + plot/open/copy/download helpers.
+# See dot_dotfiles/bin/executable_mlf for the dispatch surface.
+mlf *ARGS:
+    @uv run --script ./dot_dotfiles/bin/executable_mlf {{ARGS}}
+```
+
+### Reuse from existing codebase
+
+- `_source_path()` from `dot_dotfiles/bin/executable_fleet:67-89` — copy verbatim, s/fleet/mlf/.
+- `USAGE` / dispatch-dict structure from `executable_fleet:36-64, 186-213`.
+- `detect_kind()` logic from `dot_config/television/executable_mlflow-preview.py:42-60` (`RUN_ID_RE`, `_detect_kind`).
+- `_ms_to_iso()` from `dot_config/television/executable_mlflow-source.py:70-77`.
+- Tyro `@dataclass` + `tyro.cli()` pattern from `scripts/fleet/info.py:29-40`.
+- HTTP-URI guard + URL builder skeleton from `mlflow.toml [actions.open-browser]:142` — re-implement in Python (no shell quoting).
 
 ### Files NOT touched (and why)
 
-- `dot_ansible/roles/python_uv_tools/defaults/main.yml` — `mlflow` is already pinned (no version bump needed).
-- `CLAUDE.md` cross-file table — no MkDocs doc surface created, no new chezmoi prompt, no new shell alias / function, no new keybinding under `Ctrl+`/`Alt+` in the *shell* config (`Alt+R` is scoped to the TV channel context, which falls outside the `dot_config/{shell,zsh,bash}/` aliases / `docs/shells/keybindings.md` tables).
-- `docs/shells/aliases.md` — no shell alias added (user opted against an alias).
-- `README.md` — channel addition is not a new platform / role / setup step.
+- `dot_ansible/roles/python_uv_tools/defaults/main.yml` — `tyro`, `rich`, `plotext` are PEP 723 inline deps (matches `executable_fleet`, `executable_sms`, `executable_mi-router` convention). Only `mlflow` is ansible-pinned (already there).
+- `dot_config/television/cable/mlflow.toml [actions.open-browser]` body — left as the inline shell snippet for self-containment. A future refactor could replace it with `mlf open '{split:\t:0}'`, but that couples the channel to the umbrella; revisit after `mlf` stabilizes.
+- `docs/shells/aliases.md` — `mlf` is a `$PATH` binary, not a shell alias.
+- `CLAUDE.md` keybindings table — `Ctrl+B` is scoped to the tv channel namespace (not shell / tmux root); no shadowing concern.
+- `CLAUDE.md` cross-file maintenance table — defer until `docs/this_repo/mlf-cli.md` exists. Adding a maintenance row without a doc surface is premature.
 
 ## Verification
 
-1. **Schema lint** — open `mlflow.toml` in any TOML linter; ensure `{split:\\t:N}` placeholders survive (triple-quoted strings only where backslashes need it).
-2. **Local file mode** —
+1. **Syntax** — `python -c "import ast; ast.parse(open('dot_dotfiles/bin/executable_mlf').read().split(chr(10),1)[1])"`. Repeat for each `scripts/mlf/*.py`.
+2. **Help paths** — `mlf -h`, `mlf help`, `mlf` (no args), `mlf <sub> -h`, `mlf unknownsub` (expect exit 2 with USAGE).
+3. **tv passthrough** —
    ```
-   cd /tmp && mkdir -p mlrun-test && cd mlrun-test
-   uv run python -c "import mlflow; mlflow.set_experiment('demo'); mlflow.start_run(); mlflow.log_param('x', 1); mlflow.end_run()"
-   tv mlflow
+   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf tv
    ```
-   Expect: `demo` experiment listed under Ctrl+S source 1; one run under source 2.
-3. **SQLite mode** —
+   Same picker as `tv mlflow`. Argv passthrough: `mlf tv --source-command "~/.config/television/mlflow-source.py runs-recent"` opens the source-overridden view.
+4. **Open** —
    ```
-   cd /tmp/mlrun-test && MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db tv mlflow
+   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf open 1
+   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf open cb250b888c5b41e98960b01360e4f41d
+   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf open SomeRegisteredModel
    ```
-   Expect: empty list (fresh sqlite) → log one run → Ctrl+R → reappears.
-4. **LAN HTTP server** —
+   Expect: `/#/experiments/1`, `/#/experiments/1/runs/cb250b…`, `/#/models/SomeRegisteredModel`.
+5. **Open guard** —
    ```
-   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 tv mlflow
+   MLFLOW_TRACKING_URI=sqlite:///$PWD/mlflow.db mlf open 1
    ```
-   Expect: real experiments from the user's earlier curl smoke (`Dev/PlainTextProgress_Test`, `WF_Proxy_Test`, …) under source 1. Ctrl+F should cycle full-JSON ↔ metrics-only previews. Ctrl+O should open the run/experiment in the system browser.
-5. **Failure-path UI** —
+   Expect stderr message + exit 1, no browser launched.
+6. **Copy** — `mlf copy abc123` then paste into another app. On macOS uses pbcopy; on Linux X11 uses xclip; over SSH falls back to OSC52 (verify via `ssh -t <host> "mlf copy hello"`).
+7. **Plot all metrics** —
    ```
-   MLFLOW_TRACKING_URI=http://no-such-host:9999 tv mlflow
+   MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf plot cb250b888c5b41e98960b01360e4f41d
    ```
-   Expect: single yellow hint row, no crash, no Python traceback leaking into the source view.
-6. **Drill-down** — highlight an experiment row → `Alt+R` → TV re-launches scoped to that experiment → source 3 (`runs-experiment`) now shows real rows. Exit TV → original env restored.
-7. **`tv channels`** lists the new entry with description.
-8. **App-level validation** (per repo invariant "Validate app configs with the app, not just syntax") — `tv --version >/dev/null && tv mlflow --help 2>&1` to confirm TV parses the TOML cleanly; no error from the cable loader.
+   Expect plotext chart in terminal; multiple traces if the run logged multiple keys.
+8. **Plot one metric** — append a metric name; verify only that key is plotted and the stats line appears.
+9. **List** —
+   ```
+   mlf list experiments --limit 5
+   mlf list runs --limit 10 --experiment 1
+   mlf list models --json | jq '.[0]'
+   ```
+   Expect rich tables (default) and parseable JSON (`--json`).
+10. **Download** —
+    ```
+    mlf download MyModel@1 --dest /tmp/mymodel
+    ```
+    Expect artifacts under `/tmp/mymodel/`; stderr hints `mlflow models serve` command.
+11. **Ctrl+B in `tv mlflow`** — launch `tv mlflow`, highlight an experiment row, press `Ctrl+B`. Browser opens to `/#/experiments/<id>`. Same behavior as `Ctrl+O`.
+12. **`just mlf …`** — recipe exists; `just mlf list experiments --limit 1` works.
+13. **App-level validation** (per CLAUDE.md "Validate app configs with the app, not just syntax" invariant) — `tv` re-parses `mlflow.toml` cleanly after the Ctrl+B addition: `tv --list-channels | grep mlflow` and `tv mlflow --help` exit 0.

@@ -1,0 +1,261 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "mlflow>=3.4",
+#   "tyro>=0.9",
+#   "rich>=13.9",
+#   "plotext>=5.2",
+# ]
+# ///
+"""mlf — umbrella CLI for MLflow operations.
+
+Subcommands:
+  tv [...]                       Launch `tv mlflow` (the fuzzy picker channel)
+  open <id>                      Open the experiment / run / model page in browser
+  copy <id>                      Copy an id to the clipboard
+  plot <run_id> [metric...]      Terminal line plot of metric history (scripts/mlf/plot.py)
+  list <kind> [...]              Tabular dump of experiments / runs / models (scripts/mlf/list.py)
+  download <name>[@version|alias] Download a registered model's artifacts (scripts/mlf/download.py)
+
+Backend is read from $MLFLOW_TRACKING_URI (file:./mlruns | sqlite:///path | http(s)://host:port).
+`open` requires an http(s):// URI; other subcommands work against all three.
+
+Mirrors the structure of `fleet` (see dot_dotfiles/bin/executable_fleet).
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+USAGE = """\
+Usage: mlf <subcommand> [args...]
+
+Subcommands:
+  tv [args...]                       Open the `tv mlflow` fuzzy picker
+                                     (passes argv + env through, including
+                                      MLFLOW_TRACKING_URI / MLFLOW_EXPERIMENT_ID)
+
+  open <id>                          Open in browser; auto-detects entity kind:
+                                       32-hex  -> /#/experiments/<exp>/runs/<id>
+                                       digits  -> /#/experiments/<id>
+                                       else    -> /#/models/<name>
+                                     Requires MLFLOW_TRACKING_URI to be http(s)://.
+
+  copy <id>                          Copy <id> to system clipboard
+                                     (pbcopy / wl-copy / xclip / OSC52 fallback).
+
+  plot <run_id> [metric...]          Terminal plot of metric history. No metric
+       [--width N] [--height N]      arguments = plot every key the run logged.
+       [--theme NAME]
+
+  list experiments [--limit N]       Rich table or JSON dump.
+  list runs [--experiment ID] [--limit N]
+  list models [--limit N]
+       [--json]                      Emit JSON to stdout for piping (jq-friendly).
+
+  download <name>[@<version|alias>]  Resolve via registry, then
+           [--dest DIR]              mlflow.artifacts.download_artifacts().
+                                     Default dest: ./<name>-<version>/.
+
+Examples:
+  MLFLOW_TRACKING_URI=http://192.168.222.207:15002 mlf open 1
+  mlf open cb250b888c5b41e98960b01360e4f41d
+  mlf copy cb250b888c5b41e98960b01360e4f41d
+  mlf plot cb250b888c5b41e98960b01360e4f41d loss accuracy
+  mlf list runs --experiment 1 --limit 20
+  mlf list models --json | jq '.[].id'
+  mlf download MyModel@Champion --dest /tmp/champ
+
+See dot_config/television/cable/mlflow.toml for the tv-channel keybindings.
+"""
+
+
+def _source_path() -> Path:
+    """Locate the chezmoi source dir. Required to import scripts.mlf.*.
+
+    Identical strategy to executable_fleet:_source_path. We trust `chezmoi
+    source-path` when chezmoi is installed; otherwise fall back to the
+    conventional ~/.local/share/chezmoi.
+    """
+    chezmoi = shutil.which("chezmoi")
+    if chezmoi:
+        try:
+            out = subprocess.run(
+                [chezmoi, "source-path"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return Path(out.stdout.strip())
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    fallback = Path.home() / ".local" / "share" / "chezmoi"
+    if (fallback / "scripts" / "mlf" / "__init__.py").is_file():
+        return fallback
+    print(
+        "mlf: cannot locate chezmoi source dir.\n"
+        "  Tried: `chezmoi source-path` and ~/.local/share/chezmoi.\n"
+        "  Install chezmoi or ensure the source dir exists.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+def _dispatch_tv(args: list[str]) -> int:
+    """Exec `tv mlflow` with argv + env passthrough."""
+    tv = shutil.which("tv")
+    if not tv:
+        print("mlf tv: `tv` (television) not in PATH", file=sys.stderr)
+        return 2
+    # Replace this process so signals (Ctrl+C) reach tv directly.
+    os.execvp(tv, [tv, "mlflow", *args])
+
+
+def _dispatch_open(args: list[str]) -> int:
+    if not args:
+        print("mlf open: missing <id> argument", file=sys.stderr)
+        return 2
+    ident = args[0].strip()
+    if not ident:
+        print("mlf open: empty <id>", file=sys.stderr)
+        return 2
+
+    from scripts.mlf import detect_kind, make_client, tracking_uri, tracking_uri_is_http
+
+    uri = tracking_uri()
+    if not tracking_uri_is_http():
+        print(
+            f"mlf open: tracking URI is not http(s):// — current: {uri}\n"
+            "  Set MLFLOW_TRACKING_URI=http(s)://host:port to use the MLflow web UI.",
+            file=sys.stderr,
+        )
+        return 1
+
+    base = uri.rstrip("/")
+    kind = detect_kind(ident)
+    if kind == "run":
+        client = make_client()
+        try:
+            run = client.get_run(ident)
+            exp_id = run.info.experiment_id
+        except Exception as e:  # noqa: BLE001
+            print(
+                f"mlf open: cannot resolve run '{ident}' — "
+                f"{type(e).__name__}: {str(e).splitlines()[0][:200]}",
+                file=sys.stderr,
+            )
+            return 1
+        url = f"{base}/#/experiments/{exp_id}/runs/{ident}"
+    elif kind == "experiment":
+        url = f"{base}/#/experiments/{ident}"
+    else:
+        url = f"{base}/#/models/{ident}"
+
+    import webbrowser
+
+    print(f"[mlf] open: {url}", file=sys.stderr)
+    opened = webbrowser.open(url)
+    if not opened:
+        print(
+            "mlf open: no usable browser opener found (open/xdg-open/wslview missing).\n"
+            f"  URL: {url}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def _dispatch_copy(args: list[str]) -> int:
+    if not args:
+        print("mlf copy: missing <id> argument", file=sys.stderr)
+        return 2
+    payload = args[0]
+    # Try real clipboard providers first, then OSC 52 (works over SSH if the
+    # terminal cooperates). Order matches the tv channel's [actions.copy-id]
+    # shell snippet to keep behavior identical.
+    providers = [
+        ["pbcopy"],
+        ["wl-copy"],
+        ["xclip", "-selection", "clipboard"],
+    ]
+    for cmd in providers:
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.run(cmd, input=payload, text=True, check=True)
+            except subprocess.CalledProcessError as e:
+                print(
+                    f"mlf copy: {cmd[0]} failed ({e.returncode}); falling through",
+                    file=sys.stderr,
+                )
+                continue
+            print(f"[mlf] copied via {cmd[0]}: {payload[:12]}{'…' if len(payload) > 12 else ''}", file=sys.stderr)
+            return 0
+
+    # OSC 52 fallback — only meaningful if we have a TTY to write to.
+    try:
+        import base64
+
+        b64 = base64.b64encode(payload.encode()).decode()
+        with open("/dev/tty", "w") as tty:
+            tty.write(f"\033]52;c;{b64}\007")
+        print(f"[mlf] copied via OSC52: {payload[:12]}{'…' if len(payload) > 12 else ''}", file=sys.stderr)
+        return 0
+    except OSError as e:
+        print(
+            f"mlf copy: no clipboard provider available and OSC52 fallback failed ({e}).\n"
+            "  Install pbcopy/wl-copy/xclip, or run inside a TTY that supports OSC 52.",
+            file=sys.stderr,
+        )
+        return 1
+
+
+def _dispatch_plot(args: list[str]) -> int:
+    sys.argv = ["mlf plot", *args]
+    from scripts.mlf.plot import main as plot_main
+    return plot_main()
+
+
+def _dispatch_list(args: list[str]) -> int:
+    sys.argv = ["mlf list", *args]
+    from scripts.mlf.list import main as list_main
+    return list_main()
+
+
+def _dispatch_download(args: list[str]) -> int:
+    sys.argv = ["mlf download", *args]
+    from scripts.mlf.download import main as download_main
+    return download_main()
+
+
+def main() -> int:
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+
+    src = _source_path()
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+
+    dispatch = {
+        "tv": _dispatch_tv,
+        "open": _dispatch_open,
+        "copy": _dispatch_copy,
+        "plot": _dispatch_plot,
+        "list": _dispatch_list,
+        "download": _dispatch_download,
+    }
+    fn = dispatch.get(sub)
+    if fn is None:
+        print(f"mlf: unknown subcommand '{sub}'\n\n{USAGE}", file=sys.stderr)
+        return 2
+    return fn(rest)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

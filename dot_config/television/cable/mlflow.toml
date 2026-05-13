@@ -42,6 +42,7 @@
 #   Ctrl+Y     Copy id (experiment_id / run_id / model_name) to clipboard
 #   Ctrl+O     Open in browser (HTTP tracking URI only; prints a hint
 #              otherwise)
+#   Ctrl+B     Same as Ctrl+O — "B for browser" muscle-memory alias
 #   Alt+R      Explicit drill — same as Enter on an experiment row,
 #              available as a backup binding for muscle memory
 #   Alt+J      Dump full JSON to terminal (paged)
@@ -101,6 +102,10 @@ enter = "actions:open-or-drill"
 # id-only copy. Matches super-productivity.toml's convention.
 ctrl-y = "actions:copy-id"
 ctrl-o = "actions:open-browser"
+# Ctrl+B is the muscle-memory alias — same action body as Ctrl+O. Reusing
+# the existing action keeps the channel self-contained even if `mlf` (the
+# umbrella CLI in dot_dotfiles/bin/) isn't installed.
+ctrl-b = "actions:open-browser"
 alt-r = "actions:drill-runs"
 alt-j = "actions:dump-json"
 
