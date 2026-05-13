@@ -13,7 +13,7 @@ from typing import Annotated
 import plotext as plt
 import tyro
 
-from scripts.mlf import make_client, tracking_uri
+from scripts.mlf import fetch_histories, make_client, tracking_uri
 
 
 @dataclass
@@ -81,28 +81,7 @@ def cli(args: Args) -> int:
         )
         return 1
 
-    series: dict[str, tuple[list[int], list[float]]] = {}
-    skipped: list[tuple[str, str]] = []
-    for key in keys:
-        try:
-            history = client.get_metric_history(args.run_id, key)
-        except Exception as e:  # noqa: BLE001
-            # One slow key (commonly a system.* metric over a slow link)
-            # shouldn't abort the whole plot. We surface the failure in a
-            # post-plot warning so user-relevant training metrics still
-            # render. Bump MLFLOW_HTTP_REQUEST_TIMEOUT for the whole CLI
-            # invocation if too many keys fall into this branch.
-            skipped.append((key, f"{type(e).__name__}: {str(e).splitlines()[0][:80]}"))
-            continue
-        if not history:
-            continue
-        # mlflow returns Metric(value, timestamp, step). Sort by step for a
-        # well-defined x-axis even when step ordering wasn't guaranteed at
-        # logging time.
-        sorted_hist = sorted(history, key=lambda m: m.step)
-        steps = [m.step for m in sorted_hist]
-        values = [m.value for m in sorted_hist]
-        series[key] = (steps, values)
+    series, skipped = fetch_histories(client, args.run_id, keys)
 
     if not series:
         print(

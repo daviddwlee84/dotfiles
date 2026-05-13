@@ -6,11 +6,16 @@
 #   "tyro>=0.9",
 #   "rich>=13.9",
 #   "plotext>=5.2",
+#   "textual>=5.0",
 # ]
 # ///
 """mlf — umbrella CLI for MLflow operations.
 
+Bare `mlf` (no args) launches the interactive Textual TUI dashboard.
+Subcommands below bypass it for scripted automation.
+
 Subcommands:
+  tui                            Launch the interactive dashboard (default)
   tv [...]                       Launch `tv mlflow` (the fuzzy picker channel)
   open <id>                      Open the experiment / run / model page in browser
   copy <id>                      Copy an id to the clipboard
@@ -32,9 +37,15 @@ import sys
 from pathlib import Path
 
 USAGE = """\
-Usage: mlf <subcommand> [args...]
+Usage: mlf [<subcommand>] [args...]
+
+Bare `mlf` (or `mlf tui`) launches the interactive Textual dashboard.
+Subcommands bypass the TUI for scripted use.
 
 Subcommands:
+  tui                                Launch the interactive dashboard
+                                     (equivalent to bare `mlf`)
+
   tv [args...]                       Open the `tv mlflow` fuzzy picker
                                      (passes argv + env through, including
                                       MLFLOW_TRACKING_URI / MLFLOW_EXPERIMENT_ID)
@@ -114,102 +125,36 @@ def _dispatch_tv(args: list[str]) -> int:
     os.execvp(tv, [tv, "mlflow", *args])
 
 
-def _dispatch_open(args: list[str]) -> int:
+def _first_arg(args: list[str], sub: str) -> str | None:
+    """Return args[0].strip() or None (with a friendly stderr message).
+
+    Centralised so both the CLI dispatchers and the TUI surface the same
+    error format when an empty / missing id slips through.
+    """
     if not args:
-        print("mlf open: missing <id> argument", file=sys.stderr)
-        return 2
+        print(f"mlf {sub}: missing <id> argument", file=sys.stderr)
+        return None
     ident = args[0].strip()
     if not ident:
-        print("mlf open: empty <id>", file=sys.stderr)
+        print(f"mlf {sub}: empty <id>", file=sys.stderr)
+        return None
+    return ident
+
+
+def _dispatch_open(args: list[str]) -> int:
+    ident = _first_arg(args, "open")
+    if ident is None:
         return 2
-
-    from scripts.mlf import detect_kind, make_client, tracking_uri, tracking_uri_is_http
-
-    uri = tracking_uri()
-    if not tracking_uri_is_http():
-        print(
-            f"mlf open: tracking URI is not http(s):// — current: {uri}\n"
-            "  Set MLFLOW_TRACKING_URI=http(s)://host:port to use the MLflow web UI.",
-            file=sys.stderr,
-        )
-        return 1
-
-    base = uri.rstrip("/")
-    kind = detect_kind(ident)
-    if kind == "run":
-        client = make_client()
-        try:
-            run = client.get_run(ident)
-            exp_id = run.info.experiment_id
-        except Exception as e:  # noqa: BLE001
-            print(
-                f"mlf open: cannot resolve run '{ident}' — "
-                f"{type(e).__name__}: {str(e).splitlines()[0][:200]}",
-                file=sys.stderr,
-            )
-            return 1
-        url = f"{base}/#/experiments/{exp_id}/runs/{ident}"
-    elif kind == "experiment":
-        url = f"{base}/#/experiments/{ident}"
-    else:
-        url = f"{base}/#/models/{ident}"
-
-    import webbrowser
-
-    print(f"[mlf] open: {url}", file=sys.stderr)
-    opened = webbrowser.open(url)
-    if not opened:
-        print(
-            "mlf open: no usable browser opener found (open/xdg-open/wslview missing).\n"
-            f"  URL: {url}",
-            file=sys.stderr,
-        )
-        return 1
-    return 0
+    from scripts.mlf import open_id
+    return open_id(ident)
 
 
 def _dispatch_copy(args: list[str]) -> int:
-    if not args:
-        print("mlf copy: missing <id> argument", file=sys.stderr)
+    ident = _first_arg(args, "copy")
+    if ident is None:
         return 2
-    payload = args[0]
-    # Try real clipboard providers first, then OSC 52 (works over SSH if the
-    # terminal cooperates). Order matches the tv channel's [actions.copy-id]
-    # shell snippet to keep behavior identical.
-    providers = [
-        ["pbcopy"],
-        ["wl-copy"],
-        ["xclip", "-selection", "clipboard"],
-    ]
-    for cmd in providers:
-        if shutil.which(cmd[0]):
-            try:
-                subprocess.run(cmd, input=payload, text=True, check=True)
-            except subprocess.CalledProcessError as e:
-                print(
-                    f"mlf copy: {cmd[0]} failed ({e.returncode}); falling through",
-                    file=sys.stderr,
-                )
-                continue
-            print(f"[mlf] copied via {cmd[0]}: {payload[:12]}{'…' if len(payload) > 12 else ''}", file=sys.stderr)
-            return 0
-
-    # OSC 52 fallback — only meaningful if we have a TTY to write to.
-    try:
-        import base64
-
-        b64 = base64.b64encode(payload.encode()).decode()
-        with open("/dev/tty", "w") as tty:
-            tty.write(f"\033]52;c;{b64}\007")
-        print(f"[mlf] copied via OSC52: {payload[:12]}{'…' if len(payload) > 12 else ''}", file=sys.stderr)
-        return 0
-    except OSError as e:
-        print(
-            f"mlf copy: no clipboard provider available and OSC52 fallback failed ({e}).\n"
-            "  Install pbcopy/wl-copy/xclip, or run inside a TTY that supports OSC 52.",
-            file=sys.stderr,
-        )
-        return 1
+    from scripts.mlf import copy_id
+    return copy_id(ident)
 
 
 def _dispatch_plot(args: list[str]) -> int:
@@ -230,19 +175,33 @@ def _dispatch_download(args: list[str]) -> int:
     return download_main()
 
 
+def _dispatch_tui(args: list[str]) -> int:
+    # Currently no flags; future opts (--theme, --restore-state) can parse `args`.
+    _ = args
+    from scripts.mlf.tui import main as tui_main
+    return tui_main()
+
+
 def main() -> int:
-    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+    # Help paths print USAGE and exit. `-h` / `--help` / `help` never enter
+    # the TUI so `mlf -h | grep ...` and similar pipelines stay scriptable.
+    if len(sys.argv) >= 2 and sys.argv[1] in ("-h", "--help", "help"):
         print(USAGE)
         return 0
-
-    sub = sys.argv[1]
-    rest = sys.argv[2:]
 
     src = _source_path()
     if str(src) not in sys.path:
         sys.path.insert(0, str(src))
 
+    # Bare `mlf` → TUI. Subcommands dispatch as usual.
+    if len(sys.argv) < 2:
+        return _dispatch_tui([])
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+
     dispatch = {
+        "tui": _dispatch_tui,
         "tv": _dispatch_tv,
         "open": _dispatch_open,
         "copy": _dispatch_copy,
