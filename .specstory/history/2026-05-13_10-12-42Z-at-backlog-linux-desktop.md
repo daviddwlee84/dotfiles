@@ -5159,3 +5159,863 @@ CFW:           YES
 - `tv linux-apps` to drive the picker UX
 - `gnome-extensions install` the [window-calls extension](https://github.com/ickyicky/window-calls) for true `appactivate` focus (manual install, needs Wayland logout/login)
 - `chezmoi apply` (full) to let the `gui_apps_linux` ansible role install `playerctl` + `wmctrl` + `xdotool`
+
+---
+
+_**User (2026-05-13 12:53:05Z)**_
+
+Oh do we include Alacritty & Bitwarden etc. (and how can Alacritty create new tab? (like command + T in macOS)
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 12:53:23Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:53:24Z)**_
+
+Two separate questions. Let me probe both quickly.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:53:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Probe Alacritty + Bitwarden install paths and existing config
+
+```bash
+echo "=== Alacritty: where, what process, .desktop ==="
+which alacritty 2>&1
+ls -la ~/.local/share/applications/alacritty.desktop /usr/share/applications/Alacritty.desktop 2>/dev/null
+grep -E "^(Exec|StartupWMClass|Name)=" ~/.local/share/applications/alacritty.desktop 2>/dev/null
+echo
+pgrep -af alacritty 2>/dev/null | head -3
+echo
+echo "=== Bitwarden: snap or apt? ==="
+which bitwarden 2>&1
+snap list bitwarden 2>&1
+ls /var/lib/snapd/desktop/applications/bitwarden*.desktop 2>/dev/null
+grep -E "^(Exec|StartupWMClass|Name)=" /var/lib/snapd/desktop/applications/bitwarden_bitwarden.desktop 2>/dev/null
+echo
+pgrep -af bitwarden 2>/dev/null | head -3
+echo
+echo "=== Alacritty config: does it have any 'new window' binding? ==="
+ls /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/ 2>/dev/null
+echo "---"
+grep -E -B1 -A3 "(SpawnNewInstance|CreateNewWindow|key:\s*[\"']?[CcNn])" /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/*.toml 2>/dev/null | head -30
+```
+
+```text
+=== Alacritty: where, what process, .desktop ===
+/home/daviddwlee84/.cargo/bin/alacritty
+.rw-r--r-- 250 daviddwlee84 23 Apr 23:16 /home/daviddwlee84/.local/share/applications/alacritty.desktop
+Exec=alacritty
+Name=Alacritty
+StartupWMClass=alacritty
+
+76148 /usr/bin/zsh -c source /home/daviddwlee84/.claude/shell-snapshots/snapshot-zsh-1778667193570-2ejel1.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB 2>/dev/null || true && eval 'echo "=== Alacritty: where, what process, .desktop ===" which alacritty 2>&1 ls -la ~/.local/share/applications/alacritty.desktop /usr/share/applications/Alacritty.desktop 2>/dev/null grep -E "^(Exec|StartupWMClass|Name)=" ~/.local/share/applications/alacritty.desktop 2>/dev/null echo pgrep -af alacritty 2>/dev/null | head -3 echo echo "=== Bitwarden: snap or apt? ===" which bitwarden 2>&1 snap list bitwarden 2>&1 ls /var/lib/snapd/desktop/applications/bitwarden*.desktop 2>/dev/null grep -E "^(Exec|StartupWMClass|Name)=" /var/lib/snapd/desktop/applications/bitwarden_bitwarden.desktop 2>/dev/null echo pgrep -af bitwarden 2>/dev/null | head -3 echo echo "=== Alacritty config: does it have any '"'"'new window'"'"' binding? ===" ls /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/ 2>/dev/null echo "---" grep -E -B1 -A3 "(SpawnNewInstance|CreateNewWindow|key:\s*[\"'"'"']?[CcNn])" /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/*.toml 2>/dev/null | head -30' < /dev/null && pwd -P >| /tmp/claude-dedd-cwd
+1338475 /home/daviddwlee84/.cargo/bin/alacritty
+2113321 /home/daviddwlee84/.cargo/bin/alacritty
+
+=== Bitwarden: snap or apt? ===
+/snap/bin/bitwarden
+Name       Version   Rev  Tracking       Publisher    Notes
+bitwarden  2026.3.1  157  latest/stable  bitwarden**  -
+/var/lib/snapd/desktop/applications/bitwarden_bitwarden.desktop
+Name=Bitwarden
+Exec=/snap/bin/bitwarden %U
+StartupWMClass=Bitwarden
+
+76148 /usr/bin/zsh -c source /home/daviddwlee84/.claude/shell-snapshots/snapshot-zsh-1778667193570-2ejel1.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB 2>/dev/null || true && eval 'echo "=== Alacritty: where, what process, .desktop ===" which alacritty 2>&1 ls -la ~/.local/share/applications/alacritty.desktop /usr/share/applications/Alacritty.desktop 2>/dev/null grep -E "^(Exec|StartupWMClass|Name)=" ~/.local/share/applications/alacritty.desktop 2>/dev/null echo pgrep -af alacritty 2>/dev/null | head -3 echo echo "=== Bitwarden: snap or apt? ===" which bitwarden 2>&1 snap list bitwarden 2>&1 ls /var/lib/snapd/desktop/applications/bitwarden*.desktop 2>/dev/null grep -E "^(Exec|StartupWMClass|Name)=" /var/lib/snapd/desktop/applications/bitwarden_bitwarden.desktop 2>/dev/null echo pgrep -af bitwarden 2>/dev/null | head -3 echo echo "=== Alacritty config: does it have any '"'"'new window'"'"' binding? ===" ls /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/ 2>/dev/null echo "---" grep -E -B1 -A3 "(SpawnNewInstance|CreateNewWindow|key:\s*[\"'"'"']?[CcNn])" /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/*.toml 2>/dev/null | head -30' < /dev/null && pwd -P >| /tmp/claude-dedd-cwd
+2115987 /bin/sh /snap/bitwarden/157/bitwarden --no-sandbox
+2116058 /snap/bitwarden/157/bitwarden-app --ozone-platform=x11 --no-sandbox
+
+=== Alacritty config: does it have any 'new window' binding? ===
+alacritty.toml
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:53:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check Alacritty config + tmux new-window binding + Ghostty alt
+
+```bash
+echo "=== Alacritty config preview ==="
+cat /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml 2>/dev/null | head -40
+echo
+echo "=== tmux config: new-window keybindings (the actual answer for 'new tab') ==="
+grep -E -B1 -A1 "new-window|new window" /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/*.conf 2>/dev/null | head -30
+echo
+echo "=== ghostty .desktop (alternative terminal — does this user have it?) ==="
+ls /home/daviddwlee84/.local/share/applications/ghostty.desktop /usr/share/applications/com.mitchellh.ghostty.desktop 2>/dev/null
+which ghostty 2>&1
+```
+
+```text
+Exit code 1
+=== Alacritty config preview ===
+[font]
+normal = { family = "Hack Nerd Font Mono", style = "Regular" }
+bold = { family = "Hack Nerd Font Mono", style = "Bold" }
+italic = { family = "Hack Nerd Font Mono", style = "Italic" }
+bold_italic = { family = "Hack Nerd Font Mono", style = "Bold Italic" }
+size = 14.0
+
+[[keyboard.bindings]]
+key = "Return"
+mods = "Shift"
+chars = "\u001b[13;2u"
+
+[[keyboard.bindings]]
+key = "Slash"
+mods = "Control"
+chars = "\u001f"
+
+[[keyboard.bindings]]
+key = "Return"
+mods = "Control"
+chars = "\u001b[13;5u"
+
+# Ctrl+Number → CSI-u sequences for tmux quick window switching
+# Format: ESC [ <keycode> ; 5 u  (5 = Ctrl modifier in CSI-u)
+# Alacritty doesn't natively send CSI-u for Ctrl+Number; Ghostty/cmux does.
+[[keyboard.bindings]]
+key = "Key1"
+mods = "Control"
+chars = "\u001b[49;5u"
+
+[[keyboard.bindings]]
+key = "Key2"
+mods = "Control"
+chars = "\u001b[50;5u"
+
+[[keyboard.bindings]]
+key = "Key3"
+mods = "Control"
+chars = "\u001b[51;5u"
+
+
+=== tmux config: new-window keybindings (the actual answer for 'new tab') ===
+
+=== ghostty .desktop (alternative terminal — does this user have it?) ===
+ghostty not found
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:53:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find tmux new-window binding + check Alacritty CreateNewWindow action
+
+```bash
+echo "=== tmux key bindings dir ==="
+ls /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/ 2>/dev/null | head -10
+echo "---"
+grep -rEn "new-window|c\s|bind-key.*c\b" /home/daviddwlee84/.local/share/chezmoi/dot_config/tmux/keybindings.conf 2>/dev/null | head -10
+echo
+echo "=== Alacritty's built-in keybinding for spawning new instance ==="
+# Alacritty docs: action SpawnNewInstance opens a new window of the same instance.
+# Default is Cmd+N on macOS, no default on Linux. Need to add manually.
+grep -c "SpawnNewInstance\|CreateNewWindow" /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml
+echo
+echo "=== confirm tmux 'prefix c' is bound (probably from default) ==="
+tmux list-keys 2>/dev/null | grep "bind-key.*c " | head -5
+```
+
+```text
+=== tmux key bindings dir ===
+cheatsheet.md
+common.conf.tmpl
+executable_break-all-panes.sh
+executable_cross-session.sh
+executable_kill-session-exit.sh
+executable_menu-agents.sh
+executable_menu-layouts.sh
+executable_menu-popups.sh
+executable_menu-sesh.sh
+executable_menu-session.sh
+---
+
+=== Alacritty's built-in keybinding for spawning new instance ===
+0
+
+=== confirm tmux 'prefix c' is bound (probably from default) ===
+bind-key    -T copy-mode    C-c                    send-keys -X cancel
+bind-key    -T copy-mode-vi C-c                    send-keys -X cancel
+bind-key    -T prefix       C-y                    run-shell "  tmux capture-pane -pS - | fzf-tmux -p 80%,70% --multi --tac --no-sort     --header 'Select lines to copy (Tab=multi, Enter=copy)'     | tmux load-buffer -w - && tmux display-message 'Selected lines copied'"
+bind-key    -T prefix       -                      split-window -v -c "#{pane_current_path}"
+bind-key    -T prefix       >                      display-menu -T "#[align=centre]#{pane_index} (#{pane_id})" -x P -y P "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Top,}" < { send-keys -X history-top } "#{?#{m/r:(copy|view)-mode,#{pane_mode}},Go To Bottom,}" > { send-keys -X history-bottom } '' "#{?mouse_word,Search For #[underscore]#{=/9/...:mouse_word},}" C-r { if-shell -F "#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}" "copy-mode -t=" ; send-keys -X -t = search-backward "#{q:mouse_word}" } "#{?mouse_word,Type #[underscore]#{=/9/...:mouse_word},}" C-y { copy-mode -q ; send-keys -l "#{q:mouse_word}" } "#{?mouse_word,Copy #[underscore]#{=/9/...:mouse_word},}" c { copy-mode -q ; set-buffer "#{q:mouse_word}" } "#{?mouse_line,Copy Line,}" l { copy-mode -q ; set-buffer "#{q:mouse_line}" } '' "#{?mouse_hyperlink,Type #[underscore]#{=/9/...:mouse_hyperlink},}" C-h { copy-mode -q ; send-keys -l "#{q:mouse_hyperlink}" } "#{?mouse_hyperlink,Copy #[underscore]#{=/9/...:mouse_hyperlink},}" h { copy-mode -q ; set-buffer "#{q:mouse_hyperlink}" } '' "Horizontal Split" h { split-window -h } "Vertical Split" v { split-window -v } '' "#{?#{>:#{window_panes},1},,-}Swap Up" u { swap-pane -U } "#{?#{>:#{window_panes},1},,-}Swap Down" d { swap-pane -D } "#{?pane_marked_set,,-}Swap Marked" s { swap-pane } '' Kill X { kill-pane } Respawn R { respawn-pane -k } "#{?pane_marked,Unmark,Mark}" m { select-pane -m } "#{?#{>:#{window_panes},1},,-}#{?window_zoomed_flag,Unzoom,Zoom}" z { resize-pane -Z }
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:33Z)**_
+
+Two separate things — Bitwarden YES, Alacritty NO (footgun risk), and the Alacritty "new tab" question is a deliberate Alacritty design choice with two solutions.
+
+**Why Bitwarden YES**: Snap-confined like Spotify, clean pattern, no risk.
+
+**Why Alacritty NO**: `appquit Alacritty` matches *every* alacritty process — **including the one you're typing in**. Self-suicide risk; you'd lose your shell. For "quit the other Alacritty window", use the window's own ⌘W/⌃W instead.
+
+**Alacritty + "new tab"**: Alacritty doesn't have tabs by design (upstream rejects it on principle — single-window terminal, multiplexer for tabs). Two paths to the same effect, and you already have one:
+
+1. **tmux `prefix c`** (default `Ctrl+B c`) — new tmux window. The tmux status bar acts as your tab strip. This is what 90% of Alacritty users actually do (and what your tmux setup is built around).
+2. **New Alacritty WINDOW** via `SpawnNewInstance` action — a separate process / taskbar entry. The Linux-terminal convention is `Ctrl+Shift+T`. Alacritty doesn't bind it by default; needs a config line.
+
+Let me add Bitwarden, and add the `Ctrl+Shift+T` → new Alacritty window binding so you have the macOS-ish keystroke even if it's a window not a tab.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:34Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/alacritty/alacritty.toml`
+
+```text
+1	[font]
+2	normal = { family = "Hack Nerd Font Mono", style = "Regular" }
+3	bold = { family = "Hack Nerd Font Mono", style = "Bold" }
+4	italic = { family = "Hack Nerd Font Mono", style = "Italic" }
+5	bold_italic = { family = "Hack Nerd Font Mono", style = "Bold Italic" }
+6	size = 14.0
+7	
+8	[[keyboard.bindings]]
+9	key = "Return"
+10	mods = "Shift"
+11	chars = "\u001b[13;2u"
+12	
+13	[[keyboard.bindings]]
+14	key = "Slash"
+15	mods = "Control"
+16	chars = "\u001f"
+17	
+18	[[keyboard.bindings]]
+19	key = "Return"
+20	mods = "Control"
+21	chars = "\u001b[13;5u"
+22	
+23	# Ctrl+Number → CSI-u sequences for tmux quick window switching
+24	# Format: ESC [ <keycode> ; 5 u  (5 = Ctrl modifier in CSI-u)
+25	# Alacritty doesn't natively send CSI-u for Ctrl+Number; Ghostty/cmux does.
+26	[[keyboard.bindings]]
+27	key = "Key1"
+28	mods = "Control"
+29	chars = "\u001b[49;5u"
+30	
+31	[[keyboard.bindings]]
+32	key = "Key2"
+33	mods = "Control"
+34	chars = "\u001b[50;5u"
+35	
+36	[[keyboard.bindings]]
+37	key = "Key3"
+38	mods = "Control"
+39	chars = "\u001b[51;5u"
+40	
+41	[[keyboard.bindings]]
+42	key = "Key4"
+43	mods = "Control"
+44	chars = "\u001b[52;5u"
+45	
+46	[[keyboard.bindings]]
+47	key = "Key5"
+48	mods = "Control"
+49	chars = "\u001b[53;5u"
+50	
+51	[[keyboard.bindings]]
+52	key = "Key6"
+53	mods = "Control"
+54	chars = "\u001b[54;5u"
+55	
+56	[[keyboard.bindings]]
+57	key = "Key7"
+58	mods = "Control"
+59	chars = "\u001b[55;5u"
+60	
+61	[[keyboard.bindings]]
+62	key = "Key8"
+63	mods = "Control"
+64	chars = "\u001b[56;5u"
+65	
+66	[[keyboard.bindings]]
+67	key = "Key9"
+68	mods = "Control"
+69	chars = "\u001b[57;5u"
+70	
+71	[[keyboard.bindings]]
+72	key = "Key0"
+73	mods = "Control"
+74	chars = "\u001b[48;5u"
+75	
+76	# https://www.youtube.com/watch?v=uOnL4fEnldA
+77	# https://www.josean.com/posts/how-to-setup-alacritty-terminal
+78	[env]
+79	TERM = "xterm-256color"
+80
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: [[keyboard.bindings]]
+key = "Key0"
+mods = "Control"
+chars = "[48;5u"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:47Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Get exact bytes around the insertion point
+
+```bash
+grep -n "Key0" /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml
+echo "---"
+sed -n '70,78p' /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml | cat -A
+```
+
+```text
+72:key = "Key0"
+---
+$
+[[keyboard.bindings]]$
+key = "Key0"$
+mods = "Control"$
+chars = "\u001b[48;5u"$
+$
+# https://www.youtube.com/watch?v=uOnL4fEnldA$
+# https://www.josean.com/posts/how-to-setup-alacritty-terminal$
+[env]$
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:54:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: [[keyboard.bindings]]
+key = "Key0"
+mods = "Control"
+chars = "[48;5u"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:02Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:05Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: [[keyboard.bindings]]
+key = "Key0"
+mods = "Control"
+chars = "[48;5u"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:12Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: key = "Key0"
+mods = "Control"
+chars = "[48;5u"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:25Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:29Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify Alacritty binding deployed
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== verify the edit went in cleanly ==="
+grep -B1 -A4 "SpawnNewInstance" dot_config/alacritty/alacritty.toml
+echo
+echo "=== TOML still valid? ==="
+python3 -c "import tomllib; tomllib.loads(open('dot_config/alacritty/alacritty.toml').read()); print('TOML valid')"
+echo
+echo "=== deploy to ~/.config/alacritty/ ==="
+chezmoi apply "$HOME/.config/alacritty/alacritty.toml" 2>&1 | tail -3
+echo
+echo "=== verify deployed ==="
+grep -c SpawnNewInstance "$HOME/.config/alacritty/alacritty.toml"
+```
+
+```text
+=== verify the edit went in cleanly ===
+# Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS Cmd+T).
+# Alacritty has no native tabs by design; SpawnNewInstance opens a separate
+# Alacritty process / taskbar entry. For tmux-style tabs (a tab strip in the
+# status bar), use tmux `prefix c` (default Ctrl+B c) — that's the more
+# common workflow given how heavily this repo leans on tmux.
+[[keyboard.bindings]]
+--
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+
+# Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
+[[keyboard.bindings]]
+key = "N"
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA
+# https://www.josean.com/posts/how-to-setup-alacritty-terminal
+[env]
+
+=== TOML still valid? ===
+TOML valid
+
+=== deploy to ~/.config/alacritty/ ===
+
+=== verify deployed ===
+3
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:44Z)**_
+
+Deployed. Alacritty live config now has the bindings (will take effect on next Alacritty restart per Alacritty's hot-reload). Now append Bitwarden to the conf file.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/home/daviddwlee84/.config/shell/linux-apps.conf`
+
+```text
+68	linux_app_register Frpc-Desktop \
+69	  --desktop=appimagekit_557220393761292184db845cd26816c3-Frpc-Desktop \
+70	  --pkill='\.mount_.+/frpc-desktop($| )' \
+71	  --wm-class=Frpc-Desktop
+72	
+73	# ---------------------------------------------------------------------------
+74	# Manually-placed (no .desktop) — use --exec= for the launch path
+75	# ---------------------------------------------------------------------------
+76	
+77	# Clash for Windows — Electron app, manually placed at
+78	# ~/Documents/ClashForWindows/cfw. NO .desktop file → applaunch via --exec=
+79	# (helper expands ~ and execs via `setsid -f sh -c`).
+80	# CFW spawns a sidecar `clash-linux` at .../resources/static/files/linux/x64/
+81	# and a service at ~/.config/clash/service/clash-core-service — those are NOT
+82	# matched by --pkill (intentional — they survive appquit so the proxy stays
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.config/shell/linux-apps.conf has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:55:58Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/home/daviddwlee84/.config/shell/linux-apps.conf`
+
+```text
+90	# and a service at ~/.config/clash/service/clash-core-service — those are NOT
+91	# matched by --pkill (intentional — they survive appquit so the proxy stays
+92	# up while the UI restarts; if you want them gone too, broaden the regex to
+93	# 'ClashForWindows|clash-core-service' but mind the blast radius).
+94	linux_app_register CFW \
+95	  --exec='~/Documents/ClashForWindows/cfw' \
+96	  --pkill='^/home/.+/Documents/ClashForWindows/cfw' \
+97	  --wm-class='Clash for Windows'
+98
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.config/shell/linux-apps.conf has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Final verification — 7 registered apps
+
+```bash
+echo "=== final registry after conf update ==="
+zsh -i -c 'linux_app_register --list' 2>&1 | grep -v "can't change option"
+echo
+echo "=== apprunning across the 7 registered apps ==="
+zsh -i -c '
+for n in Cursor Discord Spotify Zen Frpc-Desktop CFW Bitwarden; do
+    if apprunning "$n"; then echo "  $n: YES"; else echo "  $n: no"; fi
+done
+' 2>&1 | grep -v "can't change option"
+```
+
+```text
+=== final registry after conf update ===
+Cursor	desktop=cursor	exec=	pkill=^/usr/share/cursor/cursor( |$)	wmclass=Cursor	mpris=
+Discord	desktop=discord	exec=	pkill=^/usr/share/discord/Discord( |$)	wmclass=discord	mpris=
+Bitwarden	desktop=bitwarden_bitwarden	exec=	pkill=^/snap/bitwarden/[^/]+/bitwarden(-app)?	wmclass=Bitwarden	mpris=
+Frpc-Desktop	desktop=appimagekit_557220393761292184db845cd26816c3-Frpc-Desktop	exec=	pkill=\.mount_.+/frpc-desktop($| )	wmclass=Frpc-Desktop	mpris=
+Spotify	desktop=spotify_spotify	exec=	pkill=^/snap/spotify/[^/]+/usr/share/spotify/spotify	wmclass=spotify	mpris=spotify
+Zen	desktop=zen-browser	exec=	pkill=\.mount_.+/zen($| )	wmclass=zen	mpris=
+CFW	desktop=	exec=~/Documents/ClashForWindows/cfw	pkill=^/home/.+/Documents/ClashForWindows/cfw	wmclass=Clash for Windows	mpris=
+
+=== apprunning across the 7 registered apps ===
+  Cursor: YES
+  Discord: YES
+  Spotify: no
+  Zen: YES
+  Frpc-Desktop: YES
+  CFW: YES
+  Bitwarden: YES
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:19Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:20Z)**_
+
+7 apps registered, 6 detected running. Now the Alacritty config change is repo-tracked — let me check if you want it committed.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Show pending alacritty change for commit decision
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git status --short
+echo
+git diff dot_config/alacritty/alacritty.toml | head -30
+```
+
+```text
+ M .specstory/history/2026-05-13_10-12-42Z-at-backlog-linux-desktop.md
+ M dot_config/alacritty/alacritty.toml
+
+diff --git a/dot_config/alacritty/alacritty.toml b/dot_config/alacritty/alacritty.toml
+index 321f95a..3df1586 100644
+--- a/dot_config/alacritty/alacritty.toml
++++ b/dot_config/alacritty/alacritty.toml
+@@ -73,6 +73,22 @@ key = "Key0"
+ mods = "Control"
+ chars = "\u001b[48;5u"
+ 
++# Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS Cmd+T).
++# Alacritty has no native tabs by design; SpawnNewInstance opens a separate
++# Alacritty process / taskbar entry. For tmux-style tabs (a tab strip in the
++# status bar), use tmux `prefix c` (default Ctrl+B c) — that's the more
++# common workflow given how heavily this repo leans on tmux.
++[[keyboard.bindings]]
++key = "T"
++mods = "Control|Shift"
++action = "SpawnNewInstance"
++
++# Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
++[[keyboard.bindings]]
++key = "N"
++mods = "Control|Shift"
++action = "SpawnNewInstance"
++
+ # https://www.youtube.com/watch?v=uOnL4fEnldA
+ # https://www.josean.com/posts/how-to-setup-alacritty-terminal
+ [env]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:56:32Z)**_
+
+Want me to commit the Alacritty binding change too? It's a 16-line additive diff with no behaviour change beyond adding two new keybindings.
+
+**Summary of what's done so far:**
+
+1. **`~/.config/shell/linux-apps.conf`** — now has 7 apps registered:
+   - Cursor, Discord, Spotify, Zen, Frpc-Desktop, CFW (from before)
+   - **+ Bitwarden** (snap, pattern matches both wrapper and `bitwarden-app`)
+   - **Deliberately NOT** registered: Alacritty (self-suicide footgun), Firefox-snap (not your daily driver)
+
+2. **`dot_config/alacritty/alacritty.toml`** — added two keybindings:
+   - `Ctrl+Shift+T` → `SpawnNewInstance` (new Alacritty window, closest to macOS Cmd+T)
+   - `Ctrl+Shift+N` → `SpawnNewInstance` (matches Cmd+N too)
+   - Alacritty hot-reloads config, so they should be live in your existing windows. New windows will definitely have them.
+
+**About "new tab" in Alacritty** — to set expectations clearly:
+- Alacritty has **no native tabs** by design (upstream explicitly rejects PRs for it — single-window terminal is the project's identity).
+- `Ctrl+Shift+T` opens a **separate window**, not a tab. It'll show as a separate taskbar entry.
+- For real "tab-strip-in-the-same-window" UX, you already have **tmux**. `prefix c` (Ctrl+B c by default) creates a new tmux window, and the tmux status bar gives you the tab strip. This is the workflow your whole tmux config is built around.
+- If you want true GUI tabs, **Ghostty** (which this repo also configures) has them natively. But you'd be switching terminal, not adding tabs to Alacritty.
+
+Live test: try pressing `Ctrl+Shift+T` in your current Alacritty window now — a second window should pop up.
+
+---
+
+_**User (2026-05-13 12:56:49Z)**_
+
+How about make dot_config/alacritty/alacritty.toml a tmpl file. So the Ctrl + Shift + T & Ctrl + Shift + N stuff only works on non-mac devices
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:12Z)**_
+
+Good call — Mac already gives you `Cmd+N` → `SpawnNewInstance` via Alacritty's built-in macOS defaults, so the Ctrl+Shift versions are dead weight on Mac (and arguably even confusing). Templating them out is cleaner.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+git mv to preserve rename history
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git mv dot_config/alacritty/alacritty.toml dot_config/alacritty/alacritty.toml.tmpl
+git status --short dot_config/alacritty/
+```
+
+```text
+RM dot_config/alacritty/alacritty.toml -> dot_config/alacritty/alacritty.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:29Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/alacritty/alacritty.toml.tmpl`
+
+```text
+75	
+76	# Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS Cmd+T).
+77	# Alacritty has no native tabs by design; SpawnNewInstance opens a separate
+78	# Alacritty process / taskbar entry. For tmux-style tabs (a tab strip in the
+79	# status bar), use tmux `prefix c` (default Ctrl+B c) — that's the more
+80	# common workflow given how heavily this repo leans on tmux.
+81	[[keyboard.bindings]]
+82	key = "T"
+83	mods = "Control|Shift"
+84	action = "SpawnNewInstance"
+85	
+86	# Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
+87	[[keyboard.bindings]]
+88	key = "N"
+89	mods = "Control|Shift"
+90	action = "SpawnNewInstance"
+91	
+92	# https://www.youtube.com/watch?v=uOnL4fEnldA
+93	# https://www.josean.com/posts/how-to-setup-alacritty-terminal
+94	[env]
+95	TERM = "xterm-256color"
+96	
+97	[window]
+98	padding.x = 10
+99	padding.y = 10
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/alacritty/alacritty.toml.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate template renders cleanly on both Linux and simulated-macOS paths
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== Linux render (this host) — should INCLUDE the bindings ==="
+chezmoi execute-template < dot_config/alacritty/alacritty.toml.tmpl | grep -B1 -A3 SpawnNewInstance | head -25
+echo
+echo "=== Simulate macOS render — should EXCLUDE the bindings ==="
+chezmoi execute-template --init --promptString 'profile=ubuntu_desktop' \
+  '{{ if ne "darwin" "darwin" }}INCLUDED{{ else }}EXCLUDED{{ end }}' 2>&1 | tail -2
+# Direct verification: render with .chezmoi.os mocked
+echo "=== render template with mocked darwin os: confirm bindings absent ==="
+# Use chezmoi's --source/--destination overrides if available; otherwise
+# do a literal sed swap and re-render
+sed 's/{{ if ne .chezmoi.os "darwin" -}}/{{ if ne "darwin" "darwin" -}}/' dot_config/alacritty/alacritty.toml.tmpl \
+  | chezmoi execute-template | grep -c SpawnNewInstance || echo "0 occurrences (expected 0 on mac)"
+echo
+echo "=== TOML validity of Linux render ==="
+chezmoi execute-template < dot_config/alacritty/alacritty.toml.tmpl > /tmp/alacritty.linux.toml
+python3 -c "import tomllib; tomllib.loads(open('/tmp/alacritty.linux.toml').read()); print('Linux TOML valid')"
+echo
+echo "=== TOML validity of macOS render (no SpawnNewInstance) ==="
+sed 's/{{ if ne .chezmoi.os "darwin" -}}/{{ if ne "darwin" "darwin" -}}/' dot_config/alacritty/alacritty.toml.tmpl \
+  | chezmoi execute-template > /tmp/alacritty.mac.toml
+python3 -c "import tomllib; tomllib.loads(open('/tmp/alacritty.mac.toml').read()); print('macOS TOML valid')"
+echo
+echo "=== diff between Linux and Mac renders (proves the gate works) ==="
+diff /tmp/alacritty.mac.toml /tmp/alacritty.linux.toml | head -25
+```
+
+```text
+=== Linux render (this host) — should INCLUDE the bindings ===
+# Linux-only: Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS
+# Cmd+T). Alacritty has no native tabs by design; SpawnNewInstance opens a
+# separate Alacritty process / taskbar entry. For tmux-style tabs (a tab
+# strip in the status bar), use tmux `prefix c` (default Ctrl+B c) — that's
+# the more common workflow given how heavily this repo leans on tmux.
+--
+# Excluded on macOS: Alacritty's built-in macOS defaults already bind
+# Cmd+N → SpawnNewInstance, which is the native muscle memory there.
+# Adding Ctrl+Shift+T on Mac would just collide with Chrome/Firefox's
+# "reopen last closed tab" reflex without adding terminal value.
+[[keyboard.bindings]]
+--
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+
+# Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
+[[keyboard.bindings]]
+--
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+
+# https://www.youtube.com/watch?v=uOnL4fEnldA
+# https://www.josean.com/posts/how-to-setup-alacritty-terminal
+
+=== Simulate macOS render — should EXCLUDE the bindings ===
+EXCLUDED=== render template with mocked darwin os: confirm bindings absent ===
+0
+0 occurrences (expected 0 on mac)
+
+=== TOML validity of Linux render ===
+Linux TOML valid
+
+=== TOML validity of macOS render (no SpawnNewInstance) ===
+macOS TOML valid
+
+=== diff between Linux and Mac renders (proves the gate works) ===
+75a76,95
+> # Linux-only: Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS
+> # Cmd+T). Alacritty has no native tabs by design; SpawnNewInstance opens a
+> # separate Alacritty process / taskbar entry. For tmux-style tabs (a tab
+> # strip in the status bar), use tmux `prefix c` (default Ctrl+B c) — that's
+> # the more common workflow given how heavily this repo leans on tmux.
+> #
+> # Excluded on macOS: Alacritty's built-in macOS defaults already bind
+> # Cmd+N → SpawnNewInstance, which is the native muscle memory there.
+> # Adding Ctrl+Shift+T on Mac would just collide with Chrome/Firefox's
+> # "reopen last closed tab" reflex without adding terminal value.
+> [[keyboard.bindings]]
+> key = "T"
+> mods = "Control|Shift"
+> action = "SpawnNewInstance"
+> 
+> # Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
+> [[keyboard.bindings]]
+> key = "N"
+> mods = "Control|Shift"
+> action = "SpawnNewInstance"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:57:59Z)**_
+
+Both renders valid; gate works cleanly. Deploy and commit.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Deploy and prep for commit
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+chezmoi apply "$HOME/.config/alacritty/alacritty.toml" 2>&1 | tail -3
+echo
+echo "=== deployed file still has the bindings (this is Linux) ==="
+grep -c SpawnNewInstance "$HOME/.config/alacritty/alacritty.toml"
+echo
+echo "=== git status ==="
+git status --short
+```
+
+```text
+=== deployed file still has the bindings (this is Linux) ===
+4
+
+=== git status ===
+ M .specstory/history/2026-05-13_10-12-42Z-at-backlog-linux-desktop.md
+RM dot_config/alacritty/alacritty.toml -> dot_config/alacritty/alacritty.toml.tmpl
+```
+</details></tool-use>

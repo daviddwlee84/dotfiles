@@ -73,6 +73,28 @@ key = "Key0"
 mods = "Control"
 chars = "\u001b[48;5u"
 
+{{ if ne .chezmoi.os "darwin" -}}
+# Linux-only: Ctrl+Shift+T → new Alacritty WINDOW (closest analog to macOS
+# Cmd+T). Alacritty has no native tabs by design; SpawnNewInstance opens a
+# separate Alacritty process / taskbar entry. For tmux-style tabs (a tab
+# strip in the status bar), use tmux `prefix c` (default Ctrl+B c) — that's
+# the more common workflow given how heavily this repo leans on tmux.
+#
+# Excluded on macOS: Alacritty's built-in macOS defaults already bind
+# Cmd+N → SpawnNewInstance, which is the native muscle memory there.
+# Adding Ctrl+Shift+T on Mac would just collide with Chrome/Firefox's
+# "reopen last closed tab" reflex without adding terminal value.
+[[keyboard.bindings]]
+key = "T"
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+
+# Ctrl+Shift+N → new window too (matches Cmd+N convention on macOS).
+[[keyboard.bindings]]
+key = "N"
+mods = "Control|Shift"
+action = "SpawnNewInstance"
+{{ end }}
 # https://www.youtube.com/watch?v=uOnL4fEnldA
 # https://www.josean.com/posts/how-to-setup-alacritty-terminal
 [env]
