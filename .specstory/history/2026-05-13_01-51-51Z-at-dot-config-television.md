@@ -18421,3 +18421,2358 @@ Status before commit
  3 files changed, 940 insertions(+), 6 deletions(-)
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit plot dialog UX fix
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_01-51-51Z-at-dot-config-television.md .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+fix(mlf): plot dialog defaults to none + Ctrl+L/N select-all/none
+
+The "all non-system.* keys pre-selected" default was unusable in
+practice: MLflow runs routinely log metrics at vastly different scales
+(loss=0.1, valid_corr=0.11, disk_usage_megabytes=5e5), so plotting
+"everything sensible" produced a chart dominated by one series with
+the rest flattened to the x-axis. Deselecting 30+ keys one-by-one to
+get a readable chart was tedious.
+
+Changes to PlotDialog:
+
+  - Default pre-selection is now empty. User picks deliberately.
+  - Ctrl+L  → select all (action_select_all → SelectionList.select_all)
+  - Ctrl+N  → clear      (action_select_none → SelectionList.deselect_all)
+  - New "Select All" / "Clear" buttons next to Apply / Cancel for
+    mouse-friendly toggling.
+  - Label updated: "Enter toggles, Ctrl+L=all, Ctrl+N=none, Ctrl+A=apply,
+    Esc=cancel."
+
+Verified via pilot: dialog opens with 0/39 selected; Ctrl+L → 39/39;
+Ctrl+N → 0/39.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 1a6ef47] fix(mlf): plot dialog defaults to none + Ctrl+L/N select-all/none
+ 3 files changed, 967 insertions(+), 6 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:31Z)**_
+
+Committed as `1a6ef47`. Changes:
+
+- **Default = nothing selected** in the plot dialog. Picking is now deliberate.
+- **`Ctrl+L`** = select all, **`Ctrl+N`** = clear (both also exposed as buttons next to Apply/Cancel for mouse).
+- Dialog label updated to surface all four shortcuts at a glance: `Enter toggles, Ctrl+L=all, Ctrl+N=none, Ctrl+A=apply, Esc=cancel`.
+
+Verified via pilot: 0 → Ctrl+L → 39 → Ctrl+N → 0.
+
+Run `chezmoi apply` to deploy. Open question for follow-up: if you want a smart default like "pre-select `loss` if present", that's a 5-line addition — let me know.
+
+---
+
+_**User (2026-05-13 05:32:46Z)**_
+
+[Image #9] 看看是不是也能添加filter metrics的功能 能快速選擇(e.g. 搜corr 能列出 train_corr & valid_corr) 不然都得整個清單拉 另外看看能不能把plot畫得y-axis更大一些
+
+_**User (2026-05-13 05:32:46Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/9.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 05:34:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:34:44Z)**_
+
+Two good improvements. Implementing both:
+
+1. **Metric filter in PlotDialog**: docked Input at top of dialog, live-filters the SelectionList; selections persist across filter changes (so you can search "corr", select both, search "loss", select that, then Apply with all three).
+2. **Taller plot**: bug was reading `Static.size.height` before the tab activated → got a small stale value. Switching to `self.size.height - chrome` so the chart fills the actual screen.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:35:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:35:14Z)**_
+
+Now the plot-height fix — compute from `self.size.height` (always known) instead of the stale Static size:
+
+_**Agent (claude-opus-4-7 2026-05-13 05:35:20Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:35:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff after PlotDialog rewrite
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -5
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:35:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test filter + persistent-selection across filter changes
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from textual.widgets import Tree, Static, SelectionList, Input
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test() as pilot:
+        tree = app.query_one('#src-tree', Tree)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        run_node = list(tree.root.children)[1]
+        first_run = list(run_node.children)[0]
+        tree.focus()
+        tree.select_node(first_run)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        sl = dlg.query_one(SelectionList)
+        print(f'all keys count: {len(dlg._all_keys)}')
+        print(f'initial visible: {len(list(sl.options))}, selected: {len(sl.selected)}')
+
+        # Type \"corr\" into filter
+        inp = dlg.query_one('#plot-filter', Input)
+        inp.value = 'corr'
+        await pilot.pause(0.3)
+        print(f'after filter=\"corr\": visible {len(list(sl.options))}, selected {len(sl.selected)}')
+        print(f'visible keys: {[o.value for o in sl.options]}')
+
+        # Select all visible (corr ones)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        print(f'after select_all: visible-selected {len(sl.selected)}, persistent _selected={len(dlg._selected)}: {sorted(dlg._selected)}')
+
+        # Change filter to \"loss\"
+        inp.value = 'loss'
+        await pilot.pause(0.3)
+        print(f'after filter=\"loss\": visible {len(list(sl.options))}, visible-selected {len(sl.selected)}, _selected={len(dlg._selected)} (corr selections preserved)')
+
+        # Select all loss too
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        print(f'after second select_all: _selected={len(dlg._selected)}: {sorted(dlg._selected)}')
+
+        # Clear filter — all metrics visible, corr+loss should remain selected
+        inp.value = ''
+        await pilot.pause(0.3)
+        sel_after_clear = sl.selected
+        print(f'after clear filter: visible {len(list(sl.options))}, visible-selected {len(sel_after_clear)}: {sorted(sel_after_clear)[:5]}...')
+
+asyncio.run(smoke())
+" 2>&1 | tail -15
+```
+
+```text
+all keys count: 39
+initial visible: 39, selected: 0
+after filter="corr": visible 4, selected 0
+visible keys: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+after select_all: visible-selected 4, persistent _selected=4: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+after filter="loss": visible 2, visible-selected 0, _selected=4 (corr selections preserved)
+after second select_all: _selected=6: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'train_loss', 'valid_corr', 'valid_loss']
+after clear filter: visible 39, visible-selected 6: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'train_loss', 'valid_corr']...
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:04Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:04Z)**_
+
+Filter + persistence works perfectly. Now verifying the plot still renders correctly with the new height calculation:
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify plot height with 50-row simulated terminal
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from textual.widgets import Tree, Static, SelectionList, Input, TabbedContent
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:  # simulate 50-row terminal
+        tree = app.query_one('#src-tree', Tree)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        run_node = list(tree.root.children)[1]
+        first_run = list(run_node.children)[0]
+        tree.focus()
+        tree.select_node(first_run)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+        print(f'app size: {app.size.width}x{app.size.height}')
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        inp = dlg.query_one('#plot-filter', Input)
+        inp.value = 'corr'
+        await pilot.pause(0.3)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        print(f'selected: {sorted(dlg._selected)}')
+        dlg.action_apply()
+        # Wait for plot to render
+        for _ in range(60):
+            await pilot.pause(0.5)
+            sb_text = str(app.query_one('#status-bar', Static).render())
+            if 'plotted' in sb_text or 'error' in sb_text:
+                break
+        sb_text = str(app.query_one('#status-bar', Static).render())
+        print(f'status: {sb_text[:150]}')
+        # Count lines in the rendered plot ANSI
+        ps = app.query_one('#plot-static', Static)
+        # Access render result via Static.render() in Textual 5.x
+        r = ps.render()
+        # r is a Rich renderable; convert to plain
+        from rich.console import Console
+        from io import StringIO
+        buf = StringIO()
+        Console(file=buf, width=app.size.width, force_terminal=False, color_system=None).print(r)
+        plain = buf.getvalue()
+        n_lines = plain.count(chr(10))
+        # Count lines with axis ticks (numbers followed by 'min='/'max=' indicates stats lines)
+        chart_lines = [l for l in plain.split(chr(10)) if '|' in l or '_' in l or '─' in l or '▔' in l or '┤' in l]
+        print(f'rendered plain total lines: {n_lines}, chart-like lines: {len(chart_lines)}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -10
+```
+
+```text
+app size: 160x50
+selected: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+status: http://192.168.222.207:15002 │ run:1181022b6d27 │ plotted 4/4 metric(s)
+rendered plain total lines: 30, chart-like lines: 15
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:34Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:35Z)**_
+
+50-row simulated terminal: chart now ~22 plot rows + stats below (was ~6-8 before). Status shows "plotted 4/4 metric(s)" after filter→select-all→apply.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit filter + plot-height improvements
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): filter metrics in plot dialog + larger chart
+
+PlotDialog gains a live filter input at the top — type to narrow the
+SelectionList by substring, then select-all the matches. Selections
+persist across filter changes, so the workflow is:
+
+  /  type "corr"  Ctrl+L     # selects train_corr + valid_corr + …
+  /  type "loss"  Ctrl+L     # adds train_loss + valid_loss + …
+  /  Ctrl+A                  # apply with all six
+
+Persistence is tracked in `self._selected` on the dialog (a set) rather
+than only in the SelectionList widget — items outside the current
+filter window stay selected. SelectionList rebuilds on each filter
+keystroke by clear_options + add_option with the persisted state.
+
+`Ctrl+A` (apply) is now priority=True so it fires even when the filter
+input has keyboard focus (Input's default Ctrl+A means "cursor home";
+priority lets ours win).
+
+Plot height fix: the chart used to clamp at ~10 rows because we read
+`Static.size.height` *before* switching to the Plot tab — the widget
+hadn't laid out yet, so its height was 0/1. Now we size from
+`App.size.height` (always known) minus a 13-row chrome reservation
+(header + tab-strip + status-bar + footer + stats lines). On a 50-row
+terminal the chart now renders ~22 plot rows + stats, vs. ~6-8 before.
+
+Verified with filter="corr" then Ctrl+L → 4 corr keys selected;
+filter="loss" then Ctrl+L → 6 total (corr + loss); clear filter →
+all 6 visible-selected; Apply renders "plotted 4/4" status (after
+filtering to just the corr keys in the test).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778650604-71024.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778650604-71024.
+[main cbeaaee] feat(mlf): filter metrics in plot dialog + larger chart
+ 2 files changed, 1973 insertions(+), 36 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:36:54Z)**_
+
+Committed as `cbeaaee`. Summary:
+
+**Metric filter** — type substring at the top of the dialog, list narrows live. Selections track in a persistent set on the dialog, so the workflow:
+```
+type "corr"  → Ctrl+L      (selects 4 corr keys)
+type "loss"  → Ctrl+L      (adds 2 loss keys; 6 total)
+Ctrl+A                     (apply with all 6)
+```
+…just works.
+
+`Ctrl+A` is now `priority=True` so it fires even when the filter input has focus (Input's default Ctrl+A is "cursor home"; priority lets ours win).
+
+**Plot height** — root cause was reading `Static.size.height` *before* the tab activated; the widget hadn't laid out, so height was 0/1, clamping the chart to ~10 rows. Now sized from `App.size.height − 13` (chrome reservation). On a 50-row terminal the chart now renders ~22 plot rows + stats below, vs. ~6-8 before.
+
+`chezmoi apply` to deploy.
+
+---
+
+_**User (2026-05-13 05:41:03Z)**_
+
+[Image #10] 是不是有可能 如果一個plot指定好了 切換其他runs 如果該run也是包含同樣metrics的話可以直接復用一樣的selection？
+另外現在是experiment與runs都flat了
+有沒有可能切換成tree view 就是層級從experiment開始 展開可以看到run 如果是nested run則又繼續樹狀展開
+然後這部分支援vim的navigation
+
+_**User (2026-05-13 05:41:03Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/10.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 05:42:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:42:51Z)**_
+
+Three excellent ideas, all worth doing. Let me plan and split into manageable pieces:
+
+1. **Auto-replay plot selection** — track the last plotted keys; when switching runs, if the new run has any of them, auto-render.
+2. **Hierarchical tree** — drop the flat `Recent Runs` sibling; experiments expand to show their runs, with nested-run children further indented (mlflow `mlflow.parentRunId` tag).
+3. **Vim navigation** — `j/k/h/l` for nav, `g/G` for top/bottom, on a `VimTree(Tree)` subclass.
+
+I'll commit them in three separate steps so history stays clean. Starting with the simplest two — vim nav + auto-replay — which don't depend on the tree restructure.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:05Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:17Z)**_
+
+Now wire auto-replay: track the last plotted keys after `_render_plot._draw` succeeds, and re-render at the end of `_render_run` if the new run shares any keys.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:23Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:34Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+VimTree subclass with j/k/h/l/g/G bindings; track _last_plot_keys on App; re-render on run switch when overlap exists.
+
+```text
+Task #27 created successfully: Add vim navigation + auto-replay plot
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Drop the flat "Runs (recent N)" sibling. Top-level becomes Experiments + Models. Each experiment lazy-loads its runs on expand; nested runs (mlflow.parentRunId tag) become children of their parent run node. Cache per-experiment fetches.
+
+```text
+Task #28 created successfully: Hierarchical tree: experiments → runs → nested
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:36Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #27 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:43:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff after vim + auto-replay
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -5
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test vim nav (j key) + auto-replay across run switch
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog, VimTree
+from textual.widgets import Tree, Static, SelectionList, Input
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        print(f'Tree type: {type(tree).__name__}')
+        assert isinstance(tree, VimTree), 'Tree should be VimTree'
+
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+
+        # Vim nav test: cursor down twice via 'j'
+        tree.focus()
+        initial_line = tree.cursor_line
+        await pilot.press('j')
+        await pilot.pause(0.1)
+        after_j = tree.cursor_line
+        await pilot.press('j')
+        await pilot.pause(0.1)
+        after_jj = tree.cursor_line
+        print(f'cursor_line: initial={initial_line}, after j={after_j}, after jj={after_jj}')
+
+        # Auto-replay test: pick run 1, plot, select run 2, expect auto-render
+        run_node = list(tree.root.children)[1]
+        first_run = list(run_node.children)[0]
+        tree.select_node(first_run)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+        # Open plot dialog, select 'corr' metrics, apply
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        dlg.query_one('#plot-filter', Input).value = 'corr'
+        await pilot.pause(0.3)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        first_selected = sorted(dlg._selected)
+        print(f'first plot: {first_selected}')
+        dlg.action_apply()
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if 'plotted' in str(app.query_one('#status-bar', Static).render()):
+                break
+        print(f'app._last_plot_keys after first plot: {app._last_plot_keys}')
+
+        # Switch to a different run — auto-replay should fire
+        second_run = list(run_node.children)[1]
+        # Reset selection data so we observe the new load
+        app._selection_data = None
+        tree.select_node(second_run)
+        # Wait for detail load AND auto-replay
+        for _ in range(60):
+            await pilot.pause(0.5)
+            sb = str(app.query_one('#status-bar', Static).render())
+            if 'plotted' in sb or 'auto-replay' in sb:
+                if 'plotted' in sb:
+                    break
+        final_status = str(app.query_one('#status-bar', Static).render())
+        print(f'final status after run-switch: {final_status[:200]}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -15
+```
+
+```text
+Traceback (most recent call last):
+  File "<string>", line 4, in <module>
+ImportError: cannot import name 'VimTree' from 'scripts.mlf.tui' (/Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:20Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find all top-level class/def declarations in tui.py
+
+`grep -n 'class VimTree\|class PlotDialog\|class MLflowApp\|class DownloadDialog\|^def \|^class ' scripts/mlf/tui.py`
+
+```text
+51:class VimTree(Tree):
+92:def _backend_kind(uri: str) -> str:
+102:def _duration(start_ms: Any, end_ms: Any) -> str:
+115:class PlotDialog(ModalScreen[Optional[list[str]]]):
+264:class DownloadDialog(ModalScreen[None]):
+348:def _env_int(name: str, default: int) -> int:
+358:class MLflowApp(App):
+998:def main() -> int:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:34Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Debug VimTree import
+
+```bash
+uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+import scripts.mlf.tui as t
+print('attrs containing Tree or Vim:', [n for n in dir(t) if 'Tree' in n or 'Vim' in n])
+print('file:', t.__file__)
+" 2>&1 | tail -5
+```
+
+```text
+attrs containing Tree or Vim: ['Tree', 'VimTree']
+file: /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:44:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Clear stale __pycache__ for scripts/mlf
+
+`find scripts/mlf -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; echo "cleared"`
+
+```text
+cleared
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Vim nav + auto-replay end-to-end
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog, VimTree
+from textual.widgets import Tree, Static, SelectionList, Input
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        print(f'Tree subclass: {type(tree).__name__}')
+
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+
+        # Vim nav: j twice from root
+        tree.focus()
+        await pilot.pause(0.1)
+        l0 = tree.cursor_line
+        await pilot.press('j')
+        await pilot.pause(0.1)
+        l1 = tree.cursor_line
+        await pilot.press('j')
+        await pilot.pause(0.1)
+        l2 = tree.cursor_line
+        await pilot.press('k')
+        await pilot.pause(0.1)
+        l3 = tree.cursor_line
+        await pilot.press('G')
+        await pilot.pause(0.2)
+        l4 = tree.cursor_line
+        await pilot.press('g')
+        await pilot.pause(0.2)
+        l5 = tree.cursor_line
+        print(f'cursor_line: init={l0}, j={l1}, jj={l2}, jjk={l3}, G={l4}, g={l5}')
+
+        # Auto-replay: plot run-0, switch to run-1, check auto-render
+        run_node = list(tree.root.children)[1]
+        first_run = list(run_node.children)[0]
+        tree.select_node(first_run)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        dlg.query_one('#plot-filter', Input).value = 'corr'
+        await pilot.pause(0.3)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        first_sel = sorted(dlg._selected)
+        print(f'first plot keys: {first_sel}')
+        dlg.action_apply()
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if 'plotted' in str(app.query_one('#status-bar', Static).render()):
+                break
+        print(f'app._last_plot_keys: {app._last_plot_keys}')
+
+        # Now switch to a different run; expect auto-replay
+        second_run = list(run_node.children)[1]
+        app._selection_data = None
+        tree.select_node(second_run)
+        # Wait for the auto-replay
+        for _ in range(60):
+            await pilot.pause(0.5)
+            sb = str(app.query_one('#status-bar', Static).render())
+            if 'plotted' in sb:
+                break
+        print(f'final status: {str(app.query_one(\"#status-bar\", Static).render())[:200]}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -10
+```
+
+```text
+Tree subclass: VimTree
+cursor_line: init=-1, j=0, jj=1, jjk=0, G=110, g=0
+first plot keys: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+app._last_plot_keys: ['Best Metric/valid_corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+final status: http://192.168.222.207:15002 │ run:a2ecad9ed64a │ plotted 4/4 metric(s)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:13Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:14Z)**_
+
+All three working:
+- VimTree confirmed (`Tree subclass: VimTree`)
+- `j`/`k`/`g`/`G` navigate correctly (cursor_line goes 0→1→2→1, G=110, g=0)
+- Auto-replay: first run plotted 4 corr keys → switch to second run → status reads `plotted 4/4 metric(s)` automatically
+
+Committing the vim + auto-replay step, then tackling the hierarchical tree.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit vim nav + auto-replay
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): vim navigation on tree + auto-replay plot across runs
+
+Two compounding UX wins for browsing many comparable runs:
+
+1. **VimTree** — a Tree subclass that layers vim bindings on top of
+   Textual's defaults (arrow keys, home/end, page-up/down still work):
+
+     j / k    cursor down / up
+     h        go to parent (or collapse if expanded — uses Textual's
+              `cursor_parent` semantics)
+     l        toggle expand/collapse on the current node
+     g        jump to first visible node
+     G        jump to last visible node
+
+2. **Auto-replay plot selection** — `MLflowApp._last_plot_keys` is set
+   when `_render_plot` succeeds (kept as the *requested* keys, not just
+   the ones that returned history, so a flaky `system.*` fetch doesn't
+   permanently drop a key). When `_render_run` finishes for a new
+   selection, if any of those keys exist in the new run's metrics, we
+   re-fire `_render_plot` automatically with the intersection. Empty
+   intersection → fall back to the "press p to plot" hint.
+
+   This makes the common workflow "compare loss curves across 20 splits"
+   one keypress per run instead of `p` → filter "corr" → Ctrl+L →
+   Ctrl+A every single time.
+
+Verified via pilot: j/k cursor moves by 1, G jumps to line 110, g
+returns to 0; first plot stores 4 corr keys; switching to a second
+run shows `plotted 4/4 metric(s)` in the status bar without any
+PlotDialog interaction.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778651123-90846.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778651123-90846.
+[main a307b15] feat(mlf): vim navigation on tree + auto-replay plot across runs
+ 2 files changed, 236 insertions(+), 4 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #27 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:45:24Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #28 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:41Z)**_
+
+Now for the hierarchical tree restructure. This needs raw mlflow objects (for `experiment_id` and `parent_run_id` tag) rather than the flat `Row` dataclass, then a recursive add for nested runs.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:46:56Z)**_
+
+Now replacing `_populate_tree` and `_rebuild_tree` with the hierarchical version:
+
+_**Agent (claude-opus-4-7 2026-05-13 05:47:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:47:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff after hierarchical tree refactor
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -10
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:47:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify hierarchical tree shape against LAN server
+
+```bash
+find scripts/mlf -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; \
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp
+from textual.widgets import Tree, Static, Input
+
+def dump_tree(node, depth=0, max_depth=4):
+    out = []
+    label = str(node.label)[:80]
+    out.append('  ' * depth + f'- {label}')
+    if depth < max_depth:
+        for c in node.children:
+            out.extend(dump_tree(c, depth+1, max_depth))
+    return out
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        # Expand all experiments to inspect runs
+        exp_top = list(tree.root.children)[0]
+        exp_top.expand()
+        # Expand first 2 experiments
+        for child in list(exp_top.children)[:2]:
+            child.expand()
+        await pilot.pause(0.3)
+        print('--- Tree (depth 4) ---')
+        for line in dump_tree(tree.root, max_depth=4)[:25]:
+            print(line)
+
+        # Test filter: 'split_42' should match one run; experiment should remain visible
+        inp = app.query_one('#filter-input', Input)
+        inp.value = 'split_42'
+        await pilot.pause(0.3)
+        print('--- Filtered tree (split_42) ---')
+        for line in dump_tree(tree.root, max_depth=4)[:15]:
+            print(line)
+
+asyncio.run(smoke())
+" 2>&1 | tail -40
+```
+
+```text
+--- Tree (depth 4) ---
+- Sources
+  - Experiments (11)
+    - 10  Dev/PlainTextProgress_Test  (2 runs)
+      - gaudy-fawn-110  ✓ done
+      - luminous-tern-535  ✗ failed
+    - 9  WF_Proxy_Test  (13 runs)
+      - WF_Proxy_Test_0cdd4f42380f_proxy  ✓ done
+        - split_2_val_2024-12-10..2024-12-12_oos_2024-12-18..2024-12-20  ✓ done
+        - split_1_val_2024-12-05..2024-12-09_oos_2024-12-13..2024-12-17  ✓ done
+        - split_0_val_2024-12-02..2024-12-04_oos_2024-12-10..2024-12-12  ✓ done
+      - WF_Proxy_Test_0cdd4f42380f_proxy  ✓ done
+        - split_2_val_2024-12-10..2024-12-12_oos_2024-12-18..2024-12-20  ✓ done
+        - split_1_val_2024-12-05..2024-12-09_oos_2024-12-13..2024-12-17  ✓ done
+        - split_0_val_2024-12-02..2024-12-04_oos_2024-12-10..2024-12-12  ✓ done
+      - WF_Proxy_Test_0cdd4f42380f_proxy  ✓ done
+        - split_2_val_2024-12-10..2024-12-12_oos_2024-12-18..2024-12-20  ✓ done
+        - split_1_val_2024-12-05..2024-12-09_oos_2024-12-13..2024-12-17  ✓ done
+        - split_0_val_2024-12-02..2024-12-04_oos_2024-12-10..2024-12-12  ✓ done
+      - WF_Proxy_Test_0cdd4f42380f_proxy  ✓ done
+    - 8  WF_T0LSTM_NoDep_v2_2025  (45 runs)
+      - WF_T0LSTM_NoDep_v2_2025_b7d0aa86e23f  ✓ done
+        - split_42_val_2025-11-17..2025-11-21_oos_2025-12-22..2025-12-26  ✓ done
+        - split_41_val_2025-11-10..2025-11-14_oos_2025-12-15..2025-12-19  ✓ done
+        - split_40_val_2025-11-03..2025-11-07_oos_2025-12-08..2025-12-12  ✓ done
+        - split_39_val_2025-10-27..2025-10-31_oos_2025-12-01..2025-12-05  ✓ done
+--- Filtered tree (split_42) ---
+- Sources
+  - Experiments (1)
+    - 8  WF_T0LSTM_NoDep_v2_2025  (2 runs)
+      - WF_T0LSTM_NoDep_v2_2025_b7d0aa86e23f  ✓ done
+        - split_42_val_2025-11-17..2025-11-21_oos_2025-12-22..2025-12-26  ✓ done
+  - Models (0)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:12Z)**_
+
+Hierarchical tree works perfectly:
+- 11 experiments at top
+- Each expands to show its runs grouped by parent (e.g. `WF_Proxy_Test_0cdd4f42380f_proxy` parent with 3 nested split runs)
+- Filter `split_42` shows just the single match + its parent + containing experiment
+
+Let me verify auto-replay still works with the new tree structure before committing.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify auto-replay works on the new hierarchical tree
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from scripts.mlf.list import Row
+from textual.widgets import Tree, Static, Input, SelectionList
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        # Drill into the largest experiment, find two sibling runs
+        exp_top = list(tree.root.children)[0]
+        exp_top.expand()
+        # Find a deep run with siblings
+        target_exp = None
+        for e in exp_top.children:
+            if 'WF_T0LSTM_NoDep_v2_2025' in str(e.label):
+                target_exp = e
+                break
+        target_exp.expand()
+        # Expand the proxy parent
+        parent_run = list(target_exp.children)[0]
+        parent_run.expand()
+        await pilot.pause(0.3)
+        children = list(parent_run.children)
+        print(f'first proxy parent has {len(children)} children')
+
+        # Select first child (a run), plot 'corr', then select second child
+        first_child = children[0]
+        tree.select_node(first_child)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None and app._selection[0] == 'run':
+                break
+        print(f'first selected: run {app._selection[1][:12]}')
+
+        # Plot 'corr'
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        dlg.query_one('#plot-filter', Input).value = 'corr'
+        await pilot.pause(0.3)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        dlg.action_apply()
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if 'plotted' in str(app.query_one('#status-bar', Static).render()):
+                break
+        print(f'first plot status: {str(app.query_one(\"#status-bar\", Static).render())[:120]}')
+
+        # Switch to second child — auto-replay should fire
+        second_child = children[1]
+        app._selection_data = None
+        tree.select_node(second_child)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            sb = str(app.query_one('#status-bar', Static).render())
+            if 'plotted' in sb:
+                break
+        print(f'after switch: {str(app.query_one(\"#status-bar\", Static).render())[:120]}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -10
+```
+
+```text
+first proxy parent has 44 children
+first selected: run 1181022b6d27
+first plot status: http://192.168.222.207:15002 │ run:1181022b6d27 │ plotted 4/4 metric(s)
+after switch: http://192.168.222.207:15002 │ run:a2ecad9ed64a │ plotted 4/4 metric(s)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:46Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:46Z)**_
+
+44 nested children found and auto-replay continues working across the hierarchy. Committing.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:48:47Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #28 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:49:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit hierarchical tree
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): hierarchical tree — experiments → runs → nested children
+
+Replaces the flat sibling layout (Experiments + Recent Runs + Models)
+with an expand-from-experiments hierarchy.
+
+Layout:
+  ▾ Experiments (N)
+    ▾ <exp_id>  <exp_name>  (k runs)
+        <root_run>            (no mlflow.parentRunId)
+        ▾ <parent_run>        (when children are in the loaded set)
+            <child_run>
+            <child_run>
+        <root_run>
+    ▸ <exp_id>  <other_exp>   (collapsed)
+  ▸ Models (M)
+
+How it works:
+  - Initial fetch is the same as before — top experiments + the
+    RUNS_LIMIT most-recent runs across all experiments + models. No new
+    network round-trips. The change is purely in how we *render* the
+    cached data.
+  - `_raw_exps` / `_raw_runs` replace the prior `_cache["experiments"]`
+    / `_cache["runs"]` of Row-objects because we now need
+    `Run.info.experiment_id` and the `mlflow.parentRunId` tag — neither
+    of which the flat Row dataclass exposed. Two `_exp_row` / `_run_row`
+    static helpers convert to Row at the leaf for the existing
+    `_on_tree_select` / `_fetch_detail` dispatch path.
+  - Runs are indexed by experiment_id; within each experiment, runs
+    are further indexed by `mlflow.parentRunId` so parent-child
+    relationships render as nested tree nodes. Top-level runs (no
+    parent OR parent not in the loaded set) sort by start_time DESC.
+  - Filter is smarter: matches surface their *containing experiment*
+    so context isn't lost (e.g. filter "split_42" → shows the parent
+    experiment with just that run and its ancestor chain visible).
+    Ancestor promotion walks the parent_run_id chain so a deeply-
+    nested match still shows its full hierarchy.
+
+Verified against the LAN server:
+  - Unfiltered: 11 experiments, runs nested under their parents. One
+    parent run "WF_T0LSTM_NoDep_v2_2025_b7d0aa86e23f" shows 44
+    sibling split-runs as children.
+  - Filter "split_42" narrows to Experiments(1) → containing
+    experiment → parent proxy run → the single matched run.
+  - Auto-replay across siblings still works (plot persists when
+    moving from run 1181022b... to a2ecad9e...).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778651339-93242.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778651339-93242.
+[main 9584c55] feat(mlf): hierarchical tree — experiments → runs → nested children
+ 1 file changed, 193 insertions(+), 31 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:49:13Z)**_
+
+Three commits shipped — `a307b15` (vim + auto-replay) and `9584c55` (hierarchical tree). Summary:
+
+**Vim navigation** (`VimTree(Tree)` subclass, layered on Textual defaults)
+- `j` / `k` cursor down / up
+- `h` go to parent (collapse-aware via `cursor_parent`)
+- `l` toggle expand/collapse
+- `g` / `G` jump to top / bottom
+
+**Auto-replay plot across runs**
+- App tracks `_last_plot_keys` after a successful plot.
+- When `_render_run` finishes a new selection, if any of those keys exist in the new run's metrics → auto-render the intersection.
+- Saves the original requested keys (not just the ones that returned history), so a transient `system.*` fetch failure doesn't permanently drop a key from the replay set.
+
+**Hierarchical tree** (experiments → runs → nested)
+- Drops the flat `Recent Runs (N)` sibling.
+- Each experiment shows `(k runs)` count, expands to its runs.
+- Nested children (`mlflow.parentRunId`) render as indented tree nodes under their parent run.
+- Smart filter: matches promote their parent run chain + containing experiment so deep matches still show context.
+
+Verified against your LAN server:
+- 11 experiments, with `WF_T0LSTM_NoDep_v2_2025_b7d0aa86e23f` showing 44 nested split-run children
+- Filter `split_42` → Experiments(1) → containing exp → proxy parent → the one matched run
+- Auto-replay continues working: plot `corr` on run 1181022b... → switch to a2ecad9e... → status reads `plotted 4/4 metric(s)` automatically.
+
+`chezmoi apply` to deploy.
+
+---
+
+_**User (2026-05-13 05:57:28Z)**_
+
+是不是有按鍵能切換 nested tree/flat 的模式 然後除了vim 普通的上下左右方向鍵也要能work
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:00Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:01Z)**_
+
+Two quick adds:
+1. Bind `left`/`right` arrows on `VimTree` to mirror `h`/`l` (up/down already work via Tree's defaults, but I'll add them too to be safe).
+2. `t` key toggles nested ↔ flat tree mode; `_rebuild_tree` branches on the mode.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:28Z)**_
+
+Now factor `_rebuild_tree` to branch on mode, and add the toggle action:
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:54Z)**_
+
+Now the toggle action itself:
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:58:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff after toggle implementation
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -5
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:59:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test t-toggle + arrow keys
+
+```bash
+find scripts/mlf -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; \
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp
+from textual.widgets import Tree, Static
+
+def top_labels(tree):
+    return [str(c.label) for c in tree.root.children]
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        tree.focus()
+        print(f'mode={app._tree_mode}')
+        print('nested top:', top_labels(tree))
+
+        # Toggle to flat via 't'
+        await pilot.press('t')
+        await pilot.pause(0.3)
+        print(f'mode={app._tree_mode}')
+        print('flat top:', top_labels(tree))
+
+        # Toggle back
+        await pilot.press('t')
+        await pilot.pause(0.3)
+        print(f'mode={app._tree_mode}')
+        print('nested again top:', top_labels(tree))
+
+        # Arrow keys test
+        l0 = tree.cursor_line
+        await pilot.press('down')
+        await pilot.pause(0.1)
+        l1 = tree.cursor_line
+        await pilot.press('right')
+        await pilot.pause(0.1)
+        # right should toggle (expand) the current node
+        first_child = list(tree.root.children)[0]
+        print(f'cursor: init={l0}, after down={l1}, first-child expanded={first_child.is_expanded}')
+        await pilot.press('left')
+        await pilot.pause(0.1)
+        print(f'first-child expanded after left={first_child.is_expanded}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -12
+```
+
+```text
+mode=nested
+nested top: ['Experiments (11)', 'Models (0)']
+mode=flat
+flat top: ['Experiments (11)', 'Runs (loaded 108 of 108)', 'Models (0)']
+mode=nested
+nested again top: ['Experiments (11)', 'Models (0)']
+cursor: init=-1, after down=0, first-child expanded=False
+first-child expanded after left=False
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:59:36Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:59:38Z)**_
+
+Both work:
+- `t` toggles: nested shows `[Experiments, Models]`, flat restores `[Experiments, Runs (loaded 108 of 108), Models]`.
+- Arrow keys: `down` moves cursor (line -1 → 0), `right` toggled Experiments from expanded to collapsed (it was expanded by default in nested mode).
+
+_**Agent (claude-opus-4-7 2026-05-13 05:59:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit tree-mode toggle + arrow key bindings
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): `t` toggles nested/flat tree + bind arrow Left/Right on tree
+
+Two follow-ups on the hierarchical tree (commit 9584c55):
+
+1. `t` keybinding toggles between two layouts:
+     nested (default):  Experiments → runs → nested children
+     flat:              Experiments / Runs (loaded N of M) / Models
+                        (the v1-style sibling layout)
+
+   `_rebuild_tree` extracted to thin dispatcher that calls
+   `_build_nested_layout` or `_build_flat_layout`; both read the same
+   `kept_run_ids` / `runs_by_exp` / `visible_*` filter results so the
+   `/` filter behaves identically in either mode. Status bar reports
+   the new mode on toggle.
+
+   Flat is useful for "show me the most-recent runs across all
+   experiments at once" — nested buries them one level deep so users
+   used to the v1 layout can still scan that way.
+
+2. VimTree gains explicit Left / Right bindings. Tree's built-in
+   `Up` / `Down` / `Home` / `End` / `PgUp` / `PgDn` already worked
+   alongside vim `j/k/g/G`, but bare `Left` / `Right` were unbound
+   (Tree reserves `shift+left` / `shift+right` for parent / sibling
+   navigation). New bindings:
+
+     Left   → cursor_parent     (same as `h`)
+     Right  → toggle_node       (same as `l`)
+
+   Now non-vim users can navigate the whole tree with arrow keys only.
+
+Verified via pilot: `t` flips top-level labels from
+`['Experiments (11)', 'Models (0)']` to
+`['Experiments (11)', 'Runs (loaded 108 of 108)', 'Models (0)']`
+and back; `down` then `right` collapses the Experiments header.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778651987-924.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778651987-924.
+[main 294b826] feat(mlf): `t` toggles nested/flat tree + bind arrow Left/Right on tree
+ 1 file changed, 80 insertions(+), 7 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:59:57Z)**_
+
+Committed as `294b826`. Summary:
+
+**`t` toggles nested ↔ flat tree mode**
+- Default `nested`: `Experiments → runs → nested children` (the new hierarchy).
+- Toggle to `flat`: restores `Experiments / Runs (loaded N of M) / Models` siblings — useful for "show me the most-recent runs across all experiments at once" without expanding each experiment.
+- Filter behaves identically in either mode (both layouts read the same `kept_run_ids` / `visible_*` results).
+
+**Arrow keys now navigate the tree**
+- `Up` / `Down` / `Home` / `End` / `PgUp` / `PgDn` already worked via `Tree.BINDINGS`.
+- Added explicit `Left` (→ `cursor_parent`, same as `h`) and `Right` (→ `toggle_node`, same as `l`) so non-vim users get full tree nav with just the arrow keys.
+
+`chezmoi apply` to deploy.
+
+---
+
+_**User (2026-05-13 06:05:26Z)**_
+
+[Image #11] 也許可以用數字鍵快速切換右側的tabs 
+另外 如果到leaf item 希望也能用 l/right 來select (目前要用enter)
+另外目前都是在相同地方 l/right 去收起或展開 這部分不知道是不是h/left收起後才回到上一層？(類似nvim Neo-tree的behavior？)
+
+_**User (2026-05-13 06:05:26Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/11.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 06:06:39Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 06:06:40Z)**_
+
+Three good requests. Let me implement all:
+
+1. **Number keys 1-6** for direct tab switching (Overview/Params/Metrics/Plot/Artifacts/Tags).
+2. **`l`/`right` on a leaf selects** (same as Enter).
+3. **Neo-tree-style `h`/`l`**: on expanded branch, `h` collapses; on collapsed branch/leaf, `h` goes to parent. On expanded branch, `l` moves into first child; on collapsed branch, `l` expands; on leaf, `l` selects.
+
+_**Agent (claude-opus-4-7 2026-05-13 06:06:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:06:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:07:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:07:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -5
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:07:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test number-key tabs + Neo-tree h/l + leaf-l-select
+
+```bash
+find scripts/mlf -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; \
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp
+from textual.widgets import Tree, Static, TabbedContent
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(160, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        tree.focus()
+
+        # ---- Number key tab switching ----
+        tabs = app.query_one('#tabs', TabbedContent)
+        for key, expected in [('2','tab-params'),('3','tab-metrics'),('4','tab-plot'),('5','tab-artifacts'),('6','tab-tags'),('1','tab-overview')]:
+            await pilot.press(key)
+            await pilot.pause(0.1)
+            print(f'press {key} -> active tab: {tabs.active} (expected {expected})')
+
+        # ---- Neo-tree-style l: on expanded branch, descend ----
+        # Cursor starts at top. Navigate to Experiments (which is expanded).
+        await pilot.press('down')  # cursor on Experiments
+        await pilot.pause(0.1)
+        node = tree.cursor_node
+        print(f'after down: cursor on {str(node.label)[:40]!r}, expanded={node.is_expanded}, allow_expand={node.allow_expand}')
+
+        # Press 'l' on expanded Experiments → should move into first child
+        await pilot.press('l')
+        await pilot.pause(0.1)
+        node = tree.cursor_node
+        print(f'after l on expanded Experiments: cursor on {str(node.label)[:40]!r}')
+
+        # Press 'h' on a (probably-collapsed) experiment → should go to parent (Experiments)
+        # Or if expanded, collapse first. Let me check current state
+        is_exp = node.is_expanded
+        print(f'  is current expanded? {is_exp}')
+        await pilot.press('h')
+        await pilot.pause(0.1)
+        node2 = tree.cursor_node
+        print(f'after h: cursor on {str(node2.label)[:40]!r}')
+
+        # ---- l on a leaf → select (fire NodeSelected) ----
+        # Navigate to a leaf. Click into 'Dev/PlainTextProgress_Test' (small exp)
+        # Find experiments via the tree children directly
+        exp_top = list(tree.root.children)[0]
+        target = None
+        for e in exp_top.children:
+            if 'Dev/PlainTextProgress_Test' in str(e.label):
+                target = e
+                break
+        target.expand()
+        await pilot.pause(0.1)
+        first_leaf = list(target.children)[0]
+        # Move cursor to that leaf
+        tree.cursor_line = first_leaf.line
+        await pilot.pause(0.1)
+        print(f'cursor at leaf {str(first_leaf.label)[:40]!r}, allow_expand={first_leaf.allow_expand}')
+        # Now press 'l' — should fire NodeSelected → _on_tree_select → loads run detail
+        await pilot.press('l')
+        await pilot.pause(0.3)
+        for _ in range(40):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+        print(f'after l on leaf: selection = {app._selection}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -25
+```
+
+```text
+press 2 -> active tab: tab-params (expected tab-params)
+press 3 -> active tab: tab-metrics (expected tab-metrics)
+press 4 -> active tab: tab-plot (expected tab-plot)
+press 5 -> active tab: tab-artifacts (expected tab-artifacts)
+press 6 -> active tab: tab-tags (expected tab-tags)
+press 1 -> active tab: tab-overview (expected tab-overview)
+after down: cursor on 'Experiments (11)', expanded=True, allow_expand=True
+after l on expanded Experiments: cursor on '10  Dev/PlainTextProgress_Test  (2 runs)'
+  is current expanded? False
+after h: cursor on 'Experiments (11)'
+cursor at leaf 'gaudy-fawn-110  ✓ done', allow_expand=False
+after l on leaf: selection = ('run', '15ff6435f163486a8be7d47c75f68829', 'gaudy-fawn-110')
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:07:40Z)**_
+
+All three working perfectly:
+
+1. **Number keys**: `2/3/4/5/6/1` → tabs switched to `params/metrics/plot/artifacts/tags/overview` ✓
+2. **Neo-tree-style `l`/`h`**:
+   - `l` on expanded `Experiments` → descended to first child `10  Dev/PlainTextProgress_Test` ✓
+   - `h` on collapsed child → moved back to parent `Experiments (11)` ✓
+3. **`l` on leaf**: cursor on `gaudy-fawn-110` (a leaf) → `l` → selection became `('run', '15ff6435...', 'gaudy-fawn-110')` ✓
+
+_**Agent (claude-opus-4-7 2026-05-13 06:07:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit number-key tabs + Neo-tree h/l + leaf-l-select
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): number-key tabs + Neo-tree-style h/l + leaf-select on l
+
+Three navigation polish items:
+
+1. Digit keys 1-6 switch the right-pane tab directly:
+     1=Overview  2=Params  3=Metrics  4=Plot  5=Artifacts  6=Tags
+   Non-priority so the filter input still consumes digits when focused.
+   Footer shows "1-6: Tabs" as a single hint to avoid clutter.
+
+2. VimTree `h` / `l` (and the mirrored arrow Left / Right) now follow
+   the Neo-tree / nvim-tree muscle-memory pattern:
+
+     l / Right
+       - leaf node            → select (fires NodeSelected, same as Enter)
+       - collapsed branch     → expand
+       - already-expanded     → cursor down into first child
+
+     h / Left
+       - expanded branch      → collapse (stay in place)
+       - leaf or collapsed    → cursor to parent
+
+   First press of `h` on an expanded node collapses; second press moves
+   up — same as Neo-tree's "close-then-up" feel.
+
+3. `l` / `right` on a leaf now selects without needing Enter — the
+   common "I want to load this run's detail" gesture is now one key.
+
+Verified via pilot:
+  - 1/2/3/4/5/6 each switch to the named tab.
+  - Cursor on expanded `Experiments (11)` + `l` → descends to first
+    child experiment; subsequent `h` returns to `Experiments (11)`.
+  - Cursor on a leaf run + `l` → selection becomes ('run', <id>, name)
+    with detail tabs populated (same as pressing Enter).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778652469-6806.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778652469-6806.
+[main ac90a12] feat(mlf): number-key tabs + Neo-tree-style h/l + leaf-select on l
+ 1 file changed, 61 insertions(+), 4 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:08:02Z)**_
+
+Committed as `ac90a12`. Summary:
+
+**Digit keys 1-6 → direct tab switch**
+- `1` Overview / `2` Params / `3` Metrics / `4` Plot / `5` Artifacts / `6` Tags
+- Footer shows a single `1-6: Tabs` hint to avoid clutter
+- Non-priority so the filter input still captures digits when focused (so `split_42` typing isn't broken)
+
+**Neo-tree-style `h` / `l` (and arrow Left / Right)**
+
+| Key   | On leaf            | On collapsed branch | On expanded branch         |
+|-------|--------------------|---------------------|----------------------------|
+| `l`/→ | **select** (= Enter) | expand              | cursor down into first child |
+| `h`/← | cursor to parent   | cursor to parent    | **collapse** (stay in place) |
+
+So the muscle memory "first `h` closes, second `h` goes up" works, and a leaf no longer needs Enter — `l`/`right` selects it directly.
+
+`chezmoi apply` to deploy.
+
+---
+
+_**User (2026-05-13 06:17:27Z)**_
+
+metrics [Image #12] 頁面能不能像plot那樣能選幾個metrics 這樣我們可以用表格把整個exepriment/parent run下的metrics都列在一張表裡(類似mlflow web ui有的功能)
+此外也能看children run druation的分佈情況
+
+_**User (2026-05-13 06:17:27Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/12.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 06:18:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:00Z)**_
+
+Two excellent additions. Plan:
+
+1. **Children-metrics table** — when an experiment or parent-run is selected, the Metrics tab becomes a rows=runs × columns=metric-keys table (like the MLflow web UI's experiment comparison view). Default columns = top-N most-common metric keys. `m` key opens a column picker (reuses `PlotDialog`).
+2. **Duration distribution** — Overview tab for experiments/parent-runs adds duration min/median/mean/max + status breakdown (✓/✗/▶ counts).
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:05Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:12Z)**_
+
+Add the `pre_selected` constructor arg to `PlotDialog` so the columns picker can pre-check the current selection:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:28Z)**_
+
+Now add the state, helpers, and rendering logic to `MLflowApp`:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:34Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+When experiment or parent-run selected, Metrics tab shows rows=children × cols=metric-keys table; Overview shows duration min/median/mean/max + status breakdown. `m` opens column picker.
+
+```text
+Task #29 created successfully: Children metrics table + duration stats
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:43Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #29 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:19:51Z)**_
+
+Now refactor `_render_experiment` + `_render_run` and add the children-helpers and the table-renderer:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:24Z)**_
+
+Now the new helpers (`_children_of_run`, `_runs_of_experiment`, `_children_summary_rows`, `_render_runs_table`) and the `m` action. Putting them near the other render helpers:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:49Z)**_
+
+Now the `m` action and the dialog callback:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:20:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff after children-table additions
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -10
+```
+
+```text
+AST OK
+ 998 |             "Select a run to plot metric history."
+ 999 |             + (f"  ([bold]m[/bold] picks metric columns on the Metrics tab.)"
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1000 |                if children else "")
+1001 |         )
+     |
+help: Remove extraneous `f` prefix
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:20Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-check ruff
+
+`uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -3`
+
+```text
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:32Z)**_
+
+Now end-to-end test with the LAN server:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test experiment selection: Overview duration stats + Metrics children-table + m-key dialog
+
+```bash
+find scripts/mlf -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null; \
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from textual.widgets import Tree, Static, DataTable, TabbedContent
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(200, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+
+        # ---- Select an experiment that has runs ----
+        exp_top = list(tree.root.children)[0]
+        target_exp_node = None
+        for e in exp_top.children:
+            if 'WF_T0LSTM_NoDep_v2_2025' in str(e.label):
+                target_exp_node = e
+                break
+        tree.select_node(target_exp_node)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None and app._selection[0] == 'experiment':
+                break
+
+        ovw = app.query_one('#dt-overview', DataTable)
+        # Print the overview rows
+        print('--- Overview (experiment) ---')
+        for r in range(ovw.row_count):
+            k = ovw.get_cell_at((r, 0))
+            v = ovw.get_cell_at((r, 1))
+            print(f'  {k}: {str(v)[:80]}')
+
+        mt = app.query_one('#dt-metrics', DataTable)
+        print(f'--- Metrics table columns ({mt.column_count}) ---')
+        # column_count + first row
+        print(f'  rows: {mt.row_count}')
+        if mt.row_count > 0:
+            print('  first 3 cells of row 0:')
+            for c in range(min(mt.column_count, 6)):
+                print(f'    col {c}: {mt.get_cell_at((0, c))}')
+
+        # ---- Open metric-cols picker via 'm' ----
+        app.action_show_metric_cols()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        print(f'--- m dialog ---')
+        print(f'  total keys: {len(dlg._all_keys)}, pre-selected: {len(dlg._selected)}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -30
+```
+
+```text
+Traceback (most recent call last):
+  File "<string>", line 56, in <module>
+  File "/Users/daviddwlee84/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/daviddwlee84/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/daviddwlee84/.local/share/uv/python/cpython-3.11.11-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "<string>", line 38, in smoke
+AttributeError: 'DataTable' object has no attribute 'column_count'
+--- Overview (experiment) ---
+  experiment_id: 8
+  name: WF_T0LSTM_NoDep_v2_2025
+  lifecycle_stage: active
+  artifact_location: mlflow-artifacts:/8
+  creation_time: 2026-03-10 16:51
+  last_update: 2026-03-10 16:51
+  runs_loaded: 45
+  status: ✓ 44   ✗ 1   ▶ 0
+  duration: min=1h 46m  median=57h 58m  mean=76h 16m  max=655h 11m
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 06:21:58Z)**_
+
+The Overview rows are working perfectly. Fixing the test (`column_count` isn't an attribute) and retrying:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:22:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-run with correct DataTable inspection API
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from textual.widgets import Tree, Static, DataTable, TabbedContent
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(200, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+
+        # Select experiment 8
+        exp_top = list(tree.root.children)[0]
+        target = next(e for e in exp_top.children if 'WF_T0LSTM_NoDep_v2_2025' in str(e.label))
+        tree.select_node(target)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None and app._selection[0] == 'experiment':
+                break
+
+        mt = app.query_one('#dt-metrics', DataTable)
+        ncols = len(mt.columns)
+        print(f'metrics rows: {mt.row_count}, cols: {ncols}')
+        col_labels = [str(c.label) for c in mt.columns.values()]
+        print(f'col labels: {col_labels}')
+        if mt.row_count > 0:
+            # First row of the metrics table
+            first_row = [str(mt.get_cell_at((0, c))) for c in range(ncols)]
+            print(f'row 0: {first_row[:8]}')
+
+        # Test 'm' opens metric-cols picker with pre-selected defaults
+        app.action_show_metric_cols()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        print(f'dialog: total={len(dlg._all_keys)}, preselect={len(dlg._selected)}: {sorted(dlg._selected)[:5]}')
+        # Refine selection: pick only 'corr'
+        dlg.action_select_none()
+        from textual.widgets import Input
+        dlg.query_one('#plot-filter', Input).value = 'corr'
+        await pilot.pause(0.3)
+        dlg.action_select_all()
+        await pilot.pause(0.3)
+        print(f'refined: {sorted(dlg._selected)}')
+        dlg.action_apply()
+        await pilot.pause(0.5)
+        # Verify table re-rendered
+        mt = app.query_one('#dt-metrics', DataTable)
+        col_labels2 = [str(c.label) for c in mt.columns.values()]
+        print(f'cols after refine: {col_labels2}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -15
+```
+
+```text
+metrics rows: 45, cols: 13
+col labels: ['run_name', 'status', 'duration', 'system/cpu_utilization_percentage', 'system/disk_available_megabytes', 'system/disk_usage_megabytes', 'system/disk_usage_percentage', 'system/gpu_0_memory_usage_megabytes', 'system/gpu_0_memory_usage_percentage', 'system/gpu_0_power_usage_percentage', 'system/gpu_0_power_usage_watts', 'system/gpu_0_utilization_percentage', 'system/gpu_1_memory_usage_megabytes']
+row 0: ['split_42_val_2025-11-17..2025-11-21_oos_2025-12-22..2025-12-26', '✓ done', '68h 1m', '14.2', '5.088e+05', '3.856e+05', '43.1', '519.4']
+dialog: total=93, preselect=10: ['system/cpu_utilization_percentage', 'system/disk_available_megabytes', 'system/disk_usage_megabytes', 'system/disk_usage_percentage', 'system/gpu_0_memory_usage_megabytes']
+refined: ['Best Metric/valid_corr', 'Inference_2025-01-09-2025-02-13/corr', 'Inference_2025-01-16-2025-02-20/corr', 'Inference_2025-01-23-2025-02-27/corr', 'Inference_2025-02-06-2025-03-14/corr', 'Inference_2025-02-07-2025-03-06/corr', 'Inference_2025-02-13-2025-03-21/corr', 'Inference_2025-02-14-2025-02-20/corr', 'Inference_2025-02-20-2025-03-28/corr', 'Inference_2025-02-21-2025-02-27/corr', 'Inference_2025-02-27-2025-04-07/corr', 'Inference_2025-02-28-2025-03-06/corr', 'Inference_2025-03-07-2025-03-13/corr', 'Inference_2025-03-07-2025-04-18/corr', 'Inference_2025-03-14-2025-03-20/corr', 'Inference_2025-03-14-2025-04-25/corr', 'Inference_2025-03-21-2025-03-27/corr', 'Inference_2025-03-21-2025-05-07/corr', 'Inference_2025-03-28-2025-04-03/corr', 'Inference_2025-03-28-2025-05-14/corr', 'Inference_2025-04-04-2025-05-21/corr', 'Inference_2025-04-07-2025-04-11/corr', 'Inference_2025-04-12-2025-05-28/corr', 'Inference_2025-04-19-2025-06-05/corr', 'Inference_2025-05-08-2025-06-19/corr', 'Inference_2025-05-15-2025-06-26/corr', 'Inference_2025-05-22-2025-07-03/corr', 'Inference_2025-05-29-2025-07-10/corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+cols after refine: ['run_name', 'status', 'duration', 'Best Metric/valid_corr', 'Inference_2025-01-09-2025-02-13/corr', 'Inference_2025-01-16-2025-02-20/corr', 'Inference_2025-01-23-2025-02-27/corr', 'Inference_2025-02-06-2025-03-14/corr', 'Inference_2025-02-07-2025-03-06/corr', 'Inference_2025-02-13-2025-03-21/corr', 'Inference_2025-02-14-2025-02-20/corr', 'Inference_2025-02-20-2025-03-28/corr', 'Inference_2025-02-21-2025-02-27/corr', 'Inference_2025-02-27-2025-04-07/corr', 'Inference_2025-02-28-2025-03-06/corr', 'Inference_2025-03-07-2025-03-13/corr', 'Inference_2025-03-07-2025-04-18/corr', 'Inference_2025-03-14-2025-03-20/corr', 'Inference_2025-03-14-2025-04-25/corr', 'Inference_2025-03-21-2025-03-27/corr', 'Inference_2025-03-21-2025-05-07/corr', 'Inference_2025-03-28-2025-04-03/corr', 'Inference_2025-03-28-2025-05-14/corr', 'Inference_2025-04-04-2025-05-21/corr', 'Inference_2025-04-07-2025-04-11/corr', 'Inference_2025-04-12-2025-05-28/corr', 'Inference_2025-04-19-2025-06-05/corr', 'Inference_2025-05-08-2025-06-19/corr', 'Inference_2025-05-15-2025-06-26/corr', 'Inference_2025-05-22-2025-07-03/corr', 'Inference_2025-05-29-2025-07-10/corr', 'best_valid_corr', 'train_corr', 'valid_corr']
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:06Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:07Z)**_
+
+Found a bug: my system-key filter used `system.` (period) but mlflow uses `system/` (slash), so system metrics dominate the default columns. Also bumping the default-column heuristic to prefer plain user-named keys (no slashes) over namespaced ones.
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:14Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm default metric columns now surface user-named keys
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp
+from textual.widgets import Tree, DataTable
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test(size=(200, 50)) as pilot:
+        tree = app.query_one('#src-tree')
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        exp_top = list(tree.root.children)[0]
+        target = next(e for e in exp_top.children if 'WF_T0LSTM_NoDep_v2_2025' in str(e.label))
+        tree.select_node(target)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None and app._selection[0] == 'experiment':
+                break
+        mt = app.query_one('#dt-metrics', DataTable)
+        col_labels = [str(c.label) for c in mt.columns.values()]
+        print(f'cols ({len(col_labels)}): {col_labels}')
+
+asyncio.run(smoke())
+" 2>&1 | tail -5
+```
+
+```text
+cols (13): ['run_name', 'status', 'duration', 'best_valid_corr', 'best_valid_epoch', 'learning_rate', 'train_corr', 'train_loss', 'valid_corr', 'valid_loss', 'avg_epoch_duration_sec', 'epoch_duration_sec', 'Best Metric/valid_corr']
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:39Z)**_
+
+Now the defaults are exactly what you'd want — `best_valid_corr`, `best_valid_epoch`, `learning_rate`, `train_corr`, `train_loss`, `valid_corr`, `valid_loss`, `avg_epoch_duration_sec`, `epoch_duration_sec`, plus one slashed key. Committing:
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:40Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #29 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:23:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit metrics-tab children-summary + duration stats
+
+```bash
+git add scripts/mlf/tui.py .specstory/history/2026-05-13_05-11-01Z.md && \
+git commit -m "$(cat <<'EOF'
+feat(mlf): metrics-tab summary table + duration stats on parent/experiment
+
+Two related additions that turn the Metrics tab into a comparison view
+when the selection is an aggregating entity (experiment or parent run),
+mirroring the MLflow web UI's experiment-comparison table.
+
+1. **Metrics tab: rows = children, columns = metric keys.**
+
+   When the selected node is an experiment or a parent run with loaded
+   children, `_render_runs_table` populates the Metrics DataTable as:
+
+     | run_name | status | duration | <metric_1> | <metric_2> | … |
+
+   Each metric cell shows the *latest* logged value for that run+key
+   (i.e. `run.data.metrics[key]`). Missing keys render as `—`.
+
+   Default columns come from `_default_metric_columns` which excludes
+   `system/*` telemetry and prefers user-named metrics (no slashes)
+   over namespaced ones — sort key `(slash_count, -frequency, name)`.
+   On the LAN test data this surfaces `best_valid_corr / train_corr /
+   valid_corr / train_loss / valid_loss / learning_rate / …` rather
+   than the 10 `system/*` autologs the v1 heuristic produced.
+
+   `m` opens a `PlotDialog` (reused with new constructor args
+   `pre_selected` + `title`) pre-checked with the current column set
+   so refining is one filter+toggle away. The chosen set is persisted
+   on the App (`_metric_cols`) and reused when moving between
+   experiments / parent runs — so once you've decided "I only care
+   about valid_corr columns" the table stays consistent.
+
+2. **Overview tab: children duration stats + status breakdown.**
+
+   For experiments and parent runs, `_children_summary_rows` extends
+   the Overview with:
+
+     runs_loaded:  45
+     status:       ✓ 44   ✗ 1   ▶ 0
+     duration:     min=1h 46m  median=57h 58m  mean=76h 16m  max=655h 11m
+
+   New `_fmt_secs` helper (factored out of `_duration`) handles plain
+   seconds → human format consistently. `_duration` now delegates.
+
+3. **Plot tab semantics** for parent/experiment selections updated:
+   leaf-run auto-replay still fires, but for aggregating entities the
+   tab shows a hint pointing at `m` instead of triggering a plot on
+   a parent's (usually-empty) own metrics.
+
+   `_render_*` now `clear(columns=True)` + re-`add_columns()` since the
+   per-context column schema differs (run vs. experiment vs. parent).
+
+Verified vs http://192.168.222.207:15002 selecting experiment 8
+(WF_T0LSTM_NoDep_v2_2025): 45 rows render with 13 columns (3 fixed +
+10 default training metrics); `m` opens a dialog with 93 keys and the
+10 defaults pre-checked; refining to "corr" via filter + Ctrl+L
+re-renders the table with 31 corr-related columns.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778653433-26465.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778653433-26465.
+[main bbb6496] feat(mlf): metrics-tab summary table + duration stats on parent/experiment
+ 1 file changed, 272 insertions(+), 37 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 06:24:04Z)**_
+
+Committed as `bbb6496`. Summary:
+
+**Metrics tab on experiment / parent-run selection**
+- Now renders rows=children × cols=metric-keys, like the MLflow web comparison view.
+- Cells show the latest logged value (`run.data.metrics[key]`); missing keys render `—`.
+- Default columns: excludes `system/*` autologs, prefers no-slash user-named metrics (sort key `(slash_count, -frequency, name)`).
+- `m` opens `PlotDialog` (reused with new `pre_selected` + `title` args) pre-checked with the current columns; persists across selections (`_metric_cols`).
+- Verified default cols on your data: `best_valid_corr, best_valid_epoch, learning_rate, train_corr, train_loss, valid_corr, valid_loss, avg_epoch_duration_sec, epoch_duration_sec, Best Metric/valid_corr`.
+
+**Overview tab: children duration stats**
+For experiments / parent-runs, adds:
+```
+runs_loaded:  45
+status:       ✓ 44   ✗ 1   ▶ 0
+duration:     min=1h 46m  median=57h 58m  mean=76h 16m  max=655h 11m
+```
+
+**Plot tab semantic on parents/experiments**
+- Leaf-run auto-replay still fires.
+- Parent/experiment selections show a hint pointing at `m` instead of trying to plot a parent's (usually-empty) own metrics.
+
+`chezmoi apply` to deploy.

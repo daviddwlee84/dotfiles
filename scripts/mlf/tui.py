@@ -13,7 +13,7 @@ from __future__ import annotations
 import json as _json
 import os
 import subprocess
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any, Optional
 
 from rich.text import Text
@@ -154,14 +154,18 @@ def _backend_kind(uri: str) -> str:
 def _duration(start_ms: Any, end_ms: Any) -> str:
     if not start_ms or not end_ms or int(end_ms) <= int(start_ms):
         return "-"
-    secs = (int(end_ms) - int(start_ms)) // 1000
-    h, rem = divmod(secs, 3600)
-    m, s = divmod(rem, 60)
-    if h:
-        return f"{h}h {m}m"
-    if m:
+    return _fmt_secs((int(end_ms) - int(start_ms)) // 1000)
+
+
+def _fmt_secs(secs: int) -> str:
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        m, s = divmod(secs, 60)
         return f"{m}m {s}s"
-    return f"{s}s"
+    h, rem = divmod(secs, 3600)
+    m = rem // 60
+    return f"{h}h {m}m"
 
 
 class PlotDialog(ModalScreen[Optional[list[str]]]):
@@ -205,21 +209,28 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
     }
     """
 
-    def __init__(self, keys: list[str]) -> None:
+    def __init__(
+        self,
+        keys: list[str],
+        pre_selected: Optional[set[str]] = None,
+        title: Optional[str] = None,
+    ) -> None:
         super().__init__()
         self._all_keys: list[str] = sorted(keys)
         # Source of truth for selection state — survives filter rebuilds.
-        # Default: NOTHING pre-selected. MLflow runs commonly log metrics
-        # at vastly different scales (loss=0.1 next to disk_usage=5e5);
-        # auto-selecting "all non-system.*" produced charts where every
-        # training metric was a flat line at the bottom.
-        self._selected: set[str] = set()
+        # Default: NOTHING pre-selected (plot UX — see commit 1a6ef47).
+        # Callers that want a pre-checked set (e.g. the metric-columns
+        # picker re-opening with the currently-applied columns) pass
+        # `pre_selected`.
+        self._selected: set[str] = set(pre_selected or ())
         self._filter: str = ""
+        self._title = title
 
     def compose(self) -> ComposeResult:
+        prompt = self._title or "Select metrics to plot"
         with Vertical():
             yield Label(
-                "Select metrics to plot — type to filter, "
+                f"{prompt} — type to filter, "
                 "[bold]Ctrl+L[/bold]=all  [bold]Ctrl+N[/bold]=none  "
                 "[bold]Ctrl+A[/bold]=apply  Esc=cancel:"
             )
@@ -447,6 +458,7 @@ class MLflowApp(App):
         Binding("b", "open_browser", "Browser"),
         Binding("y", "copy_selection", "Copy"),
         Binding("p", "show_plot", "Plot"),
+        Binding("m", "show_metric_cols", "Cols"),
         Binding("d", "show_download", "Download"),
         Binding("j", "dump_json", "JSON"),
         # Digit keys = direct tab switch. Non-priority so Input filter still
@@ -479,6 +491,12 @@ class MLflowApp(App):
         # commit 9584c55); "flat" = restore the original Experiments / Runs /
         # Models siblings layout. Toggleable at runtime via the `t` key.
         self._tree_mode: str = "nested"
+        # Columns shown in the Metrics-tab table when an experiment or
+        # parent-run is selected. None = use the heuristic default
+        # (top-N most-common keys across the children set). `m` opens a
+        # picker that refines this; persists across selections so the
+        # user doesn't re-pick when moving between experiments.
+        self._metric_cols: Optional[list[str]] = None
 
     @property
     def client(self):
@@ -863,8 +881,14 @@ class MLflowApp(App):
 
     def _render_run(self, run) -> None:
         info, data = run.info, run.data
+        # Detect parent-run status: a run is a "parent" if it has children
+        # in the loaded set. Parents get the children-summary table on the
+        # Metrics tab; leaf runs get their own per-key metrics.
+        children = self._children_of_run(info.run_id)
+
         t = self.query_one("#dt-overview", DataTable)
-        t.clear()
+        t.clear(columns=True)
+        t.add_columns("field", "value")
         rows = [
             ("run_name", info.run_name or info.run_id[:8]),
             ("run_id", info.run_id),
@@ -876,23 +900,31 @@ class MLflowApp(App):
             ("duration", _duration(info.start_time, info.end_time)),
             ("artifact_uri", info.artifact_uri or "-"),
         ]
+        if children:
+            rows.extend(self._children_summary_rows(children))
         for k, v in rows:
             t.add_row(k, str(v))
 
         t = self.query_one("#dt-params", DataTable)
-        t.clear()
+        t.clear(columns=True)
+        t.add_columns("key", "value")
         for k in sorted((data.params or {}).keys()):
             t.add_row(k, str(data.params[k]))
 
-        # Metrics: latest values only (full history fetched on Plot dialog).
-        t = self.query_one("#dt-metrics", DataTable)
-        t.clear()
-        for k in sorted((data.metrics or {}).keys()):
-            v = data.metrics[k]
-            t.add_row(k, f"{v:.4g}", "—", "—", "—")
+        # Metrics tab: parent runs → children-summary table; leaf → own metrics.
+        if children:
+            self._render_runs_table(children)
+        else:
+            t = self.query_one("#dt-metrics", DataTable)
+            t.clear(columns=True)
+            t.add_columns("key", "last", "min", "max", "n")
+            for k in sorted((data.metrics or {}).keys()):
+                v = data.metrics[k]
+                t.add_row(k, f"{v:.4g}", "—", "—", "—")
 
         t = self.query_one("#dt-tags", DataTable)
-        t.clear()
+        t.clear(columns=True)
+        t.add_columns("key", "value")
         for k in sorted((data.tags or {}).keys()):
             if k.startswith("mlflow."):
                 continue
@@ -904,12 +936,17 @@ class MLflowApp(App):
         art.root.expand()
         art.root.data = ("run-root", info.run_id, "")  # marker for lazy fetch
 
-        # Auto-replay: if a previous run-selection produced a plot, and the
-        # new run logs at least one of those same metric keys, re-render with
-        # the intersection. Comparing the same loss/accuracy curves across
-        # runs is the canonical workflow — making the user re-open PlotDialog
-        # for every run breaks the flow. We re-render only on overlap so an
-        # unrelated run doesn't get an empty / misleading chart.
+        # Auto-replay: applies to leaf-run selections only. Parent runs don't
+        # have own metric history; for them the Plot tab stays hint-only and
+        # the Metrics tab shows the children-summary table instead.
+        if children:
+            self.query_one("#plot-static", Static).update(
+                f"This run has [bold]{len(children)}[/bold] child run(s). "
+                "Select one to plot its metric history, or press [bold]m[/bold] "
+                "to pick metric columns for the summary table on the Metrics tab."
+            )
+            return
+
         avail = set(data.metrics or {})
         if self._last_plot_keys:
             replay = [k for k in self._last_plot_keys if k in avail]
@@ -926,22 +963,174 @@ class MLflowApp(App):
             )
 
     def _render_experiment(self, exp) -> None:
+        children = self._runs_of_experiment(exp.experiment_id)
+
         t = self.query_one("#dt-overview", DataTable)
-        t.clear()
-        for k, v in [
+        t.clear(columns=True)
+        t.add_columns("field", "value")
+        rows = [
             ("experiment_id", exp.experiment_id),
             ("name", exp.name or "(unnamed)"),
             ("lifecycle_stage", exp.lifecycle_stage or "-"),
             ("artifact_location", exp.artifact_location or "-"),
             ("creation_time", ms_to_iso(getattr(exp, "creation_time", None))),
             ("last_update", ms_to_iso(exp.last_update_time)),
-        ]:
+        ]
+        if children:
+            rows.extend(self._children_summary_rows(children))
+        for k, v in rows:
             t.add_row(k, str(v))
-        for tid in ("dt-params", "dt-metrics", "dt-tags"):
-            self.query_one(f"#{tid}", DataTable).clear()
-        self.query_one("#plot-static", Static).update("(plot is run-only)")
+
+        # Params / Tags are run-only.
+        for tid in ("dt-params", "dt-tags"):
+            tbl = self.query_one(f"#{tid}", DataTable)
+            tbl.clear(columns=True)
+            tbl.add_columns("key", "value")
+
+        # Metrics tab: children-summary table (or empty hint if no runs).
+        if children:
+            self._render_runs_table(children)
+        else:
+            tbl = self.query_one("#dt-metrics", DataTable)
+            tbl.clear(columns=True)
+            tbl.add_columns("key", "value")
+        self.query_one("#plot-static", Static).update(
+            "Select a run to plot metric history."
+            + ("  ([bold]m[/bold] picks metric columns on the Metrics tab.)"
+               if children else "")
+        )
         art = self.query_one("#art-tree", Tree)
-        art.reset("(plot/artifacts are run-only)")
+        art.reset("(artifacts are run-only)")
+
+    # ---------- Children-summary helpers (parent-run / experiment views) ----------
+
+    def _children_of_run(self, run_id: str) -> list:
+        """Return loaded mlflow.Run objects whose `mlflow.parentRunId` == run_id."""
+        return [
+            r for r in self._raw_runs
+            if (r.data.tags or {}).get("mlflow.parentRunId") == run_id
+        ]
+
+    def _runs_of_experiment(self, exp_id: str) -> list:
+        return [r for r in self._raw_runs if r.info.experiment_id == exp_id]
+
+    def _children_for_selection(self) -> list:
+        """Resolve `self._selection` to the set of runs to summarize.
+
+        For experiments → all loaded runs in the experiment.
+        For runs       → direct children (or empty if leaf).
+        """
+        if not self._selection:
+            return []
+        kind, ident, _ = self._selection
+        if kind == "experiment":
+            return self._runs_of_experiment(ident)
+        if kind == "run":
+            return self._children_of_run(ident)
+        return []
+
+    def _children_summary_rows(self, children: list) -> list[tuple[str, str]]:
+        """Duration + status-breakdown summary rows for the Overview tab."""
+        durs: list[int] = []
+        success = failed = running = killed = other = 0
+        for r in children:
+            if r.info.end_time and r.info.start_time:
+                durs.append((int(r.info.end_time) - int(r.info.start_time)) // 1000)
+            s = r.info.status
+            if s == "FINISHED":
+                success += 1
+            elif s == "FAILED":
+                failed += 1
+            elif s == "RUNNING":
+                running += 1
+            elif s == "KILLED":
+                killed += 1
+            else:
+                other += 1
+        rows = [
+            ("runs_loaded", str(len(children))),
+            (
+                "status",
+                f"✓ {success}   ✗ {failed}   ▶ {running}"
+                + (f"   ■ {killed}" if killed else "")
+                + (f"   ? {other}" if other else ""),
+            ),
+        ]
+        if durs:
+            durs.sort()
+            med = durs[len(durs) // 2]
+            mean = sum(durs) // len(durs)
+            # min/median/mean/max on one row to keep the overview compact.
+            rows.append(
+                (
+                    "duration",
+                    f"min={_fmt_secs(durs[0])}  "
+                    f"median={_fmt_secs(med)}  "
+                    f"mean={_fmt_secs(mean)}  "
+                    f"max={_fmt_secs(durs[-1])}",
+                )
+            )
+        return rows
+
+    def _default_metric_columns(self, children: list, cap: int = 10) -> list[str]:
+        """Heuristic default cols for the children-summary table.
+
+        Excludes mlflow's autologged `system/*` telemetry by default (users
+        almost never want disk/cpu/gpu rows as comparison columns; opt-in
+        via `m`). Among the remaining keys, prefers plain user-named
+        metrics (no `/` in the name like `train_corr`, `loss`) over
+        namespaced groups (`Inference_<date>/corr`, `Best Metric/…`) so
+        the default surfaces the headline training metrics rather than
+        deeply-namespaced per-checkpoint variants.
+
+        Sort key per candidate:
+          (slash-count ascending, frequency descending, name)
+        """
+        counter: Counter[str] = Counter()
+        for r in children:
+            for k in (r.data.metrics or {}).keys():
+                counter[k] += 1
+        candidates = [k for k in counter.keys() if not k.startswith("system/")]
+        candidates.sort(key=lambda k: (k.count("/"), -counter[k], k))
+        return candidates[:cap]
+
+    def _render_runs_table(self, children: list) -> None:
+        """Populate Metrics tab as rows=children × cols=run-info + metric keys."""
+        t = self.query_one("#dt-metrics", DataTable)
+        t.clear(columns=True)
+        if not children:
+            t.add_columns("(no runs)")
+            return
+
+        if self._metric_cols is None:
+            metric_keys = self._default_metric_columns(children)
+        else:
+            # Keep only columns still present in this set of children; if the
+            # user pinned a column that no run in this experiment has, it just
+            # disappears — better than rendering an all-`—` column.
+            available = set()
+            for r in children:
+                available.update((r.data.metrics or {}).keys())
+            metric_keys = [k for k in self._metric_cols if k in available]
+            if not metric_keys:
+                metric_keys = self._default_metric_columns(children)
+
+        cols = ["run_name", "status", "duration"] + metric_keys
+        t.add_columns(*cols)
+        # Recent first (matches the tree's order).
+        for r in sorted(
+            children, key=lambda x: x.info.start_time or 0, reverse=True
+        ):
+            info, data = r.info, r.data
+            name = info.run_name or info.run_id[:8]
+            status = STATUS_ICON.get(info.status, info.status or "?")
+            dur = _duration(info.start_time, info.end_time)
+            metrics = data.metrics or {}
+            cells: list[str] = [name, status, dur]
+            for k in metric_keys:
+                v = metrics.get(k)
+                cells.append(f"{v:.4g}" if isinstance(v, (int, float)) else "—")
+            t.add_row(*cells)
 
     def _render_model(self, model) -> None:
         t = self.query_one("#dt-overview", DataTable)
@@ -1208,6 +1397,52 @@ class MLflowApp(App):
         self.query_one("#plot-static", Static).update(msg)
         self.query_one("#tabs", TabbedContent).active = "tab-plot"
         self._set_status(msg[:80])
+
+    def action_show_metric_cols(self) -> None:
+        """Open the metric-column picker for the Metrics-tab summary table.
+
+        Applies only when the current selection is an experiment or a
+        parent run (i.e. a run with loaded children). For leaf-run
+        selections the Metrics tab shows per-key stats, not a children
+        table, so column-picking is a no-op.
+        """
+        children = self._children_for_selection()
+        if not children:
+            self._set_status(
+                "metric columns: select an experiment or parent run"
+            )
+            return
+        all_keys: set[str] = set()
+        for r in children:
+            all_keys.update((r.data.metrics or {}).keys())
+        if not all_keys:
+            self._set_status("no metrics logged in any child run")
+            return
+        # Pre-select what's currently being shown so the dialog re-opens
+        # in the same state — refining is one-Ctrl+L away.
+        if self._metric_cols is not None:
+            preselect = set(self._metric_cols)
+        else:
+            preselect = set(self._default_metric_columns(children))
+        self.push_screen(
+            PlotDialog(
+                sorted(all_keys),
+                pre_selected=preselect,
+                title="Pick metric columns for the summary table",
+            ),
+            self._on_metric_cols_chosen,
+        )
+
+    def _on_metric_cols_chosen(self, result: Optional[list[str]]) -> None:
+        if result is None:
+            return
+        self._metric_cols = list(result) if result else None
+        # Re-render with the new column set.
+        children = self._children_for_selection()
+        if children:
+            self._render_runs_table(children)
+            self.query_one("#tabs", TabbedContent).active = "tab-metrics"
+            self._set_status(f"metrics cols: {len(self._metric_cols or [])} key(s)")
 
     def action_show_download(self) -> None:
         if not self._selection:
