@@ -6019,3 +6019,159 @@ git status --short
 RM dot_config/alacritty/alacritty.toml -> dot_config/alacritty/alacritty.toml.tmpl
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:09Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the alacritty templating change
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git add dot_config/alacritty/alacritty.toml.tmpl .specstory/history/
+git commit -m "$(cat <<'EOF'
+feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+
+Rename alacritty.toml → alacritty.toml.tmpl so the new SpawnNewInstance
+bindings only deploy on non-darwin hosts. On macOS, Alacritty's built-in
+defaults already bind Cmd+N → SpawnNewInstance — Ctrl+Shift+T would just
+shadow the muscle memory of "reopen closed tab" in browsers there.
+
+The Ctrl+Shift+T / Ctrl+Shift+N convention matches Linux terminal norms
+(gnome-terminal, konsole) and gives macOS users a Cmd+T-equivalent
+keystroke on their Ubuntu Desktop. Note: Alacritty has no native tabs
+by design — these spawn a separate WINDOW (taskbar entry). For real
+tab-strip-in-the-same-window UX, the answer is still tmux `prefix c`.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -15
+echo
+git log -2 --oneline
+```
+
+```text
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 81793f9] feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+ 2 files changed, 882 insertions(+)
+ rename dot_config/alacritty/{alacritty.toml => alacritty.toml.tmpl} (70%)
+
+81793f9 feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+d7fcce9 feat(superfile): gate hotkeys.toml under enableVimMode
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:26Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify commit state
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== git log (last 4) ==="
+git log -4 --oneline
+echo
+echo "=== git status (anything still pending?) ==="
+git status --short
+```
+
+```text
+=== git log (last 4) ===
+81793f9 feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+d7fcce9 feat(superfile): gate hotkeys.toml under enableVimMode
+e9910c5 fix(brew): make --adopt pre-flight opt-in; add mas detection + stderr capture
+9e024de feat(linux-apps): Ubuntu Desktop counterpart to 54_macos_apps.sh
+
+=== git status (anything still pending?) ===
+ M .specstory/history/2026-05-13_10-12-42Z-at-backlog-linux-desktop.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:38Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:39Z)**_
+
+Both my commits landed (`81793f9` alacritty, `9e024de` linux-apps). The only remaining change is the specstory transcript continuing to grow during our chat. Let me commit that too.
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the trailing specstory transcript
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git diff --stat .specstory/history/
+git add .specstory/history/
+git commit -m "$(cat <<'EOF'
+chore(history): refresh specstory transcript for linux-apps + alacritty session
+
+Captures the rest of the 2026-05-13 conversation that landed:
+- backlog/linux-desktop-app-control.md → implementation
+- ~/.config/shell/linux-apps.conf authoring (CFW, Bitwarden additions)
+- Alacritty .tmpl gate for Ctrl+Shift+T/N
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -10
+echo
+git log -3 --oneline
+echo
+git status --short
+```
+
+```text
+ ...026-05-13_10-12-42Z-at-backlog-linux-desktop.md | 83 ++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+fix end of files.....................................(no files to check)Skipped
+trim trailing whitespace.............................(no files to check)Skipped
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[main 36d9d95] chore(history): refresh specstory transcript for linux-apps + alacritty session
+ 1 file changed, 83 insertions(+)
+
+36d9d95 chore(history): refresh specstory transcript for linux-apps + alacritty session
+81793f9 feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+d7fcce9 feat(superfile): gate hotkeys.toml under enableVimMode
+
+ M .specstory/history/2026-05-13_10-12-42Z-at-backlog-linux-desktop.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 12:58:55Z)**_
+
+All committed. Summary of the session:
+
+```
+36d9d95 chore(history): refresh specstory transcript for linux-apps + alacritty session
+81793f9 feat(alacritty): Ctrl+Shift+T/N → new window — Linux-only via .tmpl gate
+9e024de feat(linux-apps): Ubuntu Desktop counterpart to 54_macos_apps.sh
+```
+
+**The alacritty change**: `alacritty.toml` → `alacritty.toml.tmpl`, wrapping the two new `SpawnNewInstance` bindings in `{{ if ne .chezmoi.os "darwin" -}}` … `{{ end }}`. Verified:
+- **Linux render**: includes both bindings (deployed and live).
+- **Macked-macOS render**: excludes them entirely; remaining TOML still valid.
+
+(The specstory transcript keeps growing with our chat — there's a trailing `M` on it again because committing the transcript itself adds new content to the transcript. Normal SpecStory chase-your-tail; leave it for the next session's first commit.)
