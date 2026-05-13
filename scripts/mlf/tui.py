@@ -48,6 +48,47 @@ from scripts.mlf import (
 from scripts.mlf.list import STATUS_ICON, Row, _experiments, _models, _runs
 
 
+class VimTree(Tree):
+    """`Tree` with vim-style hjkl/g/G bindings on top of the defaults.
+
+    Bindings layer ON TOP of Textual's built-ins (arrow keys, home/end,
+    page-up/down) — vim users get j/k/h/l/g/G; everyone else's habits
+    keep working.
+
+    Mapping (matches what `tree`-like nvim/lf/yazi UIs use):
+      j / k      cursor down / up
+      h          go to parent (or collapse current if expanded — Textual's
+                 `cursor_parent` handles "move to parent" semantically)
+      l          toggle expand/collapse on the current node
+      g          jump to first visible node
+      G          jump to last visible node
+    """
+
+    BINDINGS = [
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+        Binding("h", "cursor_parent", "Up-level", show=False),
+        Binding("l", "toggle_node", "Expand", show=False),
+        Binding("g", "goto_top", "Top", show=False),
+        Binding("G", "goto_bottom", "Bottom", show=False),
+    ]
+
+    def action_goto_top(self) -> None:
+        self.cursor_line = 0
+        # Mirror what Tree does on cursor moves so the viewport scrolls.
+        self.scroll_to_line(0)
+
+    def action_goto_bottom(self) -> None:
+        # Tree.last_line is the highest valid cursor_line; falls back to a
+        # large value if the property name varies across Textual versions
+        # — the setter clamps.
+        try:
+            self.cursor_line = self.last_line  # type: ignore[attr-defined]
+        except AttributeError:
+            self.cursor_line = 10**9
+        self.scroll_to_line(self.cursor_line)
+
+
 def _backend_kind(uri: str) -> str:
     if uri.startswith("sqlite:"):
         return "sqlite"
@@ -365,6 +406,10 @@ class MLflowApp(App):
         # Full lists kept in memory so the `/` filter rebuilds without
         # re-hitting MLflow; refresh is explicit (`r`).
         self._cache: dict[str, list] = {"experiments": [], "runs": [], "models": []}
+        # Last successfully-plotted metric keys; reused when the user switches
+        # to a different run that logs (a subset of) the same metrics, so they
+        # don't have to re-open PlotDialog for every comparable run.
+        self._last_plot_keys: Optional[list[str]] = None
 
     @property
     def client(self):
@@ -385,7 +430,7 @@ class MLflowApp(App):
             id="filter-input",
         )
         with Horizontal(id="main"):
-            tree: Tree = Tree("Sources", id="src-tree")
+            tree: VimTree = VimTree("Sources", id="src-tree")
             tree.show_root = False
             tree.show_guides = True
             yield tree
@@ -579,9 +624,26 @@ class MLflowApp(App):
         art.root.expand()
         art.root.data = ("run-root", info.run_id, "")  # marker for lazy fetch
 
-        self.query_one("#plot-static", Static).update(
-            "Press [bold]p[/bold] to plot metric history."
-        )
+        # Auto-replay: if a previous run-selection produced a plot, and the
+        # new run logs at least one of those same metric keys, re-render with
+        # the intersection. Comparing the same loss/accuracy curves across
+        # runs is the canonical workflow — making the user re-open PlotDialog
+        # for every run breaks the flow. We re-render only on overlap so an
+        # unrelated run doesn't get an empty / misleading chart.
+        avail = set(data.metrics or {})
+        if self._last_plot_keys:
+            replay = [k for k in self._last_plot_keys if k in avail]
+        else:
+            replay = []
+        if replay:
+            self._set_status(
+                f"auto-replay plot ({len(replay)}/{len(self._last_plot_keys or [])} keys)…"
+            )
+            self._render_plot(info.run_id, replay)
+        else:
+            self.query_one("#plot-static", Static).update(
+                "Press [bold]p[/bold] to plot metric history."
+            )
 
     def _render_experiment(self, exp) -> None:
         t = self.query_one("#dt-overview", DataTable)
@@ -842,6 +904,11 @@ class MLflowApp(App):
                 f"plotted {len(series)}/{len(keys)} metric(s)"
                 + (f"  •  {len(skipped)} skipped" if skipped else "")
             )
+            # Remember this selection so the next run-select can auto-replay.
+            # Use the ORIGINAL requested `keys` (not just `series.keys()`) so
+            # that a transient fetch failure on one metric doesn't permanently
+            # drop it from the auto-replay set when we move to the next run.
+            self._last_plot_keys = list(keys)
 
         self.call_from_thread(_draw)
 
