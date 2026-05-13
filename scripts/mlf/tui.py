@@ -77,8 +77,10 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
     BINDINGS = [
         Binding("escape", "dismiss_none", "Cancel"),
         # SelectionList consumes Enter to toggle the highlighted item, so
-        # provide an explicit shortcut to confirm without tabbing to Apply.
+        # provide explicit shortcuts for select-all / select-none / apply.
         Binding("ctrl+a", "apply", "Apply"),
+        Binding("ctrl+l", "select_all", "All"),
+        Binding("ctrl+n", "select_none", "None"),
     ]
 
     DEFAULT_CSS = """
@@ -106,17 +108,23 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
 
     def __init__(self, keys: list[str]) -> None:
         super().__init__()
-        # Default pre-selection: non-system.* keys (training metrics).
-        self._items = [(k, k, not k.startswith("system.")) for k in keys]
+        # Default: NOTHING pre-selected. MLflow runs commonly log metrics
+        # at vastly different scales (loss=0.1 next to disk_usage=5e5);
+        # auto-selecting "all non-system.*" produced charts where every
+        # training metric was a flat line at the bottom. Let the user pick.
+        self._items = [(k, k, False) for k in keys]
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(
-                "Select metrics to plot — Enter to toggle, "
-                "[bold]Ctrl+A[/bold] to apply, Esc to cancel:"
+                "Select metrics to plot — Enter toggles, "
+                "[bold]Ctrl+L[/bold]=all  [bold]Ctrl+N[/bold]=none  "
+                "[bold]Ctrl+A[/bold]=apply  Esc=cancel:"
             )
             yield SelectionList[str](*self._items, id="plot-selection")
             with Horizontal(id="plot-buttons"):
+                yield Button("Select All", id="select-all")
+                yield Button("Clear", id="clear-all")
                 yield Button("Apply", id="apply", variant="primary")
                 yield Button("Cancel", id="cancel")
 
@@ -126,6 +134,12 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
     def action_apply(self) -> None:
         self._apply()
 
+    def action_select_all(self) -> None:
+        self.query_one(SelectionList).select_all()
+
+    def action_select_none(self) -> None:
+        self.query_one(SelectionList).deselect_all()
+
     @on(Button.Pressed, "#apply")
     def _apply(self) -> None:
         sel = self.query_one(SelectionList).selected
@@ -134,6 +148,14 @@ class PlotDialog(ModalScreen[Optional[list[str]]]):
     @on(Button.Pressed, "#cancel")
     def _cancel(self) -> None:
         self.dismiss(None)
+
+    @on(Button.Pressed, "#select-all")
+    def _select_all_btn(self) -> None:
+        self.action_select_all()
+
+    @on(Button.Pressed, "#clear-all")
+    def _clear_all_btn(self) -> None:
+        self.action_select_none()
 
 
 class DownloadDialog(ModalScreen[None]):

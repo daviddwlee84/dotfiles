@@ -18266,3 +18266,158 @@ Comprehensive write-up of three options (status quo / one repo each / single umb
 Also proposed a halfway alternative: add a one-line "future extraction" manifest to each `executable_*` header to set expectations without doing the refactor today.
 
 Run `chezmoi apply` to deploy the updated binary, then `mlf` should give you the working plot.
+
+---
+
+_**User (2026-05-13 05:27:53Z)**_
+
+[Image #7] [Image #8] 我覺得plot預設不要全選 很多metrics並不適合畫在一起 然後一個一個deselect也蠻類的
+
+_**User (2026-05-13 05:27:53Z)**_
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/7.png]
+
+[Image: source: /Users/daviddwlee84/.claude/image-cache/26a86c25-921c-4f94-9e81-9f8f82d8e4d2/8.png]
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:27Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:28Z)**_
+
+Good catches. The plot rendering works but the default-all selection is bad UX given heterogeneous metric scales (loss=0.1 next to disk_usage=5e5 makes everything look flat). Fixing:
+
+1. Default to **nothing** pre-selected.
+2. Add **Ctrl+L** (select all) and **Ctrl+N** (clear all) plus matching buttons.
+3. Update the label to surface the shortcuts.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/scripts/mlf/tui.py has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:28:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify syntax + ruff
+
+```bash
+python3 -c "import ast; ast.parse(open('scripts/mlf/tui.py').read()); print('AST OK')" && \
+uv run --quiet --with 'ruff' ruff check scripts/mlf/tui.py 2>&1 | tail -5
+```
+
+```text
+AST OK
+All checks passed!
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify default-none + select-all/none actions
+
+```bash
+MLFLOW_TRACKING_URI="http://192.168.222.207:15002" uv run --quiet --with 'mlflow>=3.4' --with 'textual>=5.0' --with 'plotext>=5.2' --with 'tyro>=0.9' --with 'rich>=13.9' python -c "
+import sys, asyncio
+sys.path.insert(0, '/Users/daviddwlee84/.local/share/chezmoi')
+from scripts.mlf.tui import MLflowApp, PlotDialog
+from textual.widgets import Tree, Static, SelectionList
+
+async def smoke():
+    app = MLflowApp()
+    async with app.run_test() as pilot:
+        tree = app.query_one('#src-tree', Tree)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if list(tree.root.children):
+                break
+        run_node = list(tree.root.children)[1]
+        first_run = list(run_node.children)[0]
+        tree.focus()
+        tree.select_node(first_run)
+        for _ in range(60):
+            await pilot.pause(0.5)
+            if app._selection_data is not None:
+                break
+        app.action_show_plot()
+        for _ in range(20):
+            await pilot.pause(0.3)
+            if isinstance(app.screen, PlotDialog):
+                break
+        dlg = app.screen
+        sl = dlg.query_one(SelectionList)
+        print(f'initial selected: {len(sl.selected)} (expected 0)')
+        # select_all via action
+        dlg.action_select_all()
+        await pilot.pause(0.2)
+        print(f'after select_all: {len(sl.selected)} (expected {len(list(sl.options))})')
+        # deselect_all via action
+        dlg.action_select_none()
+        await pilot.pause(0.2)
+        print(f'after select_none: {len(sl.selected)} (expected 0)')
+
+asyncio.run(smoke())
+" 2>&1 | tail -10
+```
+
+```text
+initial selected: 0 (expected 0)
+after select_all: 39 (expected 39)
+after select_none: 0 (expected 0)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:11Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:11Z)**_
+
+All three states verified. Committing.
+
+_**Agent (claude-opus-4-7 2026-05-13 05:29:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Status before commit
+
+`git status --short && echo "---" && git diff --stat`
+
+```text
+ M .specstory/history/2026-05-13_01-51-51Z-at-dot-config-television.md
+ M .specstory/history/2026-05-13_05-11-01Z.md
+ M scripts/mlf/tui.py
+?? .claude/plans/maccy-linked-twilight.md
+---
+ ...026-05-13_01-51-51Z-at-dot-config-television.md | 128 ++++
+ .specstory/history/2026-05-13_05-11-01Z.md         | 786 ++++++++++++++++++++-
+ scripts/mlf/tui.py                                 |  32 +-
+ 3 files changed, 940 insertions(+), 6 deletions(-)
+```
+</details></tool-use>
