@@ -237,6 +237,19 @@ window form prefers `workmux set-window-status clear` so workmux's internal
 agent-state is also reset; the bulk forms fall back to `tmux set-option -w
 -u @workmux_status` which only clears the user-var.
 
+### From the right-click tab menu
+
+The same single-window clear is wired into tmux's `MouseDown3Status`
+right-click menu as the **"Clear agent status"** entry (see
+[`dot_config/tmux/keybindings.conf.tmpl`](../../dot_config/tmux/keybindings.conf.tmpl)).
+Right-click any tab with a stuck 🤖/💬/✅ → press `c` (or click "Clear agent
+status") → the icon disappears immediately. The menu inlines
+`set-option -w -u @workmux_status` directly (no shell hop), so it works even
+when no shell session is alive in the target window. The same menu also
+hosts a parallel manual-tag layer (⭐/📌/🔖/🚩) backed by a separate
+`@bookmark_status` user-option — see the section below for how that layer
+coexists with the workmux icon.
+
 ## Sidebar daemon (optional)
 
 Run `wm sidebar` (or `wmsb`) once per tmux session to spawn the sidebar
@@ -373,6 +386,42 @@ This sets `@my_build_status = 🔨` before the command, swaps to ✅ on
 exit code 0 or ❌ on non-zero, and traps Ctrl+C / SIGTERM so the badge
 clears instead of leaking. Wire it into a tmuxinator pre-command, a git
 hook, a Makefile target, anywhere.
+
+### Worked example: manual tab bookmarks (right-click menu)
+
+A second producer of this repo ships in-tree: the right-click tab menu's
+**⭐ / 📌 / 🔖 / 🚩** entries. They drive `@bookmark_status` (separate from
+`@workmux_status`) so a single tab can show both at once — e.g.
+`1: shell 🤖 ⭐` for an agent-working tab the user has also pinned.
+
+Three moving parts:
+
+1. **Menu binding** in [`dot_config/tmux/keybindings.conf.tmpl`](../../dot_config/tmux/keybindings.conf.tmpl)
+   (`MouseDown3Status` block): four icon rows + one "Clear agent status"
+   row. Each icon row shells out to the toggle helper.
+2. **Toggle helper** at
+   [`dot_config/tmux/executable_toggle-bookmark.sh`](../../dot_config/tmux/executable_toggle-bookmark.sh):
+   reads `@bookmark_status` on the right-clicked `#{window_id}`, unsets if
+   it equals the clicked glyph, otherwise overwrites. So clicking the same
+   icon twice clears; clicking a different icon swaps.
+3. **Render** in [`theme.catppuccin.conf`](../../dot_config/tmux/theme.catppuccin.conf):
+   the `@catppuccin_window_text` / `@catppuccin_window_current_text` formats
+   chain a second `#{?@bookmark_status, #{@bookmark_status},}` after the
+   workmux conditional, so both glyphs stack in the tab label.
+
+CLI access — `@bookmark_status` is just another user-var, so the generic
+helpers work too:
+
+```bash
+tmux_status_set bookmark '⭐'             # tag current window
+tmux_status_set bookmark '📌' mysess:3    # tag a specific window
+tmux_status_clear bookmark                # untag current window
+tmux_status_list                          # audit all @*_status across all windows
+```
+
+This is the canonical pattern for adding a parallel manual layer alongside
+the agent layer — copy it for `@pinned_status`, `@priority_status`,
+`@review_status`, etc. as needed.
 
 For more nuanced lifecycles (multiple intermediate states like
 `compiling` / `tests` / `bundling`), drop down to the raw helpers and

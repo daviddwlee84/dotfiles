@@ -48,16 +48,22 @@ bind-key -n MouseDown3Pane \
 unbind-key -n MouseDown3Status
 # Window-tab right-click menu.
 #
-# WARNING: this menu is currently 17 visible rows, exceeding the ~14-row
+# WARNING: this menu is currently 23 visible rows, well above the ~14-row
 # soft cap documented in AGENTS.md ("tmux ≥ 3.3 required for popup menu").
 # tmux's display-menu silently suppresses itself if it can't fit on screen,
-# so on small terminals (mobile SSH, half-height splits) this menu may not
-# appear. Layouts are inlined here (rather than via a submenu) because
-# nested display-menu chained through `run-shell` had unreliable mouse-event
-# behaviour — see pitfalls/tmux-submenu-flash-and-bottom-right.md.
-# If we ever need to grow this menu further, candidates to drop / move to
-# the prefix+Enter popup: Renumber windows (covered by `prefix + r`),
-# the less-used Main horizontal/vertical layouts.
+# so on small terminals (mobile SSH, half-height splits ~≤ 26 rows) the menu
+# may not appear at all. Inlining (rather than nested submenus) is forced by
+# pitfalls/tmux-submenu-flash-and-bottom-right.md — nested display-menu via
+# run-shell from MouseDown3Status flashes / lands bottom-right / no-ops on
+# second invocation. So everything stays flat here.
+#
+# The bottom block (⭐/📌/🔖/🚩 + Clear agent status) drives two per-window
+# tmux user-options:
+#   - @bookmark_status — manual tag, toggled by ~/.config/tmux/toggle-bookmark.sh
+#   - @workmux_status  — agent state (🤖/💬/✅) written by workmux hooks; cleared
+#                        here as the GUI equivalent of `wmclear` from 38_workmux.sh
+# Both render side-by-side in the catppuccin window-text format (see
+# theme.catppuccin.conf lines 31-32).
 bind-key -n MouseDown3Status \
   display-menu -O -T "#[align=centre]#{window_index}:#{window_name}" -t = -x W -y W \
     "Swap Left"  l { swap-window -t :-1 } \
@@ -76,6 +82,12 @@ bind-key -n MouseDown3Status \
     "Kill window" X { kill-window } \
     "Renumber windows" N { move-window -r ; display-message "Windows renumbered" } \
     "Rename"      n { command-prompt -F -I "#W" { rename-window -t "#{window_id}" "%%" } } \
+    "" \
+    "⭐ Star"     s { run-shell "~/.config/tmux/toggle-bookmark.sh '#{window_id}' '⭐'" } \
+    "📌 Pin"      p { run-shell "~/.config/tmux/toggle-bookmark.sh '#{window_id}' '📌'" } \
+    "🔖 Bookmark" b { run-shell "~/.config/tmux/toggle-bookmark.sh '#{window_id}' '🔖'" } \
+    "🚩 Flag"     f { run-shell "~/.config/tmux/toggle-bookmark.sh '#{window_id}' '🚩'" } \
+    "Clear agent status" c { set-option -w -t "#{window_id}" -u "@workmux_status" ; display-message "Cleared @workmux_status on #{window_index}:#{window_name}" } \
     "" \
     "New window"  w { new-window }
 
