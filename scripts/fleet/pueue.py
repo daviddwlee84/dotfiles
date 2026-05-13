@@ -49,8 +49,25 @@ from scripts.fleet import (
 # Remote sentinel-prefixed wire format so a host that's missing pueue, has the
 # daemon down, or returns mangled output never aborts the fleet — and we can
 # tell the three apart for accurate rendering.
+#
+# PATH augmentation is load-bearing: asyncssh's `conn.run()` opens a
+# non-interactive non-login shell, which on most systems gets a minimal PATH
+# (macOS: `/usr/bin:/bin:/usr/sbin:/sbin`; Ubuntu: same + `/snap/bin`). pueue
+# is typically installed by users to `/opt/homebrew/bin` (Apple Silicon brew),
+# `/usr/local/bin` (Intel brew / Linux), `~/.cargo/bin` (Rust), `~/.local/bin`
+# (uv tool), `~/.dotfiles/bin` (chezmoi-deployed), or `~/bin` (legacy). Without
+# this prepend `command -v pueue` returns false on every host with a non-system
+# install, producing a fleetwide false-negative `not-installed`. Order: our
+# managed dirs first so user-deployed pqsum wraps win, then language-installer
+# dirs, then brew, then linuxbrew (system + per-user).
+#
+# We also catch the pueue daemon/client version-mismatch case (`pueue` exits 0
+# but writes `Error: Couldn't deserialize message: ...` to stdout because the
+# socket protocol drifted). That's a real-world `daemon-offline` scenario;
+# falling through to `PQSUM_SOURCE=ok` would feed garbage to pqsum's parser.
 _REMOTE_CMD = r"""
 set +e
+export PATH="$HOME/.dotfiles/bin:$HOME/bin:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.linuxbrew/bin:$PATH"
 if ! command -v pueue >/dev/null 2>&1; then
   printf 'PQSUM_SOURCE=missing\n'
   exit 0
@@ -61,6 +78,12 @@ if [ "$rc" != 0 ] || [ -z "$out" ]; then
   printf 'PQSUM_SOURCE=offline\n'
   exit 0
 fi
+case "$out" in
+  Error:*|error:*)
+    printf 'PQSUM_SOURCE=offline\n'
+    exit 0
+    ;;
+esac
 printf 'PQSUM_SOURCE=ok\n'
 printf '%s\n' "$out"
 """
