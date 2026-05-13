@@ -244,3 +244,10 @@ and you get a complete failure list.
 - `pitfalls/ansible-missing-sudo-tag.md` — sibling pitfall: the
   inverse of this one (sudo task without the `[sudo]` tag, fails on
   noRoot).
+- [`pitfalls/centos7-neovim-apt-register-defined.md`](centos7-neovim-apt-register-defined.md)
+  — sibling pitfall for the **sudo-having** CentOS 7 path. The gate
+  broadening in this doc is necessary but not sufficient: if the
+  user-level fallback gate references `<sudo_task_var> is not defined`,
+  it still breaks on sudo-having RedHat because `register:` on a
+  `when:`-skipped task IS defined (as a skip dict). The fix is to add
+  `or <var> is skipped` to such gates.

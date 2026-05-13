@@ -162,15 +162,23 @@
   ansible.builtin.debug:
     msg: "Neovim GitHub release not available for {{ target_architecture }} — keeping system version or install manually"
 
-# User-level fallback fires when:
-#   - Debian noRoot box: apt_neovim is undefined (sudo tasks were skipped).
-#   - RedHat-family (any noRoot or sudo): no apt branch ran at all, so
-#     apt_neovim is also undefined. Gate broadened per pitfalls/centos7-noroot.md.
+# User-level fallback fires when the system-level apt path either:
+#   - never ran at all (`apt_neovim is not defined` → noRoot Debian where
+#     --skip-tags sudo prevented even the task from being scheduled), OR
+#   - ran but was skipped because the conditional was False
+#     (`apt_neovim is skipped` → any RedHat-family box, with or without sudo,
+#     because the apt task is `when: os_family == "Debian"`. Without the
+#     `is skipped` branch the variable is defined-but-skipped and the
+#     fallback never fires — see pitfalls/centos7-neovim-apt-register-defined.md).
+# On RedHat (any glibc 2.17 box, e.g. CentOS 7): the mainline neovim/neovim
+# binaries require glibc 2.28+. We branch on the `oldEL` fact set in
+# `playbooks/linux.yml` and download from `neovim/neovim-releases` (the
+# upstream older-glibc rebuild repo) when oldEL is true.
 - name: Install Neovim tarball (user-level, no sudo required)
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - nvim_current_version is version(neovim_min_version, '<')
-    - apt_neovim is not defined  # sudo tasks were skipped
+    - (apt_neovim is not defined) or (apt_neovim is skipped)
     - nvim_sys_arch | default('') != ''
   block:
     - name: Ensure ~/.local exists
@@ -183,9 +191,36 @@
       ansible.builtin.set_fact:
         nvim_tarball_arch: "{{ nvim_sys_arch }}"
 
+    # oldEL (CentOS/RHEL 7, glibc 2.17): main neovim releases require
+    # glibc 2.28+. Use neovim/neovim-releases (upstream's older-glibc rebuild
+    # repo) which publishes the same version per release. Only their semver
+    # tags exist — no `stable` floating tag — so we fetch the latest first.
+    # `check_mode: false` so the API call happens even under `--check`;
+    # without it the registered var is a skip dict and the set_fact below
+    # crashes dereferencing `.json.tag_name`.
+    - name: Get latest neovim-releases tag (oldEL → glibc 2.17 build)
+      when: oldEL | default(false)
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/neovim/neovim-releases/releases/latest
+        return_content: true
+      register: nvim_oldel_release
+      check_mode: false
+      environment:
+        http_proxy: "{{ lookup('env', 'http_proxy') | default('', true) }}"
+        https_proxy: "{{ lookup('env', 'https_proxy') | default('', true) }}"
+
+    - name: Set Neovim tarball URL (oldEL → neovim-releases; else → stable)
+      ansible.builtin.set_fact:
+        nvim_tarball_url: >-
+          {% if oldEL | default(false) -%}
+          https://github.com/neovim/neovim-releases/releases/download/{{ nvim_oldel_release.json.tag_name }}/nvim-linux-{{ nvim_tarball_arch }}.tar.gz
+          {%- else -%}
+          https://github.com/neovim/neovim/releases/download/stable/nvim-linux-{{ nvim_tarball_arch }}.tar.gz
+          {%- endif %}
+
     - name: Download Neovim tarball
       ansible.builtin.get_url:
-        url: "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-{{ nvim_tarball_arch }}.tar.gz"
+        url: "{{ nvim_tarball_url | trim }}"
         dest: "/tmp/nvim.tar.gz"
         mode: '0644'
         timeout: 600

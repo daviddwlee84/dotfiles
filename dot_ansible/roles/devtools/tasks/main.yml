@@ -88,9 +88,11 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Set gh release architecture
+  # Broadened to RedHat + decoupled from gh_check (sudo-path) so the
+  # user-level fallback below works on CentOS 7 where the .deb install is
+  # skipped entirely. set_fact is cheap; safe to always compute.
   when:
-    - ansible_facts["os_family"] == "Debian"
-    - gh_check.rc != 0
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.set_fact:
     gh_release_arch: >-
       {{
@@ -152,8 +154,10 @@
         - /tmp/gh.deb
 
 # --- gh (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — gh is a Go
+# static binary (no glibc dependency).
 - name: Re-check if gh is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v gh
   register: gh_recheck
   changed_when: false
@@ -163,7 +167,7 @@
 
 - name: Install gh from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - gh_recheck.rc != 0
     - gh_release_arch | default('') != ''
   block:
@@ -232,9 +236,10 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Set glab release architecture
+  # Broadened to RedHat + decoupled from glab_check so the user-level
+  # fallback works on CentOS 7 where the .deb install is skipped.
   when:
-    - ansible_facts["os_family"] == "Debian"
-    - glab_check.rc != 0
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.set_fact:
     glab_release_arch: >-
       {{
@@ -296,8 +301,10 @@
         - /tmp/glab.deb
 
 # --- glab (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — glab is a Go
+# static binary (no glibc dependency).
 - name: Re-check if glab is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v glab
   register: glab_recheck
   changed_when: false
@@ -307,7 +314,7 @@
 
 - name: Install glab from GitLab releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - glab_recheck.rc != 0
     - glab_release_arch | default('') != ''
   block:
@@ -401,8 +408,10 @@
     state: present
 
 # --- bat (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — bat ships
+# `-unknown-linux-musl.tar.gz` and works on glibc 2.17.
 - name: Re-check if bat is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v bat
   register: bat_recheck
   changed_when: false
@@ -410,7 +419,7 @@
 
 - name: Install bat from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - bat_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (bat)
@@ -723,11 +732,16 @@
 # Delta can start successfully but crash when reading stdin if bat's binary
 # theme cache was built by an incompatible bat version. Verify by actually
 # feeding delta an empty diff, not only by checking `--version`.
-# On aarch64 only `unknown-linux-gnu` assets exist, and delta 0.19.x briefly
-# required glibc 2.39 (unavailable on Jammy). We therefore:
-#   1) x86_64: use the upstream `.deb` (sudo) / tarball (user).
-#   2) aarch64: probe Linuxbrew and install via `brew`; otherwise skip with a
-#      clear debug message rather than silently pulling a glibc-risky binary.
+# Glibc landscape:
+#   - x86_64: upstream publishes `unknown-linux-musl` (static, glibc-independent).
+#     User-level fallback now uses it (was `unknown-linux-gnu` until the
+#     centos7-noroot.md sweep). Works on glibc 2.17.
+#   - aarch64: only `unknown-linux-gnu` assets exist, and delta 0.19.x briefly
+#     required glibc 2.39 (unavailable on Jammy). We therefore:
+#       1) sudo path (apt .deb) is Debian/Ubuntu-only.
+#       2) aarch64 falls through to Linuxbrew (`brew install git-delta`) or
+#          skips with a clear debug message rather than silently pulling a
+#          glibc-risky binary.
 - name: Check if delta is installed
   when: ansible_facts["os_family"] == "Debian"
   ansible.builtin.shell: printf '' | delta --no-gitconfig --paging=never
@@ -824,8 +838,12 @@
       an upstream musl arm64 build.
 
 # --- git-delta (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — x86_64 uses the
+# upstream `unknown-linux-musl` tarball (glibc-independent). aarch64 still
+# has no upstream musl; that path stays Debian-only (Linuxbrew aarch64 on
+# CentOS 7 is not a typical setup we support).
 - name: Re-check if delta is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v delta && printf '' | delta --no-gitconfig --paging=never
   args:
     executable: /bin/bash
@@ -835,7 +853,7 @@
 
 - name: Install git-delta tarball (user-level, no sudo, x86_64)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - delta_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64']
   block:
@@ -851,9 +869,12 @@
         return_content: true
       register: delta_release_user
 
-    - name: Download delta tarball (user)
+    - name: Download delta musl tarball (user)
+      # Switched from `-x86_64-unknown-linux-gnu.tar.gz` to the musl variant
+      # so CentOS 7 (glibc 2.17) can install it without source build. The
+      # gnu tarball historically required glibc 2.39 on aarch64 too.
       ansible.builtin.get_url:
-        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu.tar.gz"
+        url: "https://github.com/dandavison/delta/releases/download/{{ delta_release_user.json.tag_name }}/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl.tar.gz"
         dest: /tmp/delta.tar.gz
         mode: '0644'
         timeout: 120
@@ -868,7 +889,7 @@
 
     - name: Install delta to ~/.local/bin
       ansible.builtin.copy:
-        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu/delta"
+        src: "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl/delta"
         dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/delta"
         mode: '0755'
         remote_src: true
@@ -879,7 +900,7 @@
         state: absent
       loop:
         - /tmp/delta.tar.gz
-        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-gnu"
+        - "/tmp/delta-{{ delta_release_user.json.tag_name }}-x86_64-unknown-linux-musl"
 
   rescue:
     - name: Warn git-delta (user) installation failed
@@ -939,9 +960,10 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 - name: Set diffnav release architecture
+  # Broadened to RedHat + decoupled from diffnav_check so the user-level
+  # fallback works on CentOS 7 where the sudo .deb install is skipped.
   when:
-    - ansible_facts["os_family"] == "Debian"
-    - diffnav_check.rc != 0
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.set_fact:
     diffnav_release_arch: >-
       {{
@@ -1015,8 +1037,10 @@
         - /tmp/diffnav-extract
 
 # --- diffnav (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — diffnav is a
+# Go static binary (no glibc dependency).
 - name: Re-check if diffnav is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v diffnav
   register: diffnav_recheck
   changed_when: false
@@ -1026,7 +1050,7 @@
 
 - name: Install diffnav from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - diffnav_recheck.rc != 0
     - diffnav_release_arch | default('') != ''
   block:
@@ -1119,8 +1143,10 @@
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
 # --- git-graph ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — git-graph is a
+# Rust musl binary (no glibc dependency). x86_64-only by upstream choice.
 - name: Check if git-graph is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.command: git-graph --version
   register: git_graph_check
   changed_when: false
@@ -1128,7 +1154,7 @@
 
 - name: Install git-graph from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - git_graph_check.rc != 0
     - target_architecture in ['x86_64', 'amd64']  # Only amd64 available
   block:
@@ -1218,8 +1244,13 @@
   ignore_errors: true
 
 # --- tldr (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — but note this
+# uses `mise exec -- npm`, and `dot_config/mise/config.toml.tmpl` omits node
+# on oldEL (CentOS 7) per the glibc 2.17 baseline. On EL7 mise falls back
+# to system node (often missing or too old) and this task no-ops via the
+# `mise not found` branch. Live with it; tldr is non-critical.
 - name: Re-check if tldr is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v tldr
   register: tldr_recheck
   changed_when: false
@@ -1227,7 +1258,7 @@
 
 - name: Install tldr via mise npm (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - tldr_recheck.rc != 0
   ansible.builtin.shell: |
     if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/mise" ]; then
@@ -2072,8 +2103,10 @@
         state: absent
 
 # --- yazi (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — yazi ships
+# `-unknown-linux-musl.zip` and works on glibc 2.17.
 - name: Re-check if yazi is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v yazi
   register: yazi_recheck
   changed_when: false
@@ -2083,7 +2116,7 @@
   # Prefer the musl .zip asset over unknown-linux-gnu.zip. See sudo-path
   # comment above for the glibc rationale.
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - yazi_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -2217,8 +2250,10 @@
         - /tmp/dist
 
 # --- superfile (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — superfile is a
+# Go static binary (no glibc dependency).
 - name: Re-check if superfile (spf) is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v spf
   register: spf_recheck
   changed_when: false
@@ -2228,7 +2263,7 @@
 
 - name: Map target_architecture to superfile arch name (user)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - spf_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   ansible.builtin.set_fact:
@@ -2236,7 +2271,7 @@
 
 - name: Install superfile from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - spf_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -2579,8 +2614,11 @@
   ignore_errors: true
 
 # --- btop (user-level fallback) ---
+# Broadened from `os_family == "Debian"` to `["Debian", "RedHat"]` per
+# pitfalls/centos7-noroot.md — btop ships an `-unknown-linux-musl.tar.gz`
+# static binary that runs on glibc 2.17 (CentOS 7) and modern glibc alike.
 - name: Re-check if btop is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v btop
   register: btop_recheck
   changed_when: false
@@ -2588,7 +2626,7 @@
 
 - name: Install btop from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - btop_recheck.rc != 0
   block:
     - name: Ensure ~/.local/bin exists (btop)
@@ -2603,10 +2641,15 @@
         return_content: true
       register: btop_release
 
+    # Upstream asset naming changed at v1.4.7 from
+    #   btop-<arch>-linux-musl.tbz        (bzip2; pre-v1.4.7)
+    # to
+    #   btop-<arch>-unknown-linux-musl.tar.gz   (gzip; v1.4.7+)
+    # The new format is also static-musl so it stays glibc-independent.
     - name: Download btop binary
       ansible.builtin.get_url:
-        url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ target_architecture }}-linux-musl.tbz"
-        dest: /tmp/btop.tbz
+        url: "https://github.com/aristocratos/btop/releases/download/{{ btop_release.json.tag_name }}/btop-{{ target_architecture }}-unknown-linux-musl.tar.gz"
+        dest: /tmp/btop.tar.gz
         mode: '0644'
         timeout: 120
       retries: 3
@@ -2620,7 +2663,7 @@
 
     - name: Extract btop
       ansible.builtin.shell: |
-        cd /tmp/btop-extract && tar xjf /tmp/btop.tbz
+        cd /tmp/btop-extract && tar xzf /tmp/btop.tar.gz
       args:
         executable: /bin/bash
       changed_when: true
@@ -2637,7 +2680,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - /tmp/btop.tbz
+        - /tmp/btop.tar.gz
         - /tmp/btop-extract
 
   rescue:
@@ -2650,7 +2693,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - /tmp/btop.tbz
+        - /tmp/btop.tar.gz
         - /tmp/btop-extract
 
 # --- zellij ---
@@ -2708,8 +2751,10 @@
         - /tmp/zellij.tar.gz
 
 # --- zellij (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — zellij ships
+# `-unknown-linux-musl.tar.gz` and works on glibc 2.17.
 - name: Re-check if zellij is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v zellij
   register: zellij_recheck
   changed_when: false
@@ -2717,7 +2762,7 @@
 
 - name: Install zellij from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - zellij_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -3380,8 +3425,10 @@
   ignore_errors: true
 
 # --- lnav (user-level fallback) ---
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — lnav ships
+# `linux-musl-<arch>.zip` and works on glibc 2.17.
 - name: Re-check if lnav is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v lnav
   register: lnav_recheck
   changed_when: false
@@ -3391,7 +3438,7 @@
 
 - name: Install lnav from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - lnav_recheck.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -3673,8 +3720,10 @@
 
 # --- dasel (YAML/TOML/XML/JSON/CSV query & modify; user-level fallback) ---
 # Single static binary, no apt package on Debian/Ubuntu. Pattern mirrors jq.
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — dasel is a Go
+# static binary (no glibc dependency).
 - name: Re-check if dasel is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v dasel
   register: dasel_recheck
   changed_when: false
@@ -3682,7 +3731,7 @@
 
 - name: Set dasel release architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - dasel_recheck.rc != 0
   ansible.builtin.set_fact:
     dasel_arch: >-
@@ -3695,7 +3744,7 @@
 
 - name: Install dasel from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - dasel_recheck.rc != 0
     - dasel_arch | default('') != ''
   block:
@@ -3727,8 +3776,9 @@
 # --- yq (Mike Farah's Go yq: YAML/JSON/XML; user-level fallback) ---
 # Note: Ubuntu's `yq` apt package is the unrelated Python wrapper around jq;
 # we deliberately bypass it and ship the canonical Go binary upstream ships.
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md.
 - name: Re-check if yq is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v yq
   register: yq_recheck
   changed_when: false
@@ -3736,7 +3786,7 @@
 
 - name: Set yq release architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - yq_recheck.rc != 0
   ansible.builtin.set_fact:
     yq_arch: >-
@@ -3749,7 +3799,7 @@
 
 - name: Install yq from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - yq_recheck.rc != 0
     - yq_arch | default('') != ''
   block:
@@ -3781,14 +3831,19 @@
 # --- jnv (interactive JSON viewer with jq filter; user-level fallback) ---
 # Upstream ships .tar.xz; ensure xz-utils is present (default on Ubuntu but
 # missing from minimal Debian images and some containers).
+# Gate broadened to RedHat per pitfalls/centos7-noroot.md — jnv x86_64 ships
+# musl (glibc 2.17 OK). aarch64 currently uses gnu (no musl asset upstream);
+# rescue catches glibc failures on EL7 aarch64.
 - name: Re-check if jnv is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v jnv
   register: jnv_recheck
   changed_when: false
   failed_when: false
 
 - name: Ensure xz-utils is available for jnv tarball extraction
+  # Debian-only: yum equivalent (xz) is usually already present on RedHat
+  # base; if not, the user-level extract rescue catches the failure.
   when:
     - ansible_facts["os_family"] == "Debian"
     - jnv_recheck.rc != 0
@@ -3801,7 +3856,7 @@
 
 - name: Set jnv release target
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - jnv_recheck.rc != 0
   ansible.builtin.set_fact:
     jnv_target: >-
@@ -3815,11 +3870,33 @@
         else ''
       }}
 
+# Upstream jnv publishes no `aarch64-unknown-linux-musl` tarball — the
+# aarch64 build is glibc-only. On oldEL aarch64 (glibc 2.17) the gnu binary
+# would crash with `version GLIBC_2.28 not found`. Skip with a clear hint
+# instead of letting the rescue silently drop it.
+- name: Skip jnv on oldEL aarch64 (no upstream musl for arm64)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - oldEL | default(false)
+    - jnv_recheck.rc != 0
+    - target_architecture in ['aarch64', 'arm64']
+  ansible.builtin.debug:
+    msg: >-
+      jnv skipped on oldEL aarch64: no upstream musl asset. Install via
+      `cargo install jnv --locked` once Rust is set up (rust_cargo_tools
+      role), or skip — non-critical interactive JSON viewer.
+
 - name: Install jnv from GitHub releases (user-level, no sudo)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - jnv_recheck.rc != 0
     - jnv_target | trim != ''
+    # Drop oldEL aarch64 — handled by the explicit skip above to avoid
+    # a confusing glibc 2.28 crash inside the rescue block.
+    - not (
+        (oldEL | default(false))
+        and (target_architecture in ['aarch64', 'arm64'])
+      )
   block:
     - name: Ensure ~/.local/bin exists (jnv)
       ansible.builtin.file:
@@ -3877,7 +3954,7 @@
 
 # --- witr (Why Is This Running? — process ancestry / supervision tracer) ---
 - name: Re-check if witr is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
   ansible.builtin.shell: command -v witr
   register: witr_check
   changed_when: false
@@ -3885,7 +3962,7 @@
 
 - name: Set witr release architecture
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - witr_check.rc != 0
   ansible.builtin.set_fact:
     witr_arch: >-
@@ -3896,8 +3973,10 @@
       }}
 
 - name: Install witr from GitHub releases (user-level, no sudo)
+  # Gate broadened to RedHat per pitfalls/centos7-noroot.md — witr is a
+  # Go static binary (no glibc dependency).
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - witr_check.rc != 0
     - witr_arch | default('') != ''
   block:
