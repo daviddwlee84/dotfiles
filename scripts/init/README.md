@@ -112,7 +112,7 @@ fan-qiang path, either:
 ## Design notes
 
 - **Why single-file PEP 723 and not a proper package?** Matches the
-  `scripts/fleet_apply.py` pattern in this repo — easier to maintain,
+  `scripts/fleet/apply.py` pattern in this repo — easier to maintain,
   no `pyproject.toml` to version, fetchable via
   `uv run --script <url>` without any package build step.
 - **Why `uv run --script` and not `uvx`?** `uvx --from git+https://…`

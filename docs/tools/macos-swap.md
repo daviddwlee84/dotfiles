@@ -393,7 +393,7 @@ the cost is "weekly reboot" being the canonical answer.
 
 ### Practical implication for this repo's fleet
 
-[`scripts/fleet_apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet_apply.py)
+[`scripts/fleet/apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet/apply.py)
 runs against both macOS and Linux hosts. Different reboot cadences apply:
 
 | Host type | Monitoring | Action when bloated |

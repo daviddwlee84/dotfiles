@@ -9,7 +9,7 @@ Sister tools: [`fleet pueue`](pueue.md) for structured queue probing,
 [`fleet tmux`](../this_repo/fleet-apply.md#fleet-tmux--cross-host-tmux-session-summary)
 for tmux session summaries, [`fleet info`](../this_repo/fleet-apply.md)
 for system metadata snapshots. All four share the same asyncssh + semaphore
-plumbing from `scripts/fleet_apply.py`.
+plumbing from `scripts/fleet/apply.py`.
 
 ## Install
 

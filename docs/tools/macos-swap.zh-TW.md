@@ -353,7 +353,7 @@ macOS 為了 UX 簡單把這些全砍了，代價就是「每週重開機」變�
 
 ### 對本 repo fleet 的實務意義
 
-[`scripts/fleet_apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet_apply.py)
+[`scripts/fleet/apply.py`](https://github.com/daviddwlee84/dotfiles/blob/main/scripts/fleet/apply.py)
 同時對 macOS 與 Linux 主機跑。重開機節奏不一樣：
 
 | 主機類型 | 監控 | 膨脹時的動作 |

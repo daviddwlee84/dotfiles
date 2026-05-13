@@ -6,7 +6,7 @@
 
 | Binary | Source layout |
 |---|---|
-| `fleet` | `dot_dotfiles/bin/executable_fleet` (dispatcher) + `scripts/fleet/**` (modules) + `scripts/fleet_apply.py` |
+| `fleet` | `dot_dotfiles/bin/executable_fleet` (dispatcher) + `scripts/fleet/**` (modules) + `scripts/fleet/apply.py` |
 | `mlf` | `dot_dotfiles/bin/executable_mlf` (dispatcher) + `scripts/mlf/**` (`__init__.py`, `tui.py`, `plot.py`, `list.py`, `download.py`) |
 | `sms` | `dot_dotfiles/bin/executable_sms` (single-file CLI, tyro) |
 | `mi-router` | `dot_dotfiles/bin/executable_mi-router` (single-file CLI, tyro) |

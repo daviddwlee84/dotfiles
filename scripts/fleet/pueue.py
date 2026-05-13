@@ -14,7 +14,7 @@ Output: Rich table by default (one row per (host, group)); `--json` for pipeable
 per-host records; `--ai` for AI summary; `--ai --report [--out PATH]` for markdown.
 
 This module is invoked by `dot_dotfiles/bin/executable_fleet pueue ...` and
-shares its inventory + asyncssh plumbing with `scripts/fleet_apply.py` via
+shares its inventory + asyncssh plumbing with `scripts/fleet/apply.py` via
 `from scripts.fleet import ...`.
 
 Why subprocess to pqsum (not Python import): pqsum is a deployed uv-script

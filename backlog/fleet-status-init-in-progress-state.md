@@ -53,7 +53,7 @@ Hint for the new state:
 
 S (small):
 1. Add `init-in-progress` to `_READINESS_STYLE`, `_READINESS_HINTS` in
-   `scripts/fleet_apply.py` (~10 LoC)
+   `scripts/fleet/apply.py` (~10 LoC)
 2. Update `_classify_readiness` to check for live chezmoi PID *before*
    classifying source absence as `no-source` (~5 LoC)
 3. Add to the state list in:

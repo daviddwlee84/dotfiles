@@ -10,7 +10,7 @@
 """fleet — umbrella CLI for the chezmoi dotfiles fleet.
 
 Subcommands:
-  apply [...]                  Run chezmoi update --init across the fleet (delegates to scripts/fleet_apply.py)
+  apply [...]                  Run chezmoi update --init across the fleet (delegates to scripts/fleet/apply.py)
   status [--quick] [--live N]  Default: readiness probe.  --live: process-liveness probe (with optional --watch).
   diff HOST                    Shortcut: apply --dry-run --hosts HOST --serial
   tail HOST[:RUN_ID]           Live-tail a host's fleet-apply log
@@ -98,7 +98,7 @@ def _source_path() -> Path:
         except (subprocess.TimeoutExpired, OSError):
             pass
     fallback = Path.home() / ".local" / "share" / "chezmoi"
-    if (fallback / "scripts" / "fleet_apply.py").is_file():
+    if (fallback / "scripts" / "fleet" / "apply.py").is_file():
         return fallback
     print(
         "fleet: cannot locate chezmoi source dir.\n"
@@ -110,9 +110,9 @@ def _source_path() -> Path:
 
 
 def _dispatch_apply(forwarded: list[str]) -> int:
-    """Forward to scripts.fleet_apply.main() with argv swap."""
+    """Forward to scripts.fleet.apply.main() with argv swap."""
     sys.argv = ["fleet apply", *forwarded]
-    from scripts.fleet_apply import main as apply_main
+    from scripts.fleet.apply import main as apply_main
     return apply_main()
 
 

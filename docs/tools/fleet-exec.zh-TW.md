@@ -12,7 +12,7 @@
 姊妹工具：[`fleet pueue`](pueue.md)（結構化 queue 探測）、
 [`fleet tmux`](../this_repo/fleet-apply.md#fleet-tmux--cross-host-tmux-session-summary)
 （tmux session 摘要）、[`fleet info`](../this_repo/fleet-apply.md)
-（系統資訊快照）。四者共用 `scripts/fleet_apply.py` 的 asyncssh +
+（系統資訊快照）。四者共用 `scripts/fleet/apply.py` 的 asyncssh +
 semaphore 底層。
 
 ## 安裝

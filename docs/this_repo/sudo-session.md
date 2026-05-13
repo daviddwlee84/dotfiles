@@ -44,7 +44,7 @@ All three run-scripts use these:
 ## Non-interactive password injection (`CHEZMOI_SUDO_PASSWORD_FILE`)
 
 Used by remote orchestrators that have no TTY at the consuming end — currently
-[`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) over SSH.
+[`scripts/fleet/apply.py`](../../scripts/fleet/apply.py) over SSH.
 
 When `sudo_session_init` is called and:
 

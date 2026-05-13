@@ -49,7 +49,7 @@
 ## 非互動式密碼注入 (`CHEZMOI_SUDO_PASSWORD_FILE`)
 
 被消費端沒有 TTY 的遠端協作器 (orchestrator) 使用 — 目前是
-[`scripts/fleet_apply.py`](../../scripts/fleet_apply.py) 透過 SSH。
+[`scripts/fleet/apply.py`](../../scripts/fleet/apply.py) 透過 SSH。
 
 當 `sudo_session_init` 被呼叫且：
 

@@ -12,7 +12,7 @@ Fan-out a single command over the fleet inventory:
 Output: Rich table by default; `--json` for pipeable per-host records.
 
 This module is invoked by `dot_dotfiles/bin/executable_fleet tmux ...` (the umbrella binary, deployed as `~/.dotfiles/bin/fleet`) and
-shares its inventory + asyncssh plumbing with `scripts/fleet_apply.py` via
+shares its inventory + asyncssh plumbing with `scripts/fleet/apply.py` via
 `from scripts.fleet import ...`.
 """
 from __future__ import annotations

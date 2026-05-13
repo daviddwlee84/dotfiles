@@ -8,7 +8,7 @@
 >
 > **Before applying, run [`just fleet-status`](#readiness-probe-just-fleet-status)** — a read-only pre-flight probe that predicts what `fleet-apply` would do per host (up-to-date / behind / drift / busy / toml-mismatch / not-init / unreachable / ...).
 
-Implementation: [`scripts/fleet_apply.py`](../../scripts/fleet_apply.py)
+Implementation: [`scripts/fleet/apply.py`](../../scripts/fleet/apply.py)
 (uv inline-script: `asyncssh` + `tyro` + `rich`).
 
 See also: [fleet-apply-vs-fabric.md](fleet-apply-vs-fabric.md) for an
@@ -87,11 +87,11 @@ over `just`: it works from any cwd, not just inside the chezmoi source tree.
 
 The umbrella discovers the chezmoi source dir at runtime via `chezmoi
 source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the
-shared `scripts/fleet/` package and the legacy `scripts/fleet_apply.py`. From
+shared `scripts/fleet/` package and the legacy `scripts/fleet/apply.py`. From
 inside the source tree, `just fleet *ARGS` invokes the same binary directly
 (works before the first `chezmoi apply` lands `~/.dotfiles/bin/fleet`).
 
-The existing `just fleet-*` recipes still call `./scripts/fleet_apply.py`
+The existing `just fleet-*` recipes still call `./scripts/fleet/apply.py`
 directly and are unaffected by the umbrella — they remain the muscle-memory
 path for repo work. Pick whichever feels right: same code under the hood.
 
@@ -379,7 +379,7 @@ configured at `chezmoi init` time with a `noRoot` boolean (see
 - Set `no_root_machine = false` for hosts where the remote's `noRoot = false`
 ## How sudo password reaches the remote
 
-`scripts/fleet_apply.py` does **not** echo the password into the command line.
+`scripts/fleet/apply.py` does **not** echo the password into the command line.
 The remote command (assembled by `build_remote_command()`) reads stdin into
 `~/.cache/chezmoi-fleet/sudo.pass` (mode 0600, `umask 077`), exports
 `CHEZMOI_SUDO_PASSWORD_FILE=$PWD/.cache/chezmoi-fleet/sudo.pass`, runs
@@ -623,7 +623,7 @@ disconnect is handled three ways:
    (which is most cases, including normal SIGINT on the controller).
 
 2. **Out-of-band rescue**: if even the in-band trap didn't fire (e.g.
-   `kill -9` on `fleet_apply.py`, or asyncssh closed the channel
+   `kill -9` on `scripts/fleet/apply.py`, or asyncssh closed the channel
    "cleanly" without a HUP delivery), the remote chezmoi/ansible may
    still be running:
 
@@ -754,7 +754,7 @@ your local `.gitignore` if you don't already have one for build artifacts.
   hookScript that bypasses chezmoi's pager handling, kill the orphan with
   `just fleet-apply-kill --hosts <host>` and check that subcommand for
   pager / `read` calls.
-- **Run looks dead after Ctrl+C** — when you Ctrl+C `fleet_apply.py`
+- **Run looks dead after Ctrl+C** — when you Ctrl+C `scripts/fleet/apply.py`
   asyncio cancels each task, which calls `proc.terminate()` and closes the
   SSH connection. The remote wrapper's trap catches the resulting SIGHUP
   and SIGTERMs the chezmoi tree. If anything still survives, run
@@ -770,5 +770,5 @@ your local `.gitignore` if you don't already have one for build artifacts.
   remote, ssh in and run `just upgrade-all` there. fleet_apply intentionally
   stays scoped to chezmoi apply only.
 - [`AGENTS.md`](../../AGENTS.md) — repo invariants, including why
-  `scripts/**` is in `.chezmoiignore.tmpl` (so `fleet_apply.py` is never
+  `scripts/**` is in `.chezmoiignore.tmpl` (so `scripts/fleet/apply.py` is never
   deployed to `$HOME` and only ever runs from the repo).

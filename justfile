@@ -475,7 +475,7 @@ mlf *ARGS:
 
 # Apply chezmoi update to all configured hosts in parallel
 fleet-apply *ARGS:
-    ./scripts/fleet_apply.py {{ARGS}}
+    ./scripts/fleet/apply.py {{ARGS}}
 
 # Edit fleet inventory (~/.config/fleet/machines.toml). Seeds an empty
 # template on first run; opens with $EDITOR (defaults to nvim).
@@ -495,23 +495,23 @@ fleet-edit:
 # Read-only, ~1.5s per host (with `git fetch`). See docs/this_repo/fleet-apply.md
 # § Readiness probe.
 fleet-status *ARGS:
-    ./scripts/fleet_apply.py --readiness {{ARGS}}
+    ./scripts/fleet/apply.py --readiness {{ARGS}}
 
 # Like fleet-status but skip remote `git fetch` (faster, but 'behind' state
 # may be stale). Useful offline or when you only care about drift / busy.
 fleet-status-quick *ARGS:
-    ./scripts/fleet_apply.py --readiness --readiness-no-fetch {{ARGS}}
+    ./scripts/fleet/apply.py --readiness --readiness-no-fetch {{ARGS}}
 
 
 # Preview only: runs `chezmoi diff` on every host (no changes applied)
 fleet-apply-dry-run *ARGS:
-    ./scripts/fleet_apply.py --dry-run {{ARGS}}
+    ./scripts/fleet/apply.py --dry-run {{ARGS}}
 
 # Quick `chezmoi diff` against ONE host (serial, debug-friendly output).
 # Use this in vibe loops to see exactly what your latest commit will do
 # on a specific machine before pushing/applying for real.
 fleet-diff HOST *ARGS:
-    ./scripts/fleet_apply.py --dry-run --hosts {{HOST}} --serial {{ARGS}}
+    ./scripts/fleet/apply.py --dry-run --hosts {{HOST}} --serial {{ARGS}}
 
 # Apply ONLY a single chezmoi target on each host (skips ansible / Brewfile).
 # PATH is the chezmoi target path, e.g. `.config/zsh/aliases.zsh` or
@@ -520,7 +520,7 @@ fleet-diff HOST *ARGS:
 # scope. Internally sets CHEZMOI_FLEET_APPLY_PATH so the wrapper runs
 # `chezmoi apply <relpath>` instead of `chezmoi update --init`.
 fleet-apply-file PATH *ARGS:
-    ./scripts/fleet_apply.py --apply-only-path {{PATH}} {{ARGS}}
+    ./scripts/fleet/apply.py --apply-only-path {{PATH}} {{ARGS}}
 
 # Apply a feature BRANCH instead of pulling main. Each remote does
 # `git fetch origin BRANCH && git checkout -B BRANCH origin/BRANCH &&
@@ -529,42 +529,42 @@ fleet-apply-file PATH *ARGS:
 # state with `git reset --hard`. Local hosts skip this entirely (source
 # is your editor's working tree).
 fleet-apply-branch BRANCH *ARGS:
-    ./scripts/fleet_apply.py --branch {{BRANCH}} {{ARGS}}
+    ./scripts/fleet/apply.py --branch {{BRANCH}} {{ARGS}}
 
 # Like fleet-apply-branch but uses `git reset --hard origin/BRANCH` on
 # remotes, destroying any local divergence. Use after force-pushing a
 # rebased topic branch so every host follows.
 fleet-apply-branch-force BRANCH *ARGS:
-    ./scripts/fleet_apply.py --branch {{BRANCH}} --force-checkout {{ARGS}}
+    ./scripts/fleet/apply.py --branch {{BRANCH}} --force-checkout {{ARGS}}
 
 # Apply to a single named host in --serial mode (debug-friendly output)
 fleet-apply-one HOST *ARGS:
-    ./scripts/fleet_apply.py --hosts {{HOST}} --serial {{ARGS}}
+    ./scripts/fleet/apply.py --hosts {{HOST}} --serial {{ARGS}}
 
 # Kill orphan chezmoi/ansible processes on every host (cleanup after Ctrl+C)
 fleet-apply-kill *ARGS:
-    ./scripts/fleet_apply.py --kill-orphans {{ARGS}}
+    ./scripts/fleet/apply.py --kill-orphans {{ARGS}}
 
 # Probe each host for running chezmoi/ansible (use after killing local SSH)
 fleet-apply-status *ARGS:
-    ./scripts/fleet_apply.py --status {{ARGS}}
+    ./scripts/fleet/apply.py --status {{ARGS}}
 
 # Like fleet-apply-status but re-poll every Ns until everyone is idle
 # (Ctrl+C to stop). Default interval 10s; override with --watch=N in ARGS.
 fleet-apply-watch *ARGS:
-    ./scripts/fleet_apply.py --status --watch 10 {{ARGS}}
+    ./scripts/fleet/apply.py --status --watch 10 {{ARGS}}
 
 # Live-tail the remote fleet-apply log of HOST (defaults to most recent run);
 # pass `HOST:RUN_ID` (e.g. lab-box:20260422T133615Z) to pin a specific run.
 # Ctrl+C stops the viewer only — the remote run keeps going.
 fleet-apply-tail HOST *ARGS:
-    ./scripts/fleet_apply.py --tail {{HOST}} {{ARGS}}
+    ./scripts/fleet/apply.py --tail {{HOST}} {{ARGS}}
 
 # Compact post-mortem summary across the fleet: final task reached, ansible
 # runtime, top slow tasks, failed run_* script, exit code. Defaults to each
 # host's latest run; pin to one run with --compact-run-id RUN_ID in ARGS.
 fleet-apply-compact *ARGS:
-    ./scripts/fleet_apply.py --compact {{ARGS}}
+    ./scripts/fleet/apply.py --compact {{ARGS}}
 
 # ============================================================================
 # Ad-hoc Scripts

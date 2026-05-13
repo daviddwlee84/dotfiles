@@ -8,8 +8,10 @@
 # ]
 # ///
 """
-fleet_apply.py — Run `chezmoi update --init` (or `apply` / `diff`) across a
-fleet of remote hosts in parallel, with optional sudo password injection.
+scripts/fleet/apply.py — Run `chezmoi update --init` (or `apply` / `diff`)
+across a fleet of remote hosts in parallel, with optional sudo password
+injection. (Renamed from `scripts/fleet_apply.py` on 2026-05-13 alongside
+the `fleet chezmoi` namespace refactor.)
 
 Why this exists:
     Pushing dotfile changes to N machines by hand (ssh, type password, wait,

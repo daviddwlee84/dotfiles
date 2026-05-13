@@ -40,7 +40,7 @@
 #                               CHEZMOI_SUDO_PASSWORD_FILE points to a 0600 file
 #                               containing the password, the file is adopted
 #                               instead of prompting (used by remote orchestrators
-#                               like scripts/fleet_apply.py — see docs/this_repo/
+#                               like scripts/fleet/apply.py — see docs/this_repo/
 #                               fleet-apply.md).
 #   sudo_session_skip_reason    Print a one-word label the caller uses to pick
 #                               a branch: "cached" | "passwordless" |
@@ -201,7 +201,7 @@ sudo_session_init() {
     fi
 
     # Non-interactive password injection (used by remote orchestrators like
-    # scripts/fleet_apply.py over SSH). When CHEZMOI_SUDO_PASSWORD_FILE points
+    # scripts/fleet/apply.py over SSH). When CHEZMOI_SUDO_PASSWORD_FILE points
     # to a 0600 file containing the password (one line), adopt it instead of
     # prompting on /dev/tty. The file is moved into the shared state dir and
     # the env-supplied path is unset so subsequent run-scripts use the cached

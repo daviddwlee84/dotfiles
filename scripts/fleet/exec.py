@@ -21,7 +21,7 @@ per-host stdout/stderr/json files; `--full-output` expands the table into
 per-host blocks.
 
 This module is invoked by `dot_dotfiles/bin/executable_fleet exec ...` and
-shares its inventory + asyncssh plumbing with `scripts/fleet_apply.py` via
+shares its inventory + asyncssh plumbing with `scripts/fleet/apply.py` via
 `from scripts.fleet import ...`.
 
 Argparse (not tyro) is used here because the `--` separator + REMAINDER-style

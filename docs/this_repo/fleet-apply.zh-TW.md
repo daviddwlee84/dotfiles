@@ -11,7 +11,7 @@
 > 會落在 `logs/fleet-apply/<UTC-timestamp>/<host>.log`，
 > 程序會以「失敗主機數」作為 exit code（最高封頂 125）。
 
-實作：[`scripts/fleet_apply.py`](../../scripts/fleet_apply.py)
+實作：[`scripts/fleet/apply.py`](../../scripts/fleet/apply.py)
 （uv inline-script：`asyncssh` + `tyro` + `rich`）。
 
 另見：[fleet-apply-vs-fabric.md](fleet-apply-vs-fabric.md)，那是與作者
@@ -92,7 +92,7 @@ password_source = { type = "...", ... }   # 見下文「Password sources」
 
 ## sudo 密碼如何到達遠端
 
-`scripts/fleet_apply.py` **不會**把密碼回顯到命令列上。
+`scripts/fleet/apply.py` **不會**把密碼回顯到命令列上。
 遠端命令（由 `build_remote_command()` 組裝）會把 stdin 讀進
 `~/.cache/chezmoi-fleet/sudo.pass`（mode 0600，`umask 077`），
 匯出 `CHEZMOI_SUDO_PASSWORD_FILE=$PWD/.cache/chezmoi-fleet/sudo.pass`，
@@ -321,7 +321,7 @@ Ansible 本身**沒有逐 task 的 timeout**，所以一個卡住的 `npm instal
    chezmoi（以及任何 ansible-playbook 子程序）會收到 SIGTERM，wrapper 再把 exit code 代回。
    實務上只要 asyncssh 真的關閉 channel（多數情況都會，包括協調器上的正常 SIGINT），這條就會觸發。
 
-2. **Out-of-band 救援**：如果連 in-band trap 都沒觸發（例如 `kill -9` `fleet_apply.py`，
+2. **Out-of-band 救援**：如果連 in-band trap 都沒觸發（例如 `kill -9` `scripts/fleet/apply.py`，
    或 asyncssh「乾淨地」關閉 channel 而沒有送出 HUP），遠端的 chezmoi/ansible 可能還在跑：
 
    ```bash
@@ -436,7 +436,7 @@ pipe 進密碼檔的那段 shell）。
   已經對每次 chezmoi 呼叫傳 `--no-pager`，但若你新增了繞過 chezmoi pager
   處理的自訂 subcommand / hookScript，請用 `just fleet-apply-kill --hosts <host>` 殺孤兒，
   並檢查該 subcommand 是否含 pager / `read` 呼叫。
-- **Ctrl+C 後 run 看起來死了** —— 當你 Ctrl+C 掉 `fleet_apply.py` 時，
+- **Ctrl+C 後 run 看起來死了** —— 當你 Ctrl+C 掉 `scripts/fleet/apply.py` 時，
   asyncio 會 cancel 每個 task，會呼叫 `proc.terminate()` 並關閉 SSH 連線。
   遠端 wrapper 的 trap 會接住產生的 SIGHUP，並對 chezmoi tree 送 SIGTERM。
   若還有東西活著，跑 `just fleet-apply-kill` 會對每台主機的 `chezmoi` /
@@ -449,5 +449,5 @@ pipe 進密碼檔的那段 shell）。
 - [`docs/this_repo/upgrades.md`](upgrades.md) —— 要升級遠端的工具，
   ssh 進去那台主機跑 `just upgrade-all`。fleet_apply 刻意只限定於 chezmoi apply。
 - [`AGENTS.md`](../../AGENTS.md) —— 倉庫不變量，包括為何
-  `scripts/**` 在 `.chezmoiignore.tmpl` 中（這樣 `fleet_apply.py` 永遠不會
+  `scripts/**` 在 `.chezmoiignore.tmpl` 中（這樣 `scripts/fleet/apply.py` 永遠不會
   被部署到 `$HOME`，只能從倉庫內執行）。
