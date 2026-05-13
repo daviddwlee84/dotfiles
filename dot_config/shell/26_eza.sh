@@ -5,14 +5,15 @@ command -v eza &>/dev/null || return 0
 
 # Replace ls with eza
 # Options:
-#   --icons=always  - Show file type icons
-#   --color=always  - Enable colors
+#   --icons=auto   - Show icons on TTY; disabled when piped (so `ls | grep` is clean)
+#   --color=auto   - Colors on TTY; disabled when piped
 #   --group-directories-first - Keep directories grouped together
-# Uses eza's default compact grid layout (multiple items per line)
-alias ls="eza --icons=always --color=always --group-directories-first"
+# Interactive use looks identical; pipes get plain output automatically.
+# To force colors through a pager: `ls --color=always --icons=always | less -R`.
+alias ls="eza --icons=auto --color=auto --group-directories-first"
 
 # Additional useful aliases
-alias la="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso --all"
-alias ll="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso"
-alias lt="eza --icons=always --color=always --tree --level=2"
-alias llt="eza --icons=always --color=always --long --header --git --git-repos --group-directories-first --time-style=long-iso --tree --level=3"
+alias la="eza --icons=auto --color=auto --long --header --git --git-repos --group-directories-first --time-style=long-iso --all"
+alias ll="eza --icons=auto --color=auto --long --header --git --git-repos --group-directories-first --time-style=long-iso"
+alias lt="eza --icons=auto --color=auto --tree --level=2"
+alias llt="eza --icons=auto --color=auto --long --header --git --git-repos --group-directories-first --time-style=long-iso --tree --level=3"

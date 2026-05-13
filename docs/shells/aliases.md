@@ -48,11 +48,11 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ls` | alias | `dot_config/shell/26_eza.sh` | Compact listing with icons, colors, git status |
-| `la` | alias | `dot_config/shell/26_eza.sh` | Long listing including hidden files, sorted dirs-first |
-| `ll` | alias | `dot_config/shell/26_eza.sh` | Long listing, sorted dirs-first (no hidden files) |
-| `lt` | alias | `dot_config/shell/26_eza.sh` | Tree view, 2 levels deep |
-| `llt` | alias | `dot_config/shell/26_eza.sh` | Long tree view, 3 levels deep |
+| `ls` | alias | `dot_config/shell/26_eza.sh` | Compact listing; icons + colors on TTY, plain when piped |
+| `la` | alias | `dot_config/shell/26_eza.sh` | Long listing including hidden files, dirs-first; icons/colors auto |
+| `ll` | alias | `dot_config/shell/26_eza.sh` | Long listing, dirs-first (no hidden files); icons/colors auto |
+| `lt` | alias | `dot_config/shell/26_eza.sh` | Tree view, 2 levels deep; icons/colors auto |
+| `llt` | alias | `dot_config/shell/26_eza.sh` | Long tree view, 3 levels deep; icons/colors auto |
 
 ---
 
@@ -706,3 +706,15 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `conda` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | First call lazy-inits any of miniforge3 / miniconda3 / anaconda3 (autodetects `~/miniforge3` etc.) then re-execs with given args. Saves ~200ms shell startup vs eager init. |
 | `mamba` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | Same lazy init as `conda` — picks up `etc/profile.d/mamba.sh` from full distro install. |
 | `micromamba` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | Lazy-init for the single-binary mamba (`~/.local/bin/micromamba`). Resolves `$MAMBA_ROOT_PREFIX` from env or autodetects `~/.local/share/mamba` / `~/micromamba`. Coexists with full-distro conda — both hooks evaluated if both present. Common on noRoot / EL7 / glibc-old hosts where conda-forge is the modern-toolchain escape hatch — see `docs/infra/linux-toolchain-baseline.md`. |
+
+---
+
+## Dotfiles management
+
+> Wrappers + reload hint around `chezmoi apply` / `chezmoi update`. The hint fires once per shell session when an apply happened after the shell was born; opt out with `export CHEZMOI_RELOAD_HINT=0`.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `cas [ARGS…]` | function | `dot_config/shell/99_chezmoi_reload.sh` | `chezmoi apply $@` then `exec $current_shell -l` on success. Use instead of `chezmoi apply` when you want the new rc to take effect immediately in *this* terminal |
+| `cau [ARGS…]` | function | `dot_config/shell/99_chezmoi_reload.sh` | Same as `cas` but for `chezmoi update` (pull + apply) |
+| reload hint | precmd hook | `dot_config/shell/99_chezmoi_reload.sh` | After `chezmoi apply` (any invocation: bare `chezmoi apply`, `just chezmoi-apply`, `fleet-apply` local), each pre-existing shell shows `ℹ chezmoi applied changes — run exec $SHELL -l or source ~/.zshrc to reload` on its next prompt. Once per session. Sentinel: `~/.cache/chezmoi/last-apply` (touched by `.chezmoiscripts/global/run_after_99_signal_reload.sh.tmpl`) |

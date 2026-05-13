@@ -1,0 +1,22 @@
+#!/bin/bash
+# Touch a sentinel after every `chezmoi apply` so shells that were started
+# before this apply can detect (on their next prompt) that dotfiles changed
+# and remind the user to `source ~/.zshrc` or `exec $SHELL -l`.
+#
+# Wired up in:
+#   - dot_config/shell/99_chezmoi_reload.sh    (shared backend, cas/cau, hook registration)
+#
+# Hook registration lives inside the shared backend (not per-shell tier dirs)
+# because dot_bashrc.tmpl loads $BASH_CONFIG_DIR before $XDG_CONFIG_HOME/shell.
+#
+# `run_after_99_*` (not `run_onchange_after_*`) so it fires every apply --
+# that's the signal we want. Cost is one `touch` per apply.
+#
+# Opt out (suppresses the hint in your shell sessions, sentinel still touched):
+#   export CHEZMOI_RELOAD_HINT=0
+
+set -e
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
+mkdir -p "$cache_dir"
+touch "$cache_dir/last-apply"

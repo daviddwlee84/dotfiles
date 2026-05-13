@@ -109,10 +109,77 @@ fi
 {{ end -}}
 info "Running brew bundle..."
 
+# `chezmoi apply` is install-only by design (see AGENTS.md). Skip the implicit
+# `brew update` that `brew bundle` would otherwise trigger -- it slows things
+# down, and on hosts using a Chinese mirror it can transiently fail with
+# "Unable to find <sha> under https://mirrors.aliyun.com/homebrew/brew.git"
+# while the mirror catches up to upstream. Upgrades go through `just upgrade-*`.
+export HOMEBREW_NO_AUTO_UPDATE=1
+# Quiet "you have N outdated formulae" hints during install-only flow.
+export HOMEBREW_NO_INSTALL_UPGRADE=1
+
+{{ if eq .chezmoi.os "darwin" -}}
+# --- Adopt pre-flight (macOS only)
+# Casks installed manually (drag .app into /Applications) are invisible to brew
+# until "adopted". Without this, `brew bundle` re-downloads & re-installs apps
+# the user already has, often failing on transient CDN errors. `--adopt` writes
+# Caskroom metadata in-place without downloading. Skipped silently for casks
+# whose .app isn't present (the regular bundle pass will install them).
+adopt_existing_casks() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+    command -v brew >/dev/null 2>&1 || return 0
+
+    local cask_list
+    cask_list="$(brew bundle list --casks --file="$file" 2>/dev/null)" || return 0
+    [[ -n "$cask_list" ]] || return 0
+
+    local adopted=0 already=0 skipped=0 failed=0 cask
+    while IFS= read -r cask; do
+        [[ -n "$cask" ]] || continue
+        # Already tracked by brew? Nothing to do.
+        if brew list --cask "$cask" >/dev/null 2>&1; then
+            already=$(( already + 1 ))
+            continue
+        fi
+        # Try adopt; --adopt is a no-op-error when no matching artifact exists,
+        # so we suppress stderr and only count true failures.
+        if brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+            adopted=$(( adopted + 1 ))
+            info "  adopted: $cask"
+        else
+            # Distinguish "no .app to adopt" (expected) from real errors by
+            # peeking at /Applications. Cheap heuristic; brew prints the
+            # exact .app name only when it actually attempts adoption.
+            skipped=$(( skipped + 1 ))
+        fi
+    done <<< "$cask_list"
+
+    if (( adopted > 0 || already > 0 )); then
+        info "Adopt pre-flight: $adopted newly adopted, $already already tracked, $skipped not present, $failed failed"
+    fi
+}
+
+info "Adopt pre-flight: scanning Brewfile.darwin for manually-installed casks..."
+adopt_existing_casks "$BREWFILE_DIR/Brewfile.darwin"
+{{ end -}}
+
 # Run brew bundle up to N times. Subsequent attempts only retry items that
 # failed (already-installed packages are skipped quickly). This papers over
 # transient GitHub CDN / HTTP/2 errors that commonly hit large cask lists.
+# Between attempts we wipe Homebrew's `.incomplete*` lockfiles so a previously
+# interrupted parallel `brew fetch` doesn't poison the retry with
+# "process has already locked ... .incomplete" errors.
 BUNDLE_MAX_ATTEMPTS="${BUNDLE_MAX_ATTEMPTS:-2}"
+clear_brew_download_locks() {
+    local cache_dir
+    cache_dir="$(brew --cache 2>/dev/null)/downloads"
+    [[ -d "$cache_dir" ]] || return 0
+    # Both .incomplete data files and their .lock siblings.
+    find "$cache_dir" -maxdepth 1 -name '*.incomplete*' -print -delete 2>/dev/null \
+        | head -20 \
+        | while IFS= read -r f; do info "  cleared stale lock: $(basename "$f")"; done
+}
 run_bundle_with_retry() {
     local file="$1"
     local label="$2"
@@ -122,6 +189,7 @@ run_bundle_with_retry() {
             info "Installing $label..."
         else
             info "Retrying $label (attempt $attempt/$BUNDLE_MAX_ATTEMPTS, only missing items)..."
+            clear_brew_download_locks
         fi
         if brew bundle --file="$file" --no-upgrade; then
             return 0
