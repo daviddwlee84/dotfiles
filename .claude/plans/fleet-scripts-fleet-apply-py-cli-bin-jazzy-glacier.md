@@ -1,261 +1,308 @@
-# Plan: `fleet pueue` cross-host queue view + `pqsum` AI summarizer (with cleanup/recovery analysis)
+# Plan: `fleet exec` — cross-host argv-list command runner with AI summary
 
 ## Context
 
-Surfaced 2026-05-13. Pueue is installed everywhere (brew on macOS, cargo+systemd-user on Linux). Today `pqsum` (zsh function, `dot_config/zsh/tools/36_pueue.zsh:33`) prints a per-group queue table — but only for *one* host you're logged into. There is no cross-host view, and the only existing AI summarizer is `tsum` for tmux.
+Surfaced 2026-05-13 after `fleet pueue` shipped (commits `7c130c3` feat + `bae1f48` / `03fcf09` fixes). The pueue work delivered cross-host *structured* probing — JSON queue state pipes into `pqsum ai`. The next gap: cross-host *ad-hoc* command execution.
 
-Goal: bring pueue to parity with `tsum` / `fleet tmux` / `fleet info`, **plus** extend the AI summary with actionable cleanup + failure-recovery suggestions (the analog of `tsum`'s `safe/check/keep` closability tiers, applied to pueue groups/tasks).
+User signal:
+> 然後是不是fleet加一個 可以方便我同時在多臺host上執行command並且等待收集結果的subcommand？
 
-Three user-confirmed design choices:
+Existing fleet subcommands (`tmux`, `info`, `pueue`) are all specialised: each ships a fixed bash blob and parses structured output. None help when the user wants to:
+- Run `pueue --version` everywhere (audit version drift — exactly the jingle207 case)
+- Run `df -h /` everywhere (disk pressure check)
+- Run `systemctl --user status pueued` everywhere (daemon health)
+- Run anything else ad-hoc, just once
 
-1. **Remote model — "Both, layered"**: this round uses SSH fan-out (matches `scripts/fleet/{tmux,info}.py` semaphore-8 asyncssh pattern), works through ProxyJump, zero new infra. A follow-up adds upstream's [TLS remote-connect](https://github.com/Nukesor/pueue/wiki/Connect-to-remote) for `pueue -c HOST add/kill`.
-2. **AI scope — "Both fleet + local"**: `fleet pueue --ai` for cross-host *and* `pqsum --ai` for single-host. Forces migrating pqsum from zsh-only function to Python so:
-   - Bash gets it (TODO.md:41 zsh→bash port resolved)
-   - One AI prompt template shared between local + fleet
-   - `fleet pueue --ai` is implemented by piping the merged cross-host JSON *into the same Python binary's AI subcommand*
-3. **Cleanup + recovery analysis** (NEW, this turn): the AI mode classifies each task/group and emits cleanup verdicts + failure-recovery suggestions, similar to how `tsum` tells you which tmux sessions are safe to close.
+`fleet exec` is the missing primitive. Fleet already has the asyncssh + semaphore-8 + inventory plumbing — this is a thin wrapper that exposes it directly. Aligns with the Ansible-ad-hoc / parallel-ssh use case but without leaving the existing umbrella.
 
-Architecture mirror: `tsum` does the closability-rating thing today (`dot_config/tmux/executable_tmux-session-summary.py:PROMPT_PREAMBLE` lines 450-503 — `closability ∈ safe/check/keep`, `closability_reason ≤50 chars`).
+ChatGPT's analysis (user-provided 2026-05-13) crystallises the API:
+- `--` is the standard wrapper-CLI separator (ssh / docker / cargo / pytest precedent) — argv after it is opaque to fleet's own parser, prevents flag collision
+- Argv list (default) is the safe choice — no shell quoting/injection, no accidental globbing
+- `--shell` and `--login` are orthogonal opt-ins that compose for users who explicitly want shell expansion or rc-loaded env
+
+User decisions confirmed via AskUserQuestion:
+1. **Shape**: argv list, not shell string (default).
+2. **AI**: in scope this round.
+3. **AICAP module timing**: build `fleet exec --ai` now using the existing AICAP code from `executable_pqsum` (4th Python consumer — extraction TODO promotes from `[?/M]` to higher priority after this).
 
 ## Approach
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  Local single-host:                                                       │
-│      pqsum                  → text table (today's behaviour, ported)      │
-│      pqsum --ai             → AI summary + cleanup verdicts (NEW)         │
-│      pqsum --ai --report    → markdown report + verdicts (NEW)            │
-│      pqsum --ai --clean     → markdown report THEN execute cleanups       │
-│                                (interactive confirmation per group)       │
-│      pqsum --json           → raw merged JSON                             │
+│  Default (argv list, no shell):                                          │
+│      fleet exec -- pueue --version                                       │
+│      fleet exec --hosts H1,H2 -- df -h /                                 │
+│      fleet exec --serial -- systemctl --user status pueued               │
 │                                                                            │
-│  Cross-host:                                                               │
-│      fleet pueue            → table (host × group rows)                   │
-│      fleet pueue --ai       → cross-host AI summary + verdicts            │
-│      fleet pueue --ai --report → cross-host markdown report               │
-│      fleet pueue --json     → raw merged JSON                             │
+│  Shell mode (opt-in for pipes / globs / redirects):                      │
+│      fleet exec --shell -- 'cat *.log | grep ERROR > /tmp/e.txt'         │
+│      fleet exec --shell zsh -- 'echo $0 $ZSH_VERSION'                    │
 │                                                                            │
-│  (--clean is INTENTIONALLY local-only this round. Cross-host destructive  │
-│   ops need TLS layer or explicit `ssh HOST pueue clean ...` — out of      │
-│   scope; see § Out of scope.)                                              │
+│  Login mode (opt-in for rc-loaded env: aliases, conda, mise, pyenv):     │
+│      fleet exec --login -- pueue --version                               │
+│      fleet exec --login --shell -- 'conda activate myenv && python ...' │
+│                                                                            │
+│  AI summary (succeeded / differed / failed tiers):                       │
+│      fleet exec --ai -- pueue --version                                  │
+│      fleet exec --ai --report --out /tmp/fleet-versions.md -- df -h /    │
+│                                                                            │
+│  Output formats:                                                          │
+│      fleet exec --json -- ...        → JSON array, one record per host   │
+│      fleet exec --out-dir DIR -- ... → per-host stdout/stderr/json files │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**DRY anchor**: the AI prompt template + agent dispatch + SHA cache + verdict rendering live ONLY in `dot_dotfiles/bin/executable_pqsum`. `scripts/fleet/pueue.py --ai` merges the cross-host JSON, then shells out: `pqsum ai --stdin-json --multi-host` to render. One template, one classifier.
+The four flags (`--shell`, `--login`, `--ai`, `--json`/`--out-dir`) are independent and compose freely. Defaults bias for safety (no shell, no rc) and speed (no AI).
 
-## AI prompt design (cleanup + recovery)
+## API design (locked)
 
-Prompt structure mirrors `tmux-session-summary.py:PROMPT_PREAMBLE` but pueue-themed. Strict-JSON output schema:
+### Argv vs `--shell`
 
-```json
+| Mode | Wire format | Use when |
+|---|---|---|
+| **Default (argv list)** | asyncssh `conn.run(["pueue", "--version"])` — execvp-style on remote, no shell | Most ad-hoc commands. Variable interpolation, pipes, globs DO NOT work. |
+| **`--shell`** | `conn.run("bash -c '<reassembled cmd>'")` | Pipes (`|`), globs (`*`), redirects (`>`), env-prefix (`FOO=bar cmd`), `&&` chains. |
+| **`--shell zsh`** | `conn.run("zsh -c '<...>'")` | When the user wants zsh-specific syntax. Falls back to bash with a warning if zsh isn't installed. |
+
+`--` is required before the command in BOTH modes. tyro/argparse will refuse to parse fleet flags past `--`, which is exactly the desired behaviour.
+
+In argv mode the command is passed as a list `["pueue", "--version"]`. asyncssh's `conn.run(cmdlist)` quotes per-arg via `shlex.quote()` internally when building the remote string — safe by construction. In `--shell` mode we re-join with `shlex.quote()` per arg into a single string, then prepend `bash -c ` (or whichever shell). The single-arg form `--shell -- 'cat *.log | wc'` is also accepted as a convenience: tyro receives one positional arg, we pass it through verbatim.
+
+### Login vs default
+
+| Mode | Wire format | Use when |
+|---|---|---|
+| **Default (no-login)** | Direct command + our standard PATH prelude (chezmoi → cargo → uv → ~/bin → brew → linuxbrew) | Most use cases. Fast (no rc-file load), predictable PATH. |
+| **`--login`** | Wraps in `bash -lc '<full cmd>'` (with `zsh -lc` if `--shell zsh`) | Tools that need rc-set env: `nvm`, `mise`, `pyenv`, `conda activate`, shell aliases/functions. Slower (~150-500ms per host). |
+
+Caveat noted in docs: on hosts where the user's primary shell is zsh, `bash -lc` doesn't source zshrc — only bashrc/profile. So login mode + zsh-only PATH additions (e.g. conda init blocks in zshrc) won't work unless `--shell zsh --login` is used together.
+
+`--no-augment-path` exists as an escape hatch: skip the PATH prelude entirely (and skip rc-loading) to debug "what does SSH see by default on this host". Mutually exclusive with `--login`.
+
+### `--ai` mode
+
+Mirrors the `fleet pueue --ai` shape but with a different prompt domain. Prompt template:
+
+```
+You are reviewing the per-host output of a single shell command run across a
+developer's fleet. Identify the cluster-majority output, then classify each
+host:
+
+  - "succeeded"  → rc=0 AND stdout matches the majority pattern
+  - "differed"   → rc=0 BUT stdout differs (version drift, config drift,
+                   different OS, etc.)
+  - "failed"     → rc≠0 OR SSH/timeout error
+
+For each host emit a <=60-char `summary` (e.g. "pueue 4.0.1 — older than
+cluster majority"; "permission denied on /var/log"; "host unreachable").
+
+Provide a `fleet_summary` (<=160 chars) that highlights the most actionable
+divergence — version laggards, failing hosts, anomalous configs.
+
+Respond with STRICT JSON only:
 {
-  "hosts": [                                ← single-element array in local mode
-    {
-      "host": "chimera",
-      "daemon": "Running",
-      "groups": [
-        {
-          "name": "default",
-          "summary": "13 done sklearn experiments, all completed cleanly",   ≤80 chars
-          "cleanability": "safe-to-clean",   ← safe-to-clean | review | keep
-          "cleanability_reason": "all 13 tasks Done, exit 0, no Failed",       ≤60 chars
-          "cleanup_command": "pueue clean -g default",                          ← exact command
-          "tasks_highlight": [                ← up to 3 noteworthy tasks
-            {"id": 47, "status": "Failed", "summary": "OOM on epoch 3",
-             "recovery_hint": "task 52 used same args with --mem 8G and succeeded; rerun w/ that flag",
-             "recovery_command": "pueue add --after 47 -g default -- python train.py --mem 8G"}
-          ]
-        }
-      ],
-      "overall_summary": "1 group safe to clean, 1 task needs recovery (oom)"   ≤120 chars
-    }
+  "command": "<argv joined for display>",
+  "majority_output": "<the cluster-majority stdout summary, may be empty>",
+  "hosts": [
+    {"host": "<name>", "tier": "succeeded|differed|failed",
+     "summary": "<<=60 chars>", "rc": <int>, "elapsed_ms": <int>}
   ],
-  "fleet_summary": "3/5 hosts have nothing pending; chimera has 1 OOM failure with recovery hint"   ← only present in multi-host
+  "fleet_summary": "<<=160 chars>"
 }
 ```
 
-Cleanability tiers:
-- **`safe-to-clean`** — group has only `Done` (exit 0) and `Success` statuses; tasks older than 24h; no in-flight or queued. Suggested action: `pueue clean -g <group>` or `pueue remove <ids>`.
-- **`review`** — mixed Done + Failed, or recent (<2h) completions, or Stashed/Paused entries. Don't auto-clean; user judgement.
-- **`keep`** — has `Running`/`Queued`/`Paused`; or recent failures with no recovery hint; or contains tasks referenced by `--after` chains that are still pending.
+AICAP infrastructure is **copy-pasted** from `dot_dotfiles/bin/executable_pqsum`:
+- `_SSOT_PATH_CANDIDATES` + `_load_ssot_defaults()` regex parser
+- `AGENT_CONFIG` dict + `_with_model()` helper
+- `detect_agent()`, `model_for()`, `invoke_agent()`, `_invoke_http()`
+- `_CACHE_VERSION`, `_cache_path()`, `_cache_lookup()`, `_cache_save()`
+- `parse_reply()` (adapted to the new JSON shape)
 
-Recovery analysis heuristics (in PROMPT_PREAMBLE, given to the LLM):
-1. **Same-command-as-a-success**: if a Failed task's command string matches (or fuzzy-matches) a later Done task with same group and same env vars → mark "already covered by task N".
-2. **`pueue restart`-eligible**: transient failures (exit 124 timeout, exit 137 OOM-kill, exit 143 SIGTERM) → suggest `pueue restart <id>` with concrete flag adjustments (e.g. for 137 → "increase memory, retry with larger instance").
-3. **Cascade failures**: if multiple consecutive tasks failed with same exit code on same group → suggest the group is misconfigured, not the tasks. Recovery hint: "investigate group config (likely OOM / disk / network)".
-4. **Stale Paused/Stashed**: tasks Paused for >24h → suggest "stale; either pueue start or pueue remove".
+This duplicates ~250 LOC, making `fleet exec` the **4th** Python consumer of `dot_config/shell/04_ai_agents.sh` (alongside `tmux-session-summary.py`, `aiblock.py`, `executable_pqsum`). The TODO entry `[?/M] Extract AICAP Python dispatch into shared module` is promoted to higher priority by this commit; doing the extraction first was considered and rejected per user choice ("can have --ai mode with existing AICAP").
 
-**Cache invalidation**: SHA includes task IDs + status + timestamps, so the cache hits only when the queue state is identical. New task → new SHA → fresh AI call.
+`--ai --report` emits markdown (Summary / Succeeded hosts / Differed hosts / Failed hosts / Raw outputs).
+`--ai --refresh` bypasses cache.
+`--ai --dry-run` prints the prompt without calling the LLM.
 
-**Output formats**:
-- `pqsum ai` (default): Rich-rendered blocks per host with color-coded verdicts (green=safe-to-clean, yellow=review, red=keep+failure-with-recovery).
-- `pqsum ai --report`: emits a markdown document to stdout (or `--out PATH`). Suggested location: `~/notes/pueue-reports/YYYY-MM-DD-HHMMSS.md` (NOT committed; this is a personal artifact). Sections: "## Summary", "## Cleanup Candidates" (with the exact `pueue clean` / `pueue remove` commands), "## Failures Needing Action" (recovery hints + commands), "## Raw status" (collapsed `pueue status` table).
-- `pqsum ai --clean`: emits the report first, then for each `safe-to-clean` group prompts `y/N` and runs the suggested cleanup command on confirm. `--yes` skips prompt (foot-gun guard: requires `safe-to-clean` AND `--yes` together; `review`/`keep` are NEVER auto-cleaned even with `--yes`).
+### Output table (default render)
+
+```
+                          fleet exec — pueue --version
+┏━━━━━━━━━━━━━━┳━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━┓
+┃ HOST         ┃ RC ┃ STDOUT (1L)    ┃   ms ┃
+┡━━━━━━━━━━━━━━╇━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━┩
+│ self         │  0 │ pueue 4.0.1    │  120 │
+│ hanru_mac    │  0 │ pueue 4.0.2    │  610 │
+│ ts_nas       │  0 │ pueue 4.0.1    │  990 │
+│ jingle207    │  0 │ pueue 4.0.2    │  450 │
+│ david_ubuntu │  0 │ pueue 4.0.2    │  720 │
+└──────────────┴────┴────────────────┴──────┘
+```
+
+- STDOUT cell: first line of stdout, Rich auto-truncates to terminal width.
+- Non-zero RC: red cell + show first line of stderr instead of stdout.
+- SSH/timeout failure: RC="N/A", STDOUT="<error class>", row dimmed.
+- `--full-output` flag: render the full (host, rc, stdout, stderr) blocks below the table.
+
+`--json` emits one record per host:
+```json
+[{"host":"self","rc":0,"stdout":"pueue 4.0.1\n","stderr":"","elapsed_ms":120}, ...]
+```
+
+`--out-dir DIR` writes per-host files (one set per host):
+- `DIR/<host>.stdout`
+- `DIR/<host>.stderr`
+- `DIR/<host>.json` (rc, elapsed, argv echo)
 
 ## Files to change
 
 | File | Change | Notes |
 |---|---|---|
-| `dot_dotfiles/bin/executable_pqsum` | **NEW** Python uv-script (PEP 723). Subcommands: `text` (default), `ai`, `json`. AI flags: `--report`, `--out PATH`, `--clean`, `--yes`, `--multi-host`, `--stdin-json`, `--deep`. Mirrors `pqsum_use_color/_progress_bar/_align_table` helpers from `36_pueue.zsh` (port to Python). | uv-script with `# /// script` PEP 723 header; deps likely just `rich` for table rendering, stdlib for everything else. |
-| `dot_config/zsh/tools/36_pueue.zsh` | **DELETE** — file becomes empty after migration. (Three helpers + `pqsum` function all move into Python binary.) | Removes zsh-only `${@[$idx]}` indexing flagged in TODO.md:41. |
-| `scripts/fleet/pueue.py` | **NEW** — mirrors `scripts/fleet/tmux.py` skeleton. `discover_pueue(hosts) -> list[HostResult]`, `_run_one(host)` SSH-execs `command -v pueue >/dev/null && pueue status --json 2>/dev/null \|\| echo '{"error":"unavailable"}'`. Parses to `PueueSnapshot` dataclass. Renders Rich table (host × group rows) or JSON. `--ai` flag merges JSON across hosts, pipes to `pqsum ai --stdin-json --multi-host`. `--ai --report` adds `--report` passthrough. | Reuses `_connect_kwargs` (scripts/fleet_apply.py:556) and the `asyncio.Semaphore(8)` + `asyncio.gather` pattern verbatim. |
-| `scripts/fleet/__init__.py` | Re-export `discover_pueue`, `PueueSnapshot`. | One-line additions. |
-| `dot_dotfiles/bin/executable_fleet` | Add `pueue` subcommand. Flags forwarded: `--hosts`, `--group`, `--json`, `--serial`, `--ai`, `--report`, `--out`, `--deep`. | Follow pattern at existing `tmux`/`info` dispatch sites. **Note**: `--clean` is NOT forwarded — fleet→clean would imply remote destructive ops, deferred to TLS-layer follow-up. |
-| `justfile` | Add `fleet-pueue *ARGS:` recipe. | Matches existing `fleet-tmux`, `fleet-info`. |
-| `CLAUDE.md` | Two row updates: (a) fleet cross-file row — add `scripts/fleet/pueue.py` and `dot_dotfiles/bin/executable_pqsum`. (b) AI agent autodetect row — pqsum becomes the **third** Python consumer of the SSOT (alongside `tmux-session-summary.py` and `scripts/aiblock.py`). | The duplication-of-3 triggers a follow-up refactor (listed in § Follow-ups). |
-| `docs/tools/pueue.md` | **NEW** tool doc covering: install (brief); local `pqsum text/ai/json` including `--report` and `--clean`; cross-host `fleet pueue [--ai] [--json] [--report]`; AI prompt + caching; cleanup verdict tiers + recovery hints semantics; deferred TLS remote-connect (one sentence + link). | Style: match `docs/tools/sms.md`. |
-| `docs/tools/pueue.zh-TW.md` | **NEW** zh-TW mirror with terminology rule preamble. | Required by mkdocs i18n. |
-| `mkdocs.yml` | Nav entry: `- Pueue: tools/pueue.md`. | After: `uv run mkdocs build --strict`. |
-| `docs/this_repo/fleet-apply.md` | Add `pueue` row to subcommand table near `tmux`/`info`. Mention `--ai` and SSH-only/TLS-later layering. | Keep existing invariants intact. |
-| `TODO.md` | Mark `[M] Pueue config via chezmoi` as **partial**. Remove `36_pueue.zsh` bash-port entry (resolved). Add: `[?/M] Pueue TLS remote-connect profiles`, `[?/M] Extract AICAP Python dispatch into shared module (3 consumers now)`, `[?/S] Auto-archive pqsum --ai --report output to ~/notes/pueue-reports/`. | Per project-knowledge-harness convention. |
+| `scripts/fleet/exec.py` | **NEW** ~400 LOC. Mirrors `scripts/fleet/pueue.py` skeleton: `_run_one` over asyncssh with semaphore-8, per-host `HostResult` dataclass, table/JSON/out-dir rendering, `--ai` path that copy-pastes AICAP from `executable_pqsum`. | Owns its own `AGENT_CONFIG`, `detect_agent`, `invoke_agent`, cache. New `AIEXEC_PROMPT_PREAMBLE` constant for the succeeded/differed/failed classifier. |
+| `dot_dotfiles/bin/executable_fleet` | Add `exec` to USAGE block + dispatch dict, mirror the `pueue` entry. | The `--` separator must be passed through to `scripts.fleet.exec.main()` — verify tyro accepts unknown args after `--` (already used by tmux/info dispatch). |
+| `docs/this_repo/fleet-apply.md` | Add `fleet exec [...]` row to the subcommand table near `tmux` / `info` / `pueue`. | One-line summary + link to `docs/tools/fleet-exec.md`. |
+| `docs/tools/fleet-exec.md` | **NEW**. Mirror `docs/tools/pueue.md` structure: install (auto), three modes (argv / `--shell` / `--login`), AI tiers, examples (version audit, disk audit, daemon health). | Includes the orthogonal-flags composition table. |
+| `docs/tools/fleet-exec.zh-TW.md` | **NEW** zh-TW mirror with terminology preamble. | Required by mkdocs i18n. |
+| `mkdocs.yml` | Nav entry `- fleet exec: tools/fleet-exec.md` under tools section. | Run `uv run mkdocs build --strict` (baseline = 12 pre-existing warnings, none new). |
+| `CLAUDE.md` | (a) Fleet cross-file row: add `scripts/fleet/exec.py` and `docs/tools/fleet-exec.md`. (b) AI agent autodetect row: bump consumer count `three → four`; explicitly call out that the extraction TODO is now blocking ergonomics. | Two row edits. |
+| `TODO.md` | Promote `[?/M] Extract AICAP Python dispatch into shared module` to `[P2/M]`. Update the `fleet exec` entry status from `Planned` to `Done <date>` with the commit hash. | |
+| `backlog/fleet-exec.md` | Status: Planned → Done `<date>`. Add Resolution section noting the API decisions locked here. | Per project-knowledge-harness convention. |
 
 ## Architecture detail
 
-### `executable_pqsum` Python structure
+### `scripts/fleet/exec.py` structure
 
 ```
-executable_pqsum
-├── PROMPT_PREAMBLE: str   (≈60-line system prompt; strict-JSON spec with cleanability+recovery fields)
-├── AGENT_CONFIG: dict     (claude/opencode/codex/cursor-agent; copy from tmux-session-summary.py:95-138)
-├── load_ssot()            (regex-parse dot_config/shell/04_ai_agents.sh — fallback when env not inherited)
-├── parse_pueue_json(raw)  (port jq pipeline from 36_pueue.zsh:76-238 to Python — overall + per-group + status breakdown)
-├── render_text(snapshot)  (port pqsum_progress_bar + pqsum_align_table)
-├── render_ai(snapshot, multi_host=False)
-│     ├── prompt = PROMPT_PREAMBLE + json.dumps(snapshot)
-│     ├── cache_key = sha256(prompt)[:16]
-│     ├── ~/.cache/pqsum/<key>.json   (TTL via PQSUM_MIN_REFRESH_INTERVAL, default 120s)
-│     ├── on miss → _aiagent_invoke(agent, prompt) → strict-JSON parse → cache + render
-│     └── on hit → load cached JSON → render
-├── render_report(parsed_ai) → markdown to stdout or --out PATH
-├── execute_cleanup(parsed_ai, yes=False) → for each safe-to-clean group: prompt+run command (skips review/keep always)
-└── main()
-      ├── pqsum [text]                              → render_text(parse_pueue_json(`pueue status --json`))
-      ├── pqsum json                                → print parse_pueue_json output
-      ├── pqsum ai [--multi-host] [--stdin-json]    → render_ai
-      ├── pqsum ai --report [--out PATH]            → render_report
-      └── pqsum ai --clean [--yes]                  → render_report + execute_cleanup
+scripts/fleet/exec.py
+├── _SSOT_PATH_CANDIDATES / _load_ssot_defaults / _env_or_ssot
+│       (copy from executable_pqsum:30-70)
+├── AICAP_* module-level constants
+│       (copy from executable_pqsum:73-95)
+├── AGENT_CONFIG dict + _with_model
+│       (copy from executable_pqsum:97-120)
+├── AIEXEC_PROMPT_PREAMBLE: str
+│       (NEW — succeeded/differed/failed classifier prompt; ~30 lines)
+├── @dataclass HostResult: host, rc, stdout, stderr, elapsed_ms, error
+├── async def _run_one(host, argv, shell, login, augment_path)
+│       SSH-exec command per the chosen mode; return HostResult
+├── async def discover_exec(hosts, argv, shell, login, ...) → list[HostResult]
+│       Semaphore + asyncio.gather (verbatim from pueue.py)
+├── render_table(results, full_output=False)
+│       Rich table; HOST | RC | STDOUT(1L) | ms; --full-output expands blocks
+├── emit_json(results)
+│       JSON array of records to stdout
+├── write_out_dir(results, dir_path)
+│       Per-host .stdout / .stderr / .json files
+├── invoke_ai(results, argv) → dict | None
+│       Build prompt → cache lookup → invoke_agent → parse_reply
+│       (copy of executable_pqsum AI path, adapted to new schema)
+├── render_ai(parsed, results)
+│       Rich blocks: fleet_summary line, then per-tier hosts (succeeded / differed / failed)
+├── render_ai_report(parsed, results)
+│       Markdown report; sections: Summary / Succeeded / Differed / Failed / Raw outputs
+├── cli(...) → int
+│       tyro CLI; --hosts/--exclude/--serial/--max-parallel/--shell/--login/
+│       --no-augment-path/--json/--out-dir/--full-output/--ai/--report/--out/
+│       --refresh/--no-cache/--dry-run + positional `argv: list[str]`
+└── main() → int
 ```
 
-### `scripts/fleet/pueue.py` structure
+### Critical implementation details
 
-```
-scripts/fleet/pueue.py
-├── @dataclass HostResult: host, daemon_status, groups: list[GroupRec], error: str|None, elapsed_ms
-├── @dataclass GroupRec: name, parallel, total, done, pct, eta_s, status_breakdown: dict[str,int],
-│                       failed_task_ids: list[int]   ← passed through for AI recovery analysis
-├── async def _run_one(host) → HostResult
-│     ├── SSH-exec: command -v pueue >/dev/null && pueue status --json 2>/dev/null || echo '{"error":"unavailable"}'
-│     ├── on parse/SSH failure: HostResult(error=..., ...) — does NOT abort fleet
-│     └── return populated HostResult
-├── async def discover_pueue(hosts, parallelism=8, serial=False) → list[HostResult]
-│     ├── Semaphore + asyncio.gather (verbatim from tmux.py)
-│     └── stderr ticker: "querying N/M hosts..."
-├── render_table(results)   → Rich table; one row per (host, group)
-├── emit_json(results)      → list-of-dicts JSON to stdout
-├── emit_ai(results, report=False, out_path=None)
-│     └── subprocess: pqsum ai --stdin-json --multi-host [--report [--out PATH]] (feeds dataclass→JSON via stdin)
-└── main(args)              → parse_args + dispatch
-```
+1. **Argv parsing with `--`**: tyro/argparse natively respects `--`. The CLI signature includes a positional `argv: list[str]`. Test that `fleet exec --hosts H1 -- pueue --version` correctly splits fleet flags from the inner command.
 
-### Why subprocess shell-out fleet→pqsum (not Python import)
+2. **PATH augmentation prelude**: when in `--login` mode, wrap as `bash -lc <quoted-cmd>` so login shell expands PATH from rc files. When NOT `--login`, prepend the chezmoi → cargo → uv → ~/bin → brew → linuxbrew prelude (same string as `scripts/fleet/pueue.py:_REMOTE_CMD`) before running the argv. When `--no-augment-path` is set, skip the prelude entirely.
 
-`scripts/fleet/pueue.py` runs from chezmoi source tree (dev) and from `~/.dotfiles/bin/executable_fleet` (deployed). `pqsum` is in `~/.dotfiles/bin/`. Subprocess via PATH works in both contexts and avoids Python-import-path hacks. Tiny overhead compared to AI call. Matches how `fleet info` already shells out to remote tools.
+3. **Argv quoting**: `shlex.quote(arg) for arg in argv` to build a safe shell string for both `bash -c` mode and the PATH-prefixed direct mode. Note: asyncssh's `conn.run(str)` always runs the string via `/bin/sh -c`, so even argv mode goes through `sh` — but the per-arg `shlex.quote` makes that safe.
 
-### Why `--clean` is local-only
+4. **Cache key for `--ai`**: SHA of (PROMPT_PREAMBLE + json.dumps(results)). New host added / different stdout → new SHA → fresh call. Identical results → reuse cache. TTL: `FLEETEXEC_MIN_REFRESH_INTERVAL` env, default 120s.
 
-Three reasons:
-1. Cross-host `pueue clean` would need either (a) SSH-exec the destructive op (works but is irreversible across N machines) or (b) TLS remote-connect with `pueue -c HOST clean`. (b) is the proper path and is the planned TLS follow-up.
-2. The interactive y/N confirm per group doesn't compose well across hosts (you'd be y/N-ing for 5 hosts × 3 groups = 15 prompts; too much).
-3. Bulk-cleanup across the fleet is rare enough that "if you really want it, do it host-by-host" is acceptable friction.
+5. **Output truncation in AI input**: cap per-host stdout/stderr at 4000 chars in the prompt (avoid token blowout). If truncated, indicate `[... N more chars ...]`. This is a hard ceiling — users wanting full output should use `--out-dir`.
+
+6. **Exit code**: `min(N_failed, 125)` where failed = hosts with rc≠0 or SSH error. Matches `fleet tmux` / `fleet info` / `fleet pueue` convention.
+
+7. **Tyro positional argv hand-off**: the `executable_fleet` dispatcher does `sys.argv = ["fleet exec", *rest]` before calling `scripts.fleet.exec.main()`. The `--` and argv after it survive this rewrite naturally.
 
 ## Out of scope this round
 
-- **TLS remote-connect** — separate follow-up. Tracked as `[?/M] Pueue TLS remote-connect profiles`.
-- **`fleet pueue --clean`** — depends on TLS layer above.
-- **`pueue add` from fleet** — read-only this round.
-- **Daemon autostart on macOS** — covered by existing `[M] Pueue config via chezmoi` TODO.
-- **Extracting AICAP dispatch into shared module** — pqsum becomes the 3rd Python consumer (tsum, aiblock, pqsum). 4th consumer triggers extraction.
-- **`fleet pueue --watch`** — interactive polling. Add later.
-- **`fleet pueue tail HOST:TASK_ID`** — stream remote task log. Users can `ssh HOST 'pueue follow N'`.
-- **Auto-archive markdown reports** — `pqsum ai --report` emits to stdout/`--out` only this round; rotating directory under `~/notes/pueue-reports/` is a separate `[?/S]` TODO.
-- **`pueue restart` automation** — recovery hints emit the suggested command but never execute it (`--clean` only touches `safe-to-clean` cleanup, never recovery). Auto-restart would need its own confirmation flow.
+- **stdin passthrough** — `fleet exec --stdin file.txt -- some-cmd` feeding file.txt to each remote command's stdin. Plausible follow-up.
+- **PTY allocation (`-t`)** — interactive commands (vim, less). Doesn't fit fan-out shape.
+- **Streaming output** — completed stdout/stderr only this round. Watch / tail is a different shape (separate command).
+- **`--ai --restart-failed` / actionable execution** — AI gives summary only; no auto-rerun of failed hosts. Same conservative stance as `pqsum ai --restart-failed` (deferred).
+- **Persistent rate-limiting** — semaphore-8 fan-out per invocation; no cross-invocation rate limit.
+- **Bitwarden / sudo password injection** — `fleet exec` is for non-privileged ad-hoc commands. For `sudo` use `fleet apply`'s existing password injection path.
+- **AICAP shared-module extraction** — declared next priority; not done in this commit.
 
 ## Verification
 
-After implementation, before commit:
+End-to-end checks before commit:
 
-1. **Local pqsum text mode unchanged**: `pqsum` output matches today's table closely.
-2. **Bash compat**: `bash -c 'PATH=~/.dotfiles/bin:$PATH pqsum'` works (previously zsh-only).
-3. **Local pqsum JSON**: `pqsum json | jq '.overall.total'` returns expected count.
-4. **Local pqsum AI**: `pqsum ai` returns natural-language summary with verdicts. Re-run within 120s → cache hit. With no agent configured → graceful exit-2.
-5. **Pqsum AI cleanability verdicts**: prepare a fixture queue (some Done, some Failed, some Running). Verify the LLM tags `safe-to-clean` only when all-Done; `review` for mixed; `keep` when any Running.
-6. **Pqsum AI recovery hint**: prepare two tasks where #N (Failed, OOM) and #M (Done, with `--mem 8G`) have similar commands. Verify recovery_hint correctly references #M.
-7. **Pqsum AI --report**: `pqsum ai --report --out /tmp/r.md` writes valid markdown with sections (Summary / Cleanup Candidates / Failures Needing Action / Raw status).
-8. **Pqsum AI --clean --yes**: only `safe-to-clean` groups get cleaned; `review`/`keep` are skipped even with `--yes`. Confirm via `pueue status` before/after.
-9. **Pqsum AI --clean without --yes**: prompts y/N for each safe-to-clean group; `N` skips, `y` executes.
-10. **Fleet pueue table**: `fleet pueue` returns rows for all reachable hosts. Hosts where pueued is offline show `—`; not-installed shows explicit status; SSH-unreachable shows error.
-11. **Fleet pueue JSON**: `fleet pueue --json | jq 'length'` = host count.
-12. **Fleet pueue AI**: `fleet pueue --ai` returns cross-host summary with per-host verdicts AND a `fleet_summary` line.
-13. **Fleet pueue AI --report**: writes cross-host markdown report.
-14. **`fleet pueue --hosts H1,H2`** narrows subset.
-15. **`fleet pueue --group default`** filters per-group.
-16. **`just fleet-pueue --json`** justfile recipe works.
-17. **mkdocs**: `uv run mkdocs build --strict` — no NEW warnings beyond the pre-existing zh-TW anchor drift in `backlog/mkdocs-anchor-drift.md`.
-18. **chezmoi diff** before apply: shows expected adds (executable_pqsum +x, new fleet module) and `36_pueue.zsh` removal.
-19. **Cross-shell**: open fresh zsh and bash, both run `pqsum` → identical output.
-20. **CLAUDE.md cross-file rows**: re-read after edit to confirm fleet row lists pueue files and AI row lists pqsum as 3rd consumer.
+1. **Argv default**: `fleet exec -- pueue --version` returns one row per host, RC=0 for every host that has pueue, RC=N/A for SSH-unreachable.
+2. **Argv with flag-collision check**: `fleet exec -- python -c "print('hi')"` — confirm `-c` isn't consumed by fleet's parser.
+3. **`--hosts` subset**: `fleet exec --hosts self -- echo hello` runs only on self.
+4. **`--shell`**: `fleet exec --shell -- 'echo $HOSTNAME; date'` evaluates the `$HOSTNAME` and runs `date` (proves shell expansion works).
+5. **`--shell zsh`**: `fleet exec --shell zsh -- 'echo $ZSH_VERSION'` returns zsh version on hosts with zsh, falls back / errors gracefully on hosts without.
+6. **`--login`**: `fleet exec --login -- 'echo $PATH'` returns a rich PATH including rc-set additions (cargo, mise, conda) on hosts where those are set in `~/.bashrc`. (Caveat: zsh-only PATH additions won't show unless `--login --shell zsh`.)
+7. **`--no-augment-path`**: `fleet exec --no-augment-path -- echo "$PATH"` returns the minimal SSH PATH (`/usr/bin:/bin:/usr/sbin:/sbin` on macOS; `+ /snap/bin` on Ubuntu). Proves the escape hatch works.
+8. **`--json`**: `fleet exec --json -- date | jq 'length'` equals host count.
+9. **`--out-dir`**: `fleet exec --out-dir /tmp/exec-test -- ls /tmp` writes one set of files per host with correct rc + elapsed.
+10. **`--full-output`**: long stdout renders as block below the table, not truncated.
+11. **Non-zero RC**: `fleet exec -- false` returns RC=1 for every host; row is red.
+12. **Mix RC**: `fleet exec -- test -f /etc/lsb-release` returns RC=0 on Ubuntu, RC=1 on macOS — table shows the split.
+13. **SSH failure**: `fleet exec --hosts <a-down-host> -- echo` shows RC=N/A + error; doesn't abort.
+14. **`--ai`**: `fleet exec --ai -- pueue --version` returns succeeded/differed tiers correctly classifying the live version drift across hosts (4.0.1 vs 4.0.2 — matches the known jingle207 case).
+15. **`--ai --report`**: `fleet exec --ai --report --out /tmp/r.md -- df -h /` writes valid markdown.
+16. **AI cache**: re-running the same `fleet exec --ai -- ...` within 120s hits the cache (visible via stderr log). `--refresh` forces fresh.
+17. **AI dry-run**: `fleet exec --ai --dry-run -- pueue --version` prints the constructed prompt; no LLM call.
+18. **`--ai` with no agent on PATH**: graceful exit-2 with helpful message.
+19. **mkdocs**: `uv run mkdocs build --strict` — 12 pre-existing warnings only.
+20. **chezmoi diff** before apply: shows new `scripts/fleet/exec.py`, updated `executable_fleet`, new docs, updated CLAUDE.md / TODO.md / mkdocs.yml.
+21. **`fleet --help`**: lists `exec` in the subcommand table.
 
-**Edge cases to specifically exercise**:
-- Host with pueued **not running** but pueue installed: row shows `daemon offline`, AI cleanability=`keep`/`unknown`.
-- Host with pueue **not installed**: explicit `not-installed`, AI skips it.
-- One host hangs >60s: semaphore-8 keeps fleet responsive; that host times out per `command_timeout`.
-- AI mode when `AICAP_*` env unset + SSOT unreadable (cron context): explicit exit-2, no traceback.
-- `pqsum ai --clean --yes` with NO `safe-to-clean` groups: prints "nothing to clean", exit 0.
-- `pqsum ai --clean` invoked on a group whose tasks completed <2min ago: LLM should classify as `review`, never `safe-to-clean`.
-- Stash/Pause weirdness: 100 Stashed tasks → AI should still classify (likely `review`).
+**Edge cases**:
+- Inner command needs `--`-like flag: `fleet exec -- ssh remote -- ls` — the second `--` is part of inner argv, fleet's parser stops at the first.
+- Empty argv: `fleet exec --` errors with "missing command after --".
+- Single-host subset that's the orchestrator itself: `fleet exec --hosts self -- ...` uses `asyncio.create_subprocess_exec` (no SSH). Same code path as pueue's `host.local` branch.
+- `--shell --login` together: `bash -lc <cmd>`. `--shell zsh --login`: `zsh -lc <cmd>`.
+- `--no-augment-path --login`: mutually exclusive — error at CLI level. (Login mode loads rc files which set PATH; augmentation would be redundant or conflicting.)
+- Inner command produces 50MB of stdout: captured in memory (asyncssh caps at default buffer; we may want `--max-output BYTES` later, but v1 accepts the memory usage).
 
 ## Critical files
 
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_dotfiles/bin/executable_pqsum` (NEW)
-- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/pueue.py` (NEW)
-- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/__init__.py` (exports)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_dotfiles/bin/executable_fleet` (dispatch)
-- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/tmux.py` (REFERENCE skeleton; do not edit)
-- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:556` (`_connect_kwargs` — reuse, do not edit)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/tmux/executable_tmux-session-summary.py:95-138,450-503` (REFERENCE for AGENT_CONFIG + PROMPT_PREAMBLE shape; do not edit)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_agents.sh` (SSOT — DO NOT edit)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_capture.sh` (`_aiagent_invoke` reference; do not edit)
-- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/36_pueue.zsh` (DELETE)
-- `/Users/daviddwlee84/.local/share/chezmoi/justfile` (add fleet-pueue recipe)
-- `/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md` (fleet row + AI agent row)
-- `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/pueue.md` (NEW)
-- `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/pueue.zh-TW.md` (NEW)
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/exec.py` (NEW — ~400 LOC)
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/pueue.py` (REFERENCE for `_REMOTE_CMD` PATH prelude, asyncssh + semaphore pattern, output rendering; do not edit)
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_dotfiles/bin/executable_pqsum` (REFERENCE — copy AICAP code from lines ~30-700: SSOT loader, AGENT_CONFIG, detect_agent, invoke_agent, cache helpers, parse_reply. Do not edit)
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_dotfiles/bin/executable_fleet` (add `exec` to USAGE + dispatch dict)
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet_apply.py:556` (`_connect_kwargs` — reuse via `from scripts.fleet import _connect_kwargs`)
+- `/Users/daviddwlee84/.local/share/chezmoi/scripts/fleet/__init__.py` (no new exports needed)
+- `/Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/04_ai_agents.sh` (SSOT — DO NOT edit; exec.py reads it)
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/fleet-exec.md` (NEW)
+- `/Users/daviddwlee84/.local/share/chezmoi/docs/tools/fleet-exec.zh-TW.md` (NEW)
 - `/Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/fleet-apply.md` (subcommand table)
+- `/Users/daviddwlee84/.local/share/chezmoi/CLAUDE.md` (fleet + AI agent rows)
 - `/Users/daviddwlee84/.local/share/chezmoi/mkdocs.yml` (nav)
-- `/Users/daviddwlee84/.local/share/chezmoi/TODO.md` (status updates + 3 new entries)
+- `/Users/daviddwlee84/.local/share/chezmoi/TODO.md` (promote AICAP extraction; mark fleet exec done)
+- `/Users/daviddwlee84/.local/share/chezmoi/backlog/fleet-exec.md` (status → Done)
 
 ## Follow-ups (separate tasks)
 
-1. **TLS remote-connect profiles** — `dot_config/pueue/pueue.yml.tmpl` per-host client profiles, daemon bind override (`0.0.0.0:port`), cert distribution, firewall via ansible. Enables `pueue -c HOST add/kill/status` natively → unlocks `fleet pueue --clean`.
-2. **macOS pueued autostart** — launchd plist template alongside Linux systemd-user service.
-3. **Extract AICAP dispatch into `scripts/aisum/__init__.py`** — `invoke_agent`, `cache_key`, `parse_strict_json`. Migrate `tmux-session-summary.py`, `aiblock.py`, `pqsum` to import from it.
-4. **Auto-archive `pqsum ai --report` to `~/notes/pueue-reports/YYYY-MM-DD-HHMMSS.md`** — rotating directory, retention policy.
-5. **`pqsum ai --restart-failed`** — execute the recovery commands the AI suggested, with same y/N safeguards as `--clean`.
-6. **`fleet pueue --watch` / TUI** — periodic refresh à la `tsum -i` with fzf preview.
-7. **`pqsum ai` in tv channel** — Alt+A binding in `dot_config/television/cable/pueue.toml` that runs `pqsum ai` into the preview pane.
+1. **AICAP shared-module extraction** — `scripts/aisum/__init__.py` exporting `AGENT_CONFIG`, `detect_agent`, `invoke_agent`, `cache_lookup`, `cache_save`, `load_ssot`, `parse_strict_json`. Migrate the **four** consumers to import. Triggered to higher priority by this commit (was `[?/M]`, becomes `[P2/M]`).
+2. **`fleet exec --stdin FILE`** — pipe a local file to each remote command's stdin. Plausible follow-up.
+3. **`fleet exec --max-output BYTES`** — cap per-host captured output to bound memory for pathological commands.
+4. **`fleet exec --watch N`** — periodic re-run (like `watch -n N` but cross-host). Conflicts with `--ai` cache semantics; needs design.
+5. **TV channel `tv fleet`** — interactive picker that shows recent `fleet exec` runs from a history file.
 
 ## Rationale recap
 
 | Decision | Why |
 |---|---|
-| SSH fan-out this round | Reuses fleet asyncssh+semaphore; ProxyJump/NAT; zero new infra; matches user's "Both, layered" |
-| TLS as follow-up | Native pattern needed for write ops (`pueue clean -c HOST`); cert distribution + port opening non-trivial; not blocking read-only view |
-| Migrate pqsum to Python | Required for "Both fleet + local" AI scope to share one template; resolves zsh→bash port TODO; aligns with tsum's Python pattern |
-| Delete `36_pueue.zsh` | After migration the file is empty; keeping it just to avoid a delete is noise |
-| Subprocess shell-out fleet→pqsum | Works identically in source-tree dev + deployed contexts; AI call dominates latency |
-| `--clean` local-only this round | Destructive cross-host ops belong on TLS layer; interactive y/N×N×groups doesn't scale; rare workflow |
-| 3-tier cleanability (`safe/review/keep`) | Direct mirror of tsum's `safe/check/keep`; well-validated UX; users already know the mental model |
-| Markdown report optional, never default | `pqsum ai` default = interactive Rich blocks; `--report` only when user wants archivable artifact; keeps default fast |
-| Auto-archive deferred | Don't write to `~/notes/` without explicit user opt-in; `--out PATH` covers the immediate use case |
-| Recovery hints emit commands, never execute | Same safety stance as `--clean` (only `safe-to-clean` is executable); recovery actions are inherently riskier than cleanup → defer auto-execution to a separate `--restart-failed` follow-up |
-| Don't extract AICAP module yet | 3 consumers tolerable; extraction has its own risk; defer until 4th |
+| argv after `--` (default) | Standard wrapper-CLI pattern (ssh / docker / cargo / pytest); no shell-quoting footguns; safe by construction. User explicitly chose this. |
+| `--shell` opt-in | Lets users access pipes/globs/redirects when needed without burdening the safe default. |
+| `--login` opt-in | Some commands need rc-loaded env (conda, mise, pyenv, aliases). Slow (~150-500ms) so not the default. Composes with `--shell`. |
+| PATH augmentation by default | Same lesson as `fleet pueue`: brew / cargo / uv tools live in non-default-PATH dirs. Without this `fleet exec -- pueue --version` would falsely show "not installed" on hosts where pueue is at `/opt/homebrew/bin` or `~/.cargo/bin`. |
+| `--no-augment-path` escape hatch | For users debugging "what does SSH see by default" — keep the tool inspectable. |
+| `--ai` with copy-pasted AICAP (this commit) | User-confirmed: ship feature now, accept 4-consumer duplication, prioritise extraction next. Faster user value. |
+| Markdown report mode | Mirrors `pqsum ai --report` UX; archive-worthy artifact for audit use cases (version drift report, disk audit, etc.). |
+| Output truncation in table | First line + Rich auto-truncate keeps the table scannable; `--full-output` for verbose blocks; `--out-dir` for raw files. |
+| Exit code = N_failed | Matches the convention of other fleet subcommands; lets CI / scripts react to fleet-wide failures. |
+| Don't extract AICAP in this commit | Adding the 4th consumer is the forcing function; extracting in the SAME commit blurs review focus and risks regressions in the three existing consumers. Separate commit after this. |

@@ -1,7 +1,33 @@
 # `fleet exec` — cross-host argv-list command runner with AI summary
 
-**Status**: Planned 2026-05-13 — not implemented yet.
-**Effort**: M (~150 LOC + ~80 LOC for `--ai` + docs row + tests)
+**Status**: Done 2026-05-13 — shipped as `scripts/fleet/exec.py`.
+**Effort**: M (~600 LOC including copy-pasted AICAP block; ~250 of that is AI infrastructure that will collapse into shared `scripts/aisum/` on next refactor).
+
+## Resolution (2026-05-13)
+
+Shipped exactly as planned with one refinement: the AI prompt cache excludes
+`elapsed_ms` from its hash key. The initial implementation included
+`elapsed_ms` per host, which varies every run — every invocation produced a
+cache miss. Excluding it from the hash payload (the LLM doesn't need
+millisecond precision to classify) means identical command outputs reuse the
+cached classification regardless of SSH timing variance. Verified locally:
+first run 14.8s, second run 1.6s (~9× speedup on cache hit).
+
+All other API decisions held:
+- Argv after `--` as default; `--shell bash|zsh|sh` opt-in for pipes/globs.
+- `--login` opt-in for rc-loaded env; `--no-augment-path` escape hatch
+  (mutually exclusive with `--login`).
+- AI tiers: `succeeded` / `differed` / `failed` with majority-output
+  detection.
+- `--report --out PATH` markdown output.
+- `--out-dir DIR` writes per-host stdout/stderr/json files.
+
+The AICAP code was copy-pasted from `executable_pqsum`, making `fleet exec`
+the **4th** Python consumer of `dot_config/shell/04_ai_agents.sh`. The
+extraction TODO is now P2 — next AI-tooling change should land
+`scripts/aisum/__init__.py` first.
+
+
 **Related**: `scripts/fleet/{tmux,info,pueue}.py`, `dot_dotfiles/bin/executable_fleet`, `docs/this_repo/fleet-apply.md`, `docs/tools/pueue.md` (lessons learned about SSH PATH)
 
 ## Why

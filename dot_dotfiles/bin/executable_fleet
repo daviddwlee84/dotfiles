@@ -20,6 +20,7 @@ Subcommands:
   tmux [...]                   Cross-host tmux session summary (scripts/fleet/tmux.py)
   info [...]                   Cross-host system status snapshot (scripts/fleet/info.py)
   pueue [...]                  Cross-host pueue queue summary (scripts/fleet/pueue.py)
+  exec [OPTS] -- CMD [ARG...]  Cross-host ad-hoc command runner (scripts/fleet/exec.py)
 
 Discovers the chezmoi source dir at runtime via `chezmoi source-path` (falls
 back to ~/.local/share/chezmoi), so the binary works from any cwd.
@@ -58,6 +59,12 @@ Subcommands:
                           merged JSON to `pqsum` for cleanability + recovery
                           analysis (one prompt template, shared with local
                           `pqsum --ai`).
+  exec [--hosts ...] [--shell BIN] [--login] [--json|--out-dir DIR|--ai] -- CMD [ARG...]
+                          Cross-host argv-list command runner. Argv after
+                          `--` is safe by default (no shell expansion). Use
+                          --shell bash|zsh for pipes/globs; --login for full
+                          rc-loaded env; --ai for succeeded/differed/failed
+                          classification across hosts.
 
 Examples:
   fleet status                       # readiness across all hosts
@@ -68,6 +75,10 @@ Examples:
   fleet pueue --ai                   # AI summary of every host's queue
   fleet pueue --ai --report --out /tmp/q.md
                                      # markdown report across the fleet
+  fleet exec -- pueue --version      # audit version drift
+  fleet exec --ai -- df -h /         # AI summary of disk usage
+  fleet exec --shell bash -- 'cat *.log | wc -l'
+                                     # opt-in shell expansion (pipes/globs)
 
 See docs/this_repo/fleet-apply.md for full mental model.
 """
@@ -198,6 +209,12 @@ def _dispatch_pueue(forwarded: list[str]) -> int:
     return pueue_main()
 
 
+def _dispatch_exec(forwarded: list[str]) -> int:
+    sys.argv = ["fleet exec", *forwarded]
+    from scripts.fleet.exec import main as exec_main
+    return exec_main()
+
+
 def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
         print(USAGE)
@@ -221,6 +238,7 @@ def main() -> int:
         "tmux": _dispatch_tmux,
         "info": _dispatch_info,
         "pueue": _dispatch_pueue,
+        "exec": _dispatch_exec,
     }
     fn = dispatch.get(sub)
     if fn is None:

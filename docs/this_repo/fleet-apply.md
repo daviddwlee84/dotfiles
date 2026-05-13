@@ -83,6 +83,7 @@ over `just`: it works from any cwd, not just inside the chezmoi source tree.
 | `fleet tmux [...]` | (new) — see below |
 | `fleet info [...]` | (new) — see below |
 | `fleet pueue [...]` | (new) — cross-host pueue queue summary; `--ai` for cleanability + recovery hints via local `pqsum`. See [docs/tools/pueue.md](../tools/pueue.md). |
+| `fleet exec [OPTS] -- CMD [...]` | (new) — cross-host argv-list command runner. Argv after `--` is safe by default (no shell expansion). `--shell bash\|zsh` for pipes/globs, `--login` for rc-loaded env, `--ai` for succeeded/differed/failed classification. See [docs/tools/fleet-exec.md](../tools/fleet-exec.md). |
 
 The umbrella discovers the chezmoi source dir at runtime via `chezmoi
 source-path` (falls back to `~/.local/share/chezmoi`) so it can `import` the

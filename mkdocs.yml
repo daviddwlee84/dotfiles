@@ -299,6 +299,7 @@ nav:
           - SMS (Huawei router): tools/sms.md
           - mi-router (Xiaomi router): tools/mi-router.md
           - "Pueue (pqsum + fleet pueue)": tools/pueue.md
+          - "fleet exec": tools/fleet-exec.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
       - chezmoi conventions:
