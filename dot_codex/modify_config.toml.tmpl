@@ -112,6 +112,22 @@ def prune_reserved_builtin_providers(live: dict) -> None:
         del live["model_providers"]
 
 
+def prune_deprecated_features(live: dict) -> None:
+    """Drop deprecated `[features]` keys from live so they don't survive merge.
+
+    Codex 0.130+ renamed `codex_hooks` → `hooks`. deep_merge only replaces keys
+    present in overlay, so without explicit removal the live `codex_hooks =
+    true` would persist alongside the new `hooks = true` and Codex would keep
+    emitting the deprecation warning.
+    """
+    features = live.get("features")
+    if not isinstance(features, dict):
+        return
+    features.pop("codex_hooks", None)
+    if not features:
+        del live["features"]
+
+
 def fmt_scalar(v) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -157,6 +173,7 @@ def quote_key(k: str) -> str:
 live = parse(os.environ.get("CODEX_LIVE", ""))
 overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
 prune_reserved_builtin_providers(live)
+prune_deprecated_features(live)
 
 # Pull machine-local subtrees out before merge; re-attach last so they win.
 state = {}

@@ -3,7 +3,7 @@ model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 
 [features]
-codex_hooks = true
+hooks = true
 unified_exec = true
 shell_snapshot = true
 steer = true
