@@ -161,6 +161,12 @@ make」的情境（警告並 exit 0，而不是讓整個 chezmoi apply 失敗）
   `~/.bashrc`。`dot_bash_profile.tmpl` 處理了這點：在最後 source
   `~/.bashrc`。如果你跳過了 `chezmoi apply` 或手動移除了
   `~/.bash_profile`，login shell 會落入沒有 starship 的裸 bash。
+- **`set -v`（verbose 模式）會把 ble.sh 內部 eval wrapper 洩漏到每個
+  prompt。** 你會看到 `{ _ble_edit_exec_gexec__save_lastarg "$@"; } 4>&1
+  5>&2 &>/dev/null` 在每個命令後印出，且你輸入的命令被印兩次。觸發點
+  通常是貼上/source 一段腳本啟用了 `set -v` 但沒搭配 `set +v` 復原。
+  快速修法：執行 `set +v`（不需開新 terminal）。完整診斷見
+  [`pitfalls/blesh-set-v-leaks-gexec-wrapper.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/blesh-set-v-leaks-gexec-wrapper.md)。
 
 ## Adhoc 收尾檔（`~/.bashrc.adhoc`）
 

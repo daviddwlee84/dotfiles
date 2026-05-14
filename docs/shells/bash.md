@@ -165,6 +165,13 @@ the whole chezmoi apply).
   `~/.bashrc` at the end. If you skipped `chezmoi apply` or removed
   `~/.bash_profile` manually, login shells will land in a bare bash
   with no starship.
+- **`set -v` (verbose mode) leaks ble.sh's internal eval wrapper into
+  every prompt.** You'll see `{ _ble_edit_exec_gexec__save_lastarg "$@"; }
+  4>&1 5>&2 &>/dev/null` printed after every command, plus the typed
+  command echoed twice. Trigger is usually a pasted/sourced snippet that
+  enabled `set -v` without pairing `set +v`. Quick fix: run `set +v`
+  (no new terminal needed). Full diagnosis:
+  [`pitfalls/blesh-set-v-leaks-gexec-wrapper.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/blesh-set-v-leaks-gexec-wrapper.md).
 
 ## Adhoc tail (`~/.bashrc.adhoc`)
 
