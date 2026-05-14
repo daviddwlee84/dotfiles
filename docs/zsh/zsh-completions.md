@@ -1,6 +1,46 @@
-# Zsh Completions Best Practices
+# Zsh & Bash Completions
 
-How zsh tab completions are organized in this dotfiles project.
+How tab completions are organized in this dotfiles project — for both upstream tools and in-house CLIs (`fleet`, `mlf`, `pqsum`, `mi-router`, `x`).
+
+## How autocomplete works (mechanics)
+
+Tab completion is the same idea on both shells but the plumbing differs.
+
+### zsh — `compinit` + `fpath` + autoload `_<tool>` functions
+
+1. **`compinit`** scans every directory in `$fpath` for files starting with `_` and registers them as completion candidates. Run by oh-my-zsh once at startup.
+2. **`$fpath`** is zsh's function search path. Order in this repo (`dot_zshrc.tmpl:67-70`):
+   ```
+   ~/.zfunc                                             ← user-generated (this repo's lazy autoload target)
+   ~/.oh-my-zsh/custom/plugins/zsh-completions/src/     ← community (184 tools)
+   ~/.docker/completions/                               ← Docker-shipped
+   $(brew --prefix)/share/zsh/site-functions/           ← Homebrew-managed
+   ```
+3. **The first line of each file** matters: `#compdef <name>` tells zsh which command to bind to. If you write `#compdef fleet`, then `fleet<TAB>` invokes the file's `_fleet` function.
+4. **Autoload vs eager-load**: a file in `$fpath` is *parsed* the first time the user actually TABs the command (lazy). Files sourced explicitly at startup (e.g. via `load_modular_dir` in this repo) call `compdef _<func> <cmd>` directly — parsed eagerly, no need to be in `$fpath`.
+5. **`_arguments` DSL** (zsh-only) lets you describe options + positional args declaratively: `'--hosts=[help text]:hosts:_fleet_hosts_csv'` defines the flag, hint, and a custom completer function. See `dot_config/zsh/tools/45_fleet_completion.zsh`.
+
+### bash — `bash-completion v2` + `complete -F` + `COMPREPLY`
+
+1. **bash-completion v2** is sourced at shell startup by `dot_config/bash/03_completion.bash`. It auto-loads completion files on first TAB.
+2. **The user dir** is `${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/` — drop a file named after the command (e.g. `mi-router`) here and v2 lazy-loads it on TAB.
+3. **`complete -F _func cmd`** registers a bash function as the completer for `cmd`. The function reads `$COMP_WORDS` / `$COMP_CWORD` and writes candidates to `$COMPREPLY`.
+4. **`_init_completion` + `compgen`** are bash-completion v2 helpers — `_init_completion` populates `cur`/`prev`/`words`/`cword`; `compgen -W "list" -- "$cur"` filters a wordlist by the current prefix.
+5. **Eager vs lazy** mirrors zsh: a file in the user dir is lazy; a file sourced via `load_modular_dir` (this repo's `dot_config/bash/`) calls `complete -F` immediately.
+
+### Three generation strategies in this repo
+
+| Strategy | Where the file lives | Trigger | Best for |
+|---|---|---|---|
+| **A. Lazy autoload** | zsh `~/.zfunc/_<tool>` / bash `${XDG_DATA_HOME}/bash-completion/completions/<tool>` | First TAB on the command | Tools that ship `--print-completion <shell>` or similar (tyro, click, clap-derive — including this repo's `mi-router`) |
+| **B. Eager-load at startup** | `dot_config/zsh/tools/<NN>_<tool>_completion.zsh` + `dot_config/bash/<NN>_<tool>_completion.bash` | Sourced via `load_modular_dir` after compinit / bash-completion v2 init | Hand-written completion (this repo's `fleet`, `mlf`, `pqsum`, `x`) |
+| **C. Cached eval at startup** | `${XDG_CACHE_HOME}/<shell>/<tool>_completion.<ext>` | Sourced via shell `init` script (`dot_config/shell/<NN>_<tool>.sh`) | Slow generators whose output has side effects beyond `compdef` (e.g. `thefuck --alias` outputs an `alias` line — needs to land in the running shell's namespace, not just a deferred `_<tool>` function) |
+
+Cache invalidation in classes A and C uses **binary-mtime check**:
+```sh
+[ ! -f "$cache" ] || [ "$(command -v <tool>)" -nt "$cache" ]  # → regenerate
+```
+This catches `brew upgrade`, `uv tool upgrade`, `mise install <NEW>` — anything that bumps the binary's mtime. Manual `<tool>-update-completion` helpers (in `dot_config/{shell,zsh}/10_aliases.zsh`) cover edge cases (gem-only upgrades, in-place replacements, cache corruption).
 
 ## Architecture
 
@@ -86,14 +126,40 @@ These tools inject completions as part of broader shell integration. Most live i
 
 `claude`, `gemini`, `btop`, `lazygit` -- no generation command available.
 
-### E. Python tools via `shtab` / `tyro`
+### E. Python tools via `shtab` / `tyro` / `click` / `argcomplete`
 
-Python CLI frameworks can generate completions:
+Python CLI frameworks can generate completions. Pick by what your script uses:
 
-- **[tyro](https://brentyi.github.io/tyro/tab_completion/)**: `python my_cli.py --tyro-write-completion zsh ~/.zfunc/_my_cli`
-- **[shtab](https://github.com/iterative/shtab)**: `shtab --shell=zsh my_module.parser > ~/.zfunc/_my_tool`
-- **argcomplete**: `register-python-argcomplete tool_name` (uses eval, category C)
-- **click** (used by mlflow, litellm, etc.): `_TOOL_COMPLETE=zsh_source tool > ~/.zfunc/_tool`
+- **[tyro](https://brentyi.github.io/tyro/tab_completion/)** (this repo's `mi-router` + every `scripts/fleet/*.py` and `scripts/mlf/*.py` subcommand): `<tool> --tyro-write-completion zsh <path>`. Native flag — auto-added when you call `tyro.cli(...)`. tyro emits `#compdef <full-binary-path>` for zsh, so post-process the first line to the short name (see `dot_config/shell/47_mi_router.sh` for the canonical pattern). Bash output already binds `basename`, no fixup needed.
+- **[shtab](https://github.com/iterative/shtab)**: `shtab --shell=zsh my_module.parser > ~/.zfunc/_my_tool`. Decorate-an-`argparse.ArgumentParser` style; works for both shells.
+- **argcomplete**: `register-python-argcomplete tool_name` (eval-at-startup style, category C). Requires the script to call `argcomplete.autocomplete(parser)` before `parse_args()`. Cross-shell.
+- **click** (used by `marimo`, `thefuck`, `mlflow`, `litellm`, etc.): `_TOOL_COMPLETE=zsh_source tool > ~/.zfunc/_tool`. The completion script may include side effects (aliases / functions) — if so, treat as category C and cache via `${XDG_CACHE_HOME}/<shell>/<tool>_completion.<ext>`. See the canonical pattern at `dot_config/shell/29_marimo.sh`.
+
+### F. In-house CLIs (this repo)
+
+| CLI | Source | Framework | Strategy | Files |
+|---|---|---|---|---|
+| `mi-router` | `dot_dotfiles/bin/executable_mi-router` | tyro | A (lazy autoload) | `dot_config/shell/47_mi_router.sh` (gen + mtime check); refresh helper `mi-router-update-completion` |
+| `fleet` | `dot_dotfiles/bin/executable_fleet` + `scripts/fleet/*.py` | hand-rolled umbrella + tyro/argparse subs | B (eager hand-written) | `dot_config/zsh/tools/45_fleet_completion.zsh` + `dot_config/bash/45_fleet_completion.bash` |
+| `mlf` | `dot_dotfiles/bin/executable_mlf` + `scripts/mlf/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/46_mlf_completion.zsh` + `dot_config/bash/46_mlf_completion.bash` |
+| `pqsum` | `dot_dotfiles/bin/executable_pqsum` | argparse | B | `dot_config/zsh/tools/48_pqsum_completion.zsh` + `dot_config/bash/48_pqsum_completion.bash` |
+| `x` | `dot_dotfiles/bin/executable_x` | bash hand-rolled | B | `dot_config/zsh/tools/49_x_completion.zsh` + `dot_config/bash/49_x_completion.bash` |
+| `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
+
+**Dynamic candidates wired up:**
+
+- `fleet` host names — `_fleet_hosts_one` / `_fleet_hosts_csv` shell out to `fleet hosts --list`. Used for the positional `fleet hosts NAME`, `fleet chezmoi diff HOST`, `fleet chezmoi tail HOST`, and the `--hosts=foo,bar,baz` CSV flag everywhere.
+- `pqsum -g <GROUP>` — `_pqsum` shells out to `pueue status --json | jq '.groups | keys[]'`.
+- `mlf` ids (run-id, experiment-id, model-name) — **not** auto-completed (would round-trip MLflow tracking server, possibly auth-required). Use `tv mlflow` for fuzzy id picking instead.
+
+**Adding a new in-house CLI** (decision flow):
+
+1. **Does it use tyro?** → Use Strategy A. Mirror `dot_config/shell/47_mi_router.sh`. Add a `<tool>-update-completion` helper to `dot_config/shell/10_aliases.sh`. Don't forget to rewrite `#compdef` in zsh post-gen.
+2. **Does it use argparse?** → Two sub-options:
+   - Add `argcomplete.autocomplete(parser)` to the script + Strategy C cached eval at startup.
+   - Hand-write Strategy B completion (smaller / no Python dependency at every shell startup).
+3. **Hand-rolled / shell script** → Strategy B hand-written. One zsh file in `dot_config/zsh/tools/<NN>_<name>_completion.zsh`, one bash file in `dot_config/bash/<NN>_<name>_completion.bash`. Mirror `_fleet`'s structure: top-level dispatcher → per-subcommand functions → dynamic helpers.
+4. **Update this table + `docs/shells/aliases.md`** in the same commit (per the cross-file maintenance rule in `CLAUDE.md`).
 
 ## Why `~/.zfunc/` is NOT Tracked by Chezmoi
 

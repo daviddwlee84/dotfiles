@@ -118,6 +118,34 @@ function thefuck-update-completion {
 	fi
 }
 
+# --- mi-router (tyro) completion regen -------------------------------------
+# Force-regenerate the lazy-autoload completion file used by 47_mi_router.sh.
+# Useful after a tyro upgrade where mi-router's binary mtime didn't change
+# but the completion grammar did (uncommon).
+function mi-router-update-completion {
+	command -v mi-router >/dev/null 2>&1 || {
+		echo "mi-router-update-completion: mi-router not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		local _tmp
+		_tmp=$(mktemp)
+		if mi-router --tyro-write-completion zsh "$_tmp" >/dev/null 2>&1; then
+			mkdir -p "${HOME}/.zfunc"
+			# Rewrite tyro's `#compdef <fullpath>` to the short name so
+			# `mi-router<TAB>` (not full path) triggers compinit.
+			{ echo "#compdef mi-router"; tail -n +2 "$_tmp"; } >"${HOME}/.zfunc/_mi-router" &&
+				echo "mi-router completion cache updated (zsh: ~/.zfunc/_mi-router)"
+		fi
+		rm -f "$_tmp"
+	elif [ -n "$BASH_VERSION" ]; then
+		local _bashdir="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
+		mkdir -p "$_bashdir" &&
+			mi-router --tyro-write-completion bash "$_bashdir/mi-router" >/dev/null 2>&1 &&
+			echo "mi-router completion cache updated (bash: $_bashdir/mi-router)"
+	fi
+}
+
 # --- Ghostty terminfo install on remote SSH host ---------------------------
 # Fixes character-rendering issues when SSH'ing into a fresh host from
 # Ghostty/cmux/tmux. Usage: ghostty-ssh-terminfo <ssh-host>
