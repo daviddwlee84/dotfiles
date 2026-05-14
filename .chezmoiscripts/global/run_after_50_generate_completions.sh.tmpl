@@ -1,0 +1,38 @@
+#!/bin/bash
+# Regenerate shell completion files for upstream CLIs after every `chezmoi
+# apply`. Detects tools whose binaries were upgraded since the last completion
+# generation (binary mtime > completion file mtime → regen).
+#
+# `run_after_*` (not `run_onchange_after_*`): we want to detect tools that
+# ansible / brew / mise / uv upgraded BETWEEN applies. Onchange would only fire
+# when this script's content changes — that misses every package upgrade.
+# Cost when nothing changed: ~50ms (presence checks + 28 stat calls).
+#
+# Tools handled (the "self-generating" set from docs/zsh/zsh-completions.md
+# Section A): chezmoi, mise, uv, just, starship, gh, docker, rg, fd, bat,
+# delta, zellij, pueue, opencode.
+#
+# Tools handled elsewhere (don't double-up):
+#   sesh, tv, worktrunk        → shell-startup mtime check
+#   bw, marimo, thefuck, try   → cached eval at startup
+#   mi-router                  → tyro self-gen at startup
+#   fleet, mlf, pqsum, x       → hand-written eager-load
+#
+# Manual rerun (--force regenerates all even if cache fresh):
+#   just completions-refresh
+#   bash {{ .chezmoi.sourceDir }}/scripts/generate_completions.sh --force
+#
+# Skip this hook (cache files stay as they are):
+#   export CHEZMOI_SKIP_COMPLETION_GEN=1
+
+set -e
+
+[ "${CHEZMOI_SKIP_COMPLETION_GEN:-0}" = "1" ] && exit 0
+
+generator="{{ .chezmoi.sourceDir }}/scripts/generate_completions.sh"
+[ -x "$generator" ] || {
+    echo "completions: generator not found at $generator (skipping)" >&2
+    exit 0
+}
+
+bash "$generator" --quiet

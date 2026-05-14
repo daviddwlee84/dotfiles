@@ -64,7 +64,7 @@ Tools fall into four categories:
 
 ### A. Self-generating (`tool completion zsh > ~/.zfunc/_tool`)
 
-Most modern CLI tools can output their own completion script. Run once after install, re-run after version upgrades.
+Most modern CLI tools can output their own completion script. **Auto-generated for both shells** by the `chezmoi apply` hook (`run_after_50_generate_completions.sh.tmpl` → `scripts/generate_completions.sh`); see [Generating Completions After Fresh Install](#generating-completions-after-fresh-install) for opt-out + manual rerun.
 
 | Tool | Command |
 |------|---------|
@@ -179,38 +179,42 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 
 ## Generating Completions After Fresh Install
 
-After `chezmoi apply` on a new machine, most completions already work via `zsh-completions` plugin and Homebrew site-functions. For tools you want **richer/newer completions**, generate them into `~/.zfunc/`:
+**Automatic — no manual step needed.** Every `chezmoi apply` runs `.chezmoiscripts/global/run_after_50_generate_completions.sh.tmpl`, which calls `scripts/generate_completions.sh` and regenerates completion for the 14 self-generating tools listed in Section A (`chezmoi`, `mise`, `uv`, `just`, `starship`, `gh`, `docker`, `rg`, `fd`, `bat`, `delta`, `zellij`, `pueue`, `opencode`).
+
+The hook is **idempotent** — it stat-checks each tool's binary mtime against the existing completion file and skips if the cache is fresh. Cost when nothing changed: **~21ms** total (presence checks + 28 stat calls). After an `ansible-playbook` / `brew upgrade` / `mise install <NEW>` that bumps a binary's mtime: ~140ms one-shot to regenerate the affected completions.
+
+Output paths:
+- **zsh**: `~/.zfunc/_<tool>` — lazy-loaded by compinit on first TAB (in `$fpath` via `dot_zshrc.tmpl:68`).
+- **bash**: `${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/<tool>` — lazy-loaded by bash-completion v2 on first TAB.
+
+### Manual rerun
 
 ```bash
-mkdir -p ~/.zfunc
-
-# Core tools (always installed)
-chezmoi completion zsh > ~/.zfunc/_chezmoi
-mise completion zsh > ~/.zfunc/_mise
-uv generate-shell-completion zsh > ~/.zfunc/_uv
-just --completions zsh > ~/.zfunc/_just
-starship completions zsh > ~/.zfunc/_starship
-
-# Dev tools (if installed)
-command -v gh    && gh completion -s zsh > ~/.zfunc/_gh
-command -v docker && docker completion zsh > ~/.zfunc/_docker
-command -v rg    && rg --generate complete-zsh > ~/.zfunc/_rg
-command -v fd    && fd --gen-completions zsh > ~/.zfunc/_fd
-command -v bat   && bat --completion zsh > ~/.zfunc/_bat
-command -v delta && delta --generate-completion zsh > ~/.zfunc/_delta
-command -v zellij && zellij setup --generate-completion zsh > ~/.zfunc/_zellij
-command -v sesh  && sesh completion zsh > ~/.zfunc/_sesh
-command -v pueue && pueue completions zsh > ~/.zfunc/_pueue
-
-# Coding agents (if installed)
-command -v opencode && opencode completion zsh > ~/.zfunc/_opencode
-command -v bw    && bw completion --shell zsh > ~/.zfunc/_bw
-
-# Force rebuild completion cache
-rm -f ~/.zcompdump && compinit
+just completions-refresh                              # force regen all (--force)
+bash scripts/generate_completions.sh --force          # same, no `just`
+bash scripts/generate_completions.sh                  # mtime-checked (same as the chezmoi hook)
 ```
 
-> **Tip:** You can save this as a script in `~/.local/bin/` or add it to `~/.zshrc.adhoc` as a function.
+Use `just completions-refresh` after a tool upgrade outside the chezmoi flow (e.g. `cargo install <tool>`), or to recover from a corrupted completion file.
+
+### Opt out
+
+```bash
+export CHEZMOI_SKIP_COMPLETION_GEN=1   # in ~/.shellrc.adhoc; suppresses the chezmoi-apply hook
+```
+
+Existing completion files stay as-is; you can still run `just completions-refresh` manually.
+
+### Add a new tool to the auto-gen inventory
+
+Edit the `regen <tool> "<zsh-args>" "<bash-args>"` block in `scripts/generate_completions.sh`. The arguments are whatever follows the tool name to produce the per-shell completion script — check `<tool> completion --help` or `<tool> --help | grep -i complet`. Examples already in the script cover click (`_TOOL_COMPLETE=`), clap (`--generate complete-<shell>`), tyro (`--tyro-write-completion <shell>`-equivalent), cobra (`completion <shell>`), and ad-hoc styles (`--completions <shell>`).
+
+### What about tools NOT in the auto-gen inventory?
+
+- **`sesh` / `tv` / `worktrunk`**: shell-startup mtime check (each tool has its own `dot_config/zsh/tools/<NN>_<tool>.zsh` file that runs the version check on every shell start — these tools are typically `cargo install`-ed outside chezmoi, so they need the per-startup probe to catch user upgrades).
+- **`bw` / `marimo` / `thefuck` / `try-cli`**: cached eval at startup (their completion script has side effects beyond `compdef`, so the file is `source`'d into the running shell rather than autoloaded).
+- **`mi-router`**: tyro self-gen, lives in `dot_config/shell/47_mi_router.sh` (not the bulk script — has its own `#compdef` rewrite for tyro's full-path output quirk).
+- **`fleet` / `mlf` / `pqsum` / `x`**: hand-written completion in `dot_config/{zsh/tools,bash}/45-49_*_completion.*` (in-house CLIs without a built-in completion generator).
 
 ## Priority / Override Order
 

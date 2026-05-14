@@ -376,6 +376,15 @@ info:
 # run them when you actually want tools to advance.
 # See `## Upgrades` section in AGENTS.md for rationale + category matrix.
 
+# Force-regenerate shell completion files for upstream CLIs (chezmoi/mise/uv/
+# just/starship/gh/docker/rg/fd/bat/delta/zellij/pueue/opencode). Normally
+# `chezmoi apply` does this automatically (binary-mtime check, idempotent);
+# use this recipe to refresh after a tool upgrade outside chezmoi (e.g. cargo
+# install) or to reset a corrupted completion file.
+# See docs/zsh/zsh-completions.md Section A for the inventory.
+completions-refresh:
+    ./scripts/generate_completions.sh --force
+
 # Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, flatpak, warp, agents, plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
