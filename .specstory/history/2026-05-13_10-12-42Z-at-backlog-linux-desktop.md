@@ -6175,3 +6175,46 @@ All committed. Summary of the session:
 - **Macked-macOS render**: excludes them entirely; remaining TOML still valid.
 
 (The specstory transcript keeps growing with our chat — there's a trailing `M` on it again because committing the transcript itself adds new content to the transcript. Normal SpecStory chase-your-tail; leave it for the next session's first commit.)
+
+---
+
+_**User (2026-05-13 13:05:02Z)**_
+
+Seems the Alacritty Ctrl + Shift + T/N are all create new window instead of T for create new tab?
+
+---
+
+_**Agent (claude-opus-4-7 2026-05-13 13:05:52Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-13 13:05:56Z)**_
+
+Correct observation — and that's not a bug, that's Alacritty's design speaking through your fingers. Let me clarify and offer a fix.
+
+**Why both keys do the same thing:**
+
+Alacritty has **exactly one** "make a new something" action: `SpawnNewInstance`. There is no `CreateNewTab` action because there are no tabs — upstream actively rejects PRs for it. So when I bound `T` and `N` to "the new thing," they both ended up at `SpawnNewInstance` → new window. Having two keys for the same thing is wasteful.
+
+**What "real tab" looks like in this stack:**
+
+The actual tab strip you're used to from Cmd+T = the tmux status bar at the bottom of your terminal. Each tmux window = one "tab." Your existing keystroke for it is `prefix c` (whatever your tmux prefix is + `c`). That creates a new tmux window inside the *same* Alacritty.
+
+**Options for what to do with Ctrl+Shift+T:**
+
+_**Agent (claude-opus-4-7 2026-05-13 13:06:32Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**How should Ctrl+Shift+T behave on Linux Alacritty?**
+
+Options:
+- **Send tmux `prefix c` (new tmux window = real tab)** - Change Ctrl+Shift+T to send the tmux prefix + `c` byte sequence. Inside tmux this opens a new tmux window (the tab-strip equivalent). Outside tmux the keys reach the shell as `Ctrl+B c` which is mostly harmless (readline back-one-char + insert `c`). Recommended if you live in tmux 95%+ of the time. Keep Ctrl+Shift+N as new Alacritty WINDOW for the rare case you want a fresh desktop entry.
+- **Drop Ctrl+Shift+T, keep only N for new window** - Remove the T binding entirely; Ctrl+Shift+N stays as the single new-window key. Most honest — no fake "tab" key when no tabs exist. You still get tabs via tmux `prefix c` (always-available, prefix-gated, no keypress collision).
+- **Keep both as new-window (status quo)** - Leave the current bindings unchanged — both T and N open a new Alacritty window. Some users like having two muscle-memory paths to the same action (T from browser convention, N from app convention). Slight redundancy is the price.
+
+
+**Answer:** Drop Ctrl+Shift+T, keep only N for new window
+</details></tool-use>
+
+_**Agent (<synthetic> 2026-05-13 13:06:33Z)**_
+
+You're out of extra usage · resets 10:30pm (Asia/Shanghai)

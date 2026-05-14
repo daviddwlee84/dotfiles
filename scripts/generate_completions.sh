@@ -99,6 +99,11 @@ regen() {
   else
     n_b_skip=$((n_b_skip + 1))
   fi
+
+  # `set -e` + `[ test ] && cmd` at function tail is a bash footgun: when
+  # `--quiet` makes the test fail, the &&-short-circuit returns 1, the inner
+  # `if`-`then` body returns 1, regen() returns 1, and set -e aborts.
+  return 0
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
