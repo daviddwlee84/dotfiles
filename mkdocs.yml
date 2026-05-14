@@ -332,6 +332,7 @@ nav:
       - "Emacs-style line editing: origin & must-know subset": shells/emacs-line-editing.md
   - Zsh:
       - Completions: zsh/zsh-completions.md
+      - "Plugins (oh-my-zsh + custom + UX upgrades evaluated)": zsh/oh-my-zsh-plugins.md
       - SSH login banner (MOTD): zsh/motd.md
   - Neovim:
       - Floating TUI: neovim/floating-tui.md

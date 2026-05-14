@@ -135,6 +135,8 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - **argcomplete**: `register-python-argcomplete tool_name` (eval-at-startup style, category C). Requires the script to call `argcomplete.autocomplete(parser)` before `parse_args()`. Cross-shell.
 - **click** (used by `marimo`, `thefuck`, `mlflow`, `litellm`, etc.): `_TOOL_COMPLETE=zsh_source tool > ~/.zfunc/_tool`. The completion script may include side effects (aliases / functions) — if so, treat as category C and cache via `${XDG_CACHE_HOME}/<shell>/<tool>_completion.<ext>`. See the canonical pattern at `dot_config/shell/29_marimo.sh`.
 
+> **TAB display itself**, not just completion data: see [`oh-my-zsh-plugins.md`](oh-my-zsh-plugins.md) "TAB display upgrades — alternatives evaluated" for fzf-tab (recommended) and rejected alternatives (zsh-autocomplete / carapace-bin / inshellisense).
+
 ### F. In-house CLIs (this repo)
 
 | CLI | Source | Framework | Strategy | Files |
