@@ -55,15 +55,11 @@ fi
 # =============================================================================
 # Homebrew Setup
 # =============================================================================
-{{ if eq .chezmoi.os "darwin" -}}
-# macOS: Initialize Homebrew (Apple Silicon or Intel)
-if [[ -f /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [[ -f /usr/local/bin/brew ]]; then
-    eval "$(/usr/local/bin/brew shellenv)"
-fi
-{{ else -}}
-# Linux: Initialize Linuxbrew if installed
+# macOS Homebrew shellenv runs in dot_zshrc.tmpl / dot_bashrc.tmpl BEFORE this
+# modular layer loads (so bash-completion v2 can see $HOMEBREW_PREFIX). We do
+# NOT duplicate it here — that would re-run shellenv (~17ms) at zero benefit.
+{{ if eq .chezmoi.os "linux" -}}
+# Linux: Initialize Linuxbrew if installed (no equivalent block in bashrc/zshrc).
 # Linuxbrew is optional on Linux (most packages managed by apt via Ansible).
 # Check the binary, not just the dir — a failed `brew install` leaves the
 # /home/linuxbrew/.linuxbrew/ tree behind (sudo'd by the installer before

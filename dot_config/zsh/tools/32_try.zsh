@@ -8,12 +8,24 @@ export TRY_PATH="${TRY_PATH:-$HOME/src/tries}"
 export TRY_PATH="${TRY_PATH:A}"
 export TRY_PROJECTS="${TRY_PROJECTS:-${TRY_PATH:h}}"
 
-# Find try.rb from the gem - the gem wrapper is broken due to __FILE__ == $0 guard
-_try_script=$(ruby -e "require 'rubygems'; puts File.join(Gem::Specification.find_by_name('try-cli').gem_dir, 'try.rb')" 2>/dev/null)
-[[ -f "$_try_script" ]] || return 0
-
-eval "$(ruby "$_try_script" init)"
-unset _try_script
+# Cached try-cli init: avoids two ruby cold starts (~67ms) on every shell
+# startup. Mtime check on the ruby binary auto-invalidates after a `mise
+# install ruby@<NEW>`. After a gem-only upgrade (`gem update try-cli`),
+# force-refresh with `try-update-completion`. The gem wrapper itself is
+# broken due to a __FILE__ == $0 guard, hence the indirect ruby try.rb call.
+_try_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/try_init.zsh"
+_try_ruby="$(command -v ruby 2>/dev/null)"
+if [[ -n "$_try_ruby" ]] && { [[ ! -f "$_try_cache" ]] || [[ "$_try_ruby" -nt "$_try_cache" ]]; }; then
+    _try_script=$(ruby -e "require 'rubygems'; puts File.join(Gem::Specification.find_by_name('try-cli').gem_dir, 'try.rb')" 2>/dev/null)
+    if [[ -f "$_try_script" ]]; then
+        mkdir -p "${_try_cache:h}"
+        ruby "$_try_script" init > "$_try_cache" 2>/dev/null
+    fi
+    unset _try_script
+fi
+[[ -s "$_try_cache" ]] || { unset _try_cache _try_ruby; return 0; }
+source "$_try_cache"
+unset _try_cache _try_ruby
 
 # ── try + sesh integration ───────────────────────────────────────────────────
 # Open a try project and immediately start a sesh coding session.

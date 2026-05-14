@@ -69,15 +69,18 @@ Completions ship with the package or via the `zsh-completions` community plugin.
 
 ### C. Eval/source at startup (shell integration)
 
-These tools inject completions as part of broader shell integration. Already handled in `dot_config/zsh/tools/`.
+These tools inject completions as part of broader shell integration. Most live in the POSIX `dot_config/shell/` layer (sourced by both zsh and bash); zsh-only ones live in `dot_config/zsh/tools/`.
 
-| Tool | Where | How |
-|------|-------|-----|
-| `fzf` | `tools/10_fzf.zsh` | `source <(fzf --zsh)` |
-| `zoxide` | `tools/20_zoxide.zsh` | `eval "$(zoxide init zsh)"` |
-| `thefuck` | `tools/25_thefuck.zsh` | `eval $(thefuck --alias)` |
-| `direnv` | `tools/30_direnv.zsh` | `eval "$(direnv hook zsh)"` |
-| `marimo` | `tools/29_marimo.zsh` | `eval "$(_MARIMO_COMPLETE=zsh_source marimo)"` |
+| Tool | Where | How | Cached? |
+|------|-------|-----|---------|
+| `fzf` | `dot_config/shell/10_fzf.sh` | `eval "$(fzf --zsh)"` (zsh) / `eval "$(fzf --bash)"` (bash) | — |
+| `zoxide` | `dot_config/shell/20_zoxide.sh` | `eval "$(zoxide init <shell>)"` | — |
+| `direnv` | `dot_config/shell/30_direnv.sh` | `eval "$(direnv hook <shell>)"` | — |
+| `marimo` | `dot_config/shell/29_marimo.sh` | `_MARIMO_COMPLETE=<shell>_source marimo` | ✅ `${XDG_CACHE_HOME}/{zsh,bash}/marimo_completion.{zsh,bash}` — refresh via `marimo-update-completion` |
+| `thefuck` | `dot_config/shell/27_thefuck.sh` | `thefuck --alias` | ✅ `${XDG_CACHE_HOME}/{zsh,bash}/thefuck_alias.{zsh,bash}` — refresh via `thefuck-update-completion` |
+| `try-cli` | `dot_config/zsh/tools/32_try.zsh` | `ruby try.rb init` (zsh-only) | ✅ `${XDG_CACHE_HOME}/zsh/try_init.zsh` — refresh via `try-update-completion` |
+
+> **Cached entries** auto-invalidate when the tool's binary mtime is newer than the cache file (`[ "$(command -v <tool>)" -nt "$cache" ]`) — catches `mise install <NEW>`, `brew upgrade`, `uv tool upgrade`. Manual refresh helpers handle edge cases: gem-only upgrades that don't bump the ruby binary, in-place tool replacements, or cache corruption. The pattern mirrors `dot_config/zsh/tools/95_bitwarden.zsh` (the canonical example).
 
 ### D. No completion support
 

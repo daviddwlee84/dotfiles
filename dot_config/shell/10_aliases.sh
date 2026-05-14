@@ -78,6 +78,46 @@ function bw-update-completion {
 	fi
 }
 
+# --- marimo / thefuck completion regen -------------------------------------
+# Same caching strategy as bw-update-completion (above). The mtime check on
+# the binary inside dot_config/shell/{29_marimo.sh,27_thefuck.sh} catches
+# `uv tool upgrade marimo` / `brew upgrade thefuck` automatically; these
+# helpers exist for edge cases (in-place upgrade where mtime doesn't bump,
+# corrupted cache, manual debugging). `function name { … }` syntax (not POSIX
+# `name()`) avoids the alias-collision footgun documented in
+# pitfalls/zsh-parse-error-on-resource-after-bw-completion-aliased-name.md.
+function marimo-update-completion {
+	command -v marimo >/dev/null 2>&1 || {
+		echo "marimo-update-completion: marimo not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh" &&
+			_MARIMO_COMPLETE=zsh_source marimo >"${XDG_CACHE_HOME:-$HOME/.cache}/zsh/marimo_completion.zsh" 2>/dev/null &&
+			echo "marimo completion cache updated (zsh)"
+	elif [ -n "$BASH_VERSION" ]; then
+		mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/bash" &&
+			_MARIMO_COMPLETE=bash_source marimo >"${XDG_CACHE_HOME:-$HOME/.cache}/bash/marimo_completion.bash" 2>/dev/null &&
+			echo "marimo completion cache updated (bash)"
+	fi
+}
+
+function thefuck-update-completion {
+	command -v thefuck >/dev/null 2>&1 || {
+		echo "thefuck-update-completion: thefuck not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/zsh" &&
+			thefuck --alias >"${XDG_CACHE_HOME:-$HOME/.cache}/zsh/thefuck_alias.zsh" 2>/dev/null &&
+			echo "thefuck alias cache updated (zsh)"
+	elif [ -n "$BASH_VERSION" ]; then
+		mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/bash" &&
+			thefuck --alias >"${XDG_CACHE_HOME:-$HOME/.cache}/bash/thefuck_alias.bash" 2>/dev/null &&
+			echo "thefuck alias cache updated (bash)"
+	fi
+}
+
 # --- Ghostty terminfo install on remote SSH host ---------------------------
 # Fixes character-rendering issues when SSH'ing into a fresh host from
 # Ghostty/cmux/tmux. Usage: ghostty-ssh-terminfo <ssh-host>

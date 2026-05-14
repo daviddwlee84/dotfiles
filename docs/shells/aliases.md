@@ -721,7 +721,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | Lazy-load NVM into current session (normally skipped at startup) |
-| `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | Regenerate cached Bitwarden zsh completion file |
+| `bw-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate cached Bitwarden completion (per-shell `${XDG_CACHE_HOME}/{zsh,bash}/bw_completion.*`) |
+| `marimo-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate cached marimo completion (per-shell `${XDG_CACHE_HOME}/{zsh,bash}/marimo_completion.*`); auto-invalidates on `marimo` binary mtime change in `dot_config/shell/29_marimo.sh` |
+| `thefuck-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate cached thefuck alias (per-shell `${XDG_CACHE_HOME}/{zsh,bash}/thefuck_alias.*`); auto-invalidates on `thefuck` binary mtime change in `dot_config/shell/27_thefuck.sh` |
+| `try-update-completion` | function | `dot_config/zsh/10_aliases.zsh` | **zsh-only.** Regenerate cached try-cli init (`${XDG_CACHE_HOME}/zsh/try_init.zsh`); auto-invalidates on `ruby` binary mtime change in `dot_config/zsh/tools/32_try.zsh` |
 | `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `dot_config/shell/00_exports.sh.tmpl`) |
 | `conda` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | First call lazy-inits any of miniforge3 / miniconda3 / anaconda3 (autodetects `~/miniforge3` etc.) then re-execs with given args. Saves ~200ms shell startup vs eager init. |
 | `mamba` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | Same lazy init as `conda` — picks up `etc/profile.d/mamba.sh` from full distro install. |
