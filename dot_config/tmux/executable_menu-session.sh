@@ -20,7 +20,11 @@ declare -a rows=(
   "Kill window"        W  "confirm-before -p 'Kill window #W? (y/n)' kill-window"
   "Kill session"       X  "confirm-before -p 'Kill session #S? (y/n)' kill-session"
   "Kill session & exit" E  "confirm-before -p 'Kill session #S and exit tmux? (y/n)' \"run-shell '$HOME/.config/tmux/kill-session-exit.sh'\""
-  "Kill all sessions"  Q  "confirm-before -p 'Kill ALL sessions (tmux server)? (y/n)' kill-server"
+  # "Kill all sessions" routes through kill-server-clean.sh to clear
+  # tmux-resurrect's `last` symlink, so tmux-continuum does NOT auto-restore
+  # the just-closed sessions on the next tmux start. See:
+  #   pitfalls/tmux-continuum-restores-on-intentional-quit.md
+  "Kill all sessions"  Q  "confirm-before -p 'Kill ALL sessions (tmux server)? (y/n)' \"run-shell '$HOME/.config/tmux/kill-server-clean.sh'\""
 )
 
 # AI session summary — gated on the popup helper existing so the row hides

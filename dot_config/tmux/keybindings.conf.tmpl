@@ -17,6 +17,10 @@
 # menu stays Open until an item is chosen or Escape is pressed.
 
 unbind-key -n MouseDown3Pane
+# *** IF YOU EDIT THE MENU BODY, ALSO UPDATE dot_config/tmux/menu-pane.sh ***
+# (keyboard equivalent is `prefix + M-p`, defined near the popup-menu section
+# at the bottom of this file; the body is duplicated by design per
+# pitfalls/tmux-submenu-flash-and-bottom-right.md).
 bind-key -n MouseDown3Pane \
   if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" \
     { select-pane -t = ; send-keys -M } \
@@ -46,6 +50,10 @@ bind-key -n MouseDown3Pane \
         "Kill pane"   X { confirm-before -p "Kill pane? (y/n)" kill-pane } }
 
 unbind-key -n MouseDown3Status
+# *** IF YOU EDIT THE MENU BODY, ALSO UPDATE dot_config/tmux/menu-window.sh ***
+# (keyboard equivalent is `prefix + M-w`; body duplicated by design — see the
+# comment above MouseDown3Pane for the pitfall reference.)
+#
 # Window-tab right-click menu.
 #
 # WARNING: this menu is currently 23 visible rows, well above the ~14-row
@@ -92,6 +100,13 @@ bind-key -n MouseDown3Status \
     "New window"  w { new-window }
 
 unbind-key -n MouseDown3StatusLeft
+# *** IF YOU EDIT THE MENU BODY, ALSO UPDATE dot_config/tmux/menu-status-left.sh ***
+# (keyboard equivalent is `prefix + M-s`; body duplicated by design — see the
+# comment above MouseDown3Pane for the pitfall reference.)
+#
+# "Kill all sessions" + "Kill session & exit" route through the clean-quit
+# helpers so tmux-continuum does NOT auto-restore the just-closed sessions.
+# See pitfalls/tmux-continuum-restores-on-intentional-quit.md.
 bind-key -n MouseDown3StatusLeft \
   display-menu -O -T "#[align=centre]#{session_name}" -t = -x M -y W \
     Next        n { switch-client -n } \
@@ -107,7 +122,7 @@ bind-key -n MouseDown3StatusLeft \
     "" \
     "Kill session"        X { kill-session } \
     "Kill session & exit" E { run-shell "~/.config/tmux/kill-session-exit.sh" } \
-    "Kill all sessions"   Q { confirm-before -p "Kill ALL sessions (tmux server)? (y/n)" kill-server }
+    "Kill all sessions"   Q { confirm-before -p "Kill ALL sessions (tmux server)? (y/n)" "run-shell '~/.config/tmux/kill-server-clean.sh'" }
 
 # =============================================================================
 # Vim-Style Copy Mode (prefix + [ to enter, q to exit)
@@ -479,3 +494,31 @@ bind-key Space run-shell "~/.config/tmux/menu.sh"
 # for a misdiagnosed display-menu bug — see pitfalls/tmux-display-menu-silent-fail.md).
 # Removed so `e` is free as a sub-menu mnemonic (e.g. "Even layout: horizontal"
 # in the window right-click menu).
+
+# =============================================================================
+# Right-click menus on the keyboard (prefix + M-p / M-w / M-s)
+# =============================================================================
+# Keyboard equivalents of the three MouseDown3* right-click menus defined at
+# the top of this file:
+#
+#   prefix + M-p  →  menu-pane.sh         (same as right-click on a pane)
+#   prefix + M-w  →  menu-window.sh       (same as right-click on a window tab)
+#   prefix + M-s  →  menu-status-left.sh  (same as right-click on the session
+#                                          name in the status-left area)
+#
+# WHY scripts (not inline `display-menu` like the MouseDown3* bindings):
+# `pitfalls/tmux-submenu-flash-and-bottom-right.md` — a `display-menu` launched
+# indirectly via `run-shell` from a MouseDown3 binding has its mouse-release
+# event leaked into the menu, dismissing it instantly. So the MouseDown3*
+# bodies MUST stay inline above. Keyboard activation has no pending mouse
+# event, so a script wrapper is safe — and keeps this file shorter. The menu
+# bodies are duplicated between the MouseDown3* bindings here and the scripts
+# under dot_config/tmux/menu-*.sh; each location carries a "sync me" comment.
+#
+# Requires terminal Option-as-Meta on macOS (already set by the repo's
+# Ghostty/cmux config: `macos-option-as-alt = left`). On Linux terminals the
+# Alt modifier is sent natively.
+
+bind -N "right-click pane menu (keyboard)"      M-p run-shell "~/.config/tmux/menu-pane.sh"
+bind -N "right-click window menu (keyboard)"    M-w run-shell "~/.config/tmux/menu-window.sh"
+bind -N "right-click status-left menu (keyboard)" M-s run-shell "~/.config/tmux/menu-status-left.sh"

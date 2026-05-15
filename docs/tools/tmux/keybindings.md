@@ -155,17 +155,48 @@ Command-boundary keys (`{` `}` `M-[` `M-]`) rely on OSC 133 markers emitted by `
 
 ## Right-click menus
 
-Right-click opens a context menu depending on where you click:
+Right-click opens a context menu depending on where you click. Each menu also has a keyboard equivalent under `prefix`:
 
-| Target | Menu items |
-|--------|------------|
-| Pane body (`MouseDown3Pane`) | Split h/v, swap up/down/left/right, zoom, resize 75% / even, mark, swap marked, **join marked here (h/v)**, **send pane to window…**, **break to new window**, copy mode, respawn, kill |
-| Window list (`MouseDown3Status`) | Swap left/right, move/link to session, **merge into other window as pane (h/v)**, **even layout (horizontal / vertical / tiled)**, kill window, **renumber windows**, rename, new window |
-| Session area on the left (`MouseDown3StatusLeft`) | Next/prev/choose/rename session, move current window, new session/window, kill session / kill-and-exit / kill-all-sessions |
+| Target | Mouse | Keyboard | Menu items |
+|--------|-------|----------|------------|
+| Pane body | `MouseDown3Pane` | `prefix + M-p` | Split h/v, swap up/down/left/right, zoom, resize 75% / even, mark, swap marked, **join marked here (h/v)**, **send pane to window…**, **break to new window**, copy mode, respawn, kill |
+| Window tab | `MouseDown3Status` | `prefix + M-w` | Swap left/right, move/link to session, **merge into other window as pane (h/v)**, **even layout (horizontal / vertical / tiled)**, kill window, **renumber windows**, rename, new window, bookmarks (⭐/📌/🔖/🚩), clear agent status |
+| Status-left (session name) | `MouseDown3StatusLeft` | `prefix + M-s` | Next/prev/choose/rename session, move current window, new session/window, kill session, **kill session & exit (clean)**, **kill all sessions (clean)** |
 
 Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
 
 After break / send / merge / join, a status-bar message reports what happened (e.g. `Broke pane out to window 4 (zsh)`, `Merged into 1`).
+
+### Why two implementations of the same menu?
+
+The menu body for each of the three right-click menus is intentionally duplicated between the **inline** mouse binding (in `dot_config/tmux/keybindings.conf.tmpl`) and the corresponding **script** (`dot_config/tmux/menu-pane.sh` / `menu-window.sh` / `menu-status-left.sh`):
+
+- The **mouse** path MUST stay inline. A `display-menu` launched indirectly via `run-shell` from a `MouseDown3*` binding loses its "opened from a mouse key binding" status, and the queued mouse-release event dismisses it (flash-and-gone, or pops to bottom-right). See [`pitfalls/tmux-submenu-flash-and-bottom-right.md`](../../../pitfalls/tmux-submenu-flash-and-bottom-right.md).
+- The **keyboard** path doesn't have that queued mouse event, so a script is safe — and keeps `keybindings.conf` short.
+
+Both surfaces carry a "sync me" comment pointing at the other. When editing menu items, update both copies in the same commit.
+
+### `display-menu` height limit
+
+`display-menu` does not paginate. If the menu is taller than the terminal, the entire popup is **silently suppressed** (no error, nothing in `tmux show-messages`). Both the mouse and keyboard triggers are equally affected — the keyboard variant does NOT rescue the menu on small terminals. The window-tab menu is currently 23 rows so it will not appear on terminals smaller than ~26 rows. See [`pitfalls/tmux-display-menu-silent-fail.md`](../../../pitfalls/tmux-display-menu-silent-fail.md).
+
+## Clean quit and tmux-continuum auto-restore
+
+The repo enables `@continuum-restore 'on'` (in `dot_config/tmux/common.conf.tmpl`), so tmux-continuum auto-restores the last saved session **every time the tmux server starts with no existing sessions**. It cannot distinguish "user intentionally killed everything" from "crashed / rebooted" — both look identical (server gone → restore on next start).
+
+Two paths route through clean-quit wrappers that clear the resurrect `last` symlink before the server dies, so the next start has nothing to restore:
+
+| Path | Wrapper | When |
+|------|---------|------|
+| `prefix + M-x` ("Kill session & exit") | [`kill-session-exit.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_kill-session-exit.sh) | Only when this is the **last** surviving session (so the server is about to die). With other sessions remaining the server keeps running — no restore is triggered. |
+| Right-click status-left → "Kill all sessions" (mouse or `prefix + M-s`) | [`kill-server-clean.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_kill-server-clean.sh) | Always. |
+| Popup menu → Session → "Kill all sessions (Q)" | same | Always. |
+
+Other kill paths (`prefix + x` kill-pane, `prefix + W` kill-window, plain `prefix + X` kill-session) deliberately do NOT touch the symlink — they're not "I'm exiting tmux" actions, so leaving the server up means no restore is triggered.
+
+**Crash recovery is unaffected**: historical resurrect snapshots stay on disk under `~/.local/share/tmux/resurrect/`. After a crash, the next start auto-restores from `last` as before, OR if you've cleaned it, run `prefix + Ctrl-r` to manually pick from history.
+
+See [`pitfalls/tmux-continuum-restores-on-intentional-quit.md`](../../../pitfalls/tmux-continuum-restores-on-intentional-quit.md) for the full debugging trail and why we keep `@continuum-restore 'on'` instead of turning it off entirely.
 
 ## URL Opening
 
