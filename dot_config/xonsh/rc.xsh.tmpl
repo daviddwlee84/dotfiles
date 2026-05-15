@@ -1,0 +1,58 @@
+# ~/.config/xonsh/rc.xsh — personal Xonsh extensions (sourced by ~/.xonshrc).
+#
+# This is your sandbox. The main ~/.xonshrc keeps a stable minimum; everything
+# you'd be tempted to "just hack in" goes here. Mirror of the .config/zsh/ vs
+# ~/.zshrc split.
+#
+# Why xonsh? Inline Python where shell pipes get awkward. The two examples
+# below illustrate the two killer patterns:
+#   (a) shell function written in Python (full stdlib + pip available)
+#   (b) capture shell output as a Python object you can slice/filter/sort
+#
+# Delete what you don't want. Add what you do.
+
+import os
+
+# ---------------------------------------------------------------------------
+# Example A — `largest` alias: Python-implemented shell command.
+# Usage:  largest        → top 10 files by size in cwd
+#         largest 25     → top 25
+# ---------------------------------------------------------------------------
+def _largest_files(args, stdin=None):
+    n = int(args[0]) if args else 10
+    entries = []
+    for f in os.listdir('.'):
+        if os.path.isfile(f):
+            try:
+                entries.append((f, os.path.getsize(f)))
+            except OSError:
+                pass
+    for f, s in sorted(entries, key=lambda x: -x[1])[:n]:
+        print(f"{s:>12}  {f}")
+
+aliases['largest'] = _largest_files
+
+# ---------------------------------------------------------------------------
+# Example B — capture-and-process pattern. Run any of these interactively:
+#
+#     # Files modified in last hour, as a Python list:
+#     recent = [l for l in $(ls -lt).splitlines() if 'hour' in l or 'min' in l]
+#
+#     # Pipe a shell pipeline into Python with the `pipeliner` xontrib:
+#     ls -la | @ json.dumps({'line': line, 'len': len(line)})
+#
+# (No code to define — these are interactive idioms. Drop your favourites here
+# as functions once you find ones you keep retyping.)
+# ---------------------------------------------------------------------------
+
+{{ if eq .chezmoi.os "darwin" -}}
+# macOS-specific helpers go here. Example:
+# aliases['flushdns'] = ['sudo', 'dscacheutil', '-flushcache']
+{{ else -}}
+# Linux-specific helpers go here.
+{{ end -}}
+
+# ---------------------------------------------------------------------------
+# Reload this file without restarting xonsh:
+#     source ~/.config/xonsh/rc.xsh
+# ---------------------------------------------------------------------------

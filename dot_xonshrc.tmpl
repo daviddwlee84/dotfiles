@@ -1,0 +1,74 @@
+# ~/.xonshrc — Xonsh (Python-superset shell) startup.
+#
+# Xonsh is a SECONDARY shell in this repo. We do not chsh to it — primaryShell
+# stays zsh|bash. Treat this as a Python-flavored playground you drop into:
+#
+#     $ xonsh                # interactive
+#     $ xonsh -c 'print(1+1); echo hi'   # one-shot
+#
+# Existing zsh/bash helpers (fleet/mlf/pqsum/wt/wm/aliases/.shellrc.adhoc/
+# .shellrc.secrets/atuin/ble.sh/oh-my-zsh) are intentionally NOT ported here.
+# See docs/shells/xonsh.md for the why.
+
+import os as _os
+import shutil as _sh
+
+# ---------------------------------------------------------------------------
+# 1. PATH — mirror scripts/fleet/exec.py:_PATH_PRELUDE order so xonsh sees the
+#    CLIs this repo installs (chezmoi → cargo → uv → ~/bin → brew → linuxbrew).
+#    $PATH is a list in xonsh, not a colon-string.
+# ---------------------------------------------------------------------------
+for _p in (
+    _os.path.expanduser('~/.dotfiles/bin'),
+    _os.path.expanduser('~/.cargo/bin'),
+    _os.path.expanduser('~/.local/bin'),
+    _os.path.expanduser('~/bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/home/linuxbrew/.linuxbrew/bin',
+    _os.path.expanduser('~/.linuxbrew/bin'),
+):
+    if _os.path.isdir(_p) and _p not in $PATH:
+        $PATH.insert(0, _p)
+
+# ---------------------------------------------------------------------------
+# 2. Prompt — starship has native xonsh support (>= 1.x). `starship init xonsh`
+#    emits xonsh code that we execx() into the current session.
+# ---------------------------------------------------------------------------
+if _sh.which('starship'):
+    execx($(starship init xonsh))
+
+# ---------------------------------------------------------------------------
+# 3. Sample xontribs (installed alongside xonsh via python_uv_tools `with:`).
+#    Trim or extend as you discover what you actually use.
+#    Failures are non-fatal: a missing xontrib just prints a warning.
+# ---------------------------------------------------------------------------
+xontrib load jedi zoxide pipeliner fzf-widgets
+
+{{ if .enableVimMode -}}
+# ---------------------------------------------------------------------------
+# 4. Vim modal editing — gated on .enableVimMode (same flag that drives
+#    zsh-vi-mode / `set -o vi` / ble.sh vi-mode in your other shells).
+# ---------------------------------------------------------------------------
+$VI_MODE = True
+{{ end -}}
+
+# ---------------------------------------------------------------------------
+# 5. History — atuin has no xontrib. Xonsh writes to its own
+#    $XDG_DATA_HOME/xonsh/history.json by default; nothing to do here.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 6. Extension hooks — drop personal additions in either:
+#      ~/.config/xonsh/rc.xsh    (versioned starter, see dot_config/xonsh/)
+#      ~/.xonshrc.local          (untracked, machine-local; mirrors the
+#                                 .shellrc.secrets pattern — never auto-stub)
+# ---------------------------------------------------------------------------
+for _rc in (
+    _os.path.expanduser('~/.config/xonsh/rc.xsh'),
+    _os.path.expanduser('~/.xonshrc.local'),
+):
+    if _os.path.exists(_rc) and _rc not in $XONSHRC:
+        $XONSHRC.append(_rc)
+
+del _os, _sh, _p, _rc

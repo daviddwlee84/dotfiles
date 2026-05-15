@@ -80,3 +80,14 @@ python_uv_tools:
     extra_binaries:
       - jupyter           # from jupyter-core
       - jupyter-notebook  # from notebook
+  # Xonsh: Python-superset shell. Installed as an experimental tertiary shell —
+  # never set as login shell (primaryShell schema stays zsh|bash). The bundled
+  # xontribs ship inside xonsh's tool venv so `xontrib load <name>` finds them
+  # without extra pip work. See docs/shells/xonsh.md.
+  - name: xonsh
+    binary: xonsh
+    with:
+      - xontrib-jedi          # Jedi-powered Python tab completion inside xonsh
+      - xontrib-zoxide        # z / zi directory jumping (uses zoxide binary on PATH)
+      - xontrib-pipeliner     # pipe shell output through Python expressions (xonsh selling point)
+      - xontrib-fzf-widgets   # Ctrl+R / Ctrl+T fzf widgets (uses fzf binary on PATH)
