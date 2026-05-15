@@ -78,16 +78,27 @@ repos:
         # itself has no shebang by design, so skip the shebang check for it.
         exclude: (^|/)modify_[^/]+\.tmpl$
 
-  # shellcheck - static analysis for bash scripts in scripts/
-  # Scoped narrowly: top-level scripts only. `.tmpl` files and zsh modules
-  # have syntax shellcheck's bash parser rejects (go-template `{{ ... }}`,
-  # zsh `(( ))`, `${(P)v}`, `print -u2`, etc). Broaden later if useful.
+  # shellcheck - static analysis for bash scripts.
+  # Two scopes, two severities:
+  #   1. scripts/*.sh — strict (severity=warning), always green.
+  #   2. dot_config/{shell,bash}/ — relaxed (severity=error), only blocks
+  #      on actual bugs while we gradually clean up the 40-odd preexisting
+  #      warnings. Drop to severity=warning once `just lint-shell` is clean.
+  # `.tmpl` files and zsh modules stay excluded — shellcheck's bash parser
+  # rejects go-template `{{ ... }}`, zsh `(( ))`, `${(P)v}`, `print -u2`, etc.
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
+        name: shellcheck (scripts/)
         files: '^scripts/[^/]+\.sh$'
         args: [--shell=bash, --severity=warning]
+      - id: shellcheck
+        alias: shellcheck-shared
+        name: shellcheck (dot_config/{shell,bash}/, errors only)
+        files: '^dot_config/(shell/[^/]+\.sh|bash/[^/]+\.bash)$'
+        exclude: '\.tmpl$'
+        args: [--shell=bash, --severity=error]
 
   # shfmt - auto-format bash scripts in place. Same UX as
   # trailing-whitespace / end-of-file-fixer / redact-agent-secrets:

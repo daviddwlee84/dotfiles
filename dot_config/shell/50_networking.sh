@@ -10,6 +10,7 @@ alias myip='curl -s https://ifconfig.me'
 if [[ "$OSTYPE" == darwin* ]]; then
   alias localip='ipconfig getifaddr en0'
 else
+  # shellcheck disable=SC2142  # `\$1` is awk's field-1, not a shell positional.
   alias localip='hostname -I | awk "{print \$1}"'
 fi
 

@@ -4645,3 +4645,1762 @@ b7ea573 feat(completions): auto-generate upstream-CLI completions on chezmoi app
 5e98f52 feat(mi-router): add 'endpoints' subcommand + raw help examples
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:21Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:22Z)**_
+
+Staging the feature files explicitly (no `-A` per git safety protocol). I'll leave the two stray "reply with the single word" transcripts out — they're noise from my smoke tests, not part of the feature conversation.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage feature files + design transcript
+
+`git add dot_config/shell/05_ai_run.sh dot_config/shell/04_ai_agents.sh docs/shells/aliases.md .claude/plans/alias-run-prompt-expressive-wombat.md ".specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md" && git status`
+
+```text
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   .claude/plans/alias-run-prompt-expressive-wombat.md
+	new file:   .specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md
+	modified:   docs/shells/aliases.md
+	modified:   dot_config/shell/04_ai_agents.sh
+	new file:   dot_config/shell/05_ai_run.sh
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-15_02-29-06Z-reply-with-the-single.md
+	.specstory/history/2026-05-15_02-29-23Z-reply-with-the-single.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit AI run wrappers
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat(shell): quick one-shot prompt wrappers (ocr/ccr/cxr/cur/olr/air)
+
+Mirror the [oc]/[cc]/[cx]/[cu] agent-session tags so muscle memory
+carries between `tv agent-sessions` (browse old) and these (start new).
+Streaming pass-through (unlike `aifix`, which is capture-and-diagnose);
+`air` reuses AICAP_AGENT_PRIORITY autodetect with subshell-scoped
+per-call -a/-m overrides. `olr` is shell-only sugar over `ollama run`
+— SSOT gains AICAP_OLLAMA_MODEL but ollama stays out of autodetect.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778812351-63732.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck...........................................(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778812351-63732.
+[main 12cfb10] feat(shell): quick one-shot prompt wrappers (ocr/ccr/cxr/cur/olr/air)
+ 5 files changed, 5066 insertions(+)
+ create mode 100644 .claude/plans/alias-run-prompt-expressive-wombat.md
+ create mode 100644 .specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md
+ create mode 100644 dot_config/shell/05_ai_run.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:43Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:45Z)**_
+
+Commit landed. But pre-commit output reveals **shellcheck is already configured as a pre-commit hook** (it just skipped because no files matched its scope). Let me check what's already in place vs. what I need to add.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect existing shellcheck pre-commit config
+
+`grep -n -A 12 -E "(shellcheck|shfmt)" .pre-commit-config.yaml 2>/dev/null | head -80`
+
+```text
+81:  # shellcheck - static analysis for bash scripts in scripts/
+82-  # Scoped narrowly: top-level scripts only. `.tmpl` files and zsh modules
+83:  # have syntax shellcheck's bash parser rejects (go-template `{{ ... }}`,
+84-  # zsh `(( ))`, `${(P)v}`, `print -u2`, etc). Broaden later if useful.
+85:  - repo: https://github.com/shellcheck-py/shellcheck-py
+86-    rev: v0.10.0.1
+87-    hooks:
+88:      - id: shellcheck
+89-        files: '^scripts/[^/]+\.sh$'
+90-        args: [--shell=bash, --severity=warning]
+91-
+92:  # shfmt - auto-format bash scripts in place. Same UX as
+93-  # trailing-whitespace / end-of-file-fixer / redact-agent-secrets:
+94-  # if the hook rewrites a file, pre-commit reports "files were
+95-  # modified by this hook" and the user must `git add` + re-commit.
+96-  # Previously used `-d` (diff-only, no write) which printed the
+97-  # would-be diff but left working tree untouched, forcing a manual
+98:  # `shfmt -i 2 -ci -bn -w scripts/*.sh` round-trip — easy to mis-run
+99:  # with system shfmt defaults (tabs instead of 2-space).
+100:  - repo: https://github.com/scop/pre-commit-shfmt
+101-    rev: v3.10.0-2
+102-    hooks:
+103:      - id: shfmt
+104-        files: '^scripts/[^/]+\.sh$'
+105-        args: [-i, "2", -ci, -bn, -w]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check devtools role for existing shellcheck install
+
+`grep -rn -B1 -A6 -i "shellcheck\|shfmt" dot_ansible/roles/devtools/ 2>/dev/null | head -60`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:32:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check justfile for existing lint-shell recipes
+
+`grep -n -E "(shell|lint|shellcheck|shfmt)" justfile 2>/dev/null | head -30`
+
+```text
+35:# Run interactive devbox shell
+309:# Run all linting checks
+310:lint: ansible-syntax-check pre-commit-run-all
+320:check-all: lint bats docker-test
+322:# Full check (lint + dry-run)
+323:check: lint chezmoi-dry-run
+379:# Force-regenerate shell completion files for upstream CLIs (chezmoi/mise/uv/
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:33:16Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:33:20Z)**_
+
+Surprising: shellcheck IS in pre-commit (line 85-90), but narrowly scoped to `^scripts/[^/]+\.sh$`. `shfmt` (line 100-105) same. The narrow scope is **intentional** per the inline comment — `.tmpl` files and zsh modules have syntax shellcheck rejects. The shells/bash subdirs (POSIX-clean per three-tier rule) are uncovered.
+
+So the actual gap is:
+- **devtools role doesn't install shellcheck** (not on PATH on fresh hosts)
+- **no broad lint recipe**
+- **pre-commit hook scope misses `dot_config/shell/*.sh` and `dot_config/bash/*.bash`**
+
+Let me look at the devtools role structure, then do a quick warning survey to gauge whether broadening the pre-commit hook is feasible immediately or needs a cleanup PR first.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:33:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List devtools task files
+
+`ls dot_ansible/roles/devtools/tasks/`
+
+```text
+main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Install shellcheck + shfmt for local survey
+
+`brew install shellcheck shfmt 2>&1 | tail -5`
+
+```text
+Command running in background with ID: b42j24hz4. Output is being written to: /private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/b42j24hz4.output. You will be notified when it completes. To check interim output, use Read on that file path.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:29Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:29Z)**_
+
+Brew install kicked off in background. Reading devtools/main.yml while it runs.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Size of devtools main.yml
+
+`wc -l dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+    4110 dot_ansible/roles/devtools/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Index of tasks in devtools
+
+`grep -n -E "^- name:|brew|homebrew" dot_ansible/roles/devtools/tasks/main.yml | head -40`
+
+```text
+6:# macOS - all via Homebrew
+9:- name: Tap diffnav formula (macOS)
+11:  community.general.homebrew_tap:
+15:- name: Tap raine/workmux formula (macOS)
+21:  community.general.homebrew_tap:
+25:- name: Install developer CLI tools (macOS)
+27:  community.general.homebrew:
+72:    # Note: ccze is not available on Homebrew (removed from homebrew-core).
+81:- name: Check if gh is installed
+90:- name: Set gh release architecture
+104:- name: Skip gh on unsupported architecture
+112:- name: Install gh from GitHub releases (Debian/Ubuntu)
+159:- name: Re-check if gh is installed
+168:- name: Install gh from GitHub releases (user-level, no sudo)
+229:- name: Check if glab is installed
+238:- name: Set glab release architecture
+251:- name: Skip glab on unsupported architecture
+259:- name: Install glab from GitLab releases (Debian/Ubuntu)
+306:- name: Re-check if glab is installed
+315:- name: Install glab from GitLab releases (user-level, no sudo)
+376:- name: Install bat (Debian/Ubuntu)
+384:- name: Create bat symlink on Debian/Ubuntu
+394:- name: Detect Linuxbrew for bat (Debian/Ubuntu)
+396:  ansible.builtin.shell: command -v brew || true
+399:  register: bat_brew_probe
+402:- name: Install bat via Linuxbrew when available (Debian/Ubuntu)
+405:    - bat_brew_probe.stdout | default('') | trim != ''
+406:  community.general.homebrew:
+413:- name: Re-check if bat is installed
+420:- name: Install bat from GitHub releases (user-level, no sudo)
+480:- name: Install bats (Debian/Ubuntu)
+492:- name: Re-check if bats is installed
+501:- name: Install bats-core from GitHub releases (user-level, no sudo)
+560:- name: Check if zoxide is installed
+567:- name: Install zoxide via official installer (Debian/Ubuntu)
+578:- name: Warn zoxide installation failed
+587:- name: Check if eza is installed
+594:- name: Install eza via official installer (Debian/Ubuntu)
+636:#   - aarch64: probe Linuxbrew; install via brew if present, otherwise skip
+638:- name: Re-check if eza is installed
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+25	- name: Install developer CLI tools (macOS)
+26	  when: ansible_facts["os_family"] == "Darwin"
+27	  community.general.homebrew:
+28	    name:
+29	      - bat
+30	      - bats-core
+31	      - gh
+32	      - glab
+33	      - diffnav
+34	      - git-delta
+35	      - git-graph
+36	      - eza
+37	      - tlrc
+38	      - glow
+39	      - gum
+40	      - vhs
+41	      - freeze
+42	      - thefuck
+43	      - zoxide
+44	      - direnv
+45	      - yazi
+46	      - superfile
+47	      - tmux
+48	      - sesh
+49	      - worktrunk
+50	      - workmux
+51	      - zellij
+52	      - btop
+53	      - htop
+54	      - duckdb
+55	      - rclone
+56	      - coreutils
+57	      - taplo
+58	      - television
+59	      - pandoc
+60	      - tailspin
+61	      - lnav
+62	      - grc
+63	      - dasel
+64	      - yq
+65	      - jnv
+66	      - witr
+67	      - figlet
+68	      - toilet
+69	      - lolcat
+70	      - fastfetch
+71	    state: present
+72	    # Note: ccze is not available on Homebrew (removed from homebrew-core).
+73	    # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
+74	    # on `command -v ccze` so it becomes a no-op on macOS.
+75	
+76	# =============================================================================
+77	# Linux (Debian/Ubuntu)
+78	# =============================================================================
+79	
+80	# --- gh ---
+81	- name: Check if gh is installed
+82	  when: ansible_facts["os_family"] == "Debian"
+83	  ansible.builtin.command: gh --version
+84	  register: gh_check
+85	  changed_when: false
+86	  failed_when: false
+87	  environment:
+88	    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+89	
+90	- name: Set gh release architecture
+91	  # Broadened to RedHat + decoupled from gh_check (sudo-path) so the
+92	  # user-level fallback below works on CentOS 7 where the .deb install is
+93	  # skipped entirely. set_fact is cheap; safe to always compute.
+94	  when:
+95	    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+96	  ansible.builtin.set_fact:
+97	    gh_release_arch: >-
+98	      {{
+99	        'amd64' if target_architecture in ['x86_64', 'amd64']
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:48Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:48Z)**_
+
+Let me check the Linux install pattern and survey the warning count once brew finishes.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See apt install patterns
+
+`grep -n -A 4 "apt:" dot_ansible/roles/devtools/tasks/main.yml | head -40`
+
+```text
+136:      ansible.builtin.apt:
+137-        deb: /tmp/gh.deb
+138-
+139-    - name: Clean up gh .deb
+140-      ansible.builtin.file:
+--
+283:      ansible.builtin.apt:
+284-        deb: /tmp/glab.deb
+285-
+286-    - name: Clean up glab .deb
+287-      ansible.builtin.file:
+--
+380:  ansible.builtin.apt:
+381-    name: bat
+382-    state: present
+383-
+384-- name: Create bat symlink on Debian/Ubuntu
+--
+484:  ansible.builtin.apt:
+485-    name: bats
+486-    state: present
+487-
+488-# --- bats (user-level fallback) ---
+--
+620:      ansible.builtin.apt:
+621-        name: eza
+622-        state: present
+623-        update_cache: true
+624-      when: eza_repo is succeeded
+--
+786:      ansible.builtin.apt:
+787-        deb: /tmp/git-delta.deb
+788-
+789-    - name: Clean up delta .deb
+790-      ansible.builtin.file:
+--
+1988:  ansible.builtin.apt:
+1989-    name: direnv
+1990-    state: present
+1991-
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:52Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/b42j24hz4.output`
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:35:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check brew install status
+
+`cat /private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/b42j24hz4.output 2>/dev/null; echo "---"; command -v shellcheck && shellcheck --version | head -3`
+
+```text
+Exit code 1
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:01Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check brew install background process
+
+`ls /private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/ 2>&1; ps aux | grep -i 'brew install' | grep -v grep`
+
+```text
+aa51084a439d2f465.output -> /Users/daviddwlee84/.claude/projects/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/subagents/agent-aa51084a439d2f465.jsonl
+abca3a1a87cedd6da.output -> /Users/daviddwlee84/.claude/projects/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/subagents/agent-abca3a1a87cedd6da.jsonl
+b42j24hz4.output
+biiu02bsv.output
+daviddwlee84     67117   0.0  0.0 435308416   1008   ??  Ss   10:33AM   0:00.01 /bin/zsh -c source /Users/daviddwlee84/.claude/shell-snapshots/snapshot-zsh-1778811522473-gwp4de.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB 2>/dev/null || true && eval 'brew install shellcheck shfmt 2>&1 | tail -5' < /dev/null && pwd -P >| /tmp/claude-80a2-cwd
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:12Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:12Z)**_
+
+Brew install still going. Let me try running shellcheck via `uvx` (pip-distributed bundled binary) to survey in parallel.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Try shellcheck-py via uvx
+
+`uvx --from shellcheck-py shellcheck --version 2>&1 | head -5`
+
+```text
+ShellCheck - shell script analysis tool
+version: 0.11.0
+license: GNU General Public License, version 3
+website: https://www.shellcheck.net
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:21Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Enumerate files in scope
+
+```bash
+find dot_config/shell -maxdepth 1 -name '*.sh' -not -name '*.tmpl' -print0 | xargs -0 ls -la | wc -l
+echo "--- non-template .sh files in dot_config/shell/: ---"
+find dot_config/shell -maxdepth 1 -name '*.sh' -not -name '*.tmpl' | sort
+echo
+echo "--- bash files in dot_config/bash/: ---"
+find dot_config/bash -maxdepth 1 -name '*.bash' 2>/dev/null | sort
+```
+
+```text
+      39
+--- non-template .sh files in dot_config/shell/: ---
+dot_config/shell/01_starship.sh
+dot_config/shell/02_legacy_tools.sh
+dot_config/shell/04_ai_agents.sh
+dot_config/shell/04_ai_capture.sh
+dot_config/shell/05_ai_run.sh
+dot_config/shell/05_mise.sh
+dot_config/shell/06_cargo.sh
+dot_config/shell/07_bunx_cli.sh
+dot_config/shell/10_aliases.sh
+dot_config/shell/10_fzf.sh
+dot_config/shell/15_atuin.sh
+dot_config/shell/20_zoxide.sh
+dot_config/shell/22_sesh.sh
+dot_config/shell/25_bat.sh
+dot_config/shell/26_eza.sh
+dot_config/shell/27_thefuck.sh
+dot_config/shell/28_tldr.sh
+dot_config/shell/29_log_tools.sh
+dot_config/shell/29_marimo.sh
+dot_config/shell/29_media.sh
+dot_config/shell/30_direnv.sh
+dot_config/shell/34_openclaw.sh
+dot_config/shell/35_yazi.sh
+dot_config/shell/37_lazygit.sh
+dot_config/shell/37_worktrunk.sh
+dot_config/shell/38_lazyvim.sh
+dot_config/shell/38_workmux.sh
+dot_config/shell/40_codexbar.sh
+dot_config/shell/41_github.sh
+dot_config/shell/42_gitlab.sh
+dot_config/shell/47_mi_router.sh
+dot_config/shell/50_networking.sh
+dot_config/shell/55_web_reader.sh
+dot_config/shell/56_clipboard_history.sh
+dot_config/shell/60_tmux_status.sh
+dot_config/shell/61_tmux_summary.sh
+dot_config/shell/94_ssh_agent.sh
+dot_config/shell/96_ssh_setup.sh
+dot_config/shell/99_chezmoi_reload.sh
+
+--- bash files in dot_config/bash/: ---
+dot_config/bash/01_omb_plugins.bash
+dot_config/bash/02_history.bash
+dot_config/bash/03_completion.bash
+dot_config/bash/10_aliases.bash
+dot_config/bash/45_fleet_completion.bash
+dot_config/bash/46_mlf_completion.bash
+dot_config/bash/48_pqsum_completion.bash
+dot_config/bash/49_x_completion.bash
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Count existing shellcheck warnings on proposed scope
+
+```bash
+{
+  echo "=== shellcheck severity=warning across dot_config/shell/*.sh + dot_config/bash/*.bash ==="
+  files=()
+  while IFS= read -r f; do files+=("$f"); done < <(find dot_config/shell -maxdepth 1 -name '*.sh' -not -name '*.tmpl' | sort)
+  while IFS= read -r f; do files+=("$f"); done < <(find dot_config/bash -maxdepth 1 -name '*.bash' 2>/dev/null | sort)
+  echo "Files: ${#files[@]}"
+  total=$(uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=warning -f gcc "${files[@]}" 2>&1 | wc -l | tr -d ' ')
+  echo "Total warnings+errors+infos (gcc-format lines): $total"
+  echo
+  echo "=== severity=error only ==="
+  err=$(uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=error -f gcc "${files[@]}" 2>&1 | wc -l | tr -d ' ')
+  echo "Total errors: $err"
+}
+```
+
+```text
+=== shellcheck severity=warning across dot_config/shell/*.sh + dot_config/bash/*.bash ===
+Files: 47
+Total warnings+errors+infos (gcc-format lines): 43
+
+=== severity=error only ===
+Total errors: 1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:41Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:42Z)**_
+
+43 total findings, 1 error — very manageable. Let me look at them.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:36:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Full shellcheck warning output
+
+```bash
+files=()
+while IFS= read -r f; do files+=("$f"); done < <(find dot_config/shell -maxdepth 1 -name '*.sh' -not -name '*.tmpl' | sort)
+while IFS= read -r f; do files+=("$f"); done < <(find dot_config/bash -maxdepth 1 -name '*.bash' 2>/dev/null | sort)
+uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=warning -f gcc "${files[@]}" 2>&1
+```
+
+```text
+Exit code 1
+dot_config/shell/04_ai_capture.sh:513:8: warning: pipestatus is referenced but not assigned. [SC2154]
+dot_config/shell/10_fzf.sh:25:16: warning: ShellCheck can't follow non-constant source. Use a directive to specify location. [SC1090]
+dot_config/shell/10_fzf.sh:35:16: warning: ShellCheck can't follow non-constant source. Use a directive to specify location. [SC1090]
+dot_config/shell/27_thefuck.sh:20:26: warning: ShellCheck can't follow non-constant source. Use a directive to specify location. [SC1090]
+dot_config/shell/29_marimo.sh:22:30: warning: ShellCheck can't follow non-constant source. Use a directive to specify location. [SC1090]
+dot_config/shell/35_yazi.sh:15:46: warning: Use 'cd ... || exit' or 'cd ... || return' in case cd fails. [SC2164]
+dot_config/shell/37_worktrunk.sh:50:25: warning: Use 'cd ... || exit' or 'cd ... || return' in case cd fails. [SC2164]
+dot_config/shell/38_lazyvim.sh:168:3: warning: Use 'cd ... || exit' or 'cd ... || return' in case cd fails. [SC2164]
+dot_config/shell/50_networking.sh:13:9: error: Aliases can't use positional parameters. Use a function. [SC2142]
+dot_config/shell/50_networking.sh:63:18: warning: This expands when defined, not when used. Consider escaping. [SC2139]
+dot_config/shell/94_ssh_agent.sh:20:1: warning: _ssh_add_probe references arguments, but none are ever passed. [SC2120]
+dot_config/shell/94_ssh_agent.sh:103:20: warning: Declare and assign separately to avoid masking return values. [SC2155]
+dot_config/shell/96_ssh_setup.sh:117:11: warning: Declare and assign separately to avoid masking return values. [SC2155]
+dot_config/shell/96_ssh_setup.sh:177:65: warning: Quote 'EOF' to make here document expansions happen on the server side rather than on the client. [SC2087]
+dot_config/shell/99_chezmoi_reload.sh:56:9: warning: Tilde does not expand in quotes. Use $HOME. [SC2088]
+dot_config/bash/01_omb_plugins.bash:22:1: warning: aliases appears unused. Verify use (or export if used externally). [SC2034]
+dot_config/bash/01_omb_plugins.bash:27:1: warning: plugins appears unused. Verify use (or export if used externally). [SC2034]
+dot_config/bash/01_omb_plugins.bash:35:1: warning: completions appears unused. Verify use (or export if used externally). [SC2034]
+dot_config/bash/45_fleet_completion.bash:14:17: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:46:21: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:57:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:63:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:72:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:78:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:90:21: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:106:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:113:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:121:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:126:38: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:129:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/45_fleet_completion.bash:138:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:12:21: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:21:29: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:30:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:33:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:42:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/46_mlf_completion.bash:50:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/48_pqsum_completion.bash:16:29: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/48_pqsum_completion.bash:32:25: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/48_pqsum_completion.bash:44:29: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/49_x_completion.bash:9:15: warning: prev appears unused. Verify use (or export if used externally). [SC2034]
+dot_config/bash/49_x_completion.bash:13:21: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+dot_config/bash/49_x_completion.bash:21:33: warning: Prefer mapfile or read -a to split command output (or quote to avoid splitting). [SC2207]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:37:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:37:32Z)**_
+
+Let me check my own new file is clean, then plan the cleanup scope.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:37:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Lint my new file
+
+`uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=warning -f gcc dot_config/shell/05_ai_run.sh 2>&1; echo "---rc=$?---"`
+
+```text
+---rc=0---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:37:38Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/shell/50_networking.sh`
+
+```text
+1	# 50_networking.sh - Networking tool aliases and helpers (shared bash + zsh).
+2	# Moved from dot_config/zsh/tools/50_networking.zsh; the only zsh-isms were
+3	# `print -r --` / `print -u2` / `print "..."` which all became `printf`.
+4	
+5	# --- Listening ports (works everywhere, no extra install needed) ---
+6	alias ports='lsof -i -P -n | grep LISTEN'
+7	
+8	# --- IP address helpers ---
+9	alias myip='curl -s https://ifconfig.me'
+10	if [[ "$OSTYPE" == darwin* ]]; then
+11	  alias localip='ipconfig getifaddr en0'
+12	else
+13	  alias localip='hostname -I | awk "{print \$1}"'
+14	fi
+15	
+16	# --- nmap shortcuts ---
+17	if command -v nmap &>/dev/null; then
+18	  # Quick ping sweep of local /24 subnet
+19	  pingsweep() {
+20	    local ip
+21	    if [[ "$OSTYPE" == darwin* ]]; then
+22	      ip=$(ipconfig getifaddr en0 2>/dev/null)
+23	    else
+24	      ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+25	    fi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:37:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if brew install finished
+
+`command -v shellcheck 2>&1; ls /opt/homebrew/bin/shellcheck 2>&1; brew list shellcheck shfmt 2>&1 | head -5`
+
+```text
+"/opt/homebrew/bin/shellcheck": No such file or directory (os error 2)
+Error: No such keg: /opt/homebrew/Cellar/shellcheck
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:38:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:38:50Z)**_
+
+My new file is clean. The 1 "error" in `50_networking.sh:13` is a false positive — `\$1` inside the alias body is the literal awk field-1 reference, not a shell positional. Let me look at the justfile lint patterns before deciding on the `lint-shell` recipe shape.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:38:52Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./justfile`
+
+```text
+300	
+301	# Scan git history for secrets (thorough but slower)
+302	gitleaks-scan-history:
+303	    gitleaks detect --source . --verbose --log-opts="--all"
+304	
+305	# ============================================================================
+306	# Development
+307	# ============================================================================
+308	
+309	# Run all linting checks
+310	lint: ansible-syntax-check pre-commit-run-all
+311	
+312	# Run bats unit tests (fast, no Docker, no network)
+313	bats:
+314	    bats tests/unit
+315	
+316	# Run tests (docker test suite)
+317	test: docker-test
+318	
+319	# Full check: ansible syntax + pre-commit + bats unit + docker smoke
+320	check-all: lint bats docker-test
+321	
+322	# Full check (lint + dry-run)
+323	check: lint chezmoi-dry-run
+324	
+325	# Show git status
+326	status:
+327	    @git status
+328	
+329	# Show git diff
+330	diff:
+331	    @git diff
+332	
+333	# Stage all changes, auto-redact secrets across agent artifacts (specstory +
+334	# .claude/plans + .cursor/plans + .opencode/plans), and re-stage.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:38:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check brew install + binary presence
+
+`cat /private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/b42j24hz4.output 2>/dev/null | tail -5; echo "---"; command -v shellcheck shfmt 2>&1`
+
+```text
+Exit code 1
+---
+/Users/daviddwlee84/.local/bin/shfmt
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:38:59Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Lint-related recipes
+
+`grep -n -B1 -A3 "pre-commit-run-all\|^# .*lint\|^lint" justfile | head -25`
+
+```text
+253-# Run pre-commit on all files
+254:pre-commit-run-all:
+255-    pre-commit run --all-files
+256-
+257-# Run pre-commit on staged files only
+--
+308-
+309:# Run all linting checks
+310:lint: ansible-syntax-check pre-commit-run-all
+311-
+312-# Run bats unit tests (fast, no Docker, no network)
+313-bats:
+--
+321-
+322:# Full check (lint + dry-run)
+323-check: lint chezmoi-dry-run
+324-
+325-# Show git status
+--
+352-    @echo "Development environment ready!"
+353:    @echo "Run 'just pre-commit-run-all' to scan existing files."
+354-
+355-# Show system info
+356-info:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Is brew install still running?
+
+`ps aux | grep -i 'brew install' | grep -v grep; echo "---"; date`
+
+```text
+daviddwlee84     67117   0.0  0.0 435308416    912   ??  Ss   10:33AM   0:00.01 /bin/zsh -c source /Users/daviddwlee84/.claude/shell-snapshots/snapshot-zsh-1778811522473-gwp4de.sh 2>/dev/null || true && setopt NO_EXTENDED_GLOB 2>/dev/null || true && eval 'brew install shellcheck shfmt 2>&1 | tail -5' < /dev/null && pwd -P >| /tmp/claude-80a2-cwd
+---
+Fri May 15 10:39:02 CST 2026
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:34Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:36Z)**_
+
+Now I have enough to plan the shellcheck integration. Brew is taking forever in the background — I'll let it finish; meanwhile I have `uvx --from shellcheck-py shellcheck` already working, so the just recipe can use that as a no-system-dep path.
+
+Let me make the edits.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm brew install completed
+
+`cat /private/tmp/claude-501/-Users-daviddwlee84--local-share-chezmoi/dd777364-1d98-47f7-957e-f667401d6eba/tasks/b42j24hz4.output; echo "---"; command -v shellcheck && shellcheck --version | head -1`
+
+```text
+The following shfmt executables are shadowed by other commands earlier in your PATH:
+  shfmt (shadowed by /Users/daviddwlee84/.local/bin/shfmt)
+Running these by name will not invoke the version provided by Homebrew.
+Disable this behaviour by setting `HOMEBREW_NO_PATH_SHADOW_CHECK=1`.
+Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+---
+/opt/homebrew/bin/shellcheck
+ShellCheck - shell script analysis tool
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find a simple Linux apt-install slot
+
+`grep -n -E "apt:.*name:.*direnv|^- name:.*direnv|^- name:.*ccze" dot_ansible/roles/devtools/tasks/main.yml | head -6`
+
+```text
+1991:- name: Install direnv (Debian/Ubuntu)
+1999:- name: Check installed direnv version
+2014:- name: Set direnv release architecture
+2027:- name: Install direnv from GitHub releases (user-level fallback, min v2.32.1)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:58Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:39:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+1985	
+1986	# --- thefuck ---
+1987	# NOTE: thefuck is now installed via uv tool (python_uv_tools role)
+1988	# This avoids conda/virtualenv Python path conflicts
+1989	
+1990	# --- direnv ---
+1991	- name: Install direnv (Debian/Ubuntu)
+1992	  when: ansible_facts["os_family"] == "Debian"
+1993	  become: true
+1994	  tags: [sudo]
+1995	  ansible.builtin.apt:
+1996	    name: direnv
+1997	    state: present
+1998	
+1999	- name: Check installed direnv version
+2000	  when: ansible_facts["os_family"] == "Debian"
+2001	  ansible.builtin.shell: |
+2002	    if [ -x "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv" ]; then
+2003	      "{{ ansible_facts['env']['HOME'] }}/.local/bin/direnv" --version | sed 's/^v//'
+2004	    elif command -v direnv >/dev/null 2>&1; then
+2005	      direnv --version | sed 's/^v//'
+2006	    else
+2007	      echo "0.0.0"
+2008	    fi
+2009	  args:
+2010	    executable: /bin/bash
+2011	  register: direnv_version
+2012	  changed_when: false
+2013	
+2014	- name: Set direnv release architecture
+2015	  when:
+2016	    - ansible_facts["os_family"] == "Debian"
+2017	    - direnv_version.stdout | trim is version('2.32.1', '<')
+2018	  ansible.builtin.set_fact:
+2019	    direnv_release_arch: >-
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:07Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:15Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:20Z)**_
+
+Now the justfile recipe and pre-commit hook entry. Let me look at the pre-commit yaml structure first to know exactly how to extend it.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:21Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./.pre-commit-config.yaml`
+
+```text
+75	        # chezmoi `modify_*.json.tmpl` wrappers are 1-line Go templates that
+76	        # `{{ template ... }}` the shared editor/modify.sh whose rendered
+77	        # output already carries `#!/usr/bin/env bash`. The source wrapper
+78	        # itself has no shebang by design, so skip the shebang check for it.
+79	        exclude: (^|/)modify_[^/]+\.tmpl$
+80	
+81	  # shellcheck - static analysis for bash scripts in scripts/
+82	  # Scoped narrowly: top-level scripts only. `.tmpl` files and zsh modules
+83	  # have syntax shellcheck's bash parser rejects (go-template `{{ ... }}`,
+84	  # zsh `(( ))`, `${(P)v}`, `print -u2`, etc). Broaden later if useful.
+85	  - repo: https://github.com/shellcheck-py/shellcheck-py
+86	    rev: v0.10.0.1
+87	    hooks:
+88	      - id: shellcheck
+89	        files: '^scripts/[^/]+\.sh$'
+90	        args: [--shell=bash, --severity=warning]
+91	
+92	  # shfmt - auto-format bash scripts in place. Same UX as
+93	  # trailing-whitespace / end-of-file-fixer / redact-agent-secrets:
+94	  # if the hook rewrites a file, pre-commit reports "files were
+95	  # modified by this hook" and the user must `git add` + re-commit.
+96	  # Previously used `-d` (diff-only, no write) which printed the
+97	  # would-be diff but left working tree untouched, forcing a manual
+98	  # `shfmt -i 2 -ci -bn -w scripts/*.sh` round-trip — easy to mis-run
+99	  # with system shfmt defaults (tabs instead of 2-space).
+100	  - repo: https://github.com/scop/pre-commit-shfmt
+101	    rev: v3.10.0-2
+102	    hooks:
+103	      - id: shfmt
+104	        files: '^scripts/[^/]+\.sh$'
+105	        args: [-i, "2", -ci, -bn, -w]
+106
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:28Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/.pre-commit-config.yaml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:39Z)**_
+
+Now the justfile recipe.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:40Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./justfile`
+
+```text
+250	    @echo "Pre-commit hooks installed successfully!"
+251	    @echo "Hooks will now run automatically on git commit."
+252	
+253	# Run pre-commit on all files
+254	pre-commit-run-all:
+255	    pre-commit run --all-files
+256	
+257	# Run pre-commit on staged files only
+258	pre-commit-run:
+259	    pre-commit run
+260	
+261	# Update pre-commit hooks to latest versions
+262	pre-commit-update:
+263	    pre-commit autoupdate
+264
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/justfile has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:53Z)**_
+
+Now fix the 1 real error in `50_networking.sh:13` (false positive in alias body).
+
+_**Agent (claude-opus-4-7 2026-05-15 02:40:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/dot_config/shell/50_networking.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:01Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:02Z)**_
+
+Verifying the broader hook passes now (severity=error only — should match my 1-error count, now fixed).
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run pre-commit shellcheck (both hook entries)
+
+`pre-commit run shellcheck --all-files 2>&1 | tail -30`
+
+```text
+shellcheck (scripts/)....................................................Failed
+- hook id: shellcheck
+- exit code: 1
+
+In scripts/import_ssh_to_bw.sh line 106:
+      *.pub|known_hosts*|config|authorized_keys*|*.swp|*.swo|*~|*.un~|*.log) continue ;;
+                                                             ^-- SC2221 (warning): This pattern always overrides a later one on line 106.
+                                                                ^---^ SC2222 (warning): This pattern never matches because of a previous pattern on line 106.
+
+
+In scripts/import_ssh_to_bw.sh line 359:
+  IFS=$'\n' key_infos=($(for r in "${key_infos[@]}"; do echo "$r"; done | sort -t"$FS" -k5))
+                       ^-- SC2207 (warning): Prefer mapfile or read -a to split command output (or quote to avoid splitting).
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2207 -- Prefer mapfile or read -a to spli...
+  https://www.shellcheck.net/wiki/SC2221 -- This pattern always overrides a l...
+  https://www.shellcheck.net/wiki/SC2222 -- This pattern never matches becaus...
+
+shellcheck (dot_config/{shell,bash}/, errors only).......................Failed
+- hook id: shellcheck
+- files were modified by this hook
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:18Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:19Z)**_
+
+Odd — the shared hook reports "files were modified". shellcheck doesn't modify files. Let me check what's going on and also check the scripts/ failure (preexisting? did I touch that?).
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Working tree state
+
+`git status; echo "---"; git diff scripts/import_ssh_to_bw.sh 2>&1 | head -5`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .pre-commit-config.yaml
+	modified:   .specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md
+	modified:   dot_ansible/roles/devtools/tasks/main.yml
+	modified:   dot_config/shell/50_networking.sh
+	modified:   justfile
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-15_02-29-06Z-reply-with-the-single.md
+	.specstory/history/2026-05-15_02-29-23Z-reply-with-the-single.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verbose run of just the shared-scope hook
+
+`pre-commit run shellcheck-shared --all-files --verbose 2>&1 | tail -40`
+
+```text
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+- hook id: shellcheck
+- duration: 1.69s
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:31Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:32Z)**_
+
+shellcheck-shared passes in isolation. The earlier failure was end-of-file/trailing-whitespace normalizing my SpecStory transcript, and the scripts/ failure is preexisting (not my file). Let me verify `just lint-shell`.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify just lint-shell works
+
+`just lint-shell 2>&1 | tail -25; echo "---exit=$?---"`
+
+```text
+In dot_config/bash/49_x_completion.bash line 13:
+        COMPREPLY=( $(compgen -W "copy paste open help" -- "$cur") )
+                    ^-- SC2207 (warning): Prefer mapfile or read -a to split command output (or quote to avoid splitting).
+
+
+In dot_config/bash/49_x_completion.bash line 21:
+                -*) COMPREPLY=( $(compgen -W "--force --help" -- "$cur") ) ;;
+                                ^-- SC2207 (warning): Prefer mapfile or read -a to split command output (or quote to avoid splitting).
+
+
+In scripts/import_ssh_to_bw.sh line 106:
+      *.pub|known_hosts*|config|authorized_keys*|*.swp|*.swo|*~|*.un~|*.log) continue ;;
+                                                             ^-- SC2221 (warning): This pattern always overrides a later one on line 106.
+                                                                ^---^ SC2222 (warning): This pattern never matches because of a previous pattern on line 106.
+
+
+In scripts/import_ssh_to_bw.sh line 359:
+  IFS=$'\n' key_infos=($(for r in "${key_infos[@]}"; do echo "$r"; done | sort -t"$FS" -k5))
+                       ^-- SC2207 (warning): Prefer mapfile or read -a to split command output (or quote to avoid splitting).
+
+For more information:
+  https://www.shellcheck.net/wiki/SC1090 -- ShellCheck can't follow non-const...
+  https://www.shellcheck.net/wiki/SC2034 -- aliases appears unused. Verify us...
+  https://www.shellcheck.net/wiki/SC2087 -- Quote 'EOF' to make here document...
+error: Recipe `lint-shell` failed on line 279 with exit code 1
+---exit=0---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:40Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:41Z)**_
+
+`just lint-shell` works as designed — surfaces 42 warnings and exits non-zero (visible via `set -e` semantics if used in CI). Let me create a backlog entry for the remaining cleanup. Looking at the project-knowledge-harness rules in CLAUDE.md.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Backlog format check
+
+`ls backlog/ | head -10; echo "---"; head -25 backlog/mkdocs-anchor-drift.md 2>/dev/null || head -25 "$(ls backlog/*.md | head -1)"`
+
+```text
+raycast-sync
+ai-capture-non-tmux-output.md
+ansible-env-proxy-var-case-sensitivity.md
+audit-monitor-with-apprise.md
+bin-migration.md
+chezmoi-diff-pager-agent.md
+chezmoiscripts-namespace-refactor.md
+devtools-role-split.md
+fish-shell-evaluation.md
+fleet-exec.md
+---
+# mkdocs anchor drift: stale section links across existing docs
+
+**Status**: P3 ready
+**Effort**: S (maybe 30-60 min batch)
+**Related**: [`mkdocs.yml`](../mkdocs.yml) `validation.links.anchors` · [`docs/`](../docs/) per-file fixes
+
+## Context
+
+**2026-04**: bootstrapped the mkdocs-material site. Strict build flagged ~20 stale in-page / cross-page `#anchor` links in existing docs. Most are pre-mkdocs: authors typed `#pre-commit--gitleaks` etc. on GitHub where automatic section-header slugification is lax, but MkDocs Material computes slugs differently (or the referenced section was renamed).
+
+Temporarily set `validation.links.anchors: info` in `mkdocs.yml` so the first deploy passes. That masks future regressions; this backlog ensures we come back.
+
+## Files with stale anchors (from strict-build output)
+
+- `docs/tools/pre-commit.md` → `#pre-commit--gitleaks`, `#shellcheck--shfmt` in this_repo/*
+- `docs/tools/sesh.md` → `#the-three-layer-navigation-sesh--wt--wtcd`
+- `docs/tools/worktrunk.md` (self-links) → `#install--shell-integration-in-this-repo`, `#the-three-layer-navigation-sesh--wt--wtcd`, `#per-worktree-claude--opencode`, `#merge--cleanup-flow`, `#llm-commit-messages--when-to-bother`
+- `docs/tools/tmux/README.md` → `./keybindings.md#popup-menu-prefix--space`
+- `docs/zsh/aliases.md` → `#github--gitlab`, `#package-managers--runtime` (local ToC drift)
+- `docs/tools/opencode.md` → `agent-overlays.md#opencode--agentsopencodeoverlayjson`
+- `docs/playbooks/workflow.md` → `../tools/worktrunk.md#per-worktree-claude--opencode`
+- `docs/this_repo/fleet-apply.md` → `#conflict-handling---force-vs---keep-going`
+- `docs/this_repo/cheatsheet.md` → `#pre-commit--gitleaks`
+- `docs/tools/chezmoi-prefixes.md` → `#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite`, `#dot_claudemodify_settingsjson--partial-json-management-via-jq`
+- `docs/tools/containers.md` → `#rootless-docker-linux--systemd---user-drop-in`
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:49Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check existing mentions of shellcheck
+
+`grep -n "shellcheck\|shfmt" TODO.md docs/tools/pre-commit.md 2>&1 | head -20`
+
+```text
+docs/tools/pre-commit.md:3:> A **generic** reference for [pre-commit](https://pre-commit.com/) — the hook framework itself, how its Python environment model works, and how to make `pre-commit` robust when system Python breaks (the [`uv`](https://docs.astral.sh/uv/) trick). For *this* repo's hook list + scope rules, see [`this_repo/testing.md` § shellcheck + shfmt](../this_repo/testing.md#shellcheck--shfmt).
+docs/tools/pre-commit.md:32:pre-commit run <hook-id>      # run just one hook (e.g. shellcheck)
+docs/tools/pre-commit.md:146:Verbose mode prints the full command line the hook invoked plus stdout/stderr. For formatters in `-d` (diff) mode (`shfmt`, `black --check`), the stderr often *is* the useful diff.
+docs/tools/pre-commit.md:160:Auto-formatter hooks (trailing-whitespace, end-of-file-fixer, shfmt in `-w` mode, black) **rewrite** files then exit non-zero, forcing you to `git add` the rewritten version and re-commit. This is intentional: hooks can't modify the commit being created, only the working tree. Pattern:
+docs/tools/pre-commit.md:170:If you want the formatter to check-only (so CI can fail without rewriting), most support `-d` / `--check` / `--diff`. This repo runs `shfmt -d` for that reason.
+docs/tools/pre-commit.md:193:- [`docs/this_repo/testing.md` § shellcheck + shfmt](../this_repo/testing.md#shellcheck--shfmt) — how *this* repo uses pre-commit (hook list, scope, zsh carve-out).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:41:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find this_repo/testing.md section
+
+`grep -n "shellcheck\|shfmt" docs/this_repo/testing.md 2>&1 | head -20`
+
+```text
+12:| [**shellcheck**](https://www.shellcheck.net/) | Static analysis (bugs, bad quoting) | Pre-commit on `scripts/*.sh` |
+13:| [**shfmt**](https://github.com/mvdan/sh) | Formatter (consistency check) | Pre-commit on `scripts/*.sh` |
+225:## shellcheck + shfmt
+227:[shellcheck](https://www.shellcheck.net/) is a static analyser for shell scripts. [shfmt](https://github.com/mvdan/sh) is a formatter / format-check. Both run via pre-commit in this repo. For generic pre-commit mechanics (cache location, `uv`-managed bootstrap Python, debugging broken hook envs), see [`docs/tools/pre-commit.md`](../tools/pre-commit.md).
+231:- [`shellcheck-py`](https://github.com/shellcheck-py/shellcheck-py) — ships a Python-installable wheel of shellcheck, so pre-commit environments don't need a system-wide `shellcheck` binary.
+232:- [`pre-commit-shfmt`](https://github.com/scop/pre-commit-shfmt) — pre-commit wrapper around `shfmt` with no Go toolchain required.
+247:- `dot_config/zsh/**/*.zsh` — zsh-specific syntax (`(( ... ))` math, `${(P)v}` expansion flags, `print -u2`, `emulate -L zsh`, `zmodload`) trips shellcheck's bash parser and produces too many false positives.
+248:- `*.sh.tmpl` — chezmoi go-template tokens (`{{ if eq .profile "macos" }}`) look like unbalanced braces to shellcheck.
+253:- Run shellcheck with `# shellcheck shell=bash` and manually silence known-false positives — tedious.
+260:# Run only shellcheck on all files
+261:pre-commit run shellcheck --all-files
+263:# Run only shfmt
+264:pre-commit run shfmt --all-files
+266:# shfmt is in diff mode (-d) — to actually rewrite files, install shfmt
+268:shfmt -i 2 -ci -bn -w scripts/*.sh
+300:- [shellcheck wiki](https://www.shellcheck.net/wiki/) · pre-commit hook: [shellcheck-py](https://github.com/shellcheck-py/shellcheck-py)
+301:- [shfmt flags](https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd) · pre-commit hook: [pre-commit-shfmt](https://github.com/scop/pre-commit-shfmt)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:05Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:06Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/this_repo/testing.md`
+
+```text
+222	
+223	---
+224	
+225	## shellcheck + shfmt
+226	
+227	[shellcheck](https://www.shellcheck.net/) is a static analyser for shell scripts. [shfmt](https://github.com/mvdan/sh) is a formatter / format-check. Both run via pre-commit in this repo. For generic pre-commit mechanics (cache location, `uv`-managed bootstrap Python, debugging broken hook envs), see [`docs/tools/pre-commit.md`](../tools/pre-commit.md).
+228	
+229	Pre-commit hook sources (see `.pre-commit-config.yaml`):
+230	
+231	- [`shellcheck-py`](https://github.com/shellcheck-py/shellcheck-py) — ships a Python-installable wheel of shellcheck, so pre-commit environments don't need a system-wide `shellcheck` binary.
+232	- [`pre-commit-shfmt`](https://github.com/scop/pre-commit-shfmt) — pre-commit wrapper around `shfmt` with no Go toolchain required.
+233	
+234	### Other config-file syntax checks
+235	
+236	In addition to shell tooling, `.pre-commit-config.yaml` runs these [pre-commit/pre-commit-hooks](https://github.com/pre-commit/pre-commit-hooks) validators:
+237	
+238	- `check-yaml` — ansible playbooks, role definitions, docker-compose, pre-commit itself.
+239	- `check-toml` — TV cable channel configs, starship, yazi, alacritty, etc. `.tmpl` files are excluded because chezmoi's `{{ ... }}` go-template tokens aren't valid TOML until rendered.
+240	- `check-json` — VS Code settings, claude config, lazyvim lockfile, etc.
+241	- `check-merge-conflict`, `check-added-large-files`, `detect-private-key`, `end-of-file-fixer`, `trailing-whitespace`.
+242	
+243	Ansible **playbook syntax** is checked via `just ansible-syntax-check` / `just lint`, not pre-commit — running a full playbook parse on every commit is too slow for the pre-commit hot path. Run `just lint` manually before pushing ansible-touching changes.
+244	
+245	Hook scope (see `.pre-commit-config.yaml`): **`^scripts/[^/]+\.sh$` only**. This excludes:
+246	
+247	- `dot_config/zsh/**/*.zsh` — zsh-specific syntax (`(( ... ))` math, `${(P)v}` expansion flags, `print -u2`, `emulate -L zsh`, `zmodload`) trips shellcheck's bash parser and produces too many false positives.
+248	- `*.sh.tmpl` — chezmoi go-template tokens (`{{ if eq .profile "macos" }}`) look like unbalanced braces to shellcheck.
+249	- `scripts/adhoc/*.sh` — experimental / throwaway scripts by convention.
+250	
+251	If a zsh file needs static analysis later, the best options are:
+252	
+253	- Run shellcheck with `# shellcheck shell=bash` and manually silence known-false positives — tedious.
+254	- Switch to a zsh-aware linter (there isn't a widely adopted one).
+255	- Or just write a Bats test that covers the behaviour you care about.
+256	
+257	Quick commands:
+258	
+259	```bash
+260	# Run only shellcheck on all files
+261	pre-commit run shellcheck --all-files
+262	
+263	# Run only shfmt
+264	pre-commit run shfmt --all-files
+265	
+266	# shfmt is in diff mode (-d) — to actually rewrite files, install shfmt
+267	# locally and run:
+268	shfmt -i 2 -ci -bn -w scripts/*.sh
+269	```
+270	
+271	---
+272	
+273	## Adding a new test
+274	
+275	1. Decide unit vs smoke:
+276	   - Pure logic with stub-able inputs → `tests/unit/`.
+277	   - Assertions about post-install system state → `tests/smoke/`.
+278	2. Create `tests/unit/<thing>.bats` (or smoke/). Start with:
+279	   ```bash
+280	   #!/usr/bin/env bats
+281	   load "../test_helper.bash"
+282	
+283	   @test "brief description" {
+284	     run some-command
+285	     [ "$status" -eq 0 ]
+286	   }
+287	   ```
+288	3. Run `just bats` (or `just docker-test`) to verify.
+289	4. If the test needs a stub, use `setup_path_stub` + `$BATS_STUB_DIR`.
+290	
+291	Rule of thumb for deciding whether a test is worth adding: **would a silent regression here cost me more than ten minutes to diagnose?** If no, skip the test. Personal dotfiles don't need 80% coverage.
+292	
+293	---
+294	
+295	## References
+296	
+297	- [bats-core docs](https://bats-core.readthedocs.io/) · [bats-assert](https://github.com/bats-core/bats-assert) · [bats-file](https://github.com/bats-core/bats-file) · [bats-support](https://github.com/bats-core/bats-support)
+298	- [ZUnit repo](https://github.com/zunit-zsh/zunit) (needs [Revolver](https://github.com/molovo/revolver))
+299	- [ShellSpec docs](https://shellspec.info/) · [ShellSpec repo](https://github.com/shellspec/shellspec)
+300	- [shellcheck wiki](https://www.shellcheck.net/wiki/) · pre-commit hook: [shellcheck-py](https://github.com/shellcheck-py/shellcheck-py)
+301	- [shfmt flags](https://github.com/mvdan/sh/blob/master/cmd/shfmt/shfmt.1.scd) · pre-commit hook: [pre-commit-shfmt](https://github.com/scop/pre-commit-shfmt)
+302	- Install location in this repo: `dot_ansible/roles/devtools/tasks/main.yml` (bats-core is cross-platform; no companion libraries installed by default).
+303
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:21Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:21Z)**_
+
+Updating docs/this_repo/testing.md to reflect the new scope, then creating a backlog entry for the remaining warnings.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:25Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/testing.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/testing.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/docs/this_repo/testing.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:42:54Z)**_
+
+Now the backlog entry.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Tighten shellcheck on `dot_config/{shell,bash}/` from severity=error → warning
+
+**Status**: P3 ready
+**Effort**: S (~30-60 min batch; mostly mechanical disable directives + 3-5 real fixes)
+**Related**: [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) shellcheck-shared hook · [`justfile`](../justfile) `lint-shell` recipe · [`docs/this_repo/testing.md` § shellcheck](../docs/this_repo/testing.md#shellcheck--shfmt)
+
+## Context
+
+**2026-05**: broadened pre-commit's shellcheck scope to cover `dot_config/{shell,bash}/` at `--severity=error` (one new hook entry, alias `shellcheck-shared`). Kept severity at `error` (not `warning`) because the broader scope surfaces ~41 preexisting findings — mostly mechanical false positives in completion files, a few legitimate bugs. Blocking commits on all of them on day one would be hostile to anyone touching unrelated code.
+
+This backlog tracks the cleanup so the hook can drop to `--severity=warning` (matching the original `scripts/` scope) once `just lint-shell` is clean.
+
+## Snapshot of current `just lint-shell` output (2026-05-15)
+
+41 warnings + 0 errors after the SC2142 fix in `50_networking.sh:13`. Three buckets:
+
+### Bucket A — mechanical false positives (~30 of 41)
+
+**SC2207** "Prefer mapfile or read -a" in all bash completion files. False positive for `COMPREPLY=( $(compgen ...) )` — compgen output is word-split-safe by design and that's the canonical bash-completion idiom.
+
+Files (one-line `# shellcheck disable=SC2207` directive at top of each fixes the whole file):
+
+- `dot_config/bash/45_fleet_completion.bash` — 12 instances
+- `dot_config/bash/46_mlf_completion.bash` — 6 instances
+- `dot_config/bash/48_pqsum_completion.bash` — 3 instances
+- `dot_config/bash/49_x_completion.bash` — 2 instances (+ SC2034 for `prev` which is part of the bash-completion API)
+
+**SC1090** "ShellCheck can't follow non-constant source". Files source paths computed at runtime; can't be statically analyzed. Add `# shellcheck source=/dev/null` at each call site.
+
+- `dot_config/shell/10_fzf.sh:25,35`
+- `dot_config/shell/27_thefuck.sh:20`
+- `dot_config/shell/29_marimo.sh:22`
+
+**SC2034** "appears unused" — false positive for arrays consumed by name (OMB plugins). One disable directive per file.
+
+- `dot_config/bash/01_omb_plugins.bash:22,27,35` (`aliases`, `plugins`, `completions` arrays read by `oh-my-bash` framework at sourcing time)
+
+**SC2154** "pipestatus referenced but not assigned" — false positive in `04_ai_capture.sh:513`; the variable is zsh-only and the surrounding code already gates on `$ZSH_VERSION`. Disable directive at that block.
+
+### Bucket B — real subtle bugs (~8 of 41)
+
+**SC2164** "Use `cd ... || exit/return`" — legitimate; if `cd` fails inside a function the next command runs from the wrong directory. Fixes are one-liners.
+
+- `dot_config/shell/35_yazi.sh:15`
+- `dot_config/shell/37_worktrunk.sh:50`
+- `dot_config/shell/38_lazyvim.sh:168`
+
+**SC2155** "Declare and assign separately" — `local foo=$(cmd)` masks the exit code. Fixes are mechanical: split into `local foo; foo=$(cmd)`.
+
+- `dot_config/shell/94_ssh_agent.sh:103`
+- `dot_config/shell/96_ssh_setup.sh:117`
+
+**SC2088** "Tilde does not expand in quotes. Use $HOME." — likely a real bug.
+
+- `dot_config/shell/99_chezmoi_reload.sh:56`
+
+**SC2087** "Quote 'EOF' to make heredoc expansions happen on the server side" — needs intent check; if the local variables ARE supposed to expand client-side, add `# shellcheck disable` with a comment.
+
+- `dot_config/shell/96_ssh_setup.sh:177`
+
+### Bucket C — stylistic (~3 of 41)
+
+**SC2120** — `_ssh_add_probe` defined to accept args but never called with any. Either drop the references or annotate.
+
+- `dot_config/shell/94_ssh_agent.sh:20`
+
+**SC2139** "This expands when defined, not when used" — alias body that expands `$OSTYPE` at definition time. Probably the intent.
+
+- `dot_config/shell/50_networking.sh:63`
+
+## Suggested batch
+
+1. Bucket A (disable directives): ~10 min, zero risk.
+2. Bucket B (real fixes): ~20-30 min, test each with the affected feature (worktrunk navigation, SSH agent setup, etc.).
+3. Bucket C: judgment call per case.
+4. Flip `.pre-commit-config.yaml` shellcheck-shared `--severity=error` → `--severity=warning`.
+5. Update [`docs/this_repo/testing.md` § shellcheck](../docs/this_repo/testing.md#shellcheck--shfmt) to remove the "severity=error while cleaning up" wording.
+6. Remove this backlog entry.
+
+## Why not just do it now?
+
+Triage:
+
+- The cleanup is mechanical but touches ~15 files — large blast radius for a side quest.
+- The new severity=error hook already catches the one class of bug that matters today (SC2142 alias-with-positional-param), which was the original motivator.
+- A flag-day cleanup PR makes review easier than scattering "shellcheck noise" lines across feature commits.
+
+Pick this up next time someone is doing a shell-only cleanup pass or as a `/loop`-able task.
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/backlog/shellcheck-broaden-shared-scope.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:30Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check TODO.md structure for P3 section
+
+`grep -n -E "shellcheck|shfmt|## P3|^## " TODO.md 2>/dev/null | head -20`
+
+```text
+12:## How to read this
+28:## P1 — Likely next batch
+35:## P2 — Worth doing, no rush
+66:## P3 — Someday / nice to have
+86:## P? — Needs evaluation before committing
+115:## Done (recent, kept for context — older items pruned)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:34Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./TODO.md`
+
+```text
+66	## P3 — Someday / nice to have
+67	
+68	- [ ] **[S] neovim role: refresh `nvim_current_version` after sudo apt install** — current behaviour: `nvim_current_version` fact is set ONCE in `dot_ansible/roles/neovim/tasks/main.yml:11` BEFORE the sudo apt branch runs. If apt successfully installs an old nvim (e.g. Debian 12 ships nvim 0.7.x, < the `0.11.2` minimum), the user-level fallback's gate `nvim_current_version is version(neovim_min_version, '<')` still evaluates against the original `0.0.0` reading and fires correctly — but the SAME tarball gets extracted on top, wasting bandwidth. Snap branch handles this via a separate `nvim_apt_version` re-check; user-level branch doesn't. Low impact (idempotent overwrite); fix by mirroring the snap-branch's `Check Neovim version after apt install` pattern into the user-level gate. Surfaced 2026-05-13 while fixing the `apt_neovim is not defined` bug.
+69	- [ ] **[S] TA-Lib path management** — currently in `secrets.zsh` as machine-specific. Could move to a `99_local_*.zsh` create-only stub like the proxy pattern in `dot_config/zsh/99_local_proxy.zsh`.
+70	- [ ] **[S] Try / Toolkami custom tool aliases** — currently in `secrets.zsh`. Same `99_local_*.zsh` pattern as TA-Lib above; group together.
+71	- [ ] **[M] Super Productivity Linux install** — currently macOS-only via `dot_config/homebrew/Brewfile.darwin.tmpl:83` cask. For fleet parity (`fleet-apply` against Ubuntu desktops) need either AppImage in a new ansible task or snap. Defer until first Linux desktop host actually wants it. The `tv super-productivity` channel + REST API integration ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) are cross-platform; only the desktop install path is missing.
+72	- [ ] **[?/L] `spctl` + `super-productivity-mcp`** — wrap SP's local REST API ([docs/tools/super-productivity.md](docs/tools/super-productivity.md)) as a CLI for shell automation and an MCP server for coding agents. The TV channel (v0.1) intentionally exercises every read route first to validate behaviour. Phase 2 (mutations: start/stop/complete/archive) lands as Alt-key bindings on the same channel before extracting into a separate package. Open question: TypeScript monorepo vs. plain Python `uv` script — the latter matches the rest of this repo's `scripts/` style.
+73	- [ ] **[M] `js_cli_tools` / `coding_agents` ansible: gate on minimum Node version** — both roles call `npm install --global` against system npm without checking the version. On Ubuntu 22.04 jammy hosts (e.g. `ts_nas`) the apt-installed `/usr/bin/npm` is v8.5.1 / Node v12.22.9, which fails `EBADENGINE` on modern packages (`@openai/codex` requires Node ≥18) and `EACCES` on `/usr/local/lib/node_modules` for non-root users. Fix path A in [pitfalls/ansible-js-cli-tools-old-system-node.md](pitfalls/ansible-js-cli-tools-old-system-node.md) covers the role-side patch (`is version('v18.0.0', '<')` check that forces mise fallback).
+74	- [ ] **[M] fleet-apply long-run sudo session expiry** — `jingle207` ran for 7m50s under `just fleet-apply` and failed at task `Ensure xz is available for worktrunk extraction` with `sudo: a password is required` even though the run started with `CHEZMOI_SUDO_PASSWORD_FILE` populated. Either (a) the sudo password file gets cleaned up by the wrapper's `_cleanup` trap before late tasks need it, or (b) Linux sudo `timestamp_timeout` (default 5m for many distros, 15m for some) expires mid-run and `sudo -S` doesn't re-prompt automatically. Investigation needed: instrument `scripts/lib/sudo_shared.sh` to refresh the cache periodically, or have `sudo_session_init` re-validate via `sudo -S -v -p ''` before each privileged task. See AGENTS.md → "Sudo session is shared across all run-scripts" for the existing contract.
+75	- [ ] **[?/M] fleet-apply: optional `sshpass` / interactive-password SSH login support** — currently `password_source` only feeds remote sudo (`CHEZMOI_SUDO_PASSWORD_FILE`); SSH login itself is key-only, so password-only hosts classify as `unreachable` in `fleet-status`. Schema comment + new pitfall (`pitfalls/fleet-apply-password-source-not-for-ssh-login.md`) now document the limitation. Concrete trigger: `zyc_friend` (IDC server, 2026-05-08) has `Authentications that can continue: gssapi-keyex,gssapi-with-mic,keyboard-interactive` — sshd deliberately omits `publickey` AND uses `keyboard-interactive` (PAM) instead of plain `password`, so even after `ssh-copy-id` deposits the key, login still requires the IDC password. A real fix needs: (a) optional `sshpass -f` invocation when `password_source.ssh_login = true` (or a separate `ssh_password_source`), (b) `-o PreferredAuthentications=keyboard-interactive,password` to handle PAM-only sshds (sshpass defaults to `password` method only), (c) graceful fallback when `sshpass` not installed, (d) parallel-safe (no TTY prompts), (e) opt-in only — default stays key-only for security. Recommended user fix today: ask the IDC admin to enable `PubkeyAuthentication yes` in `/etc/ssh/sshd_config`, OR remove the host from the fleet and `ssh <host> chezmoi update --apply` manually. Promote when ≥2 hosts in the fleet legitimately can't accept a pubkey.
+76	- [ ] **[S] fleet-apply `--serial` mode misses drift downgrade** — `_classify_drift()` in `scripts/fleet/apply.py` correctly downgrades `chezmoi: <path>: could not open a new TTY: open /dev/tty:` to drift in parallel mode, but `just fleet-apply-one HOST` (which uses `--serial`) reports `rc=1` for the same condition instead of `drift`. Verified on `hanru_mac` 2026-04-24: only diff was `~/.config/worktrunk` directory mode (40700 → 40755), and serial-mode reported failed; identical condition under parallel was correctly classified. Likely a code path that bypasses `_classify_drift` when `--serial` is passed.
+77	- [ ] **[M] CentOS / RedHat: broaden user-level fallback gates in remaining roles** — the `centos_server` profile (added 2026-05-06) only ports the foundational subset of roles to `os_family in ["Debian", "RedHat"]`: `base`, `zsh`, `starship`, `ruby_gem_tools`, `security_tools`, `rust_cargo_tools`. Still gated `Debian`-only on user-level paths (so they no-op on CentOS even without sudo): `devtools` (~20 hits), `neovim` (8 hits), `lazyvim_deps` (~19 hits), `docker` (~10 hits). The broadening pattern is mechanical (`pitfalls/centos7-noroot.md` documents it); the cost is the audit + re-test. Pick up when a second CentOS user appears or when `idc-server104` reports concrete missing-tool symptoms.
+78	- [ ] **[M] CentOS / RedHat: full `yum:` / EPEL bootstrap for sudo-able RedHat hosts** — with the `centos_server` profile, parallel `RedHat` blocks were added only for trivial cases (zsh, ruby_gem_tools libffi-devel/libyaml-devel, base packages). For users with sudo on a RedHat-family box, a comprehensive port would need: `epel-release` enable as a pre-task, parallel yum blocks for `devtools` (~30 packages), `neovim` (EPEL has 0.9 — old; consider AppImage path), `lazygit` (no standard RedHat repo — use GitHub release path), and possibly `vault.centos.org` mirror configuration if running on EOL CentOS 7. Keep deferred until a sudo-capable RedHat user actually requests it. Design: piggyback on `useChineseMirror` for `mirrors.tuna.tsinghua.edu.cn` if any user reports Great-Firewall-side EPEL / vault access issues.
+79	- [ ] **[S] Auto-detect `centos_server` default in `.chezmoi.toml.tmpl`** — currently `$defaultProfile` defaults to `ubuntu_server` on every non-darwin OS, including CentOS. Could use `.chezmoi.osRelease.id` (or `.idLike`) to default to `centos_server` when chezmoi sees `id=centos|rhel|rocky|alma`. Mostly cosmetic — `dotfiles_init` prompts anyway — but worth a one-liner if/when adjacent prompt logic is touched.
+80	- [ ] **[S] Wire `upgrade-skills` into `scripts/upgrade_tools.sh` as a proper category** — recipe shipped 2026-04 as a standalone `just upgrade-skills` that calls `npx skills@latest update --global -y` directly. Promote to a real category so it gets picked up by `upgrade-all` (and `upgrade-dry-run`) and appears in the per-category matrix at [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md). Mechanical: add `skills` to the script's case statement, append to the `upgrade-all` comment in `justfile`, add a row to upgrades.md. No semantic change — `chezmoi apply` is still install-only for skills (the restore loop in `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` only fires when the merger's managed-set changes, which is the right behaviour).
+81	- [ ] **[L] Split `devtools` mega-role into focused per-tool roles** — [`dot_ansible/roles/devtools/tasks/main.yml`](dot_ansible/roles/devtools/tasks/main.yml) is a 166-task grab-bag installing ~50 unrelated tools (gh, glab, bat, btop, fastfetch, jnv, lnav, pandoc, rclone, sesh, tailspin, taplo, television, tldr, tmux, vhs, yazi, yq, zellij, zoxide, …). Sibling tools that get standalone roles (atuin, starship, neovim, docker, bitwarden) prove the standalone-role pattern is fine. Cost of the current shape: long apply times even when one tool changes, hard to skip individual tools per-host (e.g. headless server doesn't need yazi), and an oversized blast radius for any single edit. Proposed split into ~6 cohesive roles with a meta-role keeping playbook entries unchanged. → [research](backlog/devtools-role-split.md)
+82	- [ ] **[S] macOS: add Stats.app cask to `Brewfile.darwin.tmpl`** — [exelban/stats](https://github.com/exelban/stats), MIT-licensed native Swift menubar widget for memory pressure / swap / CPU / network. Documented in [docs/tools/macos-swap.md → Prevention & monitoring](docs/tools/macos-swap.md#prevention--monitoring) as the recommended free alternative to iStat Menus. Currently NOT installed by default — user evaluation needed for whether it crowds the menubar (Codexbar / Codex history / wuhrai / etc. already there). Add as `cask "stats"` once user opts in. Decision criteria: at least one menubar slot freed up, or user explicitly says "I want a swap meter visible at all times". One-line Brewfile change.
+83	- [ ] **[?/M] `tv mac-storage` channel** — `tv mac-procs` (shipped 2026-05) covers the per-process angle. A complementary `tv mac-storage` would visualise *what's eating my disk* in general: parsed `du -shx /*` + `system_profiler SPStorageDataType` + `tmutil listlocalsnapshots /` + `diskutil apfs listSnapshots /` rows in one fuzzy picker. Preview: `du -h --max-depth=1 <selected>` for dirs, `ls -lh <file>` for files. Actions: open in Finder, `rm -i`, copy path. Useful when "System Data" balloons but the cause isn't swap (e.g. Xcode DerivedData, Docker volumes, brew cleanup needed, `/Library/Caches`). Defer until a second "where did my disk go" investigation actually happens — the existing `tv files-ls`/`du-here` aliases may be enough.
+84	- [ ] **[?/L] Scheduled `audit-monitor` with apprise routing** — turn the ad-hoc `health-check` / `audit-failed-logins` / `audit-summary` helpers into a real monitoring story: scheduled (pueue or systemd timer), diff-aware (only alert on state change), routed via [apprise](https://github.com/caronc/apprise) (one CLI, ~80 notification backends incl. Slack/Discord/Telegram/ntfy/email). Hard part is secret management (apprise URLs contain auth tokens — must NOT sync via dotfiles); three patterns documented (Bitwarden CLI fetch / per-host 0600 env / systemd `LoadCredentialEncrypted=`). → [research](backlog/audit-monitor-with-apprise.md). Promote when at least 2 of these become true: (a) user runs a check 3+ days in a row manually, (b) user has an incident they wish they'd caught, (c) user already has a target apprise channel provisioned.
+85	- [ ] **[?/M] `linux-mem-status` / `linux-mem-reclaim` helpers** — mirror the macOS `mac-mem-*` ergonomics on the Linux side. Linux actually has *more* targeted reclaim primitives than macOS (`swapoff -a && swapon -a`, `journalctl --vacuum-*`, `systemd-tmpfiles --clean`, `docker system prune`, `echo 2 > /proc/sys/vm/drop_caches`), so `linux-mem-reclaim --include LIST` would have richer non-reboot options than its macOS sibling. `linux-mem-status` would surface `free -h` + `vmstat` + `journalctl --disk-usage` + `df -h` + top RSS in one screen. Source file: `dot_config/shell/56_linux_mem.sh.tmpl` gated on `eq .chezmoi.os "linux"`. Trigger: when the first IDC server in the fleet (e.g. `idc-server104`) shows memory bloat that this would have helped diagnose. Cross-link from [docs/tools/macos-swap.md → Practical implication for this repo's fleet](docs/tools/macos-swap.md). Doc page should explain the fundamentally different reclaim model (Linux: per-resource targeted tools; macOS: reboot or wait).
+86	## P? — Needs evaluation before committing
+87
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/TODO.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:56Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:56Z)**_
+
+Final verification before commit.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:43:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Pending changes
+
+`git status; echo "---"; git diff --stat HEAD`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .pre-commit-config.yaml
+	modified:   .specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md
+	modified:   TODO.md
+	modified:   docs/this_repo/testing.md
+	modified:   dot_ansible/roles/devtools/tasks/main.yml
+	modified:   dot_config/shell/50_networking.sh
+	modified:   justfile
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-15_02-29-06Z-reply-with-the-single.md
+	.specstory/history/2026-05-15_02-29-23Z-reply-with-the-single.md
+	backlog/shellcheck-broaden-shared-scope.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+---
+ .pre-commit-config.yaml                            |   19 +-
+ .../2026-05-15_02-18-04Z-alias-run-prompt-using.md | 1592 ++++++++++++++++++++
+ TODO.md                                            |    1 +
+ docs/this_repo/testing.md                          |   24 +-
+ dot_ansible/roles/devtools/tasks/main.yml          |   37 +
+ dot_config/shell/50_networking.sh                  |    1 +
+ justfile                                           |   16 +
+ 7 files changed, 1680 insertions(+), 10 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify the fixed file passes the new hook
+
+`pre-commit run shellcheck-shared --files dot_config/shell/50_networking.sh 2>&1 | tail -5`
+
+```text
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:05Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:05Z)**_
+
+Hook passes. Staging and committing.
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage shellcheck integration files
+
+`git add .pre-commit-config.yaml dot_ansible/roles/devtools/tasks/main.yml dot_config/shell/50_networking.sh justfile docs/this_repo/testing.md backlog/shellcheck-broaden-shared-scope.md TODO.md ".specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md" && git status`
+
+```text
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   .pre-commit-config.yaml
+	modified:   .specstory/history/2026-05-15_02-18-04Z-alias-run-prompt-using.md
+	modified:   TODO.md
+	new file:   backlog/shellcheck-broaden-shared-scope.md
+	modified:   docs/this_repo/testing.md
+	modified:   dot_ansible/roles/devtools/tasks/main.yml
+	modified:   dot_config/shell/50_networking.sh
+	modified:   justfile
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.specstory/history/2026-05-15_02-29-06Z-reply-with-the-single.md
+	.specstory/history/2026-05-15_02-29-23Z-reply-with-the-single.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit shellcheck integration
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat(lint): broaden shellcheck to dot_config/{shell,bash}/ at severity=error
+
+Adds shellcheck + shfmt to devtools (macOS brew + Linux apt/Linuxbrew),
+a `just lint-shell` recipe for broad warning sweep (uvx-fallback so a
+fresh host without devtools applied still works), and a second pre-commit
+hook entry covering the shared shell modules. Severity=error on the
+broader scope blocks on real bugs (caught one SC2142 alias-with-$1
+false-positive in 50_networking.sh) without forcing a flag-day cleanup
+of the 41 preexisting softer warnings — tracked in
+backlog/shellcheck-broaden-shared-scope.md for gradual cleanup, then
+flip to severity=warning.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1778813057-11370.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1778813057-11370.
+[main 1701faa] feat(lint): broaden shellcheck to dot_config/{shell,bash}/ at severity=error
+ 8 files changed, 1830 insertions(+), 10 deletions(-)
+ create mode 100644 backlog/shellcheck-broaden-shared-scope.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:26Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-15 02:44:32Z)**_
+
+Both commits landed cleanly. Final state:
+
+**Commit 1** `feat(shell): quick one-shot prompt wrappers (ocr/ccr/cxr/cur/olr/air)`
+- New `dot_config/shell/05_ai_run.sh` with 6 streaming pass-through wrappers
+- `AICAP_OLLAMA_MODEL` added to the SSOT; `## AI Run` section in `docs/shells/aliases.md`
+
+**Commit 2** `feat(lint): broaden shellcheck to dot_config/{shell,bash}/ at severity=error`
+- `shellcheck` + `shfmt` added to devtools (macOS brew + Debian apt + Linuxbrew best-effort for shfmt)
+- New `just lint-shell` recipe (uvx-bundled shellcheck fallback so it works on fresh hosts)
+- Second pre-commit hook entry `shellcheck-shared` covering `dot_config/{shell,bash}/` at `--severity=error`
+- Fixed the one real-bug-or-false-positive in `50_networking.sh:13` (SC2142 in the awk-aware alias)
+- `backlog/shellcheck-broaden-shared-scope.md` + `TODO.md` entry tracking the 41 remaining softer warnings to clean up before flipping severity to `warning`
+
+Two stray transcripts (`2026-05-15_02-29-06Z` and `02-29-23Z`) are still untracked — smoke-test noise from my own `ccr`/`air` verification calls. Leave or `rm`, your call.

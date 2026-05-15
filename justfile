@@ -262,6 +262,22 @@ pre-commit-run:
 pre-commit-update:
     pre-commit autoupdate
 
+# Broad shellcheck pass across managed shell modules at severity=warning.
+# Pre-commit covers the same files at severity=error (blocks on real bugs);
+# this recipe surfaces softer suggestions for gradual cleanup and exits
+# non-zero on findings so CI can gate on it once the corpus is clean.
+# Uses uvx-bundled shellcheck so a fresh host without devtools applied
+# still gets coverage. System `shellcheck` (from devtools) is used when
+# present — saves the uvx round-trip.
+lint-shell:
+    @if command -v shellcheck >/dev/null 2>&1; then \
+        shellcheck --shell=bash --severity=warning \
+            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh; \
+    else \
+        uvx --quiet --from shellcheck-py shellcheck --shell=bash --severity=warning \
+            dot_config/shell/*.sh dot_config/bash/*.bash scripts/*.sh; \
+    fi
+
 # Uninstall pre-commit hooks
 pre-commit-uninstall:
     pre-commit uninstall

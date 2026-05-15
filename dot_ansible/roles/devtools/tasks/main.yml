@@ -68,6 +68,13 @@
       - toilet
       - lolcat
       - fastfetch
+      # Shell linting / formatting. Bundled binaries are also pulled by the
+      # `shellcheck-py` and `pre-commit-shfmt` repos in .pre-commit-config.yaml,
+      # but having them on PATH lets `just lint-shell` skip the uvx wrapper
+      # and gives users `shellcheck file.sh` / `shfmt -d file.sh` for ad-hoc
+      # checking. ~1 MB each, no transitive deps.
+      - shellcheck
+      - shfmt
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -1979,6 +1986,36 @@
 # --- thefuck ---
 # NOTE: thefuck is now installed via uv tool (python_uv_tools role)
 # This avoids conda/virtualenv Python path conflicts
+
+# --- shellcheck + shfmt ---
+# Shell linting / formatting. macOS gets both via brew (block above).
+# Linux: shellcheck is in standard Debian/Ubuntu apt; shfmt is a Go binary
+# not in apt main — best-effort install via Linuxbrew if present, else the
+# user can `go install mvdan.cc/sh/v3/cmd/shfmt@latest` or rely on the
+# pre-commit-shfmt hook which bundles its own binary.
+- name: Install shellcheck (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: shellcheck
+    state: present
+
+- name: Detect Linuxbrew for shfmt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: shfmt_brew_probe
+  changed_when: false
+
+- name: Install shfmt via Linuxbrew when available (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - shfmt_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: shfmt
+    state: present
 
 # --- direnv ---
 - name: Install direnv (Debian/Ubuntu)

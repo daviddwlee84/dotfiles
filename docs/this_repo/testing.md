@@ -9,7 +9,7 @@ How this repo tests shell code, the landscape of shell-testing tools, and when t
 | Tool | Role | Scope |
 |------|------|-------|
 | [**bats-core**](https://github.com/bats-core/bats-core) | Behaviour / unit tests | `tests/unit/`, `tests/smoke/` |
-| [**shellcheck**](https://www.shellcheck.net/) | Static analysis (bugs, bad quoting) | Pre-commit on `scripts/*.sh` |
+| [**shellcheck**](https://www.shellcheck.net/) | Static analysis (bugs, bad quoting) | Pre-commit on `scripts/*.sh` (severity=warning) + `dot_config/{shell,bash}/` (severity=error); `just lint-shell` for broad warning sweep |
 | [**shfmt**](https://github.com/mvdan/sh) | Formatter (consistency check) | Pre-commit on `scripts/*.sh` |
 
 Run everything with `just check-all`. Run just the fast unit suite with `just bats`. See [the repo tests/ tree](#how-this-repo-structures-tests) below.
@@ -242,10 +242,15 @@ In addition to shell tooling, `.pre-commit-config.yaml` runs these [pre-commit/p
 
 Ansible **playbook syntax** is checked via `just ansible-syntax-check` / `just lint`, not pre-commit — running a full playbook parse on every commit is too slow for the pre-commit hot path. Run `just lint` manually before pushing ansible-touching changes.
 
-Hook scope (see `.pre-commit-config.yaml`): **`^scripts/[^/]+\.sh$` only**. This excludes:
+Hook scope (see `.pre-commit-config.yaml`): two tiers.
+
+1. **`^scripts/[^/]+\.sh$`** at `--severity=warning` — the original strict scope; always green.
+2. **`^dot_config/(shell/[^/]+\.sh|bash/[^/]+\.bash)$`** at `--severity=error` — added 2026-05. Catches actual bugs (e.g. SC2142 alias-with-positional-param) while we gradually clean up the ~40 preexisting warnings the broader scope surfaces. Drop to `--severity=warning` once `just lint-shell` is clean — tracked in [`backlog/shellcheck-broaden-shared-scope.md`](../../backlog/shellcheck-broaden-shared-scope.md).
+
+Always excluded:
 
 - `dot_config/zsh/**/*.zsh` — zsh-specific syntax (`(( ... ))` math, `${(P)v}` expansion flags, `print -u2`, `emulate -L zsh`, `zmodload`) trips shellcheck's bash parser and produces too many false positives.
-- `*.sh.tmpl` — chezmoi go-template tokens (`{{ if eq .profile "macos" }}`) look like unbalanced braces to shellcheck.
+- `*.sh.tmpl` / `*.bash.tmpl` — chezmoi go-template tokens (`{{ if eq .profile "macos" }}`) look like unbalanced braces to shellcheck.
 - `scripts/adhoc/*.sh` — experimental / throwaway scripts by convention.
 
 If a zsh file needs static analysis later, the best options are:
@@ -257,14 +262,21 @@ If a zsh file needs static analysis later, the best options are:
 Quick commands:
 
 ```bash
-# Run only shellcheck on all files
+# Run both shellcheck hook entries (scripts/ + shared) on all files
 pre-commit run shellcheck --all-files
+
+# Run only the broader (shared shell modules) scope at severity=error
+pre-commit run shellcheck-shared --all-files
+
+# Broad warning sweep across scripts/ + dot_config/{shell,bash}/ —
+# exits non-zero on findings; useful for gradual cleanup. Uses uvx
+# shellcheck-py when system shellcheck isn't on PATH.
+just lint-shell
 
 # Run only shfmt
 pre-commit run shfmt --all-files
 
-# shfmt is in diff mode (-d) — to actually rewrite files, install shfmt
-# locally and run:
+# shfmt is in -w mode (writes in place via the hook) — to format manually:
 shfmt -i 2 -ci -bn -w scripts/*.sh
 ```
 
