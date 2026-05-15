@@ -40,6 +40,9 @@ _AICAP_AGENT_CONFIG_SOURCED=1
 : "${AICAP_OPENCODE_MODEL:=github-copilot/claude-haiku-4.5}"
 : "${AICAP_CODEX_MODEL:=}"                     # empty: ChatGPT-account auth rejects gpt-5-mini
 : "${AICAP_CURSOR_MODEL:=}"                    # empty: cursor-agent picks composer-2-fast
+: "${AICAP_OLLAMA_MODEL:=qwen2.5-coder:7b}"    # consumed ONLY by `olr` in 05_ai_run.sh
+                                               # (shell-only sugar; not in autodetect, not parsed
+                                               # by the Python consumers — see header note)
 
 # HTTP fallback (opt-in only via AICAP_AGENT=http; never auto-detected).
 # `openrouter/free` is an auto-router across OpenRouter's free tier — when
@@ -52,4 +55,5 @@ _AICAP_AGENT_CONFIG_SOURCED=1
 # Export so subprocess (Python tsum / aiblock) inherits.
 export AICAP_AGENT_PRIORITY \
        AICAP_CLAUDE_MODEL AICAP_OPENCODE_MODEL AICAP_CODEX_MODEL AICAP_CURSOR_MODEL \
+       AICAP_OLLAMA_MODEL \
        AICAP_HTTP_URL AICAP_HTTP_MODEL
