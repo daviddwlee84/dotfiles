@@ -242,6 +242,10 @@ bind-key -T copy-mode-vi 'C-l' select-pane -R
 bind | split-window -h -c "#{pane_current_path}"
 bind - split-window -v -c "#{pane_current_path}"
 
+# Also override default % and " so they inherit current pane's cwd (consistent with | / - and `c`)
+bind % split-window -h -c "#{pane_current_path}"
+bind '"' split-window -v -c "#{pane_current_path}"
+
 # Resize panes with prefix + H/J/K/L (5 cells)
 bind -r H resize-pane -L 5
 bind -r J resize-pane -D 5
