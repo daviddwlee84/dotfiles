@@ -1,0 +1,161 @@
+# rclone channel for television (tv).
+# Browse configured remotes, drill into directories, preview about/size/config.
+#
+# Usage:
+#   tv rclone
+#   RCLONE_TV_PATH='remote:some/dir/' tv rclone   # drill straight in from CLI
+#
+# Source behavior:
+#   $RCLONE_TV_PATH unset  -> `rclone listremotes`            (top-level)
+#   $RCLONE_TV_PATH set    -> `rclone lsf "$RCLONE_TV_PATH"`  (drilled)
+# The Enter action (actions:drill) sets $RCLONE_TV_PATH and re-execs `tv rclone`
+# so drilling has no back-stack to maintain — Esc in the nested view returns to
+# the parent picker because `mode = "execute"` pauses the outer TV until the
+# nested process exits. Same pattern mlflow.toml uses for experiment-scoped
+# runs, just with an env var instead of `--source-command` because the path
+# already contains everything we need.
+#
+# Row format (TSV): <path>\t<kind>
+#   kind ∈ {remote, dir, file}
+# - For `listremotes` rows, kind is hardcoded `remote` and the path ends in `:`
+#   (e.g. `mydrive:`).
+# - For `lsf` rows, kind is `dir` when the entry ends in `/`, else `file`.
+#   The path is `$RCLONE_TV_PATH` concatenated with the entry, so deep drills
+#   keep producing fully-qualified paths.
+#
+# Preview cycling (Ctrl+F):
+#   1. Default — about + top-level dirs (remote/dir rows) or lsjson (file rows)
+#   2. Deeper  — `rclone lsd --max-depth 2 | head -200`
+#   3. Flat    — `rclone lsf | head -200` (files + dirs mixed)
+#   4. Config  — `rclone config show REMOTE` of the path's remote.
+#                Header notes that obscured tokens are reversible base64,
+#                not encryption — `config show` is safe-ish but not secret.
+#
+# Keybindings (Alt+ namespace avoids tmux/TV conflicts — see CLAUDE.md):
+#   Enter      Drill (dir/remote) or paged lsjson (file)
+#   Ctrl+Y     Copy path to clipboard (overrides TV default which copies full row)
+#   Alt+A      `rclone about PATH --json` paged
+#   Alt+S      `rclone size  PATH --json` paged (can be slow on large remotes)
+#   Alt+B      `rclone ncdu  PATH` — full-screen TUI disk usage
+#   Alt+C      `rclone config show REMOTE` paged
+#   Alt+M      `mount | grep rclone` — active rclone/fuse mount status
+
+[metadata]
+name = "rclone"
+description = "rclone remotes: drill-in browser with about/size/config previews"
+requirements = ["rclone"]
+
+[source]
+command = """
+if [ -n "${RCLONE_TV_PATH:-}" ]; then
+  rclone lsf "$RCLONE_TV_PATH" 2>/dev/null | awk -v p="$RCLONE_TV_PATH" '/\\/$/{print p$0"\\tdir";next}{print p$0"\\tfile"}'
+else
+  rclone listremotes 2>/dev/null | awk '{print $0"\\tremote"}'
+fi
+"""
+display = "{split:\\t:0}"
+output = "{split:\\t:0}"
+
+[preview]
+command = [
+  """
+sel='{split:\\t:0}'
+kind='{split:\\t:1}'
+case "$kind" in
+  remote)
+    printf '=== about ===\\n'
+    rclone about "$sel" --json 2>/dev/null | jq -C . 2>/dev/null || printf '(backend does not support `about`)\\n'
+    printf '\\n=== top-level dirs ===\\n'
+    rclone lsd "$sel" --max-depth 1 2>/dev/null | head -50 || printf '(empty or unreachable)\\n'
+    ;;
+  dir)
+    printf '=== %s ===\\n' "$sel"
+    rclone lsd "$sel" --max-depth 1 2>/dev/null | head -50
+    printf '\\n=== size ===\\n'
+    rclone size "$sel" --json 2>/dev/null | jq -C . 2>/dev/null || printf '(size: unavailable)\\n'
+    ;;
+  file)
+    printf '=== %s (metadata) ===\\n' "$sel"
+    rclone lsjson "$sel" 2>/dev/null | jq -C . 2>/dev/null || printf '(lsjson failed)\\n'
+    ;;
+esac
+""",
+  """
+sel='{split:\\t:0}'
+printf '=== %s (max-depth 2) ===\\n' "$sel"
+rclone lsd "$sel" --max-depth 2 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+""",
+  """
+sel='{split:\\t:0}'
+printf '=== %s (flat, top 200) ===\\n' "$sel"
+rclone lsf "$sel" 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+""",
+  """
+sel='{split:\\t:0}'
+remote=$(printf '%s' "$sel" | awk -F: '{print $1 ":"}')
+printf '=== rclone config show %s ===\\n' "$remote"
+printf '# NOTE: obscured tokens are reversible base64, not encryption.\\n\\n'
+rclone config show "$remote" 2>/dev/null || printf '(remote not found)\\n'
+""",
+]
+header = "{split:\\t:0} ({split:\\t:1})"
+
+[ui]
+input_header = "rclone"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:drill"
+ctrl-y = "actions:copy-path"
+alt-a = "actions:about"
+alt-s = "actions:size"
+alt-b = "actions:ncdu"
+alt-c = "actions:config-show"
+alt-m = "actions:mount-status"
+
+[actions.drill]
+description = "Drill into directory (file rows show lsjson in pager)"
+command = """sel='{split:\\t:0}'
+kind='{split:\\t:1}'
+case "$kind" in
+  remote|dir) RCLONE_TV_PATH="$sel" tv rclone --input-header "rclone / $sel" ;;
+  file) rclone lsjson "$sel" 2>/dev/null | jq -C . 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _ ;;
+  *) printf '[drill] unknown kind: %s\\n' "$kind"; sleep 2 ;;
+esac"""
+mode = "execute"
+
+[actions.copy-path]
+description = "Copy selected path to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64 | tr -d '\\n')\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:0}' | _clip"""
+mode = "fork"
+
+[actions.about]
+description = "rclone about (paged JSON)"
+command = """rclone about '{split:\\t:0}' --json 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.size]
+description = "rclone size (paged JSON; can be slow on large remotes)"
+command = """rclone size '{split:\\t:0}' --json 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.ncdu]
+description = "rclone ncdu (full-screen disk usage TUI)"
+command = """rclone ncdu '{split:\\t:0}'"""
+mode = "execute"
+
+[actions.config-show]
+description = "rclone config show REMOTE (paged)"
+command = """sel='{split:\\t:0}'
+remote=$(printf '%s' "$sel" | awk -F: '{print $1 ":"}')
+rclone config show "$remote" 2>/dev/null | less -R
+printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.mount-status]
+description = "Show active rclone mounts (mount | grep -i rclone/fuse)"
+command = """mount 2>/dev/null | grep -iE 'rclone|fuse' || printf '[no active rclone/fuse mounts found]\\n'
+printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"

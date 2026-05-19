@@ -1,0 +1,58 @@
+# rclone-help channel for television (tv).
+# Fuzzy-search rclone's ~45 subcommands; preview `rclone <sub> --help`.
+#
+# Data source: parses `rclone help` stdout for the "Available commands:" block.
+# Trades a sub-second cold start (rclone fork) for always-current command list
+# (no risk of drifting out of sync with the installed rclone version).
+#
+# Row format: `<subcmd>  <description>` (padded to 15 cols, then desc).
+# {split: :0} extracts col 0 (the subcommand). Multiple spaces between columns
+# yield empty intermediate fields, but col 0 stays the subcommand name.
+#
+# Preview cycling (Ctrl+F):
+#   1. `rclone <sub> --help` rendered via bat (full doc)
+#   2. Description + `Usage:` section only — same content with the long
+#       `Flags:` block stripped out, useful for "what does this command
+#       do and what arguments does it want" at a glance.
+#
+# Keybindings:
+#   Enter      Page through `rclone <sub> --help` in less -R
+#   Ctrl+Y     Copy `rclone <sub> ` (with trailing space) to clipboard —
+#              same "needs argument" convention as cli-tools.md invocations
+
+[metadata]
+name = "rclone-help"
+description = "rclone subcommand reference: ~45 commands, --help previews"
+requirements = ["rclone"]
+
+[source]
+command = """rclone help 2>/dev/null | awk '/^Available [Cc]ommands:/{f=1;next} /^Flags:/{f=0} f && /^[[:space:]]+[a-z]/ {sub(/^[[:space:]]+/,""); printf "%-15s  %s\\n", $1, substr($0, index($0,$2))}'"""
+
+[preview]
+command = [
+  "rclone '{split: :0}' --help 2>/dev/null | bat --color=always --plain --paging=never --language=help",
+  "rclone '{split: :0}' --help 2>/dev/null | awk '/^Flags:/{exit} 1' | bat --color=always --plain --paging=never --language=help",
+]
+header = "rclone {split: :0}"
+
+[ui]
+input_header = "rclone help"
+
+[ui.preview_panel]
+size = 65
+
+[keybindings]
+enter = "actions:show-help"
+ctrl-y = "actions:copy-command"
+
+[actions.show-help]
+description = "Page through rclone <sub> --help in less -R"
+command = """rclone '{split: :0}' --help 2>/dev/null | less -R
+printf '\\n[Press Enter to exit]\\n'; read -r _"""
+mode = "execute"
+
+[actions.copy-command]
+description = "Copy 'rclone <sub> ' (with trailing space) to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64 | tr -d '\\n')\\007" > /dev/tty; fi; }
+printf 'rclone %s ' '{split: :0}' | _clip"""
+mode = "fork"
