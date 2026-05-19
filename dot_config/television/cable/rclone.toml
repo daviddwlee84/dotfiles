@@ -4,6 +4,7 @@
 # Usage:
 #   tv rclone
 #   RCLONE_TV_PATH='remote:some/dir/' tv rclone   # drill straight in from CLI
+#   RCLONE_TV_NOCACHE=1 tv rclone                 # bypass preview cache
 #
 # Source behavior:
 #   $RCLONE_TV_PATH unset  -> `rclone listremotes`            (top-level)
@@ -17,8 +18,7 @@
 #
 # Row format (TSV): <path>\t<kind>
 #   kind ∈ {remote, dir, file}
-# - For `listremotes` rows, kind is hardcoded `remote` and the path ends in `:`
-#   (e.g. `mydrive:`).
+# - For `listremotes` rows, kind is hardcoded `remote` and the path ends in `:`.
 # - For `lsf` rows, kind is `dir` when the entry ends in `/`, else `file`.
 #   The path is `$RCLONE_TV_PATH` concatenated with the entry, so deep drills
 #   keep producing fully-qualified paths.
@@ -27,9 +27,17 @@
 #   1. Default — about + top-level dirs (remote/dir rows) or lsjson (file rows)
 #   2. Deeper  — `rclone lsd --max-depth 2 | head -200`
 #   3. Flat    — `rclone lsf | head -200` (files + dirs mixed)
-#   4. Config  — `rclone config show REMOTE` of the path's remote.
-#                Header notes that obscured tokens are reversible base64,
-#                not encryption — `config show` is safe-ish but not secret.
+#   4. Config  — `rclone config show REMOTE`. Obscured tokens are
+#                reversible base64, not encryption.
+#
+# Performance / caching:
+#   All preview views cache results in /tmp/rclone-tv.UID/ keyed on
+#   path+view, TTL 60s. Each rclone invocation also uses
+#   --retries=1 --low-level-retries=1 --timeout=10s to fail fast — webdav
+#   backends without quota API and Google Drive cold-start used to take
+#   10-15s per preview without these. Set RCLONE_TV_NOCACHE=1 to bypass.
+#   `rclone size` (recursive walk) is intentionally NOT in any default
+#   preview — it's only on Alt+S.
 #
 # Keybindings (Alt+ namespace avoids tmux/TV conflicts — see CLAUDE.md):
 #   Enter      Drill (dir/remote) or paged lsjson (file)
@@ -48,7 +56,7 @@ requirements = ["rclone"]
 [source]
 command = """
 if [ -n "${RCLONE_TV_PATH:-}" ]; then
-  rclone lsf "$RCLONE_TV_PATH" 2>/dev/null | awk -v p="$RCLONE_TV_PATH" '/\\/$/{print p$0"\\tdir";next}{print p$0"\\tfile"}'
+  rclone lsf "$RCLONE_TV_PATH" --retries=1 --low-level-retries=1 --timeout=10s 2>/dev/null | awk -v p="$RCLONE_TV_PATH" '/\\/$/{print p$0"\\tdir";next}{print p$0"\\tfile"}'
 else
   rclone listremotes 2>/dev/null | awk '{print $0"\\tremote"}'
 fi
@@ -61,34 +69,60 @@ command = [
   """
 sel='{split:\\t:0}'
 kind='{split:\\t:1}'
-case "$kind" in
-  remote)
-    printf '=== about ===\\n'
-    rclone about "$sel" --json 2>/dev/null | jq -C . 2>/dev/null || printf '(backend does not support `about`)\\n'
-    printf '\\n=== top-level dirs ===\\n'
-    rclone lsd "$sel" --max-depth 1 2>/dev/null | head -50 || printf '(empty or unreachable)\\n'
-    ;;
-  dir)
-    printf '=== %s ===\\n' "$sel"
-    rclone lsd "$sel" --max-depth 1 2>/dev/null | head -50
-    printf '\\n=== size ===\\n'
-    rclone size "$sel" --json 2>/dev/null | jq -C . 2>/dev/null || printf '(size: unavailable)\\n'
-    ;;
-  file)
-    printf '=== %s (metadata) ===\\n' "$sel"
-    rclone lsjson "$sel" 2>/dev/null | jq -C . 2>/dev/null || printf '(lsjson failed)\\n'
-    ;;
-esac
+cd="${TMPDIR:-/tmp}/rclone-tv.$(id -u)"
+mkdir -p "$cd" 2>/dev/null
+cf="$cd/$(printf '%s|v1' "$sel" | shasum | cut -c1-16)"
+if [ -z "${RCLONE_TV_NOCACHE:-}" ] && [ -f "$cf" ] && [ "$(( $(date +%s) - $(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0) ))" -lt 60 ]; then
+  cat "$cf"
+else
+  {
+    case "$kind" in
+      remote)
+        printf '=== about ===\\n'
+        rclone about "$sel" --json --retries=1 --low-level-retries=1 --timeout=10s 2>/dev/null | jq -C . 2>/dev/null || printf '(backend does not support `about`)\\n'
+        printf '\\n=== top-level dirs ===\\n'
+        rclone lsd "$sel" --max-depth 1 --retries=1 --low-level-retries=1 --timeout=10s 2>/dev/null | head -50 || printf '(empty or unreachable)\\n'
+        ;;
+      dir)
+        printf '=== %s ===\\n' "$sel"
+        rclone lsd "$sel" --max-depth 1 --retries=1 --low-level-retries=1 --timeout=10s 2>/dev/null | head -50
+        printf '\\n[size: Alt+S | tree: Alt+B (ncdu)]\\n'
+        ;;
+      file)
+        printf '=== %s (metadata) ===\\n' "$sel"
+        rclone lsjson "$sel" --retries=1 --low-level-retries=1 --timeout=5s 2>/dev/null | jq -C . 2>/dev/null || printf '(lsjson failed)\\n'
+        ;;
+    esac
+  } | tee "$cf"
+fi
 """,
   """
 sel='{split:\\t:0}'
-printf '=== %s (max-depth 2) ===\\n' "$sel"
-rclone lsd "$sel" --max-depth 2 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+cd="${TMPDIR:-/tmp}/rclone-tv.$(id -u)"
+mkdir -p "$cd" 2>/dev/null
+cf="$cd/$(printf '%s|v2' "$sel" | shasum | cut -c1-16)"
+if [ -z "${RCLONE_TV_NOCACHE:-}" ] && [ -f "$cf" ] && [ "$(( $(date +%s) - $(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0) ))" -lt 120 ]; then
+  cat "$cf"
+else
+  {
+    printf '=== %s (max-depth 2) ===\\n' "$sel"
+    rclone lsd "$sel" --max-depth 2 --retries=1 --low-level-retries=1 --timeout=20s 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+  } | tee "$cf"
+fi
 """,
   """
 sel='{split:\\t:0}'
-printf '=== %s (flat, top 200) ===\\n' "$sel"
-rclone lsf "$sel" 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+cd="${TMPDIR:-/tmp}/rclone-tv.$(id -u)"
+mkdir -p "$cd" 2>/dev/null
+cf="$cd/$(printf '%s|v3' "$sel" | shasum | cut -c1-16)"
+if [ -z "${RCLONE_TV_NOCACHE:-}" ] && [ -f "$cf" ] && [ "$(( $(date +%s) - $(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0) ))" -lt 120 ]; then
+  cat "$cf"
+else
+  {
+    printf '=== %s (flat, top 200) ===\\n' "$sel"
+    rclone lsf "$sel" --retries=1 --low-level-retries=1 --timeout=20s 2>/dev/null | head -200 || printf '(empty or unreachable)\\n'
+  } | tee "$cf"
+fi
 """,
   """
 sel='{split:\\t:0}'
@@ -121,7 +155,7 @@ command = """sel='{split:\\t:0}'
 kind='{split:\\t:1}'
 case "$kind" in
   remote|dir) RCLONE_TV_PATH="$sel" tv rclone --input-header "rclone / $sel" ;;
-  file) rclone lsjson "$sel" 2>/dev/null | jq -C . 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _ ;;
+  file) rclone lsjson "$sel" --retries=1 --low-level-retries=1 --timeout=10s 2>/dev/null | jq -C . 2>/dev/null | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _ ;;
   *) printf '[drill] unknown kind: %s\\n' "$kind"; sleep 2 ;;
 esac"""
 mode = "execute"
@@ -133,12 +167,12 @@ mode = "fork"
 
 [actions.about]
 description = "rclone about (paged JSON)"
-command = """rclone about '{split:\\t:0}' --json 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+command = """rclone about '{split:\\t:0}' --json --retries=1 --low-level-retries=1 --timeout=15s 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
 mode = "execute"
 
 [actions.size]
-description = "rclone size (paged JSON; can be slow on large remotes)"
-command = """rclone size '{split:\\t:0}' --json 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
+description = "rclone size (paged JSON; recursive — can take minutes on large remotes)"
+command = """rclone size '{split:\\t:0}' --json --retries=1 --low-level-retries=1 2>/dev/null | jq -C . | less -R; printf '\\n[Press Enter to exit]\\n'; read -r _"""
 mode = "execute"
 
 [actions.ncdu]
