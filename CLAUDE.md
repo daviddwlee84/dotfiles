@@ -110,7 +110,7 @@ Secrets before adhoc (so adhoc can read secret vars); shared before per-shell (p
 
 ### `enableVimMode` gates shell + tmux vim, NOT Neovim or editors
 
-`enableVimMode` (bool, default `true`) gates **shell modal editing + tmux vim navigation only**. Neovim and every editor config (VSCode/Cursor/Antigravity/Codex/OpenCode/Cursor-CLI) are **never** affected. Full catalog of the 7 gated templated files + 1 first-seed `marimo.toml`: [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).
+`enableVimMode` (bool, default `true`) gates **shell modal editing + tmux vim navigation only**. Neovim and every editor config (VSCode/Cursor/Antigravity/Codex/OpenCode/Cursor-CLI) are **never** affected. Full catalog of the 7 gated templated files + 2 first-seed files (`marimo.toml`, btop's `btop.conf`): [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md).
 
 **Hard rules**:
 

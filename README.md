@@ -182,6 +182,7 @@ To change options later: `chezmoi init --force`
 - `~/.config/yazi/` - Yazi file manager config (v0.3.3+ syntax, [docs](https://yazi-rs.github.io/docs/configuration/overview/))
   - `yazi.toml` - Main config with open rules and openers (`o`/`O`)
   - `keymap.toml`, `theme.toml` - Optional customization files (stubs provided)
+- `~/.config/btop/btop.conf` + `~/.config/btop/themes/catppuccin_mocha.theme` - btop system-monitor baseline (Catppuccin Mocha theme, process tree view, `vim_keys` mirrors `enableVimMode`); seeded once via `create_` so btop's on-exit config rewrites never cause chezmoi drift; catppuccin theme vendored like bat's ([docs](docs/tools/btop.md))
 - `~/.claude/` - Claude Code settings
 - `~/.cursor/cli-config.json`, `~/.config/opencode/opencode.json`, `~/.codex/config.toml` - Coding-agent CLI overlays: each `modify_*` script deep-merges a small managed baseline (preferences, features, curated plugins) into the CLI's live config, preserving auth tokens, per-project trust, sessions, and other machine-local state. Codex specifically round-trips `[projects]` and `[marketplaces.*]` so per-project trust paths never get clobbered. OpenCode legacy `~/.config/opencode/config.json` is migrated to the modern filename by a one-shot `run_once_before_50_opencode_migrate.sh.tmpl`. Full design: [docs/tools/agent-overlays.md](docs/tools/agent-overlays.md).
 - `~/.specstory/cli/config.toml` - Global SpecStory defaults for `specstory run` across all projects

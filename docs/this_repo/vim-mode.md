@@ -37,6 +37,7 @@ is wired into this dotfiles repo, gated by a single chezmoi prompt
 | tmux `prefix + H/J/K/L` resize 5 cells | bound | **bound** (kept) |
 | tmux `prefix + M-h/j/k/l` fine resize | bound | **bound** (kept) |
 | marimo `[keymap] preset` (`create_marimo.toml`) | `vim` | `default` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
+| btop `vim_keys` (`create_btop.conf`) | `True` | `False` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
 | superfile `hotkeys.toml` (`dot_config/superfile/`) | yazi-parity vim preset (`j`/`k` nav, `y`/`x`/`p`/`d` file ops, `h` parent, `l`/Enter open, `q` quit, `a` create, `r` rename, `v` panel mode, `?` help) — adapted from upstream `vimHotkeys.toml` with `q`/`esc` quit, `h`/`←`/`backspace` parent, `right`/`l` confirm, `v` panel-mode kept | upstream default preset (`ctrl+c`/`ctrl+x`/`ctrl+v` file ops, single-letter focus keys `m`/`p`/`s`) |
 | Neovim (`dot_config/nvim/`) | unchanged | **unchanged** (out of scope by design) |
 | VSCode / Cursor / Antigravity vim extension | not managed | **not managed** (out of scope) |
@@ -279,6 +280,26 @@ Why not `modify_` instead? Because marimo writes its own settings
 UI, and a `modify_` script would have to reconcile those — overkill
 for one keymap key.
 
+#### btop — `vim_keys` gated on `enableVimMode`
+
+**File**: [`dot_config/btop/create_btop.conf.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/btop/create_btop.conf.tmpl) line ~25.
+
+btop (system monitor) exposes a `vim_keys` config key that enables
+`h,j,k,l,g,G` directional control in its process / device lists
+(the conflicting `h`→help and `k`→kill stay reachable with Shift).
+Templated on `enableVimMode`:
+
+```ini
+vim_keys = {{ if .enableVimMode }}True{{ else }}False{{ end }}
+```
+
+**Caveat — `create_` semantics** (identical to marimo): the file is
+seeded **once**; chezmoi never re-touches it, and btop rewrites the
+whole config on every exit. Flipping `enableVimMode` later will
+**not** re-flip `vim_keys` on an existing machine — delete
+`~/.config/btop/btop.conf` and `chezmoi apply` to re-seed. Full
+config notes: [btop](../tools/btop.md).
+
 #### superfile — `hotkeys.toml` preset swap
 
 **File**: [`dot_config/superfile/hotkeys.toml.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/superfile/hotkeys.toml.tmpl).
@@ -335,8 +356,8 @@ Spot-checked and confirmed **not** managed (or no vim keys present):
   `--bind` for vi keys; default emacs-style.
 - `less`, `bat`, `delta` — no `LESS=…` vi-keys env, no managed
   `~/.lesskey`.
-- `k9s`, `btop`, `htop`, `lazydocker`, `gh-dash` — not managed by
-  this repo.
+- `k9s`, `htop`, `lazydocker`, `gh-dash` — not managed by
+  this repo. (`btop` **is** managed — see the btop subsection above.)
 - `television` — global keymap is Ctrl-style; channel-specific
   configs use Alt+letter, no vi keys.
 - `zellij` — uses `default_mode "locked"`, all keys pass through to
@@ -368,6 +389,8 @@ After `chezmoi apply`:
   bindings.
 - (FRESH installs only) `~/.config/marimo/marimo.toml` has
   `preset = "default"`.
+- (FRESH installs only) `~/.config/btop/btop.conf` has
+  `vim_keys = False`.
 - `~/.config/superfile/hotkeys.toml` has upstream default body
   (Ctrl-prefixed file ops, `j`/`k`/`l`/`h` as secondary nav).
 

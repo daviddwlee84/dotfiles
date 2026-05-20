@@ -100,6 +100,7 @@ plugins:
             Vim integration: Vim 整合
             Clipboard: 剪貼簿
             Television (tv): Television (tv)
+            btop (system monitor): btop (系統監控)
             TV vs fzf: TV vs fzf
             Glow (markdown reader): Glow (Markdown 閱讀器)
             Gum (shell prompts): Gum (shell prompt 工具箱)
@@ -250,6 +251,7 @@ nav:
           - XDG: tools/xdg.md
           - Fzf: tools/fzf.md
           - Atuin (shell history): tools/atuin.md
+          - btop (system monitor): tools/btop.md
           - Television (tv): tools/tv.md
           - TV vs fzf: tools/tv-vs-fzf.md
           - Glow (markdown reader): tools/glow.md
