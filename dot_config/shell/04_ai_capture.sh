@@ -46,8 +46,8 @@
 #
 #   AICAP_AGENT            default: (unset — auto-detect via AICAP_AGENT_PRIORITY)
 #                                        force a specific agent: opencode | claude |
-#                                        codex | cursor-agent | http
-#   AICAP_AGENT_PRIORITY   default: opencode claude codex cursor-agent     (SSOT)
+#                                        codex | agyc | cursor-agent | http
+#   AICAP_AGENT_PRIORITY   default: opencode claude codex agyc cursor-agent (SSOT)
 #   AICAP_CLAUDE_MODEL     default: haiku                                  (SSOT)
 #   AICAP_OPENCODE_MODEL   default: github-copilot/claude-haiku-4.5        (SSOT)
 #   AICAP_CODEX_MODEL      default: (unset — gpt-5-mini errors on ChatGPT auth) (SSOT)
@@ -227,6 +227,16 @@ _aiagent_invoke() {
       _aicap_spinner_stop
       return $rc
       ;;
+    agyc)
+      # Antigravity CLI one-shot. Reached via the collision-free `agyc` symlink
+      # (the IDE squats bare `agy`). No `--model` flag — model is account/config-side.
+      printf '%s\n' "agyc (antigravity)" >&2
+      _aicap_spinner_start "agyc…"
+      agyc -p "$prompt"
+      rc=$?
+      _aicap_spinner_stop
+      return $rc
+      ;;
     http)
       # OpenAI-compatible chat-completions over curl. Covers OpenRouter (with
       # API key) and local Ollama (no auth) with the same code path. Never
@@ -279,7 +289,7 @@ _aiagent_invoke() {
       fi
       printf '%s\n' "$reply"
       ;;
-    *) printf '%s\n' "aifix: unknown agent '$agent' (supported: opencode, claude, codex, cursor-agent, http)" >&2; return 1 ;;
+    *) printf '%s\n' "aifix: unknown agent '$agent' (supported: opencode, claude, codex, agyc, cursor-agent, http)" >&2; return 1 ;;
   esac
 }
 
@@ -324,7 +334,7 @@ $block"
 _ai_print_help() {
   local name="$1" usage="$2"
   printf '%s\n' "usage: $name $usage"
-  printf '%s\n' "  -a AGENT   claude | opencode | codex | cursor-agent | http (default: auto-detect)"
+  printf '%s\n' "  -a AGENT   claude | opencode | codex | agyc | cursor-agent | http (default: auto-detect)"
   printf '%s\n' "  -p PROMPT  override default prompt"
   printf '%s\n' "  --raw      disable prettify (glow/bat), print raw agent reply"
   printf '%s\n' "  --no-meta  suppress the stderr metadata line"
@@ -376,7 +386,7 @@ _ai_capture_dispatch() {
       agent="$AICAP_AGENT"
     else
       agent=$(_aiagent_autodetect) || {
-        printf '%s\n' "$name: no coding-agent CLI found on PATH (tried: opencode, claude, codex, cursor-agent)" >&2
+        printf '%s\n' "$name: no coding-agent CLI found on PATH (tried: opencode, claude, codex, agyc, cursor-agent)" >&2
         printf '%s\n' "$name: hint — set AICAP_AGENT=http to use OpenRouter / Ollama directly" >&2
         return 1
       }

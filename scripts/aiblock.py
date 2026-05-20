@@ -135,6 +135,7 @@ AGENT_CONFIG = {
     "opencode":     {"base": ["opencode", "run", *_with_model("-m", AICAP_OPENCODE_MODEL)]},
     "claude":       {"base": ["claude", "-p", *_with_model("--model", AICAP_CLAUDE_MODEL)]},
     "codex":        {"base": ["codex", "exec", *_with_model("-m", AICAP_CODEX_MODEL)]},
+    "agyc":         {"base": ["agyc", "-p"]},  # Antigravity CLI — collision-free symlink, no --model flag
     "cursor-agent": {"base": ["cursor-agent", "-p", *_with_model("--model", AICAP_CURSOR_MODEL)]},
     "http":         {"base": []},  # opt-in only; no PATH probe
 }
@@ -286,6 +287,7 @@ def _model_for(agent: str) -> str:
         "claude": AICAP_CLAUDE_MODEL or "(default)",
         "opencode": AICAP_OPENCODE_MODEL or "(default)",
         "codex": AICAP_CODEX_MODEL or "(default)",
+        "agyc": "(account)",
         "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
         "http": AICAP_HTTP_MODEL,
     }[agent]

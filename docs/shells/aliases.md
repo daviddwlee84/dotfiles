@@ -694,7 +694,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## AI Capture
 
-> One-shot pipeline: capture a past block (via `cpblock N`) and pass it to a coding-agent CLI (claude / opencode / codex / cursor-agent) in non-interactive / advisory mode. Agent auto-detected in the order listed; override with `-a AGENT`. Prompt override via `-p PROMPT`. Agent reply goes to stdout (pipe-friendly: `aifix | tee /tmp/advice.md`), status line to stderr.
+> One-shot pipeline: capture a past block (via `cpblock N`) and pass it to a coding-agent CLI (opencode / claude / codex / agyc / cursor-agent) in non-interactive / advisory mode. Agent auto-detected in `$AICAP_AGENT_PRIORITY` order; override with `-a AGENT`. Prompt override via `-p PROMPT`. Agent reply goes to stdout (pipe-friendly: `aifix | tee /tmp/advice.md`), status line to stderr.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
@@ -709,7 +709,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ## AI Run
 
-> Quick "run one prompt through a coding agent" wrappers — fresh prompt, streams the reply straight back. Mnemonic mirrors the agent-session tags in `dot_config/television/cable/agent-sessions.toml` (`[oc]`/`[cc]`/`[cx]`/`[cu]`), so muscle memory carries between `tv agent-sessions` (browse old) and these (start new). Extra flags pass through to the underlying CLI: `ccr -c 'continue'` → `claude -p --model haiku -c 'continue'` resumes the last session. Differs from [AI Capture](#ai-capture) which is capture-and-diagnose, not arbitrary-prompt.
+> Quick "run one prompt through a coding agent" wrappers — fresh prompt, streams the reply straight back. Mnemonic mirrors the agent-session tags in `dot_config/television/cable/agent-sessions.toml` (`[oc]`/`[cc]`/`[cx]`/`[cu]`/`[ag]`), so muscle memory carries between `tv agent-sessions` (browse old) and these (start new). Extra flags pass through to the underlying CLI: `ccr -c 'continue'` → `claude -p --model haiku -c 'continue'` resumes the last session. Differs from [AI Capture](#ai-capture) which is capture-and-diagnose, not arbitrary-prompt.
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
@@ -717,6 +717,8 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `ccr [claude flags] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `claude -p --model $AICAP_CLAUDE_MODEL "<prompt>"` — agent tag `[cc]` |
 | `cxr [codex flags] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `codex exec -m $AICAP_CODEX_MODEL "<prompt>"` — agent tag `[cx]` |
 | `cur [cursor-agent flags] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `cursor-agent -p --model $AICAP_CURSOR_MODEL "<prompt>"` — agent tag `[cu]` |
+| `agr [agy flags] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `agyc -p "<prompt>"` — Antigravity CLI; agent tag `[ag]`. `agyc` is a collision-free symlink → `~/.local/bin/agy` (the IDE squats bare `agy`); no `--model` flag (model is account-side) |
+| `antigravity-cli` / `agy-ide` | alias | `dot_config/shell/05_ai_run.sh` | `antigravity-cli` → the Antigravity CLI (`agyc`); `agy-ide` → the Antigravity IDE editor launcher (defined only where the IDE is installed) |
 | `olr <prompt>` | function | `dot_config/shell/05_ai_run.sh` | `ollama run $AICAP_OLLAMA_MODEL "<prompt>"` — shell-only sugar (not an AICAP agent; flag pass-through disabled because ollama puts model positionally) |
 | `air [-a AGENT] [-m MODEL] [--] <prompt>` | function | `dot_config/shell/05_ai_run.sh` | Auto-detect via `$AICAP_AGENT_PRIORITY` (or honor `$AICAP_AGENT` / `-a`), dispatch to one of the wrappers above. `-m MODEL` overrides `AICAP_<AGENT>_MODEL` for this call only (subshell-scoped). `-a http` reaches the OpenAI-compat path (OpenRouter / local Ollama). `air -h` prints current env snapshot |
 

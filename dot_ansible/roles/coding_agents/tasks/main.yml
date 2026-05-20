@@ -304,6 +304,61 @@
   changed_when: true
   ignore_errors: true
 
+# === Antigravity CLI ===
+# Google's agentic terminal CLI (replaces Gemini CLI for consumer tiers, GA 2026-05-19).
+# Cross-platform installer self-detects darwin/linux + arch + musl; binary lands at
+# ~/.local/bin/agy.
+#
+# Two gotchas, both handled below:
+#   1. NAME COLLISION — the Antigravity *IDE* also ships an `agy` (a VS Code-fork editor
+#      launcher, no agent). To give the AICAP stack an unambiguous handle we create a
+#      collision-free `agyc` symlink and key autodetect on that (see
+#      dot_config/shell/04_ai_agents.sh). `agyc -p "<prompt>"` is the one-shot form.
+#   2. SHELL MUTATION — the upstream installer's final `agy install` step APPENDS to PATH
+#      and PURGES aliases in shell profiles. PATH is chezmoi-managed and ~/.local/bin is
+#      already on PATH, so we rewrite that handoff to run with --skip-path --skip-aliases
+#      (binary-only install, no profile writes). Install-only per repo invariant.
+
+- name: Check if Antigravity CLI is installed
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/agy"
+  register: agy_bin
+  changed_when: false
+
+- name: Install Antigravity CLI binary (skip installer shell-profile mutation)
+  when: not agy_bin.stat.exists
+  ansible.builtin.shell: |
+    set -euo pipefail
+    tmp="$(mktemp)"
+    curl -fsSL https://antigravity.google/cli/install.sh -o "$tmp"
+    # Neutralize the `agy install` handoff (it edits shell profiles): rewrite both
+    # invocations to pass --skip-path --skip-aliases so no profile is touched.
+    sed -i.bak 's#"$BINARY_PATH" install#"$BINARY_PATH" install --skip-path --skip-aliases#g' "$tmp"
+    bash "$tmp"
+    rm -f "$tmp" "$tmp.bak"
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/agy"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  failed_when: false
+  register: agy_install_result
+
+- name: Re-check Antigravity CLI binary after install
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/agy"
+  register: agy_bin_post
+  changed_when: false
+
+- name: Ensure collision-free agyc symlink for the Antigravity CLI
+  when: agy_bin_post.stat.exists
+  ansible.builtin.file:
+    src: "{{ ansible_facts['env']['HOME'] }}/.local/bin/agy"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/agyc"
+    state: link
+    force: true
+  failed_when: false
+
 # === RTK ===
 
 - name: Check if RTK is installed (macOS)

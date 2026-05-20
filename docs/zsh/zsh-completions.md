@@ -124,7 +124,7 @@ These tools inject completions as part of broader shell integration. Most live i
 
 ### D. No completion support
 
-`claude`, `gemini`, `btop`, `lazygit` -- no generation command available.
+`claude`, `gemini`, `agy`/`agyc` (Antigravity CLI), `btop`, `lazygit` -- no generation command available.
 
 ### E. Python tools via `shtab` / `tyro` / `click` / `argcomplete`
 

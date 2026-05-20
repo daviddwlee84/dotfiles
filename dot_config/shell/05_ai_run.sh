@@ -4,6 +4,7 @@
 #   ccr "prompt"      → claude -p        (agent tag [cc])
 #   cxr "prompt"      → codex exec       (agent tag [cx])
 #   cur "prompt"      → cursor-agent -p  (agent tag [cu])
+#   agr "prompt"      → agyc -p          (Antigravity CLI; agent tag [ag])
 #   olr "prompt"      → ollama run       (shell-only sugar — see note below)
 #   air "prompt"      → autodetect via $AICAP_AGENT_PRIORITY, -a / -m overrides
 #
@@ -80,6 +81,25 @@ cur() {
   cursor-agent -p "${model_args[@]}" "$@"
 }
 
+# Antigravity CLI one-shot. `agyc` is a collision-free symlink → ~/.local/bin/agy
+# (the Antigravity IDE squats the bare `agy`/`antigravity` names — the symlink is
+# created by the ansible coding_agents role). No model arg: the CLI has no --model
+# flag (model is account/config-side). Pass-through: `agr -c 'continue'` works.
+agr() {
+  if [ $# -eq 0 ]; then
+    printf '%s\n' "usage: agr [agy flags] <prompt>" >&2
+    return 1
+  fi
+  agyc -p "$@"
+}
+
+# Convenience aliases for the two Antigravity binaries (Google ships both as `agy`).
+# `agyc` itself is a real symlink on PATH (ansible) so autodetect/which work; these
+# are interactive sugar. The IDE alias is guarded so it stays harmless where the IDE
+# isn't installed (e.g. Linux servers).
+alias antigravity-cli='agyc'
+[ -x "$HOME/.antigravity/antigravity/bin/agy" ] && alias agy-ide="$HOME/.antigravity/antigravity/bin/agy"
+
 # `ollama run MODEL [PROMPT]` puts the model positionally before the
 # prompt, so pass-through would land user flags AFTER the model and
 # break parsing. Treat "$@" as the prompt only. Advanced ollama flags
@@ -106,7 +126,7 @@ air() {
         printf '%s\n' \
           "usage: air [-a AGENT] [-m MODEL] [--] <prompt> [agent flags…]" \
           "" \
-          "  -a AGENT   opencode | claude | codex | cursor-agent | ollama | http" \
+          "  -a AGENT   opencode | claude | codex | agyc | cursor-agent | ollama | http" \
           "             (default: \$AICAP_AGENT, else auto-detect via \$AICAP_AGENT_PRIORITY)" \
           "  -m MODEL   override AICAP_<AGENT>_MODEL for this call only" \
           "  --         end of air flags; everything after forwards to the agent CLI" \
@@ -149,6 +169,7 @@ air() {
     claude|cc)       ( [ -n "$model_override" ] && AICAP_CLAUDE_MODEL="$model_override";   ccr "${prompt_args[@]}" ) ;;
     codex|cx)        ( [ -n "$model_override" ] && AICAP_CODEX_MODEL="$model_override";    cxr "${prompt_args[@]}" ) ;;
     cursor-agent|cu) ( [ -n "$model_override" ] && AICAP_CURSOR_MODEL="$model_override";   cur "${prompt_args[@]}" ) ;;
+    agyc|agy|ag)     ( agr "${prompt_args[@]}" ) ;;  # no model flag; -m override ignored
     ollama|ol)       ( [ -n "$model_override" ] && AICAP_OLLAMA_MODEL="$model_override";   olr "${prompt_args[@]}" ) ;;
     http)
       # `_aiagent_invoke` is fine here: curl returns the full JSON in one
@@ -159,7 +180,7 @@ air() {
         _aiagent_invoke http "${prompt_args[*]}" )
       ;;
     *)
-      printf '%s\n' "air: unknown agent '$agent' (supported: opencode|oc, claude|cc, codex|cx, cursor-agent|cu, ollama|ol, http)" >&2
+      printf '%s\n' "air: unknown agent '$agent' (supported: opencode|oc, claude|cc, codex|cx, cursor-agent|cu, agyc|ag, ollama|ol, http)" >&2
       return 1
       ;;
   esac

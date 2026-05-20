@@ -30,7 +30,12 @@ _AICAP_AGENT_CONFIG_SOURCED=1
 # Detection priority (space-separated, left = preferred). opencode-first per
 # the 2026-05-12 benchmark — ~2-3x faster than alternatives for one-shot
 # multi-session prompts. Override globally: `export AICAP_AGENT_PRIORITY=…`.
-: "${AICAP_AGENT_PRIORITY:=opencode claude codex cursor-agent}"
+#
+# `agyc` = Antigravity CLI (`agy -p`) reached via a collision-free `agyc` symlink
+# (the Antigravity IDE squats the bare `agy`/`antigravity` names — see the ansible
+# coding_agents role). It has NO `--model` flag (model is account/config-side), so
+# there is intentionally no AICAP_AGYC_MODEL pin below.
+: "${AICAP_AGENT_PRIORITY:=opencode claude codex agyc cursor-agent}"
 
 # Per-agent lightweight model pins. Empty value → omit -m/--model at the
 # call site so the agent CLI uses its OWN default. That's the robustness

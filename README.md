@@ -136,7 +136,7 @@ During `chezmoi init`, you'll be prompted for optional installs:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, RTK, td, sidecar, specify-cli, etc. |
+| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, Antigravity CLI (`agy`), RTK, td, sidecar, specify-cli, etc. |
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
 | `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |

@@ -65,8 +65,9 @@ from rich.text import Text
 
 # ---------------------------------------------------------------------------
 # SSOT loader — same regex as tmux-session-summary.py / aiblock.py.
-# CLAUDE.md AI agent autodetect row treats this script as the THIRD Python
-# consumer of the AICAP_* SSOT; when adding a new agent there, update all three.
+# CLAUDE.md AI agent autodetect row treats this script as one of FOUR Python
+# consumers of the AICAP_* SSOT (with tmux-session-summary.py, aiblock.py, and
+# scripts/fleet/exec.py); when adding a new agent there, update all four.
 # ---------------------------------------------------------------------------
 _SSOT_PATH_CANDIDATES = (
     "~/.config/shell/04_ai_agents.sh",
@@ -123,6 +124,7 @@ AGENT_CONFIG = {
     "opencode":     {"base": ["opencode", "run", *_with_model("-m", AICAP_OPENCODE_MODEL)]},
     "claude":       {"base": ["claude", "-p", *_with_model("--model", AICAP_CLAUDE_MODEL)]},
     "codex":        {"base": ["codex", "exec", *_with_model("-m", AICAP_CODEX_MODEL)]},
+    "agyc":         {"base": ["agyc", "-p"]},  # Antigravity CLI — collision-free symlink, no --model flag
     "cursor-agent": {"base": ["cursor-agent", "-p", *_with_model("--model", AICAP_CURSOR_MODEL)]},
     "http":         {"base": []},
 }
@@ -670,6 +672,7 @@ def model_for(agent: str) -> str:
         "claude": AICAP_CLAUDE_MODEL or "(default)",
         "opencode": AICAP_OPENCODE_MODEL or "(default)",
         "codex": AICAP_CODEX_MODEL or "(default)",
+        "agyc": "(account)",
         "cursor-agent": AICAP_CURSOR_MODEL or "(default)",
         "http": AICAP_HTTP_MODEL,
     }.get(agent, "?")
