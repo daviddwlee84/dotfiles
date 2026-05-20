@@ -9426,7 +9426,7 @@ Conventions are clear: `.claude/plans/` (69 tracked) and `.specstory/history/` (
 
 I'll make **two focused commits** (Antigravity feature + the unrelated rust infra fix). Staging commit 1:
 
-_**Agent (claude-opus-4-7 2026-05-20 12:10:39Z)**_
+_**Agent (claude-opus-4-7 2026-05-20 12:10:40Z)**_
 
 <tool-use data-tool-type="shell" data-tool-name="Bash"><details>
 <summary>Tool use: **Bash**</summary>
@@ -9445,4 +9445,168 @@ git add \
   .specstory/history/2026-05-20_07-35-47Z-antigravity-cli-https-antigravity.md
 echo "=== staged for commit 1 ==="; git diff --cached --name-only
 ```
+
+```text
+=== staged for commit 1 ===
+.claude/plans/antigravity-cli-https-antigravity-googl-nifty-cray.md
+.specstory/history/2026-05-20_07-35-47Z-antigravity-cli-https-antigravity.md
+README.md
+TODO.md
+docs/shells/aliases.md
+docs/zsh/zsh-completions.md
+dot_ansible/roles/coding_agents/tasks/main.yml
+dot_config/shell/04_ai_agents.sh
+dot_config/shell/04_ai_capture.sh
+dot_config/shell/05_ai_run.sh
+dot_config/tmux/executable_tmux-session-summary.py
+dot_dotfiles/bin/executable_pqsum
+scripts/aiblock.py
+scripts/fleet/exec.py
+```
 </details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-20 12:10:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+```bash
+cd /Volumes/Data/caches/local-share-data/chezmoi
+git commit -m "$(cat <<'EOF'
+feat(coding-agents): add Antigravity CLI (agyc) to the AICAP agent stack
+
+Google's standalone Antigravity CLI (Go, GA 2026-05-19, one-shot `agy -p`)
+replaces Gemini CLI for consumer tiers. Wire it into the AICAP stack just
+ahead of cursor-agent.
+
+The bare `agy` name collides with the Antigravity IDE's editor-launcher
+symlink (which shadows the CLI at PATH position 1), so AICAP keys on a
+collision-free `agyc` symlink (~/.local/bin/agyc -> agy) created by the
+coding_agents role. No AICAP_AGYC_MODEL: the CLI has no --model flag (model
+is account/config-side).
+
+- ansible: binary-only install (install.sh patched to --skip-path
+  --skip-aliases so it never edits shell profiles) + agyc symlink
+- SSOT priority: opencode claude codex agyc cursor-agent
+- shell: agyc invoke case, agr run shortcut, antigravity-cli/agy-ide aliases
+- all four Python SSOT consumers: AGENT_CONFIG entry + model label
+- docs / README / TODO mirrors; the agy name collision is tracked as a
+  deliberately temporary workaround in TODO (P?)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1779279048-73158.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.....................................Passed
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1779279048-73158.
+[main 9bb701f] feat(coding-agents): add Antigravity CLI (agyc) to the AICAP agent stack
+ 14 files changed, 9732 insertions(+), 15 deletions(-)
+ create mode 100644 .claude/plans/antigravity-cli-https-antigravity-googl-nifty-cray.md
+ create mode 100644 .specstory/history/2026-05-20_07-35-47Z-antigravity-cli-https-antigravity.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-20 12:10:57Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-20 12:10:58Z)**_
+
+Commit 1 landed (all hooks passed, incl. redact + shellcheck). Now commit 2 — the rust hardening:
+
+_**Agent (claude-opus-4-7 2026-05-20 12:11:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+
+```bash
+cd /Volumes/Data/caches/local-share-data/chezmoi
+git add dot_ansible/roles/rust_cargo_tools/tasks/main.yml pitfalls/mise-rust-cargo-shim-dead.md
+git commit -m "$(cat <<'EOF'
+fix(ansible/rust): self-heal dead mise cargo shim + official-server fallback
+
+`cargo install` failed mid-apply with "cargo is not a valid shim" after
+~/.cargo/bin was wiped: mise's rust backend (rustup) symlinks
+installs/rust/<ver> -> ~/.cargo/bin, so the dir lingered full of dead
+symlinks and the `creates: .../installs/rust` guard skipped the reinstall
+forever. Compounded by the TUNA rustup mirror serving an obsolete manifest
+for rust@latest behind the GFW.
+
+- guard the mise rust install on ~/.cargo/bin/cargo (the real backing
+  binary) so a wiped toolchain re-triggers the install (consistent with the
+  cargo-tools + EL7 rustup-init tasks)
+- try the configured mirror first, then fall back to the official rustup
+  server (RUSTUP_DIST_SERVER=static.rust-lang.org) on failure — generalizes
+  the existing CentOS-7 workaround to all platforms; crates.io stays on the
+  user's ~/.cargo/config.toml mirror for build speed
+- pitfalls/mise-rust-cargo-shim-dead.md (symptom-grep-able)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+echo ""; echo "=== resulting log ==="; git log --oneline -3
+echo ""; echo "=== remaining unstaged (should be just the lock) ==="; git status --short
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1779279065-74851.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...............................................................Passed
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)...(no files to check)Skipped
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1779279065-74851.
+[main b03b60f] fix(ansible/rust): self-heal dead mise cargo shim + official-server fallback
+ 2 files changed, 106 insertions(+), 2 deletions(-)
+ create mode 100644 pitfalls/mise-rust-cargo-shim-dead.md
+
+=== resulting log ===
+b03b60f fix(ansible/rust): self-heal dead mise cargo shim + official-server fallback
+9bb701f feat(coding-agents): add Antigravity CLI (agyc) to the AICAP agent stack
+772caab perf(tv/rclone): cache previews + fast-fail flags — 17s→0.02s warm, 17s→3.6s cold on gdrive
+
+=== remaining unstaged (should be just the lock) ===
+ D .claude/scheduled_tasks.lock
+ M .specstory/history/2026-05-20_07-35-47Z-antigravity-cli-https-antigravity.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-7 2026-05-20 12:11:15Z)**_
+
+_**Agent (claude-opus-4-7 2026-05-20 12:11:18Z)**_
+
+Done — two clean commits on `main`, all pre-commit hooks (redact-agent-secrets, gitleaks, shellcheck, yaml) passed:
+
+- **`9bb701f`** `feat(coding-agents): add Antigravity CLI (agyc) to the AICAP agent stack` — the 12 feature files + plan + session transcript
+- **`b03b60f`** `fix(ansible/rust): self-heal dead mise cargo shim + official-server fallback` — rust role hardening + pitfall doc
+
+Two items intentionally left unstaged:
+- `D .claude/scheduled_tasks.lock` — unrelated runtime-lock churn (was already deleted at session start), not part of either change.
+- `M .specstory/history/…antigravity.md` — the transcript re-changed *after* I committed it because SpecStory keeps appending this ongoing conversation (including the commit step) to it. That's expected live logging; it'll get picked up in a later commit.
+
+I didn't push (you only asked to commit). Say the word if you want `git push`.
