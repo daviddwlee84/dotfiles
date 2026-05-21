@@ -110,3 +110,6 @@ Add new entries here as you create them. Keep alphabetical.
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
 | [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
 | [`tv-agent-sessions-richer-preview`](tv-agent-sessions-richer-preview.md) | Done (batch 1) / P? deferred (Cursor) | "tv agent-sessions richer preview + SpecStory linkage" |
+| [`mise-runtime-gating`](mise-runtime-gating.md) | P2 ready | "Gate mise runtimes (rust/dotnet/bun/ruby) + fix .NET-SDK contract bug" |
+| [`lean-bundle-init-ux`](lean-bundle-init-ux.md) | P? needs design | "Lean no-brainer bundles + init-CLI UX + decision-tree SSOT" |
+| [`cloud-vm-provision-combo`](cloud-vm-provision-combo.md) | P? idea | "Cloud-VM (az) provision + dotfiles bootstrap combo (fleet?)" |
