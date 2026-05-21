@@ -154,7 +154,15 @@ Swap-pane 會交換**內容**但保留**大小**。所以如果你有 75%/25% �
 | `M-[` / `M-]` | 跳到上一個 / 下一個命令 **output** 起始（需要 OSC 133）|
 | `q` 或 `Escape` | 退出複製模式 |
 
-在複製模式中拖曳滑鼠也會複製到剪貼簿。雙擊選取一個單字。
+### 複製模式中的滑鼠操作（vim 習慣：先選取，再複製）
+
+拖曳選取**只會反白**，不會複製（`MouseDragEnd1Pane` → `stop-selection`）。這符合「visual 選取後再 yank」的習慣，也避免每次不小心拖曳就蓋掉剪貼簿。要複製反白的選取內容，以下任一方式皆可：
+
+- 按 `y`（`copy-selection-and-cancel`），
+- 在選取上**按右鍵**（`MouseDown3Pane` 偵測到 `selection_present` 即複製），
+- 或直接**雙擊**一個單字（一個動作同時選取並複製）。
+
+每一條*複製*路徑都使用 `copy-selection-and-cancel`，所以複製後也會**退出**複製模式（不會卡在複製模式還得補按 `q`）。當**沒有**作用中選取時按右鍵，仍然會開啟窗格 context 選單（見下方）— 兩者是互斥狀態，因此不衝突。所有複製都遵循 `set-clipboard on` / OSC 52，所以即使這份 tmux 跑在遠端主機並透過 SSH 連入，複製內容仍能送達本機剪貼簿。
 
 命令邊界鍵 (`{` `}` `M-[` `M-]`) 倚賴 `dot_config/zsh/tools/02_shell_integration.zsh` 發送的 OSC 133 標記。在執行非 zsh shell，或透過 `DISABLE_OSC133=1` 退出的窗格中，這些是靜默的 no-ops。
 
@@ -169,6 +177,8 @@ Swap-pane 會交換**內容**但保留**大小**。所以如果你有 75%/25% �
 | 左側 session 區 (`MouseDown3StatusLeft`) | Next/prev/choose/rename session、move current window、new session/window、kill session / kill-and-exit / kill-all-sessions |
 
 我們的綁定使用 `display-menu -O`，所以滑鼠按鈕釋放後選單仍保持開啟 — 選一個項目或按 Escape 取消。（tmux 預設沒有 `-O`，按鈕釋放即關閉，這會讓選單無法使用。）
+
+> **`MouseDown3Pane` 會依情境多載。** 當你在複製模式中**有作用中選取**時按右鍵，會複製該選取（`copy-selection-and-cancel`）而不是開啟選單 — 見上方[複製模式中的滑鼠操作](#複製模式中的滑鼠操作vim-習慣先選取再複製)。窗格選單只在沒有作用中選取時出現，因此鍵盤等效鍵（`prefix + M-p`）與下方的選單本體重複規則皆不受影響。
 
 在 break / send / merge / join 後，狀態列會顯示訊息描述發生的事（例如 `Broke pane out to window 4 (zsh)`、`Merged into 1`）。
 

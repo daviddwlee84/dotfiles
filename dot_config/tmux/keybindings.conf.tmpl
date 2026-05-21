@@ -22,7 +22,9 @@ unbind-key -n MouseDown3Pane
 # at the bottom of this file; the body is duplicated by design per
 # pitfalls/tmux-submenu-flash-and-bottom-right.md).
 bind-key -n MouseDown3Pane \
-  if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" \
+  if-shell -F -t = "#{&&:#{?#{m/r:(copy|view)-mode,#{pane_mode}},1,0},#{selection_present}}" \
+    { send-keys -X copy-selection-and-cancel } \
+    { if-shell -F -t = "#{||:#{mouse_any_flag},#{&&:#{pane_in_mode},#{?#{m/r:(copy|view)-mode,#{pane_mode}},0,1}}}" \
     { select-pane -t = ; send-keys -M } \
     { display-menu -O -T "#[align=centre]#{pane_current_command} (pane #{pane_index})" -t = -x M -y M \
         "Horizontal Split" h { split-window -h -c "#{pane_current_path}" } \
@@ -47,7 +49,7 @@ bind-key -n MouseDown3Pane \
         "" \
         "Enter copy mode" "[" { copy-mode } \
         "Respawn"     R { respawn-pane -k } \
-        "Kill pane"   X { confirm-before -p "Kill pane? (y/n)" kill-pane } }
+        "Kill pane"   X { confirm-before -p "Kill pane? (y/n)" kill-pane } } }
 
 unbind-key -n MouseDown3Status
 # *** IF YOU EDIT THE MENU BODY, ALSO UPDATE dot_config/tmux/menu-window.sh ***
@@ -138,8 +140,12 @@ bind -T {{ $copyTable }} v send-keys -X begin-selection
 bind -T {{ $copyTable }} V send-keys -X select-line
 bind -T {{ $copyTable }} C-v send-keys -X rectangle-toggle
 bind -T {{ $copyTable }} y send-keys -X copy-selection-and-cancel
-bind -T {{ $copyTable }} MouseDragEnd1Pane send-keys -X copy-selection
-bind -T {{ $copyTable }} DoubleClick1Pane select-pane \; send-keys -X select-word
+# Mouse drag = select-only (vim visual feel): highlight without copying, then `y`
+# (copy-selection-and-cancel above) copies + exits. `stop-selection` keeps the
+# highlight alive without leaving copy-mode. See docs/tools/tmux/.
+bind -T {{ $copyTable }} MouseDragEnd1Pane send-keys -X stop-selection
+# Double-click selects the word AND copies + exits (one gesture).
+bind -T {{ $copyTable }} DoubleClick1Pane select-pane \; send-keys -X select-word \; send-keys -X copy-selection-and-cancel
 
 # -----------------------------------------------------------------------------
 # Command-boundary navigation in copy-mode (Warp-style).

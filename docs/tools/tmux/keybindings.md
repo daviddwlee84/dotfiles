@@ -149,7 +149,15 @@ Enter with `prefix + [`. Navigate with vim keys, then:
 | `M-[` / `M-]` | Jump to previous / next command **output** start (needs OSC 133) |
 | `q` or `Escape` | Exit copy mode |
 
-Mouse drag in copy mode also copies to clipboard. Double-click selects a word.
+### Mouse in copy mode (vim-idiomatic: select first, then copy)
+
+Drag-select **highlights only** — it does not copy (`MouseDragEnd1Pane` → `stop-selection`). This matches the visual-select-then-yank habit and avoids clobbering the clipboard on every stray drag. To copy the highlighted selection, do any of:
+
+- press `y` (`copy-selection-and-cancel`),
+- **right-click** the selection (`MouseDown3Pane` detects `selection_present` and copies),
+- or just **double-click** a word (selects *and* copies in one gesture).
+
+Every *copy* path uses `copy-selection-and-cancel`, so copying also **exits** copy mode (no being stranded in copy mode needing `q`). Right-clicking when there is **no** active selection still opens the pane context menu (see below) — the two are mutually exclusive states, so there is no conflict. All copies honor `set-clipboard on` / OSC 52, so they reach the local clipboard even when this tmux runs on a remote host over SSH.
 
 Command-boundary keys (`{` `}` `M-[` `M-]`) rely on OSC 133 markers emitted by `dot_config/zsh/tools/02_shell_integration.zsh`. In a pane running a non-zsh shell or one that opted out via `DISABLE_OSC133=1`, they are silent no-ops.
 
@@ -164,6 +172,8 @@ Right-click opens a context menu depending on where you click. Each menu also ha
 | Status-left (session name) | `MouseDown3StatusLeft` | `prefix + M-s` | Next/prev/choose/rename session, move current window, new session/window, kill session, **kill session & exit (clean)**, **kill all sessions (clean)** |
 
 Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
+
+> **`MouseDown3Pane` is overloaded by context.** When you right-click while a copy-mode **selection is active**, it copies that selection (`copy-selection-and-cancel`) instead of opening the menu — see [Mouse in copy mode](#mouse-in-copy-mode-vim-idiomatic-select-first-then-copy). The pane menu only appears when there is no active selection, so the keyboard equivalent (`prefix + M-p`) and the menu-body duplication rule below are unaffected.
 
 After break / send / merge / join, a status-bar message reports what happened (e.g. `Broke pane out to window 4 (zsh)`, `Merged into 1`).
 
