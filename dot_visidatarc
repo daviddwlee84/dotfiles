@@ -1,0 +1,64 @@
+# VisiData personal config (~/.visidatarc).
+# This is a Python file imported by VisiData at startup AFTER the bundled
+# loaders register themselves. Anything we set on `VisiData` / `vd` here
+# wins over the in-tree defaults.
+#
+# Managed by chezmoi (source: dot_visidatarc). Edits to ~/.visidatarc will
+# be reverted on next `chezmoi apply` — change the source instead.
+
+
+# -----------------------------------------------------------------------------
+# .feather → ArrowSheet (bypass the broken PandasSheet path)
+#
+# VisiData 3.3's bundled feather loader funnels through pandas:
+#   loaders/_pandas.py auto-registers open_feather → PandasSheet
+#     → pd.read_feather() → PandasSheet.reload() → dtype_to_type(Series)
+#     → np.issubdtype(StringDtype, np.integer)  ← ValueError
+#
+# This is unavoidable when the .feather schema metadata embeds
+# `numpy_type: string` (i.e. any DataFrame written from pandas ≥ 2.0 with
+# string columns). Downgrading the reader doesn't help — the dtype identity
+# is in the file, and pd.read_feather faithfully restores it.
+#
+# The fix is to route .feather through VisiData's *other* loader,
+# loaders/arrow.py (`ArrowSheet`), which is pure pyarrow and never touches
+# pandas. Feather v2 IS the Arrow IPC file format, so the same bytes load
+# cleanly there.
+#
+# Implementation note: `setattr(VisiData, 'open_feather', …)` direct
+# assignment, NOT the `@VisiData.api` decorator. The decorator routes
+# through the live `vd` instance and (on v3.3) does NOT shadow the class
+# attribute that loaders/_pandas.py installs at import time, so the
+# PandasSheet path still wins. Direct class-attribute assignment replaces
+# the attribute where the loader dispatch looks it up.
+#
+# Trade-off: ArrowSheet lacks PandasSheet's vectorized selectByRegex /
+# in-place sort / undoable addRow/delete_row paths. Everyday "open & look"
+# is identical; if you specifically want PandasSheet semantics on a
+# known-StringDtype-free file, fall back to `visidata -f feather <file>`.
+#
+# See pitfalls/visidata-feather-stringdtype-numpy-dtype.md for the full
+# investigation (the dtype-in-the-file diagnosis, the version matrix that
+# disproves the downgrade path, the upstream code references).
+# Drop this override once VisiData ships a fix.
+
+try:
+    from visidata import VisiData  # noqa: E402
+
+    from visidata.loaders.arrow import ArrowSheet  # noqa: E402
+
+    def open_feather(vd, p):  # noqa: ARG001 (signature matches VisiData's contract)
+        """Route .feather to ArrowSheet (pure pyarrow), bypassing PandasSheet.
+
+        Workaround for VisiData 3.3 + pandas StringDtype incompatibility.
+        See pitfalls/visidata-feather-stringdtype-numpy-dtype.md.
+        """
+        return ArrowSheet(p.base_stem, source=p)
+
+    VisiData.open_feather = open_feather
+except ImportError:
+    # pyarrow / visidata.loaders.arrow not available — leave the default
+    # PandasSheet path in place. The user will get the standard pandas
+    # error if they hit a StringDtype feather, which is no worse than not
+    # having this override at all.
+    pass

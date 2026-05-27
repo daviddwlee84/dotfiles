@@ -56,7 +56,12 @@ python_uv_tools:
     needs_modern_gcc: true  # explicit pandas + pyarrow deps
     with:
       - pandas
-      - pyarrow  # To be able open feather file
+      - pyarrow  # Required for parquet/feather/arrow loaders. Note: .feather
+                 # files whose schema metadata marks columns as pandas
+                 # StringDtype still crash the default PandasSheet path even
+                 # with pyarrow installed; the dot_visidatarc override
+                 # routes .feather → ArrowSheet to dodge that. See
+                 # pitfalls/visidata-feather-stringdtype-numpy-dtype.md.
   - name: copyparty
     binary: copyparty
   - name: trafilatura

@@ -6,6 +6,16 @@
 # --- Editor ----------------------------------------------------------------
 alias v="nvim"
 
+# --- VisiData --------------------------------------------------------------
+# Force the pure-pyarrow ArrowSheet loader for any file. Escape hatch for
+# .feather / .arrow files where the default PandasSheet path crashes on
+# pandas StringDtype columns (`ValueError: Could not convert ... to NumPy
+# dtype`). The companion dot_visidatarc reroutes .feather transparently, so
+# this alias is mostly for: (a) hosts where the rc file hasn't been deployed
+# yet, (b) explicit/debug invocation, (c) .arrow files VisiData mis-detects.
+# Full diagnosis: pitfalls/visidata-feather-stringdtype-numpy-dtype.md.
+alias vd-arrow='visidata -f arrow'
+
 # --- Keybindings cheatsheet ------------------------------------------------
 # Static viewer for ~/.config/docs/shells/keybindings.md (the same data
 # source that the `keys-picker` ZLE widget on Alt+/ reads). Useful on bash
