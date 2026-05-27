@@ -121,6 +121,14 @@ useDefault = true
   regex       = '''\bntn_[A-Za-z0-9]{40,}\b'''
   tags        = ["key", "notion", "auto"]
 
+[[rules]]
+  id          = "openrouter-api-key"
+  description = "OpenRouter API key (sk-or-v1-... 64 hex)"
+  # OpenRouter keys are sk-or-v1- prefix + 64 lowercase hex chars (73 chars total).
+  # GitHub Push Protection catches these; gitleaks default ruleset under-specifies.
+  regex       = '''\bsk-or-v1-[a-f0-9]{64}\b'''
+  tags        = ["key", "openrouter", "auto"]
+
 # ---------------------------------------------------------------------------
 # Clash / V2Ray / mihomo proxy config leaks. Example sources:
 #   - Pasted Clash YAML in SpecStory transcripts / coding-agent plan files
