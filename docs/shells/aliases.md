@@ -24,6 +24,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Task Queue](#task-queue)
 - [Networking](#networking)
 - [Log Viewers](#log-viewers)
+- [Data Viewers](#data-viewers)
 - [macOS apps](#macos-apps)
 - [Media / AV](#media--av)
 - [Clipboard History](#clipboard-history)
@@ -582,6 +583,17 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `logtail` | function | `dot_config/shell/29_log_tools.sh` | `tail -f` with live tailspin highlighting (prefers `tspin --follow`, falls back to `tail -F \| tspin --print`) |
 | `svclog` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service log follower — `journalctl -fu` on Linux, `tail -F StdoutPath` / `log stream --predicate` on macOS, piped through tailspin. Accepts `--user` for user-scope. Usage: `svclog [--user] <service>`. See [services.md](../tools/services.md) |
 | `svcstat` | function | `dot_config/shell/29_log_tools.sh` | Cross-platform service status — `systemctl status` on Linux, `launchctl print DOMAIN/LABEL` on macOS. Accepts `--user`. Usage: `svcstat [--user] <service>` |
+
+---
+
+## Data Viewers
+
+> VisiData ([`visidata.org`](https://www.visidata.org/)) — terminal spreadsheet for tabular data (CSV/TSV/JSON/parquet/feather/arrow/xlsx/sqlite). Defaults are already vim-flavored (h/j/k/l, gg/G, /? search). Companion rc at `~/.visidatarc` (chezmoi-managed via [`dot_visidatarc.tmpl`](../../dot_visidatarc.tmpl)) carries the feather/StringDtype workaround and `enableVimMode`-gated key rebinds — see [vim-mode.md → VisiData](../this_repo/vim-mode.md#visidata).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `vd-arrow` | alias | `dot_config/shell/10_aliases.sh` | `visidata -f arrow` — force the pure-pyarrow ArrowSheet loader. Escape hatch for `.feather` / `.arrow` files where the default PandasSheet path crashes on pandas `StringDtype` columns (`ValueError: Could not convert ... to NumPy dtype`). Full diagnosis: [pitfalls/visidata-feather-stringdtype-numpy-dtype.md](../../pitfalls/visidata-feather-stringdtype-numpy-dtype.md) |
+| `vd-ro` | alias | `dot_config/shell/10_aliases.sh` | `visidata --readonly` — open in read-only mode so a stray `g Ctrl+S` cannot overwrite the source. `--readonly` is an optalias for `--overwrite=n` (`visidata/modify.py:11`); in-memory edits are still allowed but the save path fails. Pair with `vd-arrow` (e.g. `visidata --readonly -f arrow file.feather`) when both protections are wanted. See [vim-mode.md → VisiData → Data safety](../this_repo/vim-mode.md#data-safety-read-only-mode) |
 
 ---
 

@@ -79,17 +79,48 @@ try:
     # -------------------------------------------------------------------------
     # enableVimMode customizations
     # -------------------------------------------------------------------------
-    # VisiData's defaults are already vim-flavored (h/j/k/l nav, gg/G top/bottom,
-    # /? search, n/N next/prev, q/Q quit).  The customize-docs canonical
-    # add-on for vim users is rebinding `i` from `addcol-incr`
-    # (features/incr.py:27) to `edit-cell`, matching vim's INSERT-mode mnemonic.
-    # `addcol-incr` remains reachable via the Alt+H command menu or
-    # `Space addcol-incr<Enter>`.  Also `e` (the historical edit-cell binding)
-    # continues to work — this gate is purely additive on the keystroke `i`.
+    # VisiData's defaults are already vim-flavored: h/j/k/l navigation, gg/G
+    # for top/bottom row, gh/gl for go-leftmost/go-rightmost column (mirrors
+    # the gg/G row-nav convention), /? search, n/N next/prev match, q/Q quit.
+    # This block ADDS strict-vim parity for line-internal navigation chars
+    # (0 / $ / _ / ^) and INSERT-mode mnemonic (i) on top of the defaults.
+    #
     # Per https://www.visidata.org/docs/customize/#example-bind-i-to-edit-cell-globally
     from visidata import TableSheet  # noqa: E402
+
+    # --- INSERT mnemonic ----------------------------------------------------
+    # `i` -> edit-cell (additive — `e` keeps working as the historical bind).
+    # Displaces `addcol-incr` (features/incr.py:27).  Still reachable via the
+    # Alt+H command menu or `Space addcol-incr<Enter>`; the gi / zi / gzi
+    # set-incr family is unaffected.
     TableSheet.unbindkey('i')
     TableSheet.bindkey('i', 'edit-cell')
+
+    # --- Column navigation (vim line-internal chars) ------------------------
+    # `0` was unbound by default — free slot, zero trade-off.
+    # `$` / `_` / `^` displace useful single-letter commands; we relocate
+    # them to mnemonic 2-char slots in the same block so they're not lost.
+    #
+    #   key  | new action       | displaced from   | relocated to
+    #   -----+------------------+------------------+--------------
+    #    0   | go-leftmost      | (was unbound)    | -
+    #    $   | go-rightmost     | type-currency    | z$  (extends $)
+    #    _   | go-leftmost      | resize-col-max   | zw  (z + Width)
+    #    ^   | go-leftmost      | rename-col       | zN  (z + Name)
+    #
+    # `gh` / `gl` (VisiData defaults) remain bound to go-leftmost/go-rightmost
+    # and provide a non-overloaded fallback.
+    TableSheet.bindkey('0', 'go-leftmost')
+    TableSheet.unbindkey('$'); TableSheet.bindkey('$', 'go-rightmost')
+    TableSheet.unbindkey('_'); TableSheet.bindkey('_', 'go-leftmost')
+    TableSheet.unbindkey('^'); TableSheet.bindkey('^', 'go-leftmost')
+
+    # Relocate displaced commands to mnemonic 2-char slots.  These slots
+    # are verified free (no clash with VisiData's existing z*/g* families
+    # like z_ = resize-col-input, z^ = rename-col-selected, etc.).
+    TableSheet.bindkey('z$', 'type-currency')
+    TableSheet.bindkey('zw', 'resize-col-max')
+    TableSheet.bindkey('zN', 'rename-col')
 {{- end }}
 except ImportError:
     # pyarrow / visidata.loaders.arrow not available — leave the default

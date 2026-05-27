@@ -16,6 +16,21 @@ alias v="nvim"
 # Full diagnosis: pitfalls/visidata-feather-stringdtype-numpy-dtype.md.
 alias vd-arrow='visidata -f arrow'
 
+# Open VisiData in read-only mode — safe for inspecting "raw data" files
+# you don't want to accidentally overwrite. Implementation note:
+# `--readonly` is an optalias for `--overwrite=n` (visidata/modify.py:11),
+# which causes `confirmOverwrite()` to `fail('overwrite disabled')` instead
+# of saving. In-memory edits in the sheet are still ALLOWED (the deferred
+# add/mod/delete tracking still works for prototyping), but you cannot
+# `Ctrl+S` or `g Ctrl+S` them back to the source file. Useful when:
+#  - inspecting .feather / .parquet inputs from upstream pipelines
+#  - opening logs / CSVs received from colleagues
+#  - any time you want belt-and-suspenders over VisiData's built-in
+#    "never auto-save" guarantee
+# (VisiData NEVER auto-saves regardless; this just blocks the save path
+# even if your finger slips on g Ctrl+S.)
+alias vd-ro='visidata --readonly'
+
 # --- Keybindings cheatsheet ------------------------------------------------
 # Static viewer for ~/.config/docs/shells/keybindings.md (the same data
 # source that the `keys-picker` ZLE widget on Alt+/ reads). Useful on bash

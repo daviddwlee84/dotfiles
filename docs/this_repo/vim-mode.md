@@ -39,7 +39,7 @@ is wired into this dotfiles repo, gated by a single chezmoi prompt
 | marimo `[keymap] preset` (`create_marimo.toml`) | `vim` | `default` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
 | btop `vim_keys` (`create_btop.conf`) | `True` | `False` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
 | superfile `hotkeys.toml` (`dot_config/superfile/`) | yazi-parity vim preset (`j`/`k` nav, `y`/`x`/`p`/`d` file ops, `h` parent, `l`/Enter open, `q` quit, `a` create, `r` rename, `v` panel mode, `?` help) — adapted from upstream `vimHotkeys.toml` with `q`/`esc` quit, `h`/`←`/`backspace` parent, `right`/`l` confirm, `v` panel-mode kept | upstream default preset (`ctrl+c`/`ctrl+x`/`ctrl+v` file ops, single-letter focus keys `m`/`p`/`s`) |
-| VisiData `~/.visidatarc` (`dot_visidatarc.tmpl`) | `TableSheet.unbindkey('i')` + `bindkey('i', 'edit-cell')` (vim `i` for INSERT-mode-mnemonic cell edit, additive — `e` still works) | no rebind (default `e` for edit-cell, `i` stays bound to `addcol-incr`) |
+| VisiData `~/.visidatarc` (`dot_visidatarc.tmpl`) | INSERT mnemonic: `i` → `edit-cell` (additive — `e` still works); column nav: `0` / `$` / `_` / `^` → `go-leftmost` / `go-rightmost` (mirrors vim line-internal chars); displaced commands relocated to `z$` (type-currency), `zw` (resize-col-max), `zN` (rename-col) | no rebind — `i` stays bound to `addcol-incr`; `$` / `_` / `^` keep their VisiData defaults (`type-currency`, `resize-col-max`, `rename-col`); `gh`/`gl` remain the canonical column-jump keystrokes |
 | Neovim (`dot_config/nvim/`) | unchanged | **unchanged** (out of scope by design) |
 | VSCode / Cursor / Antigravity vim extension | not managed | **not managed** (out of scope) |
 | Codex / OpenCode / Cursor-CLI vim mode | not managed | **not managed** (out of scope) |
@@ -343,44 +343,116 @@ Both preset bodies in the template avoid these.
 `src/superfile_config/hotkeys.toml` + `vimHotkeys.toml` when
 bumping.
 
-#### VisiData — `i` → `edit-cell` (single rebind)
+#### VisiData
 
 **File**: [`dot_visidatarc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_visidatarc.tmpl).
 
 VisiData is **already heavily vim-flavored by default** — `h/j/k/l`
-navigation, `gg`/`G` jumps, `/`/`?` search, `n`/`N` next/prev,
-`q`/`Q` quit are all bound out of the box. The one canonical vim
-ergonomic addition (from VisiData's own
-[customize docs](https://www.visidata.org/docs/customize/#example-bind-i-to-edit-cell-globally))
-is to rebind `i` from `addcol-incr` to `edit-cell` so vim users get
-their INSERT-mode mnemonic on cell editing.
+row/column navigation, `gg`/`G` top/bottom row, `gh`/`gl` leftmost/rightmost
+column, `/`/`?` search, `n`/`N` next/prev match, `q`/`Q` quit are all
+bound out of the box. The `enableVimMode` block in `dot_visidatarc.tmpl`
+adds strict-vim parity on top of those defaults: the INSERT-mode mnemonic
+(`i`) and the line-internal navigation characters (`0` / `$` / `_` / `^`).
 
-Templated on `enableVimMode`:
+##### INSERT mnemonic: `i` → `edit-cell`
+
+From VisiData's own
+[customize docs](https://www.visidata.org/docs/customize/#example-bind-i-to-edit-cell-globally) — rebind `i` from `addcol-incr` to `edit-cell`
+so vim users get their INSERT-mode mnemonic on cell editing:
 
 ```python
-{{- if .enableVimMode }}
-from visidata import TableSheet
 TableSheet.unbindkey('i')
 TableSheet.bindkey('i', 'edit-cell')
-{{- end }}
 ```
 
 **Trade-off**: `addcol-incr` (add column with incrementing values,
 [`visidata/features/incr.py:27`](https://github.com/saulpw/visidata/blob/main/visidata/features/incr.py))
-loses its single-letter shortcut on the `TableSheet` table. Still
-reachable via `Space addcol-incr<Enter>` or the `Alt+H` command menu.
-The related `gi` / `zi` / `gzi` family (set-incr / step-incr variants)
-is unaffected. Also `e` (the historical edit-cell binding) continues
+loses its single-letter shortcut. Still reachable via
+`Space addcol-incr<Enter>` or the `Alt+H` command menu. The related
+`gi` / `zi` / `gzi` family (set-incr / step-incr variants) is
+unaffected. Also `e` (the historical edit-cell binding) continues
 to work — the gate is purely additive on the keystroke `i`.
 
-**Why no broader gating?** Other potential customizations
+##### Column navigation: full vim parity (`0` / `$` / `_` / `^`)
+
+VisiData's defaults provide `gh` / `gl` for go-leftmost / go-rightmost
+column (mirroring the `gg` / `G` row convention). The vim
+line-internal navigation characters are not bound by default and three
+of them displace useful single-letter VisiData commands. This block
+binds all four and relocates the displaced commands to mnemonic 2-char
+slots so nothing is lost:
+
+| key | new action     | displaced from     | relocated to | mnemonic        |
+| --- | -------------- | ------------------ | ------------ | --------------- |
+| `0` | `go-leftmost`  | *(was unbound)*    | —            | vim default     |
+| `$` | `go-rightmost` | `type-currency`    | `z$`         | `z` + same char |
+| `_` | `go-leftmost`  | `resize-col-max`   | `zw`         | `z` + Width     |
+| `^` | `go-leftmost`  | `rename-col`       | `zN`         | `z` + Name      |
+
+The `z` prefix is VisiData's idiomatic "related-variant" namespace
+(e.g. `_` = resize-col-max, `z_` = resize-col-input,
+`gz_` = resize-cols-input) — picking 2-char slots from the same
+namespace keeps the relocations discoverable. Verified-free pre-flight:
+`vd.bindkeys._get('z$' | 'zw' | 'zN', obj=TableSheet)` returns `None`
+before this rc loads, so we do not clobber any existing default. The
+related families (`g_` = resize-cols-max, `g^` = rename-cols-row,
+`z^` = rename-col-selected, `z$` etc.) keep their original bindings.
+
+**Trade-off (be aware)**: `_` and `^` both alias to `go-leftmost` —
+this differs from strict vim where `_` is "first non-blank of line"
+and `^` is "first non-blank visible". VisiData has no analogue to
+"first non-blank cell", so all three (`0` / `_` / `^`) collapse onto
+the same semantic of "leftmost visible column". `gh` is the
+non-overloaded canonical alias.
+
+##### Data safety: read-only mode
+
+For raw-data files you don't want to accidentally overwrite, open
+VisiData via the `vd-ro` alias
+([`dot_config/shell/10_aliases.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/shell/10_aliases.sh)):
+
+```bash
+vd-ro data.feather       # = visidata --readonly data.feather
+vd-ro -f arrow data.csv  # combine with the ArrowSheet escape hatch
+```
+
+VisiData's protection model has three layers worth understanding:
+
+1. **No auto-save, ever.** Edits live in deferred buffers
+   (`Sheet._deferredAdds` / `_deferredMods` / `_deferredDels`,
+   [`visidata/modify.py:37-47`](https://github.com/saulpw/visidata/blob/main/visidata/modify.py))
+   until you explicitly press `Ctrl+S` (save-as, prompts for path) or
+   `g Ctrl+S` (save back to source, prompts to confirm overwrite).
+   Closing with `q` / `Q` / `gq` discards the buffer.
+2. **`--readonly` blocks the save path.** `vd.optalias('readonly', 'overwrite', 'n')`
+   ([`visidata/modify.py:11`](https://github.com/saulpw/visidata/blob/main/visidata/modify.py))
+   makes `--readonly` an alias for `--overwrite=n`, which causes
+   `confirmOverwrite()` to `fail('overwrite disabled')` on any save
+   attempt. In-memory edits remain ALLOWED (so the deferred-tracking
+   colorizers still work for prototyping), but the change cannot be
+   written back. This is the layer `vd-ro` adds.
+3. **Pair with `vd-arrow` for `.feather`.** `visidata --readonly -f arrow file.feather`
+   gets you both the StringDtype workaround (pure-pyarrow loader,
+   see [pitfall page](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/visidata-feather-stringdtype-numpy-dtype.md))
+   and the save-block. The `dot_visidatarc.tmpl` reroute makes
+   `-f arrow` redundant for `.feather` on managed hosts, but it's a
+   useful belt for ad-hoc machines or `.arrow` inputs.
+
+When NOT to use `--readonly`: when you actively want to script-edit
+and write back (e.g. cleanup workflow). The shell alias is opt-in;
+plain `visidata` still works as upstream.
+
+##### Why no broader gating?
+
+Other potential customizations
 (`vd.editCellBindings['Enter'] = acceptThenFunc('go-down', 'edit-cell')`
 for spreadsheet-style save-and-down, etc.) stray into spreadsheet
 ergonomics rather than vim semantics. Add them per-user via
 `~/.visidatarc` or a `$VD_DIR/plugins/` Python file if wanted, or open
 a TODO to gate behind a different flag.
 
-**Why `~/.visidatarc` and not `~/.config/visidata/config.py`?**
+##### Why `~/.visidatarc` and not `~/.config/visidata/config.py`?
+
 VisiData v2.9+ supports an XDG-located `config.py`, but
 `appdirs.user_config_dir('visidata')` on Darwin returns
 `~/Library/Preferences/visidata` (NOT `~/.config/visidata`), so a
@@ -442,9 +514,12 @@ After `chezmoi apply`:
   `vim_keys = False`.
 - `~/.config/superfile/hotkeys.toml` has upstream default body
   (Ctrl-prefixed file ops, `j`/`k`/`l`/`h` as secondary nav).
-- `~/.visidatarc` has no `TableSheet.bindkey('i', 'edit-cell')` block
-  → pressing `i` inside VisiData triggers `addcol-incr` (default).
-  Use `e` to edit a cell.
+- `~/.visidatarc` has no `enableVimMode` block at all → all VisiData
+  default keystrokes stay intact: `i` = `addcol-incr`, `$` =
+  `type-currency`, `_` = `resize-col-max`, `^` = `rename-col`, `0`
+  unbound. Use `e` to edit a cell and `gh`/`gl` for column-jump.
+  The relocations (`z$`, `zw`, `zN`) are NOT installed either —
+  they only exist as aliases when the vim block runs.
 
 **Behavioral consequences inside tmux**:
 
