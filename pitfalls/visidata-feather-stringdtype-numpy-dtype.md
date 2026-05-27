@@ -24,9 +24,9 @@ pandas metadata** marks any column as `StringDtype`, which any DataFrame
 written from pandas ≥ 2.0 + pyarrow ≥ 7 will do by default for `string` cols.
 v3.3 (latest on PyPI as of 2026-05) is unfixed; no relevant issue/PR upstream.
 **Status**: workaround documented (this repo ships
-[`dot_visidatarc`](../dot_visidatarc) — auto-routes `.feather` to the pure-arrow
-loader; explicit per-invocation escape hatch via the `vd-arrow` alias in
-[`dot_config/shell/10_aliases.sh`](../dot_config/shell/10_aliases.sh)).
+[`dot_visidatarc.tmpl`](../dot_visidatarc.tmpl) — auto-routes `.feather` to the
+pure-arrow loader; explicit per-invocation escape hatch via the `vd-arrow`
+alias in [`dot_config/shell/10_aliases.sh`](../dot_config/shell/10_aliases.sh)).
 
 ## Symptom
 
@@ -126,10 +126,10 @@ visidata -f arrow foo.feather   # works
 
 This repo wires that up two ways:
 
-1. **Permanent**, transparent — [`dot_visidatarc`](../dot_visidatarc) monkey-patches
-   `VisiData.open_feather` to return `ArrowSheet` instead of `PandasSheet`.
-   After `chezmoi apply`, plain `visidata foo.feather` "just works" without
-   the `-f arrow` flag. Verified locally:
+1. **Permanent**, transparent — [`dot_visidatarc.tmpl`](../dot_visidatarc.tmpl)
+   monkey-patches `VisiData.open_feather` to return `ArrowSheet` instead of
+   `PandasSheet`. After `chezmoi apply`, plain `visidata foo.feather` "just
+   works" without the `-f arrow` flag. Verified locally:
    ```text
    opening foo.feather as feather
    class: ArrowSheet  rows: 443  cols: 14   ← was: ValueError + 0 rows
@@ -181,9 +181,43 @@ So we leave the `with: [pandas, pyarrow]` pins alone — they're correct for
 "open csv/json/parquet" and for the producer side. The fix is the
 `open_feather` reroute, not a version pin.
 
+## XDG path / macOS appdirs caveat (why we still ship at `~/.visidatarc`)
+
+VisiData v2.9+ supports an XDG-located config
+([`visidata/settings.py:_get_config_file`](https://github.com/saulpw/visidata/blob/main/visidata/settings.py)):
+
+- If `appdirs.user_config_dir('visidata') / 'config.py'` exists, it wins.
+- Else fall back to `~/.visidatarc`.
+
+The catch: `appdirs.user_config_dir` is OS-aware
+([`visidata/vendor/appdirs.py:196-203`](https://github.com/saulpw/visidata/blob/main/visidata/vendor/appdirs.py)):
+
+| OS    | Resolved path                                               |
+| ----- | ----------------------------------------------------------- |
+| Linux | `$XDG_CONFIG_HOME/visidata` or `~/.config/visidata`         |
+| macOS | `~/Library/Preferences/visidata` (NOT `~/.config/visidata`) |
+
+So a Linux-style migration to `dot_config/visidata/config.py.tmpl` would
+silently fail on macOS (chezmoi would deploy `~/.config/visidata/config.py`
+but VisiData would only look at `~/Library/Preferences/visidata/config.py`).
+The intended upstream override is the `VD_CONFIG` / `VD_DIR` env vars read
+by [`loadConfigAndPlugins`](https://github.com/saulpw/visidata/blob/main/visidata/settings.py)
+at `settings.py:440-441` — set both to a
+`${XDG_CONFIG_HOME:-$HOME/.config}/visidata` path and macOS + Linux pick up
+the same file. Future migration is tracked as `[P3/S]` in
+[`TODO.md`](../TODO.md). Current location stays at `~/.visidatarc` because
+the feather override works there today on every platform without touching
+shell exports.
+
+> **Heads up — `VD_DIR` does more than config.** It also relocates VisiData's
+> plugins / macros / urlcache / input-history. If you want mutable state to
+> stay in a "data" location (e.g. `~/.local/share/visidata`) while only the
+> config moves, export only `VD_CONFIG` and leave `VD_DIR` at the platform
+> default. The migration TODO calls this out.
+
 ## Prevention
 
-- Keep `dot_visidatarc` deployed (default on every managed machine).
+- Keep `dot_visidatarc.tmpl` deployed (default on every managed machine).
 - When writing new pipelines that emit `.feather` AND will be inspected by
   VisiData on a host without this override (e.g. a colleague's machine),
   prefer one of:
@@ -209,7 +243,8 @@ So we leave the `with: [pandas, pyarrow]` pins alone — they're correct for
   so grepping `visidata pitfalls/` finds both.
 - `dot_ansible/roles/python_uv_tools/defaults/main.yml` — the install spec
   that pulls in `pandas + pyarrow` so VisiData has the feather loader at all
-  (just doesn't make it work without `dot_visidatarc`).
-- [`dot_visidatarc`](../dot_visidatarc) — the deployed fix.
+  (just doesn't make it work without `dot_visidatarc.tmpl`).
+- [`dot_visidatarc.tmpl`](../dot_visidatarc.tmpl) — the deployed fix
+  (templated for the `enableVimMode` gate; target path still `~/.visidatarc`).
 - [`dot_config/shell/10_aliases.sh`](../dot_config/shell/10_aliases.sh) — the
   `vd-arrow` escape-hatch alias.

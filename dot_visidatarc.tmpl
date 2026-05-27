@@ -1,11 +1,29 @@
 # VisiData personal config (~/.visidatarc).
-# This is a Python file imported by VisiData at startup AFTER the bundled
-# loaders register themselves. Anything we set on `VisiData` / `vd` here
-# wins over the in-tree defaults.
+# Loaded by VisiData at startup AFTER bundled loaders register themselves.
+# Anything we set on `VisiData` / `vd` here wins over in-tree defaults.
 #
-# Managed by chezmoi (source: dot_visidatarc). Edits to ~/.visidatarc will
-# be reverted on next `chezmoi apply` — change the source instead.
-
+# Managed by chezmoi (source: dot_visidatarc.tmpl). Edits to ~/.visidatarc
+# will be reverted on next `chezmoi apply` — change the source instead.
+#
+# -----------------------------------------------------------------------------
+# Why ~/.visidatarc and not $XDG_CONFIG_HOME/visidata/config.py?
+# -----------------------------------------------------------------------------
+# VisiData v2.9+ supports an XDG-located config.py
+# (visidata/settings.py:_get_config_file): if
+# appdirs.user_config_dir('visidata')/config.py exists, it wins over
+# ~/.visidatarc.  But appdirs on Darwin returns
+# ~/Library/Preferences/visidata (NOT ~/.config/visidata) — so a naive
+# Linux-style migration would silently fail on macOS.
+#
+# Path forward (tracked in TODO.md "[P3/S] Migrate VisiData rc to XDG path"):
+#   export VD_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/visidata/config.py"
+#   export VD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/visidata"
+# in dot_config/shell/00_exports.sh.tmpl, then move source to
+# dot_config/visidata/config.py.tmpl.  VD_CONFIG/VD_DIR are read by
+# loadConfigAndPlugins() at settings.py:440-441 and are the intended
+# upstream-supported override.  Full caveat:
+# pitfalls/visidata-feather-stringdtype-numpy-dtype.md → "XDG path / macOS
+# appdirs caveat".
 
 # -----------------------------------------------------------------------------
 # .feather → ArrowSheet (bypass the broken PandasSheet path)
@@ -56,6 +74,23 @@ try:
         return ArrowSheet(p.base_stem, source=p)
 
     VisiData.open_feather = open_feather
+{{- if .enableVimMode }}
+
+    # -------------------------------------------------------------------------
+    # enableVimMode customizations
+    # -------------------------------------------------------------------------
+    # VisiData's defaults are already vim-flavored (h/j/k/l nav, gg/G top/bottom,
+    # /? search, n/N next/prev, q/Q quit).  The customize-docs canonical
+    # add-on for vim users is rebinding `i` from `addcol-incr`
+    # (features/incr.py:27) to `edit-cell`, matching vim's INSERT-mode mnemonic.
+    # `addcol-incr` remains reachable via the Alt+H command menu or
+    # `Space addcol-incr<Enter>`.  Also `e` (the historical edit-cell binding)
+    # continues to work — this gate is purely additive on the keystroke `i`.
+    # Per https://www.visidata.org/docs/customize/#example-bind-i-to-edit-cell-globally
+    from visidata import TableSheet  # noqa: E402
+    TableSheet.unbindkey('i')
+    TableSheet.bindkey('i', 'edit-cell')
+{{- end }}
 except ImportError:
     # pyarrow / visidata.loaders.arrow not available — leave the default
     # PandasSheet path in place. The user will get the standard pandas

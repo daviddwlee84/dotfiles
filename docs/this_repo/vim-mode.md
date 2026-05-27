@@ -39,6 +39,7 @@ is wired into this dotfiles repo, gated by a single chezmoi prompt
 | marimo `[keymap] preset` (`create_marimo.toml`) | `vim` | `default` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
 | btop `vim_keys` (`create_btop.conf`) | `True` | `False` (FRESH installs only — `create_` prefix means the file is seeded once and never re-touched) |
 | superfile `hotkeys.toml` (`dot_config/superfile/`) | yazi-parity vim preset (`j`/`k` nav, `y`/`x`/`p`/`d` file ops, `h` parent, `l`/Enter open, `q` quit, `a` create, `r` rename, `v` panel mode, `?` help) — adapted from upstream `vimHotkeys.toml` with `q`/`esc` quit, `h`/`←`/`backspace` parent, `right`/`l` confirm, `v` panel-mode kept | upstream default preset (`ctrl+c`/`ctrl+x`/`ctrl+v` file ops, single-letter focus keys `m`/`p`/`s`) |
+| VisiData `~/.visidatarc` (`dot_visidatarc.tmpl`) | `TableSheet.unbindkey('i')` + `bindkey('i', 'edit-cell')` (vim `i` for INSERT-mode-mnemonic cell edit, additive — `e` still works) | no rebind (default `e` for edit-cell, `i` stays bound to `addcol-incr`) |
 | Neovim (`dot_config/nvim/`) | unchanged | **unchanged** (out of scope by design) |
 | VSCode / Cursor / Antigravity vim extension | not managed | **not managed** (out of scope) |
 | Codex / OpenCode / Cursor-CLI vim mode | not managed | **not managed** (out of scope) |
@@ -342,6 +343,54 @@ Both preset bodies in the template avoid these.
 `src/superfile_config/hotkeys.toml` + `vimHotkeys.toml` when
 bumping.
 
+#### VisiData — `i` → `edit-cell` (single rebind)
+
+**File**: [`dot_visidatarc.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_visidatarc.tmpl).
+
+VisiData is **already heavily vim-flavored by default** — `h/j/k/l`
+navigation, `gg`/`G` jumps, `/`/`?` search, `n`/`N` next/prev,
+`q`/`Q` quit are all bound out of the box. The one canonical vim
+ergonomic addition (from VisiData's own
+[customize docs](https://www.visidata.org/docs/customize/#example-bind-i-to-edit-cell-globally))
+is to rebind `i` from `addcol-incr` to `edit-cell` so vim users get
+their INSERT-mode mnemonic on cell editing.
+
+Templated on `enableVimMode`:
+
+```python
+{{- if .enableVimMode }}
+from visidata import TableSheet
+TableSheet.unbindkey('i')
+TableSheet.bindkey('i', 'edit-cell')
+{{- end }}
+```
+
+**Trade-off**: `addcol-incr` (add column with incrementing values,
+[`visidata/features/incr.py:27`](https://github.com/saulpw/visidata/blob/main/visidata/features/incr.py))
+loses its single-letter shortcut on the `TableSheet` table. Still
+reachable via `Space addcol-incr<Enter>` or the `Alt+H` command menu.
+The related `gi` / `zi` / `gzi` family (set-incr / step-incr variants)
+is unaffected. Also `e` (the historical edit-cell binding) continues
+to work — the gate is purely additive on the keystroke `i`.
+
+**Why no broader gating?** Other potential customizations
+(`vd.editCellBindings['Enter'] = acceptThenFunc('go-down', 'edit-cell')`
+for spreadsheet-style save-and-down, etc.) stray into spreadsheet
+ergonomics rather than vim semantics. Add them per-user via
+`~/.visidatarc` or a `$VD_DIR/plugins/` Python file if wanted, or open
+a TODO to gate behind a different flag.
+
+**Why `~/.visidatarc` and not `~/.config/visidata/config.py`?**
+VisiData v2.9+ supports an XDG-located `config.py`, but
+`appdirs.user_config_dir('visidata')` on Darwin returns
+`~/Library/Preferences/visidata` (NOT `~/.config/visidata`), so a
+Linux-style migration would silently fail on macOS. Migrating
+correctly requires exporting `VD_CONFIG` / `VD_DIR` in
+`dot_config/shell/00_exports.sh.tmpl`. Tracked as `[P3/S]` in
+[`TODO.md`](https://github.com/daviddwlee84/dotfiles/blob/main/TODO.md);
+full caveat:
+[`pitfalls/visidata-feather-stringdtype-numpy-dtype.md → XDG path note`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/visidata-feather-stringdtype-numpy-dtype.md).
+
 #### Other tools
 
 Spot-checked and confirmed **not** managed (or no vim keys present):
@@ -393,6 +442,9 @@ After `chezmoi apply`:
   `vim_keys = False`.
 - `~/.config/superfile/hotkeys.toml` has upstream default body
   (Ctrl-prefixed file ops, `j`/`k`/`l`/`h` as secondary nav).
+- `~/.visidatarc` has no `TableSheet.bindkey('i', 'edit-cell')` block
+  → pressing `i` inside VisiData triggers `addcol-incr` (default).
+  Use `e` to edit a cell.
 
 **Behavioral consequences inside tmux**:
 
