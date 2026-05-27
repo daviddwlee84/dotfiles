@@ -12441,7 +12441,10 @@ _**Agent (claude-opus-4-7 2026-04-27 01:47:53Z)**_
 
 **Input:**
 
-- args: `Single feature commit covering Phases C+D of the aisuggest implementation (NL→shell ghost-text widget bound to Alt+;).
+- args:
+
+```
+Single feature commit covering Phases C+D of the aisuggest implementation (NL→shell ghost-text widget bound to Alt+;).
 
 Files to include:
 - New feature: `dot_config/zsh/tools/05_aisuggest.zsh`, `docs/tools/zsh-inline-ai.md`
@@ -12455,7 +12458,9 @@ Commit message should mention:
 - aisuggest: prompt-time NL→shell ghost-text widget (Alt+; default trigger)
 - Reuses _aiagent_invoke / _aiagent_autodetect from 04_ai_capture.zsh
 - Inspired by kylesnowschwartz/zsh-ai-cmd, written from scratch (no vendored code)
-- Surgical fix for zsh-autosuggestions wrapping all widgets (ZSH_AUTOSUGGEST_IGNORE_WIDGETS), see pitfall doc`
+- Surgical fix for zsh-autosuggestions wrapping all widgets (ZSH_AUTOSUGGEST_IGNORE_WIDGETS), see pitfall doc
+```
+
 - skill: `agent-history-hygiene`
 
 </details></tool-use>
