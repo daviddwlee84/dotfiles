@@ -2,7 +2,7 @@
 
 # 2026-03-11 02:04:55Z
 
-<!-- cursoride Session 2f586d6b-355d-4c77-9f3b-8b6ab8b1c755 (2026-03-11 02:04:55Z) -->
+<!-- Cursor IDE Session 2f586d6b-355d-4c77-9f3b-8b6ab8b1c755 (2026-03-11 02:04:55Z) -->
 
 _**User**_
 
