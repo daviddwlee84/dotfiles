@@ -1,0 +1,13 @@
+# ~/.config/reyee/config.toml
+#
+# Copy this file to config.toml and fill in the password, or let `reyee`
+# prompt you on first run and save it automatically (chmod 600).
+#
+# Lookup order: --flag → config.toml → env var → interactive prompt.
+# Env overrides: REYEE_HOST, REYEE_PASS
+#
+# This router is password-only (no username). It is a Ruijie / Reyee eWeb
+# device; see docs/tools/reyee.md.
+
+host = "192.168.110.1"
+password = ""

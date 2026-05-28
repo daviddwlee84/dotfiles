@@ -1,0 +1,504 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "tyro>=0.8",
+#   "httpx>=0.27",
+#   "rich>=13",
+#   "platformdirs>=4",
+#   "cryptography>=42",
+# ]
+# ///
+"""CLI for inspecting (and minimally adjusting) Ruijie / Reyee "Shinya" routers.
+
+Tested against a Ruijie Reyee home router on the LuCI-based eWeb firmware
+(theme `eweb-ehr`, ReyeeOS 1.275.2406 / EW_3.0), CN region. Sister tools:
+`mi-router` (Xiaomi) and `sms` (Huawei HiLink).
+
+Auth — eWeb's GibberishAES handshake, which is OpenSSL AES-256-CBC in the
+"Salted__" format (`-md md5`). The login password is AES-encrypted under a
+static passphrase `k`, itself AES-decrypted from a blob baked into the login
+page under the passphrase "eweb". The ciphertext is POSTed to
+`/cgi-bin/luci/api/auth` as `{"method":"login","params":{...}}`; the response
+returns `{sid, token, sn}` and sets cookie `<sn>=<sid>`.
+
+API — everything else is a JSON-RPC POST to
+`/cgi-bin/luci/api/cmd?auth=<sid>` (cookie also carries the session) with a
+body of `{"method":"<bin>.<verb>","params":{"module":"<m>",...}}`, where the
+web UI derives `<bin>` from a CLI tool name:
+  dev_config -> devConfig   ac_config -> acConfig   dev_sta -> devSta
+e.g. reading the radios is `dev_config get -m radio`, i.e.
+`{"method":"devConfig.get","params":{"module":"radio"}}`.
+
+Read-only by design, with ONE deliberate exception: `set-channel`, a guarded
+writer (its siblings are pure inspectors). Changing a radio channel briefly
+drops every Wi-Fi client, so the writer dry-runs unless given --yes.
+
+Credentials resolve from (first non-empty wins):
+  1. --host / --password flags
+  2. ~/.config/reyee/config.toml
+  3. REYEE_HOST / REYEE_PASS env vars
+  4. interactive getpass prompt (TTY only; offers to save to config)
+"""
+from __future__ import annotations
+
+import base64
+import copy
+import getpass
+import hashlib
+import json
+import os
+import sys
+import time
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Union
+
+import httpx
+import tyro
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from platformdirs import user_config_dir
+from rich.console import Console
+from rich.table import Table
+
+APP = "reyee"
+DEFAULT_HOST = "192.168.110.1"
+
+# The login page derives the real password passphrase `k` by AES-decrypting
+# this blob under the passphrase "eweb" (GibberishAES.dec(BLOB, "eweb")).
+K_BLOB = "U2FsdGVkX19ecPYL/ZAlcSG29wb6ivqD9YjEM30k1h8="
+K_PASSPHRASE = "eweb"
+
+# 5 GHz channels that require DFS (radar detection) in most regions — flagged
+# by `set-channel` because they are a poor choice for latency-sensitive use.
+DFS_5G = set(range(52, 65)) | set(range(100, 145))
+
+CONFIG_DIR = Path(user_config_dir(APP))
+CONFIG_FILE = CONFIG_DIR / "config.toml"
+
+console = Console()
+err = Console(stderr=True, style="red")
+
+
+def die(msg: str, code: int = 1) -> None:
+    err.print(f"reyee: {msg}")
+    sys.exit(code)
+
+
+# ----------------------------------------------------------------- crypto
+# GibberishAES == OpenSSL "Salted__" AES-256-CBC with MD5 key derivation
+# (EVP_BytesToKey). Implemented inline — no openssl-CLI dependency.
+
+
+def _evp_kdf(password: bytes, salt: bytes, key_len: int = 32, iv_len: int = 16):
+    d = b""
+    prev = b""
+    while len(d) < key_len + iv_len:
+        prev = hashlib.md5(prev + password + salt).digest()
+        d += prev
+    return d[:key_len], d[key_len : key_len + iv_len]
+
+
+def aes_dec(b64: str, passphrase: str) -> str:
+    raw = base64.b64decode(b64)
+    if raw[:8] != b"Salted__":
+        raise ValueError("not an OpenSSL salted payload")
+    salt, ct = raw[8:16], raw[16:]
+    key, iv = _evp_kdf(passphrase.encode(), salt)
+    dec = Cipher(algorithms.AES(key), modes.CBC(iv)).decryptor()
+    pt = dec.update(ct) + dec.finalize()
+    return pt[: -pt[-1]].decode("utf-8")
+
+
+def aes_enc(text: str, passphrase: str) -> str:
+    salt = os.urandom(8)
+    key, iv = _evp_kdf(passphrase.encode(), salt)
+    data = text.encode("utf-8")
+    pad = 16 - (len(data) % 16)
+    data += bytes([pad]) * pad
+    enc = Cipher(algorithms.AES(key), modes.CBC(iv)).encryptor()
+    ct = enc.update(data) + enc.finalize()
+    return base64.b64encode(b"Salted__" + salt + ct).decode("ascii")
+
+
+# ----------------------------------------------------------------- config
+
+
+def load_config() -> dict[str, Any]:
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return tomllib.loads(CONFIG_FILE.read_text())
+    except Exception as e:
+        die(f"bad config {CONFIG_FILE}: {e}", 2)
+
+
+def resolve_creds(cli_host: str | None, cli_pw: str | None) -> dict[str, str]:
+    cfg = load_config()
+    host = cli_host or cfg.get("host") or os.environ.get("REYEE_HOST") or DEFAULT_HOST
+    pw = cli_pw or cfg.get("password") or os.environ.get("REYEE_PASS") or ""
+    if not pw:
+        pw = prompt_and_save(host)
+    return {"host": host, "password": pw}
+
+
+def prompt_and_save(host: str) -> str:
+    if not sys.stdin.isatty():
+        die(f"no password; pass --password, set REYEE_PASS, or populate {CONFIG_FILE}", 2)
+    err.print(f"[yellow]reyee:[/yellow] router http://{host}/ — password not configured")
+    pw = getpass.getpass("Router password: ")
+    if not pw:
+        die("empty password", 2)
+    ans = input(f"Save to {CONFIG_FILE} (chmod 600)? [Y/n] ").strip().lower()
+    if ans in ("", "y", "yes"):
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(f'host = "{host}"\npassword = "{pw}"\n')
+        CONFIG_FILE.chmod(0o600)
+        err.print(f"[green]reyee:[/green] saved {CONFIG_FILE}")
+    return pw
+
+
+# ----------------------------------------------------------------- client
+
+# CLI-tool name -> JSON-RPC method prefix, mirroring the web UI's _MAP.
+_BIN_METHOD = {"dev_config": "devConfig", "ac_config": "acConfig", "dev_sta": "devSta"}
+
+
+class Reyee:
+    def __init__(self, host: str, password: str, timeout: float = 8.0):
+        self.base = f"http://{host}"
+        self.password = password
+        self.client = httpx.Client(timeout=timeout, follow_redirects=False)
+        self.sid: str | None = None
+        self.token: str | None = None
+        self.sn: str | None = None
+
+    def login(self) -> None:
+        k = aes_dec(K_BLOB, K_PASSPHRASE)
+        payload = {
+            "method": "login",
+            "params": {
+                "password": aes_enc(self.password, k).replace("\n", ""),
+                "time": str(int(time.time())),
+                "encry": True,
+                "limit": False,
+                "setInit": False,
+            },
+        }
+        r = self.client.post(f"{self.base}/cgi-bin/luci/api/auth", json=payload)
+        r.raise_for_status()
+        body = r.json()
+        data = body.get("data") or {}
+        if body.get("result") == "fail" or not data.get("sid"):
+            raise RuntimeError(f"login failed (wrong password?): {body}")
+        self.sid = data["sid"]
+        self.token = data.get("token")
+        self.sn = data.get("sn")
+
+    def cmd(self, method: str, params: dict | None = None) -> Any:
+        """POST a JSON-RPC {method, params} to /api/cmd and return data, raising on error."""
+        if self.sid is None:
+            self.login()
+        url = f"{self.base}/cgi-bin/luci/api/cmd?auth={self.sid}"
+        r = self.client.post(url, json={"method": method, "params": params or {}})
+        r.raise_for_status()
+        body = r.json()
+        if body.get("error"):
+            raise RuntimeError(f"{method}: {body['error']}")
+        return body.get("data")
+
+    # convenience wrappers around the dev_config / ac_config / dev_sta tools.
+    # remote_ip targets a specific AP in the self-organizing network (the sub-
+    # router); omit it to act on the AP you're logged into.
+    def get(self, bin_: str, module: str, data: dict | None = None, remote_ip: str | None = None) -> Any:
+        params: dict[str, Any] = {"module": module}
+        if data is not None:
+            params["data"] = data
+        if remote_ip:
+            params["remoteIp"] = remote_ip
+        return self.cmd(f"{_BIN_METHOD[bin_]}.get", params)
+
+    def set(self, bin_: str, module: str, data: dict, remote_ip: str | None = None) -> Any:
+        params: dict[str, Any] = {"module": module, "data": data}
+        if remote_ip:
+            params["remoteIp"] = remote_ip
+        return self.cmd(f"{_BIN_METHOD[bin_]}.set", params)
+
+    # typed reads
+    def radios(self, remote_ip: str | None = None) -> list[dict]:
+        return (self.get("dev_config", "radio", remote_ip=remote_ip) or {}).get("radioList", [])
+
+    def wireless(self) -> dict:
+        return self.get("ac_config", "wireless") or {}
+
+    def clients(self) -> list[dict]:
+        return (self.get("dev_sta", "user_list") or {}).get("list", [])
+
+
+def _band_of_radio_index(idx: str) -> str:
+    return {"1": "2.4G", "2": "5G"}.get(str(idx), str(idx))
+
+
+# ----------------------------------------------------------------- subcommands
+
+
+@dataclass
+class Info:
+    """Show router identity + a one-line-per-radio summary."""
+
+
+@dataclass
+class Wifi:
+    """Show configured SSIDs (and the radios they ride on)."""
+
+    show_passwords: bool = False
+    """Print Wi-Fi passwords in cleartext (off by default)."""
+
+
+@dataclass
+class Radios:
+    """Show per-radio channel / TX power (the RF settings view)."""
+
+
+@dataclass
+class Clients:
+    """List connected client devices (band, channel, RSSI, rate)."""
+
+
+@dataclass
+class SetChannel:
+    """Set a radio's channel. GUARDED WRITER — briefly drops all Wi-Fi clients.
+
+    Dry-runs (prints the before/after payload, changes nothing) unless --yes.
+    Only the `channel` field is modified; every other radio field is preserved
+    verbatim from the current config (minimal diff). Pass `auto` to restore
+    automatic channel selection.
+
+    Examples:
+      reyee set-channel --band 5g --channel 36         # dry-run
+      reyee set-channel --band 5g --channel 36 --yes   # apply
+      reyee set-channel --band 5g --channel auto --yes
+    """
+
+    band: str
+    """Which radio: 2g / 2.4g / 5g."""
+    channel: str
+    """Channel number, or 'auto'."""
+    ap: str | None = None
+    """Target a specific AP in the mesh by IP (the sub-router), e.g. 192.168.110.91. Omit for the main router."""
+    yes: bool = False
+    """Actually apply (otherwise dry-run)."""
+
+
+@dataclass
+class Raw:
+    """POST a raw JSON-RPC method to /api/cmd and pretty-print the result.
+
+    Examples:
+      reyee raw devConfig.get --params '{"module":"radio"}'
+      reyee raw devSta.get   --params '{"module":"topology"}'
+    """
+
+    method: tyro.conf.Positional[str]
+    """JSON-RPC method, e.g. devConfig.get / acConfig.get / devSta.get."""
+    params: str = "{}"
+    """JSON object string for params."""
+
+
+@dataclass
+class LoginTest:
+    """Verify credentials and connectivity (no other output)."""
+
+
+Cmd = Union[Info, Wifi, Radios, Clients, SetChannel, Raw, LoginTest]
+
+
+# ------------------------------------------------------------------ renderers
+
+
+def show_info(r: Reyee) -> None:
+    radios = r.radios()
+    wl = r.wireless()
+    clients = r.clients()
+    t = Table(title="Router", show_header=False, box=None, pad_edge=False)
+    t.add_column(style="bold cyan")
+    t.add_column()
+    t.add_row("Host", r.base)
+    t.add_row("SN", r.sn or "?")
+    for rad in radios:
+        t.add_row(
+            _band_of_radio_index(rad.get("radioIndex", "?")),
+            f"channel={rad.get('channel', '?')}  txpower={rad.get('txpower', '?')}",
+        )
+    t.add_row("SSIDs", str(len(wl.get("ssidList", []))))
+    t.add_row("Clients", str(len(clients)))
+    console.print(t)
+
+
+def show_wifi(r: Reyee, show_passwords: bool) -> None:
+    wl = r.wireless()
+    t = Table(title="Wi-Fi SSIDs")
+    for col in ("ssid", "band", "enabled", "hidden", "encryption"):
+        t.add_column(col)
+    if show_passwords:
+        t.add_column("password", style="yellow")
+    for s in wl.get("ssidList", []):
+        row = [
+            s.get("ssidName", ""),
+            _band_of_radio_index(s.get("relatedRadio", "")),
+            "yes" if s.get("enable") == "true" else "no",
+            "yes" if s.get("ishidden") == "true" else "no",
+            s.get("encryptionMode", "?"),
+        ]
+        if show_passwords:
+            row.append(s.get("password", ""))
+        t.add_row(*row)
+    console.print(t)
+    if not show_passwords:
+        console.print("[dim](pass --show-passwords to reveal PSKs)[/dim]")
+
+
+def show_radios(r: Reyee) -> None:
+    t = Table(title="Radios")
+    for col in ("band", "radioIndex", "channel", "txpower", "hwmode"):
+        t.add_column(col)
+    for rad in r.radios():
+        t.add_row(
+            _band_of_radio_index(rad.get("radioIndex", "")),
+            str(rad.get("radioIndex", "?")),
+            str(rad.get("channel", "?")),
+            str(rad.get("txpower", "?")),
+            str(rad.get("hwmode", "-")),
+        )
+    console.print(t)
+
+
+def show_clients(r: Reyee) -> None:
+    t = Table(title="Clients")
+    for col in ("name", "ip", "mac", "band", "ch", "rssi", "rate", "ssid"):
+        t.add_column(col)
+    for c in r.clients():
+        t.add_row(
+            c.get("hostName") or c.get("name") or "?",
+            c.get("userIp", "?"),
+            c.get("mac", "?"),
+            c.get("band", "?"),
+            str(c.get("channel", "?")),
+            str(c.get("rssi", "?")),
+            c.get("rxrate", "?"),
+            c.get("ssid", "?"),
+        )
+    console.print(t)
+
+
+def _norm_band(band: str) -> str:
+    b = band.lower().replace("ghz", "").replace("g", "")
+    if b in ("2", "2.4"):
+        return "2.4G"
+    if b == "5":
+        return "5G"
+    die(f"unknown --band {band!r} (use 2g / 2.4g / 5g)", 2)
+
+
+def show_set_channel(r: Reyee, band: str, channel: str, ap: str | None, yes: bool) -> None:
+    target_type = _norm_band(band)
+    where = f"AP {ap}" if ap else "this AP"
+    radios = r.radios(remote_ip=ap)
+    if not radios:
+        die(f"could not read radio config for {where}")
+
+    target = next((x for x in radios if x.get("type") == target_type), None)
+    if target is None:
+        die(f"{where} has no {target_type} radio")
+
+    ch = channel.strip().lower()
+    if ch != "auto":
+        if not ch.isdigit():
+            die(f"--channel must be a number or 'auto', got {channel!r}", 2)
+        if target_type == "5G" and int(ch) in DFS_5G:
+            err.print(
+                f"[yellow]warning:[/yellow] channel {ch} is a DFS channel "
+                "(radar detection) — not ideal for latency-sensitive use."
+            )
+
+    cur = target.get("channel", "?")
+    if str(cur) == ch:
+        console.print(f"{where} {target_type} channel already {cur}; nothing to do.")
+        return
+
+    new_radios = copy.deepcopy(radios)
+    for rad in new_radios:
+        if rad.get("type") == target_type:
+            rad["channel"] = ch
+
+    console.print(f"[bold]{where}[/bold] {target_type} channel: [cyan]{cur}[/cyan] -> [green]{ch}[/green]")
+    if not yes:
+        console.print("[dim]dry-run (no change). Re-run with --yes to apply.[/dim]")
+        console.print("[dim]payload that WOULD be sent:[/dim]")
+        console.print_json(json.dumps({"module": "radio", "data": {"radioList": new_radios}}, ensure_ascii=False))
+        return
+
+    err.print(f"[yellow]applying to {where} — this briefly drops its Wi-Fi clients...[/yellow]")
+    r.set("dev_config", "radio", {"radioList": new_radios}, remote_ip=ap)
+    time.sleep(2)
+    after = next((x for x in r.radios(remote_ip=ap) if x.get("type") == target_type), {})
+    console.print(f"[green]done.[/green] {where} {target_type} channel is now {after.get('channel', '?')}.")
+
+
+def show_raw(r: Reyee, method: str, params: str) -> None:
+    try:
+        parsed = json.loads(params)
+    except json.JSONDecodeError as e:
+        die(f"--params is not valid JSON: {e}", 2)
+    console.print_json(json.dumps(r.cmd(method, parsed), ensure_ascii=False))
+
+
+def show_login_test(r: Reyee) -> None:
+    err.print(f"[green]ok:[/green] logged in to {r.base}  sn={r.sn}")
+
+
+# ------------------------------------------------------------------- entrypoint
+
+
+@dataclass
+class Args:
+    """CLI for Ruijie / Reyee eWeb routers."""
+
+    cmd: Cmd
+    host: str | None = None
+    """Router IP / hostname (overrides config + env)."""
+    password: str | None = None
+    """Admin password (overrides config + env; will prompt if missing)."""
+    timeout: float = 8.0
+    """HTTP timeout in seconds."""
+
+
+def main() -> None:
+    args = tyro.cli(Args, config=(tyro.conf.OmitSubcommandPrefixes,))
+    cmd = args.cmd
+    creds = resolve_creds(args.host, args.password)
+    r = Reyee(creds["host"], creds["password"], timeout=args.timeout)
+    try:
+        r.login()
+    except Exception as e:
+        die(f"login failed: {e}")
+
+    if isinstance(cmd, Info):
+        show_info(r)
+    elif isinstance(cmd, Wifi):
+        show_wifi(r, cmd.show_passwords)
+    elif isinstance(cmd, Radios):
+        show_radios(r)
+    elif isinstance(cmd, Clients):
+        show_clients(r)
+    elif isinstance(cmd, SetChannel):
+        show_set_channel(r, cmd.band, cmd.channel, cmd.ap, cmd.yes)
+    elif isinstance(cmd, Raw):
+        show_raw(r, cmd.method, cmd.params)
+    elif isinstance(cmd, LoginTest):
+        show_login_test(r)
+
+
+if __name__ == "__main__":
+    main()

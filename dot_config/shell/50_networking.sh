@@ -65,6 +65,17 @@ if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
   alias tv-lan='tv lan-devices'
 fi
 
+# --- Wi-Fi neighbor / channel scanner (feeds `tv wifi-scan`) ---
+if [[ -x "$HOME/.config/television/wifi-scan.sh" ]]; then
+  alias wifiscan="$HOME/.config/television/wifi-scan.sh scan"
+  alias tv-wifi='tv wifi-scan'
+fi
+
+# --- ping-monitor (record ping + flag latency spikes; see docs) ---
+if command -v ping-monitor &>/dev/null; then
+  alias pinggw='ping-monitor --gateway'   # spike-watch the default gateway
+fi
+
 # --- Proxy helpers (generic) ---
 # Portable proxy management: honor $LOCAL_PROXY_URL, else prefer an active
 # Clash config, else auto-probe common loopback ports (Clash 7890/7891,

@@ -171,6 +171,31 @@ function mi-router-update-completion {
 	fi
 }
 
+# --- reyee (tyro) completion regen ----------------------------------------
+# Force-regenerate the lazy-autoload completion file used by 48_reyee.sh
+# (sister to mi-router-update-completion above).
+function reyee-update-completion {
+	command -v reyee >/dev/null 2>&1 || {
+		echo "reyee-update-completion: reyee not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		local _tmp
+		_tmp=$(mktemp)
+		if reyee --tyro-write-completion zsh "$_tmp" >/dev/null 2>&1; then
+			mkdir -p "${HOME}/.zfunc"
+			{ echo "#compdef reyee"; tail -n +2 "$_tmp"; } >"${HOME}/.zfunc/_reyee" &&
+				echo "reyee completion cache updated (zsh: ~/.zfunc/_reyee)"
+		fi
+		rm -f "$_tmp"
+	elif [ -n "$BASH_VERSION" ]; then
+		local _bashdir="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
+		mkdir -p "$_bashdir" &&
+			reyee --tyro-write-completion bash "$_bashdir/reyee" >/dev/null 2>&1 &&
+			echo "reyee completion cache updated (bash: $_bashdir/reyee)"
+	fi
+}
+
 # --- Ghostty terminfo install on remote SSH host ---------------------------
 # Fixes character-rendering issues when SSH'ing into a fresh host from
 # Ghostty/cmux/tmux. Usage: ghostty-ssh-terminfo <ssh-host>

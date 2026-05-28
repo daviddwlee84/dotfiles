@@ -544,6 +544,9 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `portscan` | alias | `dot_config/shell/50_networking.sh` | Fast port scanner via rustscan *(requires rustscan)* |
 | `lanscan` | alias | `dot_config/shell/50_networking.sh` | Run full LAN device + port scan into `~/.cache/tv/` (feeds `tv lan-devices`) |
 | `tv-lan` | alias | `dot_config/shell/50_networking.sh` | Open the `lan-devices` Television channel |
+| `wifiscan` | alias | `dot_config/shell/50_networking.sh` | Scan nearby Wi-Fi networks into `~/.cache/tv/` (feeds `tv wifi-scan`) |
+| `tv-wifi` | alias | `dot_config/shell/50_networking.sh` | Open the `wifi-scan` Television channel |
+| `pinggw` | alias | `dot_config/shell/50_networking.sh` | `ping-monitor --gateway` — spike-watch the default gateway *(requires ping-monitor)* |
 
 ### Proxy helpers
 
@@ -756,6 +759,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `thefuck-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate cached thefuck alias (per-shell `${XDG_CACHE_HOME}/{zsh,bash}/thefuck_alias.*`); auto-invalidates on `thefuck` binary mtime change in `dot_config/shell/27_thefuck.sh` |
 | `try-update-completion` | function | `dot_config/zsh/10_aliases.zsh` | **zsh-only.** Regenerate cached try-cli init (`${XDG_CACHE_HOME}/zsh/try_init.zsh`); auto-invalidates on `ruby` binary mtime change in `dot_config/zsh/tools/32_try.zsh` |
 | `mi-router-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate lazy-autoload completion for `mi-router` via tyro `--tyro-write-completion` (zsh: `~/.zfunc/_mi-router`; bash: `${XDG_DATA_HOME}/bash-completion/completions/mi-router`); auto-invalidates on binary mtime change in `dot_config/shell/47_mi_router.sh`. See [docs/zsh/zsh-completions.md](../zsh/zsh-completions.md) Section F. |
+| `reyee-update-completion` | function | `dot_config/shell/10_aliases.sh` | Regenerate lazy-autoload completion for `reyee` via tyro `--tyro-write-completion` (zsh: `~/.zfunc/_reyee`; bash: `${XDG_DATA_HOME}/bash-completion/completions/reyee`); auto-invalidates on binary mtime change in `dot_config/shell/48_reyee.sh`. See [docs/zsh/zsh-completions.md](../zsh/zsh-completions.md) Section F. |
 | `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | Switch Homebrew mirror on-the-fly (GFW workaround): `brew-mirror {aliyun\|ustc\|bfsu\|tuna}`. Updates env vars + rewrites existing clone origins; no-arg prints current endpoints. Default baseline is Aliyun (set in `dot_config/shell/00_exports.sh.tmpl`) |
 | `conda` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | First call lazy-inits any of miniforge3 / miniconda3 / anaconda3 (autodetects `~/miniforge3` etc.) then re-execs with given args. Saves ~200ms shell startup vs eager init. |
 | `mamba` | function (lazy) | `dot_config/zsh/tools/04_conda_mamba.zsh` | Same lazy init as `conda` — picks up `etc/profile.d/mamba.sh` from full distro install. |
