@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for `ghget` in dot_config/zsh/tools/41_github.zsh.
+# Unit tests for `ghget` in dot_config/shell/41_github.sh.
 #
 # ghget parses GitHub tree URLs and downloads a subdirectory. The parsing path
 # is pure string manipulation in zsh — high silent-regression risk (wrong
@@ -8,7 +8,7 @@
 
 load "../test_helper.bash"
 
-GH_FILE="$REPO_ROOT/dot_config/zsh/tools/41_github.zsh"
+GH_FILE="$REPO_ROOT/dot_config/shell/41_github.sh"
 
 # Stub curl + tar that just echo the args they were called with into a log
 # file, so tests can assert on what URL curl was asked to fetch / what tar

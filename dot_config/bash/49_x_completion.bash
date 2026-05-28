@@ -10,13 +10,13 @@ _x_completion() {
     _init_completion || return
 
     if [ "$cword" -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "copy paste open help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "copy copy-file paste open help" -- "$cur") )
         return
     fi
 
     local sub="${words[1]}"
     case "$sub" in
-        copy)
+        copy|copy-file)
             case "$cur" in
                 -*) COMPREPLY=( $(compgen -W "--force --help" -- "$cur") ) ;;
                 *)  _filedir ;;

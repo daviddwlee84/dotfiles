@@ -5,6 +5,7 @@ usage() {
     printf '%s\n' \
         "Usage:" \
         "  x copy [--force] [FILE]" \
+        "  x copy-file [--force] PATH..." \
         "  x paste" \
         "  x open TARGET" \
         "  x help" \
@@ -12,6 +13,7 @@ usage() {
         "Examples:" \
         "  printf \"hello\" | x copy" \
         "  x copy ~/.ssh/id_ed25519.pub" \
+        "  x copy-file ~/Downloads/report.pdf" \
         "  x paste" \
         "  x open https://example.com"
 }
@@ -27,6 +29,10 @@ is_wsl() {
     [[ "$version" == *[Mm]icrosoft* || "$version" == *[Ww][Ss][Ll]* ]]
 }
 
+is_macos() {
+    [[ "$(uname -s)" == "Darwin" ]]
+}
+
 clipboard_backend_help() {
     printf '%s\n' \
         "x: no clipboard backend found." \
@@ -36,6 +42,16 @@ clipboard_backend_help() {
         "x:   - Linux X11: xclip or xsel" \
         "x:   - WSL: clip.exe / powershell.exe" \
         "x:   - SSH/headless: OSC 52 (needs a TTY and a terminal that supports it)" >&2
+}
+
+file_clipboard_backend_help() {
+    printf '%s\n' \
+        "x: no file clipboard backend found." \
+        "x: install/use one of:" \
+        "x:   - macOS: osascript (built-in)" \
+        "x:   - Linux Wayland: wl-clipboard (wl-copy)" \
+        "x:   - Linux X11: xclip" \
+        "x: file-object copy is not available over SSH/OSC 52; use 'x copy FILE' for contents or 'realpath FILE | x copy' for a path." >&2
 }
 
 # OSC 52 clipboard copy: ships stdin bytes through a terminal escape sequence.
@@ -51,8 +67,10 @@ osc52_copy() {
     [[ -n "$data" ]] || return 0
 
     if [[ -n "${TMUX:-}" ]]; then
+        # shellcheck disable=SC1003 # printf consumes the backslash escapes.
         printf '\033Ptmux;\033\033]52;c;%s\033\033\\\033\\' "$data" > /dev/tty
     else
+        # shellcheck disable=SC1003 # printf consumes the backslash escapes.
         printf '\033]52;c;%s\033\\' "$data" > /dev/tty
     fi
 }
@@ -104,6 +122,22 @@ is_sensitive_file() {
     return 1
 }
 
+file_uri_payload() {
+    command -v python3 >/dev/null 2>&1 || {
+        err "copy-file: python3 required to generate file:// URIs on Linux"
+        exit 1
+    }
+
+    python3 - "$@" <<'PY'
+import pathlib
+import sys
+
+print("copy")
+for raw in sys.argv[1:]:
+    print(pathlib.Path(raw).resolve(strict=True).as_uri())
+PY
+}
+
 copy_backend() {
     if is_wsl && command -v clip.exe >/dev/null 2>&1; then
         if clip.exe; then
@@ -151,6 +185,61 @@ copy_backend() {
     fi
 
     clipboard_backend_help
+    exit 1
+}
+
+copy_file_macos() {
+    command -v osascript >/dev/null 2>&1 || return 1
+
+    if osascript - "$@" <<'APPLESCRIPT'
+on run argv
+    set fileList to {}
+    repeat with p in argv
+        set end of fileList to (POSIX file p)
+    end repeat
+    set the clipboard to fileList
+end run
+APPLESCRIPT
+    then
+        return 0
+    fi
+
+    err "copy-file backend failed: osascript"
+    exit 1
+}
+
+copy_file_linux() {
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+        if file_uri_payload "$@" | wl-copy --type x-special/gnome-copied-files; then
+            return 0
+        fi
+        err "copy-file backend failed: wl-copy"
+        exit 1
+    fi
+
+    if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
+        if file_uri_payload "$@" | xclip -selection clipboard -target x-special/gnome-copied-files; then
+            return 0
+        fi
+        err "copy-file backend failed: xclip"
+        exit 1
+    fi
+
+    return 1
+}
+
+copy_file_backend() {
+    if is_macos; then
+        if copy_file_macos "$@"; then
+            return 0
+        fi
+    fi
+
+    if copy_file_linux "$@"; then
+        return 0
+    fi
+
+    file_clipboard_backend_help
     exit 1
 }
 
@@ -316,6 +405,69 @@ do_copy() {
     copy_backend
 }
 
+do_copy_file() {
+    local force=0
+    local path
+    local -a paths=()
+
+    while (($#)); do
+        case "$1" in
+            --force)
+                force=1
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                err "copy-file: unknown option: $1"
+                usage >&2
+                exit 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if (($# == 0)); then
+        err "copy-file: expected at least one PATH"
+        usage >&2
+        exit 2
+    fi
+
+    for path in "$@"; do
+        if [[ ! -e "$path" ]]; then
+            err "copy-file: path does not exist: $path"
+            exit 1
+        fi
+
+        if [[ -f "$path" && ! -r "$path" ]]; then
+            err "copy-file: file not readable: $path"
+            exit 1
+        fi
+
+        if [[ -f "$path" ]] && ((force == 0)) && is_sensitive_file "$path"; then
+            err "copy-file: refusing to copy sensitive key material: $path"
+            err "copy-file: use 'x copy-file --force \"$path\"' to override."
+            exit 3
+        fi
+
+        if [[ "$path" = /* ]]; then
+            paths+=("$path")
+        else
+            paths+=("$PWD/$path")
+        fi
+    done
+
+    copy_file_backend "${paths[@]}"
+}
+
 do_paste() {
     if (($# != 0)); then
         err "paste: unexpected arguments"
@@ -345,6 +497,9 @@ main() {
     case "$sub" in
         copy)
             do_copy "$@"
+            ;;
+        copy-file)
+            do_copy_file "$@"
             ;;
         paste)
             do_paste "$@"

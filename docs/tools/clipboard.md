@@ -110,11 +110,14 @@ Why conditional rather than always-on OSC 52? OSC 52 paste is unreliable (see th
 ```bash
 printf "hello" | x copy        # copy stdin to clipboard
 x copy path/to/file            # copy file contents
+x copy-file path/to/file       # copy file object (paste into Finder / Files)
 x paste                        # print clipboard to stdout
 x open https://example.com     # open URL/file in default app
 ```
 
 Its copy backend tries, in order: `clip.exe` (WSL) → `pbcopy` (macOS) → `wl-copy` (Wayland) → `xclip` → `xsel` → **OSC 52 fallback** writing directly to `/dev/tty`. This means `x copy` Just Works on macOS, Linux desktop, Linux SSH server, WSL, and anything else that can reach a terminal — you never have to think about which backend is available.
+
+`x copy-file PATH...` is intentionally separate from `x copy PATH`: it places file objects on the desktop clipboard so a file manager can paste/copy the selected files, instead of pasting the files' text contents. It uses macOS `osascript` on Finder-compatible desktops and Linux `x-special/gnome-copied-files` MIME data via `wl-copy` / `xclip` for common GTK file managers. This is local-desktop only; OSC 52 cannot carry file objects over SSH. For remote hosts, copy contents with `x copy FILE` or copy a path with `realpath FILE | x copy`.
 
 The OSC 52 fallback in `x` is also wrapped for tmux:
 

@@ -164,6 +164,9 @@ _PEM_BLOCK_RE = re.compile(
     r"-----BEGIN[^-]*PRIVATE KEY[^-]*-----.*?-----END[^-]*PRIVATE KEY[^-]*-----",
     re.DOTALL,
 )
+_PRIVATE_KEY_MARKER_RE = re.compile(
+    r"-----(?:BEGIN|END)[^-]*(?:PRIVATE KEY|PRIV\*\*\*KEY)[^-]*-----"
+)
 
 # Matches the literal string the detect-private-key hook greps for
 _PRIVATE_KEY_STR = "PRIVATE KEY"
@@ -203,6 +206,9 @@ def redact_private_keys(file_path: Path) -> bool:
     content = _PEM_BLOCK_RE.sub("[REDACTED PEM PRIVKEY BLOCK]", content)
     # Replace remaining literal "PRIVATE KEY" mentions
     content = content.replace(_PRIVATE_KEY_STR, "PRIV***KEY")
+    # Replace standalone PEM boundary markers, including markers already
+    # partially redacted by the previous line.
+    content = _PRIVATE_KEY_MARKER_RE.sub("[REDACTED PRIVKEY MARKER]", content)
     if content != original:
         write_text(file_path, content)
         return True

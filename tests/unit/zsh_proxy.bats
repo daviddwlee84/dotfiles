@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
-# Unit tests for dot_config/zsh/tools/50_networking.zsh proxy helpers.
+# Unit tests for dot_config/shell/50_networking.sh proxy helpers.
 #
 # Strategy: each test runs `zsh -f -c '...'` (no startup files) with the proxy
-# file sourced fresh, so cache state ($_ZSH_NET_PROXY_CACHE) can't leak between
+# file sourced fresh, so cache state ($_NET_PROXY_CACHE) can't leak between
 # tests. `nc` is stubbed via a temp dir prepended to PATH so probes don't touch
 # the network.
 
 load "../test_helper.bash"
 
-PROXY_FILE="$REPO_ROOT/dot_config/zsh/tools/50_networking.zsh"
+PROXY_FILE="$REPO_ROOT/dot_config/shell/50_networking.sh"
 
 # Helper: write a fake `nc` that exits 0 only when port matches $EXPECT_PORT
 # (set by the calling test via env). All other ncs fail -> simulates closed.
@@ -27,8 +27,8 @@ STUB
 @test "detect_proxy: \$LOCAL_PROXY_URL is used verbatim, no probe" {
   result="$(LOCAL_PROXY_URL=http://sentinel:9999 zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    print -r -- \"\$_ZSH_NET_PROXY_CACHE\"
+    __net_detect_proxy
+    print -r -- \"\$_NET_PROXY_CACHE\"
   ")"
   [ "$result" = "http://sentinel:9999" ]
 }
@@ -41,8 +41,8 @@ STUB
   # If probe order regressed or skipped a port, this would return a different URL.
   result="$(EXPECT_PORT=1087 zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    print -r -- \"\$_ZSH_NET_PROXY_CACHE\"
+    __net_detect_proxy
+    print -r -- \"\$_NET_PROXY_CACHE\"
   ")"
   [ "$result" = "http://127.0.0.1:1087" ]
 }
@@ -68,8 +68,8 @@ EOF
 
   result="$(HOME="$home" zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    printf 'http=%s\nall=%s\nsource=%s\n' \"\$_ZSH_NET_PROXY_CACHE\" \"\$(__zsh_net_all_proxy_url)\" \"\$_ZSH_NET_PROXY_SOURCE_CACHE\"
+    __net_detect_proxy
+    printf 'http=%s\nall=%s\nsource=%s\n' \"\$_NET_PROXY_CACHE\" \"\$(__net_all_proxy_url)\" \"\$_NET_PROXY_SOURCE_CACHE\"
   ")"
   [[ "$result" == *"http=http://127.0.0.1:7891"* ]]
   [[ "$result" == *"all=socks5://127.0.0.1:7891"* ]]
@@ -98,8 +98,8 @@ EOF
 
   result="$(HOME="$home" zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    printf 'http=%s\nall=%s\n' \"\$_ZSH_NET_PROXY_CACHE\" \"\$(__zsh_net_all_proxy_url)\"
+    __net_detect_proxy
+    printf 'http=%s\nall=%s\n' \"\$_NET_PROXY_CACHE\" \"\$(__net_all_proxy_url)\"
   ")"
   [[ "$result" == *"http=http://127.0.0.1:7890"* ]]
   [[ "$result" == *"all=socks5://127.0.0.1:7891"* ]]
@@ -116,8 +116,8 @@ EOF
 
   run zsh -f -c "
     source '$PROXY_FILE'
-    if __zsh_net_detect_proxy; then rc=0; else rc=\$?; fi
-    print -r -- \"cache=\$_ZSH_NET_PROXY_CACHE rc=\$rc\"
+    if __net_detect_proxy; then rc=0; else rc=\$?; fi
+    print -r -- \"cache=\$_NET_PROXY_CACHE rc=\$rc\"
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"cache=none"* ]]
@@ -128,16 +128,16 @@ EOF
   # With SOCKS url set → returns SOCKS url.
   result="$(LOCAL_PROXY_URL=http://a:1 LOCAL_PROXY_SOCKS_URL=socks5://b:2 zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    __zsh_net_all_proxy_url
+    __net_detect_proxy
+    __net_all_proxy_url
   ")"
   [ "$result" = "socks5://b:2" ]
 
   # Without SOCKS url → falls back to HTTP cache.
   result="$(LOCAL_PROXY_URL=http://a:1 zsh -f -c "
     source '$PROXY_FILE'
-    __zsh_net_detect_proxy
-    __zsh_net_all_proxy_url
+    __net_detect_proxy
+    __net_all_proxy_url
   ")"
   [ "$result" = "http://a:1" ]
 }
@@ -178,7 +178,7 @@ EOF
     for v in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy NO_PROXY no_proxy; do
       if [[ -n \"\${(P)v}\" ]]; then printf '%s=still-set\n' \"\$v\"; fi
     done
-    if [[ -n \"\$_ZSH_NET_PROXY_CACHE\$_ZSH_NET_PROXY_SOCKS_CACHE\$_ZSH_NET_PROXY_SOURCE_CACHE\" ]]; then
+    if [[ -n \"\$_NET_PROXY_CACHE\$_NET_PROXY_SOCKS_CACHE\$_NET_PROXY_SOURCE_CACHE\" ]]; then
       print cache=still-set
     fi
   ")"

@@ -2,10 +2,9 @@
 # Moved from dot_config/zsh/tools/41_github.zsh. The original relied on
 # zsh-only constructs for the URL parsing:
 #   ${(s:/:)url}      → split on `/`        — replaced with tr + while-read
-#   ${(j:/:)slice}    → join with `/`       — replaced with IFS=/ + ${arr[*]}
-#   ${parts[N]}       → 1-indexed access    — replaced with bash-style slicing
-#                                              `${arr[@]:N-1:1}` (works in both)
-#   ${parts[5,-1]}    → slice               — replaced with `${arr[@]:4}`
+#   ${(j:/:)slice}    → join with `/`       — replaced with an explicit loop
+#   ${parts[N]}       → 1-indexed access    — replaced with an explicit loop
+#   ${parts[5,-1]}    → slice               — replaced with an explicit loop
 #   ${var:t}          → basename            — replaced with `${var##*/}`
 #   ${#arr}           → array length        — replaced with `${#arr[@]}`
 # setopt localoptions pipefail is gated on $ZSH_VERSION; bash falls back to
@@ -41,7 +40,7 @@ ghget() {
     return 1
   fi
 
-  url="${url#$prefix}"
+  url="${url#"$prefix"}"
   url="${url%%\?*}"
   url="${url%%\#*}"
   url="${url%/}"
@@ -55,7 +54,7 @@ ghget() {
   local tok
   while IFS= read -r tok; do
     parts+=( "$tok" )
-  done < <(printf '%s' "$url" | tr '/' '\n')
+  done < <(printf '%s\n' "$url" | tr '/' '\n')
 
   if [ "${#parts[@]}" -lt 5 ]; then
     printf '%s\n' "Invalid GitHub tree URL: $1" >&2
@@ -64,13 +63,24 @@ ghget() {
     return 1
   fi
 
-  # ${parts[@]:N:1} is bash-style slicing (0-indexed); zsh supports it on
-  # `[@]`. Quoted, a 1-element slice expands to that element as a single word.
   local owner repo tree_marker branch
-  owner="${parts[*]:0:1}"
-  repo="${parts[*]:1:1}"
-  tree_marker="${parts[*]:2:1}"
-  branch="${parts[*]:3:1}"
+  owner=""
+  repo=""
+  tree_marker=""
+  branch=""
+  local -a subdir_parts
+  subdir_parts=()
+  local idx=0
+  for tok in "${parts[@]}"; do
+    idx=$((idx + 1))
+    case "$idx" in
+      1) owner="$tok" ;;
+      2) repo="$tok" ;;
+      3) tree_marker="$tok" ;;
+      4) branch="$tok" ;;
+      *) subdir_parts+=( "$tok" ) ;;
+    esac
+  done
 
   if [ "$tree_marker" != "tree" ]; then
     printf '%s\n' "Invalid GitHub tree URL: $1" >&2
@@ -80,12 +90,15 @@ ghget() {
   fi
 
   # Subdir path = parts from index 4 onwards, joined with `/`.
-  # `${arr[*]}` joins with first char of IFS (zsh + bash both).
   local subdir_path
-  local _oldifs="$IFS"
-  IFS='/'
-  subdir_path="${parts[*]:4}"
-  IFS="$_oldifs"
+  subdir_path=""
+  for tok in "${subdir_parts[@]}"; do
+    if [ -z "$subdir_path" ]; then
+      subdir_path="$tok"
+    else
+      subdir_path="$subdir_path/$tok"
+    fi
+  done
 
   # Leaf basename via parameter expansion (replaces zsh's `${var:t}` modifier).
   local leaf="${subdir_path##*/}"
@@ -103,13 +116,7 @@ ghget() {
   fi
 
   # Count path components (subdir depth) for `tar --strip-components=N`.
-  local -a path_parts
-  path_parts=()
-  local p
-  while IFS= read -r p; do
-    [ -n "$p" ] && path_parts+=( "$p" )
-  done < <(printf '%s' "$subdir_path" | tr '/' '\n')
-  local strip="${#path_parts[@]}"
+  local strip="${#subdir_parts[@]}"
 
   local archive_root="${repo}-${branch}"
   local tmpdir

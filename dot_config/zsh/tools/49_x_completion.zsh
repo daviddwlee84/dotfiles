@@ -17,6 +17,7 @@ _x() {
         subcommand)
             local -a subs=(
                 'copy:Copy stdin or FILE to system clipboard'
+                'copy-file:Copy file objects to the desktop clipboard'
                 'paste:Paste clipboard contents to stdout'
                 'open:Open URL or path with system handler'
                 'help:Show usage'
@@ -29,6 +30,11 @@ _x() {
                     _arguments \
                         '--force[copy even if file looks like a private key]' \
                         '*:file:_files'
+                    ;;
+                copy-file)
+                    _arguments \
+                        '--force[copy even if file looks like a private key]' \
+                        '*:path:_files'
                     ;;
                 open)
                     _arguments '*:target:_files'

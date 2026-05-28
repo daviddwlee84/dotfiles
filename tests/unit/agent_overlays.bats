@@ -154,8 +154,10 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   # Overlay wins on managed keys.
   echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
   echo "$output" | yq -p toml -e '.model == "gpt-5.4"' >/dev/null
-  echo "$output" | yq -p toml -e '.features.codex_hooks == true' >/dev/null
+  echo "$output" | yq -p toml -e '.features.hooks == true' >/dev/null
   echo "$output" | yq -p toml -e '.features.unified_exec == true' >/dev/null
+  # Deprecated live key must be pruned, not preserved beside `hooks`.
+  echo "$output" | yq -p toml -e '.features | has("codex_hooks") | not' >/dev/null
   # User-added [features] keys outside overlay survive.
   echo "$output" | yq -p toml -e '.features.some_user_flag == true' >/dev/null
   # Per-project trust round-trips verbatim.
