@@ -144,6 +144,7 @@ plugins:
             Bootstrap (curl|sh): Bootstrap (curl|sh)
             Ansible customization: Ansible 客製化
             Upgrades: 升級
+            "Tool managers (who installs what)": "工具管理器（誰安裝什麼）"
             Testing: 測試
             Sudo session: Sudo session
             Vim mode (catalog + opt-out): Vim 模式（總覽與停用）

@@ -2,6 +2,8 @@
 
 > How to actually move installed tools forward on a machine managed by this repo, and why `chezmoi apply` deliberately will *not* do that for you.
 
+> **See also**: [`tool-managers.md`](tool-managers.md) — the install-side companion to this doc. It maps every tool in the repo to its install mechanism (which manager owns it, where it lands, per-OS dispatch). When you're trying to figure out "why doesn't `just upgrade-X` move tool Y forward?", that's where the coverage gaps are documented.
+
 ## Why install and upgrade are split
 
 `chezmoi apply` (and the ansible phase it triggers) is **install-only by design**. Ansible roles use `state: present` + `creates:` so that running `chezmoi apply` on a running box is idempotent and never silently bumps every tool to whatever happens to be latest that day. This matters because:

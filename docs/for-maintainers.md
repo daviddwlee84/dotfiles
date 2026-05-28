@@ -46,6 +46,17 @@ Examples referenced from public docs on this site:
 
 TODO / backlog / pitfalls are collectively managed by the `project-knowledge-harness` agent skill. When to use which, naming conventions, and the "graduates to Hard invariant" rule are covered in [`CLAUDE.md`](https://github.com/daviddwlee84/dotfiles/blob/main/CLAUDE.md) → "Long-term backlog + past pitfalls".
 
+## In-site maintenance references
+
+A few published docs primarily serve maintainers (not end users browsing for "how do I configure tool X"). They're in the main site nav but worth flagging here as the entry points when you're working on the repo itself:
+
+- [`this_repo/architecture.md`](this_repo/architecture.md) — install-flow phases, profile / tag matrix, no-root mode
+- [`this_repo/tool-managers.md`](this_repo/tool-managers.md) — **install-side reference**: which manager owns which tool (per-manager catalog + A–Z lookup + decision tree for new tools)
+- [`this_repo/upgrades.md`](this_repo/upgrades.md) — **upgrade-side reference**: `just upgrade-*` categories + what `chezmoi apply` will NOT do
+- [`this_repo/uv-bootstrap.md`](this_repo/uv-bootstrap.md) — why uv is special (Python's-own-pip pitfalls + brew-vs-curl dispatch)
+- [`this_repo/sudo-session.md`](this_repo/sudo-session.md) — the shared sudo cache used across all three run-scripts
+- [`this_repo/fleet-apply.md`](this_repo/fleet-apply.md) — multi-host `chezmoi apply` orchestration
+
 ---
 
 Why these aren't site content:

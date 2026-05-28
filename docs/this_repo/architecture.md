@@ -2,6 +2,8 @@
 
 How `chezmoi apply` deploys configs and triggers ansible / brew on this machine.
 
+> **See also**: [`tool-managers.md`](tool-managers.md) — once you've read this architecture overview, that doc maps every tool in the repo to its concrete install mechanism (manager-by-manager catalog + A–Z tool index + decision tree for adding new tools). And [`upgrades.md`](upgrades.md) for the upgrade-side companion.
+
 ## Layout
 
 ```
