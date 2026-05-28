@@ -71,44 +71,39 @@
     creates: "{{ ansible_facts['env']['HOME'] }}/.claude/local/bin/claude"
 
 # === OpenCode ===
+# Cross-platform: use the official installer everywhere. We dropped the macOS
+# Homebrew path (anomalyco/tap formula) because:
+#   1. The formula version lags the official releases (was stuck at 1.14.48
+#      when 1.15.10 was out), with extra latency on Chinese brew mirrors.
+#   2. The Homebrew install pins the version in the Cellar dir, so OpenCode's
+#      built-in `opencode upgrade` / Update Available prompt cannot actually
+#      swap binaries — every restart still showed the old version, even after
+#      "Confirm".
+# Both platforms now land at ~/.opencode/bin/opencode (already prepended to
+# PATH by dot_config/shell/00_exports.sh.tmpl), so `opencode upgrade` works
+# natively and the explicit upgrade path in scripts/upgrade_tools.sh's
+# cat_agents() keeps doing the right thing on macOS too.
+#
+# SHELL MUTATION (same gotcha as the Antigravity CLI block above): the
+# upstream installer appends `export PATH=...opencode/bin:$PATH` to ~/.zshrc
+# / ~/.bashrc by default. Those files are chezmoi-managed and PATH is
+# already exported by dot_config/shell/00_exports.sh.tmpl, so we pass
+# `--no-modify-path` to keep the installer binary-only (no profile writes).
 
-- name: Check if OpenCode is installed (macOS)
-  when: ansible_facts["os_family"] == "Darwin"
-  ansible.builtin.command: which opencode
-  register: opencode_macos_check
-  changed_when: false
-  failed_when: false
-
-- name: Tap anomalyco/tap for OpenCode (macOS)
-  when:
-    - ansible_facts["os_family"] == "Darwin"
-    - opencode_macos_check.rc != 0
-  community.general.homebrew_tap:
-    name: anomalyco/tap
-    state: present
-
-- name: Install OpenCode (macOS)
-  when:
-    - ansible_facts["os_family"] == "Darwin"
-    - opencode_macos_check.rc != 0
-  community.general.homebrew:
-    name: opencode
-    state: present
-
-- name: Check if OpenCode is installed (Linux)
-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+- name: Check if OpenCode is installed
   ansible.builtin.command: which opencode
   register: opencode_check
   changed_when: false
   failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin:{{ ansible_facts['env']['PATH'] }}"
 
-- name: Install OpenCode (Linux)
-  when:
-    - ansible_facts["os_family"] in ["Debian", "RedHat"]
-    - opencode_check.rc != 0
+- name: Install OpenCode (official installer, no shell-profile mutation)
+  when: opencode_check.rc != 0
   ansible.builtin.shell: |
-    curl -fsSL https://opencode.ai/install | bash
+    curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path
   args:
+    executable: /bin/bash
     creates: "{{ ansible_facts['env']['HOME'] }}/.opencode/bin/opencode"
 
 # === Cursor CLI ===
