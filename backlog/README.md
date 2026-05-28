@@ -113,3 +113,4 @@ Add new entries here as you create them. Keep alphabetical.
 | [`mise-runtime-gating`](mise-runtime-gating.md) | P2 ready | "Gate mise runtimes (rust/dotnet/bun/ruby) + fix .NET-SDK contract bug" |
 | [`lean-bundle-init-ux`](lean-bundle-init-ux.md) | P? needs design | "Lean no-brainer bundles + init-CLI UX + decision-tree SSOT" |
 | [`cloud-vm-provision-combo`](cloud-vm-provision-combo.md) | P? idea | "Cloud-VM (az) provision + dotfiles bootstrap combo (fleet?)" |
+| [`opencodebox-wrapper`](opencodebox-wrapper.md) | P? deferred | "opencodebox wrapper for the containerized opencode image" |
