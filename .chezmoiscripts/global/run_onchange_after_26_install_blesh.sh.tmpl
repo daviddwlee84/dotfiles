@@ -1,7 +1,7 @@
 #!/bin/bash
-# Compile + install ble.sh into ~/.local/share/blesh after the chezmoi
-# external clones the source tree (and on subsequent weekly refreshes
-# whose pull moves HEAD).
+# Compile + install ble.sh into the runtime dir ~/.local/share/blesh after
+# the chezmoi external clones the source tree to ~/.local/src/blesh (and on
+# subsequent weekly refreshes whose pull moves HEAD).
 #
 # Trigger: change in the cloned repo's HEAD (commit-hash bump). chezmoi's
 # `include` template function reads the file at template-render time; we
@@ -9,14 +9,17 @@
 # the repo clone — if the path changes, this script becomes a no-op
 # until manual `chezmoi apply --refresh-externals`.
 #
-# blesh source HEAD: {{ $bleshHead := joinPath .chezmoi.homeDir ".local/share/blesh/.git/HEAD" -}}
+# blesh source HEAD: {{ $bleshHead := joinPath .chezmoi.homeDir ".local/src/blesh/.git/HEAD" -}}
 # {{ if stat $bleshHead -}}{{ include $bleshHead | sha256sum }}{{ else }}absent{{ end }}
 #
 # The `make install` target compiles the runtime ble.sh artefact
-# (~/.local/share/blesh/ble.sh) — distinct from the source tree at
-# ~/.local/share/blesh/. dot_bashrc.tmpl sources the runtime artefact;
-# without this script, the source clone exists but the runtime doesn't,
-# and bashrc's presence-gate skips ble.sh init.
+# (~/.local/share/blesh/ble.sh) FROM the source tree at ~/.local/src/blesh.
+# Source and install dir are kept separate on purpose: `make install`
+# rewrites lib/*.sh in place, so installing into the git clone would dirty
+# it and break the next `git pull --ff-only` (see .chezmoiexternal.toml.tmpl
+# + pitfalls/chezmoi-update-blesh-local-changes-overwritten.md). dot_bashrc
+# .tmpl sources the runtime artefact; without this script the source clone
+# exists but the runtime doesn't, and bashrc's presence-gate skips ble.sh.
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -25,7 +28,7 @@ info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
 success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
 warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
 
-BLESH_SRC="$HOME/.local/share/blesh"
+BLESH_SRC="$HOME/.local/src/blesh"
 
 if [[ ! -d "$BLESH_SRC" ]]; then
     info "ble.sh source not cloned yet (skip — chezmoi external may be in-flight)"

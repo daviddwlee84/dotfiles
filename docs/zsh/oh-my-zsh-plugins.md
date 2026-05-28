@@ -75,7 +75,7 @@ plugins=(
 
 ### Bash side
 
-`ble.sh` (already in `.chezmoiexternal.toml.tmpl:105-112`, init order documented in [`docs/shells/bash.md`](../shells/bash.md)) provides the bash equivalent of OMZ's autosuggestions + syntax-highlighting + vi-mode. Plus ble.sh has [native fzf integration](https://github.com/akinomyoga/ble.sh/wiki/Manual-§-Completion#fzf) for menu filtering — gives ~70% of fzf-tab's UX without a separate plugin. No bash-side equivalent install needed if you adopt fzf-tab on the zsh side.
+`ble.sh` (already in `.chezmoiexternal.toml.tmpl:114-121`, init order documented in [`docs/shells/bash.md`](../shells/bash.md)) provides the bash equivalent of OMZ's autosuggestions + syntax-highlighting + vi-mode. Plus ble.sh has [native fzf integration](https://github.com/akinomyoga/ble.sh/wiki/Manual-§-Completion#fzf) for menu filtering — gives ~70% of fzf-tab's UX without a separate plugin. No bash-side equivalent install needed if you adopt fzf-tab on the zsh side.
 
 ## Adding a new plugin
 

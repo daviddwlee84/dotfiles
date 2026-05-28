@@ -1,0 +1,26 @@
+#!/bin/bash
+# One-time migration: ble.sh source clone moved out of its install dir.
+#
+# Old layout cloned the git repo straight into ~/.local/share/blesh, which is
+# also `make install`'s INSDIR (from PREFIX=~/.local). The install rewrote the
+# checkout's lib/*.sh in place, dirtying the tree so the weekly
+# `git pull --ff-only` aborted ("local changes would be overwritten by merge").
+# New layout: source clone -> ~/.local/src/blesh, runtime install ->
+# ~/.local/share/blesh (a plain dir, no .git). See
+# pitfalls/chezmoi-update-blesh-local-changes-overwritten.md.
+#
+# This runs in the `before` phase, ahead of the relocated external clone and
+# the run_after_26 install, so the stale git repo is gone before `make install`
+# repopulates ~/.local/share/blesh as a clean runtime dir.
+#
+# Guard: delete ONLY while it is still a git clone. Once migrated, the path is
+# a normal install dir and must never be removed by this script.
+
+set -e
+
+old="$HOME/.local/share/blesh"
+
+if [ -d "$old/.git" ]; then
+    echo -e "\033[0;34m[INFO]\033[0m Migrating ble.sh: removing old git clone at $old (source moves to ~/.local/src/blesh)"
+    rm -rf "$old"
+fi
