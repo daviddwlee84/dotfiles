@@ -423,6 +423,12 @@ function sesh-vibe() {
     local agent_cli="claude"
     local agents_csv=""
     local min_width="${SVIBE_MIN_WIDTH:-80}"
+    # Seconds to wait between launching each agent pane. Default 0.25s staggers
+    # startup so DB-backed agents (opencode opens a single global SQLite DB and
+    # runs `PRAGMA journal_mode = WAL`, which needs a brief exclusive lock)
+    # don't race on a simultaneous cold start. Set 0 to launch all at once.
+    # See pitfalls/opencode-concurrent-launch-wal-pragma-fails.md.
+    local launch_stagger="${SVIBE_LAUNCH_STAGGER:-0.25}"
     while [ $# -gt 0 ]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
@@ -474,6 +480,10 @@ Example on a 240-col terminal:
   min-width 80   → auto N=3, three even-horizontal columns
   min-width 120  → auto N=2, two even-horizontal columns
 
+$SVIBE_LAUNCH_STAGGER (seconds, default 0.25) delays each pane launch so
+agents that share a global resource at cold start (e.g. opencode's single
+SQLite DB + WAL pragma) don't race. Set 0 to launch all panes at once.
+
 Examples:
   svibe                                            # auto N × claude, width-aware layout
   svibe 2                                          # 2× claude
@@ -492,6 +502,13 @@ EOF
 
     if ! [[ "$min_width" =~ ^[0-9]+$ ]] || (( min_width < 1 )); then
         echo "svibe: --min-width must be a positive integer (got: $min_width)" >&2
+        return 1
+    fi
+
+    # Accept an integer or decimal number of seconds (e.g. 0, 0.25, 1). Used as
+    # a `sleep` argument between pane launches.
+    if ! [[ "$launch_stagger" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "svibe: SVIBE_LAUNCH_STAGGER must be a non-negative number of seconds (got: $launch_stagger)" >&2
         return 1
     fi
 
@@ -624,7 +641,7 @@ EOF
     # `${agents[@]:0:1}` is bash-style array slicing (0-indexed); zsh
     # supports the same syntax on `[@]`, sidestepping the bash-0/zsh-1
     # indexing fork.
-    local first_agent="${agents[*]:0:1}"
+    local first_agent="${agents[@]:0:1}"
     tmux new-session -d -s "$session" -c "$repo_root" -n agents \
         "$(_vibe_agent_cmd "$first_agent")"
 
@@ -643,6 +660,10 @@ EOF
 
     # Add remaining panes (skip the first via array slice).
     for a in "${agents[@]:1}"; do
+        # Stagger launches so simultaneously-spawned agents don't race on a
+        # shared resource at cold start (opencode's global SQLite DB + WAL
+        # pragma — see pitfalls/opencode-concurrent-launch-wal-pragma-fails.md).
+        [ "$launch_stagger" != "0" ] && sleep "$launch_stagger"
         tmux split-window -t "${session}:agents" -c "$repo_root" \
             "$(_vibe_agent_cmd "$a")"
         # Re-balance after each split so layout stays uniform

@@ -177,6 +177,19 @@ window 3 "edit"      — nvim
 
 窗格數量限制在 `[1, 12]`。超過約 6 之後 tiled 網格在多數顯示器上就太擠了——上限是保守、非技術性的。
 
+##### 啟動錯開（同時啟動多個 agent）
+
+`svibe` 在啟動每個 agent 窗格之間會等待一小段間隔，讓那些在冷啟動時共用同一全域資源的 agent 不會互搶。觸發此設計的案例：`opencode` 會開啟單一全域 SQLite 資料庫（`~/.local/share/opencode/`）並執行 `PRAGMA journal_mode = WAL`，這需要短暫的獨占鎖——若以零延遲執行 `svibe 4 opencode`，其中一個實例會搶不到鎖而以 `Failed to run the query 'PRAGMA journal_mode = WAL'` 退出。
+
+| 旋鈕 | 預設值 | 覆寫方式 |
+|------|---------|----------|
+| 啟動錯開（秒） | `0.25` | 環境變數 `SVIBE_LAUNCH_STAGGER`（接受 `0` 或小數） |
+
+```bash
+SVIBE_LAUNCH_STAGGER=0.4 svibe 4 opencode   # 留更多餘裕
+SVIBE_LAUNCH_STAGGER=0   svibe 4 claude      # 一次啟動所有窗格
+```
+
 ##### 驗證（fail-fast）
 
 `svibe` 在建立任何東西之前先驗證：

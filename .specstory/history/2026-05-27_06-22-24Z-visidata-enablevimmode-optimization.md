@@ -12571,3 +12571,220 @@ M  dot_visidatarc.tmpl
 <summary>Tool use: **run_terminal_command_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/daviddwlee84/.local/share/chezmoi && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(visidata): full-vim column nav (0/$/_/^) + vd-ro read-only alias
+
+Extend the `enableVimMode` block in `dot_visidatarc.tmpl` so vim's
+line-internal navigation chars all jump within a row's columns:
+
+  0  -> go-leftmost   (was unbound)
+  $  -> go-rightmost  (displaces type-currency  -> relocated to z$)
+  _  -> go-leftmost   (displaces resize-col-max -> relocated to zw)
+  ^  -> go-leftmost   (displaces rename-col     -> relocated to zN)
+
+Mnemonics: `z$` extends the original `$` via the z-prefix family;
+`zw` = z + Width (resize-col-max's intent); `zN` = z + Name
+(rename-col's intent). All three relocation slots were verified empty
+before binding (no clash with VisiData's existing z_ / z^ / gz_ / gz^
+families). `gh` / `gl` remain the canonical column-jump fallbacks.
+
+For raw-data inspection, add `vd-ro='visidata --readonly'` alongside
+`vd-arrow` — `--readonly` is `vd.optalias('readonly', 'overwrite', 'n')`
+(`visidata/modify.py:11`), which makes `confirmOverwrite()` fail with
+`'overwrite disabled'` on any save attempt. In-memory edits stay allowed
+(deferred-buffer tracking still works for prototyping) but cannot be
+written back; pair with `vd-arrow` (`visidata --readonly -f arrow`) to
+combine the StringDtype workaround with the save-block.
+
+Per AGENTS cross-file rules: also document the rebinds + relocations +
+read-only practice in `docs/this_repo/vim-mode.md` (refresh catalog row,
+rewrite the App-layer subsection with column-nav table + data-safety
+mini-section, expand the `enableVimMode=false` bullet); add a new
+`Data Viewers` section to `docs/shells/aliases.md` covering both
+`vd-arrow` (fills a prior-commit gap) and `vd-ro`, plus a TOC entry.
+
+Verification: runtime probe loads the rendered rc the way VisiData's
+`loadConfigFile` does, then resolves via `prettykeys` normalization to
+confirm all 8 vim-on bindings (i / 0 / $ / _ / ^ / z$ / zw / zN) dispatch
+correctly, and that `enableVimMode=false` leaves every default intact
+(0 still unbound; $/_/^/i back to type-currency/resize-col-max/rename-col/
+addcol-incr; relocations not installed) while preserving the feather
+open_feather override. `mkdocs build --strict` warning count unchanged
+from baseline (pre-existing zh-TW i18n drift only).
+EOF
+)" && echo '--- post-commit status ---' && git status --short && git log -1 --oneline</summary>
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(visidata): full-vim column nav (0/$/_/^) + vd-ro read-only alias
+
+Extend the `enableVimMode` block in `dot_visidatarc.tmpl` so vim's
+line-internal navigation chars all jump within a row's columns:
+
+  0  -> go-leftmost   (was unbound)
+  $  -> go-rightmost  (displaces type-currency  -> relocated to z$)
+  _  -> go-leftmost   (displaces resize-col-max -> relocated to zw)
+  ^  -> go-leftmost   (displaces rename-col     -> relocated to zN)
+
+Mnemonics: `z$` extends the original `$` via the z-prefix family;
+`zw` = z + Width (resize-col-max's intent); `zN` = z + Name
+(rename-col's intent). All three relocation slots were verified empty
+before binding (no clash with VisiData's existing z_ / z^ / gz_ / gz^
+families). `gh` / `gl` remain the canonical column-jump fallbacks.
+
+For raw-data inspection, add `vd-ro='visidata --readonly'` alongside
+`vd-arrow` — `--readonly` is `vd.optalias('readonly', 'overwrite', 'n')`
+(`visidata/modify.py:11`), which makes `confirmOverwrite()` fail with
+`'overwrite disabled'` on any save attempt. In-memory edits stay allowed
+(deferred-buffer tracking still works for prototyping) but cannot be
+written back; pair with `vd-arrow` (`visidata --readonly -f arrow`) to
+combine the StringDtype workaround with the save-block.
+
+Per AGENTS cross-file rules: also document the rebinds + relocations +
+read-only practice in `docs/this_repo/vim-mode.md` (refresh catalog row,
+rewrite the App-layer subsection with column-nav table + data-safety
+mini-section, expand the `enableVimMode=false` bullet); add a new
+`Data Viewers` section to `docs/shells/aliases.md` covering both
+`vd-arrow` (fills a prior-commit gap) and `vd-ro`, plus a TOC entry.
+
+Verification: runtime probe loads the rendered rc the way VisiData's
+`loadConfigFile` does, then resolves via `prettykeys` normalization to
+confirm all 8 vim-on bindings (i / 0 / $ / _ / ^ / z$ / zw / zN) dispatch
+correctly, and that `enableVimMode=false` leaves every default intact
+(0 still unbound; $/_/^/i back to type-currency/resize-col-max/rename-col/
+addcol-incr; relocations not installed) while preserving the feather
+open_feather override. `mkdocs build --strict` warning count unchanged
+from baseline (pre-existing zh-TW i18n drift only).
+EOF
+)" && echo '--- post-commit status ---' && git status --short && git log -1 --oneline
+```
+
+```
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/daviddwlee84/.cache/pre-commit/patch1779870779-94001.
+Auto-redact secrets in agent artifacts...................................Passed
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...............................................................Passed
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/daviddwlee84/.cache/pre-commit/patch1779870779-94001.
+[main 455fce8] feat(visidata): full-vim column nav (0/$/_/^) + vd-ro read-only alias
+ 6 files changed, 5186 insertions(+), 28 deletions(-)
+ create mode 100644 .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
+--- post-commit status ---
+ M .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
+ M .specstory/statistics.json
+455fce8 feat(visidata): full-vim column nav (0/$/_/^) + vd-ro read-only alias
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The commit went through successfully with the redaction hook automatically normalizing the specstory transcript as expected, and the statistics file getting its typical post-commit update. Let me verify what actually changed to make sure everything looks right.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+Commit `455fce8` landed. The post-commit `.specstory/*` modifications are the auto-redactor hook re-touching the transcript (expected on every commit) — let me verify and decide whether to amend.
+
+_**Agent (claude-opus-4-7)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/daviddwlee84/.local/share/chezmoi && git diff --stat HEAD && echo '---' && git diff HEAD .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md 2>&1 | head -30</summary>
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi && git diff --stat HEAD && echo '---' && git diff HEAD .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md 2>&1 | head -30
+```
+
+```
+ ...6-22-24Z-visidata-enablevimmode-optimization.md | 7557 ++++++++++++++++++++
+ .specstory/statistics.json                         |    8 +-
+ 2 files changed, 7561 insertions(+), 4 deletions(-)
+---
+diff --git a/.specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md b/.specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
+index d43ba07..741e2c6 100644
+--- a/.specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
++++ b/.specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
+@@ -5014,3 +5014,7560 @@ EOF
+ &lt;summary&gt;Tool use: **run_terminal_command_v2**&lt;/summary&gt;
+ 
+ &lt;/details&gt;&lt;/tool-use&gt;
++
++_**Agent (claude-opus-4-7)**_
++
++&lt;think&gt;&lt;details&gt;&lt;summary&gt;Thought Process&lt;/summary&gt;
++ Looking at the keybinding probe results, I can see that most of the z-prefix variants are already taken—&#96;z_&#96; handles column resizing with input, &#96;z^&#96; renames from the selected cell, and &#96;gz_&#96; resizes multiple columns. The unbound slots are &#96;z$&#96;, &#96;g$&#96;, and &#96;gz$&#96;, which gives me some flexibility for new commands.
++
++The real challenge is that both &#96;_&#96; (resize-col-max) and &#96;^&#96; (rename-col) have their entire prefix families already populated—each has a single-column variant, a multi-column variant, and a selected-cell variant. Since the user wants to relocate these to other shortcuts with good mnemonics, I need to find free slots that make intuitive sense rather than trying to squeeze them into the existing pattern. Let me search through the available keybindings to find mnemonic alternatives that aren't already claimed.&lt;/details&gt;&lt;/think&gt;
++
++_**Agent (claude-opus-4-7)**_
++
++&lt;tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"&gt;
++&lt;details&gt;&lt;summary&gt;Tool use: **run_terminal_command_v2** • Run command: ~/.local/share/uv/tools/visidata/bin/python &lt;&lt;'EOF'
++import visidata
++from visidata import vd, TableSheet, BaseSheet
++# Probe a wider set of single + 2-char slots that would make mnemonic sense.
++candidates = [
++    # Single chars (very risky to take — likely all bound)
++    '=', '+', '|', '?', '!',
++    # z-prefix single letter
++    'zw', 'zW', 'zN', 'zn', 'zE',
++    # g-prefix
++    'gw', 'gN', 'gE',
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-7)**_
+
+<think><details><summary>Thought Process</summary>
+ The SpecStory transcript expanded significantly after I committed it since the tool continues recording our live conversation. I'm recognizing this as expected behavior—the snapshot I committed was from before these recent exchanges. According to the AGENTS contract, I should handle this as a delta update covering the post-commit discussion, and I'm considering whether to leave it as is or take another approach.
+
+I'm settling on leaving the post-commit deltas untouched. Since SpecStory writes asynchronously during shell operations, amending now would just trigger more deltas and create unnecessary noise. The transcript updates properly belong to the next commit's session anyway, and the user can bundle them into a future backup commit like they've done before.</details></think>
+
+_**Agent (claude-opus-4-7)**_
+
+That's the live SpecStory recorder appending **this** post-commit conversation to the transcript — normal async behavior. The transcript I just committed (`d43ba07`) captured the work up through your "git commit" message; everything after is now being recorded into the file but belongs to a future session/commit. **Don't amend** — SpecStory will keep appending as we type, and amending would just race the recorder.
+
+## Done — commit `455fce8`
+
+```
+feat(visidata): full-vim column nav (0/$/_/^) + vd-ro read-only alias
+
+ .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md | new
+ .specstory/statistics.json                                                     |  ±
+ docs/shells/aliases.md                                                         | +12
+ docs/this_repo/vim-mode.md                                                     | +117/-28
+ dot_config/shell/10_aliases.sh                                                 | +15
+ dot_visidatarc.tmpl                                                            | +45
+```
+
+All pre-commit hooks passed (auto-redact, secret scan, private-key check, shellcheck on the new aliases, etc.). The post-commit `.specstory/*` modifications are the live transcript continuing to record this very exchange — leave them for whenever you next backup chat history (paralleling commits `7864430` / `924ee0c` in your recent history).
+
+Branch is now 3 commits ahead of `origin/main`; ready to push whenever you are (`git push`).

@@ -214,6 +214,24 @@ window 3 "edit"      — nvim
 Pane count is bounded `[1, 12]`. Above ~6 the tiled grid becomes too
 cramped on most displays — the cap is conservative, not technical.
 
+##### Launch stagger (concurrent agents)
+
+`svibe` waits a short interval between launching each agent pane so that
+agents sharing a global resource at cold start don't race. The motivating
+case: `opencode` opens a single global SQLite DB (`~/.local/share/opencode/`)
+and runs `PRAGMA journal_mode = WAL`, which needs a brief exclusive lock —
+firing `svibe 4 opencode` with zero delay makes one instance lose the lock and
+exit with `Failed to run the query 'PRAGMA journal_mode = WAL'`.
+
+| Knob | Default | Override |
+|------|---------|----------|
+| launch stagger (seconds) | `0.25` | env `SVIBE_LAUNCH_STAGGER` (accepts `0` / decimals) |
+
+```bash
+SVIBE_LAUNCH_STAGGER=0.4 svibe 4 opencode   # more breathing room
+SVIBE_LAUNCH_STAGGER=0   svibe 4 claude      # launch all panes at once
+```
+
 ##### Validation (fail-fast)
 
 `svibe` validates before building anything:
