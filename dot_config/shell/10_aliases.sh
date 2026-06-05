@@ -54,6 +54,36 @@ bindings() {
 	unset doc
 }
 
+# --- run-for: time-box any long-running / infinite command -----------------
+# Run CMD for at most DURATION, then send SIGINT (same as Ctrl-C) so a script's
+# `trap INT` summary still prints; escalate to SIGKILL after a grace if the
+# command ignores the interrupt. Wraps GNU timeout — gtimeout on macOS, timeout
+# on Linux (both shipped by the coreutils install in the devtools ansible role).
+#
+# Usage:  run-for DURATION CMD [ARGS...]
+#   DURATION takes GNU timeout suffixes: 30s, 5m, 2h, 1d, or bare seconds.
+#   RUN_FOR_SIGNAL      signal sent on expiry (default INT)
+#   RUN_FOR_KILL_AFTER  grace before SIGKILL (default 5s)
+# Exit status: 124 = the time-box was hit (command still running); otherwise
+#   the command's own exit status passes through.
+# Examples:
+#   run-for 5m ping-monitor --gateway 10
+#   run-for 30s ./some-infinite-loop.sh
+run-for() {
+	[ "$#" -lt 2 ] && {
+		echo "Usage: run-for DURATION CMD [ARGS...]" >&2
+		return 2
+	}
+	local to dur
+	to="$(command -v gtimeout || command -v timeout)" || {
+		echo "run-for: GNU timeout not found (install coreutils)" >&2
+		return 127
+	}
+	dur="$1"
+	shift
+	"$to" --signal="${RUN_FOR_SIGNAL:-INT}" --kill-after="${RUN_FOR_KILL_AFTER:-5s}" "$dur" "$@"
+}
+
 # --- Chezmoi ---------------------------------------------------------------
 # https://www.chezmoi.io/user-guide/frequently-asked-questions/design/#why-does-chezmoi-cd-spawn-a-shell-instead-of-just-changing-directory
 chezmoi-cd() {
