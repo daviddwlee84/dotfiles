@@ -5,9 +5,13 @@
 #
 # What it does, in order:
 #   1. Installs `uv` (Astral's Python runtime/tool manager) if missing.
-#   2. Re-execs against /dev/tty so questionary prompts work even though stdin
-#      is the curl pipe. Without this, the interactive wrapper falls back to
-#      non-interactive stubs and skips every prompt.
+#   2. Attaches /dev/tty as the FINAL `exec uv run`'s stdin so questionary
+#      prompts work even though THIS script's own stdin is the curl pipe.
+#      We must NOT do `exec </dev/tty` mid-script — that would repoint
+#      bash's own script reader at /dev/tty and hang on the next line
+#      (bash reads the script body from fd 0 in `curl | bash` mode, and
+#      its read behaviour is "undefined" enough to bite on fresh users).
+#      See: pitfalls/bootstrap-curl-bash-hangs-after-reattaching-tty.md.
 #   3. Fetches + runs scripts/init/dotfiles_init.py from the pinned ref via
 #      `uv run --script <url>` — this downloads the script, resolves its
 #      PEP 723 inline deps into an ephemeral venv, and runs it. No global
@@ -61,16 +65,25 @@ else
     log "uv already present: $(command -v uv) ($(uv --version 2>/dev/null || echo unknown))"
 fi
 
-# --- 2. re-exec under /dev/tty if we were piped (curl | bash) ----------------
-# `[ -t 0 ]` is false when stdin is the pipe; re-exec so questionary can read
-# keystrokes. Skip when there's no controlling TTY at all (headless CI).
+# --- 2. decide whether to feed /dev/tty to the final exec --------------------
+# `[ -t 0 ]` is false when stdin is the pipe; questionary needs a real TTY.
+# We CANNOT `exec </dev/tty` here — that repoints bash's own fd 0, which
+# is also where bash reads the rest of THIS script from in `curl | bash`
+# mode. The next line would then block on /dev/tty waiting for keyboard
+# input that never comes. Instead we attach /dev/tty as the *child*'s
+# stdin on the final exec, leaving bash's own fd 0 on the curl pipe.
+NEED_TTY_REDIRECT=0
 if [ ! -t 0 ] && [ -r /dev/tty ]; then
-    log "stdin is a pipe — reattaching to /dev/tty for interactive prompts"
-    exec < /dev/tty
+    log "stdin is a pipe — will attach /dev/tty as uv run's stdin (not bash's)"
+    NEED_TTY_REDIRECT=1
 fi
 
 # --- 3. run ------------------------------------------------------------------
 log "fetching + running ${SCRIPT_URL}"
 log "(first run resolves PEP 723 deps: questionary, rich, tyro — may take 30s-3min on slow networks)"
 log "(set DOTFILES_BOOTSTRAP_VERBOSE=1 to see uv resolver progress)"
-exec uv run "${UV_RUN_FLAGS[@]}" --script "$SCRIPT_URL" "$@"
+if [ "$NEED_TTY_REDIRECT" = "1" ]; then
+    exec uv run "${UV_RUN_FLAGS[@]}" --script "$SCRIPT_URL" "$@" </dev/tty
+else
+    exec uv run "${UV_RUN_FLAGS[@]}" --script "$SCRIPT_URL" "$@"
+fi

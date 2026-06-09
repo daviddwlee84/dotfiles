@@ -1810,3 +1810,315 @@ APPLIED_OK after 17 tries
 <summary>Tool use: **run_terminal_command_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm ready to commit these changes — the shell script fix with the stagger adjustment, the documentation updates in both English and Traditional Chinese, the pitfall index and new pitfall files, plus the auto-generated chat history files that follow the repo's backup convention. Looking at the commit log style, I'll scope this as `fix(svibe)` since the core issue is the zsh array slicing bug. I'm crafting a commit message that explains the root cause—using `${agents[*]:0:1}` joins the array before slicing in zsh, causing the first pane to run `o` instead of `opencode`—and describes the fix of switching to `${agents[@]:0:1}` for proper element slicing, plus the stagger mitigation to prevent SQLite WAL pragma races. The pre-commit hooks should be fine since my pitfall files aren't in the scanned directories, so I'll stage the relevant files and commit.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+The background apply succeeded (`APPLIED_OK after 17 tries`) — the live `~/.config/shell/22_sesh.sh` now has the fix. Let me mark that done and commit my changes (excluding the auto-generated `.specstory/` history, which gets its own "Backup chat history" commits in this repo).
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Record zsh ${arr[*]:0:1} vs [@] slicing pitfall",
+      "id": "pitfall",
+      "status": "completed"
+    },
+    {
+      "content": "Add WAL-race launch stagger to svibe",
+      "id": "stagger",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/aliases if interface changes",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "chezmoi apply the corrected 22_sesh.sh live",
+      "id": "apply",
+      "status": "completed"
+    },
+    {
+      "content": "mkdocs build --strict to validate docs",
+      "id": "validate",
+      "status": "completed"
+    },
+    {
+      "content": "git commit the svibe fix + stagger + pitfalls + docs",
+      "id": "commit",
+      "status": "in_progress"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Record zsh ${arr[*]:0:1} vs [@] slicing pitfall",
+      "id": "pitfall",
+      "status": "completed"
+    },
+    {
+      "content": "Add WAL-race launch stagger to svibe",
+      "id": "stagger",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/aliases if interface changes",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "chezmoi apply the corrected 22_sesh.sh live (backgrounded, waiting for lock)",
+      "id": "apply",
+      "status": "in_progress"
+    },
+    {
+      "content": "mkdocs build --strict to validate docs",
+      "id": "validate",
+      "status": "completed"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /home/taa/.local/share/chezmoi && git add dot_config/shell/22_sesh.sh docs/tools/sesh.md docs/tools/sesh.zh-TW.md pitfalls/README.md pitfalls/opencode-concurrent-launch-wal-pragma-fails.md pitfalls/zsh-star-slice-substring-not-element.md && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(svibe): correct zsh array slice (first pane ran `o`) + stagger opencode launches
+
+In zsh `${agents[*]:0:1}` joins the array into a string then takes a substring,
+so `svibe N opencode` ran `o` (command not found) in the first agent pane while
+the rest ran fine. Use `${agents[@]:0:1}` for true element slicing — correct in
+both zsh and bash (bash masked the bug).
+
+Also add SVIBE_LAUNCH_STAGGER (default 0.25s) between agent-pane launches so
+concurrently cold-started opencode instances don't race on the shared global
+SQLite DB's `PRAGMA journal_mode = WAL` (one loser exits with "Failed to run
+the query 'PRAGMA journal_mode = WAL'").
+
+Docs mirrored (en + zh-TW); two pitfalls recorded and indexed.
+EOF
+)" && echo "=== status after commit ===" && git status</summary>
+
+```bash
+cd /home/taa/.local/share/chezmoi && git add dot_config/shell/22_sesh.sh docs/tools/sesh.md docs/tools/sesh.zh-TW.md pitfalls/README.md pitfalls/opencode-concurrent-launch-wal-pragma-fails.md pitfalls/zsh-star-slice-substring-not-element.md && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(svibe): correct zsh array slice (first pane ran `o`) + stagger opencode launches
+
+In zsh `${agents[*]:0:1}` joins the array into a string then takes a substring,
+so `svibe N opencode` ran `o` (command not found) in the first agent pane while
+the rest ran fine. Use `${agents[@]:0:1}` for true element slicing — correct in
+both zsh and bash (bash masked the bug).
+
+Also add SVIBE_LAUNCH_STAGGER (default 0.25s) between agent-pane launches so
+concurrently cold-started opencode instances don't race on the shared global
+SQLite DB's `PRAGMA journal_mode = WAL` (one loser exits with "Failed to run
+the query 'PRAGMA journal_mode = WAL'").
+
+Docs mirrored (en + zh-TW); two pitfalls recorded and indexed.
+EOF
+)" && echo "=== status after commit ===" && git status
+```
+
+```
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/taa/.cache/pre-commit/patch1780485168-158894.
+Auto-redact secrets in agent artifacts...............(no files to check)Skipped
+Detect hardcoded secrets.................................................Passed
+detect private key.......................................................Passed
+check for added large files..............................................Passed
+check for merge conflicts................................................Passed
+fix end of files.........................................................Passed
+trim trailing whitespace.................................................Passed
+check yaml...........................................(no files to check)Skipped
+check toml...........................................(no files to check)Skipped
+check json...........................................(no files to check)Skipped
+check that executables have shebangs.................(no files to check)Skipped
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+shfmt................................................(no files to check)Skipped
+[INFO] Restored changes from /home/taa/.cache/pre-commit/patch1780485168-158894.
+[main 7040604] fix(svibe): correct zsh array slice (first pane ran &#96;o&#96;) + stagger opencode launches
+ 6 files changed, 251 insertions(+), 1 deletion(-)
+ create mode 100644 pitfalls/opencode-concurrent-launch-wal-pragma-fails.md
+ create mode 100644 pitfalls/zsh-star-slice-substring-not-element.md
+=== status after commit ===
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-22_06-27-41Z-script-update-and-commit-history-issues.md
+	modified:   .specstory/history/2026-05-27_06-22-24Z-visidata-enablevimmode-optimization.md
+	modified:   .specstory/statistics.json
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	.specstory/history/2026-05-27_06-42-47Z-opencode-tmux-errors.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ The commit went through successfully with all pre-commit checks passing, creating commit `7040604` with 6 files. The `.specstory/` history files are the only unstaged changes, which I'm keeping separate for their own backup commits. Now I'll update the todos and wrap up with a summary without pushing.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+Committed cleanly as `7040604` — all pre-commit hooks passed (including shellcheck on the shell file).
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Record zsh ${arr[*]:0:1} vs [@] slicing pitfall",
+      "id": "pitfall",
+      "status": "completed"
+    },
+    {
+      "content": "Add WAL-race launch stagger to svibe",
+      "id": "stagger",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/aliases if interface changes",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "chezmoi apply the corrected 22_sesh.sh live",
+      "id": "apply",
+      "status": "completed"
+    },
+    {
+      "content": "mkdocs build --strict to validate docs",
+      "id": "validate",
+      "status": "completed"
+    },
+    {
+      "content": "git commit the svibe fix + stagger + pitfalls + docs",
+      "id": "commit",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Record zsh ${arr[*]:0:1} vs [@] slicing pitfall",
+      "id": "pitfall",
+      "status": "completed"
+    },
+    {
+      "content": "Add WAL-race launch stagger to svibe",
+      "id": "stagger",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/aliases if interface changes",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "chezmoi apply the corrected 22_sesh.sh live",
+      "id": "apply",
+      "status": "completed"
+    },
+    {
+      "content": "mkdocs build --strict to validate docs",
+      "id": "validate",
+      "status": "completed"
+    },
+    {
+      "content": "git commit the svibe fix + stagger + pitfalls + docs",
+      "id": "commit",
+      "status": "in_progress"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+已提交 ✅
+
+**Commit `7040604`** — `fix(svibe): correct zsh array slice (first pane ran \`o\`) + stagger opencode launches`,6 files changed, 251 insertions(+), 1 deletion(-):
+
+- `dot_config/shell/22_sesh.sh` — `[*]`→`[@]` 修復 + `SVIBE_LAUNCH_STAGGER`
+- `docs/tools/sesh.md` + `docs/tools/sesh.zh-TW.md`
+- `pitfalls/README.md` + 兩個新 pitfall 檔
+
+pre-commit hooks 全過(含 `dot_config/{shell,bash}/` 的 shellcheck、secrets 偵測)。
+
+幾點補充:
+- 我**刻意排除** `.specstory/` 的自動聊天歷史(`2026-05-27_*-opencode-tmux-errors.md` 等),這些在本 repo 是用獨立的 "Backup chat history" commit 管理的,沒混進這次的功能 commit。
+- 分支現在 **ahead of origin/main by 1 commit**,我**沒有 push**。要 push 再跟我說。
+- 稍早背景的 `chezmoi apply` 已成功把修復套到 live(`~/.config/shell/22_sesh.sh` 第 644 行已是 `[@]`);開個新 shell 就生效。
