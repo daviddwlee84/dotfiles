@@ -165,7 +165,14 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `enableVimMode` | true | Vim-style modal editing in shells (zsh-vi-mode, `set -o vi`, ble.sh) + tmux vim navigation. Does NOT affect Neovim. See [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md). |
 <!-- /dotfiles-init:prompts -->
 
-To change options later: `chezmoi init --force`
+To change options later, don't hand-edit `~/.config/chezmoi/chezmoi.toml` — run the reconfigure tool, which seeds the same TUI from your current values and re-applies via `chezmoi init --apply --prompt`:
+
+```bash
+just reconfigure                 # interactive (or: czcfg)
+just reconfigure -- --set installLlmTools=true --yes   # non-interactive single key
+```
+
+See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 
 ## What You Get
 

@@ -84,6 +84,26 @@ cau() {
     exec "$sh" -l
 }
 
+# czcfg - reconfigure dotfiles prompts on an already-initialized machine.
+# Seeds the grouped TUI from your current chezmoi.toml values, then runs
+# `chezmoi init --apply --prompt` (the SSOT wrapper, scripts/init/dotfiles_init.py)
+# so changed answers actually take effect. `scripts/` isn't deployed, so we
+# locate it via `chezmoi source-path`. Non-interactive single-key changes:
+#   czcfg --set installLlmTools=true motdStyle=figlet --yes
+# Does NOT exec a fresh shell itself — chezmoi apply's reload hint (above) does.
+czcfg() {
+    if ! command -v uv >/dev/null 2>&1; then
+        printf 'czcfg: uv not found; install it first (https://astral.sh/uv).\n' >&2
+        return 1
+    fi
+    local src
+    src="$(chezmoi source-path 2>/dev/null)" || {
+        printf 'czcfg: could not resolve chezmoi source-path.\n' >&2
+        return 1
+    }
+    uv run --script "${src}/scripts/init/dotfiles_init.py" reconfigure "$@"
+}
+
 # Hook registration — source-time dispatch by current shell. The other branch
 # is never parsed at runtime, so zsh-only / bash-only syntax inside each
 # branch is fine (but we keep both branches POSIX-clean anyway).

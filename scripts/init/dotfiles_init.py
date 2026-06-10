@@ -49,6 +49,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
@@ -493,6 +494,19 @@ def _prompt_applies(p: Prompt, os_name: str, profile: object, arch: str) -> bool
     return p.condition is None or p.condition.matches(os_name, profile, arch)
 
 
+def read_current_config() -> dict[str, object]:
+    """Return the `[data]` table of ~/.config/chezmoi/chezmoi.toml as a dict
+    of {prompt_key: current_value}, or {} if the config doesn't exist / can't
+    be parsed. This is what `reconfigure` seeds the TUI with so you toggle
+    deltas from the live state instead of from prompt defaults."""
+    if not CHEZMOI_CONFIG.exists():
+        return {}
+    try:
+        return tomllib.loads(CHEZMOI_CONFIG.read_text()).get("data", {}) or {}
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
 def _detect_ssh() -> str | None:
     """Return a short hint describing why we think SSH-to-github is configured,
     or None if we can't tell. We accept several signals because the user may
@@ -819,13 +833,21 @@ def build_chezmoi_argv(
     repo: str | None,
     use_ssh: bool,
     apply: bool,
+    prompt: bool = False,
 ) -> list[str]:
     """Build the chezmoi init argv. The critical detail is that `chezmoi init`
     matches --promptBool / --promptString / --promptChoice flags by the PROMPT
     TEXT (3rd arg to promptXOnce in the template), NOT the key name. That's
     why every Prompt carries a prompt_text field and we use it here as the
     flag key. We only emit flags for prompts present in `answers` (i.e. the
-    ones applicable to this host); chezmoi harmlessly ignores extras anyway."""
+    ones applicable to this host); chezmoi harmlessly ignores extras anyway.
+
+    `prompt=True` adds `--prompt`, which FORCES the `prompt*Once` template
+    functions to prompt again. This is mandatory when re-initializing an
+    already-configured machine: without it, chezmoi reads the existing value
+    from ~/.config/chezmoi/chezmoi.toml's [data] and our --promptX flags are
+    silently ignored (so the answers never actually change). With --prompt,
+    every Once call re-fires and our flags satisfy them non-interactively."""
     argv: list[str] = [chezmoi_bin, "init"]
     if repo:
         argv.append(repo)
@@ -833,6 +855,8 @@ def build_chezmoi_argv(
         argv.append("--ssh")
     if apply:
         argv.append("--apply")
+    if prompt:
+        argv.append("--prompt")
     by_key = {p.key: p for p in PROMPTS}
     # String + choice prompts (basics).
     for key in ("email", "name"):
@@ -1120,12 +1144,35 @@ class DoctorCmd:
 
 
 @dataclass
+class ReconfigureCmd:
+    """Change settings on an ALREADY-initialized machine.
+
+    Seeds the same grouped TUI from your CURRENT ~/.config/chezmoi/chezmoi.toml
+    values (so you toggle deltas, not start from prompt defaults), then runs
+    `chezmoi init --apply --prompt` so the new answers actually take effect.
+    (`--prompt` is required: without it chezmoi keeps the existing [data]
+    values and the override flags are silently ignored.)
+
+    Non-interactive single-key changes for scripts / fleet (space-separated):
+        reconfigure --set installLlmTools=true motdStyle=figlet --yes"""
+
+    set: Annotated[
+        tuple[str, ...],
+        tyro.conf.arg(help="space-separated key=value override(s). Non-interactive when combined with --yes"),
+    ] = ()
+    yes: Annotated[bool, tyro.conf.arg(help="Non-interactive: skip the TUI, apply current+--set values directly")] = False
+    dry_run: Annotated[bool, tyro.conf.arg(help="Print the chezmoi command instead of running it")] = False
+    no_apply: Annotated[bool, tyro.conf.arg(help="Render chezmoi.toml but skip `chezmoi apply`")] = False
+
+
+@dataclass
 class ListBundlesCmd:
     """List available bundles and their overrides."""
 
 
 Command = (
     Annotated[InitCmd, tyro.conf.subcommand(name="init")]
+    | Annotated[ReconfigureCmd, tyro.conf.subcommand(name="reconfigure")]
     | Annotated[GenCmd, tyro.conf.subcommand(name="gen")]
     | Annotated[DoctorCmd, tyro.conf.subcommand(name="doctor")]
     | Annotated[ListBundlesCmd, tyro.conf.subcommand(name="list-bundles")]
@@ -1189,6 +1236,15 @@ def run_init(cmd: InitCmd) -> int:
     overrides = dict(BUNDLES[bundle_name])
     console.print(f"[dim]Bundle: {bundle_name}[/dim]\n")
 
+    # Re-init on an already-configured machine: seed from the LIVE config so
+    # the TUI shows current values and untouched options aren't silently reset
+    # to bundle/prompt defaults. Explicit --bundle still layers on top.
+    if pf.source_exists:
+        current = read_current_config()
+        if current:
+            overrides = {**current, **overrides}
+            console.print("[dim]Seeded answers from current chezmoi.toml (re-init).[/dim]\n")
+
     # Basics & features — interactive prompts vs pure resolution.
     if cmd.yes:
         basics = resolve_basics_non_interactive(
@@ -1210,6 +1266,9 @@ def run_init(cmd: InitCmd) -> int:
         repo=None if pf.source_exists else cmd.repo,
         use_ssh=use_ssh,
         apply=not cmd.no_apply,
+        # On re-init the values already exist in [data]; --prompt forces the
+        # promptXOnce calls to re-fire so our flags actually take effect.
+        prompt=pf.source_exists,
     )
 
     if not cmd.yes and not confirm_plan(answers, argv):
@@ -1238,6 +1297,135 @@ def _install_chezmoi_silent() -> str:
     return str(local) if local.exists() else (shutil.which("chezmoi") or str(local))
 
 
+_TRUE_TOKENS = {"true", "1", "yes", "y", "on"}
+_FALSE_TOKENS = {"false", "0", "no", "n", "off"}
+
+
+def _coerce_set_value(p: Prompt, raw: str) -> object:
+    """Coerce a --set string value to the prompt's type, raising ValueError on
+    a bad bool token or an out-of-range choice."""
+    if p.kind == "bool":
+        low = raw.strip().lower()
+        if low in _TRUE_TOKENS:
+            return True
+        if low in _FALSE_TOKENS:
+            return False
+        raise ValueError(f"{p.key}: expected a bool (true/false), got {raw!r}")
+    if p.kind == "choice":
+        if raw not in p.choices:
+            raise ValueError(f"{p.key}: {raw!r} not in {list(p.choices)}")
+        return raw
+    return raw
+
+
+def parse_set_overrides(pairs: tuple[str, ...]) -> dict[str, object]:
+    """Parse `--set key=value` pairs into a typed override dict, validating
+    each key against PROMPTS. Raises SystemExit with a friendly message on any
+    unknown key or bad value."""
+    by_key = {p.key: p for p in PROMPTS}
+    out: dict[str, object] = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise SystemExit(f"--set expects key=value, got {pair!r}")
+        key, raw = pair.split("=", 1)
+        key = key.strip()
+        if key not in by_key:
+            raise SystemExit(
+                f"--set: unknown key {key!r}. Valid keys: "
+                + ", ".join(p.key for p in PROMPTS)
+            )
+        try:
+            out[key] = _coerce_set_value(by_key[key], raw)
+        except ValueError as e:
+            raise SystemExit(f"--set: {e}")
+    return out
+
+
+def _valid_profile(profile: object) -> bool:
+    return profile in _by_key("profile").choices
+
+
+def run_reconfigure(cmd: ReconfigureCmd) -> int:
+    pf = detect()
+    print_preflight(pf)
+
+    if not pf.source_exists:
+        console.print(
+            "[red]No chezmoi source found — this machine isn't initialized yet.\n"
+            "Run the init flow first (curl bootstrap or `just bootstrap-local`).[/red]"
+        )
+        return 2
+
+    if pf.chezmoi and not pf.chezmoi_is_snap:
+        chezmoi_bin = pf.chezmoi
+    elif pf.chezmoi_is_snap:
+        console.print(f"[yellow]Found snap chezmoi at {pf.chezmoi}; the snap build has a "
+                      "stdin/stdout permission bug that can break modify_/run_ scripts.[/yellow]")
+        if cmd.yes or questionary.confirm(
+            "Install the canonical chezmoi to ~/.local/bin (recommended)?", default=True
+        ).ask():
+            chezmoi_bin = _install_chezmoi_silent()
+            console.print(f"[green]Using {chezmoi_bin}[/green]\n")
+        else:
+            chezmoi_bin = pf.chezmoi
+    else:
+        console.print("[red]chezmoi not found on PATH; cannot reconfigure.[/red]")
+        return 2
+
+    # Seed from the live config, then layer --set overrides on top.
+    current = read_current_config()
+    set_overrides = parse_set_overrides(cmd.set)
+    overrides: dict[str, object] = {**current, **set_overrides}
+
+    # A stale/removed profile value (e.g. the retired "macos_intel") can't drive
+    # the picker or be a valid --promptChoice; drop it so basics fall back to
+    # OS auto-detect / re-pick.
+    if "profile" in overrides and not _valid_profile(overrides["profile"]):
+        console.print(
+            f"[yellow]Current profile {overrides['profile']!r} is not a valid choice anymore; "
+            "falling back to auto-detect.[/yellow]"
+        )
+        overrides.pop("profile")
+
+    non_interactive = cmd.yes or not pf.is_tty
+    if non_interactive and not cmd.yes:
+        console.print("[yellow]No TTY detected — running non-interactively from current + --set values.[/yellow]")
+
+    if non_interactive:
+        basics = resolve_basics_non_interactive(
+            pf, overrides, name_flag=None, email_flag=None, profile_flag=None,
+        )
+        features = resolve_features_non_interactive(pf, overrides, basics["profile"])
+        choices = resolve_choices_non_interactive(pf, overrides, basics["profile"])
+    else:
+        basics = ask_basics(pf, overrides)
+        features = ask_features(pf, overrides, basics["profile"])
+        choices = ask_choices(pf, overrides, basics["profile"])
+
+    answers: dict[str, object] = {**basics, **features, **choices}
+
+    argv = build_chezmoi_argv(
+        answers,
+        chezmoi_bin=chezmoi_bin,
+        repo=None,            # re-init: never re-clone, just re-render + apply
+        use_ssh=False,
+        apply=not cmd.no_apply,
+        prompt=True,          # mandatory so the new values override [data]
+    )
+
+    if not cmd.yes and not confirm_plan(answers, argv):
+        console.print("[yellow]Aborted.[/yellow]")
+        return 130
+
+    if cmd.dry_run:
+        console.print(Panel(" ".join(argv), title="dry-run", border_style="yellow"))
+        return 0
+
+    rc = run_chezmoi(argv)
+    print_recap(answers, rc)
+    return rc
+
+
 def run_gen(cmd: GenCmd) -> int:
     return gen_report(cmd.source, check=cmd.check)
 
@@ -1264,6 +1452,8 @@ def main() -> int:
     cmd = tyro.cli(Command, default=InitCmd())
     if isinstance(cmd, InitCmd):
         return run_init(cmd)
+    if isinstance(cmd, ReconfigureCmd):
+        return run_reconfigure(cmd)
     if isinstance(cmd, GenCmd):
         return run_gen(cmd)
     if isinstance(cmd, DoctorCmd):

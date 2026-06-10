@@ -151,6 +151,16 @@ bootstrap-local-verbose *ARGS:
     @echo "[bootstrap-local-verbose] uv --verbose; expect lots of resolver output"
     uv run --verbose --script scripts/init/dotfiles_init.py {{ARGS}}
 
+# Reconfigure an ALREADY-initialized machine. Seeds the same grouped TUI from
+# your current ~/.config/chezmoi/chezmoi.toml values, then runs
+# `chezmoi init --apply --prompt` so the new answers actually take effect
+# (the `--prompt` is what re-fires promptXOnce; without it the old values win).
+# Non-interactive single-key changes (space-separated, for scripts / fleet):
+#     just reconfigure -- --set installLlmTools=true motdStyle=figlet --yes
+#     just reconfigure -- --dry-run        # preview the chezmoi command
+reconfigure *ARGS:
+    uv run --script scripts/init/dotfiles_init.py reconfigure {{ARGS}}
+
 # Regenerate the chezmoi prompt blocks (.chezmoi.toml.tmpl + Dockerfile) from
 # PROMPTS in scripts/init/dotfiles_init.py — the single source of truth. Run
 # after editing PROMPTS, then commit the regenerated files. The pre-commit

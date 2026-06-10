@@ -31,10 +31,35 @@ uv run --script ~/.local/share/chezmoi/scripts/init/dotfiles_init.py
 ```
 
 Detects that `~/.local/share/chezmoi/.git` exists and calls
-`chezmoi init --apply` **without** a repo arg, which re-renders
-`.chezmoi.toml.tmpl` with your new `--promptBool` / `--promptString`
-overrides. Answers written by `promptStringOnce` / `promptBoolOnce`
-are overridden by the CLI flags.
+`chezmoi init --apply --prompt` **without** a repo arg, which re-renders
+`.chezmoi.toml.tmpl`. On re-init the TUI is seeded from your **current**
+`~/.config/chezmoi/chezmoi.toml` values so untouched options aren't reset.
+
+The `--prompt` flag is load-bearing: see "Re-init semantics" below.
+
+### Reconfigure (change settings after init)
+
+Prefer this over hand-editing `~/.config/chezmoi/chezmoi.toml`:
+
+```bash
+# Interactive — grouped TUI pre-filled with your current values:
+just reconfigure
+# or the shell wrapper (locates the script via `chezmoi source-path`):
+czcfg
+
+# Non-interactive single-key changes (space-separated key=value), e.g. fleet:
+just reconfigure -- --set installLlmTools=true motdStyle=figlet --yes
+czcfg --set noRoot=true --yes
+
+# Preview the chezmoi command without running it:
+just reconfigure -- --dry-run
+```
+
+`reconfigure` reads the live `[data]` table, layers any `--set` overrides on
+top, and runs `chezmoi init --apply --prompt` so the new answers actually take
+effect. `--set` keys/values are validated against `PROMPTS` (unknown key, bad
+bool token, or out-of-range choice fail fast). A stale/removed `profile` value
+(e.g. the retired `macos_intel`) is dropped and re-detected.
 
 ### Regenerate / drift check
 
@@ -97,14 +122,32 @@ Current bundles (edit `BUNDLES` in `dotfiles_init.py` to tune):
 
 ## Re-init semantics
 
-`.chezmoi.toml.tmpl` uses `promptBoolOnce` / `promptStringOnce` (the
-`-Once` variants). On first init they prompt; on subsequent runs they
-read the existing value from `~/.config/chezmoi/chezmoi.toml` — **unless**
-you pass `--prompt` to force re-prompting, or pass explicit
-`--promptBool k=v` / `--promptString k=v` flags, which take precedence.
+`.chezmoi.toml.tmpl` uses `promptBoolOnce` / `promptStringOnce` /
+`promptChoiceOnce` (the `-Once` variants). On first init they prompt; on
+subsequent runs they read the existing value from
+`~/.config/chezmoi/chezmoi.toml`'s `[data]` and **return it directly**.
 
-This wrapper always passes explicit flags, so re-running it always
-updates answers to whatever you select in the UI.
+Crucially, `--promptBool k=v` / `--promptString k=v` / `--promptChoice k=v`
+flags do **NOT** override an already-stored value on their own — the `-Once`
+function short-circuits before the `promptBool` lookup ever happens. Verified
+empirically (chezmoi v2.69.x):
+
+```console
+$ printf '{{ promptBoolOnce . "installLlmTools" "P" false }}' \
+    | chezmoi execute-template --init --promptBool "P=false"
+true        # stored value wins; the flag is ignored
+
+$ chezmoi init --prompt --promptBool "P=false" …
+            # --prompt forces the Once call to re-fire → flag now wins
+```
+
+So to actually change answers you must pass `--prompt` (force re-prompting)
+**together with** the full set of `--promptX` flags (which then satisfy the
+re-fired prompts non-interactively). Both `init` (on re-init) and the
+`reconfigure` subcommand pass `--prompt` plus a complete flag set for every
+applicable prompt, so re-running them updates answers to your selections.
+(Without `--prompt`, the stale `[data]` values silently persist —
+`pitfalls/chezmoi-reinit-promptonce-keeps-stale-value.md`.)
 
 ## Behind GFW
 
