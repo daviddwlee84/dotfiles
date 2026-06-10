@@ -61,16 +61,41 @@
   changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
   failed_when: false
 
+# TUNA's rustup mirror lags upstream releases: right after a new stable lands,
+# the channel manifest already names it but the tarballs 404 ("could not
+# download nonexistent rust version `1.96.0-…`"). Leaving rust missing here is
+# NOT contained to this task — every later `mise exec -- npm …` (coding_agents,
+# js_cli_tools) first tries to auto-install the missing rust, hits the same
+# 404, and fails the play. Retry against the canonical rustup server, same
+# fallback pattern as rust_cargo_tools. crates.io stays on the user's
+# ~/.cargo/config.toml mirror. See pitfalls/mise-rust-cargo-shim-dead.md.
+- name: Retry mise global tools against official rustup server (mirror lag)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - target_architecture not in ['armv7l', 'armv6l']
+    - mise_install.rc is defined
+    - mise_install.rc != 0
+  ansible.builtin.command:
+    cmd: "{{ mise_bin }} install --yes"
+  environment:
+    RUSTUP_DIST_SERVER: "https://static.rust-lang.org"
+    RUSTUP_UPDATE_ROOT: "https://static.rust-lang.org/rustup"
+  register: mise_install_retry
+  changed_when: "'install' in mise_install_retry.stderr or 'install' in mise_install_retry.stdout"
+  failed_when: false
+
 - name: Warn if mise install had failures
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - mise_install.rc is defined
     - mise_install.rc != 0
+    - mise_install_retry.rc | default(1) != 0
   ansible.builtin.debug:
     msg: |
-      mise install exited with rc={{ mise_install.rc }} — some tools may have failed.
+      mise install exited with rc={{ mise_install.rc }} — some tools may have failed
+      (official-server retry rc={{ mise_install_retry.rc | default('skipped') }}).
       Re-run manually to retry: `{{ mise_bin }} install --yes`
-      Stderr tail: {{ mise_install.stderr_lines[-5:] | default([]) | join(' | ') }}
+      Stderr tail: {{ (mise_install_retry.stderr_lines | default(mise_install.stderr_lines))[-5:] | default([]) | join(' | ') }}
 
 # fzf - upstream clone is managed by .chezmoiexternal.toml.tmpl (Linux only,
 # since the apt version is outdated and lacks --zsh). We only need to build

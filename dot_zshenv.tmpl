@@ -1,2 +1,14 @@
 # ~/.zshenv - Loaded for all shells (interactive and non-interactive)
 # Keep minimal - only essential environment variables
+
+{{ if eq .chezmoi.os "linux" -}}
+# Ubuntu's /etc/zsh/zshrc runs a bare `compinit` before ~/.zshrc. When the
+# inherited FPATH contains dirs that fail compaudit (e.g. a shared Linuxbrew's
+# site-functions owned by another user — exported by `brew shellenv`, so every
+# NESTED zsh inherits them), that bare compinit blocks on an interactive
+# "Ignore insecure directories and files ... [y]/[n]?" prompt. Skip it via the
+# escape hatch documented in /etc/zsh/zshrc itself — oh-my-zsh runs compinit
+# in ~/.zshrc anyway, so this also drops a duplicate compinit at startup.
+# See pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md.
+skip_global_compinit=1
+{{ end -}}

@@ -73,6 +73,20 @@ fpath+=~/.zfunc
 # Skip compinit insecure directory warnings (e.g. /usr/local/share on Intel Macs)
 # ZSH_DISABLE_COMPFIX=true
 {{ end }}
+{{- if eq .chezmoi.os "linux" }}
+# Shared Linuxbrew (prefix owned by ANOTHER user on a multi-user box) trips
+# compaudit's OWNERSHIP check — perms are fine (755), so the suggested
+# `compaudit | xargs chmod g-w,o-w` can't fix it, and chown would break the
+# owner's `brew upgrade`. Without this, oh-my-zsh refuses brew's
+# site-functions and prints the "[oh-my-zsh] Insecure completion-dependent
+# directories" wall on every nested shell (`brew shellenv` exports FPATH, so
+# child zsh inherits it at compinit time). The shared prefix is trusted →
+# let compinit load from all dirs (-u). Single-user installs keep the audit.
+# See pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md.
+if [[ -e /home/linuxbrew/.linuxbrew/bin/brew && ! -O /home/linuxbrew/.linuxbrew ]]; then
+    ZSH_DISABLE_COMPFIX=true
+fi
+{{ end }}
 
 # Load Oh-My-Zsh (also runs compinit)
 [[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"

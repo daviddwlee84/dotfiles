@@ -5006,4 +5006,34 @@ _**Agent (claude-opus-4-8)**_
 
 | 层级 | 位置 | 作用 | 触发时机 |
 |------|------|------|----------|
-| **指示(给 agent/人看)** | `AGENTS.md`→`CLAUDE.md` 第 19 行 | "改 `PROMPTS` → 跑 `just gen-prompts` → 补 README 表;
+| **指示(给 agent/人看)** | `AGENTS.md`→`CLAUDE.md` 第 19 行 | "改 `PROMPTS` → 跑 `just gen-prompts` → 补 README 表;绝不手改生成区间" | 写代码时主动遵循 |
+| **便捷命令** | `justfile` `gen-prompts` | 一键重新渲染 / 校验 | 手动调用 |
+| **强制兜底** | `.pre-commit-config.yaml` `dotfiles-init-gen-check` | 跑 `gen --check`,漂移就 **阻断 commit** | 当 `dotfiles_init.py` / `.chezmoi.toml.tmpl` / `Dockerfile` / `README.md` 任一被改时自动跑 |
+
+所以你担心的"避免忘记"已经由 pre-commit hook 覆盖,"放到 justfile"也已经做了。
+
+## 具体怎么用(正常工作流)
+
+```bash
+# 1. 编辑 PROMPTS(唯一数据源)
+$EDITOR scripts/init/dotfiles_init.py
+
+# 2. 重新渲染模板 + Dockerfile
+just gen-prompts
+
+# 3. 把 README 选项表也补上对应的 key(coverage 检查)
+
+# 4. 一起提交(template / Dockerfile / README / dotfiles_init.py)
+git add -A && git commit -m "feat(init): add <newPrompt>"
+```
+
+## 关于"渲染时机"
+
+渲染本身是**手动**的(`just gen-prompts`),pre-commit hook 只做 **`--check`(只读校验,不自动写)**。这是有意的设计:
+
+- **好处**:生成内容显式可见、可 review,不会在你 commit 时"偷偷"改文件。
+- **代价**:如果你忘了跑 `gen`,commit 会被 hook 拦下并提示你跑 `just gen-prompts`,然后重新 `git add` + commit(和 `trailing-whitespace` 那类 hook 一样的 UX)。
+
+一个可选的取舍:可以把这个 hook 改成**自动修复型**(像仓库里 `redact-agent-secrets` 那样,直接 `gen` 写盘,然后报 "files were modified by this hook" 让你 re-add)。这样就完全不会"忘记渲染"。
+
+要我把它改成自动渲染(auto-fix)模式吗?还是保持现在的只读校验?

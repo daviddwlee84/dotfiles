@@ -25,6 +25,23 @@
   ```
 - The ansible task `Install Rust via mise` reports **`ok` in ~0.2s** (it was
   skipped by its `creates:` guard, not actually run).
+- **Cascading variant** (observed 2026-06-10 on `ta-stg`, Ubuntu 22.04): every
+  `mise exec -- npm install -g …` task (coding_agents, js_cli_tools) fails with
+  the same rust error before npm even runs — `mise exec` auto-installs ALL
+  missing config tools first, so one broken rust mirror takes down unrelated
+  npm installs and the `js_cli_tools` task (the only non-`ignore_errors` one)
+  fails the whole play:
+  ```
+  mise rust@1.96.0     [1/3] install
+  error: could not download nonexistent rust version `1.96.0-x86_64-unknown-linux-gnu`:
+  … 'https://mirrors.tuna.tsinghua.edu.cn/rustup/dist/rust-1.96.0-….tar.gz.sha256'
+  … http request returned an unsuccessful status code: 404
+  ```
+  Here TUNA's channel manifest already named 1.96.0 but the tarballs were not
+  yet synced (mirror lag, the inverse of the GC case). Also note: the
+  `creates: ~/.cargo/bin/cargo` guard does NOT help in this state — rustup's
+  proxy shims exist in `~/.cargo/bin` even though no toolchain is installed
+  ("rustup could not choose a version of cargo to run").
 
 ## Root cause — two independent traps that compound
 
@@ -48,7 +65,7 @@
    ```
    So even once the guard re-triggers, the install itself fails on the mirror.
 
-## Fix (shipped in `dot_ansible/roles/rust_cargo_tools/tasks/main.yml`)
+## Fix (shipped in `dot_ansible/roles/rust_cargo_tools/tasks/main.yml` + `lazyvim_deps`)
 
 - Guard the mise rust install on **`creates: ~/.cargo/bin/cargo`** (the real
   backing binary), not the `installs/rust` dir — self-heals the dead-symlink
@@ -59,6 +76,12 @@
   attempt returns non-zero — generalizes the CentOS-7 workaround to all
   platforms. crates.io stays on the user's `~/.cargo/config.toml` mirror so
   dependency builds keep their speed.
+- **`lazyvim_deps` retries `mise install --yes` against the official server**
+  when the first (mirrored) run exits non-zero. lazyvim_deps runs *before*
+  coding_agents / js_cli_tools in every profile's tag order, so repairing rust
+  there keeps the later `mise exec -- npm …` tasks from tripping over the
+  auto-install cascade (the `mise install` path has no `creates:` guard, so it
+  also self-heals the proxy-shims-but-no-toolchain state).
 
 ## Manual repair (one machine, without a full apply)
 
