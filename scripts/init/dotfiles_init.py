@@ -207,6 +207,11 @@ PROMPTS: tuple[Prompt, ...] = (
            "nmap, mtr, httpie, gping, trippy.",
            default=False,
            prompt_text="Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)"),
+    Prompt("installTunnelTools", "bool", "System & apps",
+           "Tunnel tools (ngrok, cloudflared)",
+           "Expose localhost / SSH reverse tunnels via ngrok and cloudflared.",
+           default=False,
+           prompt_text="Install tunnel tools (ngrok, cloudflared — expose localhost, SSH tunnels)"),
     # --- Preferences -----------------------------------------------------
     Prompt("useChineseMirror", "bool", "Preferences",
            "Use China (GFW) mirrors",
@@ -517,6 +522,55 @@ def resolve_features_non_interactive(pf: Preflight, overrides: dict[str, object]
     return result
 
 
+def _applicable_choice_prompts(pf: Preflight, profile: object):
+    """Yield the non-hidden choice prompts chezmoi will actually prompt for,
+    given the OS + chosen profile. discordChannel is special: the template
+    only prompts it on ubuntu_desktop (it's hardcoded to "none" elsewhere),
+    so we must NOT pre-answer it on other profiles or chezmoi would reject an
+    unmatched --promptChoice flag."""
+    for p in PROMPTS:
+        if p.kind != "choice" or p.hidden:
+            continue
+        if p.darwin_only and pf.os_name != "darwin":
+            continue
+        if p.key == "discordChannel" and profile != "ubuntu_desktop":
+            continue
+        yield p
+
+
+def resolve_choices_non_interactive(
+    pf: Preflight, overrides: dict[str, object], profile: object
+) -> dict[str, object]:
+    """Non-interactive choice prompts: bundle override → embedded default."""
+    result: dict[str, object] = {}
+    for p in _applicable_choice_prompts(pf, profile):
+        result[p.key] = overrides.get(p.key, p.default)
+    return result
+
+
+def ask_choices(
+    pf: Preflight, overrides: dict[str, object], profile: object
+) -> dict[str, object]:
+    """Interactive single-select for each applicable non-basics choice prompt
+    (backupMode, motdStyle, primaryShell, and discordChannel on ubuntu_desktop).
+    Without this, chezmoi falls back to prompting them itself mid-apply."""
+    result: dict[str, object] = {}
+    prompts = list(_applicable_choice_prompts(pf, profile))
+    if not prompts:
+        return result
+    console.print()
+    console.print("[bold]Other choices[/bold]")
+    for p in prompts:
+        default = overrides.get(p.key, p.default)
+        answer = questionary.select(
+            f"{p.label}?",
+            choices=list(p.choices),
+            default=default if default in p.choices else None,
+        ).ask()
+        result[p.key] = answer if answer is not None else default
+    return result
+
+
 def ask_features(pf: Preflight, overrides: dict[str, object]) -> dict[str, bool]:
     """Grouped multi-select. Returns {key: bool} for every non-basics bool prompt."""
     feature_prompts = [p for p in PROMPTS if p.kind == "bool" and not p.hidden
@@ -811,11 +865,13 @@ def run_init(cmd: InitCmd) -> int:
             name_flag=cmd.name, email_flag=cmd.email, profile_flag=cmd.profile,
         )
         features = resolve_features_non_interactive(pf, overrides)
+        choices = resolve_choices_non_interactive(pf, overrides, basics["profile"])
     else:
         basics = ask_basics(pf, overrides)
         features = ask_features(pf, overrides)
+        choices = ask_choices(pf, overrides, basics["profile"])
 
-    answers: dict[str, object] = {**basics, **features}
+    answers: dict[str, object] = {**basics, **features, **choices}
 
     argv = build_chezmoi_argv(
         answers,
