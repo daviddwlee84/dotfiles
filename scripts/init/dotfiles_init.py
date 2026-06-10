@@ -243,6 +243,15 @@ PROMPTS: tuple[Prompt, ...] = (
            default=False,
            prompt_text="Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)",
            comment="是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)"),
+    Prompt("installExtraRuntimes", "bool", "Dev tooling",
+           "Extra mise runtimes (rust, bun, ruby)",
+           "Rust toolchain + cargo tools, bun, ruby + gem tools via mise (~1.8GB). Node is always installed regardless (nvim LSP / npm agents need it).",
+           default=True,
+           prompt_text="Install extra mise runtimes (rust, bun, ruby) and their cargo/gem tools",
+           comment=("是否安裝額外的 mise runtimes (rust, bun, ruby) 與對應的 cargo/gem 工具（~1.8GB）。\n"
+                    "Node 永遠會裝（nvim LSP / npm-based coding agents 硬依賴），不受此 flag 影響。\n"
+                    "false 時 mise [tools] 只留 node，且 ansible TAGS 會剔除 rust_cargo_tools /\n"
+                    "ruby_gem_tools（沒有 toolchain 跑了也只會失敗）。lean cloud VM / CI 建議 false。")),
     Prompt("installAuditd", "bool", "System & apps",
            "Linux audit framework (auditd)",
            "Installs auditd + a baseline rule set (identity / sudoers / sshd_config / privileged-exec watches). Linux only — no-op on macOS. See docs/sysadmin/auditd.md.",
@@ -408,6 +417,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installAiDesktopApps": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
+        "installExtraRuntimes": True,
         "installBitwarden": True,
         "installBrewApps": True,
         "installNetworkingTools": True,
@@ -418,6 +428,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installCodingAgents": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
+        "installExtraRuntimes": True,
         "installBrewApps": True,
         "backupMode": "smart",
         # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden
@@ -426,10 +437,31 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installCodingAgents": True,
         "installPythonUvTools": True,
         "installJsCliTools": True,
+        "installExtraRuntimes": True,
         "installNetworkingTools": True,
         "installAuditd": True,
         "backupMode": "smart",
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
+    },
+    "cloud-vm": {
+        # Lean throwaway / cloud dev VM: ergonomic shell + tmux + nvim +
+        # coding agents, nothing heavier. Pairs with `just az-dev-vm`
+        # (scripts/azure/dev_vm.py) which passes --bundle cloud-vm during the
+        # remote non-interactive bootstrap. Compared to server-linux this
+        # drops uv/js/networking/auditd extras AND the ~1.8GB of extra mise
+        # runtimes (rust/bun/ruby + dotnet) — node stays (nvim/agents).
+        "installCodingAgents": True,
+        "installLlmTools": False,
+        "installPythonUvTools": False,
+        "installJsCliTools": False,
+        "installExtraRuntimes": False,
+        "installDotnetTools": False,
+        "installIacTools": False,
+        "installBitwarden": False,
+        "installNetworkingTools": False,
+        "installMediaTools": False,
+        "installAuditd": False,
+        "backupMode": "off",  # fresh VM — nothing worth backing up
     },
     "minimal": {
         # Dotfiles only — every installX forced off so `chezmoi apply` in CI /
@@ -441,6 +473,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installAiDesktopApps": False,
         "installPythonUvTools": False,
         "installJsCliTools": False,
+        "installExtraRuntimes": False,
         "installDotnetTools": False,
         "installIacTools": False,
         "installBitwarden": False,
@@ -648,6 +681,7 @@ def ask_bundle() -> str:
             ("personal-mac", "full personal setup (AI desktop apps, LLM tools, Brewfile)"),
             ("work-mac",     "safer: coding agents + dev tooling, no personal AI apps"),
             ("server-linux", "headless linux — coding agents, networking, dev tooling"),
+            ("cloud-vm",     "lean throwaway VM — shell + tmux + nvim + coding agents only"),
             ("minimal",      "dotfiles only, no installX flags"),
             ("custom",       "no overrides — tick every feature yourself"),
         ]
@@ -952,6 +986,7 @@ DOCKER_ARG_DEFAULTS: dict[str, object] = {
     "installCodingAgents": False,
     "installPythonUvTools": False,
     "installJsCliTools": False,
+    "installExtraRuntimes": False,  # skip ~1.8GB of mise runtimes in CI images
     "backupMode": "off",
     "discordChannel": "none",
 }

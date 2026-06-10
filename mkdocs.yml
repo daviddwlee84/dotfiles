@@ -360,6 +360,7 @@ nav:
       - Vim mode (catalog + opt-out): this_repo/vim-mode.md
       - Fleet apply: this_repo/fleet-apply.md
       - fleet-apply vs fabric: this_repo/fleet-apply-vs-fabric.md
+      - Azure dev VM (az-dev-vm): this_repo/az-dev-vm.md
       - chezmoiscripts layout: this_repo/chezmoiscripts-layout.md
       - Instant-LLM-fix prior art: this_repo/instant-llm-fix-prior-art.md
       - Initial setup:

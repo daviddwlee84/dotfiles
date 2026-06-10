@@ -78,6 +78,12 @@
       - jq
       - tree
       - build-essential
+      # unzip: required by ansible.builtin.unarchive for .zip archives
+      # (duckdb, etc.). Minimal cloud images (Azure Ubuntu 24.04) don't ship
+      # it, which used to fail the devtools role with the misleading
+      # "Unable to list files in the archive: bzip2: (stdin) is not a bzip2
+      # file" before the real "'unzip' binary not in path" line.
+      - unzip
       # python3-debian: required by ansible.builtin.deb822_repository (used in
       # devtools / gui_apps_linux roles after the apt_repository deprecation).
       - python3-debian

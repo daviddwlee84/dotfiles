@@ -215,6 +215,15 @@ warn "Unknown profile: {{ .profile }}"
 exit 0
 {{ end -}}
 
+{{ $installExtraRuntimes := true }}{{ if hasKey . "installExtraRuntimes" }}{{ $installExtraRuntimes = .installExtraRuntimes }}{{ end -}}
+{{ if not $installExtraRuntimes -}}
+# installExtraRuntimes=false: mise skips rust/bun/ruby (see
+# dot_config/mise/config.toml.tmpl), so the roles that need those toolchains
+# would only fail — drop them from the base tag set.
+TAGS="${TAGS//,rust_cargo_tools/}"
+TAGS="${TAGS//,ruby_gem_tools/}"
+{{ end -}}
+
 # Add optional tags based on chezmoi config
 {{ if .installCodingAgents -}}
 TAGS="${TAGS},coding_agents"

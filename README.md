@@ -59,7 +59,7 @@ flowchart TB
 curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | bash
 ```
 
-Installs [`uv`](https://docs.astral.sh/uv/) (if missing) and launches `dotfiles-init` — a Python wrapper that groups the ~19 chezmoi prompts into a clean multi-select UI, offers pre-set bundles (`personal-mac` / `work-mac` / `server-linux` / `minimal`), checks SSH keys, then calls real `chezmoi init` with your answers pre-filled. Full docs: [`scripts/init/README.md`](scripts/init/README.md).
+Installs [`uv`](https://docs.astral.sh/uv/) (if missing) and launches `dotfiles-init` — a Python wrapper that groups the ~19 chezmoi prompts into a clean multi-select UI, offers pre-set bundles (`personal-mac` / `work-mac` / `server-linux` / `cloud-vm` / `minimal`), checks SSH keys, then calls real `chezmoi init` with your answers pre-filled. Full docs: [`scripts/init/README.md`](scripts/init/README.md).
 
 On first-run or slow networks the `uv` resolver can sit silently for a few minutes — use the verbose form to see timestamped progress + `uv --verbose` resolver output + `set -x`:
 
@@ -154,6 +154,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
 | `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
+| `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby; ~1.8GB) + their cargo/gem tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
 | `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
 | `useChineseMirror` | false | Switch Homebrew / pip / npm / cargo / etc. to China (GFW) mirrors |
 | `gitleaksAllRepos` | false | Run gitleaks on ALL git repos, not just those with `.pre-commit-config.yaml` |

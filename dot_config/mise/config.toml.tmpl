@@ -1,4 +1,13 @@
 {{- $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+{{- /* installExtraRuntimes gates rust/bun/ruby (~1.8GB). Default TRUE when the
+       key is absent so machines initialized before this prompt existed keep
+       their runtimes until they re-init and answer explicitly. */ -}}
+{{- $extraRuntimes := true }}{{ if hasKey . "installExtraRuntimes" }}{{ $extraRuntimes = .installExtraRuntimes }}{{ end -}}
+{{- /* installDotnetTools gates the .NET SDK. Default FALSE when absent — this
+       is the contract-bug fix: the prompt (default false) always promised to
+       gate the SDK, but the SDK used to land unconditionally (~650MB even
+       after answering No). See backlog/mise-runtime-gating.md. */ -}}
+{{- $dotnet := false }}{{ if hasKey . "installDotnetTools" }}{{ $dotnet = .installDotnetTools }}{{ end -}}
 {{- /* Detect CentOS/RHEL 7 — glibc 2.17 + libstdc++ from gcc 4.8.5. Modern
        Node (18+) / Bun musl / .NET 6+ binaries refuse to load against this
        baseline, and mise's rustup channel is gated on a TUNA mirror that
@@ -42,18 +51,29 @@ ruby.compile = false
 # version matrix and why these decisions are structural, not transient.
 ruby = "3"
 {{ else -}}
-# Node.js LTS for LazyVim LSP servers and tree-sitter-cli
+# Node.js LTS for LazyVim LSP servers and tree-sitter-cli — always installed
+# (nvim LSP/treesitter + npm-based coding agents hard-depend on it).
 node = "lts"
+{{ if $extraRuntimes -}}
 # Bun for bunx CLI tools
 bun = "latest"
 # Rust toolchain for cargo tools
 rust = "latest"
-# .NET SDK
+{{ else -}}
+# bun/rust skipped: installExtraRuntimes=false (lean VM / CI)
+{{ end -}}
+{{ if $dotnet -}}
+# .NET SDK (installDotnetTools=true)
 dotnet = "latest"
-{{ if not $noRoot -}}
+{{ else -}}
+# .NET SDK skipped: installDotnetTools=false
+{{ end -}}
+{{ if and $extraRuntimes (not $noRoot) -}}
 # Ruby for gem tools
 ruby = "3"
-{{ else -}}
+{{ else if $noRoot -}}
 # Ruby skipped in noRoot mode: ruby-build requires libffi-dev (needs sudo)
+{{ else -}}
+# Ruby skipped: installExtraRuntimes=false
 {{ end -}}
 {{ end -}}

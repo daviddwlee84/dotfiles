@@ -47,6 +47,8 @@ Decision-tree complexity is real and multi-dimensional:
 
 2026-05-21 — captured for discussion. Likely sequencing: (1) ship the small `cloud-vm` bundle once mise gating exists, (2) add the upfront-vs-toggle field + an `--explain` tree renderer (D), (3) only then consider codegen (C) if hand-sync still hurts.
 
+2026-06-10 — **step (1) shipped** alongside the mise gating ([mise-runtime-gating.md](mise-runtime-gating.md)) and the az-dev-vm combo ([cloud-vm-provision-combo.md](cloud-vm-provision-combo.md)): `cloud-vm` bundle in `BUNDLES` (coding agents ON; uv/js/networking/auditd OFF; `installExtraRuntimes=false` → drops the ~1.8GB; `backupMode=off`), listed in `ask_bundle()` + both READMEs. Note option (C) codegen had ALREADY landed separately (`just gen-prompts` renders `.chezmoi.toml.tmpl` + Dockerfile from PROMPTS), so the 3-place hand-sync this note worried about is down to PROMPTS + the TAGS assembly in `run_onchange_after_20_ansible_roles.sh.tmpl`. Still open: step (2) — upfront-vs-toggle field + `--explain` tree renderer.
+
 ## References
 
 - Footprint audit: `.specstory/history/2026-05-21_05-19-56Z-dotfile-dev-machine-heavy.md`

@@ -334,6 +334,9 @@ forgiving here.
 
 Path: `~/.config/fleet/machines.toml`. Seeded **once** by chezmoi from
 [`dot_config/fleet/create_private_machines.toml.tmpl`](../../dot_config/fleet/create_private_machines.toml.tmpl).
+[`just az-dev-vm`](az-dev-vm.md) also appends/updates a `[[hosts]]` entry here
+automatically when it provisions an Azure dev VM (and removes it on
+`az-dev-vm-down`).
 The `create_private_` prefix means:
 
 - `create_` → chezmoi seeds the file on first apply, then never touches it

@@ -58,6 +58,15 @@ Leaning **A now (fix the bug regardless) + C as the lean lever**, with bundles s
 
 2026-05-21 — captured, not yet scheduled. Fix the dotnet contract bug whenever mise config or the .NET prompt is next touched (cheap, correctness, not just disk).
 
+2026-06-10 — **SHIPPED as "A + C"** (with the Azure dev-VM combo work):
+
+- New `installExtraRuntimes` prompt (bool, default **true** so machines initialized before the prompt keep their runtimes; the template also `hasKey`-defaults to true) gates `rust`/`bun`/`ruby` in `dot_config/mise/config.toml.tmpl`.
+- The dotnet contract bug is fixed: `dotnet = "latest"` is now wrapped in `installDotnetTools` (template `hasKey`-defaults to **false** — matching the prompt default, so a host that answered No finally stops getting the 650MB SDK).
+- `run_onchange_after_20_ansible_roles.sh.tmpl` drops `rust_cargo_tools` / `ruby_gem_tools` from the base TAGS when `installExtraRuntimes=false` (no toolchain → those roles could only fail).
+- Bundles: `personal-mac`/`work-mac`/`server-linux` pin true; `minimal` + new `cloud-vm` pin false. Docker ARG default flipped to false (leaner CI images).
+- Known cost: the new prompt key makes pre-existing fleet hosts show `toml-mismatch` in `fleet-status` until a one-time interactive `chezmoi init` answers it.
+- NOT revisited: per-runtime granularity (option B) — `installExtraRuntimes` is the single coarse knob; split only if someone wants rust-without-ruby.
+
 ## References
 
 - Footprint audit transcript: `.specstory/history/2026-05-21_05-19-56Z-dotfile-dev-machine-heavy.md`

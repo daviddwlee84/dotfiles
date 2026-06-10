@@ -41,6 +41,11 @@ installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Pytho
 installJsCliTools = {{ promptBoolOnce . "installJsCliTools" "Install standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.)" true }}
 # 是否安裝 .NET SDK (via mise) 與 .NET global tools (azure-cost-cli, 等)
 installDotnetTools = {{ promptBoolOnce . "installDotnetTools" "Install .NET SDK via mise and dotnet global tools (azure-cost-cli, etc.)" false }}
+# 是否安裝額外的 mise runtimes (rust, bun, ruby) 與對應的 cargo/gem 工具（~1.8GB）。
+# Node 永遠會裝（nvim LSP / npm-based coding agents 硬依賴），不受此 flag 影響。
+# false 時 mise [tools] 只留 node，且 ansible TAGS 會剔除 rust_cargo_tools /
+# ruby_gem_tools（沒有 toolchain 跑了也只會失敗）。lean cloud VM / CI 建議 false。
+installExtraRuntimes = {{ promptBoolOnce . "installExtraRuntimes" "Install extra mise runtimes (rust, bun, ruby) and their cargo/gem tools" true }}
 # 是否安裝 Linux Audit framework (auditd) + 基準規則集（identity / sudoers /
 # sshd_config / privileged-exec watch）。Linux only — macOS 自動跳過（macOS 用
 # OpenBSM，不是 auditd），所以在 darwin 上不問也直接 false。

@@ -609,6 +609,31 @@ fleet-apply-compact *ARGS:
     ./scripts/fleet/apply.py --compact {{ARGS}}
 
 # ============================================================================
+# Azure dev VM (scripts/azure/dev_vm.py — docs/this_repo/az-dev-vm.md)
+# ============================================================================
+
+# One command -> running Azure dev VM with the lean cloud-vm bundle applied:
+# az vm create (idempotent, B2s/32GB) + auto-shutdown guardrail + wait for SSH
+# + remote non-interactive `chezmoi init --apply --bundle cloud-vm` + register
+# in ~/.config/fleet/machines.toml. GPU seam: `just az-dev-vm --gpu`.
+az-dev-vm *ARGS:
+    ./scripts/azure/dev_vm.py up {{ARGS}}
+
+# Teardown (symmetric to az-dev-vm): delete the VM + its resources (whole
+# resource group when this VM is the only one in it) and de-register the host
+# from the fleet inventory. Prompts for the VM name unless --yes.
+az-dev-vm-down *ARGS:
+    ./scripts/azure/dev_vm.py down {{ARGS}}
+
+# Power state / public IP / size of every VM in the dev resource group.
+az-dev-vm-status *ARGS:
+    ./scripts/azure/dev_vm.py status {{ARGS}}
+
+# Resolve the VM's public IP and ssh in.
+az-dev-vm-ssh *ARGS:
+    ./scripts/azure/dev_vm.py ssh {{ARGS}}
+
+# ============================================================================
 # Ad-hoc Scripts
 # ============================================================================
 

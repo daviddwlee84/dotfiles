@@ -43,6 +43,17 @@ Leaning B for the first cut (keep fleet's contract), promote to A if it gets use
 
 2026-05-21 — captured. Sequence after the lean bundle ships: prototype as standalone (option B), measure usage, then decide on `fleet up` promotion.
 
+2026-06-10 — **SHIPPED as option B**: `scripts/azure/dev_vm.py` (uv script: tyro + rich + tomlkit) + `just az-dev-vm` / `az-dev-vm-down` / `az-dev-vm-status` / `az-dev-vm-ssh`. All four phases landed:
+
+1. Provision — `az vm create` Ubuntu2404 Gen2 / `Standard_B2s` / 32GB / ssh-key inject / `--nsg-rule SSH`; `--spot` (auto-switches default size to `Standard_D2as_v5` — B-series can't Spot) and `--gpu` (NC4as_T4_v3 + `NvidiaGpuDriverLinux` extension) seams.
+2. Wait for SSH — socket poll on :22, 5 min budget.
+3. Fleet register — tomlkit append/update of `[[hosts]]` in `~/.config/fleet/machines.toml`; `down` de-registers symmetrically.
+4. Bootstrap — remote bash over SSH: curl-install chezmoi + non-interactive `chezmoi init --apply --bundle cloud-vm`. The flag set is COMPUTED by importing `dotfiles_init.py`'s PROMPTS/BUNDLES + `build_chezmoi_argv` (no fourth hand-copied flag list). Re-runs re-apply without the repo arg (promptXOnce reads stored answers).
+
+Blockers from above all addressed: teardown symmetry (`down` deletes the whole RG when this VM is its only VM, else VM + name-prefixed NIC/PIP/NSG/disk sweep), idempotency (fixed RG+name key), auth/state surfaced (`az account show` preflight prints the active subscription), plus a cost guardrail that wasn't in the original sketch: `az vm auto-shutdown --time 1900` enabled by default.
+
+Provider abstraction deliberately NOT built — az-only, promote to `fleet up <provider>` only when a second provider is actually wanted. Docs: [docs/this_repo/az-dev-vm.md](../docs/this_repo/az-dev-vm.md).
+
 ## References
 
 - Footprint audit + scenario: `.specstory/history/2026-05-21_05-19-56Z-dotfile-dev-machine-heavy.md`

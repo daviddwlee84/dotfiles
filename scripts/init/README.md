@@ -7,7 +7,7 @@ Interactive wrapper around `chezmoi init` inspired by
 `name`, plus 16 `installX` / preference flags). Running `chezmoi init`
 walks you through them one-by-one. This wrapper groups them into a
 single multi-select UI, adds pre-set bundles (`personal-mac`,
-`work-mac`, `server-linux`, `minimal`), checks SSH-key prerequisites,
+`work-mac`, `server-linux`, `cloud-vm`, `minimal`), checks SSH-key prerequisites,
 and then calls real `chezmoi init` with `--promptString` /
 `--promptBool` / `--promptChoice` flags so chezmoi stays the source of
 truth.
@@ -120,6 +120,7 @@ Current bundles (edit `BUNDLES` in `dotfiles_init.py` to tune):
 | `personal-mac` | Full personal setup — AI desktop apps, LLM tools, Brewfile, Bitwarden. |
 | `work-mac` | Safer — coding agents + dev tooling, no personal AI/LLM apps. |
 | `server-linux` | Headless — coding agents, networking, dev tooling; noRoot stays off. |
+| `cloud-vm` | Lean throwaway/cloud dev VM — shell + tmux + nvim + coding agents only; `installExtraRuntimes=false` (no rust/bun/ruby, ~1.8GB saved), backup off. Used by `just az-dev-vm`. |
 | `minimal` | Dotfiles only — no `installX` flags on. |
 | `custom` | No overrides applied — tick every feature yourself. |
 
