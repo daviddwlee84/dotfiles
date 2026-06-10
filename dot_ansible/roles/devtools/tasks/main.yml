@@ -612,23 +612,61 @@
       args:
         creates: /etc/apt/keyrings/gierens.gpg
 
-    # apt_repository internally runs `apt update`, which fails on machines
-    # with any broken third-party repo (expired GPG, missing Release file, etc.).
-    # Tolerate that and let the GitHub-release fallback below install eza instead.
-    - name: Add eza repository
-      ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main"
-        state: present
-        filename: gierens
+    # deb822_repository (apt_repository is deprecated, removed in
+    # ansible-core 2.25) writes the .sources file WITHOUT running
+    # `apt update`, so we verify reachability ourselves and roll the file
+    # back when the repo is broken/unreachable (GFW hosts) — a leftover
+    # broken source would otherwise fail the base role's cache update on
+    # every subsequent run. The GitHub-release fallback below installs eza
+    # in that case. Requires python3-debian (installed by the base role).
+    - name: Remove legacy one-line eza source (pre-deb822 format)
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/gierens.list
+        state: absent
+
+    - name: Add eza repository (deb822)
+      ansible.builtin.deb822_repository:
+        name: gierens
+        types: deb
+        uris: http://deb.gierens.de
+        suites: stable
+        components: main
+        signed_by: /etc/apt/keyrings/gierens.gpg
       ignore_errors: true
       register: eza_repo
+
+    - name: Refresh apt cache (eza repo)
+      when: eza_repo is succeeded
+      ansible.builtin.apt:
+        update_cache: true
+      ignore_errors: true
+
+    # The apt module treats a partially-failed `apt update` (one unreachable
+    # source, others fine) as SUCCESS-with-warnings, so its failed/succeeded
+    # status can't tell us whether the gierens repo actually works. Probe
+    # deterministically: eza resolvable from deb.gierens.de ⇒ keep + install;
+    # otherwise roll the .sources file back so it can't slow down / break
+    # later apt updates, and let the GitHub fallback below take over.
+    - name: Check eza is resolvable from the gierens repo
+      when: eza_repo is succeeded
+      ansible.builtin.command: apt-cache policy eza
+      register: eza_policy
+      changed_when: false
+      failed_when: false
+
+    - name: Remove eza repository (broken or unreachable)
+      when:
+        - eza_repo is succeeded
+        - "'deb.gierens.de' not in (eza_policy.stdout | default(''))"
+      ansible.builtin.deb822_repository:
+        name: gierens
+        state: absent
 
     - name: Install eza from repository
       ansible.builtin.apt:
         name: eza
         state: present
-        update_cache: true
-      when: eza_repo is succeeded
+      when: "'deb.gierens.de' in (eza_policy.stdout | default(''))"
       ignore_errors: true
   rescue:
     - name: Warn eza apt install failed

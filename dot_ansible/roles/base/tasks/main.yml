@@ -16,6 +16,53 @@
       - just
     state: present
 
+# apt cache update is split out as best-effort: a single broken third-party
+# source (dead PPA, GFW-blocked host, expired Release file) makes
+# `apt-get update` exit non-zero, and with `update_cache: true` inlined in the
+# install task the whole play used to die right here with the unhelpful
+# "Failed to update apt cache after 5 retries: ''". Base packages all live in
+# the main Ubuntu/Debian archives, so installing against a stale cache is
+# almost always fine. See pitfalls/apt-update-fails-base-role-empty-error.md.
+- name: Update apt cache (Debian/Ubuntu, best-effort)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  register: base_apt_cache
+  ignore_errors: true
+
+# The apt module swallows the underlying fetch errors (empty msg above), so
+# re-run `apt-get update` via CLI purely to surface WHICH source is broken.
+- name: Diagnose broken apt sources (cache update failed)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - base_apt_cache is failed
+  become: true
+  tags: [sudo]
+  ansible.builtin.command: apt-get update
+  register: base_apt_diag
+  changed_when: false
+  failed_when: false
+
+# `Err:` lines (which repo) land on stdout, `E:`/`W:` summaries on stderr.
+# msg is a list so each broken source renders on its own output line.
+- name: Report broken apt sources
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - base_apt_cache is failed
+  tags: [sudo]
+  vars:
+    base_apt_broken_lines: >-
+      {{ base_apt_diag.stdout_lines | default([]) | select('match', '^(Err|Ign):.*') | list
+         + base_apt_diag.stderr_lines | default([]) }}
+  ansible.builtin.debug:
+    msg: "{{ ['apt cache update FAILED — continuing with the existing (possibly stale) package lists.',
+              'Broken source(s) reported by `apt-get update`:']
+             + base_apt_broken_lines
+             + ['Fix or remove the offending file under /etc/apt/sources.list.d/ and re-run: chezmoi apply'] }}"
+
 - name: Install base packages (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   become: true
@@ -31,9 +78,10 @@
       - jq
       - tree
       - build-essential
+      # python3-debian: required by ansible.builtin.deb822_repository (used in
+      # devtools / gui_apps_linux roles after the apt_repository deprecation).
+      - python3-debian
     state: present
-    update_cache: true
-    cache_valid_time: 3600
 
 - name: Create fd symlink on Debian/Ubuntu
   when: ansible_facts["os_family"] == "Debian"

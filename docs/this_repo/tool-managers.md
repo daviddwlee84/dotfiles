@@ -366,7 +366,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
 | `neovim` | `neovim` ≥ 0.11.2 (`state: latest` on macOS) | macOS: brew formula · Linux: apt → snap (`classic`) if too old → GitHub release tarball (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
-| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew · Linux: mise (`node@lts` general; `node@20` + `rust@latest` on armv7l); fzf built from chezmoi external clone (Linux); lazygit PPA → GitHub release; tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
+| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew · Linux: mise (`node@lts` general; `node@20` + `rust@latest` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 
 #### 3.7 Networking + IaC + LLM + media (`networking_tools`, `iac_tools`, `llm_tools`, `media_tools`)

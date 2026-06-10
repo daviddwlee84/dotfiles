@@ -90,27 +90,34 @@
   changed_when: false
   failed_when: false
 
-- name: Install lazygit via PPA (Ubuntu only — PPA has no Debian Release file)
+# The lazygit PPA (ppa:lazygit-team/release) was deprecated upstream in 2021
+# (jesseduffield/lazygit#1399) — it has no Release file for focal+ and adding
+# it breaks `apt-get update` for the whole machine. We used to add it here;
+# purge any leftover source file from previously provisioned hosts so the
+# base role's cache update stops failing. Install now goes straight to the
+# GitHub-release path below.
+# See pitfalls/apt-update-fails-base-role-empty-error.md.
+- name: Find stale lazygit PPA source files (PPA deprecated upstream)
+  when: ansible_facts["distribution"] == "Ubuntu"
+  ansible.builtin.find:
+    paths: /etc/apt/sources.list.d
+    patterns:
+      - "*lazygit*"
+      - "ppa_lazygit_team_*"
+  register: lazygit_ppa_leftovers
+
+- name: Remove stale lazygit PPA source files
   when:
     - ansible_facts["distribution"] == "Ubuntu"
-    - lazygit_check.rc != 0
+    - lazygit_ppa_leftovers.files | length > 0
   become: true
   tags: [sudo]
-  block:
-    - name: Add lazygit PPA
-      ansible.builtin.apt_repository:
-        repo: ppa:lazygit-team/release
-        state: present
-      ignore_errors: true
-      register: lazygit_ppa
-
-    - name: Install lazygit from apt
-      ansible.builtin.apt:
-        name: lazygit
-        state: present
-      ignore_errors: true
-      register: lazygit_apt
-      when: lazygit_ppa is succeeded
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ lazygit_ppa_leftovers.files }}"
+  loop_control:
+    label: "{{ item.path }}"
 
 - name: Set lazygit release architecture
   when: ansible_facts["os_family"] in ["Debian", "RedHat"]
@@ -126,7 +133,6 @@
   when:
     - ansible_facts["os_family"] in ["Debian", "RedHat"]
     - lazygit_check.rc != 0
-    - (lazygit_apt is not defined) or (lazygit_apt is failed) or (lazygit_apt is skipped)
     - lazygit_arch | trim != ''
   become: true
   tags: [sudo]

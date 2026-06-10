@@ -195,20 +195,62 @@
   become: true
   tags: [sudo]
   block:
-    - name: Add AppImageLauncher PPA
-      ansible.builtin.apt_repository:
-        repo: ppa:appimagelauncher-team/stable
-        state: present
-        update_cache: true
-        filename: appimagelauncher-team-stable
+    # deb822_repository (apt_repository is deprecated, removed in ansible-core
+    # 2.25) doesn't support the ppa: shorthand — spell out the launchpad URI +
+    # signing key. Fingerprint from
+    # https://api.launchpad.net/devel/~appimagelauncher-team/+archive/ubuntu/stable
+    # It also doesn't run `apt update` itself, so verify reachability and roll
+    # the .sources file back on failure — a leftover broken source would fail
+    # the base role's cache update on every later run.
+    # Requires python3-debian (installed by the base role).
+    - name: Remove legacy one-line AppImageLauncher PPA source (pre-deb822 format)
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/appimagelauncher-team-stable.list
+        state: absent
+
+    - name: Add AppImageLauncher PPA (deb822)
+      ansible.builtin.deb822_repository:
+        name: appimagelauncher-team-stable
+        types: deb
+        uris: https://ppa.launchpadcontent.net/appimagelauncher-team/stable/ubuntu
+        suites: "{{ ansible_facts['distribution_release'] }}"
+        components: main
+        signed_by: https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xACD802F535B6F55D365285574AF9B16F75EF2FCA
       ignore_errors: true
       register: ail_ppa
+
+    - name: Refresh apt cache (AppImageLauncher PPA)
+      when: ail_ppa is succeeded
+      ansible.builtin.apt:
+        update_cache: true
+      ignore_errors: true
+
+    # The apt module treats a partially-failed `apt update` (one unreachable
+    # source, others fine) as SUCCESS-with-warnings, so probe the PPA
+    # deterministically: package resolvable from the launchpad URI ⇒ keep +
+    # install; otherwise roll the .sources file back (a leftover broken
+    # source breaks/slows every later apt update) and let the GitHub .deb
+    # fallback below take over.
+    - name: Check appimagelauncher is resolvable from the PPA
+      when: ail_ppa is succeeded
+      ansible.builtin.command: apt-cache policy appimagelauncher
+      register: ail_policy
+      changed_when: false
+      failed_when: false
+
+    - name: Remove AppImageLauncher PPA (broken or unreachable)
+      when:
+        - ail_ppa is succeeded
+        - "'ppa.launchpadcontent.net/appimagelauncher-team' not in (ail_policy.stdout | default(''))"
+      ansible.builtin.deb822_repository:
+        name: appimagelauncher-team-stable
+        state: absent
 
     - name: Install appimagelauncher from PPA
       ansible.builtin.apt:
         name: appimagelauncher
         state: present
-      when: ail_ppa is succeeded
+      when: "'ppa.launchpadcontent.net/appimagelauncher-team' in (ail_policy.stdout | default(''))"
       register: ail_apt_install
       ignore_errors: true
   rescue:
@@ -342,14 +384,28 @@
       args:
         creates: /etc/apt/keyrings/microsoft.gpg
 
-    - name: Add VSCode apt repository
-      ansible.builtin.apt_repository:
-        repo: >-
-          deb [arch={{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[target_architecture] }}
-          signed-by=/etc/apt/keyrings/microsoft.gpg]
-          https://packages.microsoft.com/repos/code stable main
-        state: present
-        filename: vscode
+    # apt_repository is deprecated (removed in ansible-core 2.25); deb822
+    # doesn't run `apt update` itself, so refresh explicitly. A cache-update
+    # failure lands in the rescue below, which rolls the .sources file back
+    # so it can't break the base role's cache update on later runs.
+    # Requires python3-debian (installed by the base role).
+    - name: Remove legacy one-line VSCode source (pre-deb822 format)
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/vscode.list
+        state: absent
+
+    - name: Add VSCode apt repository (deb822)
+      ansible.builtin.deb822_repository:
+        name: vscode
+        types: deb
+        uris: https://packages.microsoft.com/repos/code
+        suites: stable
+        components: main
+        architectures: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[target_architecture] }}"
+        signed_by: /etc/apt/keyrings/microsoft.gpg
+
+    - name: Refresh apt cache (VSCode repo)
+      ansible.builtin.apt:
         update_cache: true
 
     - name: Install VSCode package
@@ -357,6 +413,12 @@
         name: code
         state: present
   rescue:
+    - name: Remove VSCode apt repository (install failed; avoid leaving a broken source)
+      ansible.builtin.deb822_repository:
+        name: vscode
+        state: absent
+      ignore_errors: true
+
     - name: Warn VSCode install failed
       ansible.builtin.debug:
         msg: "VSCode install failed — rerun with --tags gui_apps after fixing network/GPG/apt issues."
