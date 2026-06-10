@@ -389,15 +389,23 @@
     - target_architecture not in ['armv7l', 'armv6l']
     - treesitter_npm.rc | default(1) != 0
     - not (oldEL | default(false))   # EL7: bindgen can't find libclang
+  # Probe `cargo --version`, NOT `command -v cargo`: when a rust install
+  # failed half-way (e.g. mise's rust@latest dies on a GFW mirror), the
+  # rustup proxy shim at ~/.cargo/bin/cargo still exists but errors with
+  # "rustup could not choose a version of cargo to run ... no default is
+  # configured". Treat that the same as "no cargo": skip gracefully —
+  # the rust_cargo_tools role (runs later, has mirror fallbacks) repairs
+  # rust, and the next `chezmoi apply` retries this task.
   ansible.builtin.shell: |
-    if command -v cargo >/dev/null 2>&1; then
+    if cargo --version >/dev/null 2>&1; then
       cargo install tree-sitter-cli
     else
-      echo "Neither Node.js nor cargo available for tree-sitter-cli"
-      echo "Install manually: cargo install tree-sitter-cli"
+      echo "No working cargo toolchain for tree-sitter-cli (rust missing or rustup has no default toolchain)"
+      echo "Will retry on next chezmoi apply once rust is installed; or run manually: cargo install tree-sitter-cli"
       exit 0
     fi
   args:
     executable: /bin/bash
-  changed_when: true
+  register: treesitter_cargo
+  changed_when: "'No working cargo toolchain' not in (treesitter_cargo.stdout | default(''))"
   ignore_errors: true

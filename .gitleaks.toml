@@ -59,6 +59,9 @@ useDefault = true
     # narrow — a stray `next_page_token` in committed source/docs still
     # gets the entropy check.
     '''\bnext[-_]?[Pp]age[-_]?[Tt]oken\b''',
+    # PGP PUBLIC key fingerprints (e.g. Launchpad PPA signing_key_fingerprint
+    # from the API, or `signed_by` keyserver URLs) — public by definition.
+    '''\bsigning[-_]?key[-_]?fingerprint\b''',
   ]
 
 # ---------------------------------------------------------------------------

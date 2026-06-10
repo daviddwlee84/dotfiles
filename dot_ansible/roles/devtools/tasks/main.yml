@@ -3769,19 +3769,37 @@
     path: "{{ ansible_facts.env.HOME }}/.tmux/plugins/tpm/bin/install_plugins"
   register: tpm_bin
 
+# ignore_errors: a flaky network (GFW) can fail individual plugin clones
+# (install_plugins exits 1 if ANY plugin fails) — that must not abort the
+# whole play. The sentinel below is only written on success, so the next
+# `chezmoi apply` retries; plugins can also be installed in-tmux via
+# `prefix + I` at any time.
 - name: Install tmux plugins via TPM
   when:
     - tpm_bin.stat.exists
     - not tpm_sentinel.stat.exists
   ansible.builtin.shell: |
-    # Source config to set TMUX_PLUGIN_MANAGER_PATH (works with running server)
-    tmux source-file {{ ansible_facts.env.HOME }}/.tmux.conf
+    # Source config to set TMUX_PLUGIN_MANAGER_PATH (works with running
+    # server; errors harmlessly when no server is up — install_plugins
+    # reads ~/.tmux.conf itself in that case)
+    tmux source-file {{ ansible_facts.env.HOME }}/.tmux.conf || true
     # Now install plugins
     {{ ansible_facts.env.HOME }}/.tmux/plugins/tpm/bin/install_plugins
   args:
     executable: /bin/bash
   changed_when: true
   register: tpm_install_result
+  ignore_errors: true
+
+- name: Warn TPM plugin install had failures
+  when:
+    - tpm_install_result is failed
+  ansible.builtin.debug:
+    msg: |
+      Some tmux plugins failed to download (likely network timeout) — will
+      retry on next `chezmoi apply`, or run `prefix + I` inside tmux.
+      Failed: {{ (tpm_install_result.stdout_lines | default([]) + tpm_install_result.stderr_lines | default([]))
+                 | select('search', 'download fail') | list }}
 
 - name: Mark TPM plugins as installed
   when:
