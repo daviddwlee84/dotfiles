@@ -864,16 +864,41 @@ def build_chezmoi_argv(
             argv += ["--promptString", f"{by_key[key].prompt_text}={answers[key]}"]
     if "profile" in answers:
         argv += ["--promptChoice", f"{by_key['profile'].prompt_text}={answers['profile']}"]
+
+    # Emit a flag for EVERY non-hidden prompt — not just the host-applicable
+    # ones. Host-gated prompts whose `condition` doesn't match this machine are
+    # absent from `answers`; we still pass their `else_value` so the flag set is
+    # COMPLETE. This matters under --prompt (re-init / reconfigure), which
+    # re-fires *all* promptXOnce: if the template's `$profile` ever differs from
+    # the profile we resolved (e.g. a desktop→server migration mid-reconfigure),
+    # a gated promptBoolOnce can still execute, and without a matching flag it
+    # falls through to an interactive prompt mid-apply (the very leak this fixes:
+    # `Install general GUI apps…?` / `Install Traditional Chinese IME?`). chezmoi
+    # silently ignores any flag whose prompt the template never calls, so the
+    # extra flags are harmless on hosts where the else-branch is baked instead.
+    def _flag_value(p: Prompt) -> object | None:
+        if p.key in answers:
+            return answers[p.key]
+        if p.condition is not None:        # gated-off here → bake else_value
+            return p.else_value
+        return None                        # applicable but unanswered → skip
+
     # Non-basics choice prompts (e.g. discordChannel, backupMode, motdStyle).
     for p in PROMPTS:
-        if p.kind != "choice" or p.hidden or p.key not in answers:
+        if p.kind != "choice" or p.hidden:
             continue
-        argv += ["--promptChoice", f"{p.prompt_text}={answers[p.key]}"]
+        val = _flag_value(p)
+        if val is None:
+            continue
+        argv += ["--promptChoice", f"{p.prompt_text}={val}"]
     # Bool prompts.
     for p in PROMPTS:
-        if p.kind != "bool" or p.hidden or p.key not in answers:
+        if p.kind != "bool" or p.hidden:
             continue
-        val_str = "true" if answers[p.key] else "false"
+        val = _flag_value(p)
+        if val is None:
+            continue
+        val_str = "true" if val else "false"
         argv += ["--promptBool", f"{p.prompt_text}={val_str}"]
     return argv
 

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# dotcfg — reconfigure your dotfiles prompts on an already-initialized machine.
+#
+# Thin, deployed launcher (lives on PATH at ~/.dotfiles/bin/dotcfg) for the
+# `reconfigure` subcommand of scripts/init/dotfiles_init.py — the single source
+# of truth for chezmoi prompts. That script is NOT deployed (scripts/** is in
+# .chezmoiignore.tmpl); it is fetched as one URL by bootstrap.sh on fresh
+# machines and otherwise run from the chezmoi source dir. We locate it via
+# `chezmoi source-path`, so this wrapper works from any cwd.
+#
+# Why a wrapper and not move the script here: the script must stay a single
+# self-contained PEP 723 file in scripts/init/ (bootstrap fetches it by URL,
+# and `gen` renders .chezmoi.toml.tmpl + Dockerfile from its PROMPTS table).
+# Mirrors the `czcfg` shell function in dot_config/shell/99_chezmoi_reload.sh;
+# this binary form additionally works from non-interactive / non-shell contexts
+# and gets tab-completion parity with fleet / mlf / pqsum / x.
+#
+#   dotcfg                                  # interactive TUI, seeded from current values
+#   dotcfg --set installLlmTools=true --yes # non-interactive single-key change
+#   dotcfg --dry-run                        # preview the chezmoi command
+#
+# All arguments are forwarded verbatim to `dotfiles_init.py reconfigure`.
+set -euo pipefail
+
+if ! command -v uv >/dev/null 2>&1; then
+    printf 'dotcfg: uv not found — install it first (https://astral.sh/uv).\n' >&2
+    exit 1
+fi
+if ! command -v chezmoi >/dev/null 2>&1; then
+    printf 'dotcfg: chezmoi not found on PATH.\n' >&2
+    exit 1
+fi
+
+src="$(chezmoi source-path 2>/dev/null)" || {
+    printf 'dotcfg: could not resolve `chezmoi source-path`.\n' >&2
+    exit 1
+}
+script="${src}/scripts/init/dotfiles_init.py"
+if [ ! -f "$script" ]; then
+    printf 'dotcfg: %s not found (is the chezmoi source dir intact?).\n' "$script" >&2
+    exit 1
+fi
+
+exec uv run --script "$script" reconfigure "$@"

@@ -46,10 +46,13 @@ Prefer this over hand-editing `~/.config/chezmoi/chezmoi.toml`:
 just reconfigure
 # or the shell wrapper (locates the script via `chezmoi source-path`):
 czcfg
+# or the deployed PATH twin (on ~/.dotfiles/bin, with tab completion):
+dotcfg
 
 # Non-interactive single-key changes (space-separated key=value), e.g. fleet:
 just reconfigure -- --set installLlmTools=true motdStyle=figlet --yes
 czcfg --set noRoot=true --yes
+dotcfg --set noRoot=true --yes
 
 # Preview the chezmoi command without running it:
 just reconfigure -- --dry-run

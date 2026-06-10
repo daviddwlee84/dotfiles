@@ -77,6 +77,33 @@ czcfg --set noRoot=true --yes                      # shell wrapper
 Do not "fix" a stuck setting by editing `~/.config/chezmoi/chezmoi.toml` by
 hand — that bypasses chezmoi's type validation and re-init semantics.
 
+## Related leak: host-gated prompts still get asked under `--prompt`
+
+`--prompt` re-fires **every** `prompt*Once`, including ones the wrapper
+*didn't* pass a flag for. Host-gated prompts (`installBrewApps`,
+`installInputMethod`, `discordChannel`, `installAiDesktopApps`) are normally
+baked to their `else_value` by the template's `{{ if $profile … }}` else-branch
+on non-matching hosts, and the wrapper skips emitting their flags. But if the
+template's `$profile` ends up DIFFERENT from the profile the wrapper resolved
+— e.g. a desktop→server migration where the stored `$profile` is still a
+desktop value when the gated `{{ if }}` is evaluated — the gated
+`promptBoolOnce` executes after all, finds no matching flag, and falls through
+to an interactive prompt mid-`chezmoi apply`:
+
+```
+Install general GUI apps via Homebrew Brewfile …?
+Install Traditional Chinese input methods (McBopomofo, RIME)?
+```
+
+(With `--no-tty`, used over SSH / fleet, it silently returns the template
+default instead — which masks the bug on remote hosts but not on an
+interactive local reconfigure.)
+
+**Fix**: `build_chezmoi_argv` emits a flag for EVERY non-hidden prompt — the
+chosen value for applicable ones, the `else_value` for gated-off ones — so the
+flag set is always complete and nothing can fall through. chezmoi ignores any
+flag whose prompt the template never calls, so the extra flags are harmless.
+
 ## Related
 
 - `scripts/init/README.md` → "Re-init semantics" (the empirical test above).

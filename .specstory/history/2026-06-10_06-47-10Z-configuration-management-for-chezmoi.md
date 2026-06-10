@@ -2956,4 +2956,365 @@ cd /Users/david/.local/share/chezmoi && git diff --stat
 _**Agent (claude-opus-4-8)**_
 
 <think><details><summary>Thought Process</summary>
- I'm sorting through what needs to be committed—there are the actual code and documentation changes related to the feature itself, plus some agent artifacts like plans and history files that I should probably exclude from the commit.</details></think>
+ I'm sorting through what needs to be committed—there are the actual code and documentation changes related to the feature itself, plus some agent artifacts like plans and history files that I should probably exclude from the commit.
+
+Actually, looking at the repo's conventions, it seems like SpecStory transcripts and plan files are meant to be committed alongside feature diffs, and there's a pre-commit hook that handles redacting any sensitive agent data anyway. So I'll stage everything relevant—the feature files, the plan, and the history artifacts—and commit with a message like `feat(init): add reconfigure subcommand to change settings after init` to match the repo's conventional commit style.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+變更已就緒。我把這次功能相關檔案、以及 repo 慣例會一起提交的 agent 紀錄（plan / specstory）一起 commit。
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/david/.local/share/chezmoi && git add -A && git status --short</summary>
+
+```bash
+cd /Users/david/.local/share/chezmoi && git add -A && git status --short
+```
+
+```
+A  .cursor/plans/chezmoi_reconfigure_tool_990ee5b3.plan.md
+A  .specstory/history/2026-06-10_06-47-10Z-configuration-management-for-chezmoi.md
+M  .specstory/statistics.json
+M  README.md
+M  docs/shells/aliases.md
+M  dot_config/shell/99_chezmoi_reload.sh
+M  justfile
+M  pitfalls/README.md
+A  pitfalls/chezmoi-reinit-promptonce-keeps-stale-value.md
+M  scripts/init/README.md
+M  scripts/init/dotfiles_init.py
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/david/.local/share/chezmoi && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(init): add reconfigure subcommand to change settings after init
+
+Re-running `chezmoi init` on an already-configured machine silently kept
+the old [data] values: promptXOnce short-circuits before --promptBool, so
+the override flags were ignored unless `chezmoi init --prompt` forces the
+Once calls to re-fire. The wrapper never passed --prompt, so the only way
+to change a setting was hand-editing ~/.config/chezmoi/chezmoi.toml.
+
+- dotfiles_init.py: new `reconfigure` subcommand (TUI seeded from the live
+  config via tomllib; `--set key=value` non-interactive single-key changes
+  validated against PROMPTS; stale/removed profile re-detected). Add
+  `prompt` arg to build_chezmoi_argv and pass --prompt on every re-init
+  (init re-init branch now also seeds from current config).
+- justfile: `just reconfigure` recipe; dot_config/shell: `czcfg` wrapper.
+- docs: correct the wrong "Re-init semantics" note, add Reconfigure section,
+  swap README's `chezmoi init --force` hint, add pitfall.
+EOF
+)" && echo "=== post-commit status ===" && git status --short && git log --oneline -1</summary>
+
+```bash
+cd /Users/david/.local/share/chezmoi && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(init): add reconfigure subcommand to change settings after init
+
+Re-running `chezmoi init` on an already-configured machine silently kept
+the old [data] values: promptXOnce short-circuits before --promptBool, so
+the override flags were ignored unless `chezmoi init --prompt` forces the
+Once calls to re-fire. The wrapper never passed --prompt, so the only way
+to change a setting was hand-editing ~/.config/chezmoi/chezmoi.toml.
+
+- dotfiles_init.py: new `reconfigure` subcommand (TUI seeded from the live
+  config via tomllib; `--set key=value` non-interactive single-key changes
+  validated against PROMPTS; stale/removed profile re-detected). Add
+  `prompt` arg to build_chezmoi_argv and pass --prompt on every re-init
+  (init re-init branch now also seeds from current config).
+- justfile: `just reconfigure` recipe; dot_config/shell: `czcfg` wrapper.
+- docs: correct the wrong "Re-init semantics" note, add Reconfigure section,
+  swap README's `chezmoi init --force` hint, add pitfall.
+EOF
+)" && echo "=== post-commit status ===" && git status --short && git log --oneline -1
+```
+
+```
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check).......................Passed
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Failed
+- hook id: end-of-file-fixer
+- exit code: 1
+- files were modified by this hook
+
+Fixing .cursor/plans/chezmoi_reconfigure_tool_990ee5b3.plan.md
+
+trim trailing whitespace.....................................................Passed
+check yaml...............................................(no files to check)Skipped
+check toml...............................................(no files to check)Skipped
+check json...................................................................Passed
+check that executables have shebangs.........................................Passed
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)...........................Passed
+shfmt....................................................(no files to check)Skipped
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ The pre-commit hook automatically fixed the end-of-file formatting in the plan file, which caused the commit to fail. I need to re-stage the modified file and commit again—this auto-fix by the hook doesn't count as me manually editing the plan, so it's acceptable.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+Pre-commit auto-fixed a trailing newline; re-stage and commit again.
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/david/.local/share/chezmoi && git add -A && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(init): add reconfigure subcommand to change settings after init
+
+Re-running `chezmoi init` on an already-configured machine silently kept
+the old [data] values: promptXOnce short-circuits before --promptBool, so
+the override flags were ignored unless `chezmoi init --prompt` forces the
+Once calls to re-fire. The wrapper never passed --prompt, so the only way
+to change a setting was hand-editing ~/.config/chezmoi/chezmoi.toml.
+
+- dotfiles_init.py: new `reconfigure` subcommand (TUI seeded from the live
+  config via tomllib; `--set key=value` non-interactive single-key changes
+  validated against PROMPTS; stale/removed profile re-detected). Add
+  `prompt` arg to build_chezmoi_argv and pass --prompt on every re-init
+  (init re-init branch now also seeds from current config).
+- justfile: `just reconfigure` recipe; dot_config/shell: `czcfg` wrapper.
+- docs: correct the wrong "Re-init semantics" note, add Reconfigure section,
+  swap README's `chezmoi init --force` hint, add pitfall.
+EOF
+)" && echo "=== post-commit ===" && git status --short && git log --oneline -1</summary>
+
+```bash
+cd /Users/david/.local/share/chezmoi && git add -A && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(init): add reconfigure subcommand to change settings after init
+
+Re-running `chezmoi init` on an already-configured machine silently kept
+the old [data] values: promptXOnce short-circuits before --promptBool, so
+the override flags were ignored unless `chezmoi init --prompt` forces the
+Once calls to re-fire. The wrapper never passed --prompt, so the only way
+to change a setting was hand-editing ~/.config/chezmoi/chezmoi.toml.
+
+- dotfiles_init.py: new `reconfigure` subcommand (TUI seeded from the live
+  config via tomllib; `--set key=value` non-interactive single-key changes
+  validated against PROMPTS; stale/removed profile re-detected). Add
+  `prompt` arg to build_chezmoi_argv and pass --prompt on every re-init
+  (init re-init branch now also seeds from current config).
+- justfile: `just reconfigure` recipe; dot_config/shell: `czcfg` wrapper.
+- docs: correct the wrong "Re-init semantics" note, add Reconfigure section,
+  swap README's `chezmoi init --force` hint, add pitfall.
+EOF
+)" && echo "=== post-commit ===" && git status --short && git log --oneline -1
+```
+
+```
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check).......................Passed
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...............................................(no files to check)Skipped
+check toml...............................................(no files to check)Skipped
+check json...................................................................Passed
+check that executables have shebangs.........................................Passed
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)...........................Passed
+shfmt....................................................(no files to check)Skipped
+[main e893b3d] feat(init): add reconfigure subcommand to change settings after init
+ 11 files changed, 3451 insertions(+), 17 deletions(-)
+ create mode 100644 .cursor/plans/chezmoi_reconfigure_tool_990ee5b3.plan.md
+ create mode 100644 .specstory/history/2026-06-10_06-47-10Z-configuration-management-for-chezmoi.md
+ create mode 100644 pitfalls/chezmoi-reinit-promptonce-keeps-stale-value.md
+=== post-commit ===
+e893b3d feat(init): add reconfigure subcommand to change settings after init
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ The commit went through successfully. Now I need to tackle the other parts of the request: explaining how to set up on a new machine, and deciding whether these tools should live in `dot_dotfiles/bin` alongside the existing fleet/mlf/pqsum CLIs. I should examine the structure and patterns in that directory to give a solid recommendation.
+
+The key distinction is that tools in `dot_dotfiles/bin` get deployed to the machine and added to PATH after chezmoi apply, while `dotfiles_init.py` lives in scripts and is excluded from deployment—it's only used during bootstrap. Let me check what's actually in `dot_dotfiles/bin` to understand the pattern better.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+Commit `e893b3d` 完成，所有 pre-commit hook 通過、工作區乾淨。
+
+我看一下 `dot_dotfiles/bin` 的結構，才能對第三個問題給出有依據的建議。
+
+_**Agent (claude-opus-4-8)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/david/.local/share/chezmoi && ls -la dot_dotfiles/bin/ 2>/dev/null; echo "=== is scripts/ deployed? check .chezmoiignore.tmpl ==="; grep -nE 'scripts|dot_dotfiles' .chezmoiignore.tmpl 2>/dev/null | head</summary>
+
+```bash
+cd /Users/david/.local/share/chezmoi && ls -la dot_dotfiles/bin/ 2>/dev/null; echo "=== is scripts/ deployed? check .chezmoiignore.tmpl ==="; grep -nE 'scripts|dot_dotfiles' .chezmoiignore.tmpl 2>/dev/null | head
+```
+
+```
+.rw-r--r--@  12k david 13 May 21:25 executable_fleet
+.rw-r--r--@  19k david 13 May 21:25 executable_mi-router
+.rwxr-xr-x@ 7.5k david 13 May 21:25 executable_mlf
+.rwxr-xr-x@ 4.7k david  5 Jun 17:11 executable_ping-monitor
+.rwxr-xr-x@  44k david 22 May 14:01 executable_pqsum
+.rwxr-xr-x@  17k david  5 Jun 17:11 executable_reyee
+.rw-r--r--@ 4.2k david 13 May 21:25 executable_sesh-preview
+.rw-r--r--@  12k david 13 May 21:25 executable_sms
+.rwxr-xr-x@  12k david  5 Jun 17:11 executable_x
+=== is scripts/ deployed? check .chezmoiignore.tmpl ===
+28:# See scripts/init/README.md.
+53:#   .chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl when source dir == repo;
+68:scripts/**
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ So the executable scripts in `dot_dotfiles/bin/` get deployed to `~/.dotfiles/bin/` and are available on the PATH as runtime CLIs, while the `scripts/` directory is ignored during deployment since it's only needed for bootstrap and repository setup.
+
+The tension is that `dotfiles_init.py` needs to stay in `scripts/init/` as a single self-contained file that bootstrap.sh can fetch via URL, and it's the source of truth for the prompts that gen reads. But conceptually it's a runtime operation like fleet, so it could live in `dot_dotfiles/bin/` too. The solution is to keep the script in `scripts/` as the SSOT and add a thin wrapper executable in `dot_dotfiles/bin/` that uses `chezmoi source-path` to locate and run the source script via `uv run --script`. This gives it the same ergonomics as fleet while preserving the bootstrap-fetchable single-file design, and it works outside interactive shells where the current `czcfg` shell function doesn't.
+
+Now I'm thinking through the new machine setup flow to give a clear recommendation: the core script stays put, but I can suggest the bin wrapper as an optional enhancement for consistency with other deployed tools. I should also cover the bootstrap one-liner and what happens after init.</details></think>
+
+_**Agent (claude-opus-4-8)**_
+
+已 commit（`e893b3d`），pre-commit 全通過、工作區乾淨。下面回答你另外兩個問題。
+
+## 新機器怎麼 setup
+
+一行指令搞定（`bootstrap.sh` 會處理所有前置）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/daviddwlee84/dotfiles/main/bootstrap.sh | bash
+```
+
+它依序做：
+1. 沒有 `uv` 就裝 `uv`；確保 `~/.local/bin/chezmoi`（避開 snap 版的 stdin/stdout bug）並把它排到 PATH 最前。
+2. 把 `/dev/tty` 接到最後那個 `uv run` 當 stdin，讓互動 TUI 在 `curl | bash` 模式下仍可操作。
+3. `uv run --script <raw URL>` 跑 `scripts/init/dotfiles_init.py`：先選 bundle（`personal-mac` / `work-mac` / `server-linux` / `minimal` / `custom`），再用分組多選勾功能旗標，最後呼叫真正的 `chezmoi init --apply` 把答案帶進去。
+
+慢網路想看進度：`... | DOTFILES_BOOTSTRAP_VERBOSE=1 bash`。
+
+已 clone repo（GFW / 重跑）可改用本機路徑：`just bootstrap-local`（互動）或 `just bootstrap-local -- --yes --bundle minimal`（非互動）。
+
+**裝完之後要改設定**，就用這次新加的工具，不用再手改 `~/.config/chezmoi/chezmoi.toml`：
+
+```bash
+just reconfigure                                  # 互動，預填目前值
+czcfg --set installLlmTools=true --yes            # 非互動單鍵（重開 shell 後 czcfg 可用）
+```
+
+## 要不要像 fleet 一樣搬進 `dot_dotfiles/bin`？
+
+先講關鍵差異：`dot_dotfiles/bin/executable_*`（`fleet`/`mlf`/`pqsum`/`x` …）是**會被部署**到 `~/.dotfiles/bin/` 且在 PATH 上的 runtime CLI；而 `scripts/**` 在 `.chezmoiignore.tmpl`（第 68 行）裡，**不會部署**，是 bootstrap / repo-time 專用。
+
+我的建議是**核心不要搬、可選加一個薄 wrapper**：
+
+- `dotfiles_init.py` 必須留在 `scripts/init/`，原因有二且都是硬限制：
+  1. `bootstrap.sh` 是在「還沒 clone repo」的新機上用單一 URL `uv run --script <url>` 抓它，所以它得是一個自含的 PEP 723 單檔。
+  2. 它是 `PROMPTS` 的 SSOT，`gen` 會從它生成 `.chezmoi.toml.tmpl` / `Dockerfile`。搬進 `dot_dotfiles/bin` 會同時破壞 curl 安裝路徑與 gen 假設。
+- 真正「像 fleet 一樣」能加的，是在 `dot_dotfiles/bin` 放一個**薄殼**（例如 `executable_dotcfg`），內容就是 `uv run --script "$(chezmoi source-path)/scripts/init/dotfiles_init.py" reconfigure "$@"`——跟現在的 `czcfg` shell function 同一招，但變成真正在 PATH 上的指令。
+
+它比 `czcfg` 多的好處：可在非 zsh/bash 情境（cron、其他腳本、其他工具）呼叫、`ls ~/.dotfiles/bin` 就看得到、跟 fleet/mlf 風格一致。成本是：依 `AGENTS.md` 規則，新增 `dot_dotfiles/bin` CLI 要在 zsh + bash 各補一份 tab completion 並更新 `docs/zsh/zsh-completions.md` Section F 與 `docs/shells/aliases.md`，而且功能跟 `czcfg` 重疊。
+
+結論：如果你只在互動 shell 裡用，現在的 `czcfg` 就夠了；如果想要一個正式、可被任何情境呼叫、與 fleet 並列的指令，我建議加 `dot_dotfiles/bin/executable_dotcfg` 薄殼（不是搬整支腳本）。要的話我可以順手把 wrapper + 兩份 completion + 文件一起補上。
+
+---
+
+_**User**_
+
+```
+│ (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim=true                                                                                                     │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+? Proceed? Yes
+$ /home/daweilee/.local/bin/chezmoi init --apply --prompt --promptString What is your email address=daviddwlee84@gmail.com --promptString What is your full name=Da-Wei Lee
+--promptChoice Which profile=ubuntu_server --promptChoice Backup mode for existing dotfiles (smart|full|off)=smart --promptChoice SSH login banner style
+(figlet|fastfetch-slim|fastfetch-full)=fastfetch-slim --promptChoice Primary interactive shell (zsh|bash)=zsh --promptBool Install coding agents (Claude Code, OpenCode, Cursor,
+Copilot, Gemini, etc.)=true --promptBool Install local LLM tools (Ollama, LiteLLM, llmfit, models)=false --promptBool Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp,
+etc.)=true --promptBool Install standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.)=true --promptBool Install .NET SDK via mise and dotnet global
+tools (azure-cost-cli, etc.)=false --promptBool Install Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec watches)=true
+--promptBool Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)=false --promptBool Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)=true
+--promptBool Install Bitwarden CLI (and Desktop on ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent integration=false --promptBool Install networking
+CLI tools (nmap, mtr, httpie, gping, trippy, etc.)=true --promptBool Install tunnel tools (ngrok, cloudflared — expose localhost, SSH tunnels)=true --promptBool Are you in China
+(behind GFW) and need to use mirrors=true --promptBool Enable gitleaks for ALL git repos (not just those with .pre-commit-config.yaml)=false --promptBool Allow partial Ansible
+failures (continue installing other tools if one role fails)=false --promptBool No sudo/root access - skip all system package installations=false --promptBool Enable vim-style
+modal editing in shells (zsh-vi-mode, set -o vi, ble.sh vi-mode) and tmux vim navigation (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim=true
+──────────────────────────────────────────────────────────────────────────────── chezmoi output ─────────────────────────────────────────────────────────────────────────────────
+Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)?
+Install Traditional Chinese input methods (McBopomofo, RIME)?
+Cloning into '/home/daweilee/.fzf'...
+^[[Ofatal: unable to access 'https://github.com/junegunn/fzf.git/': GnuTLS recv error (-110): The TLS connection was non-properly terminated.
+chezmoi: .fzf: /home/daweilee/.fzf: exit status 128
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭─────────────────────────────────────────────────────────────────────────────────── Summary ───────────────────────────────────────────────────────────────────────────────────╮
+│ ✗ chezmoi init exit=1                                                                                                                                                         │
+│ ✓ 9 of 19 feature groups enabled                                                                                                                                              │
+│                                                                                                                                                                               │
+│ Enabled:                                                                                                                                                                      │
+│   Coding agents                                                                                                                                                               │
+│   Python CLI tools (via uv)                                                                                                                                                   │
+│   JS / npm CLI tools                                                                                                                                                          │
+│   Linux audit framework (auditd)                                                                                                                                              │
+│   Media / AV CLI tools                                                                                                                                                        │
+│   Networking CLI tools                                                                                                                                                        │
+│   Tunnel tools (ngrok, cloudflared)                                                                                                                                           │
+│   Use China (GFW) mirrors                                                                                                                                                     │
+│   Vim mode in shells & tmux                                                                                                                                                   │
+│                                                                                                                                                                               │
+│ Next:                                                                                                                                                                         │
+│   • Review with: chezmoi diff                                                                                                                                                 │
+│   • Upgrade later with: just upgrade-all                                                                                                                                      │
+│   • Fleet-apply to other hosts with: just fleet-apply                                                                                                                         │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+DEBUG Command exited with code: 1
+mise WARN  failed to update ruby-build
+mise WARN  Failed to resolve tool version list for ruby: [~/.config/mise/config.toml] ruby@3: timed out after 20.00s
+```
+
+發現仍有漏網之魚 （我這個是 linux_server -> ubuntu_server） 有些可能雖然用不到 （多選時選項不必選） 但是也必須要有default value 要不然還是會被問
+(確實可以考慮 在 dot_dotfiles/bin 放一個薄殼（例如 executable_dotcfg））
+
+---
+
+_**Agent (claude-opus-4-8)**_
+
+<think><details><summary>Thought Process</summary>
+ I see the issue—on ubuntu_server, two prompts with desktop-only conditions are still asking interactively because they're missing the flag. The `installBrewApps` and `installInputMethod` prompts are gated to desktop profiles with fallback values, but the template isn't applying those fallback values during non-interactive reconfigure, so chezmoi prompts the user anyway. So the real issue is that `--prompt` forces all `promptBoolOnce` calls to re-prompt, but the gated prompts for desktop features are inside conditional blocks that don't execute on ubuntu_server — their else branches just set the values to false. Since those template branches never run, the `promptBoolOnce` calls inside them shouldn't fire at all. Yet they're appearing in the output, which means either the profile variable isn't actually ubuntu_server at template evaluation time, or the conditional logic isn't preventing execution as expected. The user's comment suggests the real problem: prompts that weren't passed explicit flags get forced to prompt interactively when `--prompt` is used, and since the desktop-gated prompts are skipped during flag generation on ubuntu_server, no flags exist for them, so chezmoi prompts for them anyway.</details></think>
