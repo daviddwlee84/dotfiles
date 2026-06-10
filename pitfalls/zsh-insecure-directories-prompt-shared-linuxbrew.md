@@ -61,6 +61,43 @@ drwxr-xr-x 2 taa taa 4096 May  8 00:51 /home/linuxbrew/.linuxbrew/share/zsh/site
   them. Single-user installs (prefix owned by me, or no linuxbrew) keep the
   full audit.
 
+## Why this is NOT an ad-hoc hack
+
+The fix may look like "just silence the warning", but it is the standard
+client-side counterpart of Homebrew's own multi-user story:
+
+1. **Server-side vs client-side are orthogonal.** The recommended multi-user
+   Linuxbrew architecture (dedicated `linuxbrew` owner, prefix `755`, single
+   maintainer doing `brew install`/`upgrade`, Brewfile for audit trail)
+   governs WHO may write the prefix. It says nothing about how non-owner
+   users' shells should treat it — that is exactly what this dotfiles fix
+   covers. We don't admin the shared boxes we SSH into, so the server layer
+   is out of scope for this repo anyway.
+2. **Even the "correct" architecture still fails compaudit.** compaudit
+   accepts only root- or current-user-owned dirs. A prefix owned by a
+   dedicated `linuxbrew` user is, from every other user's perspective, still
+   "another non-root user" — identical to the `taa`-owned prefix that
+   triggered this pitfall. So every non-owner user needs `compinit -u`
+   (i.e. `ZSH_DISABLE_COMPFIX=true`) regardless of how well the server is
+   managed. There is no server-side configuration that makes compaudit pass
+   for everyone without breaking `brew upgrade` for the owner.
+3. **Homebrew itself calls shared installs unsupported.** The
+   [Support Tiers](https://docs.brew.sh/Support-Tiers) doc lists "multiple
+   users share the same installation" as unsupported, and
+   [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux) fixes the
+   prefix at `/home/linuxbrew/.linuxbrew` (required for bottles) — which is
+   why hardcoding that path in the `dot_zshrc.tmpl` condition is fine.
+4. **The recommended setup widens the trigger, not narrows it.** Best
+   practice on such boxes is a global `/etc/profile.d/linuxbrew.sh` running
+   `eval "$(brew shellenv)"` — which exports `FPATH` to ALL login shells, so
+   the current "nested shells only" symptom would become "every shell". The
+   client-side fix becomes more necessary under the proper architecture, not
+   less.
+5. **The surgical alternative was considered and rejected.** Stripping the
+   non-owned brew dirs from `fpath` before compinit would keep the full audit
+   but drop completions for everything brew installs (rg, fd, gh, ...). On a
+   team box where the shared prefix is trusted, that trade is strictly worse.
+
 ## Things that do NOT fix it
 
 - `compaudit | xargs chmod g-w,o-w` — perms already clean; failure is ownership.
@@ -75,3 +112,5 @@ drwxr-xr-x 2 taa taa 4096 May  8 00:51 /home/linuxbrew/.linuxbrew/share/zsh/site
 - [`dot_zshenv.tmpl`](../dot_zshenv.tmpl), [`dot_zshrc.tmpl`](../dot_zshrc.tmpl) — both halves of the fix
 - [`dot_config/shell/00_exports.sh.tmpl`](../dot_config/shell/00_exports.sh.tmpl) — the Linux `brew shellenv` callsite whose exported `FPATH` leaks into nested shells
 - `docs/zsh/zsh-completions.md` — compinit/fpath architecture ("compinit runs once inside oh-my-zsh.sh" — now true on Ubuntu too, since the global compinit is skipped)
+- [Homebrew Support Tiers](https://docs.brew.sh/Support-Tiers) — shared multi-user installations are officially unsupported
+- [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux) — `/home/linuxbrew/.linuxbrew` is the fixed default prefix (required for bottles)
