@@ -19,6 +19,22 @@ repos:
           ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
           | ^raycast/.*\.json$
 
+      # Single-source-of-truth guard: PROMPTS in dotfiles_init.py generates the
+      # prompt block in .chezmoi.toml.tmpl and the ARG/RUN blocks in Dockerfile,
+      # and is coverage-checked against the README table. Fail if any drifted
+      # (fix with `just gen-prompts`). See scripts/init/README.md.
+      - id: dotfiles-init-gen-check
+        name: chezmoi prompts in sync (dotfiles_init.py gen --check)
+        entry: uv run --script scripts/init/dotfiles_init.py gen --check --source .
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)
+          ^scripts/init/dotfiles_init\.py$
+          | ^\.chezmoi\.toml\.tmpl$
+          | ^Dockerfile$
+          | ^README\.md$
+
   # Gitleaks - detect secrets (blocks commit if secrets found)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.22.1

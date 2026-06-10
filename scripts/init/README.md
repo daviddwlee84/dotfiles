@@ -36,15 +36,24 @@ Detects that `~/.local/share/chezmoi/.git` exists and calls
 overrides. Answers written by `promptStringOnce` / `promptBoolOnce`
 are overridden by the CLI flags.
 
-### Schema parity check
+### Regenerate / drift check
 
 ```bash
-uv run --script ~/.local/share/chezmoi/scripts/init/dotfiles_init.py doctor
+# Regenerate .chezmoi.toml.tmpl + Dockerfile from PROMPTS:
+uv run --script ~/.local/share/chezmoi/scripts/init/dotfiles_init.py gen --source .
+# Or via just:
+just gen-prompts
+
+# Verify on-disk matches PROMPTS (no writes; non-zero exit = drift):
+uv run --script ~/.local/share/chezmoi/scripts/init/dotfiles_init.py gen --check --source .
+# `doctor` is a back-compat alias for `gen --check`.
 ```
 
-Greps `.chezmoi.toml.tmpl` + `Dockerfile` and compares to the
-embedded `PROMPTS` tuple. Non-zero exit = drift. Run this in CI /
-pre-commit so the three surfaces never go out of sync.
+`PROMPTS` is the single source of truth. `gen` renders the marker-delimited
+prompt block in `.chezmoi.toml.tmpl` and the `ARG` + flag blocks in
+`Dockerfile` from it, and coverage-checks the README option table. The
+`dotfiles-init-gen-check` pre-commit hook runs `gen --check` so the surfaces
+can never drift.
 
 ### List bundles
 
@@ -54,21 +63,22 @@ uv run --script ~/.local/share/chezmoi/scripts/init/dotfiles_init.py list-bundle
 
 ## Adding a new chezmoi prompt
 
-Per the "Dockerfile + dotfiles_init wrapper" cross-file rule in
-[../../CLAUDE.md](../../CLAUDE.md), a new prompt requires changes in
-three places, in the same commit:
+`PROMPTS` in `dotfiles_init.py` is the single source of truth; the template
+and Dockerfile are generated from it. So adding a prompt is now two steps:
 
-1. **`.chezmoi.toml.tmpl`** — add the
-   `promptBoolOnce` / `promptStringOnce` / `promptChoiceOnce` call.
-2. **`Dockerfile`** — add a matching `ARG CHEZMOI_*` build argument
-   and a `--promptBool` / `--promptString` flag on the `chezmoi init`
-   command.
-3. **`scripts/init/dotfiles_init.py`** — add a matching entry to the
-   `PROMPTS` tuple (key, kind, group, label, desc, default). If the
-   prompt should be on-by-default for any bundle, also update
-   `BUNDLES`.
+1. **Edit `PROMPTS`** in `scripts/init/dotfiles_init.py` — add a `Prompt(...)`
+   entry (key, kind, group, label, desc, default, `prompt_text`, and a
+   `comment` doc block). For host-specific prompts set `condition=When(...)`
+   and an `else_value` (baked in the template + hidden in the TUI on
+   non-matching hosts). If it should be on-by-default for a bundle, also
+   update `BUNDLES`.
+2. **Run `just gen-prompts`** (or `dotfiles_init.py gen --source .`) to
+   regenerate the marker regions in `.chezmoi.toml.tmpl` and `Dockerfile`,
+   then add the new key to the README option table (coverage-checked).
 
-Verify with `dotfiles_init.py doctor` before committing.
+Commit the regenerated files together. `just gen-prompts -- --check` (and the
+`dotfiles-init-gen-check` pre-commit hook) fail if anything drifts — you never
+hand-edit the generated regions.
 
 ## Bundles
 

@@ -139,7 +139,7 @@ chezmoi-reinit:
 # uv resolves PEP 723 deps locally; chezmoi init clones from the same remote
 # you're cloned from. Pass extra args after `--`:
 #     just bootstrap-local                  # interactive
-#     just bootstrap-local -- doctor        # schema parity check
+#     just bootstrap-local -- doctor        # schema parity check (alias for gen --check)
 #     just bootstrap-local -- list-bundles  # show bundles
 #     just bootstrap-local -- --yes --bundle minimal  # non-interactive
 bootstrap-local *ARGS:
@@ -150,6 +150,13 @@ bootstrap-local *ARGS:
 bootstrap-local-verbose *ARGS:
     @echo "[bootstrap-local-verbose] uv --verbose; expect lots of resolver output"
     uv run --verbose --script scripts/init/dotfiles_init.py {{ARGS}}
+
+# Regenerate the chezmoi prompt blocks (.chezmoi.toml.tmpl + Dockerfile) from
+# PROMPTS in scripts/init/dotfiles_init.py — the single source of truth. Run
+# after editing PROMPTS, then commit the regenerated files. The pre-commit
+# `dotfiles-init-gen-check` hook (or `just gen-prompts -- --check`) fails on drift.
+gen-prompts *ARGS:
+    uv run --script scripts/init/dotfiles_init.py gen --source . {{ARGS}}
 
 # Clear run_once script state (allows re-running run_once scripts)
 chezmoi-clear-scripts:

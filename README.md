@@ -132,24 +132,38 @@ Full diagnosis: [`pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md`](pitfalls/bo
 
 ### Optional Components
 
-During `chezmoi init`, you'll be prompted for optional installs:
+During `chezmoi init`, you'll be prompted for optional installs. The prompts
+themselves are defined once in [`scripts/init/dotfiles_init.py`](scripts/init/dotfiles_init.py)
+(`PROMPTS`) and generated into `.chezmoi.toml.tmpl` + `Dockerfile`; this table
+is coverage-checked against that list by `dotfiles_init.py gen --check`.
 
+<!-- dotfiles-init:prompts (coverage-checked by scripts/init/dotfiles_init.py gen --check) -->
 | Option | Default | Description |
 |--------|---------|-------------|
 | `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, Antigravity CLI (`agy`), RTK, td, sidecar, specify-cli, etc. |
 | `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
 | `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
+| `installJsCliTools` | true | Standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.) |
 | `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
-| `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`) |
-| `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps) |
-| `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux) |
+| `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`). macOS only. |
+| `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+| `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+| `discordChannel` | `flatpak` | Discord install channel on `ubuntu_desktop`: `flatpak` (recommended), `deb`, or `none`. macOS uses the Brewfile cask; servers skip. |
 | `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
+| `installTunnelTools` | false | Tunnel tools (ngrok, cloudflared) — expose localhost / SSH reverse tunnels |
 | `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
 | `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
-| `noRoot` | false | Skip sudo-requiring tasks (for servers without root access) |
+| `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
+| `useChineseMirror` | false | Switch Homebrew / pip / npm / cargo / etc. to China (GFW) mirrors |
+| `gitleaksAllRepos` | false | Run gitleaks on ALL git repos, not just those with `.pre-commit-config.yaml` |
+| `backupMode` | `smart` | Back up existing dotfiles before apply: `smart` (only files chezmoi overwrites), `full` (fixed allowlist), `off` (skip) |
+| `allowPartialFailure` | false | Continue installing other Ansible roles if one role fails |
+| `noRoot` | false | Skip sudo-requiring tasks (for servers without root access). Linux only. |
 | `motdStyle` | `figlet` | SSH login banner style: `figlet` (~6 lines, default), `fastfetch-slim` (figlet + fastfetch w/o logo, ~10 lines), `fastfetch-full` (full distro logo + everything, ~22 lines). Runtime override: `MOTD_STYLE=...` in `~/.zshrc.adhoc`. See [docs/zsh/motd.md](docs/zsh/motd.md). |
 | `primaryShell` | `zsh` | Primary interactive shell: `zsh` (default, full-featured) or `bash` (oh-my-bash + ble.sh, close-to-zsh UX). Both `~/.zshrc` and `~/.bashrc` deploy on every host; this only governs which shell `chsh` switches to as the login shell. See [docs/shells/bash.md](docs/shells/bash.md) for the bash side's known gaps and tradeoffs. |
+| `enableVimMode` | true | Vim-style modal editing in shells (zsh-vi-mode, `set -o vi`, ble.sh) + tmux vim navigation. Does NOT affect Neovim. See [docs/this_repo/vim-mode.md](docs/this_repo/vim-mode.md). |
+<!-- /dotfiles-init:prompts -->
 
 To change options later: `chezmoi init --force`
 

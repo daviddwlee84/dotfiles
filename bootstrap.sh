@@ -5,6 +5,9 @@
 #
 # What it does, in order:
 #   1. Installs `uv` (Astral's Python runtime/tool manager) if missing.
+#   1b. Ensures a non-snap `~/.local/bin/chezmoi` exists and is first on PATH
+#      (the snap build has a stdin/stdout `permission denied` bug that breaks
+#      this repo's modify_/run_ scripts), so the TUI resolves the good binary.
 #   2. Attaches /dev/tty as the FINAL `exec uv run`'s stdin so questionary
 #      prompts work even though THIS script's own stdin is the curl pipe.
 #      We must NOT do `exec </dev/tty` mid-script — that would repoint
@@ -64,6 +67,32 @@ if ! command -v uv >/dev/null 2>&1; then
 else
     log "uv already present: $(command -v uv) ($(uv --version 2>/dev/null || echo unknown))"
 fi
+
+# --- 1b. ensure a non-snap chezmoi on PATH ----------------------------------
+# The TUI resolves chezmoi via PATH. The snap build has a long-standing
+# stdin/stdout `permission denied` bug that breaks this repo's modify_/run_
+# scripts, and is not the install the README documents. So if chezmoi is
+# missing OR the one found is under /snap, install the canonical binary to
+# ~/.local/bin; then put ~/.local/bin first on PATH so it always wins.
+CHEZMOI_FOUND="$(command -v chezmoi 2>/dev/null || true)"
+NEED_CHEZMOI=0
+if [ -z "$CHEZMOI_FOUND" ]; then
+    NEED_CHEZMOI=1
+    log "chezmoi not found — installing to ~/.local/bin via get.chezmoi.io"
+elif [ "${CHEZMOI_FOUND#/snap/}" != "$CHEZMOI_FOUND" ]; then
+    NEED_CHEZMOI=1
+    log "found snap chezmoi at ${CHEZMOI_FOUND} (stdin/stdout bug) — installing canonical to ~/.local/bin"
+fi
+if [ "$NEED_CHEZMOI" = "1" ] && [ ! -x "${HOME}/.local/bin/chezmoi" ]; then
+    mkdir -p "${HOME}/.local/bin"
+    if ! (curl -fsLS --retry 3 --retry-delay 5 get.chezmoi.io/lb | BINDIR="${HOME}/.local/bin" sh); then
+        log "chezmoi install via get.chezmoi.io failed; the TUI will offer to install it"
+    fi
+fi
+# Keep ~/.local/bin first so the canonical chezmoi (and uv-installed tools)
+# always win over any /snap or system copy.
+export PATH="${HOME}/.local/bin:${PATH}"
+log "chezmoi resolved: $(command -v chezmoi || echo MISSING)"
 
 # --- 2. decide whether to feed /dev/tty to the final exec --------------------
 # `[ -t 0 ]` is false when stdin is the pipe; questionary needs a real TTY.
