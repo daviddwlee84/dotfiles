@@ -155,10 +155,92 @@ This is the pattern to replicate whenever an apt-shipped tool is too old for wha
 
 ## Why not "just use snap for everything"?
 
-- **CLI tools suffer under confinement** — `snap install nvim` then trying to read `~/.config/nvim/init.lua` via a hardlink or external editor plugin can silently fail under AppArmor rules.
+- **CLI tools suffer under confinement** — the strictly-confined btop snap crashes on launch because AppArmor blocks reads of `~/.config/btop/themes` (see [tools/btop.md](tools/btop.md)). Classic snaps escape the sandbox but keep every other snap downside below.
 - **Refresh surprises** — snaps auto-refresh by default on a cadence you don't fully control; a CI or deploy script relying on a specific CLI version can break overnight.
 - **Slow launch** — matters when a tool is invoked many times per shell session (shell prompts, completion scripts).
 - **Server profile avoids snapd** — `ubuntu_server` deliberately keeps snapd out of the loop.
+
+## snap in this repo
+
+Current state: **exactly one role installs anything via snap** — Bitwarden
+Desktop (`dot_ansible/roles/bitwarden/tasks/main.yml`, gated behind the
+`installBitwarden` prompt, snap first with a vendor `.deb` fallback). That is
+deliberate: a closed-source GUI app is the one category where snap's
+auto-update + confinement model is a good fit (see the pick-by-tool-type
+table above). Everything else stays off snap.
+
+### Why the Neovim role dropped its snap path (2026-06)
+
+Until June 2026 the neovim role had a middle tier: apt too old + `snap`
+on PATH → `snap install nvim --classic`. It was removed (apt too old now
+goes straight to the GitHub release tarball → `/opt/nvim` +
+`/usr/local/bin/nvim` symlink) because the snap tier contradicted the
+repo's own rules:
+
+1. **Auto-refresh violates the [install/upgrade split](https://github.com/daviddwlee84/dotfiles/blob/main/CLAUDE.md#install-vs-upgrade-is-split-on-purpose).**
+   Snaps refresh themselves on snapd's schedule — nvim could change
+   version overnight, outside the explicit `just upgrade-*` path. No
+   other tool in this repo upgrades implicitly.
+2. **Policy contradiction.** This very page says the server profile
+   keeps snapd out of the loop and routes CLI tools to
+   Linuxbrew / GitHub binaries — yet a stock `ubuntu_server` devbox
+   (old apt nvim + snapd preinstalled) landed on the snap tier.
+3. **`~/snap` home clutter** — the symptom that triggered the review:
+   a bare `~/snap/nvim` directory appearing in `$HOME` (see below).
+4. **Track record.** The repo had already been burned twice by snap
+   builds of CLI tools: the chezmoi snap's stdin/stdout bug
+   (`scripts/init/dotfiles_init.py` actively detects and avoids it) and
+   the btop snap's AppArmor crash
+   ([pitfalls/btop-themes-permission-denied-core-dumped.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/btop-themes-permission-denied-core-dumped.md)).
+5. The `nvim` snap is community-published (a Canonical employee), not an
+   official Neovim project artifact; the GitHub tarball is the upstream
+   release itself.
+
+The tarball tier was already battle-tested — it was the existing
+"no snap available" fallback and the noRoot user-level path — so the
+change only deleted the middle tier, it added no new mechanism.
+
+### snap knowledge worth keeping
+
+- **`~/snap/<name>/` is snapd's per-user data home**, created
+  automatically the first time a snap runs. Layout:
+  `~/snap/<name>/<revision>/` (versioned `$HOME` for the app),
+  `current` symlink, and `common/` (revision-independent data). It is
+  *not* an installation directory — binaries live under `/snap/` —
+  and nothing is misplaced when you see it. It famously ignores XDG
+  conventions (upstream bug open since 2016; an experimental
+  `hidden-snap-folder` option to move it to `~/.snap` exists but never
+  became default).
+- **`classic` vs strict confinement**: strict snaps run inside
+  AppArmor with whitelisted interfaces (this is what breaks dotfile
+  reads — hidden directories like `~/.config` are blocked by the
+  `home` interface). `--classic` snaps run unconfined, like a normal
+  package — the nvim snap was classic, so its problem was never the
+  sandbox, only refresh/clutter/ownership.
+- **Holding refreshes is possible but not our policy**:
+  `sudo snap refresh --hold` (snapd ≥ 2.58) holds all updates
+  indefinitely, `--hold=72h` per-snap and time-boxed. The repo prefers
+  not to depend on per-host snapd state — tools that must not move
+  come from apt / tarball instead.
+- **Disk/teardown**: snapd keeps previous revisions
+  (`refresh.retain`, default 2-3), so even small CLIs cost 2× their
+  squashfs size plus a loop mount each.
+
+### Cleaning up a host that got the old snap nvim
+
+Hosts provisioned before the change keep working (the role's version
+check passes, so it touches nothing), but converge manually with:
+
+```bash
+sudo snap remove nvim          # binary + /snap/nvim revisions
+rm -rf ~/snap/nvim             # per-user data dir (safe: nvim state lives in ~/.config/nvim etc.)
+# then re-apply so the role installs the tarball tier:
+chezmoi apply    # or: just fleet-apply <host>
+```
+
+Only remove the **per-app** directory, not all of `~/snap` — on
+`ubuntu_desktop` hosts `~/snap` can hold real user data for other snaps
+(e.g. the preinstalled Firefox snap keeps its entire profile there).
 
 ## Related docs
 

@@ -366,7 +366,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 
 | Role | Owns | Per-OS mechanism |
 |---|---|---|
-| `neovim` | `neovim` ≥ 0.11.2 (`state: latest` on macOS) | macOS: brew formula · Linux: apt → snap (`classic`) if too old → GitHub release tarball (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
+| `neovim` | `neovim` ≥ 0.11.2 (`state: latest` on macOS) | macOS: brew formula · Linux: apt → GitHub release tarball if too old (`/opt/nvim` + `/usr/local/bin/nvim` symlink) → user-level tarball to `~/.local`; **oldEL** pulls from `neovim/neovim-releases` (glibc 2.17 rebuild repo). No snap (dropped 2026-06 — see [linux-package-sources.md → snap in this repo](../linux-package-sources.md#snap-in-this-repo)). See [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
 | `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew · Linux: mise (`node@lts` general; `node@20` + `rust@latest` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
 
@@ -822,7 +822,7 @@ with rationale.
 | **Discord** | macOS: brew cask; Linux: flatpak (default) or `.deb` via `discordChannel` chooser | apt has no Discord; flatpak is sandboxed-and-current, `.deb` is for users who hate flatpak |
 | **Steam** | macOS: brew cask gated by `installGamingApps`; Linux: Valve apt repo + `steam-launcher` gated by `installGamingApps` | Valve's apt repo is the supported Linux path; Flathub exists but is community-packaged |
 | **just**, **starship**, **zoxide**, **direnv** | macOS: brew; Linux: vendor curl-installer | Linux distro packages are too stale for these fast-moving tools |
-| **Neovim** | macOS: brew (`state: latest`); Linux: apt → snap → GitHub release tarball → user fallback → `neovim/neovim-releases` on oldEL | Min version 0.11.2 is too new for most distros |
+| **Neovim** | macOS: brew (`state: latest`); Linux: apt → GitHub release tarball → user fallback → `neovim/neovim-releases` on oldEL | Min version 0.11.2 is too new for most distros; no snap by policy |
 | **tree-sitter-cli** | npm via mise (preferred, timeout 180) → cargo fallback | npm is faster; cargo needs libclang to compile. Same binary either way |
 | **bw (Bitwarden CLI)** | npm global (preferred) or system npm fallback | always npm, the dispatch is mise-npm vs system-npm |
 
@@ -841,7 +841,7 @@ Notable cascading-fallback patterns:
 | Tool | Chain |
 |---|---|
 | **mise binary** | curl `https://mise.run` (preferred) → direct binary download from `mise.jdx.dev/mise-latest-linux-${arch}` → musl variant (forced when glibc < 2.28) |
-| **Neovim (Linux)** | apt → snap (`classic`) when too old → GitHub release tarball (`/opt/nvim` + symlink) → user-tarball to `~/.local` → `neovim-releases` fork (oldEL glibc 2.17 rebuild) |
+| **Neovim (Linux)** | apt → GitHub release tarball when too old (`/opt/nvim` + symlink) → user-tarball to `~/.local` → `neovim-releases` fork (oldEL glibc 2.17 rebuild) |
 | **Most Linux CLIs in base/devtools/networking_tools** | apt/yum (sudo) → user-level GitHub release musl tarball to `~/.local/bin`. Several have arch-specific brew-on-aarch64 branch (`eza`, `git-delta`) |
 | **Rust (mise)** | configured mirror → official `static.rust-lang.org` → on oldEL: `rustup-init` directly |
 | **Cursor `.deb` (Linux)** | `get_url` with retries=4 (large file, GFW-prone) — single mechanism but heavily retried |
@@ -1018,7 +1018,7 @@ list.
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |
 | **mtr** | brew | apt/yum | networking_tools |
 | **nmap** | brew | apt/yum | networking_tools |
-| **neovim** | brew (`state: latest`) | apt → snap → GitHub release → user → oldEL fork | neovim |
+| **neovim** | brew (`state: latest`) | apt → GitHub release → user → oldEL fork | neovim |
 | **ngrok** | brew cask | vendor apt repo → user tgz / RedHat tgz | networking_tools (tunnel) |
 | **node** | brew (via `lazyvim_deps`) | mise | mise + lazyvim_deps |
 | **nvme-cli** (`nvme`) | n/a | apt/yum (gated on NVMe detected) | homelab_tools |

@@ -319,8 +319,8 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 | Platform | Package Manager | Notes |
 |----------|-----------------|-------|
 | macOS | Homebrew | Full support |
-| Ubuntu Desktop | apt + snap | Full support |
-| Ubuntu Server | apt + snap | Full support |
+| Ubuntu Desktop | apt + snap (GUI apps only) | Full support |
+| Ubuntu Server | apt + GitHub binaries | Full support; no snap ([why](docs/linux-package-sources.md#snap-in-this-repo)) |
 | Ubuntu Server (no root) | GitHub binaries + mise + cargo + uv | `noRoot=true`, tools installed to `~/.local/bin` |
 | Raspberry Pi 5 (64-bit OS) | apt + Linuxbrew | Full support (same as Ubuntu Server) |
 | Raspberry Pi 4 (32-bit OS) | apt + GitHub binaries | Linuxbrew skipped; some tools without armhf builds are skipped |

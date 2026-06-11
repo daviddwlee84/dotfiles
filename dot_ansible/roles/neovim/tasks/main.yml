@@ -22,7 +22,11 @@
     name: neovim
     state: latest
 
-# Linux - try apt first, then snap
+# Linux - apt baseline, GitHub release tarball when apt is too old.
+# Deliberately NO snap: snaps auto-refresh outside the explicit
+# `just upgrade-*` path (violates the install/upgrade split), pollute
+# $HOME with ~/snap, and the repo policy keeps snapd off servers —
+# see docs/linux-package-sources.md "snap in this repo".
 - name: Install Neovim from apt (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   become: true
@@ -39,33 +43,6 @@
   changed_when: false
   failed_when: false
 
-- name: Check if snap is available
-  when: ansible_facts["os_family"] == "Debian"
-  ansible.builtin.command: which snap
-  register: snap_check
-  changed_when: false
-  failed_when: false
-
-- name: Install Neovim from snap if apt version too old
-  when:
-    - ansible_facts["os_family"] == "Debian"
-    - nvim_apt_version.stdout is defined
-    - nvim_apt_version.stdout is version(neovim_min_version, '<')
-    - snap_check.rc == 0
-  become: true
-  tags: [sudo]
-  block:
-    - name: Remove apt Neovim
-      ansible.builtin.apt:
-        name: neovim
-        state: absent
-
-    - name: Install Neovim from snap
-      community.general.snap:
-        name: nvim
-        classic: true
-        state: present
-
 # Architecture fact applies to both Debian-family and RedHat-family
 # Linux paths (system-level on Debian; user-level on either when noRoot or
 # when the system package version is too old). Pure data, no package
@@ -81,12 +58,11 @@
         else ''
       }}
 
-- name: Install Neovim from GitHub releases if snap unavailable
+- name: Install Neovim from GitHub releases if apt version too old
   when:
     - ansible_facts["os_family"] == "Debian"
     - nvim_apt_version.stdout is defined
     - nvim_apt_version.stdout is version(neovim_min_version, '<')
-    - snap_check.rc != 0
     - nvim_sys_arch | default('') != ''
   become: true
   tags: [sudo]

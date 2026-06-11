@@ -359,7 +359,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 
 | Role | 擁有什麼 | OS 機制 |
 |---|---|---|
-| `neovim` | `neovim` ≥ 0.11.2(macOS 上 `state: latest`) | macOS:brew formula · Linux:apt → 太舊則 snap(`classic`) → GitHub release tarball(`/opt/nvim` + `/usr/local/bin/nvim` symlink) → 使用者層級 tarball 到 `~/.local`;**oldEL** 抓 `neovim/neovim-releases`(glibc 2.17 重建 repo)。見 [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
+| `neovim` | `neovim` ≥ 0.11.2(macOS 上 `state: latest`) | macOS:brew formula · Linux:apt → 太舊則 GitHub release tarball(`/opt/nvim` + `/usr/local/bin/nvim` symlink) → 使用者層級 tarball 到 `~/.local`;**oldEL** 抓 `neovim/neovim-releases`(glibc 2.17 重建 repo)。不用 snap(2026-06 移除——見 [linux-package-sources.zh-TW.md → 這個 repo 的 snap 使用現況](../linux-package-sources.zh-TW.md#這個-repo-的-snap-使用現況))。見 [`pitfalls/centos7-neovim-apt-register-defined.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/centos7-neovim-apt-register-defined.md) |
 | `lazyvim_deps` | `fzf`、`lazygit`、`tree-sitter`、`node` | macOS:brew · Linux:mise(一般情境 `node@lts`;armv7l 上 `node@20` + `rust@latest`);fzf 由 chezmoi external clone 編譯(Linux);lazygit PPA → GitHub release;tree-sitter-cli 透過 `mise exec -- npm install -g tree-sitter-cli`(timeout 180)→ cargo fallback 並先裝 `libclang-dev`/`clang-devel` |
 | `nerdfonts` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
 
@@ -799,7 +799,7 @@ GitHub release tarball 並解壓到 `~/.local/bin`(使用者可寫,已在 PATH)�
 | **tmux** | macOS:brew;Linux:apt → 系統版本 < 3.3 時 `nelsonenzo/tmux-appimage` | `display-menu` popup 需要 3.3+ — 見 AGENTS.md tmux hard invariant |
 | **Discord** | macOS:brew cask;Linux:flatpak(預設)或 `.deb`,由 `discordChannel` 選 | apt 沒有 Discord;flatpak 沙箱化且最新,`.deb` 給討厭 flatpak 的人 |
 | **just**、**starship**、**zoxide**、**direnv** | macOS:brew;Linux:廠商 curl-installer | Linux 發行版套件對這些快速迭代的工具太舊 |
-| **Neovim** | macOS:brew(`state: latest`);Linux:apt → snap → GitHub release tarball → 使用者 fallback → oldEL 上的 `neovim/neovim-releases` | 最低版本 0.11.2 對大多數發行版太新 |
+| **Neovim** | macOS:brew(`state: latest`);Linux:apt → GitHub release tarball → 使用者 fallback → oldEL 上的 `neovim/neovim-releases` | 最低版本 0.11.2 對大多數發行版太新;政策上不用 snap |
 | **tree-sitter-cli** | npm 透過 mise(優先,timeout 180)→ cargo fallback | npm 比較快;cargo 需要 libclang 才能編譯。兩條路徑產生同一份 binary |
 | **bw (Bitwarden CLI)** | npm 全域(優先)或系統 npm fallback | 永遠是 npm,分派是 mise-npm vs 系統-npm |
 
@@ -816,7 +816,7 @@ fallback。多層 fallback 會增加實際沒人會跑的測試組合(5 層 × 5
 | 工具 | 鏈 |
 |---|---|
 | **mise binary** | curl `https://mise.run`(優先)→ 直接從 `mise.jdx.dev/mise-latest-linux-${arch}` 下載 → musl 變體(glibc < 2.28 時強制) |
-| **Neovim (Linux)** | apt → 太舊則 snap(`classic`)→ GitHub release tarball(`/opt/nvim` + symlink)→ 使用者 tarball 到 `~/.local` → `neovim-releases` 分支(oldEL glibc 2.17 重建) |
+| **Neovim (Linux)** | apt → 太舊則 GitHub release tarball(`/opt/nvim` + symlink)→ 使用者 tarball 到 `~/.local` → `neovim-releases` 分支(oldEL glibc 2.17 重建) |
 | **base/devtools/networking_tools 中大多數 Linux CLI** | apt/yum(sudo)→ 使用者層級 GitHub release musl tarball 到 `~/.local/bin`。部分有架構專屬 brew-on-aarch64 分支(`eza`、`git-delta`) |
 | **Rust (mise)** | 設定的 mirror → 官方 `static.rust-lang.org` → 在 oldEL 上:直接 `rustup-init` |
 | **Cursor `.deb` (Linux)** | `get_url` 配 retries=4(大檔,GFW-prone)— 單一機制但重試多次 |
@@ -988,7 +988,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |
 | **mtr** | brew | apt/yum | networking_tools |
 | **nmap** | brew | apt/yum | networking_tools |
-| **neovim** | brew(`state: latest`) | apt → snap → GitHub release → 使用者 → oldEL 分支 | neovim |
+| **neovim** | brew(`state: latest`) | apt → GitHub release → 使用者 → oldEL 分支 | neovim |
 | **ngrok** | brew cask | 廠商 apt repo → 使用者 tgz / RedHat tgz | networking_tools(tunnel) |
 | **node** | brew(透過 `lazyvim_deps`) | mise | mise + lazyvim_deps |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |

@@ -132,10 +132,80 @@ tv: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by
 
 ## 為什麼不「全部都用 snap」？
 
-- **CLI 工具在 confinement 下吃苦頭** — `snap install nvim` 後想透過 hardlink 或外部 editor plugin 讀取 `~/.config/nvim/init.lua` 可能在 AppArmor 規則下靜默失敗。
+- **CLI 工具在 confinement 下吃苦頭** — 嚴格限制 (strictly-confined) 的 btop snap 一啟動就崩潰，因為 AppArmor 擋住了 `~/.config/btop/themes` 的讀取（見 [tools/btop.zh-TW.md](tools/btop.zh-TW.md)）。Classic snap 雖然逃出 sandbox，但下面其他缺點一個不少。
 - **Refresh 驚喜** — snap 預設按你不完全控制的節奏自動 refresh；CI 或部署腳本若依賴特定 CLI 版本可能一夜之間壞掉。
 - **啟動慢** — 對每個 shell session 呼叫多次的工具（shell prompt、completion script）影響顯著。
 - **Server profile 避開 snapd** — `ubuntu_server` 刻意把 snapd 排除在外。
+
+## 這個 repo 的 snap 使用現況
+
+現況：**只剩一個 role 透過 snap 安裝東西** —— Bitwarden Desktop
+（`dot_ansible/roles/bitwarden/tasks/main.yml`，由 `installBitwarden` prompt
+控管，snap 優先、廠商 `.deb` fallback）。這是刻意的：封閉原始碼的 GUI
+應用程式正是 snap 的自動更新 + confinement 模型最適合的類別（見上方依工具
+類型挑選的表格）。其他一切都不走 snap。
+
+### 為什麼 Neovim role 移除了 snap 路徑（2026-06）
+
+2026 年 6 月之前，neovim role 有一個中間層：apt 太舊 + PATH 上有 `snap`
+→ `snap install nvim --classic`。它被移除了（apt 太舊現在直接走 GitHub
+release tarball → `/opt/nvim` + `/usr/local/bin/nvim` symlink），因為這個
+snap 層和 repo 自己的規則互相矛盾：
+
+1. **自動 refresh 違反 [install/upgrade 拆分原則](https://github.com/daviddwlee84/dotfiles/blob/main/CLAUDE.md#install-vs-upgrade-is-split-on-purpose)。**
+   Snap 按 snapd 的排程自我更新——nvim 可能一夜之間換版本，繞過明確的
+   `just upgrade-*` 路徑。Repo 裡沒有任何其他工具會隱式升級。
+2. **政策矛盾。** 本頁明明寫著 server profile 把 snapd 排除在外、CLI
+   工具路由到 Linuxbrew / GitHub binary——但一台原廠 `ubuntu_server`
+   devbox（apt nvim 太舊 + snapd 預裝）卻落在 snap 層。
+3. **`~/snap` 弄髒 home** —— 觸發這次檢討的症狀：`$HOME` 裡突然冒出
+   `~/snap/nvim` 目錄（見下方）。
+4. **前科紀錄。** 這個 repo 已被 CLI 工具的 snap 版本燙過兩次：chezmoi
+   snap 的 stdin/stdout bug（`scripts/init/dotfiles_init.py` 會主動偵測並
+   避開）、以及 btop snap 的 AppArmor 崩潰
+   （[pitfalls/btop-themes-permission-denied-core-dumped.md](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/btop-themes-permission-denied-core-dumped.md)）。
+5. `nvim` snap 是社群發佈的（一位 Canonical 員工），不是 Neovim 官方
+   專案的產物；GitHub tarball 才是 upstream 自己的 release。
+
+Tarball 層早就久經考驗——它本來就是「沒有 snap 可用」的 fallback 和
+noRoot 使用者層級路徑——所以這次變更只是刪掉中間層，沒有引入任何新機制。
+
+### 值得留存的 snap 知識
+
+- **`~/snap/<name>/` 是 snapd 的 per-user 資料目錄**，snap 第一次執行時
+  自動建立。結構：`~/snap/<name>/<revision>/`（該 app 的版本化
+  `$HOME`）、`current` symlink、`common/`（跨 revision 的資料）。它*不是*
+  安裝目錄——binary 住在 `/snap/` 底下——所以看到它不代表東西裝錯位置。
+  它出了名地無視 XDG 慣例（upstream bug 從 2016 年開到現在；有一個實驗性
+  `hidden-snap-folder` 選項可移到 `~/.snap`，但從未成為預設）。
+- **`classic` vs 嚴格 confinement**：strict snap 跑在 AppArmor 裡，只開放
+  白名單 interface（這就是 dotfile 讀取會壞的原因——`home` interface 擋掉
+  `~/.config` 之類的隱藏目錄）。`--classic` snap 不受限制地執行，像一般
+  套件——nvim snap 是 classic，所以它的問題從來不是 sandbox，而是
+  refresh / 弄髒 home / 發佈者歸屬。
+- **可以 hold refresh，但不是我們的政策**：`sudo snap refresh --hold`
+  （snapd ≥ 2.58）無限期凍結所有更新，`--hold=72h` 可以針對單一 snap 限時
+  hold。Repo 偏好不依賴每台主機的 snapd 狀態——不准動的工具改由 apt /
+  tarball 提供。
+- **磁碟 / 清理**：snapd 會保留先前 revision（`refresh.retain`，預設
+  2–3 個），所以再小的 CLI 也要花 2 倍 squashfs 空間，外加每個一個 loop
+  mount。
+
+### 清理之前裝過 snap nvim 的主機
+
+變更之前部署的主機照常運作（role 的版本檢查會通過，所以什麼都不動），
+要手動收斂的話：
+
+```bash
+sudo snap remove nvim          # binary + /snap/nvim revisions
+rm -rf ~/snap/nvim             # per-user 資料目錄（安全：nvim 狀態其實住在 ~/.config/nvim 等處）
+# 然後重新 apply，讓 role 安裝 tarball 層：
+chezmoi apply    # 或：just fleet-apply <host>
+```
+
+只刪**該 app 的**目錄，不要刪整個 `~/snap`——在 `ubuntu_desktop` 主機上
+`~/snap` 可能存著其他 snap 的真實使用者資料（例如預裝的 Firefox snap 把
+整個 profile 放在那裡）。
 
 ## 相關文件
 
