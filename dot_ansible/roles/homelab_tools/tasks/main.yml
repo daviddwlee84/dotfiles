@@ -1,0 +1,246 @@
+---
+# homelab_tools role — hardware-monitoring CLIs for physical servers.
+# See docs/sysadmin/hardware.md and docs/sysadmin/helpers.md (#hardware).
+#
+# Tools: lm-sensors, smartmontools, ipmitool, nvme-cli, storcli.
+#
+# Two layers of gating:
+#   1. This whole role is a no-op on non-Linux and inside VMs (BMC / RAID /
+#      SMART sensors are meaningless there). The chezmoi `installHomelabTools`
+#      prompt gates whether the `homelab_tools` tag runs at all (see
+#      .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl).
+#   2. Each tool is then gated on whether its hardware is actually present, so
+#      we never install storcli on a box with no MegaRAID controller, etc.
+
+- name: Skip homelab_tools role on non-Linux
+  when: ansible_facts["os_family"] not in ["Debian", "RedHat"]
+  ansible.builtin.meta: end_play
+
+- name: Skip homelab_tools role inside a virtual machine
+  when: ansible_facts["virtualization_role"] | default("") == "guest"
+  ansible.builtin.meta: end_play
+
+# -----------------------------------------------------------------------------
+# Prerequisites for detection (pciutils -> lspci, dmidecode -> DMI tables)
+# -----------------------------------------------------------------------------
+
+- name: Install detection prerequisites (Debian / Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - pciutils
+      - dmidecode
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install detection prerequisites (RHEL / CentOS / Rocky / Alma)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name:
+      - pciutils
+      - dmidecode
+    state: present
+
+# -----------------------------------------------------------------------------
+# Hardware detection — register facts that gate the per-tool installs below.
+# All probes are read-only and never fail the play.
+# -----------------------------------------------------------------------------
+
+- name: Probe PCI devices for RAID controller (MegaRAID / LSI / Smart Array)
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    lspci -nn 2>/dev/null | grep -iE 'raid bus controller|megaraid|lsi logic|smart array' || true
+  args:
+    executable: /bin/bash
+  register: homelab_raid_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Probe PCI devices for NVMe controller
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    lspci -nn 2>/dev/null | grep -iE 'non-volatile memory controller|nvme' || true
+  args:
+    executable: /bin/bash
+  register: homelab_nvme_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Probe for a BMC / IPMI device (/dev/ipmi*)
+  ansible.builtin.find:
+    paths: /dev
+    patterns: "ipmi*"
+    file_type: any
+  register: homelab_ipmi_dev
+
+- name: Probe DMI for an IPMI device (type 38) when no /dev/ipmi* present
+  when: homelab_ipmi_dev.matched | default(0) | int == 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    dmidecode -t 38 2>/dev/null | grep -i 'IPMI Device Information' || true
+  args:
+    executable: /bin/bash
+  register: homelab_ipmi_dmi
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Consolidate hardware-presence facts
+  ansible.builtin.set_fact:
+    homelab_has_raid: "{{ (homelab_raid_probe.stdout | default('') | trim) | length > 0 }}"
+    homelab_has_nvme: "{{ (homelab_nvme_probe.stdout | default('') | trim) | length > 0 }}"
+    homelab_has_bmc: >-
+      {{ (homelab_ipmi_dev.matched | default(0) | int > 0)
+         or ((homelab_ipmi_dmi.stdout | default('') | trim) | length > 0) }}
+
+- name: Show detected hardware
+  ansible.builtin.debug:
+    msg: >-
+      homelab_tools detection — RAID controller: {{ homelab_has_raid }},
+      NVMe: {{ homelab_has_nvme }}, BMC/IPMI: {{ homelab_has_bmc }}
+
+# -----------------------------------------------------------------------------
+# Always-useful installs on physical Linux (sensors + SMART work everywhere)
+# -----------------------------------------------------------------------------
+
+- name: Build base package list (lm-sensors + smartmontools)
+  ansible.builtin.set_fact:
+    homelab_pkgs: >-
+      {{ (([('lm-sensors' if ansible_facts['os_family'] == 'Debian' else 'lm_sensors')]
+            if homelab_install_lm_sensors else [])
+          + (['smartmontools'] if homelab_install_smartmontools else [])
+          + (['ipmitool'] if (homelab_install_ipmitool and homelab_has_bmc) else [])
+          + (['nvme-cli'] if (homelab_install_nvme_cli and homelab_has_nvme) else [])) }}
+
+- name: Install homelab hardware tools (Debian / Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - homelab_pkgs | length > 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: "{{ homelab_pkgs }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install homelab hardware tools (RHEL / CentOS / Rocky / Alma)
+  when:
+    - ansible_facts["os_family"] == "RedHat"
+    - homelab_pkgs | length > 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name: "{{ homelab_pkgs }}"
+    state: present
+
+# -----------------------------------------------------------------------------
+# storcli — only when a RAID controller is present. Not in distro repos, so
+# this is a best-effort vendor/mirror download gated on `homelab_storcli_url`.
+# -----------------------------------------------------------------------------
+
+- name: Check whether storcli is already installed
+  when: homelab_install_storcli and homelab_has_raid
+  ansible.builtin.shell: command -v storcli || command -v storcli64 || true
+  args:
+    executable: /bin/bash
+  register: homelab_storcli_check
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Install storcli from vendor URL (RAID present, not installed, URL set)
+  when:
+    - homelab_install_storcli
+    - homelab_has_raid
+    - (homelab_storcli_check.stdout | default('') | trim) | length == 0
+    - homelab_storcli_url | length > 0
+    - target_architecture in ['x86_64', 'amd64']
+  block:
+    - name: Ensure ~/.local/bin exists (storcli)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: "0755"
+
+    - name: Download storcli archive
+      ansible.builtin.get_url:
+        url: "{{ homelab_storcli_url }}"
+        dest: /tmp/storcli_dl
+        mode: "0644"
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create storcli extract directory
+      ansible.builtin.file:
+        path: /tmp/storcli_extract
+        state: directory
+        mode: "0755"
+
+    - name: Extract storcli archive
+      ansible.builtin.unarchive:
+        src: /tmp/storcli_dl
+        dest: /tmp/storcli_extract
+        remote_src: true
+
+    - name: Find storcli binary in extracted tree
+      ansible.builtin.find:
+        paths: /tmp/storcli_extract
+        patterns: "storcli,storcli64"
+        file_type: file
+        recurse: true
+      register: homelab_storcli_find
+
+    - name: Fail if storcli binary not found after extraction
+      when: homelab_storcli_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "storcli binary not found under /tmp/storcli_extract — check homelab_storcli_url"
+
+    - name: Install storcli to ~/.local/bin
+      ansible.builtin.copy:
+        src: "{{ homelab_storcli_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/storcli"
+        mode: "0755"
+        remote_src: true
+  rescue:
+    - name: Warn storcli install failed
+      ansible.builtin.debug:
+        msg: >-
+          storcli install failed — skipping. Install manually (see
+          docs/sysadmin/hardware.md "Installing storcli").
+          Error: {{ ansible_failed_result.msg | default('unknown') }}
+  always:
+    - name: Clean up storcli temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/storcli_dl
+        - /tmp/storcli_extract
+
+- name: Hint when RAID present but storcli unavailable and no URL configured
+  when:
+    - homelab_install_storcli
+    - homelab_has_raid
+    - (homelab_storcli_check.stdout | default('') | trim) | length == 0
+    - homelab_storcli_url | length == 0
+  ansible.builtin.debug:
+    msg: >-
+      A RAID controller was detected but storcli is not installed and
+      homelab_storcli_url is empty. Set that var to a reachable storcli tarball,
+      or install manually — see docs/sysadmin/hardware.md "Installing storcli".
+
+# -----------------------------------------------------------------------------
+# Note: smartd / ipmievd services are intentionally NOT enabled. This repo is
+# install-only (see CLAUDE.md "Install vs upgrade is split on purpose"); a
+# monitoring/alerting timer would be a separate opt-in feature.

@@ -76,6 +76,7 @@ plugins:
             Firewall and network exposure: Firewall 與網路曝險面
             "Scheduled jobs (cron / timers / launchd)": "排程任務（cron / timer / launchd）"
             Disk / filesystem monitoring: Disk / filesystem 監控
+            Hardware monitoring (homelab): 硬體監控（homelab）
             Service health: Service health
             Atuin vs audit: Atuin vs audit
             Cookbook (scenario recipes): Cookbook（場景食譜）
@@ -326,6 +327,7 @@ nav:
       - Firewall and network exposure: sysadmin/firewall.md
       - Scheduled jobs (cron / timers / launchd): sysadmin/scheduled-jobs.md
       - Disk / filesystem monitoring: sysadmin/disk.md
+      - Hardware monitoring (homelab): sysadmin/hardware.md
       - Service health: sysadmin/services-health.md
       - Atuin vs audit: sysadmin/atuin-vs-audit.md
       - Cookbook (scenario recipes): sysadmin/cookbook.md

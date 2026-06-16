@@ -41,6 +41,8 @@ ceiling is.
   launchd; the persistence-detection surface
 - [Disk / filesystem monitoring](disk.md) — `df` / `du` / inodes /
   mounts; auditd disk-full prevention
+- [Hardware monitoring (homelab)](hardware.md) — fans / temps / RAID /
+  SMART on physical servers; `hw-*` helpers (Linux + physical only)
 - [Service health](services-health.md) — failed units, restart loops,
   OOM kills; `health-check` morning summary
 - [Atuin vs audit](atuin-vs-audit.md) — why personal shell history is not
@@ -62,6 +64,7 @@ ceiling is.
 "What's exposed on this server?"        →  fw-listening     (firewall.md)
 "What's scheduled to run on this box?"  →  cron-list        (scheduled-jobs.md)
 "Is anything full / about to fill up?"  →  disk-usage       (disk.md)
+"Is the hardware OK? (fans/temps/RAID)" →  hw-status        (hardware.md, physical only)
 "Quick morning health check"            →  health-check     (services-health.md)
 "Live monitor for risky activity"       →  audit-watch
 "Compliance / forensic incident"        →  auditd + offsite log shipping

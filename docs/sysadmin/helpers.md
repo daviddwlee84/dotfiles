@@ -63,6 +63,23 @@ helpers are templated to use the right one per host.
 | `mount-info` | Active mounts with options + `/etc/fstab` contents | No |
 | `disk-watch [mount]` | Live `watch -n 1` of `df -h <mount>` + largest files | No |
 
+### Hardware
+
+Physical-server hardware health (Linux only; installed by the `homelab_tools`
+role, chezmoi prompt `installHomelabTools`). Full guide:
+[hardware.md](hardware.md).
+
+| Function | What it answers | Wraps | Sudo? |
+|---|---|---|---|
+| `hw-status [--no-color]` | One-screen sweep: fans + temps + RAID + per-disk SMART + SEL errors | composite (ipmitool / storcli / smartctl) | Yes (per-section degrade) |
+| `hw-fans` | Chassis fan RPM (BMC plane); `ns`/No-Reading = empty slot | `ipmitool sdr type fan` | Yes |
+| `hw-temps` | Temperatures: BMC + on-board chips | `ipmitool sdr type temperature` + `sensors` | Yes (BMC part) |
+| `hw-sensors` | Full lm-sensors dump | `sensors` | No |
+| `hw-raid` | MegaRAID status, VD/PD, ROC temp, enclosure sensors | `storcli show` + `/cALL` + `/cALL/eALL show all` | Yes |
+| `hw-smart [dev]` | Per-disk SMART health (no arg) or full `-a` report (with dev); NVMe via `nvme smart-log` | `smartctl -H` / `smartctl -a` | Yes |
+| `hw-disks` | Synonym for `hw-smart` no-arg sweep | `smartctl -H` per disk | Yes |
+| `hw-sel [--all]` | BMC System Event Log (PSU / ECC / thermal faults) | `ipmitool sel info` + `sel elist` | Yes |
+
 ### Package install history
 
 | Function | What it answers | Sudo? |

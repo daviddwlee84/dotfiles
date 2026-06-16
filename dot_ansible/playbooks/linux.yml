@@ -120,3 +120,6 @@
 
     - role: auditd
       tags: [auditd]
+
+    - role: homelab_tools
+      tags: [homelab_tools]

@@ -61,6 +61,22 @@ POSIX 形式，zsh 與 bash 共用。少數 zsh-only 便利處用 source-time �
 | `mount-info` | active mount + options + `/etc/fstab` | 否 |
 | `disk-watch [mount]` | 即時 `watch -n 1` of `df -h <mount>` + 最大檔 | 否 |
 
+### 硬體 {#hardware}
+
+實體機硬體健康（僅 Linux；由 `homelab_tools` role 安裝，chezmoi prompt
+`installHomelabTools`）。完整指南：[hardware.md](hardware.md)。
+
+| 函式 | 回答什麼 | 包裝 | Sudo？ |
+|---|---|---|---|
+| `hw-status [--no-color]` | 一頁總覽：風扇 + 溫度 + RAID + 每碟 SMART + SEL 錯誤 | 複合（ipmitool / storcli / smartctl） | 是（逐段降級） |
+| `hw-fans` | 機箱風扇 RPM（BMC 平面）；`ns`/No-Reading = 空槽 | `ipmitool sdr type fan` | 是 |
+| `hw-temps` | 溫度：BMC + 主機板晶片 | `ipmitool sdr type temperature` + `sensors` | 是（BMC 部分） |
+| `hw-sensors` | 完整 lm-sensors dump | `sensors` | 否 |
+| `hw-raid` | MegaRAID 狀態、VD/PD、ROC 溫度、enclosure 感測器 | `storcli show` + `/cALL` + `/cALL/eALL show all` | 是 |
+| `hw-smart [dev]` | 每碟 SMART 健康（無參數）或單碟完整 `-a` 報告；NVMe 走 `nvme smart-log` | `smartctl -H` / `smartctl -a` | 是 |
+| `hw-disks` | `hw-smart` 無參數巡檢的同義詞 | 每碟 `smartctl -H` | 是 |
+| `hw-sel [--all]` | BMC System Event Log（PSU / ECC / 過熱故障） | `ipmitool sel info` + `sel elist` | 是 |
+
 ### 套件安裝歷史
 
 | 函式 | 回答 | sudo？ |

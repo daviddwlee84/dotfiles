@@ -156,6 +156,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
 | `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby; ~1.8GB) + their cargo/gem tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
 | `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
+| `installHomelabTools` | false | Homelab hardware-monitoring CLIs (lm-sensors, smartmontools, ipmitool, nvme-cli, storcli) + `hw-*` shell helpers, each gated on detected hardware. Linux only; no-op in VMs. See [docs/sysadmin/hardware.md](docs/sysadmin/hardware.md). |
 | `useChineseMirror` | false | Switch Homebrew / pip / npm / cargo / etc. to China (GFW) mirrors |
 | `gitleaksAllRepos` | false | Run gitleaks on ALL git repos, not just those with `.pre-commit-config.yaml` |
 | `backupMode` | `smart` | Back up existing dotfiles before apply: `smart` (only files chezmoi overwrites), `full` (fixed allowlist), `off` (skip) |
@@ -285,6 +286,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **Input Methods** (optional): McBopomofo + RIME (Squirrel on macOS, ibus-rime on Linux)
 - **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
 - **Linux audit framework** (optional, Linux only, `installAuditd=true`): [`auditd`](docs/sysadmin/auditd.md) + baseline rule set (identity / sudoers / sshd_config / privileged-exec watches), plus `audit-*` shell helpers and `tv sessions` / `tv sudo-history` / `tv audit-events` Television channels for the routine "who did what on this server" queries. Full guide: [docs/sysadmin/](docs/sysadmin/README.md); ansible role: [docs/playbooks/auditd.md](docs/playbooks/auditd.md)
+- **Homelab hardware monitoring** (optional, Linux/physical only, `installHomelabTools=true`): hardware-monitoring CLIs ([lm-sensors, smartmontools, ipmitool, nvme-cli, storcli](docs/sysadmin/hardware.md)) installed only when the matching hardware is detected, plus the `hw-*` shell helper family (`hw-fans`, `hw-temps`, `hw-raid`, `hw-smart`, `hw-status` …) for the "is this server's hardware healthy?" sweep. Full guide: [docs/sysadmin/hardware.md](docs/sysadmin/hardware.md)
 - **Media / AV tools** (optional, `installMediaTools=true`): [ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md). Plus three zsh helpers (`compress-video`, `extract-audio`, `to-wav16k`) at [`dot_config/zsh/tools/29_media.zsh`](dot_config/zsh/tools/29_media.zsh). Also satisfies `vhs`'s runtime ffmpeg dep.
 - **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)

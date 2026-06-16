@@ -42,6 +42,8 @@
 # dotnet_tools defaults: {{ include "dot_ansible/roles/dotnet_tools/defaults/main.yml" | sha256sum }}
 # gui_apps_linux tasks: {{ include "dot_ansible/roles/gui_apps_linux/tasks/main.yml" | sha256sum }}
 # gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
+# homelab_tools tasks: {{ include "dot_ansible/roles/homelab_tools/tasks/main.yml" | sha256sum }}
+# homelab_tools defaults: {{ include "dot_ansible/roles/homelab_tools/defaults/main.yml" | sha256sum }}
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -270,6 +272,10 @@ TAGS="${TAGS},dotnet_tools"
 {{ $installAuditd := false }}{{ if hasKey . "installAuditd" }}{{ $installAuditd = .installAuditd }}{{ end -}}
 {{ if and $installAuditd (eq .chezmoi.os "linux") -}}
 TAGS="${TAGS},auditd"
+{{ end -}}
+{{ $installHomelabTools := false }}{{ if hasKey . "installHomelabTools" }}{{ $installHomelabTools = .installHomelabTools }}{{ end -}}
+{{ if and $installHomelabTools (eq .chezmoi.os "linux") -}}
+TAGS="${TAGS},homelab_tools"
 {{ end -}}
 
 # Extra vars for role-level configuration

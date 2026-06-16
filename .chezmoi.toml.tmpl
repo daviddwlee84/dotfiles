@@ -55,6 +55,16 @@ installAuditd = {{ promptBoolOnce . "installAuditd" "Install Linux audit framewo
 {{ else -}}
 installAuditd = false
 {{ end -}}
+# 是否安裝 homelab 硬體監控 CLI（lm-sensors / smartmontools / ipmitool /
+# nvme-cli / storcli）。每個工具還會依實際偵測到的硬體決定要不要裝（沒有
+# MegaRAID 控制器就不裝 storcli、沒有 NVMe 就不裝 nvme-cli…），避免裝一堆
+# 用不到的東西。Linux only — macOS 與 VM 內自動跳過。
+# 詳見 docs/sysadmin/hardware.md。
+{{ if eq .chezmoi.os "linux" -}}
+installHomelabTools = {{ promptBoolOnce . "installHomelabTools" "Install homelab hardware-monitoring tools (lm-sensors / smartmontools / ipmitool / nvme-cli / storcli), gated on detected hardware" false }}
+{{ else -}}
+installHomelabTools = false
+{{ end -}}
 # 是否安裝 Infrastructure-as-Code 工具 (Azure CLI, Terraform, OpenTofu)
 installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)" false }}
 # 是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)

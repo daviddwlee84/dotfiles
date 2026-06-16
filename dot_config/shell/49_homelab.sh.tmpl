@@ -1,0 +1,271 @@
+# shellcheck shell=sh
+# hw-* helpers — homelab hardware health for physical servers.
+#
+# POSIX-portable wrappers around ipmitool / sensors / storcli / smartctl /
+# nvme. Sourced by both bash and zsh via load_modular_dir of ~/.config/shell/.
+# See docs/sysadmin/hardware.md for the guide and docs/sysadmin/helpers.md
+# (#hardware) for the reference table. Installed by the `homelab_tools` ansible
+# role (chezmoi prompt installHomelabTools).
+#
+# Conventions (match 45_audit.sh.tmpl):
+#   - All hw-* functions accept --help.
+#   - Root-only sources elevate via a single `sudo -v` on a TTY, else hint+exit.
+#   - These are shell *functions*: `sudo hw-foo` will NOT work (sudo spawns a
+#     fresh process). Warm the cache with `sudo -v` first.
+#
+# Two distinct sensor planes this file fronts (a real-world gotcha):
+#   - lm-sensors  -> on-board Super-I/O / PCI temp+fan chips (hw-sensors)
+#   - ipmitool    -> the BMC's view: chassis fans, temps, PSU, SEL (hw-fans/temps/sel)
+#   - storcli     -> the RAID card's ROC temp + enclosure sensors (hw-raid)
+# A passive SGPIO backplane reports 0 fans / 0 temp sensors to the RAID card —
+# that's normal, not a fault; chassis fans live on the BMC plane instead.
+
+{{- if eq .chezmoi.os "linux" }}
+
+# ---------------------------------------------------------------------------
+# Internal helpers (prefix _hw_ — not part of public surface)
+# ---------------------------------------------------------------------------
+
+_hw_is_tty() { [ -t 0 ] || [ -t 1 ] || [ -t 2 ]; }
+_hw_is_root() { [ "$(id -u)" = "0" ]; }
+_hw_have() { command -v "$1" >/dev/null 2>&1; }
+
+# Run "$@" with sudo if not root; if root, run directly. Mirrors
+# _audit_run_root: non-interactive fast path, then TTY-driven `sudo -v`.
+_hw_run_root() {
+    if _hw_is_root; then "$@"; return $?; fi
+    if ! _hw_have sudo; then
+        printf 'hw: needs root and sudo not installed\n' >&2
+        return 1
+    fi
+    if sudo -n true 2>/dev/null; then sudo "$@"; return $?; fi
+    if _hw_is_tty; then
+        if sudo -v; then sudo "$@"; return $?; fi
+        return 1
+    fi
+    printf 'hw: needs root. Run `sudo -v` once in this shell first, then re-run.\n' >&2
+    printf '    (These are shell functions, so `sudo <helper>` will NOT work.)\n' >&2
+    return 1
+}
+
+# Emit "tool not installed" hint pointing at the role. Usage: _hw_need <tool> <pkg>
+_hw_need() {
+    printf 'hw: %s not found — install the homelab_tools role (pkg: %s)\n' "$1" "$2" >&2
+    printf '    chezmoi prompt installHomelabTools; see docs/sysadmin/hardware.md\n' >&2
+    return 1
+}
+
+# First storcli binary on PATH (storcli or storcli64), or empty.
+_hw_storcli() {
+    if _hw_have storcli; then printf 'storcli\n';
+    elif _hw_have storcli64; then printf 'storcli64\n';
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# hw-fans — chassis fan RPM via the BMC.
+# ---------------------------------------------------------------------------
+hw-fans() {
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-fans\n\n'
+            printf '  Chassis fan RPM + status via `ipmitool sdr type fan` (BMC plane).\n'
+            printf '  Rows showing "ns / No Reading" are unpopulated fan slots, not faults.\n'
+            printf '  Requires a BMC and root (IPMI device is root-only).\n'
+            return 0 ;;
+    esac
+    _hw_have ipmitool || { _hw_need ipmitool ipmitool; return 1; }
+    _hw_run_root ipmitool sdr type fan
+}
+
+# ---------------------------------------------------------------------------
+# hw-temps — temperatures: BMC sensors + lm-sensors if present.
+# ---------------------------------------------------------------------------
+hw-temps() {
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-temps\n\n'
+            printf '  Temperatures from the BMC (`ipmitool sdr type temperature`) and,\n'
+            printf '  if installed, on-board chips via `sensors`.\n'
+            return 0 ;;
+    esac
+    if _hw_have ipmitool; then
+        printf '== ipmitool (BMC) ==\n'
+        _hw_run_root ipmitool sdr type temperature
+    fi
+    if _hw_have sensors; then
+        printf '\n== lm-sensors (on-board) ==\n'
+        sensors 2>/dev/null
+    elif ! _hw_have ipmitool; then
+        _hw_need 'ipmitool/sensors' 'ipmitool lm-sensors'
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# hw-sensors — full lm-sensors dump.
+# ---------------------------------------------------------------------------
+hw-sensors() {
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-sensors\n\n'
+            printf '  Full `sensors` output (lm-sensors). If empty, run\n'
+            printf '  `sudo sensors-detect` once to enable the kernel modules.\n'
+            return 0 ;;
+    esac
+    _hw_have sensors || { _hw_need sensors lm-sensors; return 1; }
+    sensors 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# hw-raid — RAID controller health, ROC temp, enclosure sensors (storcli).
+# ---------------------------------------------------------------------------
+hw-raid() {
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-raid\n\n'
+            printf '  LSI/MegaRAID summary via storcli: controller status, VDs, PDs,\n'
+            printf '  ROC chip temperature, and enclosure (fan/temp) sensors.\n'
+            printf '  Requires storcli and root. SGPIO backplanes report 0 fans/temps\n'
+            printf '  (normal — chassis fans are on the BMC plane; use hw-fans).\n'
+            return 0 ;;
+    esac
+    sc=$(_hw_storcli)
+    [ -n "$sc" ] || { _hw_need storcli 'storcli (vendor download)'; return 1; }
+    printf '== controllers (storcli show) ==\n'
+    _hw_run_root "$sc" show 2>/dev/null
+    printf '\n== /cALL summary (status, VDs, PDs, ROC temp) ==\n'
+    _hw_run_root "$sc" /cALL show 2>/dev/null \
+        | grep -iE 'controller|status|temperature|ROC|optimal|degraded|failed' || true
+    printf '\n== enclosure sensors (/cALL/eALL) ==\n'
+    _hw_run_root "$sc" /cALL/eALL show all 2>/dev/null \
+        | grep -iEA6 'fan|temperature sensor|voltage sensor|EID' || true
+}
+
+# ---------------------------------------------------------------------------
+# hw-smart [device] — SMART health. No arg = sweep every physical disk.
+# ---------------------------------------------------------------------------
+hw-smart() {
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-smart [device]\n\n'
+            printf '  With a device (e.g. /dev/sda): `smartctl -a <dev>` full report.\n'
+            printf '  Without: `smartctl -H` health verdict for every physical disk\n'
+            printf '  (lsblk type=disk). NVMe namespaces also get `nvme smart-log`.\n'
+            printf '  Requires smartmontools and root.\n'
+            return 0 ;;
+    esac
+    _hw_have smartctl || { _hw_need smartctl smartmontools; return 1; }
+    if [ -n "${1:-}" ]; then
+        _hw_run_root smartctl -a "$1"
+        return $?
+    fi
+    for d in $(lsblk -dpno NAME,TYPE 2>/dev/null | awk '$2=="disk"{print $1}'); do
+        printf '== %s ==\n' "$d"
+        _hw_run_root smartctl -H "$d" 2>/dev/null \
+            | grep -iE 'SMART overall|test result|SMART Health' || printf '  (no SMART verdict)\n'
+        case "$d" in
+            *nvme*)
+                if _hw_have nvme; then
+                    _hw_run_root nvme smart-log "$d" 2>/dev/null \
+                        | grep -iE 'critical_warning|temperature|percentage_used|media_errors' || true
+                fi ;;
+        esac
+        printf '\n'
+    done
+}
+
+# hw-disks — alias-style synonym for the no-arg sweep.
+hw-disks() {
+    case ${1:-} in
+        -h|--help) printf 'Usage: hw-disks\n\n  Per-disk SMART health sweep (same as `hw-smart` with no args).\n'; return 0 ;;
+    esac
+    hw-smart
+}
+
+# ---------------------------------------------------------------------------
+# hw-sel — BMC System Event Log (hardware faults: PSU, ECC, thermal, …).
+# ---------------------------------------------------------------------------
+hw-sel() {
+    n=20
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-sel [--all]\n\n'
+            printf '  BMC System Event Log via ipmitool. Default: last %s entries.\n' "$n"
+            printf '  --all dumps the full log. Also prints SEL time + capacity.\n'
+            return 0 ;;
+        --all) n=0 ;;
+    esac
+    _hw_have ipmitool || { _hw_need ipmitool ipmitool; return 1; }
+    printf '== SEL info ==\n'
+    _hw_run_root ipmitool sel info 2>/dev/null | grep -iE 'entries|last add|free space|time' || true
+    printf '\n== SEL entries ==\n'
+    if [ "$n" -eq 0 ]; then
+        _hw_run_root ipmitool sel elist 2>/dev/null
+    else
+        _hw_run_root ipmitool sel elist 2>/dev/null | tail -"$n"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# hw-status — one-screen aggregator (mirrors health-check). The 30-second
+# "is this server's hardware OK?" sweep.
+# ---------------------------------------------------------------------------
+hw-status() {
+    color=1
+    case ${1:-} in
+        -h|--help)
+            printf 'Usage: hw-status [--no-color]\n\n'
+            printf '  One-screen hardware sweep: fans, temps, RAID, per-disk SMART, SEL\n'
+            printf '  errors. Sections run independently (a missing tool skips its\n'
+            printf '  section). --no-color auto-on when stdout is not a TTY.\n'
+            return 0 ;;
+        --no-color) color=0 ;;
+    esac
+    [ -t 1 ] || color=0
+    if [ "$color" = "1" ]; then H='\033[1;36m'; N='\033[0m'; else H=''; N=''; fi
+    _hw_sec() { printf "${H}== %s ==${N}\n" "$1"; }
+
+    _hw_sec 'fans (BMC)'
+    if _hw_have ipmitool; then
+        _hw_run_root ipmitool sdr type fan 2>/dev/null | grep -iv 'no reading' || printf '  (none)\n'
+    else printf '  ipmitool not installed\n'; fi
+    printf '\n'
+
+    _hw_sec 'temperatures (BMC)'
+    if _hw_have ipmitool; then
+        _hw_run_root ipmitool sdr type temperature 2>/dev/null | grep -iv 'no reading' || printf '  (none)\n'
+    else printf '  ipmitool not installed\n'; fi
+    printf '\n'
+
+    _hw_sec 'RAID'
+    sc=$(_hw_storcli)
+    if [ -n "$sc" ]; then
+        _hw_run_root "$sc" /cALL show 2>/dev/null \
+            | grep -iE 'controller status|status =|temperature|optimal|degraded|failed' \
+            | head -10 || printf '  (no controller data)\n'
+    else printf '  storcli not installed\n'; fi
+    printf '\n'
+
+    _hw_sec 'disks (SMART health)'
+    if _hw_have smartctl; then
+        for d in $(lsblk -dpno NAME,TYPE 2>/dev/null | awk '$2=="disk"{print $1}'); do
+            v=$(_hw_run_root smartctl -H "$d" 2>/dev/null | grep -iE 'SMART overall|test result|SMART Health' | head -1)
+            printf '  %-14s %s\n' "$d" "${v:-(no verdict)}"
+        done
+    else printf '  smartmontools not installed\n'; fi
+    printf '\n'
+
+    _hw_sec 'recent SEL errors'
+    if _hw_have ipmitool; then
+        out=$(_hw_run_root ipmitool sel elist 2>/dev/null | grep -iE 'error|critical|fail|assert' | tail -5)
+        [ -n "$out" ] && printf '%s\n' "$out" || printf '  none\n'
+    else printf '  ipmitool not installed\n'; fi
+}
+
+{{- else }}
+
+# Non-Linux: hw-* helpers target physical-server hardware (IPMI/MegaRAID/SMART)
+# and are Linux-only. Define no functions here.
+
+{{- end }}

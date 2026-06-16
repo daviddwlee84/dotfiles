@@ -1,0 +1,23 @@
+---
+# homelab_tools role defaults
+#
+# Hardware-monitoring CLIs for physical servers. Each tool is additionally
+# gated at runtime on whether the matching hardware is actually present (see
+# tasks/main.yml "hardware detection") so a box with no MegaRAID controller /
+# no NVMe drive / no BMC does not pull in unused packages.
+#
+# These toggles are the coarse on/off switch; hardware detection is the fine
+# one. Both must be true for a tool to install.
+
+homelab_install_lm_sensors: true      # board temp/fan sensors (lm-sensors)
+homelab_install_smartmontools: true   # smartctl/smartd — disk SMART health
+homelab_install_ipmitool: true        # BMC sensors + SEL (gated on /dev/ipmi0 or DMI type 38)
+homelab_install_nvme_cli: true        # nvme-cli (gated on an NVMe controller being present)
+homelab_install_storcli: true         # LSI/MegaRAID mgmt (gated on a RAID controller being present)
+
+# storcli is NOT in distro repos (Broadcom ships it as a zip behind a portal).
+# Leave this empty to SKIP the download and instead emit a clear hint when a
+# MegaRAID controller is detected but storcli is missing. Set it to a reachable
+# tarball/zip URL (x86_64 only) to enable the best-effort vendor download into
+# ~/.local/bin. See docs/sysadmin/hardware.md "Installing storcli".
+homelab_storcli_url: ""

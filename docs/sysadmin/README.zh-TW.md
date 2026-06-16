@@ -36,6 +36,8 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
   persistence 偵測面
 - [Disk / filesystem 監控](disk.md) — `df` / `du` / inode / mount；
   auditd disk-full 預防
+- [硬體監控（homelab）](hardware.md) — 實體機的風扇 / 溫度 / RAID / SMART；
+  `hw-*` helper（僅 Linux + 實體機）
 - [Service health](services-health.md) — failed unit、restart loop、OOM；
   `health-check` 早晨摘要
 - [Atuin vs audit](atuin-vs-audit.md) — 為什麼個人 shell history 不是
@@ -56,6 +58,7 @@ Wazuh、商業 EDR）。那些不在 dotfiles repo 的範圍內，但
 「這台 server 曝什麼？」                  →  fw-listening     (firewall.md)
 「這台機器排了什麼會自動執行？」          →  cron-list        (scheduled-jobs.md)
 「有東西滿了 / 快滿了嗎？」               →  disk-usage       (disk.md)
+「硬體還好嗎？(風扇/溫度/RAID)」          →  hw-status        (hardware.md，僅實體機)
 「早晨快速健康檢查」                      →  health-check     (services-health.md)
 「即時監控可疑活動」                      →  audit-watch
 「合規 / 鑑識事件」                      →  auditd + 異地 log shipping

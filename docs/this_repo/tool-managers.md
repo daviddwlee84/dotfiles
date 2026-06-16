@@ -994,6 +994,7 @@ list.
 | **httpie** | brew | apt (Debian) | networking_tools |
 | **imagemagick** | brew | apt | media_tools |
 | **input methods** (`mcbopomofo`, `squirrel`) | brew cask | (Debian) apt `ibus-rime` | input_method |
+| **ipmitool** | n/a | apt/yum (gated on BMC detected) | homelab_tools |
 | **iperf3** | brew | apt/yum | networking_tools |
 | **jnv** | brew | release | devtools |
 | **jq** | brew | apt/yum → GitHub release | base |
@@ -1004,6 +1005,7 @@ list.
 | **libfuse2** | n/a | apt | gui_apps_linux |
 | **litellm[proxy]** (`litellm`) | uv tool (python 3.13) | uv tool | llm_tools |
 | **llmfit** | brew formula | curl `llmfit.axjns.dev/install.sh` | llm_tools |
+| **lm-sensors** (`sensors`) | n/a | apt/yum (`lm-sensors`/`lm_sensors`) | homelab_tools |
 | **lnav** | brew | apt/release | devtools |
 | **lolcat** | brew | (apt) | devtools |
 | **maccy** | brew cask | n/a | Brewfile.darwin |
@@ -1017,6 +1019,7 @@ list.
 | **neovim** | brew (`state: latest`) | apt → snap → GitHub release → user → oldEL fork | neovim |
 | **ngrok** | brew cask | vendor apt repo → user tgz / RedHat tgz | networking_tools (tunnel) |
 | **node** | brew (via `lazyvim_deps`) | mise | mise + lazyvim_deps |
+| **nvme-cli** (`nvme`) | n/a | apt/yum (gated on NVMe detected) | homelab_tools |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |
 | **ollama** | brew formula `ollama` (CLI) + cask `ollama-app` (GUI) | curl `ollama.com/install.sh` | llm_tools |
 | **openchamber** (`@openchamber/web`) | npm global | `mise exec -- npm install -g` | coding_agents |
@@ -1042,12 +1045,14 @@ list.
 | **sesh** | brew | GitHub release | devtools |
 | **shellcheck / shfmt** | brew | apt or release | devtools |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
+| **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |
 | **specify-cli** | `uv tool install` from git | same | coding_agents |
 | **specstory** | brew tap `specstoryai/tap` → GitHub release | GitHub release tarball | coding_agents |
 | **speedtest** (Ookla) | brew (tap `teamookla/speedtest`) | `install.speedtest.net` | networking_tools |
 | **spotify** | brew cask | n/a | Brewfile.darwin |
 | **sqlit-tui[ssh]** | uv tool | uv tool | python_uv_tools |
 | **starship** | brew | curl `starship.rs/install.sh` | starship |
+| **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask (arm64) | n/a | Brewfile.darwin |

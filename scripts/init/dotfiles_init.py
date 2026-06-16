@@ -262,6 +262,17 @@ PROMPTS: tuple[Prompt, ...] = (
                     "sshd_config / privileged-exec watch）。Linux only — macOS 自動跳過（macOS 用\n"
                     "OpenBSM，不是 auditd），所以在 darwin 上不問也直接 false。\n"
                     "詳見 docs/sysadmin/auditd.md 與 docs/playbooks/auditd.md。")),
+    Prompt("installHomelabTools", "bool", "System & apps",
+           "Homelab hardware-monitoring tools",
+           "Installs physical-server hardware CLIs (lm-sensors, smartmontools, ipmitool, nvme-cli, storcli), each gated on the matching hardware being present. Linux only; no-op on macOS and inside VMs. See docs/sysadmin/hardware.md.",
+           default=False,
+           condition=When(os=frozenset({"linux"})), else_value=False,
+           prompt_text="Install homelab hardware-monitoring tools (lm-sensors / smartmontools / ipmitool / nvme-cli / storcli), gated on detected hardware",
+           comment=("是否安裝 homelab 硬體監控 CLI（lm-sensors / smartmontools / ipmitool /\n"
+                    "nvme-cli / storcli）。每個工具還會依實際偵測到的硬體決定要不要裝（沒有\n"
+                    "MegaRAID 控制器就不裝 storcli、沒有 NVMe 就不裝 nvme-cli…），避免裝一堆\n"
+                    "用不到的東西。Linux only — macOS 與 VM 內自動跳過。\n"
+                    "詳見 docs/sysadmin/hardware.md。")),
     Prompt("installIacTools", "bool", "Dev tooling",
            "Infrastructure-as-Code tools",
            "Azure CLI, Terraform, OpenTofu.",
@@ -440,6 +451,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installExtraRuntimes": True,
         "installNetworkingTools": True,
         "installAuditd": True,
+        "installHomelabTools": True,
         "backupMode": "smart",
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
     },
@@ -461,6 +473,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNetworkingTools": False,
         "installMediaTools": False,
         "installAuditd": False,
+        "installHomelabTools": False,
         "backupMode": "off",  # fresh VM — nothing worth backing up
     },
     "minimal": {
@@ -482,6 +495,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNetworkingTools": False,
         "installMediaTools": False,
         "installAuditd": False,
+        "installHomelabTools": False,
         "useChineseMirror": False,
         "gitleaksAllRepos": False,
         "backupMode": "off",
