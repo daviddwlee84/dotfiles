@@ -130,6 +130,16 @@ pyrightconfig.json
 .config/niri/**
 {{- end }}
 
+# AeroSpace config (XDG) — macOS-only tiling WM, installed via the cask in
+# Brewfile.darwin.tmpl (gated by installBrewApps). Only manage on darwin when
+# installBrewApps=true. Legacy ~/.aerospace.toml is removed by .chezmoiremove
+# to avoid AeroSpace's both-configs-present ambiguity error.
+{{- $installBrewApps := false }}{{ if hasKey . "installBrewApps" }}{{ $installBrewApps = .installBrewApps }}{{ end }}
+{{- if or (ne .chezmoi.os "darwin") (not $installBrewApps) }}
+.config/aerospace
+.config/aerospace/**
+{{- end }}
+
 # -----------------------------------------------------------------------------
 # Editor overlays (VSCode / Cursor / Antigravity)
 #

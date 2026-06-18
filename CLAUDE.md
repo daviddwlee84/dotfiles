@@ -67,6 +67,8 @@ This repo uses the `project-knowledge-harness` agent skill (restored on every `c
 
 **Hard rule**: before adding `{{ if eq .profile … }}`, ask if the predicate is auto-detectable. If yes, use `.chezmoi.os` / `.chezmoi.arch` / `.chezmoi.hostname`. `.profile` is for user-role choices only. Values are limited to `macos`, `ubuntu_desktop`, `ubuntu_server` — do **not** introduce new values for OS/arch facts (historical `macos_intel` profile was removed for exactly this reason).
 
+**Hard rule — prefer XDG paths.** When a tool supports both a `$HOME`-root dotfile and an XDG path (`~/.config/<tool>/…`), manage the XDG copy (`dot_config/<tool>/…`) to keep `$HOME` tidy; only use a root dotfile when the tool can't read XDG. For tools that error when *both* paths exist (e.g. AeroSpace), also remove the legacy root file via a gated `.chezmoiremove` entry. Full rule + lookup-order caveats: [docs/this_repo/config-conventions.md → A1](docs/this_repo/config-conventions.md).
+
 | Predicate | Use |
 |---|---|
 | Any macOS | `eq .chezmoi.os "darwin"` |

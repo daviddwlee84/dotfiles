@@ -39,6 +39,22 @@ Tools that **don't** follow XDG (stuck for backwards-compat):
 In this repo: `dot_config/{nvim,git,mise,starship,zoxide,direnv,bat,
 eza,atuin,zellij,gh,fd,ripgrep,zsh,bash,shell}/` — XDG locations.
 
+**Rule — prefer XDG to keep `$HOME` tidy.** When a tool supports *both* a
+dotfile at `$HOME` root **and** an XDG path (`~/.config/<tool>/…`), manage the
+**XDG** copy (`dot_config/<tool>/…`), not the `$HOME`-root dotfile. A clean
+`$HOME` is the goal; only fall back to a root dotfile when the tool genuinely
+can't read XDG (see A2 — bash, ssh, the classic `~/.gitconfig`, etc.). Confirm
+the tool's XDG support + lookup order from its docs before choosing the path.
+
+> **Watch for "both locations = error" tools.** Some tools search *both* paths
+> and **abort** if both exist rather than picking one. AeroSpace is the canonical
+> case: it reads `~/.aerospace.toml` **and** `~/.config/aerospace/aerospace.toml`
+> and reports an ambiguity error when both are present. So when migrating such a
+> tool to XDG, also remove the legacy root dotfile — we do this via a gated
+> `.chezmoiremove` entry (`smart` backup captures it first). See
+> [`dot_config/aerospace/aerospace.toml`](../../dot_config/aerospace/aerospace.toml)
+> + the `.aerospace.toml` block in `.chezmoiremove`.
+
 ### A2. Tool-specific dirs (pre-XDG)
 
 OpenSSH lives in `~/.ssh/` with strict 0700 perms. Bash insists on
