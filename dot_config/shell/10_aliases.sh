@@ -54,6 +54,12 @@ bindings() {
 	unset doc
 }
 
+# --- tmux restore cleanup --------------------------------------------------
+# Intentional "I am done" exits should clear tmux-resurrect's `last` pointer so
+# tmux-continuum doesn't resurrect every just-killed session on the next start.
+alias tmux-kill-clean='$HOME/.config/tmux/kill-server-clean.sh'
+alias tmux-forget-last='$HOME/.config/tmux/resurrect-forget.sh'
+
 # --- run-for: time-box any long-running / infinite command -----------------
 # Run CMD for at most DURATION, then send SIGINT (same as Ctrl-C) so a script's
 # `trap INT` summary still prints; escalate to SIGKILL after a grace if the

@@ -16,6 +16,8 @@ All bindings use the default prefix `Ctrl + b`.
 | `prefix + 0` | Lightweight sesh session at git root of current dir (no nvim/agent layout — symmetric counterpart to `prefix + 9`) |
 | `prefix + N` | New session (prompts for name) |
 | `prefix + X` | Kill session (with confirmation) |
+| `prefix + M-x` | Kill current session and exit tmux client; clears auto-restore only if this was the last session |
+| `prefix + M-Q` | Kill all sessions cleanly and forget tmux-continuum auto-restore |
 | `prefix + W` | Kill window (with confirmation) |
 | `prefix + r` | Renumber windows (close gaps left by killed windows) |
 | `prefix + M` | Move current window to another session (prompts for `session[:index]`) |
@@ -103,6 +105,7 @@ These open `display-popup -E` at `#{pane_current_path}`; the popup closes when t
 | `prefix + U` | CLI tools picker (`tv tools`) |
 | `prefix + u` | URL picker (tmux-fzf-url) |
 | `prefix + a` | Live coding-agent panes picker (`tv agent-panes`) — see [agent pane discovery](../agent-panes-discovery.md) |
+| `prefix + M-a` | Agent quota wakeup dashboard (`tv agent-wakeup`) — quota waits, reset timers, scheduled `continue` |
 
 When to use which:
 
@@ -169,7 +172,7 @@ Right-click opens a context menu depending on where you click. Each menu also ha
 |--------|-------|----------|------------|
 | Pane body | `MouseDown3Pane` | `prefix + M-p` | Split h/v, swap up/down/left/right, zoom, resize 75% / even, mark, swap marked, **join marked here (h/v)**, **send pane to window…**, **break to new window**, copy mode, respawn, kill |
 | Window tab | `MouseDown3Status` | `prefix + M-w` | Swap left/right, move/link to session, **merge into other window as pane (h/v)**, **even layout (horizontal / vertical / tiled)**, kill window, **renumber windows**, rename, new window, bookmarks (⭐/📌/🔖/🚩), clear agent status |
-| Status-left (session name) | `MouseDown3StatusLeft` | `prefix + M-s` | Next/prev/choose/rename session, move current window, new session/window, kill session, **kill session & exit (clean)**, **kill all sessions (clean)** |
+| Status-left (session name) | `MouseDown3StatusLeft` | `prefix + M-s` | Next/prev/choose/rename session, **copy session name**, move current window, new session/window, kill session, **kill session & exit (clean)**, **kill all sessions (clean)**, **forget auto-restore** |
 
 Our bindings use `display-menu -O` so the menu stays open after the mouse button is released — pick an item or press Escape to dismiss. (tmux's defaults omit `-O` and dismiss on release, which makes the menu unusable.)
 
@@ -199,8 +202,10 @@ Two paths route through clean-quit wrappers that clear the resurrect `last` syml
 | Path | Wrapper | When |
 |------|---------|------|
 | `prefix + M-x` ("Kill session & exit") | [`kill-session-exit.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_kill-session-exit.sh) | Only when this is the **last** surviving session (so the server is about to die). With other sessions remaining the server keeps running — no restore is triggered. |
-| Right-click status-left → "Kill all sessions" (mouse or `prefix + M-s`) | [`kill-server-clean.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_kill-server-clean.sh) | Always. |
-| Popup menu → Session → "Kill all sessions (Q)" | same | Always. |
+| Right-click status-left → "Kill all sessions (clean)" (mouse or `prefix + M-s`) | [`kill-server-clean.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_kill-server-clean.sh) | Always. |
+| Popup menu → Session → "Kill all sessions (clean) (Q)" | same | Always. |
+| `prefix + M-Q` or shell `tmux-kill-clean` | same | Always. |
+| Right-click status-left → "Forget auto-restore", popup menu → Session → "Forget auto-restore", or shell `tmux-forget-last` | [`resurrect-forget.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/tmux/executable_resurrect-forget.sh) | Clears only the `last` symlink; does not kill the server. |
 
 Other kill paths (`prefix + x` kill-pane, `prefix + W` kill-window, plain `prefix + X` kill-session) deliberately do NOT touch the symlink — they're not "I'm exiting tmux" actions, so leaving the server up means no restore is triggered.
 

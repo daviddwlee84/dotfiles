@@ -106,7 +106,7 @@ unbind-key -n MouseDown3StatusLeft
 # (keyboard equivalent is `prefix + M-s`; body duplicated by design — see the
 # comment above MouseDown3Pane for the pitfall reference.)
 #
-# "Kill all sessions" + "Kill session & exit" route through the clean-quit
+# "Kill all sessions (clean)" + "Kill session & exit" route through the clean-quit
 # helpers so tmux-continuum does NOT auto-restore the just-closed sessions.
 # See pitfalls/tmux-continuum-restores-on-intentional-quit.md.
 bind-key -n MouseDown3StatusLeft \
@@ -116,6 +116,7 @@ bind-key -n MouseDown3StatusLeft \
     "" \
     "Choose session..." c { choose-tree -Zs } \
     Rename      N { command-prompt -I "#S" { rename-session "%%" } } \
+    "Copy session name" y { set-buffer -w "#{session_name}" ; display-message "Copied session name: #{session_name}" } \
     "" \
     "Move current window to..." m { choose-tree -Zs -F "#{session_name}" "move-window -s '#{window_id}' -t '%%'" } \
     "" \
@@ -124,7 +125,8 @@ bind-key -n MouseDown3StatusLeft \
     "" \
     "Kill session"        X { kill-session } \
     "Kill session & exit" E { run-shell "~/.config/tmux/kill-session-exit.sh" } \
-    "Kill all sessions"   Q { confirm-before -p "Kill ALL sessions (tmux server)? (y/n)" "run-shell '~/.config/tmux/kill-server-clean.sh'" }
+    "Kill all sessions (clean)" Q { confirm-before -p "Kill ALL sessions cleanly (forget auto-restore)? (y/n)" "run-shell '~/.config/tmux/kill-server-clean.sh'" } \
+    "Forget auto-restore" F { run-shell "~/.config/tmux/resurrect-forget.sh" ; display-message "Forgot tmux auto-restore snapshot" }
 
 # =============================================================================
 # Vim-Style Copy Mode (prefix + [ to enter, q to exit)
@@ -307,6 +309,8 @@ bind X confirm-before -p "Kill session #S? (y/n)" kill-session
 # command separator.
 bind M-x confirm-before -p "Kill session #S and exit tmux? (y/n)" \
   "run-shell '$HOME/.config/tmux/kill-session-exit.sh'"
+bind M-Q confirm-before -p "Kill ALL sessions cleanly (forget auto-restore)? (y/n)" \
+  "run-shell '$HOME/.config/tmux/kill-server-clean.sh'"
 bind x confirm-before -p "Kill pane? (y/n)" kill-pane
 bind W confirm-before -p "Kill window #W? (y/n)" kill-window
 

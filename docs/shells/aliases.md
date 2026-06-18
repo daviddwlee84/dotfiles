@@ -448,6 +448,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `tv ssh-config` | tv channel | `dot_config/television/cable/ssh-config.toml` | SSH host picker with `Include config.d/*` support; Enter connects |
 | `tv ports` | tv channel | `dot_config/television/cable/ports.toml` | Listening ports picker with PID; Ctrl+K kills, Ctrl+D force kills |
 | `tv kill-process` | tv channel | `dot_config/television/cable/kill-process.toml` | Raycast-style process killer: fuzzy search by name, CPU/MEM stats |
+| `tv agent-wakeup` | tv channel | `dot_config/television/cable/agent-wakeup.toml` | Live coding-agent quota dashboard: detects rate/session-limit waits, shows reset time, schedules/cancels pueue-backed `continue` wakeups |
 | `tv mac-apps` | tv channel | `dot_config/television/cable/mac-apps.toml.tmpl` | **macOS-only.** GUI app picker; Enter = activate (front), Alt+Q = graceful Quit, Alt+R = restart, Alt+H = hide, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = responsiveness probe. Reuses `dot_config/shell/54_macos_apps.sh` helpers. |
 | `tv linux-apps` | tv channel | `dot_config/television/cable/linux-apps.toml.tmpl` | **Linux + `ubuntu_desktop` profile only.** GUI app picker; Enter = activate (gtk-launch / GNOME `window-calls` ext if installed), Alt+Q = SIGTERM via pkill pattern, Alt+R = restart, Alt+K = SIGKILL, Alt+I = info pager, Alt+P = MPRIS responsiveness probe. **No Alt+H** — Linux can't hide windows without compositor IPC. Reuses `dot_config/shell/56_linux_apps.sh` helpers; user overrides in `~/.config/shell/linux-apps.conf`. |
 
@@ -468,6 +469,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `mrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | Fire-and-forget: detached tmux/zellij session running CMD at `$PWD`, returns immediately. `mrun [-b tmux\|zellij] [-n NAME] [-d DIR] [-f] [--on-exit shell\|kill\|restart] [-k] [--] CMD [ARGS...]`. Default `--on-exit shell` keeps the session alive after CMD exits (drops to login shell, re-run via history-Up); `-k` restores fire-and-forget kill semantics. Backend default tmux (override via `$MRUN_BACKEND`). Soft-warns on TUI commands. Prints attach hint to stderr |
 | `tmrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b tmux`. Detached tmux session running CMD; attach with `tmux attach -t NAME` |
 | `zjrun` | function | `dot_config/zsh/tools/23_mrun.zsh` | `mrun -b zellij`. Generates ephemeral KDL under `$TMPDIR/mrun-layout-*` (with `default_tab_template` so the standard tab-bar / status-bar plugins are restored), spawns detached zellij session; attach with `zellij attach NAME` |
+| `agent-wakeup` | function | `dot_config/shell/62_agent_wakeup.sh` | Wrapper for `~/.config/television/agent-wakeup.py`: list quota-blocked agent panes, schedule/cancel pueue-backed wakeups, or send `continue` now |
+| `agent-continue-at` | function | `dot_config/shell/62_agent_wakeup.sh` | Shortcut for `agent-wakeup schedule`; examples: `agent-continue-at --pane %12 --at 01:52am`, `agent-continue-at --current --delay 70m` |
+| `tmux-kill-clean` | alias | `dot_config/shell/10_aliases.sh` | Clear tmux-resurrect's `last` auto-restore pointer, then `tmux kill-server` so an intentional full quit does not resurrect stale sessions |
+| `tmux-forget-last` | alias | `dot_config/shell/10_aliases.sh` | Clear only tmux-resurrect's `last` auto-restore pointer; historical snapshots stay available for manual restore |
 
 ---
 

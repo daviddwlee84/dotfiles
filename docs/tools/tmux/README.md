@@ -26,6 +26,8 @@ This setup is tuned for coding-agent and Neovim workflows:
 - URL opening via fzf (`prefix + u`) and tmux-open in copy mode
 - capture pane to clipboard helpers
 - sesh integration for session picking
+- live coding-agent pane discovery plus quota wakeup scheduling (`prefix + a`,
+  `prefix + M-a`)
 - `extended-keys` with `csi-u` so keys like `Ctrl+/` reach Neovim inside tmux
 - OSC 52 clipboard and OSC passthrough enabled
 - macOS terminal must send Option as Meta for `M-` bindings — see [ghostty.md](../ghostty.md)
@@ -58,8 +60,8 @@ The ansible `devtools` role now checks the tmux version and, when it is below 3.
 After an upgrade, existing tmux servers keep running the old binary (a live process doesn't re-exec on PATH change). Clients attaching to the same socket also stay on the old version. To switch over:
 
 ```bash
-# lose current sessions but get a clean 3.3+ server
-tmux kill-server
+# lose current sessions and suppress tmux-continuum auto-restore
+tmux-kill-clean    # or: ~/.config/tmux/kill-server-clean.sh
 
 # or: start the new server on a new socket and migrate sessions manually
 tmux -L new new-session -s work
@@ -178,7 +180,11 @@ If a change still behaves wrong, try a new pane/window first. Only `tmux kill-se
 - `prefix + d` — detach the current client, leaving the session running
 - `exit` — close the current shell; when the last pane exits, the session ends
 - `prefix + :` then `kill-session` — kill the current session immediately
-- `tmux kill-server` — kill every session and stop the server
+- `tmux-kill-clean` or `prefix + M-Q` — kill every session, stop the server,
+  and clear tmux-resurrect's `last` pointer so this intentional quit does not
+  auto-restore
+- `tmux kill-server` — raw server kill; with tmux-continuum enabled, the next
+  empty start may restore the previous snapshot
 
 `detach-on-destroy off` is set, so when you kill a session tmux switches to another one instead of detaching if other sessions exist.
 

@@ -8,7 +8,7 @@
 # *** IF YOU EDIT THE MENU ITEMS, ALSO UPDATE ***
 #     dot_config/tmux/keybindings.conf.tmpl :: MouseDown3StatusLeft
 #
-# NOTE — "Kill all sessions" routes through executable_kill-server-clean.sh
+# NOTE — "Kill all sessions (clean)" routes through executable_kill-server-clean.sh
 # to clear tmux-resurrect's `last` symlink before killing the server, so
 # tmux-continuum does NOT auto-restore the just-closed sessions on the next
 # tmux start. The kept-in-sync inline copy in keybindings.conf.tmpl does the
@@ -23,6 +23,7 @@ declare -a rows=(
   "" "" ""
   "Choose session..." c "choose-tree -Zs"
   "Rename"            N "command-prompt -I '#S' \"rename-session '%%'\""
+  "Copy session name" y "set-buffer -w '#{session_name}' ; display-message 'Copied session name: #{session_name}'"
   "" "" ""
   "Move current window to..." m "choose-tree -Zs -F '#{session_name}' \"move-window -s '#{window_id}' -t '%%'\""
   "" "" ""
@@ -31,7 +32,8 @@ declare -a rows=(
   "" "" ""
   "Kill session"        X "kill-session"
   "Kill session & exit" E "run-shell '$HOME/.config/tmux/kill-session-exit.sh'"
-  "Kill all sessions"   Q "confirm-before -p 'Kill ALL sessions (tmux server)? (y/n)' \"run-shell '$HOME/.config/tmux/kill-server-clean.sh'\""
+  "Kill all sessions (clean)" Q "confirm-before -p 'Kill ALL sessions cleanly (forget auto-restore)? (y/n)' \"run-shell '$HOME/.config/tmux/kill-server-clean.sh'\""
+  "Forget auto-restore" F "run-shell '$HOME/.config/tmux/resurrect-forget.sh' ; display-message 'Forgot tmux auto-restore snapshot'"
 )
 
 exec tmux display-menu -T "#[align=centre]#{session_name}" -x R -y P "${rows[@]}"
