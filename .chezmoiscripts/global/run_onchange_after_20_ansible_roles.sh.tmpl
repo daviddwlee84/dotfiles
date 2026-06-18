@@ -277,6 +277,10 @@ TAGS="${TAGS},auditd"
 {{ if and $installHomelabTools (eq .chezmoi.os "linux") -}}
 TAGS="${TAGS},homelab_tools"
 {{ end -}}
+{{ $installNiri := false }}{{ if hasKey . "installNiri" }}{{ $installNiri = .installNiri }}{{ end -}}
+{{ if and $installNiri (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+TAGS="${TAGS},niri"
+{{ end -}}
 
 # Extra vars for role-level configuration
 # primary_shell is read by both the zsh role (gates chsh-to-zsh) and the
@@ -378,6 +382,15 @@ if [[ "$TAGS" == *gui_apps* ]]; then
         EXTRA_VARS="gui_apps_linux_no_root=true"
     else
         EXTRA_VARS="$EXTRA_VARS gui_apps_linux_no_root=true"
+    fi
+fi
+# niri needs sudo (apt build deps + /usr/local + /etc/systemd/user); flag the
+# role to no-op cleanly under noRoot instead of building a binary it can't install.
+if [[ "$TAGS" == *niri* ]]; then
+    if [[ -z "$EXTRA_VARS" ]]; then
+        EXTRA_VARS="niri_no_root=true"
+    else
+        EXTRA_VARS="$EXTRA_VARS niri_no_root=true"
     fi
 fi
 {{ if $installLlmTools -}}

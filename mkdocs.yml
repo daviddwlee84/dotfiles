@@ -237,6 +237,7 @@ nav:
   - Playbooks:
       - Workflow (sesh + worktrunk + tmux): playbooks/workflow.md
       - Linux GUI apps (.deb / Snap / AppImage): playbooks/linux-gui-apps.md
+      - niri compositor (opt-in): playbooks/niri.md
       - auditd role (opt-in): playbooks/auditd.md
       - mDNS / Bonjour diagnostics: playbooks/mdns-diagnostics.md
       - Wi-Fi latency spikes: playbooks/wifi-latency-spikes.md

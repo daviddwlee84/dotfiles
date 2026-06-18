@@ -103,6 +103,9 @@
     - role: gui_apps_linux
       tags: [gui_apps]
 
+    - role: niri
+      tags: [niri]
+
     - role: input_method
       tags: [input_method]
 

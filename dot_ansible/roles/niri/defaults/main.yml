@@ -1,0 +1,22 @@
+---
+# niri role defaults
+#
+# niri (https://github.com/niri-wm/niri) is a scrollable-tiling Wayland
+# compositor. It is NOT in the Ubuntu 24.04 apt repos (lands in 25.04+), so
+# this role builds it from source with cargo.
+#
+# niri_ref: the git tag to build. Pin to a released tag (CalVer, e.g. v26.04)
+# rather than a moving branch so `chezmoi apply` is reproducible across the
+# fleet. Bump this value to upgrade; the role rebuilds when the installed
+# `niri --version` no longer matches.
+niri_ref: "v26.04"
+
+# noRoot mode (no sudo): niri fundamentally needs sudo (apt build deps,
+# /usr/local, /etc/systemd/user). When true the whole role no-ops with a
+# debug note. The run_onchange wrapper passes this via --extra-vars, mirroring
+# gui_apps_linux_no_root.
+niri_no_root: false
+
+# Where the source checkout + cargo build happens. Kept out of $HOME proper so
+# it doesn't clutter; safe to delete to force a clean rebuild.
+niri_build_dir: "{{ ansible_facts['env']['HOME'] }}/.cache/niri-build"

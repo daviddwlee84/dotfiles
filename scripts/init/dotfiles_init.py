@@ -328,6 +328,16 @@ PROMPTS: tuple[Prompt, ...] = (
                     "詳細決策 + sandbox 副作用見 docs/playbooks/linux-gui-apps.md\n"
                     "注意: 這裡引用前面定義的 $profile local variable（不是 .profile，因為\n"
                     ".chezmoi.toml.tmpl 正在產生 .profile，init 階段 .profile 還不存在）")),
+    Prompt("installNiri", "bool", "System & apps",
+           "niri Wayland compositor",
+           "Scrollable-tiling Wayland compositor, built from source (cargo). ubuntu_desktop only — not in Ubuntu 24.04 apt. Installs binary + GDM session/systemd files; NVIDIA gets a VRAM application-profile automatically. See docs/playbooks/niri.md.",
+           default=False,
+           condition=When(profile=frozenset({"ubuntu_desktop"})), else_value=False,
+           prompt_text="Install niri (scrollable-tiling Wayland compositor, built from source)",
+           comment=("是否安裝 niri (scrollable-tiling Wayland 合成器)，從源碼 cargo build。ubuntu_desktop\n"
+                    "only — macOS 無 Wayland、ubuntu_server 無 GUI，皆直接 false。NVIDIA 在現代驅動上開箱\n"
+                    "即用，niri role 會自動寫入 VRAM application-profile（GLVidHeapReuseRatio=0）。\n"
+                    "詳見 dot_ansible/roles/niri/ 與 docs/playbooks/niri.md")),
     Prompt("installNetworkingTools", "bool", "System & apps",
            "Networking CLI tools",
            "nmap, mtr, httpie, gping, trippy.",
@@ -492,6 +502,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBitwarden": False,
         "installBrewApps": False,
         "installInputMethod": False,
+        "installNiri": False,
         "installNetworkingTools": False,
         "installMediaTools": False,
         "installAuditd": False,

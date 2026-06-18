@@ -102,6 +102,15 @@ discordChannel = {{ promptChoiceOnce . "discordChannel" "Discord install channel
 {{ else -}}
 discordChannel = "none"
 {{ end -}}
+# 是否安裝 niri (scrollable-tiling Wayland 合成器)，從源碼 cargo build。ubuntu_desktop
+# only — macOS 無 Wayland、ubuntu_server 無 GUI，皆直接 false。NVIDIA 在現代驅動上開箱
+# 即用，niri role 會自動寫入 VRAM application-profile（GLVidHeapReuseRatio=0）。
+# 詳見 dot_ansible/roles/niri/ 與 docs/playbooks/niri.md
+{{ if eq $profile "ubuntu_desktop" -}}
+installNiri = {{ promptBoolOnce . "installNiri" "Install niri (scrollable-tiling Wayland compositor, built from source)" false }}
+{{ else -}}
+installNiri = false
+{{ end -}}
 # 是否安裝網路診斷工具 (nmap, mtr, httpie, gping, trippy, etc.)
 installNetworkingTools = {{ promptBoolOnce . "installNetworkingTools" "Install networking CLI tools (nmap, mtr, httpie, gping, trippy, etc.)" false }}
 # 是否安裝 tunnel 工具 (ngrok, cloudflared) — expose localhost / SSH reverse tunnel

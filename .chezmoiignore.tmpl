@@ -121,6 +121,15 @@ pyrightconfig.json
 .gemrc
 {{- end }}
 
+# niri compositor config — only manage on Linux when installNiri=true
+# (ubuntu_desktop). hasKey guard so hosts whose chezmoi.toml predates the
+# installNiri prompt don't error.
+{{- $installNiri := false }}{{ if hasKey . "installNiri" }}{{ $installNiri = .installNiri }}{{ end }}
+{{- if or (ne .chezmoi.os "linux") (not $installNiri) }}
+.config/niri
+.config/niri/**
+{{- end }}
+
 # -----------------------------------------------------------------------------
 # Editor overlays (VSCode / Cursor / Antigravity)
 #

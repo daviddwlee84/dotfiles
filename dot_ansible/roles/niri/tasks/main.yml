@@ -1,0 +1,234 @@
+---
+# =============================================================================
+# niri — scrollable-tiling Wayland compositor (built from source)
+#
+# niri (https://github.com/niri-wm/niri) is not packaged in Ubuntu 24.04 apt
+# (lands in 25.04+), so this role compiles it with cargo and installs the
+# binary + session/systemd files so GDM (or any DM) shows "niri" as a Wayland
+# session.
+#
+# Scope: Debian-family + x86_64 only. niri targets desktop GPUs; armhf/aarch64
+# have no practical first-class story here and cargo builds are slow.
+#
+# No-op on:
+#   - macOS  → no Wayland; debug note only.
+#   - armhf / non-x86_64 → debug note only.
+#   - noRoot → needs sudo for apt deps + /usr/local + /etc/systemd/user; the
+#              build alone is useless without them, so the whole role skips.
+#
+# User config (~/.config/niri/config.kdl) is managed by chezmoi, NOT ansible —
+# see dot_config/niri/config.kdl.tmpl. niri also writes a default config on
+# first launch if none exists.
+#
+# NVIDIA: modern drivers (modeset on by default in 580+) run niri out of the
+# box. The one upstream-recommended tweak is an application-profile that stops
+# the driver hoarding VRAM in Wayland compositors — written below when an
+# NVIDIA GPU is detected. See docs/playbooks/niri.md.
+# =============================================================================
+
+# --- Platform / mode banners (skip paths) ------------------------------------
+
+- name: Announce niri is Linux-only
+  when: ansible_facts['os_family'] == 'Darwin'
+  ansible.builtin.debug:
+    msg: "niri is a Wayland compositor — Linux only. Skipping on macOS."
+
+- name: Skip niri on non-x86_64
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture != 'x86_64'
+  ansible.builtin.debug:
+    msg: >-
+      Skipping niri on {{ target_architecture }} — this role targets x86_64
+      desktops only (cargo builds are slow and GPU support is best on x86_64).
+
+- name: Skip niri in noRoot mode
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - niri_no_root | default(false) | bool
+  ansible.builtin.debug:
+    msg: >-
+      Skipping niri — noRoot mode has no sudo for apt build deps, /usr/local,
+      or /etc/systemd/user. Install niri manually or grant sudo, then re-run
+      with --tags niri.
+
+# Everything below runs only on Debian x86_64 with sudo available.
+# --- Build dependencies (apt) ------------------------------------------------
+
+- name: Install niri build dependencies
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - gcc
+      - clang
+      - libudev-dev
+      - libgbm-dev
+      - libxkbcommon-dev
+      - libegl1-mesa-dev
+      - libwayland-dev
+      - libinput-dev
+      - libdbus-1-dev
+      - libsystemd-dev
+      - libseat-dev
+      - libpipewire-0.3-dev
+      - libpango1.0-dev
+      - libdisplay-info-dev
+    state: present
+    update_cache: true
+
+# --- Decide whether we need to (re)build -------------------------------------
+
+- name: Check installed niri version
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+  ansible.builtin.command: niri --version
+  register: niri_installed
+  changed_when: false
+  failed_when: false
+
+- name: Decide whether niri needs (re)building
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+  ansible.builtin.set_fact:
+    # Rebuild when niri is absent OR the installed version string does not
+    # contain the target tag's version number (v26.04 -> "26.04").
+    niri_needs_install: >-
+      {{ niri_installed.rc != 0
+         or (niri_ref | regex_replace('^v', '')) not in (niri_installed.stdout | default('')) }}
+
+# --- Source checkout + cargo build -------------------------------------------
+
+- name: Clone / update niri source at {{ niri_ref }}
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_needs_install | bool
+  ansible.builtin.git:
+    repo: https://github.com/niri-wm/niri.git
+    dest: "{{ niri_build_dir }}"
+    version: "{{ niri_ref }}"
+    depth: 1
+    force: true
+
+- name: Build niri (cargo build --release)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_needs_install | bool
+  # NOTE: do NOT pass --all-features — some are dev-only and cause issues
+  # (e.g. indefinite memory growth). Upstream warns against it explicitly.
+  ansible.builtin.command: cargo build --release --locked
+  args:
+    chdir: "{{ niri_build_dir }}"
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"
+  changed_when: true
+  timeout: 3600
+
+# --- Install artifacts (binary + session + systemd) --------------------------
+
+- name: Ensure wayland-sessions dir exists
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_needs_install | bool
+  become: true
+  tags: [sudo]
+  ansible.builtin.file:
+    path: /usr/local/share/wayland-sessions
+    state: directory
+    mode: '0755'
+
+- name: Install niri artifacts
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_needs_install | bool
+  become: true
+  tags: [sudo]
+  ansible.builtin.copy:
+    src: "{{ niri_build_dir }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+    remote_src: true
+  loop:
+    - { src: "target/release/niri", dest: "/usr/local/bin/niri", mode: "0755" }
+    - { src: "resources/niri-session", dest: "/usr/local/bin/niri-session", mode: "0755" }
+    - { src: "resources/niri.desktop", dest: "/usr/local/share/wayland-sessions/niri.desktop", mode: "0644" }
+    - { src: "resources/niri.service", dest: "/etc/systemd/user/niri.service", mode: "0644" }
+    - { src: "resources/niri-shutdown.target", dest: "/etc/systemd/user/niri-shutdown.target", mode: "0644" }
+
+# --- NVIDIA: cap free-buffer-pool VRAM use in Wayland compositors -------------
+# Upstream-recommended for NVIDIA users (otherwise the driver hoards VRAM).
+# Harmless to install even on systems whose NVIDIA card isn't the active GPU.
+
+- name: Detect NVIDIA GPU (kernel module loaded)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+  ansible.builtin.stat:
+    path: /proc/driver/nvidia/version
+  register: niri_nvidia
+
+- name: Ensure NVIDIA application-profiles dir exists
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_nvidia.stat.exists
+  become: true
+  tags: [sudo]
+  ansible.builtin.file:
+    path: /etc/nvidia/nvidia-application-profiles-rc.d
+    state: directory
+    mode: '0755'
+
+- name: Write NVIDIA application-profile (limit free buffer pool)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture == 'x86_64'
+    - not (niri_no_root | default(false) | bool)
+    - niri_nvidia.stat.exists
+  become: true
+  tags: [sudo]
+  ansible.builtin.copy:
+    dest: /etc/nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json
+    mode: '0644'
+    content: |
+      {
+          "rules": [
+              {
+                  "pattern": {
+                      "feature": "procname",
+                      "matches": "niri"
+                  },
+                  "profile": "Limit Free Buffer Pool On Wayland Compositors"
+              }
+          ],
+          "profiles": [
+              {
+                  "name": "Limit Free Buffer Pool On Wayland Compositors",
+                  "settings": [
+                      {
+                          "key": "GLVidHeapReuseRatio",
+                          "value": 0
+                      }
+                  ]
+              }
+          ]
+      }
