@@ -9,6 +9,7 @@ set -euo pipefail
 
 declare -a rows=(
   "Live agent panes (tv)"     a "display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Live agent panes ' 'tv agent-panes'"
+  "Quota wakeup (tv)"         w "display-popup -E -w 88% -h 75% -d '#{pane_current_path}' -T ' Agent wakeup ' 'tv agent-wakeup'"
   "Stored sessions (tv)"      s "display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Agent sessions ' 'tv agent-sessions'"
 )
 

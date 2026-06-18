@@ -427,6 +427,10 @@ bind-key "U" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' CLI T
 #   docs/tools/agent-panes-discovery.md
 bind-key "a" display-popup -E -w 80% -h 70% -d '#{pane_current_path}' -T ' Live agent panes (tv) ' "tv agent-panes"
 
+# prefix + M-a: quota/rate-limit wakeup dashboard for live agent panes.
+# Shows quota waits, parsed reset times, and pueue-scheduled continue tasks.
+bind-key M-a display-popup -E -w 88% -h 75% -d '#{pane_current_path}' -T ' Agent wakeup (tv) ' "tv agent-wakeup"
+
 # (prefix + W is now bound earlier in this file as `kill-window`. The previous
 # `sesh window` binding was removed because `sesh` has no `window` subcommand;
 # pressing it printed sesh's help to a popup. See git history.)

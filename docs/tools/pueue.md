@@ -78,6 +78,29 @@ Results cache at `$XDG_CACHE_HOME/pqsum/<host>-<prompt_hash>.json` (default
 `~/.cache/pqsum/`). Re-runs within `PQSUM_MIN_REFRESH_INTERVAL` seconds
 (default 120) reuse the cached LLM output. Force fresh: `pqsum ai --refresh`.
 
+## Agent wakeups
+
+`agent-wakeup` uses pueue as a small persistent scheduler for quota/rate-limit
+resets in live coding-agent panes. It creates group `agent-wakeup`, sets group
+parallelism to 1, and labels each task as `agent-wakeup:%pane_id`.
+
+```bash
+agent-wakeup status
+agent-continue-at --pane %12 --at 01:52am
+agent-continue-at --current --delay 70m
+agent-wakeup cancel --pane %12
+```
+
+The scheduled command calls back into
+`~/.config/television/agent-wakeup.py send-now`. When the task runs, it
+captures the target tmux pane again. If the original quota marker has
+disappeared, the task exits without sending text unless `--force` was used.
+That guard is intentional: scheduled `continue` should not type into a pane
+that may already have resumed or changed context.
+
+For the dashboard UI, use `tv agent-wakeup` or tmux `prefix + M-a`. See
+[Agent pane discovery](agent-panes-discovery.md#tv-agent-wakeup-quota-waits--scheduled-continue).
+
 ### Agent selection
 
 Same SSOT as `tsum` / `aifix` / `aiblock`:

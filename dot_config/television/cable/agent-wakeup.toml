@@ -1,0 +1,109 @@
+# Agent quota wakeup dashboard.
+#
+# Shows live coding-agent panes, conservatively detected quota/rate-limit wait
+# states, parsed reset times, and queued pueue wakeup tasks.
+#
+# Keybindings:
+#   Enter      Jump to pane
+#   Alt+C      Schedule continue at detected reset time + 2 minutes
+#   Alt+T      Prompt for custom time/delay
+#   Alt+N      Send continue now
+#   Alt+X      Cancel queued wakeup task(s)
+#   Ctrl+F     Cycle preview (live pane capture via agent-wakeup.py)
+
+[metadata]
+name = "agent-wakeup"
+description = "Agent quota wakeup dashboard: quota waits, reset timers, scheduled continue tasks"
+requirements = ["tmux", "python3", "pueue"]
+
+[source]
+command = "~/.config/television/agent-wakeup.py status --tsv"
+display = "{split:\t:0} {split:\t:1} {split:\t:2}  │ reset {split:\t:4} │ wake {split:\t:6} │ {split:\t:8}"
+output = "{split:\t:2}"
+watch = 5.0
+no_sort = true
+
+[preview]
+command = "~/.config/television/agent-wakeup.py preview --pane '{split:\t:3}' || true"
+header = "{split:\t:0}  {split:\t:1}  {split:\t:2}"
+
+[ui]
+input_header = "Agent Wakeup"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:switch_pane"
+alt-c = ["actions:schedule_detected", "reload_source"]
+alt-t = ["actions:schedule_custom", "reload_source"]
+alt-n = ["actions:send_now", "reload_source"]
+alt-x = ["actions:cancel", "reload_source"]
+
+[actions.switch_pane]
+description = "Switch tmux focus to that pane"
+command = '''
+target='{split:\t:2}'
+[ -z "$target" ] && exit 0
+case "$target" in
+  %*) tmux select-pane -t "$target" 2>/dev/null || tmux display-message "agent-wakeup: pane $target no longer exists" ;;
+  *)
+    session="${target%%:*}"
+    winpane="${target#*:}"
+    window="${winpane%.*}"
+    tmux switch-client -t "$session" 2>/dev/null \
+      && tmux select-window -t "$session:$window" 2>/dev/null \
+      && tmux select-pane -t "$target" 2>/dev/null \
+      || tmux display-message "agent-wakeup: pane $target no longer exists"
+    ;;
+esac
+'''
+mode = "fork"
+
+[actions.schedule_detected]
+description = "Schedule continue at detected reset time + 2 minutes"
+command = '''
+pane='{split:\t:3}'
+epoch='{split:\t:5}'
+if [ -z "$pane" ] || [ -z "$epoch" ]; then
+  echo "No detected reset time for this pane."
+  echo "[Press Enter]"; read -r _
+  exit 0
+fi
+~/.config/television/agent-wakeup.py schedule --pane "$pane" --at-epoch "$epoch" --buffer-minutes 2
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.schedule_custom]
+description = "Prompt for custom time/delay, then schedule continue"
+command = '''
+pane='{split:\t:3}'
+[ -z "$pane" ] && exit 0
+printf 'Time/delay (examples: 01:52am, 2026-06-19 01:52:00, 70m, 5h): '
+read -r when
+[ -z "$when" ] && exit 0
+~/.config/television/agent-wakeup.py schedule --pane "$pane" --when "$when" --no-expect-quota
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.send_now]
+description = "Send continue now"
+command = '''
+pane='{split:\t:3}'
+[ -z "$pane" ] && exit 0
+~/.config/television/agent-wakeup.py send-now --pane "$pane"
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.cancel]
+description = "Cancel queued wakeup tasks for selected pane"
+command = '''
+pane='{split:\t:3}'
+[ -z "$pane" ] && exit 0
+~/.config/television/agent-wakeup.py cancel --pane "$pane"
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"

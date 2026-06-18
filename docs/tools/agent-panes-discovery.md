@@ -15,6 +15,7 @@ Two complementary surfaces ship in this repo, both backed by tmux:
 | Tool | Scope | Best at |
 |---|---|---|
 | `tv agent-panes` | All four agents (Claude / Codex / OpenCode / Cursor) | "Where am I running stuff?" cross-agent overview, jump-to-pane |
+| `tv agent-wakeup` | Same live panes, plus pueue wakeup tasks | "Which agent is quota-blocked, when should I send `continue`?" |
 | `recon` (optional) | Claude-only, with live status (Working / Idle / Waiting) parsed from pane capture | "Which Claude needs my attention?" — recon's live status detection is richer than what we replicate in tv |
 
 ## `tv agent-panes` (primary)
@@ -62,6 +63,46 @@ others.
   equals the pane's `pane_current_path`. If multiple sessions share a
   cwd, the most recently updated wins. The pane is still listed even if
   no session ID matches — the row is useful for jump-to-pane regardless.
+
+## `tv agent-wakeup` (quota waits + scheduled continue)
+
+Open with `prefix + M-a`, via the popup menu
+(`prefix + Space → → Agents → Quota wakeup (tv)`), or from a shell with
+`tv agent-wakeup`.
+
+The channel reuses the live pane resolver from `tv agent-panes`, captures the
+last part of each pane scrollback, and conservatively marks panes as quota
+waiting only when it sees explicit limit wording such as `session limit`,
+`rate limit`, `limit reached`, or `quota`. It parses reset phrases like
+`resets 1:50am`, `resets in 70m`, or `resets in 5h 20m`, then shows any
+queued pueue wakeup task for the pane.
+
+| Key | Action |
+|---|---|
+| `Enter` | Switch tmux focus to that pane |
+| `Alt+C` | Schedule `continue` at the detected reset time + 2 minutes |
+| `Alt+T` | Prompt for a custom time/delay (`01:52am`, `70m`, `5h`, etc.) |
+| `Alt+N` | Send `continue` now |
+| `Alt+X` | Cancel queued wakeup tasks for that pane |
+| `Ctrl+F` | Cycle preview; the default preview is live `tmux capture-pane` output |
+
+The shell equivalent is:
+
+```bash
+agent-wakeup status
+agent-continue-at --pane %12 --at 01:52am
+agent-continue-at --current --delay 70m
+agent-wakeup cancel --pane %12
+```
+
+Scheduled wakeups are pueue tasks in group `agent-wakeup` with labels
+`agent-wakeup:%pane_id`. The scheduled task re-captures the pane right before
+sending. If the quota marker has disappeared, it aborts instead of blindly
+typing into a session that may already be doing unrelated work.
+
+The fully automatic "detect quota, schedule, continue, repeat until non-quota
+exit" supervisor is deliberately deferred; see
+[`backlog/agent-quota-auto-loop.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/agent-quota-auto-loop.md).
 
 ## `recon` (Claude-only fast popup, optional)
 

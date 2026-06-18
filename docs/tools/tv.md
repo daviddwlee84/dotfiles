@@ -54,6 +54,22 @@ For pasting an invocation to the shell buffer (with trailing space for tools tha
 
 ---
 
+### `agent-wakeup` channel
+
+Dashboard for live coding-agent panes that are waiting on quota/rate-limit
+resets. Open with `tv agent-wakeup` or tmux `prefix + M-a`.
+
+It shows each live agent pane, detected quota message, parsed reset time, and
+any queued pueue wakeup task. `Alt+C` schedules `continue` at the detected
+reset time plus a small buffer, `Alt+T` prompts for a custom time/delay,
+`Alt+N` sends `continue` immediately, and `Alt+X` cancels queued wakeups.
+
+The shell wrapper is `agent-wakeup`; the shortcut
+`agent-continue-at --pane %12 --at 01:52am` schedules a one-off wakeup
+without opening TV. Full details: [Agent pane discovery](agent-panes-discovery.md#tv-agent-wakeup-quota-waits--scheduled-continue).
+
+---
+
 ### `lan-devices` channel
 
 Fuzzy-search devices on the local subnet with open ports, MAC/vendor, hostname (rDNS + mDNS), ping RTT, and last-seen timestamp. Backed by `~/.config/television/lan-scan.sh`, which writes results incrementally to `~/.cache/tv/lan-devices.tsv` and per-host nmap detail to `~/.cache/tv/lan-ports/<ip>.txt`. The channel uses `watch = 2.0`, so rows stream into the picker as the background scan progresses (state column: `discovered` → `scanning` → `scanned`).
