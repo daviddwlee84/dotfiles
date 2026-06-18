@@ -91,6 +91,71 @@ ls /usr/local/share/wayland-sessions/niri.desktop  # GDM can see the session
 Then log out and pick **niri** from the GDM session menu (gear icon, bottom
 right). It coexists with GNOME / i3 — niri is just another session option.
 
+## First login & daily use
+
+At the GDM login screen, click your user, then the **gear icon at the bottom-right**
+of the password screen and pick **Niri**. (That gear lists every session — e.g.
+`i3`, `i3 (with debug log)`, `Niri`, `Ubuntu` (default = GNOME Wayland),
+`Ubuntu on Xorg`. It is *not* on the first page — easy to miss.)
+
+niri starts as an **empty black screen** — no panel, no wallpaper by default. Drive
+it with keybinds (`Mod` = the **Super / Windows** key):
+
+| Key | Action |
+|---|---|
+| `Mod+Shift+/` | **Show the full hotkey overlay — press this first** |
+| `Mod+T` | Terminal (alacritty) |
+| `Mod+D` | App launcher (fuzzel) |
+| `Mod+H`/`J`/`K`/`L` or arrows | Move focus |
+| `Mod+Shift+H`/`J`/`K`/`L` | Move window / column |
+| `Mod+1`..`5` | Switch workspace |
+| `Mod+Q` | Close window |
+| `Mod+R` | Cycle column width |
+| **`Mod+Shift+E` then `Enter`** | **Quit niri → back to GDM (escape hatch)** |
+
+To return to GNOME/i3: `Mod+Shift+E`, confirm with `Enter`, then pick another
+session from the GDM gear menu.
+
+## Autostart: which GUI apps launch under niri?
+
+niri's `niri.service` declares `Wants=xdg-desktop-autostart.target`, so niri **does**
+run XDG autostart entries (`/etc/xdg/autostart/*.desktop` + `~/.config/autostart/*.desktop`)
+— but systemd's xdg-autostart generator honors each entry's `OnlyShowIn=` / `NotShowIn=`
+against `$XDG_CURRENT_DESKTOP`, which niri sets to `niri`. So:
+
+- Entries marked `OnlyShowIn=GNOME;` (on Ubuntu that's the majority — ~25 of ~39 in
+  `/etc/xdg/autostart/` on the reference box) **only run under the GNOME "Ubuntu"
+  session**, never under niri.
+- Generic entries (no `OnlyShowIn`, or one that lists niri) **do** start under niri.
+- **i3** (X11) does *not* pull `xdg-desktop-autostart.target` at all — it autostarts
+  via `exec` / `exec_always` lines in the i3 config, so by default runs none of these.
+
+So "do my autostart apps only start in the Ubuntu default session?" → the
+**GNOME-gated** ones, yes. The portable way to start something under niri is
+`spawn-at-startup "…"` in `config.kdl` (already used for the polkit agent), not the
+GNOME-only XDG autostart entry.
+
+## Troubleshooting
+
+- **niri not in the GDM session list** → it's behind the **gear icon** on the
+  password screen, not the first page. The `.desktop` must live in a dir GDM scans:
+  we install to `/usr/local/share/wayland-sessions/` (on the default `$XDG_DATA_DIRS`)
+  and also keep a copy in `/usr/share/wayland-sessions/` as belt-and-suspenders.
+  `sudo systemctl restart gdm3` forces the greeter to rescan.
+- **`Mod+T` does nothing (no terminal opens)** → alacritty is installed by
+  `gui_apps_linux` to `~/.cargo/bin/alacritty`, which is **not** on the niri/systemd
+  session PATH (`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:…`). Fix:
+  `sudo ln -sf ~/.cargo/bin/alacritty /usr/local/bin/alacritty`. Same caveat for any
+  `~/.cargo/bin` or `~/.local/bin` tool you `spawn` — symlink it into `/usr/local/bin`
+  or extend PATH in niri's `environment {}` block.
+- **`Mod+D` does nothing** → fuzzel isn't installed: `sudo apt install -y fuzzel`.
+- **NVIDIA + Wayland** → Ubuntu's `/usr/lib/udev/rules.d/61-gdm.rules` disables GDM
+  Wayland only for NVIDIA driver **< 470**; 470+ (this box runs 580) keeps Wayland
+  enabled, so niri is selectable. The role's VRAM application-profile is the only
+  extra NVIDIA tweak.
+- **`[…] RDSEED32 is broken. Disabling …` at boot** → benign CPU errata notice from
+  the kernel; nothing to do with niri.
+
 ## Related
 
 - Role: [`dot_ansible/roles/niri/`](../../dot_ansible/roles/niri/tasks/main.yml)
