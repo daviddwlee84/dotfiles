@@ -134,8 +134,9 @@ def _parse_agent_panes() -> list[PaneRec]:
     return rows
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _QUOTA_LINE_RE = re.compile(
-    r"(session limit|rate limit|limit reached|usage .*limit|hit your .*limit|quota)",
+    r"(session limit|rate limit|limit reached|hit your .*limit|quota)",
     re.IGNORECASE,
 )
 _RESET_RE = re.compile(r"\bresets?\b(?:\s+in)?\s+([^)\n\r]+)", re.IGNORECASE)
@@ -143,6 +144,22 @@ _RATE_LIMIT_MENU_RE = re.compile(
     r"(/rate-limit-options|stop and wait for limit to reset|what do you want to do\?)",
     re.IGNORECASE,
 )
+_CLAUDE_HUD_USAGE_RE = re.compile(
+    r"(^|\s│\s)Usage\s+.*\bLimit reached\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
+def _is_claude_hud_usage_line(line: str) -> bool:
+    """claude-hud statusLine usage is cached/non-authoritative for wakeups."""
+    plain = _strip_ansi(line).strip()
+    if not _CLAUDE_HUD_USAGE_RE.search(plain):
+        return False
+    return plain.startswith("Usage ") or plain.startswith("Context ") or " │ Usage " in plain
 
 
 def _format_dt(dt: datetime) -> str:
@@ -194,7 +211,11 @@ def _parse_reset_expr(expr: str, now: datetime) -> datetime | None:
 
 def detect_quota(text: str, now: datetime | None = None) -> tuple[str, int, str]:
     now = now or datetime.now().astimezone()
-    quota_lines = [line.strip() for line in text.splitlines() if _QUOTA_LINE_RE.search(line)]
+    quota_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if _QUOTA_LINE_RE.search(line) and not _is_claude_hud_usage_line(line)
+    ]
     if not quota_lines:
         return ("", 0, "")
 

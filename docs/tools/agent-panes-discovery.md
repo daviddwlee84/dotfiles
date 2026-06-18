@@ -77,6 +77,10 @@ waiting only when it sees explicit limit wording such as `session limit`,
 `resets 1:50am`, `resets in 70m`, or `resets in 5h 20m`, then shows any
 queued pueue wakeup task for the pane.
 
+Claude HUD usage lines such as `Context ... | Usage Limit reached` are
+ignored because `claude-hud` renders from cached/API usage data and is not an
+authoritative live indicator that the pane is currently blocked.
+
 `WAIT_MENU` is the Claude `/rate-limit-options` screen where option 1
 (`Stop and wait for limit to reset`) is already selected. For that state the
 recommended action is `enter`, not `continue`.
