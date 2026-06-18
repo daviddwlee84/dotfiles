@@ -31,6 +31,7 @@ GROUP = "agent-wakeup"
 LABEL_PREFIX = "agent-wakeup:"
 DEFAULT_TEXT = "continue"
 CAPTURE_LINES = 120
+ACTIVE_TAIL_LINES = 24
 ACTION_CONTINUE = "continue"
 ACTION_ENTER = "enter"
 
@@ -219,6 +220,12 @@ def recommended_action(text: str) -> str:
     return ACTION_CONTINUE
 
 
+def active_quota_text(text: str, action: str) -> str:
+    if action == ACTION_ENTER:
+        return text
+    return "\n".join(text.splitlines()[-ACTIVE_TAIL_LINES:])
+
+
 def _status_name(status: Any) -> str:
     if isinstance(status, str):
         return status
@@ -295,8 +302,8 @@ def _rows() -> tuple[list[PaneRec], list[WakeTask]]:
     now = datetime.now().astimezone()
     for pane in panes:
         text = capture_pane(pane.pane_id or pane.target)
-        msg, reset_epoch, reset_display = detect_quota(text, now)
         pane.action = recommended_action(text)
+        msg, reset_epoch, reset_display = detect_quota(active_quota_text(text, pane.action), now)
         pane.quota_message = msg
         pane.reset_epoch = reset_epoch
         pane.reset_display = reset_display
