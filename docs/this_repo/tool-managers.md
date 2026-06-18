@@ -1034,7 +1034,7 @@ list.
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
 | **python-dotenv[cli]** | uv tool | uv tool | python_uv_tools |
 | **raycast** | brew cask | n/a | Brewfile.darwin |
-| **rclone** | brew | official installer or GitHub | devtools |
+| **rclone** | brew | official installer or GitHub | devtools — macOS `rclone mount` also needs **macFUSE** (5.x on macOS 26+), manual & **not** repo-managed (reboot + GUI approval); brew rclone ≥1.73 already ships `mount` so the binary isn't the blocker ([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)) |
 | **readability-cli** (`readable`) | npm global | `mise exec -- npm install -g` | js_cli_tools |
 | **recon** | cargo install (git source) | same | rust_cargo_tools |
 | **ripgrep** | brew | apt/yum → GitHub release | base |

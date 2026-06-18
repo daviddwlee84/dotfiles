@@ -22,6 +22,34 @@
     name: raine/workmux
     state: present
 
+# Homebrew 6.0 added a formula-trust security gate: `brew install` refuses to
+# load formulae from third-party taps until the tap is explicitly trusted
+# ("Error: Refusing to load formula <tap>/<formula> from untrusted tap"). The
+# homebrew_tap module has no trust parameter, so trust via `brew trust`.
+# Idempotent + back-compatible: older Homebrew has no trust concept, so
+# `tap-info` won't contain "Untrusted" and the trust task no-ops (no version
+# gate needed). Keep this loop in sync with the third-party taps above — add any
+# new third-party tap here too. See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md
+- name: Check trust state of third-party taps (macOS, Homebrew >= 6.0 formula-trust gate)
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: "brew tap-info {{ item }}"
+  loop:
+    - dlvhdr/formulae
+    - raine/workmux
+  register: devtools_tap_info
+  changed_when: false
+  failed_when: false
+
+- name: Trust untrusted third-party taps (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - "'Untrusted' in item.stdout"
+  ansible.builtin.command: "brew trust {{ item.item }}"
+  loop: "{{ devtools_tap_info.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: true
+
 - name: Install developer CLI tools (macOS)
   when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:

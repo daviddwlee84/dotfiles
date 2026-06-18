@@ -187,6 +187,18 @@ rclone mount myremote: ~/mnt/myremote --vfs-cache-mode full --daemon
 
 Per-user, no root required. Good for cloud-backed personal working sets.
 
+**macOS prerequisite — macFUSE, not the rclone binary.** `rclone mount` on macOS
+needs a current [macFUSE](https://macfuse.github.io/) (5.x on macOS 26+). The
+*binary* choice is **not** the blocker: modern Homebrew rclone (≥ 1.73, the build
+this repo installs) ships with `mount` support, same as the official build — so
+there's no need to swap install methods. After a macOS major upgrade, an old
+macFUSE 4.x kext triggers an "Unsupported macOS Version" dialog and mounts fail;
+fix with `brew reinstall --cask macfuse` → reboot → approve the system extension
+in System Settings ▸ Privacy & Security. macFUSE is **not** managed by this repo
+(it needs a reboot + GUI approval). See
+[`pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md).
+On Linux, mount works via the system libfuse — no extra step.
+
 ## Storage for containers and K8s
 
 Shared storage often surfaces to workloads via CSI drivers:

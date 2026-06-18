@@ -1005,7 +1005,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
 | **python-dotenv[cli]** | uv tool | uv tool | python_uv_tools |
 | **raycast** | brew cask | n/a | Brewfile.darwin |
-| **rclone** | brew | 官方 installer 或 GitHub | devtools |
+| **rclone** | brew | 官方 installer 或 GitHub | devtools — macOS 的 `rclone mount` 還需要 **macFUSE**（macOS 26+ 需 5.x），手動安裝且**不由本 repo 管理**（需重開機 + GUI 授權）；brew rclone ≥1.73 已內建 `mount`，所以瓶頸不是 binary（[pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)） |
 | **readability-cli**(`readable`) | npm 全域 | `mise exec -- npm install -g` | js_cli_tools |
 | **recon** | cargo install(git source) | 同 | rust_cargo_tools |
 | **ripgrep** | brew | apt/yum → GitHub release | base |

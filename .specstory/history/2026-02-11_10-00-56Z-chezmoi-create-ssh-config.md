@@ -1988,7 +1988,7 @@ docs/tutorials/bitwarden_ssh_agent.md:178:    IdentityFile ~/.ssh/jingle.pub
 docs/tutorials/bitwarden_ssh_agent.md:219:Or in `~/.ssh/config`:
 CLAUDE.md:129:| Profile | OS | Tags Included |
 run_once_before_02_fix_intel_homebrew.sh.tmpl:47:#             sudo chmod g-w "$dir" 2>/dev/null || true
-docs/scripts/import_ssh_to_bw.sh.md:13:1. **Discovery** -- Scans `~/.ssh` (or a custom directory) for files starting with `-----BEGIN...PRIV***KEY-----`. Skips `.pub`, `known_hosts`, `config`, `authorized_keys`, swap files, etc.
+docs/scripts/import_ssh_to_bw.sh.md:13:1. **Discovery** -- Scans `~/.ssh` (or a custom directory) for files starting with `[REDACTED PRIVKEY MARKER]`. Skips `.pub`, `known_hosts`, `config`, `authorized_keys`, swap files, etc.
 docs/scripts/import_ssh_to_bw.sh.md:29:| `-d, --dir DIR` | Directory to scan (default: `~/.ssh`) |
 docs/scripts/import_ssh_to_bw.sh.md:38:# Interactive mode -- scan ~/.ssh, pick which keys to import
 docs/initial_setup/0_ManualSetupRecord.md:64:- [ohmyzsh/ohmyzsh: 🙃 A delightful community-driven (with 2,400+ contributors) framework for managing your zsh configuration. Includes 300+ optional plugins (rails, git, macOS, hub, docker, homebrew, node, php, python, etc), 140+ themes to spice up your morning, and an auto-update tool that makes it easy to keep up with the latest updates from the community.](https://github.com/ohmyzsh/ohmyzsh?tab=readme-ov-file#manual-installation)
