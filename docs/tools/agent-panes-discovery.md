@@ -77,12 +77,16 @@ waiting only when it sees explicit limit wording such as `session limit`,
 `resets 1:50am`, `resets in 70m`, or `resets in 5h 20m`, then shows any
 queued pueue wakeup task for the pane.
 
+`WAIT_MENU` is the Claude `/rate-limit-options` screen where option 1
+(`Stop and wait for limit to reset`) is already selected. For that state the
+recommended action is `enter`, not `continue`.
+
 | Key | Action |
 |---|---|
 | `Enter` | Switch tmux focus to that pane |
-| `Alt+C` | Schedule `continue` at the detected reset time + 2 minutes |
+| `Alt+C` | Schedule a smart wakeup at the detected reset time + 2 minutes |
 | `Alt+T` | Prompt for a custom time/delay (`01:52am`, `70m`, `5h`, etc.) |
-| `Alt+N` | Send `continue` now |
+| `Alt+N` | Smart send now: `Enter` for `WAIT_MENU`, otherwise `continue` + Enter |
 | `Alt+X` | Cancel queued wakeup tasks for that pane |
 | `Ctrl+F` | Cycle preview; the default preview is live `tmux capture-pane` output |
 
@@ -91,6 +95,8 @@ The shell equivalent is:
 ```bash
 agent-wakeup status
 agent-continue-at --pane %12 --at 01:52am
+agent-wakeup send-now --pane %44 --auto        # Enter for /rate-limit-options, continue otherwise
+agent-wakeup send-now --pane %44 --enter-only  # force selecting Stop-and-wait menu item
 agent-continue-at --current --delay 70m
 agent-wakeup cancel --pane %12
 ```
@@ -98,7 +104,9 @@ agent-wakeup cancel --pane %12
 Scheduled wakeups are pueue tasks in group `agent-wakeup` with labels
 `agent-wakeup:%pane_id`. The scheduled task re-captures the pane right before
 sending. If the quota marker has disappeared, it aborts instead of blindly
-typing into a session that may already be doing unrelated work.
+typing into a session that may already be doing unrelated work. With `--auto`,
+the send step re-captures the pane and chooses `Enter` for a rate-limit menu
+or `continue` for a normal prompt.
 
 The fully automatic "detect quota, schedule, continue, repeat until non-quota
 exit" supervisor is deliberately deferred; see

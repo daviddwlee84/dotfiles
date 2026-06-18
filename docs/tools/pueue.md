@@ -87,6 +87,8 @@ parallelism to 1, and labels each task as `agent-wakeup:%pane_id`.
 ```bash
 agent-wakeup status
 agent-continue-at --pane %12 --at 01:52am
+agent-wakeup send-now --pane %44 --auto
+agent-wakeup send-now --pane %44 --enter-only
 agent-continue-at --current --delay 70m
 agent-wakeup cancel --pane %12
 ```
@@ -97,6 +99,11 @@ captures the target tmux pane again. If the original quota marker has
 disappeared, the task exits without sending text unless `--force` was used.
 That guard is intentional: scheduled `continue` should not type into a pane
 that may already have resumed or changed context.
+
+Use `--auto` when you do not know whether the pane needs `continue` or only
+`Enter`: Claude's `/rate-limit-options` screen is treated as `Enter` because
+`Stop and wait for limit to reset` is already selected; normal prompts use
+`continue` + Enter. Use `--enter-only` to force the menu selection.
 
 For the dashboard UI, use `tv agent-wakeup` or tmux `prefix + M-a`. See
 [Agent pane discovery](agent-panes-discovery.md#tv-agent-wakeup-quota-waits--scheduled-continue).

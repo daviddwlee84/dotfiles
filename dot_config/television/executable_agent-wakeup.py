@@ -31,6 +31,8 @@ GROUP = "agent-wakeup"
 LABEL_PREFIX = "agent-wakeup:"
 DEFAULT_TEXT = "continue"
 CAPTURE_LINES = 120
+ACTION_CONTINUE = "continue"
+ACTION_ENTER = "enter"
 
 
 @dataclass
@@ -51,6 +53,7 @@ class PaneRec:
     state: str = "UNKNOWN"
     scheduled_display: str = ""
     scheduled_ids: str = ""
+    action: str = ACTION_CONTINUE
 
 
 @dataclass
@@ -135,6 +138,10 @@ _QUOTA_LINE_RE = re.compile(
     re.IGNORECASE,
 )
 _RESET_RE = re.compile(r"\bresets?\b(?:\s+in)?\s+([^)\n\r]+)", re.IGNORECASE)
+_RATE_LIMIT_MENU_RE = re.compile(
+    r"(/rate-limit-options|stop and wait for limit to reset|what do you want to do\?)",
+    re.IGNORECASE,
+)
 
 
 def _format_dt(dt: datetime) -> str:
@@ -204,6 +211,12 @@ def detect_quota(text: str, now: datetime | None = None) -> tuple[str, int, str]
     if reset_dt:
         return (chosen, int(reset_dt.timestamp()), _format_dt(reset_dt))
     return (chosen, 0, "")
+
+
+def recommended_action(text: str) -> str:
+    if _RATE_LIMIT_MENU_RE.search(text):
+        return ACTION_ENTER
+    return ACTION_CONTINUE
 
 
 def _status_name(status: Any) -> str:
@@ -283,6 +296,7 @@ def _rows() -> tuple[list[PaneRec], list[WakeTask]]:
     for pane in panes:
         text = capture_pane(pane.pane_id or pane.target)
         msg, reset_epoch, reset_display = detect_quota(text, now)
+        pane.action = recommended_action(text)
         pane.quota_message = msg
         pane.reset_epoch = reset_epoch
         pane.reset_display = reset_display
@@ -291,6 +305,8 @@ def _rows() -> tuple[list[PaneRec], list[WakeTask]]:
             pane.state = "SCHEDULED"
             pane.scheduled_display = ", ".join(t.when_display or t.status for t in pane_tasks)
             pane.scheduled_ids = ",".join(t.task_id for t in pane_tasks)
+        elif msg and pane.action == ACTION_ENTER:
+            pane.state = "WAIT_MENU"
         elif msg and reset_epoch and reset_epoch <= int(now.timestamp()):
             pane.state = "READY"
         elif msg:
@@ -342,6 +358,7 @@ def _print_tsv(panes: list[PaneRec]) -> None:
             p.cwd,
             p.sid,
             p.quota_message,
+            p.action,
         ]
         print("\t".join(c.replace("\t", " ").replace("\n", " ") for c in cols))
 
@@ -425,6 +442,9 @@ def cmd_schedule(args: argparse.Namespace) -> int:
             pane = resolved
     text = args.text or DEFAULT_TEXT
     delay = _delay_arg(args)
+    action = ACTION_ENTER if args.enter_only else ACTION_CONTINUE
+    if args.auto:
+        action = recommended_action(capture_pane(pane))
     expect_quota = False
     if not args.no_expect_quota:
         msg, _, _ = detect_quota(capture_pane(pane))
@@ -435,11 +455,15 @@ def cmd_schedule(args: argparse.Namespace) -> int:
         "send-now",
         "--pane",
         shlex.quote(pane),
-        "--text",
-        shlex.quote(text),
     ]
+    if action == ACTION_ENTER:
+        cmd.append("--enter-only")
+    else:
+        cmd.extend(["--text", shlex.quote(text)])
     if expect_quota:
         cmd.append("--expect-quota")
+    if args.auto:
+        cmd.append("--auto")
     if args.force:
         cmd.append("--force")
     command = " ".join(cmd)
@@ -488,6 +512,9 @@ def cmd_schedule(args: argparse.Namespace) -> int:
 
 def cmd_send_now(args: argparse.Namespace) -> int:
     pane = _select_pane(args.pane, args.current)
+    action = ACTION_ENTER if args.enter_only else ACTION_CONTINUE
+    if args.auto:
+        action = recommended_action(capture_pane(pane))
     if args.expect_quota and not args.force:
         msg, _, _ = detect_quota(capture_pane(pane))
         if not msg:
@@ -496,11 +523,21 @@ def cmd_send_now(args: argparse.Namespace) -> int:
     if not resolve_pane_id(pane):
         print(f"agent-wakeup: pane not found: {pane}", file=sys.stderr)
         return 2
-    cp = run(["tmux", "send-keys", "-t", pane, "C-u", args.text or DEFAULT_TEXT, "Enter"])
+    if action == ACTION_ENTER:
+        cmd = ["tmux", "send-keys", "-t", pane, "Enter"]
+        sent = "Enter"
+    else:
+        text = args.text or DEFAULT_TEXT
+        cmd = ["tmux", "send-keys", "-t", pane, "C-u", text, "Enter"]
+        sent = repr(text)
+    if args.dry_run:
+        print(" ".join(shlex.quote(part) for part in cmd))
+        return 0
+    cp = run(cmd)
     if cp.returncode != 0:
         print(cp.stderr or cp.stdout, file=sys.stderr, end="")
         return cp.returncode
-    print(f"sent {args.text or DEFAULT_TEXT!r} to {pane}")
+    print(f"sent {sent} to {pane}")
     return 0
 
 
@@ -563,6 +600,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--at-epoch", type=int, help="Epoch seconds, converted to local time")
     s.add_argument("--buffer-minutes", type=int, default=0, help="Add minutes to --at-epoch")
     s.add_argument("--text", default=DEFAULT_TEXT, help="Text to send before Enter")
+    s.add_argument("--enter-only", action="store_true", help="Send only Enter")
+    s.add_argument("--auto", action="store_true", help="Choose Enter for rate-limit menus, otherwise continue")
     s.add_argument("--no-expect-quota", action="store_true", help="Do not abort if quota marker disappears")
     s.add_argument("--force", action="store_true", help="Force send even if expected quota marker is gone")
     s.add_argument("--dry-run", action="store_true")
@@ -572,8 +611,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--pane", help="tmux pane target or pane id")
     s.add_argument("--current", action="store_true", help="Use $TMUX_PANE")
     s.add_argument("--text", default=DEFAULT_TEXT)
+    s.add_argument("--enter-only", action="store_true", help="Send only Enter")
+    s.add_argument("--auto", action="store_true", help="Choose Enter for rate-limit menus, otherwise continue")
     s.add_argument("--expect-quota", action="store_true")
     s.add_argument("--force", action="store_true")
+    s.add_argument("--dry-run", action="store_true")
     s.set_defaults(func=cmd_send_now)
 
     s = sub.add_parser("cancel", help="Cancel queued wakeups for a pane")

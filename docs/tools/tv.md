@@ -62,7 +62,8 @@ resets. Open with `tv agent-wakeup` or tmux `prefix + M-a`.
 It shows each live agent pane, detected quota message, parsed reset time, and
 any queued pueue wakeup task. `Alt+C` schedules `continue` at the detected
 reset time plus a small buffer, `Alt+T` prompts for a custom time/delay,
-`Alt+N` sends `continue` immediately, and `Alt+X` cancels queued wakeups.
+`Alt+N` smart-sends immediately (`Enter` for Claude's `/rate-limit-options`
+screen, otherwise `continue` + Enter), and `Alt+X` cancels queued wakeups.
 
 The shell wrapper is `agent-wakeup`; the shortcut
 `agent-continue-at --pane %12 --at 01:52am` schedules a one-off wakeup
