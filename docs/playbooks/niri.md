@@ -24,11 +24,19 @@ Debian + x86_64 only):
 4. **Install artifacts** (sudo):
    - `target/release/niri` → `/usr/local/bin/niri`
    - `resources/niri-session` → `/usr/local/bin/niri-session`
-   - `resources/niri.desktop` → `/usr/local/share/wayland-sessions/niri.desktop`
-     (so GDM lists **niri** as a Wayland session)
+   - `resources/niri.desktop` → **both** `/usr/local/share/wayland-sessions/` and
+     `/usr/share/wayland-sessions/` (so GDM lists **niri** regardless of which dir
+     its greeter scans; de-duped by XDG precedence so only one entry shows)
    - `resources/niri.service` + `resources/niri-shutdown.target` →
      `/etc/systemd/user/`
-5. **NVIDIA tweak** (only when `/proc/driver/nvidia/version` exists): writes
+5. **Desktop usability** (sudo): so the empty-screen first launch isn't a dead end —
+   - `apt install fuzzel` — the `Mod+D` app launcher referenced in `config.kdl`.
+   - symlink `~/.cargo/bin/alacritty` → `/usr/local/bin/alacritty` so the `Mod+T`
+     terminal is findable on the GDM/systemd session PATH (alacritty is cargo-built
+     by `gui_apps_linux` into `~/.cargo/bin`, which is **not** on that PATH). Other
+     GUI apps (Zen AppImage, VSCode/Cursor/Discord `.deb`) use absolute paths or
+     `/usr/bin`, so they need no such fix and just show up in fuzzel.
+6. **NVIDIA tweak** (only when `/proc/driver/nvidia/version` exists): writes
    `/etc/nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json`
    with `GLVidHeapReuseRatio=0` so the driver doesn't hoard VRAM in Wayland
    compositors (upstream-recommended).
@@ -138,17 +146,18 @@ GNOME-only XDG autostart entry.
 ## Troubleshooting
 
 - **niri not in the GDM session list** → it's behind the **gear icon** on the
-  password screen, not the first page. The `.desktop` must live in a dir GDM scans:
-  we install to `/usr/local/share/wayland-sessions/` (on the default `$XDG_DATA_DIRS`)
-  and also keep a copy in `/usr/share/wayland-sessions/` as belt-and-suspenders.
-  `sudo systemctl restart gdm3` forces the greeter to rescan.
-- **`Mod+T` does nothing (no terminal opens)** → alacritty is installed by
-  `gui_apps_linux` to `~/.cargo/bin/alacritty`, which is **not** on the niri/systemd
-  session PATH (`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:…`). Fix:
+  password screen, not the first page. The role installs the `.desktop` to **both**
+  `/usr/local/share/wayland-sessions/` and `/usr/share/wayland-sessions/` so GDM sees
+  it regardless of which it scans. If you applied an older revision, copy it across
+  and `sudo systemctl restart gdm3` to make the greeter rescan.
+- **`Mod+T` does nothing (no terminal opens)** → alacritty is cargo-built by
+  `gui_apps_linux` into `~/.cargo/bin/alacritty`, which is **not** on the niri/systemd
+  session PATH (`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:…`). The niri role
+  now symlinks it onto the PATH automatically; manual fallback:
   `sudo ln -sf ~/.cargo/bin/alacritty /usr/local/bin/alacritty`. Same caveat for any
-  `~/.cargo/bin` or `~/.local/bin` tool you `spawn` — symlink it into `/usr/local/bin`
-  or extend PATH in niri's `environment {}` block.
-- **`Mod+D` does nothing** → fuzzel isn't installed: `sudo apt install -y fuzzel`.
+  other `~/.cargo/bin` or `~/.local/bin` tool you `spawn` from `config.kdl`.
+- **`Mod+D` does nothing** → fuzzel launcher missing. The role installs it now;
+  manual fallback: `sudo apt install -y fuzzel`.
 - **NVIDIA + Wayland** → Ubuntu's `/usr/lib/udev/rules.d/61-gdm.rules` disables GDM
   Wayland only for NVIDIA driver **< 470**; 470+ (this box runs 580) keeps Wayland
   enabled, so niri is selectable. The role's VRAM application-profile is the only
