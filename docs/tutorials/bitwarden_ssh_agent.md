@@ -244,6 +244,7 @@ The remote host can then use your Bitwarden-managed keys to authenticate onward
 | Git commit signing fails | `user.signingkey` not set or wrong | Verify with `git config --global user.signingkey` |
 | Agent works in terminal but not in IDE | IDE uses its own environment | Configure `SSH_AUTH_SOCK` in IDE settings or launch IDE from terminal |
 | Bitwarden closed but SSH still works | Fallback ssh-agent took over (expected) | See [SSH Agent Fallback](../tools/ssh-agent.md) |
+| `git push`/`ssh` fails `Connection closed by … port 443` + `Could not read from remote repository` on a **remote/headless** session; intermittent (first use OK, later fail) | The desktop "Confirm SSH key usage" prompt renders on the box's **physical** display, which you can't click over SSH/tmux, so the agent refuses to sign (approval is cached briefly → first use works, then fails) | Approve at the physical screen; **or** disable per-use confirmation in **Settings → SSH agent**; **or** forward the agent from a clickable machine (`ssh -A`); **or** use HTTPS+PAT for git. Full write-up: `pitfalls/bitwarden-ssh-agent-confirm-blocks-remote-git-push.md` |
 
 ## Related
 

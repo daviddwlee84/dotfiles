@@ -249,6 +249,7 @@ Host myserver
 | Git commit 簽署失敗 | `user.signingkey` 未設定或設錯 | 用 `git config --global user.signingkey` 確認 |
 | agent 在終端機正常但 IDE 無法使用 | IDE 使用自己的環境 | 在 IDE 設定中設定 `SSH_AUTH_SOCK`，或從終端機啟動 IDE |
 | Bitwarden 已關閉但 SSH 仍能運作 | 備援 ssh-agent 接手了（預期行為） | 見 [SSH Agent Fallback](../tools/ssh-agent.md) |
+| 在**遠端/無頭**session 上 `git push`/`ssh` 失敗 `Connection closed by … port 443` + `Could not read from remote repository`；時好時壞（第一次成功、之後失敗） | 桌面的「Confirm SSH key usage」確認框彈在機器的**實體螢幕**上，你透過 SSH/tmux 按不到，agent 因而拒絕簽署（授權會短暫快取 → 第一次成功、之後失敗） | 到實體螢幕按確認；**或**在 **Settings → SSH agent** 關閉每次使用需確認；**或**從可點擊的機器轉發 agent（`ssh -A`）；**或** git 改用 HTTPS+PAT。完整說明：`pitfalls/bitwarden-ssh-agent-confirm-blocks-remote-git-push.md` |
 
 ## 相關連結
 
