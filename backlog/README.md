@@ -96,6 +96,8 @@ Add new entries here as you create them. Keep alphabetical.
 
 | Slug | Status | TODO entry |
 |---|---|---|
+| [`agent-quota-auto-loop`](agent-quota-auto-loop.md) | P? deferred | "Agent quota auto-continue loop" |
+| [`agent-session-dashboard-tui`](agent-session-dashboard-tui.md) | P? design backlog | "Native agent-session dashboard TUI" |
 | [`ai-capture-non-tmux-output`](ai-capture-non-tmux-output.md) | P2 deferred / P3 rejected | "aicapture: non-tmux output capture (Tier 2 tee / Tier 3 script/PTY)" |
 | [`ansible-env-proxy-var-case-sensitivity`](ansible-env-proxy-var-case-sensitivity.md) | P2 ready | "ansible env-var lookup: handle `HTTPS_PROXY` (uppercase) hosts" |
 | [`chezmoi-diff-pager-agent`](chezmoi-diff-pager-agent.md) | P? deferred | "chezmoi diff pager: TTY-aware delta fallback" |
