@@ -180,13 +180,19 @@
     - { src: "resources/niri.service", dest: "/etc/systemd/user/niri.service", mode: "0644" }
     - { src: "resources/niri-shutdown.target", dest: "/etc/systemd/user/niri-shutdown.target", mode: "0644" }
 
-# --- Desktop usability: launcher + a terminal that's actually findable --------
-# niri boots to an empty screen; without a launcher (Mod+D) and a terminal
-# (Mod+T) a new user gets stuck. fuzzel is the launcher referenced in
-# config.kdl. alacritty is built by gui_apps_linux into ~/.cargo/bin, which is
-# NOT on the GDM/systemd graphical-session PATH (/usr/local/bin:/usr/bin:…), so
-# `spawn "alacritty"` silently no-ops — symlink it onto the session PATH.
-# (Zen/VSCode/Cursor/Discord don't need this: AppImage abs-paths or /usr/bin.)
+# --- Desktop usability: launcher --------------------------------------------
+# niri boots to an empty screen; a launcher (Mod+D) is the minimum to not get
+# stuck. fuzzel is the launcher referenced in config.kdl.
+#
+# The Mod+T terminal is alacritty, cargo-built by gui_apps_linux into
+# ~/.cargo/bin — which is NOT on the GDM/systemd graphical-session PATH. That's
+# fixed PER-USER in config.kdl's `environment { PATH … }` block (chezmoi
+# templates the user's own $HOME in), NOT a system-wide /usr/local/bin symlink:
+# a shared system path pointing into one user's $HOME breaks on multi-user
+# hosts (permission-denied traversing $HOME, dangling link if that user rebuilds,
+# and a non-root user controlling a system-PATH binary). So nothing
+# alacritty-related happens here.
+# (Zen/VSCode/Cursor/Discord need neither: AppImage abs-paths or /usr/bin.)
 
 - name: Install fuzzel (Mod+D app launcher)
   when:
@@ -199,29 +205,6 @@
     name: fuzzel
     state: present
     update_cache: false
-
-- name: Check for alacritty in ~/.cargo/bin (built by gui_apps_linux)
-  when:
-    - ansible_facts['os_family'] == 'Debian'
-    - target_architecture == 'x86_64'
-    - not (niri_no_root | default(false) | bool)
-  ansible.builtin.stat:
-    path: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/alacritty"
-  register: niri_cargo_alacritty
-
-- name: Symlink alacritty onto the session PATH (/usr/local/bin)
-  when:
-    - ansible_facts['os_family'] == 'Debian'
-    - target_architecture == 'x86_64'
-    - not (niri_no_root | default(false) | bool)
-    - niri_cargo_alacritty.stat.exists
-  become: true
-  tags: [sudo]
-  ansible.builtin.file:
-    src: "{{ ansible_facts['env']['HOME'] }}/.cargo/bin/alacritty"
-    dest: /usr/local/bin/alacritty
-    state: link
-    force: true
 
 # --- NVIDIA: cap free-buffer-pool VRAM use in Wayland compositors -------------
 # Upstream-recommended for NVIDIA users (otherwise the driver hoards VRAM).

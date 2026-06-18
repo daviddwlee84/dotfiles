@@ -79,6 +79,13 @@ environment {
     QT_QPA_PLATFORM "wayland"
     MOZ_ENABLE_WAYLAND "1"
     DISPLAY ":0"
+    // Put per-user tool dirs on PATH for `spawn` (Mod+T → alacritty lives in
+    // ~/.cargo/bin, which is NOT on the GDM/systemd session PATH). niri applies
+    // this to every process it spawns. Done here (per-user, chezmoi-templated
+    // $HOME) rather than a system-wide /usr/local/bin symlink, so it stays
+    // correct on multi-user hosts. niri does not append, so the value is the
+    // full PATH; keep the standard session dirs after the user-local ones.
+    PATH "{{ .chezmoi.homeDir }}/.cargo/bin:{{ .chezmoi.homeDir }}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
 }
 
 binds {

@@ -29,13 +29,17 @@ Debian + x86_64 only):
      its greeter scans; de-duped by XDG precedence so only one entry shows)
    - `resources/niri.service` + `resources/niri-shutdown.target` →
      `/etc/systemd/user/`
-5. **Desktop usability** (sudo): so the empty-screen first launch isn't a dead end —
+5. **Desktop usability** so the empty-screen first launch isn't a dead end —
    - `apt install fuzzel` — the `Mod+D` app launcher referenced in `config.kdl`.
-   - symlink `~/.cargo/bin/alacritty` → `/usr/local/bin/alacritty` so the `Mod+T`
-     terminal is findable on the GDM/systemd session PATH (alacritty is cargo-built
-     by `gui_apps_linux` into `~/.cargo/bin`, which is **not** on that PATH). Other
-     GUI apps (Zen AppImage, VSCode/Cursor/Discord `.deb`) use absolute paths or
-     `/usr/bin`, so they need no such fix and just show up in fuzzel.
+   - The `Mod+T` terminal (alacritty) is cargo-built by `gui_apps_linux` into
+     `~/.cargo/bin`, which is **not** on the GDM/systemd session PATH. This is fixed
+     **per-user** in [`config.kdl.tmpl`](../../dot_config/niri/config.kdl.tmpl)'s
+     `environment { PATH … }` block (chezmoi templates the user's own `$HOME`), which
+     niri applies to everything it `spawn`s — **not** a system-wide
+     `/usr/local/bin` symlink, which would point a shared path into one user's
+     `$HOME` and break on multi-user hosts. Other GUI apps (Zen AppImage,
+     VSCode/Cursor/Discord `.deb`) use absolute paths or `/usr/bin`, so they need
+     no fix and just show up in fuzzel.
 6. **NVIDIA tweak** (only when `/proc/driver/nvidia/version` exists): writes
    `/etc/nvidia/nvidia-application-profiles-rc.d/50-limit-free-buffer-pool-in-wayland-compositors.json`
    with `GLVidHeapReuseRatio=0` so the driver doesn't hoard VRAM in Wayland
@@ -152,10 +156,12 @@ GNOME-only XDG autostart entry.
   and `sudo systemctl restart gdm3` to make the greeter rescan.
 - **`Mod+T` does nothing (no terminal opens)** → alacritty is cargo-built by
   `gui_apps_linux` into `~/.cargo/bin/alacritty`, which is **not** on the niri/systemd
-  session PATH (`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:…`). The niri role
-  now symlinks it onto the PATH automatically; manual fallback:
-  `sudo ln -sf ~/.cargo/bin/alacritty /usr/local/bin/alacritty`. Same caveat for any
-  other `~/.cargo/bin` or `~/.local/bin` tool you `spawn` from `config.kdl`.
+  session PATH (`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:…`). `config.kdl`'s
+  `environment { PATH … }` block prepends `~/.cargo/bin` + `~/.local/bin` (templated
+  per-user) so niri's `spawn` finds it — this also covers any other `~/.cargo/bin` /
+  `~/.local/bin` tool you `spawn`. (Do **not** "fix" it with a `/usr/local/bin`
+  symlink into your `$HOME` — that breaks on multi-user hosts.) Changes here need a
+  niri restart (`Mod+Shift+E` → re-login) to take effect.
 - **`Mod+D` does nothing** → fuzzel launcher missing. The role installs it now;
   manual fallback: `sudo apt install -y fuzzel`.
 - **NVIDIA + Wayland** → Ubuntu's `/usr/lib/udev/rules.d/61-gdm.rules` disables GDM
