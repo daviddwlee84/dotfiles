@@ -116,6 +116,23 @@ The fully automatic "detect quota, schedule, continue, repeat until non-quota
 exit" supervisor is deliberately deferred; see
 [`backlog/agent-quota-auto-loop.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/agent-quota-auto-loop.md).
 
+## Scheduled work beyond quota waits
+
+For non-quota delayed work, prefer native agent scheduling when it fits:
+
+- Claude Code has session-scoped `/loop` / cron tasks, Desktop scheduled
+  tasks, and cloud Routines.
+- Codex App has Automations, including thread automations that wake up the
+  same thread on a schedule.
+- OpenCode is scriptable through `opencode run --continue` / `--session`, and
+  its GitHub integration supports cron schedules in GitHub Actions.
+
+Those native surfaces are better for agent-owned scheduled work. The local
+`agent-wakeup` / pueue path is still useful when the target is a specific tmux
+pane, a one-shot future continuation, or a cross-agent workflow that should
+show up in the same dashboard. The broader local wrapper idea is tracked in
+[`backlog/agent-delayed-run-scheduler.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/agent-delayed-run-scheduler.md).
+
 ## `recon` (Claude-only fast popup, optional)
 
 [`gavraz/recon`](https://github.com/gavraz/recon) is a Rust TUI dashboard

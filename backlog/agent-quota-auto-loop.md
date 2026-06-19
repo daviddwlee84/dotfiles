@@ -54,6 +54,9 @@ loop.
 Revisit B/C only after enough real pane captures accumulate to design a
 state classifier with known failure modes. Any auto-loop must default to
 safe-abort when the pane no longer contains an explicit quota marker.
+Known classifier trap: do not treat Claude HUD `Usage ... Limit reached`
+statusLine output as live quota state; see
+[claude-hud-usage-statusline-stale.md](../pitfalls/claude-hud-usage-statusline-stale.md).
 
 The broader "one screen for all agent sessions, quota state, timers, and
 actions" product direction is tracked separately in
@@ -76,4 +79,5 @@ shape.
 
 - [docs/tools/agent-panes-discovery.md](../docs/tools/agent-panes-discovery.md)
 - [docs/tools/pueue.md](../docs/tools/pueue.md)
+- [pitfalls/claude-hud-usage-statusline-stale.md](../pitfalls/claude-hud-usage-statusline-stale.md)
 - [pitfalls/tv-channel-bare-braces-break-substitution.md](../pitfalls/tv-channel-bare-braces-break-substitution.md)
