@@ -2,7 +2,7 @@
 
 **Status**: P? research captured (2026-06)
 **Effort**: M
-**Related**: `dot_config/television/executable_agent-wakeup.py`, `dot_config/shell/62_agent_wakeup.sh`, [docs/tools/agent-panes-discovery.md](../docs/tools/agent-panes-discovery.md), [backlog/agent-quota-auto-loop.md](agent-quota-auto-loop.md), [backlog/agent-session-dashboard-tui.md](agent-session-dashboard-tui.md)
+**Related**: `dot_config/television/executable_agent-wakeup.py`, `dot_config/shell/62_agent_wakeup.sh`, [docs/tools/agent-panes-discovery.md](../docs/tools/agent-panes-discovery.md), [backlog/agent-quota-auto-loop.md](agent-quota-auto-loop.md), [backlog/agent-quota-warmup-at-time.md](agent-quota-warmup-at-time.md), [backlog/agent-session-dashboard-tui.md](agent-session-dashboard-tui.md)
 
 ## Context
 
@@ -17,6 +17,10 @@ This differs from quota recovery:
 - delayed work is user-intentional and may happen while quota is available;
 - the scheduler needs to remember the target session, cwd, prompt, and whether
   to resume an existing conversation or start a fresh run.
+
+It also differs from quota warmup, where the goal is to start a provider usage
+window with a tiny prompt and explicitly avoid continuing real work; see
+[agent-quota-warmup-at-time.md](agent-quota-warmup-at-time.md).
 
 ## Investigation
 

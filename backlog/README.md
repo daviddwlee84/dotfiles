@@ -98,6 +98,7 @@ Add new entries here as you create them. Keep alphabetical.
 |---|---|---|
 | [`agent-delayed-run-scheduler`](agent-delayed-run-scheduler.md) | P? research captured | "Agent delayed-run scheduler for non-quota work" |
 | [`agent-quota-auto-loop`](agent-quota-auto-loop.md) | P? deferred | "Agent quota auto-continue loop" |
+| [`agent-quota-warmup-at-time`](agent-quota-warmup-at-time.md) | P? research captured | "Agent quota warmup at scheduled time" |
 | [`agent-session-dashboard-tui`](agent-session-dashboard-tui.md) | P? design backlog | "Native agent-session dashboard TUI" |
 | [`ai-capture-non-tmux-output`](ai-capture-non-tmux-output.md) | P2 deferred / P3 rejected | "aicapture: non-tmux output capture (Tier 2 tee / Tier 3 script/PTY)" |
 | [`ansible-env-proxy-var-case-sensitivity`](ansible-env-proxy-var-case-sensitivity.md) | P2 ready | "ansible env-var lookup: handle `HTTPS_PROXY` (uppercase) hosts" |
