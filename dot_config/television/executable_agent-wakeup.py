@@ -135,8 +135,11 @@ def _parse_agent_panes() -> list[PaneRec]:
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+# Word-boundary anchored so we don't fire on "quotation"/"quotas"/incidental
+# substrings; "hit your <plan> limit" stays flexible but bounded.
 _QUOTA_LINE_RE = re.compile(
-    r"(session limit|rate limit|limit reached|hit your .*limit|quota)",
+    r"\b(?:session limit|rate limit|limit reached|quota)\b"
+    r"|\bhit your\b.+?\blimit\b",
     re.IGNORECASE,
 )
 _RESET_RE = re.compile(r"\bresets?\b(?:\s+in)?\s+([^)\n\r]+)", re.IGNORECASE)
@@ -144,8 +147,13 @@ _RATE_LIMIT_MENU_RE = re.compile(
     r"(/rate-limit-options|stop and wait for limit to reset|what do you want to do\?)",
     re.IGNORECASE,
 )
+# claude-hud statusLine: a single line led (at start, or after a box "│") by a
+# "Context"/"Usage" segment that also says "Limit reached". Self-contained so the
+# classifier needs no post-hoc startswith/substring checks (the cache is stale —
+# see pitfalls/claude-hud-usage-statusline-stale.md). A genuine agent message
+# like "...your usage limit reached" is NOT led by Context/Usage, so it survives.
 _CLAUDE_HUD_USAGE_RE = re.compile(
-    r"(^|\s│\s)Usage\s+.*\bLimit reached\b",
+    r"(?:^|│\s*)(?:Context|Usage)\b.*\bLimit reached\b",
     re.IGNORECASE,
 )
 
@@ -156,10 +164,7 @@ def _strip_ansi(text: str) -> str:
 
 def _is_claude_hud_usage_line(line: str) -> bool:
     """claude-hud statusLine usage is cached/non-authoritative for wakeups."""
-    plain = _strip_ansi(line).strip()
-    if not _CLAUDE_HUD_USAGE_RE.search(plain):
-        return False
-    return plain.startswith("Usage ") or plain.startswith("Context ") or " │ Usage " in plain
+    return _CLAUDE_HUD_USAGE_RE.search(_strip_ansi(line).strip()) is not None
 
 
 def _format_dt(dt: datetime) -> str:
@@ -323,6 +328,11 @@ def _rows() -> tuple[list[PaneRec], list[WakeTask]]:
     now = datetime.now().astimezone()
     for pane in panes:
         text = capture_pane(pane.pane_id or pane.target)
+        # Asymmetry by design: recommended_action() scans the FULL capture (the
+        # /rate-limit-options menu can sit above the fold), but detect_quota()
+        # only sees active_quota_text() — the last ACTIVE_TAIL_LINES for a
+        # CONTINUE action — so a stale quota line that scrolled up does not keep
+        # a now-active pane wrongly marked WAIT_QUOTA. ENTER (menu) keeps full text.
         pane.action = recommended_action(text)
         msg, reset_epoch, reset_display = detect_quota(active_quota_text(text, pane.action), now)
         pane.quota_message = msg

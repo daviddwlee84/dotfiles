@@ -13,7 +13,7 @@ _agent_wakeup_script() {
 
 agent-wakeup() {
     _aw_script="$(_agent_wakeup_script)"
-    if [ ! -x "$_aw_script" ]; then
+    if [ -z "$_aw_script" ] || [ ! -x "$_aw_script" ]; then
         printf 'agent-wakeup: %s not executable (run chezmoi apply?)\n' "$_aw_script" >&2
         unset _aw_script
         return 127
