@@ -1,11 +1,15 @@
 #!/bin/bash
+{{ $installBrewApps := false }}{{ if hasKey . "installBrewApps" }}{{ $installBrewApps = .installBrewApps }}{{ end -}}
+{{ $installAiDesktopApps := false }}{{ if hasKey . "installAiDesktopApps" }}{{ $installAiDesktopApps = .installAiDesktopApps }}{{ end -}}
+{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
 # Run brew bundle when Brewfiles change
-# Runs when general Brew apps are enabled, or on macOS when AI desktop apps are enabled
+# Runs when general Brew apps are enabled, or on macOS when AI/gaming desktop apps are enabled
 # Profile: {{ .profile }}
-# installBrewApps: {{ .installBrewApps }}
-# installAiDesktopApps: {{ .installAiDesktopApps }}
+# installBrewApps: {{ $installBrewApps }}
+# installAiDesktopApps: {{ $installAiDesktopApps }}
+# installGamingApps: {{ $installGamingApps }}
 
-{{ if and (not .installBrewApps) (or (ne .chezmoi.os "darwin") (not .installAiDesktopApps)) -}}
+{{ if and (not $installBrewApps) (or (ne .chezmoi.os "darwin") (and (not $installAiDesktopApps) (not $installGamingApps))) -}}
 # Brew app installation is disabled for this profile
 # To enable, run: chezmoi init --force
 exit 0

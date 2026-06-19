@@ -129,6 +129,7 @@ Overall process exit code is `1` iff at least one category is in FAILED. `--dry-
 
 - **No `state: latest` rewrites of ansible roles.** `chezmoi apply` semantics stay conservative; the upgrade path uses package-manager commands directly.
 - **No `apt upgrade` / system package bumps.** Keeps the default scope sudo-light and noise-free. Run `sudo apt upgrade && sudo apt autoremove` manually if you want that.
+- **No Linux Steam upgrade category.** The Ubuntu Desktop Steam launcher/runtime packages are apt-managed through Valve's repo, so they move with your normal system apt upgrade cadence; the Steam client itself self-updates on launch. macOS Steam is a Homebrew cask and is covered by `just upgrade-brew`.
 - **No daemon restart** for LiteLLM / Ollama / pueued / anything `systemd`-managed. We only refresh the binaries; restarting is your call.
 - **No automatic scheduling.** There is no cron, launchd, or systemd timer wired up. Running `just upgrade-all` is an intentional action you take when you have time to review diffs / deal with breakage.
 - **`scripts/**` is ignored by chezmoi** ([`.chezmoiignore.tmpl`](../../.chezmoiignore.tmpl) line 29) — the script is *not* deployed to `$HOME`. It runs from the dotfiles repo checkout directly (where `chezmoi cd` takes you). That is a deliberate choice: upgrade logic is repo-local, not per-user.

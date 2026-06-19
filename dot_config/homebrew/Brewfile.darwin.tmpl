@@ -4,6 +4,7 @@
 # This file is managed by chezmoi. Edit the source:
 #   chezmoi edit ~/.config/homebrew/Brewfile.darwin
 
+{{ if .installBrewApps -}}
 # =============================================================================
 # Casks - Terminals & Editors
 # =============================================================================
@@ -13,6 +14,7 @@ cask "warp"
 cask "cmux"
 cask "cursor"
 cask "visual-studio-code"
+{{ end -}}
 
 # =============================================================================
 # Casks - AI & Coding Assistants
@@ -42,6 +44,7 @@ cask "ollama-app"
 # cask "termius"          # SSH client
 {{ end -}}
 
+{{ if .installBrewApps -}}
 # =============================================================================
 # Casks - System Utilities
 # =============================================================================
@@ -90,16 +93,19 @@ cask "super-productivity"   # Task/time management
 # =============================================================================
 cask "spotify"
 cask "anki"
+{{ end -}}
 
 # =============================================================================
-# Casks - Gaming (skip on work machines)
+# Casks - Gaming
 # =============================================================================
-# {{ if not (env "WORK_MACHINE") -}}
-# cask "steam"
+{{ if .installGamingApps -}}
+cask "steam"
+{{ end -}}
+
+{{ if .installBrewApps -}}
 # cask "minecraft"
 # cask "battle-net"
 # cask "hstracker"  # Hearthstone deck tracker
-# {{- end }}
 
 # =============================================================================
 # Casks - Finance & Trading
@@ -152,6 +158,7 @@ cask "superset"
 # mas "Numbers", id: 409203825
 # mas "Pages", id: 409201541
 # mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
+{{ end -}}
 
 # =============================================================================
 # Apps NOT available via Homebrew (manual install required):

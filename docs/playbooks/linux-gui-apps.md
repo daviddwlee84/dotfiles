@@ -76,6 +76,7 @@ follows when a vendor ships in multiple formats:
 | **Cursor** | `.deb` (auto-adds `/etc/apt/sources.list.d/cursor.sources`) | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
 | **VSCode** | `.deb` (auto-adds `vscode.sources`) | ✅ `apt upgrade code` | same role | `/usr/share/code/` |
 | **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
+| **Steam** | Valve apt repo (`steam-launcher`), gated by `installGamingApps=true` and x86_64 | ✅ via apt for launcher/runtime packages; Steam client self-updates on launch | same role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
 | **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
 | **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
@@ -172,6 +173,25 @@ To switch from `.deb` to `flatpak` on an existing machine: set
 `chezmoi apply --tags gui_apps`. The two installs can coexist briefly
 (different `.desktop` entries); once you've validated the Flatpak version,
 `sudo apt remove discord` to clean up the old `.deb`.
+
+## Steam — why this uses Valve's apt repo, not Flatpak/Snap
+
+Steam is gated by `installGamingApps=true` and currently only installed on
+x86_64 Ubuntu Desktop. Valve publishes an official apt repository at
+`https://repo.steampowered.com/steam/`; the role installs its signing key
+from `archive/stable/steam.gpg`, enables `i386`, adds the repo as deb822,
+and installs `steam-launcher`.
+
+The `i386` architecture is intentional: Steam still needs 32-bit runtime
+libraries for parts of the launcher and many games. Do not hard-code old
+Mesa package names from older guides (for example `libgl1-mesa-glx`) in the
+role; Ubuntu 24.04 no longer ships that package. Let `steam-launcher` pull
+the current dependencies and recommends.
+
+Flathub's `com.valvesoftware.Steam` exists, but it is a community package
+and explicitly not Valve's supported path. It also needs extra filesystem
+overrides for libraries on non-default drives. If this repo ever adds a
+`steamChannel` prompt, keep Valve apt as the default.
 
 ## Snap (Ubuntu App Center) — what's actually happening
 

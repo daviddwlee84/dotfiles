@@ -193,7 +193,7 @@ Raspberry Pi 5（僅限 64 位元 OS）使用 `ubuntu_server` profile 即可獲�
 
 ## Brewfile (GUI app，opt-in)
 
-GUI 應用程式透過 `~/.config/homebrew/` 中的 Homebrew Brewfile 管理。安裝為 **opt-in**（預設停用）：透過 `chezmoi init --force` 啟用，並設定 `installBrewApps = true`。在 macOS 上，AI 桌面應用程式為獨立的 opt-in，透過 `installAiDesktopApps = true` 啟用。
+GUI 應用程式透過 `~/.config/homebrew/` 中的 Homebrew Brewfile 管理。安裝為 **opt-in**（預設停用）：透過 `chezmoi init --force` 啟用，並設定 `installBrewApps = true`。在 macOS 上，AI 桌面應用程式與遊戲應用程式為獨立的 opt-in，分別透過 `installAiDesktopApps = true` 與 `installGamingApps = true` 啟用。
 
 ```
 ~/.config/homebrew/
@@ -209,10 +209,12 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin  # Check
 chezmoi apply                                         # Or trigger via run_onchange
 ```
 
-**分類 (darwin)**：終端機與編輯器 (alacritty、iterm2、warp、cmux、cursor、vscode)、AI 與 coding (claude、chatgpt、opencode-desktop、antigravity、Apple Silicon 上的 codex-app、由 `installAiDesktopApps` + `installLlmTools` 控管的 ollama-app)、系統工具 (aerospace、alt-tab、raycast、jordanbaird-ice)、通訊 (discord、telegram、wechat、tencent-meeting)、瀏覽器 (arc、google-chrome、tor-browser)、生產力 (obsidian、google-drive、grammarly-desktop)、遊戲 (steam、minecraft、battle-net — 若設定了 `WORK_MACHINE` 環境變數則跳過)、金融 (binance、tradingview)、網路 (tailscale、openvpn-connect、clash-verge-rev)、Mac App Store (LINE、Keynote、Numbers、Pages)。
+**分類 (darwin)**：由 `installBrewApps` 控管的一般 GUI app（終端機/編輯器、系統工具、通訊、瀏覽器、生產力、媒體、網路、開發工具）、由 `installAiDesktopApps` 控管的 AI 與 coding (claude、chatgpt、opencode-desktop、antigravity、Apple Silicon 上的 codex-app、再由 `installLlmTools` 控管的 ollama-app)、以及由 `installGamingApps` 控管的遊戲 (Steam)。
 
 **條件式區塊**（Brewfile 是 chezmoi 樣板 (template)）：
 
-- 遊戲 app：若設定 `WORK_MACHINE` 則跳過。
-- 中國 app (baidunetdisk)：僅在 `useChineseMirror` 為 true 時包含。
+- 一般 GUI app：僅在 `installBrewApps` 為 true 時包含。
+- AI 桌面 app：僅在 `installAiDesktopApps` 為 true 時包含。
+- 遊戲 app：僅在 `installGamingApps` 為 true 時包含。
+- 中國 app (baidunetdisk)：僅在一般 GUI 區塊內、且 `useChineseMirror` 為 true 時包含。
 - mas app：需先登入 App Store.app。

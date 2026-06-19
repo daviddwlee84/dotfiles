@@ -3,8 +3,8 @@
 Interactive wrapper around `chezmoi init` inspired by
 [vercel-labs/skills](https://github.com/vercel-labs/skills).
 
-`.chezmoi.toml.tmpl` in this repo defines ~19 prompts (`profile`, `email`,
-`name`, plus 16 `installX` / preference flags). Running `chezmoi init`
+`.chezmoi.toml.tmpl` in this repo defines the bootstrap prompts (`profile`,
+`email`, `name`, plus `installX` / preference flags). Running `chezmoi init`
 walks you through them one-by-one. This wrapper groups them into a
 single multi-select UI, adds pre-set bundles (`personal-mac`,
 `work-mac`, `server-linux`, `cloud-vm`, `minimal`), checks SSH-key prerequisites,

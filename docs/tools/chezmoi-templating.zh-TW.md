@@ -26,7 +26,7 @@
 | `.chezmoi.kernel.osrelease` | Linux 上的發行版資訊 | `/proc/sys/kernel/osrelease` | WSL 上含 `microsoft` | 區分 WSL 與原生 Linux |
 | `.chezmoi.hostname` | 哪一台機器？ | `os.Hostname()` | `work-laptop`、`rpi5`…… | 各機器覆寫（單一行為怪異的主機） |
 | `.profile`（本 repo） | 使用者要扮演什麼**角色**？ | init 時的 `promptChoiceOnce` | `macos`、`ubuntu_desktop`、`ubuntu_server` | 桌面 vs 伺服器 (server)（GUI 套件、nerdfonts、alacritty）—— **無法**自動偵測 |
-| `env "WORK_MACHINE"` | 這台機器目前在工作模式嗎？ | `chezmoi apply` 時的 shell 環境 | unset / `1` | per-session 切換（跳過遊戲類 cask） |
+| `env "WORK_MACHINE"` | 這台機器目前在工作模式嗎？ | `chezmoi apply` 時的 shell 環境 | unset / `1` | per-session 切換（示意用途 —— 目前沒有樣板以此分支；遊戲類 cask 已改由 `installGamingApps` prompt 控管） |
 
 ## 規則
 

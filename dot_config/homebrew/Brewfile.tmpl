@@ -7,7 +7,9 @@
 # =============================================================================
 # Taps (Third-party repositories)
 # =============================================================================
+{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
 tap "nikitabobko/tap"  # aerospace (macOS window manager)
+{{ end -}}
 
 # =============================================================================
 # Formulas - CLI Tools (cross-platform)
@@ -15,8 +17,8 @@ tap "nikitabobko/tap"  # aerospace (macOS window manager)
 # Note: Most CLI tools are managed by ansible for better cross-platform support
 # Only add formulas here that you want to manage via Brewfile
 
-# The following Formulas are MacOS only
-{{ if eq .chezmoi.os "darwin" -}}
+# The following formulas support the general macOS GUI app bundle.
+{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)
 brew "mas"
 brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)

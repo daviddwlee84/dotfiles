@@ -14,7 +14,7 @@ _dotcfg_keys=(
     installCodingAgents installLlmTools installAiDesktopApps
     installPythonUvTools installJsCliTools installDotnetTools installAuditd
     installIacTools installMediaTools installBitwarden installBrewApps
-    installInputMethod discordChannel installNetworkingTools installTunnelTools
+    installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools
     useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot
     motdStyle primaryShell enableVimMode
 )

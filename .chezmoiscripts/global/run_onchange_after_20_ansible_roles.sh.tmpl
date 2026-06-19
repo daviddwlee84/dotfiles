@@ -308,6 +308,11 @@ if [[ -z "$EXTRA_VARS" ]]; then
 else
     EXTRA_VARS="$EXTRA_VARS discord_channel={{ $discordChannel }}"
 fi
+{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
+{{ if $installGamingApps -}}
+# Gaming apps (gui_apps_linux): currently Steam via Valve apt repo.
+EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_gaming_apps=true"
+{{ end -}}
 {{ end -}}
 
 [[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }

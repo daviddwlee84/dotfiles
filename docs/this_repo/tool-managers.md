@@ -28,8 +28,8 @@ If you want to know:
 | Manager | Owns | Where listed | Upgrade category |
 |---|---|---|---|
 | **Bootstrap** (`run_once_before_*.sh.tmpl`) | Homebrew itself, uv, mise, ansible-core, apt prereqs | `run_once_before_00_bootstrap.sh.tmpl` | n/a (one-shot, idempotent) |
-| **Homebrew formulae** | macOS-shared CLI (`tailscale`, `mas`) + role-driven (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
-| **Homebrew casks** | macOS GUI apps (~25 entries; gated by `installAiDesktopApps` for AI ones) | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
+| **Homebrew formulae** | General macOS GUI helpers (`tailscale`, `mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
+| **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
 | **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release) |
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
@@ -40,7 +40,7 @@ If you want to know:
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
 | **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory/codexbar | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
 | **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
-| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
+| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
 | **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
 
 ---
@@ -78,7 +78,7 @@ before the next phase can run.
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ Phase 3 — Brew bundle (run_onchange_after_30_brew_bundle)               │
 │   `brew bundle --no-upgrade` against ~/.config/homebrew/Brewfile*       │
-│   Mostly GUI casks (macOS); skipped if installBrewApps=false            │
+│   Mostly GUI casks (macOS); skipped unless Brew/AI/gaming apps enabled  │
 └─────────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -159,7 +159,7 @@ empty, Linuxbrew use happens role-by-role.
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | Taps: `nikitabobko/tap`. Formulae (macOS-only via inner `{{ if eq .chezmoi.os "darwin" }}`): `mas`, `tailscale` |
+| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formulae `mas`, `tailscale` |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -167,21 +167,22 @@ empty, Linuxbrew use happens role-by-role.
 
 | Cask | Gating |
 |---|---|
-| `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | always |
+| `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | `installBrewApps` |
 | `claude`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
 | `chatgpt`, `codex-app` | `installAiDesktopApps` + arm64 |
 | `codeisland` (tap `wxtsky/tap`) | `installAiDesktopApps` |
 | `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
-| `nikitabobko/tap/aerospace`, `alt-tab`, `raycast`, `maccy`, `scroll-reverser`, `the-unarchiver`, `applite` | always (system utilities) |
-| `discord` | always |
-| `arc` | always |
-| `obsidian`, `google-drive`, `grammarly-desktop`, `super-productivity` | always |
-| `spotify`, `anki` | always |
-| `tailscale-app` | always |
-| `dbeaver-community` | always |
-| `superset` | arm64 only |
+| `steam` | `installGamingApps` |
+| `nikitabobko/tap/aerospace`, `alt-tab`, `raycast`, `maccy`, `scroll-reverser`, `the-unarchiver`, `applite` | `installBrewApps` |
+| `discord` | `installBrewApps` |
+| `arc` | `installBrewApps` |
+| `obsidian`, `google-drive`, `grammarly-desktop`, `super-productivity` | `installBrewApps` |
+| `spotify`, `anki` | `installBrewApps` |
+| `tailscale-app` | `installBrewApps` |
+| `dbeaver-community` | `installBrewApps` |
+| `superset` | `installBrewApps` + arm64 |
 
-Many more entries exist in commented-out form (steam, telegram,
+Many more entries exist in commented-out form (minecraft, telegram,
 openvpn-connect, etc.) — uncomment to enable.
 
 #### 2.2 Role-driven brew (formulae + casks)
@@ -242,7 +243,7 @@ host and silently no-op" trap — see
 `installLlmTools`, `installPythonUvTools`, `installJsCliTools`,
 `installDotnetTools`, `installIacTools`, `installMediaTools`,
 `installNetworkingTools`, `installTunnelTools`, `installBitwarden`,
-`installInputMethod`, `installAuditd`. Roles gate themselves on the
+`installGamingApps`, `installInputMethod`, `installAuditd`. Roles gate themselves on the
 matching flag; the bundle script `scripts/init/dotfiles_init.py` defines
 profile presets (`minimal`, `cloud-vm` planned, default-developer, …).
 
@@ -819,6 +820,7 @@ with rationale.
 | **gh** | macOS: brew (via `devtools`); Linux: vendor apt repo → user tarball fallback | brew is canonical macOS; vendor apt repo is canonical Linux |
 | **tmux** | macOS: brew; Linux: apt → `nelsonenzo/tmux-appimage` when system < 3.3 | `display-menu` popup requires 3.3+ — see AGENTS.md tmux hard invariant |
 | **Discord** | macOS: brew cask; Linux: flatpak (default) or `.deb` via `discordChannel` chooser | apt has no Discord; flatpak is sandboxed-and-current, `.deb` is for users who hate flatpak |
+| **Steam** | macOS: brew cask gated by `installGamingApps`; Linux: Valve apt repo + `steam-launcher` gated by `installGamingApps` | Valve's apt repo is the supported Linux path; Flathub exists but is community-packaged |
 | **just**, **starship**, **zoxide**, **direnv** | macOS: brew; Linux: vendor curl-installer | Linux distro packages are too stale for these fast-moving tools |
 | **Neovim** | macOS: brew (`state: latest`); Linux: apt → snap → GitHub release tarball → user fallback → `neovim/neovim-releases` on oldEL | Min version 0.11.2 is too new for most distros |
 | **tree-sitter-cli** | npm via mise (preferred, timeout 180) → cargo fallback | npm is faster; cargo needs libclang to compile. Same binary either way |
@@ -1052,6 +1054,7 @@ list.
 | **spotify** | brew cask | n/a | Brewfile.darwin |
 | **sqlit-tui[ssh]** | uv tool | uv tool | python_uv_tools |
 | **starship** | brew | curl `starship.rs/install.sh` | starship |
+| **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
 | **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
 | **superfile** | brew | installer/release | devtools |

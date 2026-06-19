@@ -49,6 +49,7 @@ Ubuntu 對桌面應用 (desktop apps) 有**五種**打包機制 (packaging mecha
 | **Cursor** | `.deb`（自動加入 `/etc/apt/sources.list.d/cursor.sources`） | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
 | **VSCode** | `.deb`（自動加入 `vscode.sources`） | ✅ `apt upgrade code` | 同 role | `/usr/share/code/` |
 | **Discord** | `flatpak`（預設、推薦）或 `.deb`（無 apt source）—— 由 `discordChannel` chezmoi prompt 挑選 | ✅ 透過 `flatpak update`（預設）/ ❌ `.deb` 為手動 | 同 role | `~/.local/share/flatpak/app/com.discordapp.Discord/`（flatpak）或 `/usr/share/discord/`（.deb） |
+| **Steam** | Valve apt repo（`steam-launcher`），由 `installGamingApps=true` 與 x86_64 控制 | ✅ launcher/runtime 套件透過 apt；Steam client 啟動時自我更新 | 同 role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
 | **Zen Browser** | AppImage 在 `~/Applications/zen.AppImage`（穩定檔名、無版本後綴） | ❌ —— 重新跑 ansible 任務 | 同 role | `~/Applications/zen.AppImage` |
 | **Alacritty** | `cargo install alacritty` | ❌ —— `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
 | **AppImageLauncher** | `.deb`（22.04 用 PPA、24.04 用 GitHub release） | ✅ 透過 apt | 同 role | system + `appimagelauncherd.service`（user） |
@@ -116,6 +117,21 @@ dpkg -L discord | grep -E 'sources|keyring'
 3. 在使用者層級安裝 `com.discordapp.Discord`（無需 sudo）
 
 要在既有機器上從 `.deb` 切換到 `flatpak`：在 `~/.config/chezmoi/chezmoi.toml` 設定 `discordChannel = "flatpak"` 並執行 `chezmoi apply --tags gui_apps`。兩種安裝可短暫共存（不同 `.desktop` 條目）；驗證 Flatpak 版本後，`sudo apt remove discord` 清掉舊的 `.deb`。
+
+## Steam —— 為何用 Valve 的 apt repo，而非 Flatpak/Snap
+
+Steam 由 `installGamingApps=true` 控制，目前只在 x86_64 的 Ubuntu Desktop 上
+安裝。Valve 在 `https://repo.steampowered.com/steam/` 提供官方 apt 倉庫；該 role
+從 `archive/stable/steam.gpg` 安裝簽章金鑰、啟用 `i386`、以 deb822 格式加入倉庫，
+然後安裝 `steam-launcher`。
+
+`i386` 架構是刻意的：Steam 的 launcher 與許多遊戲仍需要 32-bit runtime 函式庫。
+不要在 role 裡硬寫舊指南裡的 Mesa 套件名（例如 `libgl1-mesa-glx`）；Ubuntu 24.04
+已不再出貨該套件。讓 `steam-launcher` 自己拉取當前的 dependencies 與 recommends。
+
+Flathub 的 `com.valvesoftware.Steam` 存在，但它是社群封裝、且明確不是 Valve 支援的
+路徑；它也需要額外的檔案系統 override 才能存取非預設磁碟上的函式庫。若本 repo 日後
+新增 `steamChannel` prompt，仍應以 Valve apt 為預設。
 
 ## Snap (Ubuntu App Center) —— 實際發生什麼
 

@@ -82,6 +82,14 @@ installBrewApps = {{ promptBoolOnce . "installBrewApps" "Install general GUI app
 {{ else -}}
 installBrewApps = false
 {{ end -}}
+# 是否安裝遊戲相關桌面應用（目前先裝 Steam）。Desktop-class only（macos /
+# ubuntu_desktop）；macOS 走 Homebrew Cask，Ubuntu Desktop 走 Valve 官方 apt repo /
+# steam-launcher。headless server 直接 false。
+{{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}
+installGamingApps = {{ promptBoolOnce . "installGamingApps" "Install gaming apps (Steam)" false }}
+{{ else -}}
+installGamingApps = false
+{{ end -}}
 # 是否安裝繁體中文輸入法 (McBopomofo + RIME)
 # Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。
 {{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}

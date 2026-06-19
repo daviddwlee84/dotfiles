@@ -4168,3 +4168,3687 @@ _**Agent (gpt-5.5 2026-06-19 03:12:56Z)**_
 
 I'm considering wrapping shared formulas under `{{ if .installBrewApps }}`, which could be useful. Alternatively, I could run shared only when any platform's Brewfile needs taps. The `Brewfile.tmpl` also includes a tap for nikitabobko/tap related to aerospace, which is only necessary if `installBrewApps` is enabled. Additionally, the wxtsky tap is already included in the AI Brewfile. This way, I can streamline what gets installed based on the conditions set.
 </details></think>
+
+---
+
+_**User (2026-06-19 03:16:01Z)**_
+
+Implement the plan.
+
+---
+
+_**Agent (gpt-5.5 2026-06-19 03:16:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Planning implementation steps**
+
+I’m thinking about how we need to implement this plan properly. The user has asked about using a skill related to untracked `.specstory` history while running `git status`. We’ve already loaded it in plan mode, but it seems like we might need to announce the skill. For now, I need to inspect the current worktree with the user’s changes. I may need to use `update_plan` and `apply_patch` for edits. Let's finalize that approach!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Considering repo constraints**
+
+I need to think through the plan details and the constraints of the repo. Adding a prompt means I’ll have to create a script to write `.chezmoi.toml.tmpl` and a Dockerfile. In default mode, mutation is okay, and I need to apply patches for manual edits. I should avoid using tricks to create or edit files directly. Also, I might not need to run `mkdocs` if the docs are already modified. It's important to align our documentation with current changes and ensure everything is up to date!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Inspecting `.chezmoiignore`**
+
+I need to take a closer look at the actual `.chezmoiignore` file. It appears that it only gates the Aerospace config and not the `Brewfile.darwin`. There was some confusion because the lines in `.chezmoiignore.tmpl` at line 134 are meant to ignore the Aerospace config, not the `Brewfile`. I should verify if the `Brewfile.darwin` is ignored somewhere else. I can use `rg` to help with that search. Let’s figure this out!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:20Z)**_
+
+I’ll implement the plan now, keeping the Steam work separate from the existing dirty files. I’ll start by re-checking the exact files that need changes, then patch the prompt, install paths, docs, and completions.
+
+_**Agent (gpt-5.5 2026-06-19 03:16:20Z)**_
+
+<tool-use data-tool-type="task" data-tool-name="update_plan"><details>
+<summary>Tool use: **update_plan**</summary>
+**Agent task list:**
+- [⚡] Inspect current prompt/Brewfile/gui role surfaces
+- [ ] Add installGamingApps prompt and generated surfaces
+- [ ] Implement macOS Brewfile and Linux Steam ansible path
+- [ ] Update docs and completions
+- [ ] Run focused validation
+
+```
+Plan updated
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "Brewfile.darwin|installBrewApps|installAiDesktopApps|installGamingApps|Gaming|steam|gui_apps_linux_install" .chezmoiignore.tmpl .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl dot_config/homebrew dot_ansible/roles/gui_apps_linux scripts/init/dotfiles_init.py README.md docs/playbooks/linux-gui-apps.md docs/this_repo/tool-managers.md docs/this_repo/upgrades.md dot_config/zsh/tools/51_dotcfg_completion.zsh dot_config/bash/51_dotcfg_completion.bash`</summary>
+```
+Chunk ID: e9587e
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2885
+Output:
+dot_config/bash/51_dotcfg_completion.bash:15:installCodingAgents installLlmTools installAiDesktopApps \
+dot_config/bash/51_dotcfg_completion.bash:17:installIacTools installMediaTools installBitwarden installBrewApps \
+docs/this_repo/upgrades.md:122:+ brew bundle --file=/Users/me/.config/homebrew/Brewfile.darwin
+dot_config/zsh/tools/51_dotcfg_completion.zsh:14:    installCodingAgents installLlmTools installAiDesktopApps
+dot_config/zsh/tools/51_dotcfg_completion.zsh:16:    installIacTools installMediaTools installBitwarden installBrewApps
+README.md:97:4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled)
+README.md:148:| `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`). macOS only. |
+README.md:149:| `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+README.md:295:- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+README.md:304:- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), Discord (`.deb`, x86_64-only — aarch64 gets a Flatpak hint), Zen Browser (AppImage + `.desktop` entry for launcher search), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl) (Arc + Discord casks there). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
+README.md:306:- **AeroSpace** (macOS, with `installBrewApps=true`): [AeroSpace](https://github.com/nikitabobko/AeroSpace) tiling window manager (cask in [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl)). Config is chezmoi-managed at the XDG path [`~/.config/aerospace/aerospace.toml`](dot_config/aerospace/aerospace.toml) (legacy `~/.aerospace.toml` is auto-removed via `.chezmoiremove` to avoid AeroSpace's both-configs-present error). macOS counterpart to niri on Linux — keybinds (alt + hjkl/arrows, `alt+enter` terminal) are aligned.
+docs/this_repo/tool-managers.md:32:| **Homebrew casks** | macOS GUI apps (~25 entries; gated by `installAiDesktopApps` for AI ones) | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
+docs/this_repo/tool-managers.md:81:│   Mostly GUI casks (macOS); skipped if installBrewApps=false            │
+docs/this_repo/tool-managers.md:128:| **Homebrew** | `Homebrew/install` curl script | macOS always; Linux only when `installBrewApps=true` & non-noRoot & arch∈{amd64,arm64}. Mirrors via `HOMEBREW_*_GIT_REMOTE` (Aliyun / USTC / BFSU / TUNA) when `useChineseMirror=true` |
+docs/this_repo/tool-managers.md:163:| `Brewfile.darwin.tmpl` | All GUI casks — see table below |
+docs/this_repo/tool-managers.md:171:| `claude`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
+docs/this_repo/tool-managers.md:172:| `chatgpt`, `codex-app` | `installAiDesktopApps` + arm64 |
+docs/this_repo/tool-managers.md:173:| `codeisland` (tap `wxtsky/tap`) | `installAiDesktopApps` |
+docs/this_repo/tool-managers.md:174:| `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
+docs/this_repo/tool-managers.md:184:Many more entries exist in commented-out form (steam, telegram,
+docs/this_repo/tool-managers.md:241:`installBrewApps`, `installAiDesktopApps`, `installCodingAgents`,
+docs/this_repo/tool-managers.md:379:| `llm_tools` (gated `installLlmTools`) | `litellm[proxy]` (via uv), `llmfit`, `models`, `ollama` | mixed — brew formula on macOS / curl-installer on Linux. Ollama: brew formula always (CLI) + cask `ollama-app` from Brewfile when `installBrewApps`; Linux uses `curl https://ollama.com/install.sh` (sudo, skipped in noRoot) |
+docs/this_repo/tool-managers.md:816:| **Ollama** | brew formula always (CLI); brew cask `ollama-app` when `installAiDesktopApps + installLlmTools`; Linux: `curl ollama.com/install.sh` | CLI vs GUI split; vendor installer is the canonical Linux path |
+docs/this_rep
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: 357b97
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 37
+Output:
+ M .specstory/history/2026-06-19_02-35-48Z-daviddwlee84-in-dongwu-tick.md
+ M .specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '286,356p' scripts/init/dotfiles_init.py`</summary>
+```
+Chunk ID: 1f5366
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1476
+Output:
+           prompt_text="Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool, libvips)",
+           comment=("是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)\n"
+                    "ffmpeg 也是 vhs 的 runtime 依賴；裝了影音包之後 vhs 才能真正錄製。詳見 docs/tools/ffmpeg.md")),
+
+    # --- System & apps ---------------------------------------------------
+    Prompt("installBitwarden", "bool", "System & apps",
+           "Bitwarden CLI + Desktop",
+           "@bitwarden/cli with SSH Agent integration and Zsh completion. On ubuntu_desktop / macOS profiles, also installs Bitwarden Desktop (snap or .deb fallback on Linux, Homebrew Cask on macOS).",
+           default=False,
+           prompt_text="Install Bitwarden CLI (and Desktop on ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent integration",
+           comment=("是否安裝 Bitwarden CLI（+ SSH Agent 自動偵測 + Zsh completion）；在\n"
+                    "ubuntu_desktop / macOS profile 上同時也會裝 Bitwarden Desktop（snap 優先、\n"
+                    ".deb fallback / Homebrew Cask）。詳細邏輯見 docs/playbooks/linux-gui-apps.md\n"
+                    "和 dot_ansible/roles/bitwarden/。")),
+    Prompt("installBrewApps", "bool", "System & apps",
+           "Homebrew GUI apps",
+           "Terminals, browsers, utilities via Brewfile (excl. AI desktop). Desktop-class profiles only (macos / ubuntu_desktop).",
+           default=False,
+           condition=When(profile=_DESKTOP_PROFILES), else_value=False,
+           prompt_text="Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)",
+           comment=("是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)\n"
+                    "Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。")),
+    Prompt("installInputMethod", "bool", "System & apps",
+           "Traditional Chinese IME",
+           "McBopomofo + RIME for zh-TW input. Desktop-class profiles only (macos / ubuntu_desktop).",
+           default=False,
+           condition=When(profile=_DESKTOP_PROFILES), else_value=False,
+           prompt_text="Install Traditional Chinese input methods (McBopomofo, RIME)",
+           comment=("是否安裝繁體中文輸入法 (McBopomofo + RIME)\n"
+                    "Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。")),
+    Prompt("discordChannel", "choice", "System & apps",
+           "Discord install channel",
+           "ubuntu_desktop only (macOS → Brewfile cask, ubuntu_server → skipped). flatpak (recommended): Flathub auto-updates via `flatpak update`. deb: official .deb, manual re-deploy each release. none: skip.",
+           default="flatpak",
+           condition=When(profile=frozenset({"ubuntu_desktop"})), else_value="none",
+           prompt_text="Discord install channel (flatpak|deb|none)",
+           choices=("flatpak", "deb", "none"),
+           comment=("Discord channel: 哪一條安裝路徑（ubuntu_desktop only — macOS 走 Brewfile cask，\n"
+                    "ubuntu_server 沒有 GUI 不需要）\n"
+                    "  - flatpak: 推薦，Flathub 走 com.discordapp.Discord，自動更新\n"
+                    "  - deb:     官方 .deb，每次版本更新需手動跑 `chezmoi apply` 重抓\n"
+                    "  - none:    完全不裝，留給使用者自行處理\n"
+                    "詳細決策 + sandbox 副作用見 docs/playbooks/linux-gui-apps.md\n"
+                    "注意: 這裡引用前面定義的 $profile local variable（不是 .profile，因為\n"
+                    ".chezmoi.toml.tmpl 正在產生 .profile，init 階段 .profile 還不存在）")),
+    Prompt("installNiri", "bool", "System & apps",
+           "niri Wayland compositor",
+           "Scrollable-tiling Wayland compositor, built from source (cargo). ubuntu_desktop only — not in Ubuntu 24.04 apt. Installs binary + GDM session/systemd files; NVIDIA gets a VRAM application-profile automatically. See docs/playbooks/niri.md.",
+           default=False,
+           condition=When(profile=frozenset({"ubuntu_desktop"})), else_value=False,
+           prompt_text="Install niri (scrollable-tiling Wayland compositor, built from source)",
+           comment=("是否安裝 niri (scrollable-tiling Wayland 合成器)，從源碼 cargo build。ubuntu_desktop\n"
+                    "only — macOS 無 Wayland、ubuntu_server 無 GUI，皆直接 false。NVIDIA 在現代驅動上開箱\n"
+                    "即用，niri role 會自動寫入 VRAM application-profile（GLVidHeapReuseRatio=0）。\n"
+                    "詳見 dot_ansible/roles/niri/ 與 docs/playbooks/niri.md")),
+    Prompt("installNetwor
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,130p' .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`</summary>
+```
+Chunk ID: 02708d
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1268
+Output:
+#!/bin/bash
+# Run brew bundle when Brewfiles change
+# Runs when general Brew apps are enabled, or on macOS when AI desktop apps are enabled
+# Profile: {{ .profile }}
+# installBrewApps: {{ .installBrewApps }}
+# installAiDesktopApps: {{ .installAiDesktopApps }}
+
+{{ if and (not .installBrewApps) (or (ne .chezmoi.os "darwin") (not .installAiDesktopApps)) -}}
+# Brew app installation is disabled for this profile
+# To enable, run: chezmoi init --force
+exit 0
+{{ end -}}
+
+{{ if eq .chezmoi.os "darwin" -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
+{{ else -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.linux: {{ include "dot_config/homebrew/Brewfile.linux.tmpl" | sha256sum }}
+{{ end -}}
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Setup Homebrew PATH
+{{ if eq .chezmoi.os "darwin" -}}
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linuxbrew
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+{{ end -}}
+
+# Check if brew is available
+if ! command -v brew &> /dev/null; then
+    {{ if eq .chezmoi.os "darwin" -}}
+    error "Homebrew not found. It should have been installed by bootstrap."
+    exit 1
+    {{ else -}}
+    warn "Homebrew (Linuxbrew) not installed. Skipping brew bundle."
+    warn "To install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    exit 0
+    {{ end -}}
+fi
+
+BREWFILE_DIR="$HOME/.config/homebrew"
+
+# Check if Brewfiles exist
+if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
+    warn "Brewfile not found at $BREWFILE_DIR/Brewfile"
+    warn "Run 'chezmoi apply' to deploy Brewfiles first."
+    exit 0
+fi
+
+{{ if eq .chezmoi.os "darwin" -}}
+# --- Shared sudo session (see scripts/lib/sudo_shared.sh)
+# Inlined at render time. By the time brew-bundle runs, bootstrap and ansible
+# will usually have already prompted + spawned the watchdog (which keeps the
+# TTY timestamp warm every 50 s). `sudo_session_init` is idempotent: if the
+# session already exists, it just re-exports env vars + re-registers traps.
+# If the user invoked brew-bundle standalone (without the other phases), the
+# prompt happens here instead.
+{{ include "scripts/lib/sudo_shared.sh" }}
+# --- end sudo helper
+
+# Pre-authenticate sudo so Homebrew cask pkg installers (e.g. google-drive,
+# squirrel, ollama-app) can invoke /usr/sbin/installer without prompting from
+# a non-TTY child. The watchdog refreshes the timestamp every 50 s, which
+# is well inside sudo's default 5-minute tty_tickets window.
+if sudo_session_init "brew"; then
+    case "$(sudo_session_skip_reason)" in
+        cached)
+            # Warm the current TTY's timestamp right now so the FIRST cask
+            # that shells out to `sudo /usr/sbin/installer` finds a live
+            # ticket (cask installers read a TTY timestamp, not stdin).
+            sudo_session_warm_cache || warn "sudo_session_warm_cache failed; pkg casks may prompt or fail"
+            ;;
+        passwordless)
+            info "Passwordless sudo detected"
+            ;;
+        non-interactive | "")
+            warn "Non-interactive mode without passwordless sudo - pkg-based casks may fail"
+            ;;
+    esac
+else
+    warn "Sudo session could not be established - pkg-based casks may fail"
+fi
+
+{{ end -}}
+info "Running brew bundle..."
+
+# `chezmoi apply` is install-only by design (see AGENTS.md). Skip the implicit
+# `brew update` that `brew bundle` would otherwise trigger -- it slows things
+# down, and on hosts using a Chinese mirror it can transiently fail with
+# "Unable to find <sha> under https://mirrors.aliyun.com/homebrew/brew.git"
+# while the mirror catches up to upstream. Upgrades go through `just upgrade-*`.
+export HOMEBREW_NO_AUTO_UPDATE=1
+# Quiet "you have N outdated formulae" hints during install-only flow.
+export HOMEBREW_NO_INSTALL_UPGRADE=1
+
+{{ if eq .chezmoi.os "darwin" -}}
+# --- Adopt pre-flight (macOS only, OPT-IN)
+# Casks installed manually (drag .app into /Applications) are invisible to brew
+# until "adopted". `brew install --cask --adopt <name>` writes Caskroom
+# metadata in-place so subsequent `brew bundle` runs skip the cask.
+#
+# Why opt-in (CHEZMOI_BREW_ADOPT_PREF
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '270,322p' .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`</summary>
+```
+Chunk ID: 10b4cc
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 658
+Output:
+TAGS="${TAGS},dotnet_tools"
+{{ end -}}
+{{ $installAuditd := false }}{{ if hasKey . "installAuditd" }}{{ $installAuditd = .installAuditd }}{{ end -}}
+{{ if and $installAuditd (eq .chezmoi.os "linux") -}}
+TAGS="${TAGS},auditd"
+{{ end -}}
+{{ $installHomelabTools := false }}{{ if hasKey . "installHomelabTools" }}{{ $installHomelabTools = .installHomelabTools }}{{ end -}}
+{{ if and $installHomelabTools (eq .chezmoi.os "linux") -}}
+TAGS="${TAGS},homelab_tools"
+{{ end -}}
+{{ $installNiri := false }}{{ if hasKey . "installNiri" }}{{ $installNiri = .installNiri }}{{ end -}}
+{{ if and $installNiri (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+TAGS="${TAGS},niri"
+{{ end -}}
+
+# Extra vars for role-level configuration
+# primary_shell is read by both the zsh role (gates chsh-to-zsh) and the
+# bash role (gates brew-install bash 5.x on macOS, /etc/shells whitelist,
+# and chsh-to-bash). Default "zsh" so existing bashes (apply on a host
+# from before this prompt existed) keep zsh as login shell.
+{{ $primaryShell := "zsh" }}{{ if hasKey . "primaryShell" }}{{ $primaryShell = .primaryShell }}{{ end -}}
+EXTRA_VARS="primary_shell={{ $primaryShell }}"
+{{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
+# Install Bitwarden Desktop app (for SSH agent) on desktop profiles
+EXTRA_VARS="$EXTRA_VARS bitwarden_install_desktop=true"
+{{ end -}}
+{{ if $installLlmTools -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="llm_tools_install_brew_apps={{ .installBrewApps }}"
+else
+    EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
+fi
+{{ end -}}
+{{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+# Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
+{{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="discord_channel={{ $discordChannel }}"
+else
+    EXTRA_VARS="$EXTRA_VARS discord_channel={{ $discordChannel }}"
+fi
+{{ end -}}
+
+[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+
+# === Handle sudo (delegated to scripts/lib/sudo_shared.sh) ==================
+# The helper (sudo_session_init) is idempotent: if bootstrap already prompted
+# the user and spawned the watchdog, this call just re-exports the env vars.
+# If ansible is run standalone (bypassing bootstrap), it prompts here instead.
+#
+# After init we classify via sudo_session_skip_reason:
+#   "cached"           -> pass $CHEZMOI_ANSIBLE_BECOME_FILE to ansible via -e @
+#   "passwordless"     -> no become password needed
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '68,118p' docs/playbooks/linux-gui-apps.md`</summary>
+```
+Chunk ID: 0daf04
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1088
+Output:
+> sometimes assume from their Cask experience. Pick by row 1-3 above.
+
+## Inventory of GUI apps on this machine
+
+### Ansible-managed (this repo)
+
+| App | Mechanism | Auto-update? | Source-of-truth | Where it lives |
+|---|---|---|---|---|
+| **Cursor** | `.deb` (auto-adds `/etc/apt/sources.list.d/cursor.sources`) | ✅ `apt upgrade cursor` | [`gui_apps_linux/tasks/main.yml`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install Cursor via .deb" | `/usr/share/cursor/` |
+| **VSCode** | `.deb` (auto-adds `vscode.sources`) | ✅ `apt upgrade code` | same role | `/usr/share/code/` |
+| **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
+| **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
+| **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
+| **AppImageLauncher** | `.deb` (PPA on 22.04, GitHub release on 24.04) | ✅ via apt | same role | system + `appimagelauncherd.service` (user) |
+| **Bitwarden CLI** (`bw`) | npm via mise (gated by `installBitwarden=true`) | ❌ — `just upgrade-mise` | [`bitwarden` role](../../dot_ansible/roles/bitwarden/tasks/main.yml) | `~/.local/share/mise/...` |
+| **Bitwarden Desktop** | Snap (`bitwarden`) → `.deb` fallback if `snap` unavailable; gated by `installBitwarden=true` AND `profile=ubuntu_desktop` | ✅ via `snapd` background refresh (or `apt upgrade` for fallback `.deb`) | same role | `/snap/bitwarden/current/` |
+| **CopyQ** | `.deb` via stock apt (`apt install copyq`); gated by `profile=ubuntu_desktop` via tag selection in [`run_onchange_after_20_ansible_roles.sh.tmpl`](../../.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl) | ✅ via `apt upgrade` | [`gui_apps_linux`](../../dot_ansible/roles/gui_apps_linux/tasks/main.yml) "Install CopyQ via apt" | `/usr/bin/copyq` + `/etc/xdg/autostart/com.github.hluk.copyq.desktop` |
+
+### Manually managed (you installed these yourself, outside ansible)
+
+| App | Mechanism | Auto-update? | How it got there | How to upgrade |
+|---|---|---|---|---|
+| **Spotify** | Snap (publisher `Spotify**`) | ✅ background | Ubuntu App Center | `snap refresh spotify` |
+| **Firefox** | Snap (canonical default since Ubuntu 22.04) | ✅ background | preinstalled with the OS | `snap refresh firefox` |
+| **btop** | Snap (kz6fittycent) | ✅ background | manual | `snap refresh btop` |
+| **Frpc Desktop** | AppImage at `~/Applications/Frpc-Desktop-1.2.1.AppImage` | ❌ — manual re-download | manual drop-in | overwrite the file |
+| **Clash for Windows** | tarball at `~/Documents/ClashForWindows/` ⚠️ | ❌ **DEPRECATED upstream** | extracted manually 2025 | **Migrate** — see below |
+
+> **Clash for Windows is dead.** The original developer (Fndroid)
+> publicly stopped maintenance in **2023-11** and the GitHub repo is
+> archived. No new releases, no CVE patches. Migrate to one of the
+> maintained forks:
+>
+> - [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) — active fork, ships .deb + AppImage
+> - [Clash Nyanpasu](https://github.com/libnyanpasu/clash-nyanpasu) — Tauri-based GUI, AppImage + .deb
+> - [Mihomo Party](https://github.com/mihomo-party-org/mihomo-party) — successor of CFW UX, AppImage + .deb
+>
+> All three publish `.deb` packages — drop the new app into `gui_apps_linux`
+> following the [`.deb` pattern](#concrete-patterns) below and delete
+> `~/Documents/ClashForWindows/` after the new one is wired up.
+
+## Why `.deb` auto-update works (the apt-source postinst trick)
+
+When `dpkg -i cursor_<v>_amd64.deb` runs, Cursor's package contains a
+`DEBIAN/postinst` script that, on success, writes:
+
+- `/etc/apt/sources.list.d/cursor.sources` — pointing at `https://downloads.cursor.com/aptrepo`
+- `/usr/share/keyrings/anysphere.gpg` — the signing key
+
+After that, `apt update` pulls Cursor's release index alongside Ubuntu's
+own, and `apt upgrade cursor` (or generic `apt upgrade` / `just upgrade-system`)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:38Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Checking git status**
+
+I see the git status output is showing that only the specstory is now modified, and those previous dirty files are no longer an issue. Is this possibly due to compaction? It seems the current status indicates just two modified specstory files. I noticed there's something untracked; now it's tracked, which is good. There's no need to commit yet, but I might want to mention that in the final update plan. Alright, let's implement that!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:38Z)**_
+
+The current worktree now only shows SpecStory transcript changes; I’ll leave those untouched. One correction from the plan: `Brewfile.darwin` itself is not ignored, only AeroSpace config is gated by `installBrewApps`, so I only need to adjust the brew-bundle run condition and gate the Brewfile contents correctly.
+
+_**Agent (gpt-5.5 2026-06-19 03:16:38Z)**_
+
+<tool-use data-tool-type="task" data-tool-name="update_plan"><details>
+<summary>Tool use: **update_plan**</summary>
+**Agent task list:**
+- [X] Inspect current prompt/Brewfile/gui role surfaces
+- [⚡] Add installGamingApps prompt and generated surfaces
+- [ ] Implement macOS Brewfile and Linux Steam ansible path
+- [ ] Update docs and completions
+- [ ] Run focused validation
+
+```
+Plan updated
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:16:48Z)**_
+
+I’m adding the new prompt in the SSOT first, then I’ll run the repo generator so the template and Dockerfile marker regions are not hand-edited.
+
+_**Agent (gpt-5.5 2026-06-19 03:16:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py`**
+
+```diff
+@@
+     Prompt("installBrewApps", "bool", "System & apps",
+            "Homebrew GUI apps",
+            "Terminals, browsers, utilities via Brewfile (excl. AI desktop). Desktop-class profiles only (macos / ubuntu_desktop).",
+            default=False,
+            condition=When(profile=_DESKTOP_PROFILES), else_value=False,
+            prompt_text="Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)",
+            comment=("是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)\n"
+                     "Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。")),
++    Prompt("installGamingApps", "bool", "System & apps",
++           "Gaming apps",
++           "Steam for desktop profiles: Homebrew cask on macOS, Valve apt repo on Ubuntu Desktop.",
++           default=False,
++           condition=When(profile=_DESKTOP_PROFILES), else_value=False,
++           prompt_text="Install gaming apps (Steam)",
++           comment=("是否安裝遊戲相關桌面應用（目前先裝 Steam）。Desktop-class only（macos /\n"
++                    "ubuntu_desktop）；macOS 走 Homebrew Cask，Ubuntu Desktop 走 Valve 官方 apt repo /\n"
++                    "steam-launcher。headless server 直接 false。")),
+     Prompt("installInputMethod", "bool", "System & apps",
+            "Traditional Chinese IME",
+            "McBopomofo + RIME for zh-TW input. Desktop-class profiles only (macos / ubuntu_desktop).",
+            default=False,
+            condition=When(profile=_DESKTOP_PROFILES), else_value=False,
+@@
+         "installAiDesktopApps": False,
+         "installPythonUvTools": False,
+         "installJsCliTools": False,
+         "installExtraRuntimes": False,
+         "installDotnetTools": False,
+         "installIacTools": False,
+         "installBitwarden": False,
+         "installBrewApps": False,
++        "installGamingApps": False,
+         "installInputMethod": False,
+         "installNiri": False,
+         "installNetworkingTools": False,
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:01Z)**_
+
+The prompt is added as desktop-only and remains off for all bundles. I’m regenerating the generated prompt surfaces next.
+
+_**Agent (gpt-5.5 2026-06-19 03:17:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just gen-prompts`</summary>
+```
+Chunk ID: b865cc
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 50
+Output:
+uv run --script scripts/init/dotfiles_init.py gen --source . 
+wrote .chezmoi.toml.tmpl
+wrote Dockerfile
+README is missing prompt keys: installGamingApps (coverage-only; add them to the
+marked table).
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Updating the Brewfile plan**
+
+I need to think through the plan after reviewing the documentation. The README is still missing, but I've completed the generated surfaces. Implementing brew is important, particularly regarding general Brewfile entries. The current configuration might install unwanted casks unless I wrap them under a condition. If the focus is gaming only, do I really want shared formulas? I might need to adjust Brewfile.tmpl to ensure everything aligns with our plan.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Reviewing brew-bundle requirements**
+
+I need to evaluate whether AI desktop apps require shared taps. The CodeIsland tap in the Darwin file isn’t shared, and if I set `installAiDesktopApps` to true while keeping `installBrewApps` false, I might inadvertently install unnecessary components like mas/tailscale. The current design could be fine, but the plan suggests gating shared entries under `installBrewApps`. I should adjust this to ensure it aligns with AI-only behavior without unintended consequences. Wrapping sections in Brewfile.darwin is necessary for clarity.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Organizing the Brewfile sections**
+
+I’m considering adding `{{ if .installBrewApps -}}` at the top before the Casks for Terminals & Editors and ending it before the Gaming section. It might make sense to separate the gaming block and possibly include the old commented Casks - Gaming inside it. This way, I can ensure everything is structured properly and related sections are organized. It’s a small but important step to keep everything clean and functional!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+For macOS, enabling only Steam would currently run the full general GUI Brewfile. I’m going to gate the general Brewfile entries behind `installBrewApps`, then add a separate `installGamingApps` Steam block so the new option is genuinely narrow.
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,180p' dot_config/homebrew/Brewfile.darwin.tmpl`</summary>
+```
+Chunk ID: 4990ab
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1731
+Output:
+# Brewfile.darwin - macOS GUI applications (casks) and Mac App Store apps
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.darwin
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.darwin
+
+# =============================================================================
+# Casks - Terminals & Editors
+# =============================================================================
+cask "alacritty"
+# cask "iterm2"
+cask "warp"
+cask "cmux"
+cask "cursor"
+cask "visual-studio-code"
+
+# =============================================================================
+# Casks - AI & Coding Assistants
+# =============================================================================
+{{ if .installAiDesktopApps -}}
+cask "claude"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "chatgpt"
+{{ end -}}
+cask "opencode-desktop"
+cask "antigravity"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "codex-app"
+{{ end -}}
+# cask "chatgpt-atlas"  # Uncomment if needed
+# CodeIsland — macOS notch HUD that surfaces coding-agent activity (Claude/Codex/
+# Cursor/Copilot/Gemini/AntiGravity/OpenCode). macOS 14+ only; Swift app uses a
+# Unix socket at /tmp/codeisland-<uid>.sock. The app auto-installs hook payloads
+# into each detected CLI's config; our chezmoi overlays are deliberately
+# hook-aware to coexist (see docs/tools/agent-overlays.md).
+tap "wxtsky/tap"
+cask "codeisland"
+# Local LLM GUI runtime (also provides the `ollama` CLI)
+{{ if .installLlmTools -}}
+cask "ollama-app"
+{{ end -}}
+# cask "termius"          # SSH client
+{{ end -}}
+
+# =============================================================================
+# Casks - System Utilities
+# =============================================================================
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "maccy"                       # Plaintext-SQLite clipboard history (scriptable; `cb`/`cbl`/`cbe`)
+# cask "itsycal"                     # Menu bar calendar
+# cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+cask "scroll-reverser"             # Reverse scroll direction per device
+# cask "sloth"                       # Process/file viewer
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+
+# =============================================================================
+# Casks - Communication
+# =============================================================================
+cask "discord"
+# cask "messenger"
+# cask "telegram"
+# cask "wechat"   # We used to install WeChat using Apple Store (TODO: maybe use mas?! but that would need login...)
+# cask "whatsapp"
+# cask "dingtalk"
+# cask "tencent-meeting"  # TencentMeeting.app
+
+# =============================================================================
+# Casks - Browsers
+# =============================================================================
+cask "arc"
+# cask "google-chrome"
+# cask "tor-browser"
+
+# =============================================================================
+# Casks - Productivity
+# =============================================================================
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+# cask "readest"              # E-book reader
+cask "super-productivity"   # Task/time management
+# cask "wispr-flow"           # Voice typing
+# cask "mathpix-snipping-tool"
+
+# =============================================================================
+# Casks - Media & Entertainment
+# =============================================================================
+cask "spotify"
+cask "anki"
+
+# =============================================================================
+# Casks - Gaming (skip on work machines)
+# =============================================================================
+# {{ if not (env "WORK_MACHINE") -}}
+# cask "steam"
+# cask "minecraft"
+# cask "battle-net"
+# cask "hstracker"  # Hearthstone deck tracker
+# {{- end }}
+
+# =============================================================================
+# Casks - Finance & Trading
+# =============================================================================
+# cask "binance"
+# cask "tradingview"
+
+# =============================================================================
+# Casks - Network & VPN
+# =============================================================================
+# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+# but Tailscale was delisted from the Mac App Store (mas install now fails with
+# "No apps found in the App Store for ADAM ID 1475387142").
+cask "tailscale-app"
+# cask "openvpn-connect"
+# cask "vibetunnel"
+# cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
+
+# =============================================
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,80p' dot_config/homebrew/Brewfile.tmpl`</summary>
+```
+Chunk ID: 57a7f3
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 264
+Output:
+# Brewfile - Shared configuration (macOS & Linux)
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile
+
+# =============================================================================
+# Taps (Third-party repositories)
+# =============================================================================
+tap "nikitabobko/tap"  # aerospace (macOS window manager)
+
+# =============================================================================
+# Formulas - CLI Tools (cross-platform)
+# =============================================================================
+# Note: Most CLI tools are managed by ansible for better cross-platform support
+# Only add formulas here that you want to manage via Brewfile
+
+# The following Formulas are MacOS only
+{{ if eq .chezmoi.os "darwin" -}}
+# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+brew "mas"
+brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+{{ end -}}
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,80p' .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`</summary>
+```
+Chunk ID: e76fa8
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 694
+Output:
+#!/bin/bash
+# Run brew bundle when Brewfiles change
+# Runs when general Brew apps are enabled, or on macOS when AI desktop apps are enabled
+# Profile: {{ .profile }}
+# installBrewApps: {{ .installBrewApps }}
+# installAiDesktopApps: {{ .installAiDesktopApps }}
+
+{{ if and (not .installBrewApps) (or (ne .chezmoi.os "darwin") (not .installAiDesktopApps)) -}}
+# Brew app installation is disabled for this profile
+# To enable, run: chezmoi init --force
+exit 0
+{{ end -}}
+
+{{ if eq .chezmoi.os "darwin" -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
+{{ else -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.linux: {{ include "dot_config/homebrew/Brewfile.linux.tmpl" | sha256sum }}
+{{ end -}}
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Setup Homebrew PATH
+{{ if eq .chezmoi.os "darwin" -}}
+if [[ -f /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f /usr/local/bin/brew ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+{{ else -}}
+# Linuxbrew
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+    eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+fi
+{{ end -}}
+
+# Check if brew is available
+if ! command -v brew &> /dev/null; then
+    {{ if eq .chezmoi.os "darwin" -}}
+    error "Homebrew not found. It should have been installed by bootstrap."
+    exit 1
+    {{ else -}}
+    warn "Homebrew (Linuxbrew) not installed. Skipping brew bundle."
+    warn "To install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    exit 0
+    {{ end -}}
+fi
+
+BREWFILE_DIR="$HOME/.config/homebrew"
+
+# Check if Brewfiles exist
+if [[ ! -f "$BREWFILE_DIR/Brewfile" ]]; then
+    warn "Brewfile not found at $BREWFILE_DIR/Brewfile"
+    warn "Run 'chezmoi apply' to deploy Brewfiles first."
+    exit 0
+fi
+
+{{ if eq .chezmoi.os "darwin" -}}
+# --- Shared sudo session (see scripts/lib/sudo_shared.sh)
+# Inlined at render time. By the time brew-bundle runs, bootstrap and ansible
+# will usually have already prompted + spawned the watchdog (which keeps the
+# TTY timestamp warm every 50 s). `sudo_session_init` is idempotent: if the
+# session already exists, it just re-exports env vars + re-registers traps.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Considering Brewfile adjustments**
+
+I need to create a patch for the Brewfile template to manage installations effectively, especially for macOS. I think about the necessity of keeping taps in shared use while gaming, though for Steam, it might be unnecessary. I’ll ensure that installations cater to general macOS GUI apps. In the Brewfile for Darwin, I’ll need to configure the conditions properly to keep the AI features independent. Organizing sections could be tricky, but I’m aiming for clarity.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Refining Brewfile structure**
+
+I'm thinking about a better approach for patching the Brewfile. I could add `{{ if .installBrewApps -}}` at the top, then close it before the AI section. This would keep the AI block and reopen it after, closing before the Mac App Store section. Each segment should maintain clarity, so I want to organize general terminals, AI, and system sections neatly. Gaming may need to be outside the general block, potentially placed between media and finance, but I want to ensure it remains separate for clarity.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Optimizing the Brewfile layout**
+
+I want to properly structure the Brewfile for clarity. I’m considering placing the gaming block before closing the general section and reopening it for Finance. However, if I do that, Finance might just remain as a comment. It's essential to have active network and developer sections within the general block. I could simplify things by keeping the gaming block inside the general section and adding the actual Steam block afterward, especially if it's only for gaming installations.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:36Z)**_
+
+I’m patching the Brewfiles so AI-only and gaming-only installs no longer pull general utilities as side effects. The shared Brewfile’s mas/tailscale tap setup will now stay tied to `installBrewApps`.
+
+_**Agent (gpt-5.5 2026-06-19 03:17:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.tmpl`**
+
+```diff
+@@
+ # =============================================================================
+ # Taps (Third-party repositories)
+ # =============================================================================
++{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+ tap "nikitabobko/tap"  # aerospace (macOS window manager)
++{{ end -}}
+@@
+-# The following Formulas are MacOS only
+-{{ if eq .chezmoi.os "darwin" -}}
++# The following formulas support the general macOS GUI app bundle.
++{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+ # Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+ brew "mas"
+ brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+ {{ end -}}
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.tmpl
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:39Z)**_
+
+Next I’m restructuring the macOS Brewfile into three independent blocks: general apps, AI desktop apps, and Steam.
+
+_**Agent (gpt-5.5 2026-06-19 03:17:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl`**
+
+```diff
+@@
+ # This file is managed by chezmoi. Edit the source:
+ #   chezmoi edit ~/.config/homebrew/Brewfile.darwin
+ 
++{{ if .installBrewApps -}}
+ # =============================================================================
+ # Casks - Terminals & Editors
+ # =============================================================================
+ cask "alacritty"
+@@
+ # cask "iterm2"
+ cask "warp"
+ cask "cmux"
+ cask "cursor"
+ cask "visual-studio-code"
++{{ end -}}
+ 
+ # =============================================================================
+ # Casks - AI & Coding Assistants
+@@
+ # cask "termius"          # SSH client
+ {{ end -}}
+ 
++{{ if .installBrewApps -}}
+ # =============================================================================
+ # Casks - System Utilities
+ # =============================================================================
+ cask "nikitabobko/tap/aerospace"  # Tiling window manager
+@@
+ # =============================================================================
+ # Casks - Media & Entertainment
+ # =============================================================================
+ cask "spotify"
+ cask "anki"
++{{ end -}}
+ 
+ # =============================================================================
+-# Casks - Gaming (skip on work machines)
++# Casks - Gaming
+ # =============================================================================
+-# {{ if not (env "WORK_MACHINE") -}}
+-# cask "steam"
++{{ if .installGamingApps -}}
++cask "steam"
++{{ end -}}
++
++{{ if .installBrewApps -}}
++# cask "minecraft"
+ # cask "minecraft"
+ # cask "battle-net"
+ # cask "hstracker"  # Hearthstone deck tracker
+-# {{- end }}
+ 
+ # =============================================================================
+ # Casks - Finance & Trading
+@@
+ # mas "Pages", id: 409201541
+ # mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
++{{ end -}}
+ 
+ # =============================================================================
+ # Apps NOT available via Homebrew (manual install required):
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,150p' dot_config/homebrew/Brewfile.darwin.tmpl`</summary>
+```
+Chunk ID: db663f
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1475
+Output:
+# Brewfile.darwin - macOS GUI applications (casks) and Mac App Store apps
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.darwin
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.darwin
+
+{{ if .installBrewApps -}}
+# =============================================================================
+# Casks - Terminals & Editors
+# =============================================================================
+cask "alacritty"
+# cask "iterm2"
+cask "warp"
+cask "cmux"
+cask "cursor"
+cask "visual-studio-code"
+{{ end -}}
+
+# =============================================================================
+# Casks - AI & Coding Assistants
+# =============================================================================
+{{ if .installAiDesktopApps -}}
+cask "claude"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "chatgpt"
+{{ end -}}
+cask "opencode-desktop"
+cask "antigravity"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "codex-app"
+{{ end -}}
+# cask "chatgpt-atlas"  # Uncomment if needed
+# CodeIsland — macOS notch HUD that surfaces coding-agent activity (Claude/Codex/
+# Cursor/Copilot/Gemini/AntiGravity/OpenCode). macOS 14+ only; Swift app uses a
+# Unix socket at /tmp/codeisland-<uid>.sock. The app auto-installs hook payloads
+# into each detected CLI's config; our chezmoi overlays are deliberately
+# hook-aware to coexist (see docs/tools/agent-overlays.md).
+tap "wxtsky/tap"
+cask "codeisland"
+# Local LLM GUI runtime (also provides the `ollama` CLI)
+{{ if .installLlmTools -}}
+cask "ollama-app"
+{{ end -}}
+# cask "termius"          # SSH client
+{{ end -}}
+
+{{ if .installBrewApps -}}
+# =============================================================================
+# Casks - System Utilities
+# =============================================================================
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "maccy"                       # Plaintext-SQLite clipboard history (scriptable; `cb`/`cbl`/`cbe`)
+# cask "itsycal"                     # Menu bar calendar
+# cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+cask "scroll-reverser"             # Reverse scroll direction per device
+# cask "sloth"                       # Process/file viewer
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+
+# =============================================================================
+# Casks - Communication
+# =============================================================================
+cask "discord"
+# cask "messenger"
+# cask "telegram"
+# cask "wechat"   # We used to install WeChat using Apple Store (TODO: maybe use mas?! but that would need login...)
+# cask "whatsapp"
+# cask "dingtalk"
+# cask "tencent-meeting"  # TencentMeeting.app
+
+# =============================================================================
+# Casks - Browsers
+# =============================================================================
+cask "arc"
+# cask "google-chrome"
+# cask "tor-browser"
+
+# =============================================================================
+# Casks - Productivity
+# =============================================================================
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+# cask "readest"              # E-book reader
+cask "super-productivity"   # Task/time management
+# cask "wispr-flow"           # Voice typing
+# cask "mathpix-snipping-tool"
+
+# =============================================================================
+# Casks - Media & Entertainment
+# =============================================================================
+cask "spotify"
+cask "anki"
+{{ end -}}
+
+# =============================================================================
+# Casks - Gaming
+# =============================================================================
+{{ if .installGamingApps -}}
+cask "steam"
+{{ end -}}
+
+{{ if .installBrewApps -}}
+# cask "minecraft"
+# cask "minecraft"
+# cask "battle-net"
+# cask "hstracker"  # Hearthstone deck tracker
+
+# =============================================================================
+# Casks - Finance & Trading
+# =============================================================================
+# cask "binance"
+# cask "tradingview"
+
+# =============================================================================
+# Casks - Network & VPN
+# =============================================================================
+# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+# but Tailscale was delisted from the Mac App Store (mas install now fails with
+# "No apps found in the App Store for ADAM ID 1475387142").
+cask "tailscale-app"
+# cask "openvpn-connect"
+# cask "vibetunnel"
+# cask "clash-verge-rev"  # Clash proxy G
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:17:56Z)**_
+
+I spotted a duplicate commented Minecraft line from the restructure and will clean that small artifact before moving on.
+
+_**Agent (gpt-5.5 2026-06-19 03:17:59Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl`**
+
+```diff
+@@
+ {{ end -}}
+ 
+ {{ if .installBrewApps -}}
+-# cask "minecraft"
+ # cask "minecraft"
+ # cask "battle-net"
+ # cask "hstracker"  # Hearthstone deck tracker
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_config/homebrew/Brewfile.darwin.tmpl
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Patching installation variables**
+
+I need to check the existing `installBrewApps` condition for Linux, which runs brew bundle if it's true. I'll add a comment for clarity. I'm thinking I should use variables throughout for `installBrewApps` in comments, but maybe I won't need them. This script runs after the configuration, and I’ll be using `$installGamingApps`. In Go templates, I see that variable reassignment is possible, like in `{{ $installNiri := false }}`, so I can proceed with the patch.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:10Z)**_
+
+I’m updating the brew-bundle run gate so macOS Steam can trigger the Brewfile, while Linux Steam stays in Ansible and does not invoke Linuxbrew.
+
+_**Agent (gpt-5.5 2026-06-19 03:18:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl`**
+
+```diff
+@@
+ #!/bin/bash
+ # Run brew bundle when Brewfiles change
+-# Runs when general Brew apps are enabled, or on macOS when AI desktop apps are enabled
++# Runs when general Brew apps are enabled, or on macOS when AI/gaming desktop apps are enabled
+ # Profile: {{ .profile }}
+ # installBrewApps: {{ .installBrewApps }}
+ # installAiDesktopApps: {{ .installAiDesktopApps }}
++# installGamingApps: {{ .installGamingApps }}
+ 
+-{{ if and (not .installBrewApps) (or (ne .chezmoi.os "darwin") (not .installAiDesktopApps)) -}}
++{{ $installBrewApps := false }}{{ if hasKey . "installBrewApps" }}{{ $installBrewApps = .installBrewApps }}{{ end -}}
++{{ $installAiDesktopApps := false }}{{ if hasKey . "installAiDesktopApps" }}{{ $installAiDesktopApps = .installAiDesktopApps }}{{ end -}}
++{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
++{{ if and (not $installBrewApps) (or (ne .chezmoi.os "darwin") (and (not $installAiDesktopApps) (not $installGamingApps))) -}}
+ # Brew app installation is disabled for this profile
+ # To enable, run: chezmoi init --force
+ exit 0
+ {{ end -}}
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Exploring Ansible Gaming App Installations**
+
+I’m considering the need for comments in using `.installGamingApps`, as it might error out if something is missing. If a key isn't found in the config but is in `.chezmoi.toml`, that’s generated fine. I’ll have to establish a robust design for the Linux Ansible tasks, and maybe use `ansible.builtin.deb822_repository` with an architecture list. For Steam, I need the right syntax to configure the repository. I’ll explore whether Ansible allows for a list in the `architectures` parameter.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Configuring Ansible for Steam Installation**
+
+I’m working on setting the architectures in YAML to include `[amd64, i386]`, ensuring to add `i386` only if it's missing. I need to register changes and update the cache if the repository or architecture changes. For this, I'll use `ansible.builtin.command: dpkg --print-foreign-architectures`. Also, if `dpkg --add-architecture i386` is needed, it should run with sudo privileges. I’ll register the key file by fetching it directly to `/usr/share/keyrings/steam.gpg`. Then, I’ll handle updating and installing the `steam-launcher`, considering options like `install_recommends`.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Considering repo management**
+
+I’m exploring whether to add a block or rescue option to remove a broken repository. Existing patterns suggest rolling back to avoid disruption, especially since the Steam repository is official. However, if an `apt update` fails after adding a source, I could cause more issues. It's tricky—removing the source after a transient network failure seems counterproductive, but maybe I could adopt patterns from VSCode. 
+
+Keeping the source for official repositories might be fine, but it complicates dependency conflicts during installation.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Organizing tasks for Steam installation**
+
+I’m considering creating tasks under a block for checking if Steam is installed and ensuring proper installation via the Valve APT repository. Even if Steam is already installed, I want to confirm the repository exists for upgrades. Although the tasks focus on installation, ensuring the repo is idempotent makes sense. 
+
+I’ll need to include debugging messages and account for non-sudo scenarios, especially with a `noRoot` variable for installations. Deciding on the task group location, I think placing it after Discord and before Zen is ideal. I'll also update comments as necessary.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Understanding noRoot and repository setup**
+
+I’m reflecting on using `--skip-tags sudo` with potential noRoot tasks. If the block has no sudo tags but includes tasks that do, those will be skipped if noRoot is set. Adding a debug message for noRoot sounds good. I should include `deb822_repository` in the block to ensure all sudo tags are recognized.
+
+For adding architecture, I’m thinking `dpkg --add-architecture` could use a command with a creates option. I’ll need to perform an apt update after adding architecture and before including the APT repository since the i386 architecture influences all sources. A single apt update should suffice after adding the repo.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+For Linux, I’m adding a narrow Steam block to `gui_apps_linux`: x86_64 only, sudo-only, Valve repo, i386 architecture, then `steam-launcher`. It will emit skip messages for ARM and noRoot instead of silently doing nothing.
+
+_**Agent (gpt-5.5 2026-06-19 03:18:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/defaults/main.yml`**
+
+```diff
+@@
+ # users still get AppImage desktop integration.
+ gui_apps_linux_no_root: false
++
++# Desktop gaming bundle. Currently installs Steam only. Plumbed from the
++# `installGamingApps` chezmoi prompt on ubuntu_desktop.
++gui_apps_linux_install_gaming_apps: false
+```
+
+
+```
+apply_patch verification failed: Failed to find expected lines in /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/defaults/main.yml:
+# users still get AppImage desktop integration.
+gui_apps_linux_no_root: false
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,40p' dot_ansible/roles/gui_apps_linux/defaults/main.yml`</summary>
+```
+Chunk ID: 85a1eb
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 98
+Output:
+---
+# gui_apps_linux defaults
+#
+# noRoot mode (no sudo available): system-wide installers are skipped via
+# `--skip-tags sudo`, and this flag switches user-level AppImage fallbacks on
+# for AppImageLauncher Lite. Override per-invocation via
+# `--extra-vars "gui_apps_linux_no_root=true"` (the run_onchange wrapper does
+# this automatically when profile=noRoot).
+gui_apps_linux_no_root: false
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:18:47Z)**_
+
+The defaults file is shorter than expected, so I’m appending the new role variable directly after the existing noRoot flag.
+
+_**Agent (gpt-5.5 2026-06-19 03:18:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/defaults/main.yml`**
+
+```diff
+@@
+ # this automatically when profile=noRoot).
+ gui_apps_linux_no_root: false
++
++# Desktop gaming bundle. Currently installs Steam only. Plumbed from the
++# `installGamingApps` chezmoi prompt on ubuntu_desktop.
++gui_apps_linux_install_gaming_apps: false
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/defaults/main.yml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`**
+
+```diff
+@@
+ {{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+ # Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
+ {{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}
+ if [[ -z "$EXTRA_VARS" ]]; then
+@@
+     EXTRA_VARS="$EXTRA_VARS discord_channel={{ $discordChannel }}"
+ fi
++{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
++{{ if $installGamingApps -}}
++# Gaming apps (gui_apps_linux): currently Steam via Valve apt repo.
++EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_gaming_apps=true"
++{{ end -}}
+ {{ end -}}
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Organizing gaming patch tasks**
+
+I need to focus on installing the Gaming variable outside for clarity. It's crucial to patch the GUI role comments and tasks — I’ll be using apply_patch for that. I also need to insert a Steam block after the Discord flatpak block, but before Zen. I should locate the end of the Discord section first, and after the flatpak rescue, I can insert it just before the Zen header. I’ll make sure to check the exact text as well!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,34p' dot_ansible/roles/gui_apps_linux/tasks/main.yml && sed -n '600,690p' dot_ansible/roles/gui_apps_linux/tasks/main.yml`</summary>
+```
+Chunk ID: 503fde
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1315
+Output:
+---
+# =============================================================================
+# gui_apps_linux — Ubuntu/Debian desktop GUI app installer
+#
+# Handles the "desktop-only" category of apps that aren't in the apt default
+# repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
+# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
+# x86_64-only), Zen Browser (AppImage + .desktop), libfuse2 (AppImage runtime
+# on Ubuntu 22.04+), and a placeholder hook for Antigravity once an official
+# Linux package ships.
+#
+# No-op on:
+#   - macOS  → Brewfile (`cask "alacritty"`, `cask "visual-studio-code"` when
+#              you add them) covers the desktop story. This role emits a
+#              debug note only on Darwin, no install logic runs.
+#   - armhf  → 32-bit ARM has no practical GUI story; cargo builds are slow
+#              and AppImages lack first-class armv7 support.
+#   - noRoot → `--skip-tags sudo` (set by run_onchange) skips every system
+#              apt/deb/PPA task. AppImageLauncher Lite (user-level AppImage)
+#              still runs when `gui_apps_linux_no_root=true` is passed via
+#              `--extra-vars`.
+#
+# Editor user-config overlays (settings.json / keybindings.json) are handled
+# by chezmoi itself, NOT ansible — see `.chezmoitemplates/editor/` and the
+# `modify_settings.json.tmpl` / `create_keybindings.json.tmpl` source files.
+#
+# Adding a new GUI app: read docs/playbooks/linux-gui-apps.md FIRST. It
+# contains the .deb / Snap / Flatpak / AppImage decision tree, the
+# "concrete patterns" you'd copy here, and the inventory table you must
+# also update so the doc stays in sync with this role.
+# =============================================================================
+
+# --- Platform banner ---
+
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Flathub remote is configured (per-user)
+      community.general.flatpak_remote:
+        name: flathub
+        flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
+        method: user
+        state: present
+
+    - name: Install Discord from Flathub (per-user)
+      community.general.flatpak:
+        name: com.discordapp.Discord
+        state: present
+        method: user
+        remote: flathub
+  rescue:
+    - name: Warn Discord Flatpak install failed
+      ansible.builtin.debug:
+        msg: >-
+          Discord Flatpak install failed. Manual fallback —
+          `flatpak install flathub com.discordapp.Discord` from a shell,
+          or set discordChannel=deb in ~/.config/chezmoi/chezmoi.toml to
+          revert to the .deb path.
+
+# =============================================================================
+# Zen Browser — Firefox-based browser, shipped as an AppImage
+#
+# User-level install under ~/Applications/, mirrors the Alacritty pattern for
+# desktop integration (icon + .desktop entry + update-desktop-database) so
+# the app is searchable in GNOME/KDE launchers without needing to run the
+# AppImage once to let AppImageLauncher auto-integrate it.
+#
+# noRoot-friendly: the whole block is user-level, no `become: true`, no
+# `tags: [sudo]`. Works identically in `gui_apps_linux_no_root=true` mode.
+# =============================================================================
+
+- name: Check if Zen AppImage is already installed
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
+  register: zen_appimage_check
+
+- name: Install Zen Browser AppImage + desktop integration
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - target_architecture in ['x86_64', 'aarch64']
+    - not zen_appimage_check.stat.exists
+  block:
+    - name: Ensure ~/Applications exists (Zen)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/Applications"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest Zen Browser release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/zen-browser/desktop/releases/latest
+        return_content: true
+      register: zen_release
+
+    - name: Resolve Zen AppImage asset URL
+      ansible.builtin.set_fact:
+        zen_appimage_url: >-
+          {{ (zen_release.json.assets
+              | selectattr('name', 'match', '^zen-' + target_architecture + '\\.AppImage$')
+              | map(attribute='browser_download_url')
+              | list
+              | first) | default('') }}
+
+    - name: Download Zen AppImage
+      when: zen_appimage_url | length > 0
+      ansible.builtin.get_url:
+        url: "{{ zen_appimage_url }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/Applications/zen.AppImage"
+        mode: '0755'
+        timeout: 300
+      retries: 3
+      delay: 5
+      register: zen_appimage_dl
+
+    - name: Download Zen SVG ico
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Updating apt configuration**
+
+I need to update my settings, considering using a module like `lock_timeout`, but I think that’s not necessary. I'll need to implement `signed_by` with the key and ensure the `deb822_repository` writes the source file if the architecture changes. Also, I should decide whether to remove the old `steam-stable.list` to avoid duplicates. Should I add an `i386` architecture? 
+
+Using `force: true` with `get_url` is likely needed for key rotations, especially for refreshing without needing to upgrade the whole package.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Refining Ansible playbook tasks**
+
+Okay, I’m thinking about whether running the Ansible `get_url` module will cause changes every time. It seems that it only marks as changed if the checksum of the destination differs, even with the `force` option. I need to keep `update_cache` true only when specific changes occur, like changes to `steam_i386_arch` or the `steam_key`. 
+
+It might be simpler to always update the apt cache using a `cache_valid_time` of 3600. For installing `steam-launcher`, I'll ensure the installation conditions reflect noRoot and ARM configurations. Also, I need to make sure all tasks are properly tagged for sudo access.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:24Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Reviewing YAML syntax for repositories**
+
+I'm thinking about how the `deb822_repository` can include a local path for the `signed_by` option. It also needs to specify `architectures` such as `amd64` and `i386`. I need to ensure I’m using the correct YAML syntax—like utilizing single quotes for file modes. This is important to prevent any syntax errors later on, so I need to carefully format this section in my configuration.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:25Z)**_
+
+I’m adding the Steam install block now, including cleanup for common old Steam source-list filenames so apt does not warn about duplicate repo targets.
+
+_**Agent (gpt-5.5 2026-06-19 03:19:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/tasks/main.yml`**
+
+```diff
+@@
+-# repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
+-# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
+-# x86_64-only), Zen Browser (AppImage + .desktop), libfuse2 (AppImage runtime
+-# on Ubuntu 22.04+), and a placeholder hook for Antigravity once an official
+-# Linux package ships.
++# repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
++# (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
++# x86_64-only), Steam (Valve apt repo, optional), Zen Browser (AppImage +
++# .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a placeholder
++# hook for Antigravity once an official Linux package ships.
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:19:52Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/tasks/main.yml`**
+
+```diff
+@@
+   rescue:
+     - name: Warn Discord Flatpak install failed
+       ansible.builtin.debug:
+         msg: >-
+           Discord Flatpak install failed. Manual fallback —
+           `flatpak install flathub com.discordapp.Discord` from a shell,
+           or set discordChannel=deb in ~/.config/chezmoi/chezmoi.toml to
+           revert to the .deb path.
+ 
++# =============================================================================
++# Steam — optional gaming bundle via Valve's official apt repository
++#
++# Gated by the `installGamingApps` chezmoi prompt, plumbed through
++# `gui_apps_linux_install_gaming_apps`. Valve's repo publishes an amd64
++# `steam-launcher` package and an i386 transitional package; adding i386 is
++# required so Steam can resolve its 32-bit runtime libraries. Avoid hard-coding
++# old package names like `libgl1-mesa-glx`, which no longer exists on Ubuntu
++# 24.04 — let apt resolve current dependencies/recommends from the package.
++# =============================================================================
++
++- name: Skip Steam on non-x86_64 Linux
++  when:
++    - ansible_facts['os_family'] == 'Debian'
++    - gui_apps_linux_install_gaming_apps | bool
++    - target_architecture != 'x86_64'
++  ansible.builtin.debug:
++    msg: >-
++      Steam is only installed on x86_64 here. Valve's Ubuntu launcher and
++      game runtime expect amd64/i386 packages; skipping on {{ target_architecture }}.
++
++- name: Skip Steam in noRoot mode
++  when:
++    - ansible_facts['os_family'] == 'Debian'
++    - gui_apps_linux_install_gaming_apps | bool
++    - target_architecture == 'x86_64'
++    - gui_apps_linux_no_root | bool
++  ansible.builtin.debug:
++    msg: >-
++      installGamingApps=true, but Steam requires sudo to add Valve's apt repo,
++      enable i386, and install steam-launcher. Skipping in noRoot mode.
++
++- name: Install Steam via Valve apt repo
++  when:
++    - ansible_facts['os_family'] == 'Debian'
++    - gui_apps_linux_install_gaming_apps | bool
++    - target_architecture == 'x86_64'
++    - not (gui_apps_linux_no_root | bool)
++  block:
++    - name: Check enabled foreign architectures (Steam)
++      ansible.builtin.command: dpkg --print-foreign-architectures
++      register: steam_foreign_arches
++      changed_when: false
++      failed_when: false
++
++    - name: Enable i386 architecture for Steam runtime
++      when: "'i386' not in (steam_foreign_arches.stdout_lines | default([]))"
++      become: true
++      tags: [sudo]
++      ansible.builtin.command: dpkg --add-architecture i386
++
++    - name: Ensure /usr/share/keyrings exists (Steam)
++      become: true
++      tags: [sudo]
++      ansible.builtin.file:
++        path: /usr/share/keyrings
++        state: directory
++        mode: '0755'
++
++    - name: Install Valve Steam apt signing key
++      become: true
++      tags: [sudo]
++      ansible.builtin.get_url:
++        url: https://repo.steampowered.com/steam/archive/stable/steam.gpg
++        dest: /usr/share/keyrings/steam.gpg
++        mode: '0644'
++        force: true
++        timeout: 120
++
++    - name: Remove legacy Steam apt source list files
++      become: true
++      tags: [sudo]
++      ansible.builtin.file:
++        path: "{{ item }}"
++        state: absent
++      loop:
++        - /etc/apt/sources.list.d/steam.list
++        - /etc/apt/sources.list.d/steam-stable.list
++
++    - name: Add Valve Steam apt repository
++      become: true
++      tags: [sudo]
++      ansible.builtin.deb822_repository:
++        name: steam
++        types: deb
++        uris: https://repo.steampowered.com/steam/
++        suites: stable
++        components: steam
++        architectures:
++          - amd64
++          - i386
++        signed_by: /usr/share/keyrings/steam.gpg
++
++    - name: Refresh apt cache (Steam repo)
++      become: true
++      tags: [sudo]
++      ansible.builtin.apt:
++        update_cache: true
++        cache_valid_time: 3600
++
++    - name: Install Steam launcher
++      become: true
++      tags: [sudo]
++      ansible.builtin.apt:
++        name: steam-launcher
++        state: present
++        install_recommends: true
++        update_cache: false
++  rescue:
++    - name: Warn Steam install failed
++      ansible.builtin.debug:
++        msg: >-
++          Steam install failed. Manual fallback: follow Valve's apt repo
++          instructions at https://repo.steampowered.com/steam/ or install the
++          latest launcher package from
++          https://repo.steampowered.com/steam/archive/stable/steam_latest.deb.
++
+ # =============================================================================
+ # Zen Browser — Firefox-based browser, shipped as an AppImage
+ #
+ # User-level install under ~/Applications/, mirrors the Alacritty pattern for
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/gui_apps_linux/tasks/main.yml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:04Z)**_
+
+The Linux role now has the Steam path and the macOS Brewfiles are split by feature. I’m moving to documentation and shell completion updates, including the README prompt table so the generator check passes.
+
+_**Agent (gpt-5.5 2026-06-19 03:20:04Z)**_
+
+<tool-use data-tool-type="task" data-tool-name="update_plan"><details>
+<summary>Tool use: **update_plan**</summary>
+**Agent task list:**
+- [X] Inspect current prompt/Brewfile/gui role surfaces
+- [X] Add installGamingApps prompt and generated surfaces
+- [X] Implement macOS Brewfile and Linux Steam ansible path
+- [⚡] Update docs and completions
+- [ ] Run focused validation
+
+```
+Plan updated
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '130,160p' README.md && sed -n '288,308p' README.md`</summary>
+```
+Chunk ID: 9dfc7c
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2350
+Output:
+- On `noRoot=true` installs, login shell isn't changed — run `exec zsh` / `exec bash` per session, or ask your sysadmin: `sudo chsh -s "$(command -v zsh)" $USER` (or `bash`).
+- Open a new shell after install so PATH changes take effect. Both `~/.bashrc` and `~/.zshrc` are deployed regardless of `primaryShell` choice, so the other shell still works ad-hoc.
+
+### Optional Components
+
+During `chezmoi init`, you'll be prompted for optional installs. The prompts
+themselves are defined once in [`scripts/init/dotfiles_init.py`](scripts/init/dotfiles_init.py)
+(`PROMPTS`) and generated into `.chezmoi.toml.tmpl` + `Dockerfile`; this table
+is coverage-checked against that list by `dotfiles_init.py gen --check`.
+
+<!-- dotfiles-init:prompts (coverage-checked by scripts/init/dotfiles_init.py gen --check) -->
+| Option | Default | Description |
+|--------|---------|-------------|
+| `installCodingAgents` | true | Claude Code, Codex CLI, OpenCode, Cursor, Copilot, Gemini CLI, Antigravity CLI (`agy`), RTK, td, sidecar, specify-cli, etc. |
+| `installBitwarden` | false | Bitwarden CLI (`bw`) + Desktop app (desktop profiles) with SSH agent auto-detection |
+| `installPythonUvTools` | true | Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.) |
+| `installJsCliTools` | true | Standalone JS/npm CLI utilities (readability-cli for terminal web reader, etc.) |
+| `installLlmTools` | false | Local LLM tools: Ollama, LiteLLM, llmfit, models |
+| `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`). macOS only. |
+| `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+| `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+| `discordChannel` | `flatpak` | Discord install channel on `ubuntu_desktop`: `flatpak` (recommended), `deb`, or `none`. macOS uses the Brewfile cask; servers skip. |
+| `installNiri` | false | [niri](https://github.com/niri-wm/niri) scrollable-tiling Wayland compositor, built from source (`ubuntu_desktop` only). Installs the binary + GDM session/systemd files; NVIDIA gets a VRAM application-profile automatically. See [docs/playbooks/niri.md](docs/playbooks/niri.md). |
+| `installNetworkingTools` | false | Networking CLI tools (nmap, mtr, httpie, gping, trippy, bandwhich, rustscan, etc.) |
+| `installTunnelTools` | false | Tunnel tools (ngrok, cloudflared) — expose localhost / SSH reverse tunnels |
+| `installIacTools` | false | Infrastructure-as-Code CLIs (Azure CLI, Terraform, OpenTofu) |
+| `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
+| `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
+| `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby; ~1.8GB) + their cargo/gem tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
+| `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
+| `installHomelabTools` | false | Homelab hardware-monitoring CLIs (lm-sensors, smartmontools, ipmitool, nvme-cli, storcli) + `hw-*` shell helpers, each gated on detected hardware. Linux only; no-op in VMs. See [docs/sysadmin/hardware.md](docs/sysadmin/hardware.md). |
+- **Networking tools** (optional): nmap, arp-scan, mtr, iperf3, doggo, httpie, gping, trippy, bandwhich, speedtest, rustscan
+- **Linux audit framework** (optional, Linux only, `installAuditd=true`): [`auditd`](docs/sysadmin/auditd.md) + baseline rule set (identity / sudoers / sshd_config / privileged-exec watches), plus `audit-*` shell helpers and `tv sessions` / `tv sudo-history` / `tv audit-events` Television channels for the routine "who did what on this server" queries. Full guide: [docs/sysadmin/](docs/sysadmin/README.md); ansible role: [docs/playbooks/auditd.md](docs/playbooks/auditd.md)
+- **Homelab hardware monitoring** (optional, Linux/physical only, `installHomelabTools=true`): hardware-monitoring CLIs ([lm-sensors, smartmontools, ipmitool, nvme-cli, storcli](docs/sysadmin/hardware.md)) installed only when the matching hardware is detected, plus the `hw-*` shell helper family (`hw-fans`, `hw-temps`, `hw-raid`, `hw-smart`, `hw-status` …) for the "is this server's hardware healthy?" sweep. Full guide: [
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '20,90p' docs/this_repo/tool-managers.md && sed -n '158,188p' docs/this_repo/tool-managers.md && sed -n '232,248p' docs/this_repo/tool-managers.md && sed -n '808,852p' docs/this_repo/tool-managers.md && sed -n '1048,1068p' docs/this_repo/tool-managers.md`</summary>
+```
+Chunk ID: e3e566
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 4227
+Output:
+> guards; nothing in `chezmoi apply` silently bumps a tool's version. The
+> only thing that intentionally moves tools forward is
+> `scripts/upgrade_tools.sh` (via `just upgrade-*`).
+
+---
+
+## TL;DR — manager landscape
+
+| Manager | Owns | Where listed | Upgrade category |
+|---|---|---|---|
+| **Bootstrap** (`run_once_before_*.sh.tmpl`) | Homebrew itself, uv, mise, ansible-core, apt prereqs | `run_once_before_00_bootstrap.sh.tmpl` | n/a (one-shot, idempotent) |
+| **Homebrew formulae** | macOS-shared CLI (`tailscale`, `mas`) + role-driven (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
+| **Homebrew casks** | macOS GUI apps (~25 entries; gated by `installAiDesktopApps` for AI ones) | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
+| **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release) |
+| **mise** | Runtime versions: `node`, `bun`, `rust`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
+| **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
+| **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
+| **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
+| **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
+| **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
+| **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
+| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory/codexbar | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
+| **chezmoi externals** | git checkouts on weekly refresh: oh-my-zsh + plugins, oh-my-bash, ble.sh, TPM, fzf (Linux), toolkami.rb | `.chezmoiexternal.toml.tmpl` | `externals` (`chezmoi apply --refresh-externals`) |
+| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
+| **flatpak** | Discord (default channel on Linux) | `gui_apps_linux/tasks/main.yml` | `flatpak` (`flatpak update -y`) |
+
+---
+
+## Install order
+
+Five phases in chronological order. Anything earlier MUST be present
+before the next phase can run.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Phase 0 — Bootstrap (run_once_before_*)                                 │
+│   curl-installer: Homebrew, uv, mise                                    │
+│   apt: build-essential, git, curl (Linux prereqs for Linuxbrew)         │
+│   apt: libffi-dev, libyaml-dev, python3-dev (Linux non-noRoot only)     │
+│   uv: ansible-core (pinned Python 3.13)                                 │
+│   ansible-galaxy: community.general collection                          │
+│   mise: install runtimes from ~/.config/mise/config.toml                │
+└─────────────────────────────────────────────────────────────────�
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,80p' docs/this_repo/upgrades.md && sed -n '112,132p' docs/this_repo/upgrades.md`</summary>
+```
+Chunk ID: 3ce443
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 2456
+Output:
+# Upgrades — Explicit, Opt-in Tool Refresh
+
+> How to actually move installed tools forward on a machine managed by this repo, and why `chezmoi apply` deliberately will *not* do that for you.
+
+> **See also**: [`tool-managers.md`](tool-managers.md) — the install-side companion to this doc. It maps every tool in the repo to its install mechanism (which manager owns it, where it lands, per-OS dispatch). When you're trying to figure out "why doesn't `just upgrade-X` move tool Y forward?", that's where the coverage gaps are documented.
+
+## Why install and upgrade are split
+
+`chezmoi apply` (and the ansible phase it triggers) is **install-only by design**. Ansible roles use `state: present` + `creates:` so that running `chezmoi apply` on a running box is idempotent and never silently bumps every tool to whatever happens to be latest that day. This matters because:
+
+- **Predictability** — rerunning apply after editing one role file shouldn't ripple-upgrade unrelated tools.
+- **Offline / flaky network** — install-only can be satisfied by what's already on disk; `--upgrade` workflows always hit the network.
+- **Review friction** — you *want* to see "chezmoi says 10 casks would move; proceed?" as a separate decision from "apply my dotfile changes".
+
+The explicit upgrade path lives in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh), exposed via `just upgrade-*` recipes in [`justfile`](../../justfile). It is the **only** thing that intentionally moves tools forward on this repo's flow.
+
+Two side-effects worth knowing about:
+
+- `.chezmoiexternal.toml.tmpl` entries have `refreshPeriod = "168h"` — chezmoi itself will re-fetch those weekly on apply. That's a bounded "nudge", not an upgrade mechanism for installed binaries.
+- Homebrew casks that carry a `homebrew_cask` entry with `state: present` freeze to that version until a Brewfile hash change forces a re-bundle with `--no-upgrade`. Still install-only; `upgrade-brew` is what actually bumps them.
+
+## Entry points
+
+```bash
+just upgrade-all          # externals → brew → mise → uv → npm → cargo → dotnet → gem → flatpak → warp → agents → plugins
+just upgrade-dry-run      # same, but commands are printed, not executed
+just upgrade-<category>   # run one category in isolation
+```
+
+Or use the script directly when you want the flags:
+
+```bash
+./scripts/upgrade_tools.sh                           # same as 'all'
+./scripts/upgrade_tools.sh brew uv                   # two categories
+./scripts/upgrade_tools.sh --only brew,mise          # same, via --only
+./scripts/upgrade_tools.sh --skip agents,plugins     # all, minus those
+./scripts/upgrade_tools.sh --dry-run all             # preview
+./scripts/upgrade_tools.sh --help
+```
+
+The script runs categories in the canonical `ALL_CATEGORIES` order regardless of CLI arg order — dependencies between categories are real (see [§ Run order](#run-order)).
+
+## Category matrix
+
+| Category | What actually happens |
+| --- | --- |
+| `externals` | `chezmoi upgrade` (the chezmoi binary itself) + `chezmoi apply --refresh-externals` (force-refresh the 168h externals: oh-my-zsh, TPM, toolkami.rb, fzf). First because a chezmoi version bump may change how later steps behave. |
+| `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile` *without* `--no-upgrade` → `Brewfile.{darwin,linux}` → `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) so cask pkg installers that shell out to `sudo /usr/sbin/installer` find a live ticket. |
+| `mise` | `mise self-update --yes` + `mise upgrade` (honours the version constraints in `~/.config/mise/config.toml`). `self-update` warns, rather than fails, when mise was installed via brew/apt. |
+| `uv` | Detects install style by binary path (Homebrew vs curl-installer) and dispatches to the right channel: `brew upgrade uv` for Homebrew/Linuxbrew installs, `uv self update` for the standalone curl installer. Then `uv tool upgrade --all`. Covers every tool listed in [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) and [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml). The `python_uv_tools` ansible role does the same dispatch automatically when uv is below `min_uv_version` — see [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md). |
+| `npm` | `npm -g update`, falling back to `mise exec -- npm -g update` when `npm` is not directly on PATH (same detection as [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml)). |
+| `cargo` | If absent, bootstraps the `cargo-update` crate, then `cargo install-update -a`. Covers pueue (Linux) plus any future entries in [`rust_cargo_tools/de
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '213,236p' docs/this_repo/architecture.md`</summary>
+```
+Chunk ID: aa940a
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 426
+Output:
+## Brewfile (GUI apps, opt-in)
+
+GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps are a separate opt-in via `installAiDesktopApps = true`.
+
+```
+~/.config/homebrew/
+├── Brewfile          # Shared: taps, CLI formulas, mas
+├── Brewfile.darwin   # macOS: casks (GUI apps), mas entries
+└── Brewfile.linux    # Linux: linuxbrew-specific (minimal)
+```
+
+```bash
+chezmoi edit ~/.config/homebrew/Brewfile.darwin       # Edit
+brew bundle --file=~/.config/homebrew/Brewfile        # Apply manually
+brew bundle check --file=~/.config/homebrew/Brewfile.darwin  # Check
+chezmoi apply                                         # Or trigger via run_onchange
+```
+
+**Categories (darwin)**: terminals & editors (alacritty, iterm2, warp, cmux, cursor, vscode), AI & coding (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installAiDesktopApps` + `installLlmTools`), system utilities (aerospace, alt-tab, raycast, jordanbaird-ice), communication (discord, telegram, wechat, tencent-meeting), browsers (arc, google-chrome, tor-browser), productivity (obsidian, google-drive, grammarly-desktop), gaming (steam, minecraft, battle-net — skipped if `WORK_MACHINE` env set), finance (binance, tradingview), network (tailscale, openvpn-connect, clash-verge-rev), Mac App Store (LINE, Keynote, Numbers, Pages).
+
+**Conditional sections** (Brewfiles are chezmoi templates):
+
+- Gaming apps: skipped if `WORK_MACHINE` is set.
+- Chinese apps (baidunetdisk): only included if `useChineseMirror` is true.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '10,25p' dot_config/zsh/tools/51_dotcfg_completion.zsh && sed -n '13,22p' dot_config/bash/51_dotcfg_completion.bash`</summary>
+```
+Chunk ID: af2299
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 286
+Output:
+(( $+commands[dotcfg] )) || return 0
+
+_dotcfg_keys=(
+    profile email name
+    installCodingAgents installLlmTools installAiDesktopApps
+    installPythonUvTools installJsCliTools installDotnetTools installAuditd
+    installIacTools installMediaTools installBitwarden installBrewApps
+    installInputMethod discordChannel installNetworkingTools installTunnelTools
+    useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot
+    motdStyle primaryShell enableVimMode
+)
+
+_dotcfg() {
+    local cur="${words[CURRENT]}"
+    if [[ "$cur" == -* ]]; then
+        compadd -- --set --yes --dry-run --no-apply --help
+    local flags="--set --yes --dry-run --no-apply --help"
+    local keys="profile email name \
+installCodingAgents installLlmTools installAiDesktopApps \
+installPythonUvTools installJsCliTools installDotnetTools installAuditd \
+installIacTools installMediaTools installBitwarden installBrewApps \
+installInputMethod discordChannel installNetworkingTools installTunnelTools \
+useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot \
+motdStyle primaryShell enableVimMode"
+
+    if [[ "$cur" == -* ]]; then
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:29Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Fixing output sequence**
+
+I think the current parallel output is a bit quirky, but it seems good enough overall. I need to work on patching some completions. Specifically, I’ve noticed that I should add the "installGamingApps" step right after "installBrewApps." I’m curious if this will smooth out the process and make it more efficient! Let’s see how it all fits together once I make this adjustment.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:29Z)**_
+
+I’m updating `dotcfg --set` completions so the new prompt is discoverable in both shells.
+
+_**Agent (gpt-5.5 2026-06-19 03:20:31Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/51_dotcfg_completion.zsh`**
+
+```diff
+@@
+     installCodingAgents installLlmTools installAiDesktopApps
+     installPythonUvTools installJsCliTools installDotnetTools installAuditd
+     installIacTools installMediaTools installBitwarden installBrewApps
+-    installInputMethod discordChannel installNetworkingTools installTunnelTools
++    installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools
+     useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot
+     motdStyle primaryShell enableVimMode
+ )
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_config/zsh/tools/51_dotcfg_completion.zsh
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/dot_config/bash/51_dotcfg_completion.bash`**
+
+```diff
+@@
+ installCodingAgents installLlmTools installAiDesktopApps \
+ installPythonUvTools installJsCliTools installDotnetTools installAuditd \
+ installIacTools installMediaTools installBitwarden installBrewApps \
+-installInputMethod discordChannel installNetworkingTools installTunnelTools \
++installGamingApps installInputMethod discordChannel installNetworkingTools installTunnelTools \
+ useChineseMirror gitleaksAllRepos backupMode allowPartialFailure noRoot \
+ motdStyle primaryShell enableVimMode"
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/dot_config/bash/51_dotcfg_completion.bash
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:20:40Z)**_
+
+I’m updating the user-facing README next: prompt table coverage, macOS GUI description, and Linux GUI inventory summary.
+
+_**Agent (gpt-5.5 2026-06-19 03:20:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/README.md`**
+
+```diff
+@@
+-4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` is enabled)
++4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` / `installGamingApps` is enabled)
+@@
+ | `installAiDesktopApps` | false | macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode Desktop, Antigravity, Codex Desktop on Apple Silicon; `ollama-app` also requires `installLlmTools=true`). macOS only. |
+ | `installBrewApps` | false | General GUI apps via Homebrew Brewfile (terminals, browsers, utilities, mas; excludes AI desktop apps). Desktop profiles only (`macos`/`ubuntu_desktop`). |
++| `installGamingApps` | false | Gaming apps, currently Steam only. macOS uses Homebrew Cask; `ubuntu_desktop` uses Valve's official apt repo / `steam-launcher`. Desktop profiles only. |
+ | `installInputMethod` | false | Traditional Chinese input methods (McBopomofo, RIME/Squirrel on macOS; ibus-rime on Linux). Desktop profiles only (`macos`/`ubuntu_desktop`). |
+@@
+-- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
++- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale Desktop via Homebrew Cask; Tailscale CLI via `brew "tailscale"` in shared Brewfile when `installBrewApps=true`.
+@@
+-- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), Discord (`.deb`, x86_64-only — aarch64 gets a Flatpak hint), Zen Browser (AppImage + `.desktop` entry for launcher search), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl) (Arc + Discord casks there). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
++- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [`gui_apps_linux`](dot_ansible/roles/gui_apps_linux/tasks/main.yml) bundles Alacritty (cargo), AppImageLauncher (PPA with `.deb` fallback, Lite variant for noRoot), VSCode (Microsoft apt repo), Cursor (`.deb`), Discord (Flatpak default or `.deb`), optional Steam via Valve apt repo when `installGamingApps=true`, Zen Browser (AppImage + `.desktop` entry for launcher search), and `libfuse2` for AppImage compatibility. macOS equivalents ship via [`Brewfile.darwin.tmpl`](dot_config/homebrew/Brewfile.darwin.tmpl) (Arc + Discord + optional Steam casks there). See [docs/tools/appimage.md](docs/tools/appimage.md) for AppImageLauncher install paths, `ail-cli` usage, and Ubuntu 24.04 AppArmor gotchas.
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/README.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:21:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Updating documentation for Linux GUI**
+
+I need to include documentation for the Linux GUI, and I’m thinking of adding a row for Steam. It might also be good to add a section about the Valve apt repository right after the Discord info or the .deb auto section. Adding a brief note about “Steam via Valve apt repo” sounds useful. Also, I'll think about updating the decision tree for adding new GUI, but maybe it needs a patch first.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:21:05Z)**_
+
+I’m adding Steam to the Linux GUI playbook inventory and documenting the specific apt/i386 behavior so future GUI app additions don’t confuse it with Discord’s Flatpak path.
+
+_**Agent (gpt-5.5 2026-06-19 03:21:15Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/playbooks/linux-gui-apps.md`**
+
+```diff
+@@
+ | **VSCode** | `.deb` (auto-adds `vscode.sources`) | ✅ `apt upgrade code` | same role | `/usr/share/code/` |
+ | **Discord** | `flatpak` (default, recommended) OR `.deb` (no apt source) — picked by `discordChannel` chezmoi prompt | ✅ via `flatpak update` (default) / ❌ manual on `.deb` | same role | `~/.local/share/flatpak/app/com.discordapp.Discord/` (flatpak) or `/usr/share/discord/` (.deb) |
++| **Steam** | Valve apt repo (`steam-launcher`), gated by `installGamingApps=true` and x86_64 | ✅ via apt for launcher/runtime packages; Steam client self-updates on launch | same role | `/usr/lib/steam/` + `/usr/share/applications/steam.desktop` |
+ | **Zen Browser** | AppImage at `~/Applications/zen.AppImage` (stable filename, no version suffix) | ❌ — re-run ansible task | same role | `~/Applications/zen.AppImage` |
+ | **Alacritty** | `cargo install alacritty` | ❌ — `just upgrade-cargo` | [`devtools` role](../../dot_ansible/roles/devtools/tasks/main.yml) | `~/.cargo/bin/alacritty` |
+@@
+ To switch from `.deb` to `flatpak` on an existing machine: set
+ `discordChannel = "flatpak"` in `~/.config/chezmoi/chezmoi.toml` and run
+ `chezmoi apply --tags gui_apps`. The two installs can coexist briefly
+ (different `.desktop` entries); once you've validated the Flatpak version,
+ `sudo apt remove discord` to clean up the old `.deb`.
++
++## Steam — why this uses Valve's apt repo, not Flatpak/Snap
++
++Steam is gated by `installGamingApps=true` and currently only installed on
++x86_64 Ubuntu Desktop. Valve publishes an official apt repository at
++`https://repo.steampowered.com/steam/`; the role installs its signing key
++from `archive/stable/steam.gpg`, enables `i386`, adds the repo as deb822,
++and installs `steam-launcher`.
++
++The `i386` architecture is intentional: Steam still needs 32-bit runtime
++libraries for parts of the launcher and many games. Do not hard-code old
++Mesa package names from older guides (for example `libgl1-mesa-glx`) in the
++role; Ubuntu 24.04 no longer ships that package. Let `steam-launcher` pull
++the current dependencies and recommends.
++
++Flathub's `com.valvesoftware.Steam` exists, but it is a community package
++and explicitly not Valve's supported path. It also needs extra filesystem
++overrides for libraries on non-default drives. If this repo ever adds a
++`steamChannel` prompt, keep Valve apt as the default.
+ 
+ ## Snap (Ubuntu App Center) — what's actually happening
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/playbooks/linux-gui-apps.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:21:23Z)**_
+
+I’m updating the install-side catalog to reflect the new manager ownership: macOS Steam belongs to Brewfile casks, Linux Steam belongs to the GUI Ansible role via apt.
+
+_**Agent (gpt-5.5 2026-06-19 03:21:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md`**
+
+```diff
+@@
+-| **Homebrew casks** | macOS GUI apps (~25 entries; gated by `installAiDesktopApps` for AI ones) | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
++| **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
+@@
+-| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
++| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
+@@
+-│   Mostly GUI casks (macOS); skipped if installBrewApps=false            │
++│   Mostly GUI casks (macOS); skipped unless Brew/AI/gaming apps enabled  │
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:21:48Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md`**
+
+```diff
+@@
+-| `Brewfile.tmpl` (shared) | Taps: `nikitabobko/tap`. Formulae (macOS-only via inner `{{ if eq .chezmoi.os "darwin" }}`): `mas`, `tailscale` |
++| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formulae `mas`, `tailscale` |
+ | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
+ | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
+@@
+-| `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | always |
++| `alacritty`, `warp`, `cmux`, `cursor`, `visual-studio-code` | `installBrewApps` |
+ | `claude`, `opencode-desktop`, `antigravity` | `installAiDesktopApps` |
+ | `chatgpt`, `codex-app` | `installAiDesktopApps` + arm64 |
+ | `codeisland` (tap `wxtsky/tap`) | `installAiDesktopApps` |
+ | `ollama-app` | `installAiDesktopApps` + `installLlmTools` |
+-| `nikitabobko/tap/aerospace`, `alt-tab`, `raycast`, `maccy`, `scroll-reverser`, `the-unarchiver`, `applite` | always (system utilities) |
+-| `discord` | always |
+-| `arc` | always |
+-| `obsidian`, `google-drive`, `grammarly-desktop`, `super-productivity` | always |
+-| `spotify`, `anki` | always |
+-| `tailscale-app` | always |
+-| `dbeaver-community` | always |
+-| `superset` | arm64 only |
++| `steam` | `installGamingApps` |
++| `nikitabobko/tap/aerospace`, `alt-tab`, `raycast`, `maccy`, `scroll-reverser`, `the-unarchiver`, `applite` | `installBrewApps` |
++| `discord` | `installBrewApps` |
++| `arc` | `installBrewApps` |
++| `obsidian`, `google-drive`, `grammarly-desktop`, `super-productivity` | `installBrewApps` |
++| `spotify`, `anki` | `installBrewApps` |
++| `tailscale-app` | `installBrewApps` |
++| `dbeaver-community` | `installBrewApps` |
++| `superset` | `installBrewApps` + arm64 |
+ 
+-Many more entries exist in commented-out form (steam, telegram,
++Many more entries exist in commented-out form (minecraft, telegram,
+ openvpn-connect, etc.) — uncomment to enable.
+@@
+ `installBrewApps`, `installAiDesktopApps`, `installCodingAgents`,
+ `installLlmTools`, `installPythonUvTools`, `installJsCliTools`,
+ `installDotnetTools`, `installIacTools`, `installMediaTools`,
+ `installNetworkingTools`, `installTunnelTools`, `installBitwarden`,
+-`installInputMethod`, `installAuditd`. Roles gate themselves on the
++`installGamingApps`, `installInputMethod`, `installAuditd`. Roles gate themselves on the
+ matching flag; the bundle script `scripts/init/dotfiles_init.py` defines
+ profile presets (`minimal`, `cloud-vm` planned, default-developer, …).
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:21:51Z)**_
+
+I’m adding Steam to the multi-mechanism rationale and A-Z index so `tool-managers.md` stays useful as a lookup table.
+
+_**Agent (gpt-5.5 2026-06-19 03:21:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md`**
+
+```diff
+@@
+ | **tmux** | macOS: brew; Linux: apt → `nelsonenzo/tmux-appimage` when system < 3.3 | `display-menu` popup requires 3.3+ — see AGENTS.md tmux hard invariant |
+ | **Discord** | macOS: brew cask; Linux: flatpak (default) or `.deb` via `discordChannel` chooser | apt has no Discord; flatpak is sandboxed-and-current, `.deb` is for users who hate flatpak |
++| **Steam** | macOS: brew cask gated by `installGamingApps`; Linux: Valve apt repo + `steam-launcher` gated by `installGamingApps` | Valve's apt repo is the supported Linux path; Flathub exists but is community-packaged |
+ | **just**, **starship**, **zoxide**, **direnv** | macOS: brew; Linux: vendor curl-installer | Linux distro packages are too stale for these fast-moving tools |
+@@
+ | **spotify** | brew cask | n/a | Brewfile.darwin |
+ | **sqlit-tui[ssh]** | uv tool | uv tool | python_uv_tools |
+ | **starship** | brew | curl `starship.rs/install.sh` | starship |
++| **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
+ | **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:22:06Z)**_
+
+I’m adding the upgrade-side note now: macOS Steam follows `upgrade-brew`; Linux Steam deliberately remains outside `upgrade_tools.sh` because it is apt-managed plus client self-update.
+
+_**Agent (gpt-5.5 2026-06-19 03:22:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/upgrades.md`**
+
+```diff
+@@
+ | `brew` | `brew update` → `brew upgrade` → `brew upgrade --cask --greedy` → `brew bundle --file=~/.config/homebrew/Brewfile` *without* `--no-upgrade` → `Brewfile.{darwin,linux}` → `brew cleanup`. macOS pre-warms the shared sudo session via [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) so cask pkg installers that shell out to `sudo /usr/sbin/installer` find a live ticket. |
+@@
+ - **No `apt upgrade` / system package bumps.** Keeps the default scope sudo-light and noise-free. Run `sudo apt upgrade && sudo apt autoremove` manually if you want that.
++- **No Linux Steam upgrade category.** The Ubuntu Desktop Steam launcher/runtime packages are apt-managed through Valve's repo, so they move with your normal system apt upgrade cadence; the Steam client itself self-updates on launch. macOS Steam is a Homebrew cask and is covered by `just upgrade-brew`.
+ - **No daemon restart** for LiteLLM / Ollama / pueued / anything `systemd`-managed. We only refresh the binaries; restarting is your call.
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/upgrades.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:22:16Z)**_
+
+There’s one architecture doc section that still described the old `WORK_MACHINE` gaming comment; I’m aligning it with the new prompt-based split.
+
+_**Agent (gpt-5.5 2026-06-19 03:22:27Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/architecture.md`**
+
+```diff
+@@
+-GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps are a separate opt-in via `installAiDesktopApps = true`.
++GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps and gaming apps are separate opt-ins via `installAiDesktopApps = true` and `installGamingApps = true`.
+@@
+-**Categories (darwin)**: terminals & editors (alacritty, iterm2, warp, cmux, cursor, vscode), AI & coding (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installAiDesktopApps` + `installLlmTools`), system utilities (aerospace, alt-tab, raycast, jordanbaird-ice), communication (discord, telegram, wechat, tencent-meeting), browsers (arc, google-chrome, tor-browser), productivity (obsidian, google-drive, grammarly-desktop), gaming (steam, minecraft, battle-net — skipped if `WORK_MACHINE` env set), finance (binance, tradingview), network (tailscale, openvpn-connect, clash-verge-rev), Mac App Store (LINE, Keynote, Numbers, Pages).
++**Categories (darwin)**: general GUI apps gated by `installBrewApps` (terminals/editors, system utilities, communication, browsers, productivity, media, network, developer tools), AI & coding gated by `installAiDesktopApps` (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installLlmTools`), and gaming gated by `installGamingApps` (Steam).
+ 
+ **Conditional sections** (Brewfiles are chezmoi templates):
+ 
+-- Gaming apps: skipped if `WORK_MACHINE` is set.
++- General GUI apps: only included if `installBrewApps` is true.
++- AI desktop apps: only included if `installAiDesktopApps` is true.
++- Gaming apps: only included if `installGamingApps` is true.
+ - Chinese apps (baidunetdisk): only included if `useChineseMirror` is true.
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/architecture.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:22:33Z)**_
+
+I’m cleaning up a couple of stale prompt-count and Homebrew descriptions while I’m in the docs, so the new option doesn’t leave misleading side notes behind.
+
+_**Agent (gpt-5.5 2026-06-19 03:22:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py`**
+
+```diff
+@@
+-The existing `.chezmoi.toml.tmpl` defines ~19 prompts (profile, email, name,
+-16 feature flags). `chezmoi init` asks them sequentially, which works but
++The existing `.chezmoi.toml.tmpl` defines the prompt set (profile, email,
++name, feature flags, and preferences). `chezmoi init` asks them sequentially, which works but
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:22:39Z)**_
+
+Because I edited the prompt SSOT comment after generating, I’ll rerun the prompt generator after finishing the manual docs so the generated surfaces stay current.
+
+_**Agent (gpt-5.5 2026-06-19 03:22:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/scripts/init/README.md`**
+
+```diff
+@@
+-`.chezmoi.toml.tmpl` in this repo defines ~19 prompts (`profile`, `email`,
+-`name`, plus 16 `installX` / preference flags). Running `chezmoi init`
+-walks you through them one-by-one. This wrapper groups them into a
++`.chezmoi.toml.tmpl` in this repo defines the bootstrap prompts (`profile`,
++`email`, `name`, plus `installX` / preference flags). Running `chezmoi init`
++walks you through them one-by-one. This wrapper groups them into a
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/scripts/init/README.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:22:49Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md`**
+
+```diff
+@@
+-| **Homebrew formulae** | macOS-shared CLI (`tailscale`, `mas`) + role-driven (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
++| **Homebrew formulae** | General macOS GUI helpers (`tailscale`, `mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:01Z)**_
+
+I’m making the bundle behavior explicit for non-personal/minimal bundles: none of them turns gaming on, and work/cloud/minimal will keep it off when used as an override set.
+
+_**Agent (gpt-5.5 2026-06-19 03:23:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py`**
+
+```diff
+@@
+         "installJsCliTools": True,
+         "installExtraRuntimes": True,
+         "installBrewApps": True,
++        "installGamingApps": False,
+         "backupMode": "smart",
+-        # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden
++        # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden, installGamingApps
+     },
+@@
+         "installNetworkingTools": True,
+         "installAuditd": True,
+         "installHomelabTools": True,
++        "installGamingApps": False,
+         "backupMode": "smart",
+         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
+@@
+         "installIacTools": False,
+         "installBitwarden": False,
+         "installNetworkingTools": False,
+         "installMediaTools": False,
++        "installGamingApps": False,
+         "installAuditd": False,
+         "installHomelabTools": False,
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:13Z)**_
+
+I’m regenerating the prompt-derived files again now that the bundle table changed.
+
+_**Agent (gpt-5.5 2026-06-19 03:23:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just gen-prompts`</summary>
+```
+Chunk ID: a6dd32
+Wall time: 0.0135 seconds
+Process exited with code 0
+Original token count: 35
+Output:
+uv run --script scripts/init/dotfiles_init.py gen --source . 
+wrote .chezmoi.toml.tmpl
+wrote Dockerfile
+README prompt-table coverage OK.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:27Z)**_
+
+The generator now reports README prompt coverage OK. I’ll do a focused static pass over the touched templates before running the heavier checks.
+
+_**Agent (gpt-5.5 2026-06-19 03:23:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "installGamingApps|steam|Steam|gui_apps_linux_install_gaming_apps|Install gaming" .chezmoi.toml.tmpl Dockerfile scripts/init/dotfiles_init.py .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl dot_config/homebrew/Brewfile.tmpl dot_config/homebrew/Brewfile.darwin.tmpl dot_ansible/roles/gui_apps_linux dot_config/zsh/tools/51_dotcfg_completion.zsh dot_config/bash/51_dotcfg_completion.bash README.md docs/playbooks/linux-gui-apps.md docs/this_repo/tool-managers.md docs/this_repo/upgrades.md docs/this_repo/architecture.md`</summary>
+```
+Chunk ID: ac8345
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 3173
+Output:
+scripts/init/dotfiles_init.py:308:    Prompt("installGamingApps", "bool", "System & apps",
+scripts/init/dotfiles_init.py:310:           "Steam for desktop profiles: Homebrew cask on macOS, Valve apt repo on Ubuntu Desktop.",
+scripts/init/dotfiles_init.py:313:           prompt_text="Install gaming apps (Steam)",
+scripts/init/dotfiles_init.py:314:           comment=("是否安裝遊戲相關桌面應用（目前先裝 Steam）。Desktop-class only（macos /\n"
+scripts/init/dotfiles_init.py:316:                    "steam-launcher。headless server 直接 false。")),
+scripts/init/dotfiles_init.py:463:        "installGamingApps": False,
+scripts/init/dotfiles_init.py:465:        # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden, installGamingApps
+scripts/init/dotfiles_init.py:475:        "installGamingApps": False,
+scripts/init/dotfiles_init.py:496:        "installGamingApps": False,
+scripts/init/dotfiles_init.py:516:        "installGamingApps": False,
+Dockerfile:165:    --promptBool "Install gaming apps (Steam)=${CHEZMOI_INSTALL_GAMING_APPS}" \
+docs/this_repo/architecture.md:215:GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps and gaming apps are separate opt-ins via `installAiDesktopApps = true` and `installGamingApps = true`.
+docs/this_repo/architecture.md:231:**Categories (darwin)**: general GUI apps gated by `installBrewApps` (terminals/editors, system utilities, communication, browsers, productivity, media, network, developer tools), AI & coding gated by `installAiDesktopApps` (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installLlmTools`), and gaming gated by `installGamingApps` (Steam).
+docs/this_repo/architecture.md:237:- Gaming apps: only included if `installGamingApps` is true.
+docs/this_repo/upgrades.md:132:- **No Linux Steam upgrade category.** The Ubuntu Desktop Steam launcher/runtime packages are apt-managed through Valve's repo, so they move with your normal system apt upgrade cadence; the Steam client itself self-updates on launch. macOS Steam is a Homebrew cask and is covered by `just upgrade-brew`.
+.chezmoi.toml.tmpl:85:# 是否安裝遊戲相關桌面應用（目前先裝 Steam）。Desktop-class only（macos /
+.chezmoi.toml.tmpl:87:# steam-launcher。headless server 直接 false。
+.chezmoi.toml.tmpl:89:installGamingApps = {{ promptBoolOnce . "installGamingApps" "Install gaming apps (Steam)" false }}
+.chezmoi.toml.tmpl:91:installGamingApps = false
+docs/this_repo/tool-managers.md:32:| **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
+docs/this_repo/tool-managers.md:43:| **apt** / **yum** | Distro packages (build deps, ffmpeg, audit, fontconfig, libnotify-bin, system git/zsh/bash, Steam launcher/runtime, …) | scattered `ansible.builtin.apt:` / `ansible.builtin.yum:` in roles | **none** (relies on `apt upgrade` outside this repo) |
+docs/this_repo/tool-managers.md:175:| `steam` | `installGamingApps` |
+docs/this_repo/tool-managers.md:246:`installGamingApps`, `installInputMethod`, `installAuditd`. Roles gate themselves on the
+docs/this_repo/tool-managers.md:823:| **Steam** | macOS: brew cask gated by `installGamingApps`; Linux: Valve apt repo + `steam-launcher` gated by `installGamingApps` | Valve's apt repo is the supported Linux path; Flathub exists but is community-packaged |
+docs/this_repo/tool-managers.md:1057:| **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
+README.md:97:4. Runs brew bundle (if `installBrewApps` is enabled, or on macOS if `installAiDesktopApps` / `installGamingApps` is enabled)
+README.md:150:| `installGamingApps` | false | Gaming apps, currently Steam only. macOS uses Homebrew Cask; `ubuntu_desktop` uses Valve's official apt repo / `steam-launcher`. Desktop profiles only. |
+README.md:296:- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale Desktop via Homebrew Cask; Tailscale CLI via `brew "tailscale"` in shared Brewfile when `installBrewApps=true`.
+README.md:305:- **GUI Apps on Linux** (`gui_apps` tag on `ubuntu_desktop`): [
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,155p' dot_config/homebrew/Brewfile.darwin.tmpl`</summary>
+```
+Chunk ID: 041645
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1556
+Output:
+# Brewfile.darwin - macOS GUI applications (casks) and Mac App Store apps
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile.darwin
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile.darwin
+
+{{ if .installBrewApps -}}
+# =============================================================================
+# Casks - Terminals & Editors
+# =============================================================================
+cask "alacritty"
+# cask "iterm2"
+cask "warp"
+cask "cmux"
+cask "cursor"
+cask "visual-studio-code"
+{{ end -}}
+
+# =============================================================================
+# Casks - AI & Coding Assistants
+# =============================================================================
+{{ if .installAiDesktopApps -}}
+cask "claude"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "chatgpt"
+{{ end -}}
+cask "opencode-desktop"
+cask "antigravity"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "codex-app"
+{{ end -}}
+# cask "chatgpt-atlas"  # Uncomment if needed
+# CodeIsland — macOS notch HUD that surfaces coding-agent activity (Claude/Codex/
+# Cursor/Copilot/Gemini/AntiGravity/OpenCode). macOS 14+ only; Swift app uses a
+# Unix socket at /tmp/codeisland-<uid>.sock. The app auto-installs hook payloads
+# into each detected CLI's config; our chezmoi overlays are deliberately
+# hook-aware to coexist (see docs/tools/agent-overlays.md).
+tap "wxtsky/tap"
+cask "codeisland"
+# Local LLM GUI runtime (also provides the `ollama` CLI)
+{{ if .installLlmTools -}}
+cask "ollama-app"
+{{ end -}}
+# cask "termius"          # SSH client
+{{ end -}}
+
+{{ if .installBrewApps -}}
+# =============================================================================
+# Casks - System Utilities
+# =============================================================================
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "maccy"                       # Plaintext-SQLite clipboard history (scriptable; `cb`/`cbl`/`cbe`)
+# cask "itsycal"                     # Menu bar calendar
+# cask "jordanbaird-ice"             # Menu bar manager (Ice.app)
+cask "scroll-reverser"             # Reverse scroll direction per device
+# cask "sloth"                       # Process/file viewer
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+
+# =============================================================================
+# Casks - Communication
+# =============================================================================
+cask "discord"
+# cask "messenger"
+# cask "telegram"
+# cask "wechat"   # We used to install WeChat using Apple Store (TODO: maybe use mas?! but that would need login...)
+# cask "whatsapp"
+# cask "dingtalk"
+# cask "tencent-meeting"  # TencentMeeting.app
+
+# =============================================================================
+# Casks - Browsers
+# =============================================================================
+cask "arc"
+# cask "google-chrome"
+# cask "tor-browser"
+
+# =============================================================================
+# Casks - Productivity
+# =============================================================================
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+# cask "readest"              # E-book reader
+cask "super-productivity"   # Task/time management
+# cask "wispr-flow"           # Voice typing
+# cask "mathpix-snipping-tool"
+
+# =============================================================================
+# Casks - Media & Entertainment
+# =============================================================================
+cask "spotify"
+cask "anki"
+{{ end -}}
+
+# =============================================================================
+# Casks - Gaming
+# =============================================================================
+{{ if .installGamingApps -}}
+cask "steam"
+{{ end -}}
+
+{{ if .installBrewApps -}}
+# cask "minecraft"
+# cask "battle-net"
+# cask "hstracker"  # Hearthstone deck tracker
+
+# =============================================================================
+# Casks - Finance & Trading
+# =============================================================================
+# cask "binance"
+# cask "tradingview"
+
+# =============================================================================
+# Casks - Network & VPN
+# =============================================================================
+# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+# but Tailscale was delisted from the Mac App Store (mas install now fails with
+# "No apps found in the App Store for ADAM ID 1475387142").
+cask "tailscale-app"
+# cask "openvpn-connect"
+# cask "vibetunnel"
+# cask "clash-verge-rev"  # Clash proxy GUI (replacement for
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '610,745p' dot_ansible/roles/gui_apps_linux/tasks/main.yml`</summary>
+```
+Chunk ID: 36525b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1196
+Output:
+    - name: Install Discord from Flathub (per-user)
+      community.general.flatpak:
+        name: com.discordapp.Discord
+        state: present
+        method: user
+        remote: flathub
+  rescue:
+    - name: Warn Discord Flatpak install failed
+      ansible.builtin.debug:
+        msg: >-
+          Discord Flatpak install failed. Manual fallback —
+          `flatpak install flathub com.discordapp.Discord` from a shell,
+          or set discordChannel=deb in ~/.config/chezmoi/chezmoi.toml to
+          revert to the .deb path.
+
+# =============================================================================
+# Steam — optional gaming bundle via Valve's official apt repository
+#
+# Gated by the `installGamingApps` chezmoi prompt, plumbed through
+# `gui_apps_linux_install_gaming_apps`. Valve's repo publishes an amd64
+# `steam-launcher` package and an i386 transitional package; adding i386 is
+# required so Steam can resolve its 32-bit runtime libraries. Avoid hard-coding
+# old package names like `libgl1-mesa-glx`, which no longer exists on Ubuntu
+# 24.04 — let apt resolve current dependencies/recommends from the package.
+# =============================================================================
+
+- name: Skip Steam on non-x86_64 Linux
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture != 'x86_64'
+  ansible.builtin.debug:
+    msg: >-
+      Steam is only installed on x86_64 here. Valve's Ubuntu launcher and
+      game runtime expect amd64/i386 packages; skipping on {{ target_architecture }}.
+
+- name: Skip Steam in noRoot mode
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture == 'x86_64'
+    - gui_apps_linux_no_root | bool
+  ansible.builtin.debug:
+    msg: >-
+      installGamingApps=true, but Steam requires sudo to add Valve's apt repo,
+      enable i386, and install steam-launcher. Skipping in noRoot mode.
+
+- name: Install Steam via Valve apt repo
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture == 'x86_64'
+    - not (gui_apps_linux_no_root | bool)
+  block:
+    - name: Check enabled foreign architectures (Steam)
+      ansible.builtin.command: dpkg --print-foreign-architectures
+      register: steam_foreign_arches
+      changed_when: false
+      failed_when: false
+
+    - name: Enable i386 architecture for Steam runtime
+      when: "'i386' not in (steam_foreign_arches.stdout_lines | default([]))"
+      become: true
+      tags: [sudo]
+      ansible.builtin.command: dpkg --add-architecture i386
+
+    - name: Ensure /usr/share/keyrings exists (Steam)
+      become: true
+      tags: [sudo]
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install Valve Steam apt signing key
+      become: true
+      tags: [sudo]
+      ansible.builtin.get_url:
+        url: https://repo.steampowered.com/steam/archive/stable/steam.gpg
+        dest: /usr/share/keyrings/steam.gpg
+        mode: '0644'
+        force: true
+        timeout: 120
+
+    - name: Remove legacy Steam apt source list files
+      become: true
+      tags: [sudo]
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/steam.list
+        - /etc/apt/sources.list.d/steam-stable.list
+
+    - name: Add Valve Steam apt repository
+      become: true
+      tags: [sudo]
+      ansible.builtin.deb822_repository:
+        name: steam
+        types: deb
+        uris: https://repo.steampowered.com/steam/
+        suites: stable
+        components: steam
+        architectures:
+          - amd64
+          - i386
+        signed_by: /usr/share/keyrings/steam.gpg
+
+    - name: Refresh apt cache (Steam repo)
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Steam launcher
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        name: steam-launcher
+        state: present
+        install_recommends: true
+        update_cache: false
+  rescue:
+    - name: Warn Steam install failed
+      ansible.builtin.debug:
+        msg: >-
+          Steam install failed. Manual fallback: follow Valve's apt repo
+          instructions at https://repo.steampowered.com/steam/ or install the
+          latest launcher package from
+          https://repo.steampowered.com/steam/archive/stable/steam_latest.deb.
+
+# =============================================================================
+# Zen Browser — Firefox-based browser, shipped as an AppImage
+#
+# User-level install under ~/Applications/, mirrors the Alacritty pattern for
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '1,28p' .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl && sed -n '292,322p' .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl`</summary>
+```
+Chunk ID: 75dc56
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 731
+Output:
+#!/bin/bash
+# Run brew bundle when Brewfiles change
+# Runs when general Brew apps are enabled, or on macOS when AI/gaming desktop apps are enabled
+# Profile: {{ .profile }}
+# installBrewApps: {{ .installBrewApps }}
+# installAiDesktopApps: {{ .installAiDesktopApps }}
+# installGamingApps: {{ .installGamingApps }}
+
+{{ $installBrewApps := false }}{{ if hasKey . "installBrewApps" }}{{ $installBrewApps = .installBrewApps }}{{ end -}}
+{{ $installAiDesktopApps := false }}{{ if hasKey . "installAiDesktopApps" }}{{ $installAiDesktopApps = .installAiDesktopApps }}{{ end -}}
+{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
+{{ if and (not $installBrewApps) (or (ne .chezmoi.os "darwin") (and (not $installAiDesktopApps) (not $installGamingApps))) -}}
+# Brew app installation is disabled for this profile
+# To enable, run: chezmoi init --force
+exit 0
+{{ end -}}
+
+{{ if eq .chezmoi.os "darwin" -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.darwin: {{ include "dot_config/homebrew/Brewfile.darwin.tmpl" | sha256sum }}
+{{ else -}}
+# === Brewfile Hashes (changes trigger re-run) ===
+# Brewfile: {{ include "dot_config/homebrew/Brewfile.tmpl" | sha256sum }}
+# Brewfile.linux: {{ include "dot_config/homebrew/Brewfile.linux.tmpl" | sha256sum }}
+{{ end -}}
+
+set -e
+{{ if and $installBitwarden (or (eq .chezmoi.os "darwin") (eq .profile "ubuntu_desktop")) -}}
+# Install Bitwarden Desktop app (for SSH agent) on desktop profiles
+EXTRA_VARS="$EXTRA_VARS bitwarden_install_desktop=true"
+{{ end -}}
+{{ if $installLlmTools -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="llm_tools_install_brew_apps={{ .installBrewApps }}"
+else
+    EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
+fi
+{{ end -}}
+{{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
+# Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
+{{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="discord_channel={{ $discordChannel }}"
+else
+    EXTRA_VARS="$EXTRA_VARS discord_channel={{ $discordChannel }}"
+fi
+{{ $installGamingApps := false }}{{ if hasKey . "installGamingApps" }}{{ $installGamingApps = .installGamingApps }}{{ end -}}
+{{ if $installGamingApps -}}
+# Gaming apps (gui_apps_linux): currently Steam via Valve apt repo.
+EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_gaming_apps=true"
+{{ end -}}
+{{ end -}}
+
+[[ -f "$PLAYBOOK" ]] || { warn "Playbook not found: $PLAYBOOK"; exit 0; }
+
+# === Handle sudo (delegated to scripts/lib/sudo_shared.sh) ==================
+# The helper (sudo_session_init) is idempotent: if bootstrap already prompted
+# the user and spawned the watchdog, this call just re-exports the env vars.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Checking Brewfile completeness**
+
+I'm looking at the output and it seems mostly good! However, the Brewfile.darwin looks like it might lack a final end statement. I noticed we printed to 150 but not the full content. I need to double-check that we include the final `{{ end -}}` after the Mac App Store section and before the Apps NOT available part. It's important to make sure everything is complete and in order!
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `sed -n '150,220p' dot_config/homebrew/Brewfile.darwin.tmpl`</summary>
+```
+Chunk ID: 0f3d57
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 281
+Output:
+
+# =============================================================================
+# Mac App Store Apps (via mas)
+# Requires: mas signin (or sign in via App Store.app)
+# =============================================================================
+# mas "Tailscale", id: 1475387142  # delisted from MAS — use cask "tailscale-app" above instead
+# mas "LINE", id: 539883307
+# mas "Keynote", id: 409183694
+# mas "Numbers", id: 409203825
+# mas "Pages", id: 409201541
+# mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
+{{ end -}}
+
+# =============================================================================
+# Apps NOT available via Homebrew (manual install required):
+# - 东方财富, 同花顺 (Chinese finance apps)
+# - FileZilla (removed from Homebrew)
+# - Google Docs/Sheets/Slides (PWAs, not standalone apps)
+# - Safari (system built-in)
+# - osu! (use official installer)
+# - Wine Staging (deprecated, use wine-stable or crossover)
+# - Perplexity (App Store only)
+# - Immersive Translate (browser extension)
+# =============================================================================
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:40Z)**_
+
+The static pass looks coherent. One small doc nuance remains: Chinese macOS casks now also require the general Brewfile block, so I’m tightening that wording.
+
+_**Agent (gpt-5.5 2026-06-19 03:23:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+**Update: `/home/daviddwlee84/.local/share/chezmoi/docs/this_repo/architecture.md`**
+
+```diff
+@@
+-- Chinese apps (baidunetdisk): only included if `useChineseMirror` is true.
++- Chinese apps (baidunetdisk): only included inside the general GUI block when `useChineseMirror` is true.
+```
+
+
+```
+Exit code: 0
+Wall time: 0 seconds
+Output:
+Success. Updated the following files:
+M /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/architecture.md
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:57Z)**_
+
+I’m starting validation now: generated prompt drift, ansible syntax, and a dry-run reconfigure path for `installGamingApps=true`.
+
+_**Agent (gpt-5.5 2026-06-19 03:23:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just gen-prompts -- --check`</summary>
+```
+Chunk ID: d480ce
+Wall time: 0.0000 seconds
+Process exited with code 2
+Original token count: 496
+Output:
+uv run --script scripts/init/dotfiles_init.py gen --source . -- --check
+╭─ Unrecognized options ───────────────────────────────────────────────────────╮
+│ Unrecognized or misplaced options:                                           │
+│   --check (applied to scripts/init/dotfiles_init.py gen)                     │
+│                                                                              │
+│ Arguments are applied to the directly preceding subcommand, so ordering can  │
+│ matter.                                                                      │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ Perhaps you meant:                                                           │
+│     --check, --no-check                                                      │
+│         Verify on-disk matches PROMPTS; non-zero exit on drift (no writes)   │
+│         (default: False)                                                     │
+│         in scripts/init/dotfiles_init.py gen --help                          │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ For full helptext, run scripts/init/dotfiles_init.py --help                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+error: Recipe `gen-prompts` failed on line 169 with exit code 2
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just ansible-syntax-check`</summary>
+```
+Chunk ID: 6fb98b
+Wall time: 1.2557 seconds
+Process exited with code 0
+Original token count: 109
+Output:
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/base.yml
+
+playbook: dot_ansible/playbooks/base.yml
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml
+
+playbook: dot_ansible/playbooks/macos.yml
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
+
+playbook: dot_ansible/playbooks/linux.yml
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just reconfigure -- --set installGamingApps=true --dry-run --yes`</summary>
+```
+Chunk ID: 4447e4
+Wall time: 0.0000 seconds
+Process exited with code 2
+Original token count: 984
+Output:
+uv run --script scripts/init/dotfiles_init.py reconfigure -- --set installGamingApps=true --dry-run --yes
+╭─ Unrecognized options ───────────────────────────────────────────────────────╮
+│ Unrecognized or misplaced options:                                           │
+│   --set (applied to scripts/init/dotfiles_init.py reconfigure)               │
+│   installGamingApps=true (applied to scripts/init/dotfiles_init.py           │
+│ reconfigure)                                                                 │
+│   --dry-run (applied to scripts/init/dotfiles_init.py reconfigure)           │
+│   --yes (applied to scripts/init/dotfiles_init.py reconfigure)               │
+│                                                                              │
+│ Arguments are applied to the directly preceding subcommand, so ordering can  │
+│ matter.                                                                      │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ Arguments similar to --dry-run:                                              │
+│     --dry-run, --no-dry-run                                                  │
+│         Print the chezmoi command instead of running it (default: False)     │
+│         in scripts/init/dotfiles_init.py reconfigure --help                  │
+│         in scripts/init/dotfiles_init.py init --help                         │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ Arguments similar to --yes:                                                  │
+│     --yes, --no-yes                                                          │
+│         Non-interactive: skip the TUI, apply current+--set values directly   │
+│         (default: False)                                                     │
+│         in scripts/init/dotfiles_init.py reconfigure --help                  │
+│         Fully non-interactive: no prompts, no confirmation, assume defaults  │
+│         (default: False)                                                     │
+│         in scripts/init/dotfiles_init.py init --help                         │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ Arguments similar to --set:                                                  │
+│     --set [STR [STR ...]]                                                    │
+│         space-separated key=value override(s). Non-interactive when combined │
+│         with --yes (default: )                                               │
+│         in scripts/init/dotfiles_init.py reconfigure --help                  │
+│ ──────────────────────────────────────────────────────────────────────────── │
+│ For full helptext, run scripts/init/dotfiles_init.py --help                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+error: Recipe `reconfigure` failed on line 162 with exit code 2
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:23:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --help | sed -n '1,120p'`</summary>
+```
+Chunk ID: c636bc
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1040
+Output:
+Description
+  Execute templates. This is useful for testing templates or for calling
+  chezmoi from other scripts. templates are interpreted as literal templates,
+  with no whitespace added to the output between arguments. If no templates
+  are specified, the template is read from stdin.
+
+Usage:
+  chezmoi execute-template [template]... [flags]
+
+Examples:
+  chezmoi execute-template '{{ .chezmoi.sourceDir }}'
+  chezmoi execute-template '{{ .chezmoi.os }}' / '{{ .chezmoi.arch }}'
+  echo '{{ .chezmoi | toJson }}' | chezmoi execute-template
+  chezmoi execute-template --init --promptString email=me@home.org < ~/.
+local/share/chezmoi/.chezmoi.toml.tmpl
+
+Flags:
+  -f, --file                               Treat arguments as filenames
+  -h, --help                               help for execute-template
+  -i, --init                               Simulate chezmoi init
+      --left-delimiter string              Set left template delimiter
+      --promptBool stringToString          Simulate promptBool (default [])
+      --promptChoice stringToString        Simulate promptChoice (default [])
+      --promptInt stringToInt              Simulate promptInt (default [])
+      --promptMultichoice stringToString   Simulate promptMultichoice (default [])
+  -p, --promptString stringToString        Simulate promptString (default [])
+      --right-delimiter string             Set right template delimiter
+      --stdinisatty                        Simulate stdinIsATTY (default true)
+      --with-stdin                         Set .chezmoi.stdin to the contents of the standard input
+
+Global Flags:
+      --age-recipient string                           Override age recipient
+      --age-recipient-file string                      Override age recipient
+      --cache path                                     Set cache directory (default /home/daviddwlee84/.cache/chezmoi)
+      --color bool|auto                                Colorize output (default auto)
+  -c, --config path                                    Set config file
+      --config-format <none>|json|toml|yaml            Set config file format
+      --debug                                          Include debug information in output
+  -D, --destination path                               Set destination directory (default /home/daviddwlee84)
+  -n, --dry-run                                        Do not make any modifications to the destination directory
+      --force                                          Make all changes without prompting
+      --interactive                                    Prompt for all changes
+  -k, --keep-going                                     Keep going as far as possible after an error
+      --less-interactive                               Prompt for changed or pre-existing targets
+      --mode file|symlink                              Mode (default file)
+      --no-pager                                       Do not use the pager
+      --no-tty                                         Do not attempt to get a TTY for prompts
+  -o, --output path                                    Write output to path instead of stdout
+      --override-data string                           Override data
+      --override-data-file path                        Override data with file
+      --persistent-state path                          Set persistent state file
+      --progress bool|auto                             Display progress bars (default auto)
+  -R, --refresh-externals always|auto|never[=always]   Refresh external cache (default auto)
+  -S, --source path                                    Set source directory (default /home/daviddwlee84/.local/share/chezmoi)
+      --source-path                                    Specify targets by source path
+      --use-builtin-age bool|auto                      Use builtin age (default auto)
+      --use-builtin-diff                               Use builtin diff
+      --use-builtin-git bool|auto                      Use builtin git (default auto)
+  -v, --verbose                                        Make output more verbose
+  -W, --working-tree path                              Set working tree directory
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:06Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Reviewing command syntax**
+
+I realize that I ran some commands incorrectly because I included too many dashes in the arguments. For instance, the invocation should be `just gen-prompts --check`, not `-- --check`. The same issue occurred with the reconfigure recipe. The README mentions using the dashes, but it seems like it might just be semantics. I need to clarify that the correct command is `just reconfigure --set install...` and rerun it. I'll make a note about the invocation failure as well.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:07Z)**_
+
+Two validation commands failed because I passed an extra `--` through `just`; the recipes already append arguments directly. Ansible syntax passed. I’m rerunning the prompt and reconfigure checks with the correct invocation.
+
+_**Agent (gpt-5.5 2026-06-19 03:24:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just gen-prompts --check`</summary>
+```
+Chunk ID: cd3a99
+Wall time: 0.0098 seconds
+Process exited with code 0
+Original token count: 30
+Output:
+uv run --script scripts/init/dotfiles_init.py gen --source . --check
+All generated surfaces are in sync with PROMPTS.
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `just reconfigure --set installGamingApps=true --dry-run --yes`</summary>
+```
+Chunk ID: 5cdf7a
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 1073
+Output:
+uv run --script scripts/init/dotfiles_init.py reconfigure --set installGamingApps=true --dry-run --yes
+                          Preflight                          
+  chezmoi           ✓ /home/daviddwlee84/.local/bin/chezmoi  
+  git               ✓ /usr/bin/git                           
+  SSH               ✓ ~/.ssh/config routes github.com        
+  chezmoi source    ✓ present (re-init mode)                 
+
+╭────────────────────────────────── dry-run ───────────────────────────────────╮
+│ /home/daviddwlee84/.local/bin/chezmoi init --apply --prompt --promptString   │
+│ What is your email address=daviddwlee84@gmail.com --promptString What is     │
+│ your full name=Da-Wei Lee --promptChoice Which profile=ubuntu_desktop        │
+│ --promptChoice Discord install channel (flatpak|deb|none)=flatpak            │
+│ --promptChoice Backup mode for existing dotfiles (smart|full|off)=smart      │
+│ --promptChoice SSH login banner style                                        │
+│ (figlet|fastfetch-slim|fastfetch-full)=fastfetch-full --promptChoice Primary │
+│ interactive shell (zsh|bash)=zsh --promptBool Install coding agents (Claude  │
+│ Code, OpenCode, Cursor, Copilot, Gemini, etc.)=true --promptBool Install     │
+│ local LLM tools (Ollama, LiteLLM, llmfit, models)=true --promptBool Install  │
+│ AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode,      │
+│ Antigravity, Codex, Ollama app)=false --promptBool Install Python CLI tools  │
+│ via uv (mlflow, sqlit-tui, tmuxp, etc.)=true --promptBool Install standalone │
+│ JS/npm CLI utilities (readability-cli for terminal web reader, etc.)=true    │
+│ --promptBool Install .NET SDK via mise and dotnet global tools               │
+│ (azure-cost-cli, etc.)=true --promptBool Install extra mise runtimes (rust,  │
+│ bun, ruby) and their cargo/gem tools=true --promptBool Install Linux audit   │
+│ framework (auditd) + baseline rules (identity / sudoers / sshd_config /      │
+│ privileged-exec watches)=true --promptBool Install homelab                   │
+│ hardware-monitoring tools (lm-sensors / smartmontools / ipmitool / nvme-cli  │
+│ / storcli), gated on detected hardware=false --promptBool Install            │
+│ Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)=true           │
+│ --promptBool Install media/AV CLI tools (ffmpeg, ImageMagick, exiftool,      │
+│ libvips)=true --promptBool Install Bitwarden CLI (and Desktop on             │
+│ ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent  │
+│ integration=true --promptBool Install general GUI apps via Homebrew Brewfile │
+│ (terminals, browsers, utilities, etc.; excludes AI desktop apps)=true        │
+│ --promptBool Install gaming apps (Steam)=true --promptBool Install           │
+│ Traditional Chinese input methods (McBopomofo, RIME)=true --promptBool       │
+│ Install niri (scrollable-tiling Wayland compositor, built from source)=true  │
+│ --promptBool Install networking CLI tools (nmap, mtr, httpie, gping, trippy, │
+│ etc.)=true --promptBool Install tunnel tools (ngrok, cloudflared — expose    │
+│ localhost, SSH tunnels)=true --promptBool Are you in China (behind GFW) and  │
+│ need to use mirrors=true --promptBool Enable gitleaks for ALL git repos (not │
+│ just those with .pre-commit-config.yaml)=false --promptBool Allow partial    │
+│ Ansible failures (continue installing other tools if one role fails)=false   │
+│ --promptBool No sudo/root access - skip all system package                   │
+│ installations=false --promptBool Enable vim-style modal editing in shells    │
+│ (zsh-vi-mode, set -o vi, ble.sh vi-mode) and tmux vim navigation             │
+│ (vim-tmux-navigator C-h/j/k/l, mode-keys vi); does NOT affect Neovim=true    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+**Validating template rendering**
+
+I need to validate the template render for Brew using chezmoi's execute-template with override-data. It seems I should use the `--override-data` string, possibly in TOML format. I might try something like `chezmoi execute-template --override-data 'installBrewApps=false ...'` to test the rendering file without mutating anything. Let's keep it small and see how it goes! This could be a little tricky, but I’m determined to get it right.
+</details></think>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:14Z)**_
+
+Prompt drift and dry-run reconfigure now pass. I’m checking rendered Brewfile cases next so the new gating does what it says.
+
+_**Agent (gpt-5.5 2026-06-19 03:24:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command**</summary>
+```bash
+chezmoi execute-template --override-data 'installBrewApps=false
+installAiDesktopApps=false
+installGamingApps=true
+installLlmTools=false
+profile="macos"' '{{ .installGamingApps }} {{ .installBrewApps }} {{ .profile }}'
+```
+```
+Chunk ID: 10279c
+Wall time: 0.0000 seconds
+Process exited with code 1
+Original token count: 16
+Output:
+chezmoi: invalid character 'i' looking for beginning of value
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:20Z)**_
+
+`chezmoi --override-data` expects JSON here, not TOML, so I’m switching the render probes to JSON data.
+
+_**Agent (gpt-5.5 2026-06-19 03:24:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"installBrewApps":false,"installAiDesktopApps":false,"installGamingApps":true,"installLlmTools":false,"profile":"macos"}' '{{ .installGamingApps }} {{ .installBrewApps }} {{ .profile }}'`</summary>
+```
+Chunk ID: 54c570
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 4
+Output:
+true false macos
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:40Z)**_
+
+I’ll render four macOS Brewfile data combinations and grep active `tap`/`brew`/`cask` lines to confirm the split.
+
+_**Agent (gpt-5.5 2026-06-19 03:24:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"installBrewApps":false,"installAiDesktopApps":false,"installGamingApps":true,"installLlmTools":false,"profile":"macos"}' --file dot_config/homebrew/Brewfile.darwin.tmpl | rg '^(tap|brew|cask) '`</summary>
+```
+Chunk ID: 490aa4
+Wall time: 0.0187 seconds
+Process exited with code 0
+Original token count: 4
+Output:
+cask "steam"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"installBrewApps":false,"installAiDesktopApps":true,"installGamingApps":false,"installLlmTools":false,"profile":"macos"}' --file dot_config/homebrew/Brewfile.darwin.tmpl | rg '^(tap|brew|cask) '`</summary>
+```
+Chunk ID: d2ddad
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 23
+Output:
+cask "claude"
+cask "opencode-desktop"
+cask "antigravity"
+tap "wxtsky/tap"
+cask "codeisland"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"installBrewApps":true,"installAiDesktopApps":false,"installGamingApps":false,"installLlmTools":false,"profile":"macos"}' --file dot_config/homebrew/Brewfile.darwin.tmpl | rg '^(tap|brew|cask) '`</summary>
+```
+Chunk ID: 7b9306
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 190
+Output:
+cask "alacritty"
+cask "warp"
+cask "cmux"
+cask "cursor"
+cask "visual-studio-code"
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "maccy"                       # Plaintext-SQLite clipboard history (scriptable; `cb`/`cbl`/`cbe`)
+cask "scroll-reverser"             # Reverse scroll direction per device
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+cask "discord"
+cask "arc"
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+cask "super-productivity"   # Task/time management
+cask "spotify"
+cask "anki"
+cask "tailscale-app"
+cask "dbeaver-community"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"installBrewApps":true,"installAiDesktopApps":true,"installGamingApps":true,"installLlmTools":true,"profile":"macos"}' --file dot_config/homebrew/Brewfile.darwin.tmpl | rg '^(tap|brew|cask) '`</summary>
+```
+Chunk ID: cd517b
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 221
+Output:
+cask "alacritty"
+cask "warp"
+cask "cmux"
+cask "cursor"
+cask "visual-studio-code"
+cask "claude"
+cask "opencode-desktop"
+cask "antigravity"
+tap "wxtsky/tap"
+cask "codeisland"
+cask "ollama-app"
+cask "nikitabobko/tap/aerospace"  # Tiling window manager
+cask "alt-tab"                     # Windows-style alt-tab
+cask "raycast"                     # Spotlight replacement
+cask "maccy"                       # Plaintext-SQLite clipboard history (scriptable; `cb`/`cbl`/`cbe`)
+cask "scroll-reverser"             # Reverse scroll direction per device
+cask "the-unarchiver"              # Archive extraction
+cask "applite"                     # GUI for Homebrew casks
+cask "discord"
+cask "arc"
+cask "obsidian"
+cask "google-drive"
+cask "grammarly-desktop"
+cask "super-productivity"   # Task/time management
+cask "spotify"
+cask "anki"
+cask "steam"
+cask "tailscale-app"
+cask "dbeaver-community"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:59Z)**_
+
+The Brewfile render probes passed: gaming-only emits only `cask "steam"`, AI-only emits only AI casks/tap, and general-only excludes Steam. I’m checking the Linux run-script render and then I’ll run the docs build.
+
+_**Agent (gpt-5.5 2026-06-19 03:24:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `chezmoi execute-template --override-data '{"profile":"ubuntu_desktop","installGamingApps":true,"installBrewApps":false,"installAiDesktopApps":false,"installLlmTools":false,"installBitwarden":false,"discordChannel":"flatpak","primaryShell":"zsh","noRoot":false,"installExtraRuntimes":true,"installCodingAgents":false,"installPythonUvTools":false,"installJsCliTools":false,"installInputMethod":false,"installNetworkingTools":false,"installTunnelTools":false,"installIacTools":false,"installMediaTools":false,"installDotnetTools":false,"installAuditd":false,"installHomelabTools":false,"installNiri":false,"useChineseMirror":false,"allowPartialFailure":false}' --file .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl | rg 'gui_apps_linux_install_gaming_apps|discord_channel|TAGS='`</summary>
+```
+Chunk ID: 9c2579
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 73
+Output:
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
+    EXTRA_VARS="discord_channel=flatpak"
+    EXTRA_VARS="$EXTRA_VARS discord_channel=flatpak"
+EXTRA_VARS="$EXTRA_VARS gui_apps_linux_install_gaming_apps=true"
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:24:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `uv run mkdocs build --strict`</summary>
+```
+Chunk ID: cb3f90
+Wall time: 4.2814 seconds
+Process exited with code 1
+Original token count: 32263
+Output:
+Total output lines: 671
+
+
+[31m │  ⚠  Warning from the Material for MkDocs team[0m
+[31m │[0m
+[31m │[0m  MkDocs 2.0, the underlying framework of Material for MkDocs,
+[31m │[0m  will introduce backward-incompatible changes, including:
+[31m │[0m
+[31m │  × [0mAll plugins will stop working – the plugin system has been removed
+[31m │  × [0mAll theme overrides will break – the theming system has been rewritten
+[31m │  × [0mNo migration path exists – existing projects cannot be upgraded
+[31m │  × [0mClosed contribution model – community members can't report bugs
+[31m │  × [0mCurrently unlicensed – unsuitable for production use
+[31m │[0m
+[31m │[0m  Our full analysis:
+[31m │[0m
+[31m │[0m  [4mhttps://squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/[0m
+[0m
+INFO    -  mkdocs_static_i18n: Building 'en' documentation to directory: /home/daviddwlee84/.local/share/chezmoi/site
+INFO    -  Cleaning site directory
+INFO    -  Building documentation to directory: /home/daviddwlee84/.local/share/chezmoi/site
+WARNING -  A reference to 'this_repo/scripts/import_ssh_to_bw.sh.md' is included in the 'nav' configuration, which is not found in the documentation files.
+INFO    -  Doc file 'index.md' contains a link 'llms.txt', but the target is not found among documentation files.
+INFO    -  Doc file 'index.md' contains a link 'llms-full.txt', but the target is not found among documentation files.
+INFO    -  Doc file 'linux-package-sources.md' contains a link '../CLAUDE.md#install-vs-upgrade-is-split-on-purpose', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'infra/README.md' contains a link '../../dot_ansible/roles/docker/tasks/main.yml', but the target '../dot_ansible/roles/docker/tasks/main.yml' is not found among documentation files.
+INFO    -  Doc file 'infra/README.md' contains an unrecognized relative link '../tools/', it was left as is.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-noroot.md', but the target '../pitfalls/centos7-noroot.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-noroot.md', but the target '../pitfalls/centos7-noroot.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-zsh-too-old.md', but the target '../pitfalls/centos7-zsh-too-old.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/centos7-ansible-yum-dnf-backend.md', but the target '../pitfalls/centos7-ansible-yum-dnf-backend.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md', but the target '../pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md' is not found among documentation files.
+INFO    -  Doc file 'infra/linux-toolchain-baseline.md' contains a link '../../pitfalls/tuna-nodejs-mirror-aggressive-gc.md', but the target '../pitfalls/tuna-nodejs-mirror-aggressive-gc.md' is not found among documentation files.
+INFO    -  Doc file 'infra/rhel-ecosystem.md' contains a link '../../pitfalls/centos7-noroot.md', but the target '../pitfalls/centos7-noroot.md' is not found among documentation files.
+INFO    -  Doc file 'infra/rhel-ecosystem.md' contains a link '../../pitfalls/centos7-numpy-pandas-source-build.md', but the target '../pitfalls/centos7-numpy-pandas-source-build.md' is not found among documentation files.
+INFO    -  Doc file 'infra/rhel-ecosystem.md' contains a link '../../pitfalls/centos7-zsh-too-old.md', but the target '../pitfalls/centos7-zsh-too-old.md' is not found among documentation files.
+INFO    -  Doc file 'infra/shared-storage.md' contains a link '../../README.md', but 
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:25:18Z)**_
+
+The run-script render shows the Steam extra-var is passed alongside the existing `gui_apps` tag. `mkdocs build --strict` still fails, but on the repository’s pre-existing known nav/link/anchor warnings, not on a new Steam-specific warning; I’ll include that in the final verification notes.
+
+_**Agent (gpt-5.5 2026-06-19 03:25:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `ansible-doc -s ansible.builtin.deb822_repository | rg -n "architectures|signed_by|types|uris|suites|components" -C 2`</summary>
+```
+Chunk ID: 71335d
+Wall time: 0.2364 seconds
+Process exited with code 0
+Original token count: 450
+Output:
+8-      allow_weak:            # Allow repositories signed with a key using a weak
+9-                             # digest algorithm.
+10:      architectures:         # Architectures to search within repository.
+11-      by_hash:               # Controls if APT should try to acquire indexes via
+12-                             # a URI constructed
+--
+27-      check_valid_until:     # Controls if APT should try to detect replay
+28-                             # attacks.
+29:      components:            # Components specify different sections of one
+30-                             # distribution
+31-                             # version present in
+--
+78-                             # downloading the new
+79-                             # indexes entirely.
+80:      signed_by:             # Either a URL to a GPG key, absolute path to a
+81-                             # keyring file, one
+82-                             # or more
+--
+91-                             # public key block.
+92-      state:                 # A source string state.
+93:      suites:                # Suite can specify an exact path in relation to the
+94-                             # URI(s) provided, in
+95-                             # which case the
+--
+119-                             # are installed from
+120-                             # this source.
+121:      types:                 # Which types of packages to look for from a given
+122-                             # source; either
+123-                             # binary `deb' or
+124-                             # source code
+125-                             # `deb-src'.
+126:      uris:                  # The URIs must specify the base of the Debian
+127-                             # distribution
+128-                             # archive, from which
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:25:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git diff --check`</summary>
+```
+Chunk ID: 79e3ce
+Wall time: 0.0000 seconds
+Process exited with code 2
+Original token count: 3617
+Output:
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3238: trailing whitespace.
++HTTP/1.1 200 Connection established
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3239: trailing whitespace.
++
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3240: trailing whitespace.
++HTTP/2 404 
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3241: trailing whitespace.
++server: Google-Edge-Cache
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3242: trailing whitespace.
++date: Fri, 19 Jun 2026 03:08:23 GMT
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3243: trailing whitespace.
++content-type: text/html
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3244: trailing whitespace.
++content-length: 153
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3245: trailing whitespace.
++x-request-id: e073a1eb-6b16-45fa-8c4e-0116e43a5477
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3246: trailing whitespace.
++x-xss-protection: 0
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3247: trailing whitespace.
++x-frame-options: SAMEORIGIN
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3265: trailing whitespace.
++HTTP/1.1 200 Connection established
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3266: trailing whitespace.
++
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3267: trailing whitespace.
++HTTP/2 404 
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3268: trailing whitespace.
++server: Google-Edge-Cache
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3269: trailing whitespace.
++date: Fri, 19 Jun 2026 03:08:23 GMT
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3270: trailing whitespace.
++content-type: text/html
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3271: trailing whitespace.
++content-length: 153
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3272: trailing whitespace.
++x-request-id: 0fd87059-6ac8-4b90-8977-8fb1a223b3f8
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3273: trailing whitespace.
++x-xss-protection: 0
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3274: trailing whitespace.
++x-frame-options: SAMEORIGIN
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3482: trailing whitespace.
++
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0  2768    0     0    0     0  HTTP/1.1 200 Connection established
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3483: trailing whitespace.
++
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3484: trailing whitespace.
++HTTP/2 200 
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3485: trailing whitespace.
++server: Google-Edge-Cache
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3486: trailing whitespace.
++date: Fri, 19 Jun 2026 03:08:45 GMT
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3487: trailing whitespace.
++content-type: application/octet-stream
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3488: trailing whitespace.
++content-length: 2768
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3489: trailing whitespace.
++last-modified: Tue, 16 Jun 2026 16:17:18 GMT
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3490: trailing whitespace.
++etag: "6a31770e-ad0"
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3491: trailing whitespace.
++cache-control: public
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3492: trailing whitespace.
++accept-ranges: bytes
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3493: trailing whitespace.
++x-request-id: 71d170c7-a626-4cdb-8041-6da5cf7745ba
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3494: trailing whitespace.
++x-xss-protection: 0
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3495: trailing whitespace.
++x-frame-options: SAMEORIGIN
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3496: trailing whitespace.
++alt-svc: h3=":443"; ma=2592000, h3-29=":443"; ma=2592000
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3497: trailing whitespace.
++
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3515: trailing whitespace.
++HTTP/1.1 200 Connection established
+.specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md:3516: trailing whitespace.
++
+.specstory/history/2026-06-19_03-04
+... (truncated)
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:25:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `git status --short`</summary>
+```
+Chunk ID: 575048
+Wall time: 0.0000 seconds
+Process exited with code 0
+Original token count: 202
+Output:
+ M .chezmoi.toml.tmpl
+ M .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl
+ M .chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl
+ M .specstory/history/2026-06-19_02-35-48Z-daviddwlee84-in-dongwu-tick.md
+ M .specstory/history/2026-06-19_03-04-16Z-desktop-gui-profile-game.md
+ M Dockerfile
+ M README.md
+ M docs/playbooks/linux-gui-apps.md
+ M docs/this_repo/architecture.md
+ M docs/this_repo/tool-managers.md
+ M docs/this_repo/upgrades.md
+ M dot_ansible/roles/gui_apps_linux/defaults/main.yml
+ M dot_ansible/roles/gui_apps_linux/tasks/main.yml
+ M dot_config/bash/51_dotcfg_completion.bash
+ M dot_config/homebrew/Brewfile.darwin.tmpl
+ M dot_config/homebrew/Brewfile.tmpl
+ M dot_config/zsh/tools/51_dotcfg_completion.zsh
+ M scripts/init/README.md
+ M scripts/init/dotfiles_init.py
+```
+</details></tool-use>
+
+_**Agent (gpt-5.5 2026-06-19 03:25:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="exec_command"><details>
+<summary>Tool use: **exec_command** `rg -n "installGamingApps|Gaming apps|Steam" scripts/init/README.md docs/this_repo/bootstrap.md docs/zsh/zsh-completions.md docs/shells/aliases.md`</summary>
+```
+Chunk ID: 98ef64
+Wall time: 0.0000 seconds
+Process exited with code 1
+Original token count: 0
+Output:
+```
+</details></tool-use>
+
+---
+
+_**User (2026-06-19 03:53:01Z)**_
+
+現在運行得怎樣了 請繼續

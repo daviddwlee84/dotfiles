@@ -212,7 +212,7 @@ Raspberry Pi 5 (64-bit OS only) works with the `ubuntu_server` profile and gets 
 
 ## Brewfile (GUI apps, opt-in)
 
-GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps are a separate opt-in via `installAiDesktopApps = true`.
+GUI applications managed via Homebrew Brewfile in `~/.config/homebrew/`. Installation is **opt-in** (disabled by default): enable via `chezmoi init --force` and set `installBrewApps = true`. On macOS, AI desktop apps and gaming apps are separate opt-ins via `installAiDesktopApps = true` and `installGamingApps = true`.
 
 ```
 ~/.config/homebrew/
@@ -228,10 +228,12 @@ brew bundle check --file=~/.config/homebrew/Brewfile.darwin  # Check
 chezmoi apply                                         # Or trigger via run_onchange
 ```
 
-**Categories (darwin)**: terminals & editors (alacritty, iterm2, warp, cmux, cursor, vscode), AI & coding (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installAiDesktopApps` + `installLlmTools`), system utilities (aerospace, alt-tab, raycast, jordanbaird-ice), communication (discord, telegram, wechat, tencent-meeting), browsers (arc, google-chrome, tor-browser), productivity (obsidian, google-drive, grammarly-desktop), gaming (steam, minecraft, battle-net — skipped if `WORK_MACHINE` env set), finance (binance, tradingview), network (tailscale, openvpn-connect, clash-verge-rev), Mac App Store (LINE, Keynote, Numbers, Pages).
+**Categories (darwin)**: general GUI apps gated by `installBrewApps` (terminals/editors, system utilities, communication, browsers, productivity, media, network, developer tools), AI & coding gated by `installAiDesktopApps` (claude, chatgpt, opencode-desktop, antigravity, codex-app on Apple Silicon, ollama-app gated on `installLlmTools`), and gaming gated by `installGamingApps` (Steam).
 
 **Conditional sections** (Brewfiles are chezmoi templates):
 
-- Gaming apps: skipped if `WORK_MACHINE` is set.
-- Chinese apps (baidunetdisk): only included if `useChineseMirror` is true.
+- General GUI apps: only included if `installBrewApps` is true.
+- AI desktop apps: only included if `installAiDesktopApps` is true.
+- Gaming apps: only included if `installGamingApps` is true.
+- Chinese apps (baidunetdisk): only included inside the general GUI block when `useChineseMirror` is true.
 - mas apps: requires signing in to App Store.app first.

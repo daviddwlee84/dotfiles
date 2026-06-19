@@ -21,7 +21,7 @@ Pick the **narrowest** knob that correctly expresses the predicate.
 | `.chezmoi.kernel.osrelease` | Distro info on Linux | `/proc/sys/kernel/osrelease` | contains `microsoft` on WSL | Distinguishing WSL from native Linux |
 | `.chezmoi.hostname` | Which machine? | `os.Hostname()` | `work-laptop`, `rpi5`, … | Per-machine overrides (a single misbehaving host) |
 | `.profile` (this repo) | What **role** does the user want? | `promptChoiceOnce` at init | `macos`, `ubuntu_desktop`, `ubuntu_server` | Desktop vs server (GUI packages, nerdfonts, alacritty) — **not** auto-detectable |
-| `env "WORK_MACHINE"` | Is this machine in work mode right now? | Shell env at `chezmoi apply` time | unset / `1` | Per-session toggles (skip gaming casks) |
+| `env "WORK_MACHINE"` | Is this machine in work mode right now? | Shell env at `chezmoi apply` time | unset / `1` | Per-session toggles (illustrative — no template branches on this today; gaming casks now gate on the `installGamingApps` prompt) |
 
 ## Rule
 

@@ -5,9 +5,9 @@
 # Handles the "desktop-only" category of apps that aren't in the apt default
 # repos: Alacritty (cargo), AppImageLauncher (PPA / .deb / Lite), VSCode
 # (Microsoft apt repo), Cursor (.deb with graceful fallback), Discord (.deb,
-# x86_64-only), Zen Browser (AppImage + .desktop), libfuse2 (AppImage runtime
-# on Ubuntu 22.04+), and a placeholder hook for Antigravity once an official
-# Linux package ships.
+# x86_64-only), Steam (Valve apt repo, optional), Zen Browser (AppImage +
+# .desktop), libfuse2 (AppImage runtime on Ubuntu 22.04+), and a placeholder
+# hook for Antigravity once an official Linux package ships.
 #
 # No-op on:
 #   - macOS  → Brewfile (`cask "alacritty"`, `cask "visual-studio-code"` when
@@ -621,6 +621,123 @@
           `flatpak install flathub com.discordapp.Discord` from a shell,
           or set discordChannel=deb in ~/.config/chezmoi/chezmoi.toml to
           revert to the .deb path.
+
+# =============================================================================
+# Steam — optional gaming bundle via Valve's official apt repository
+#
+# Gated by the `installGamingApps` chezmoi prompt, plumbed through
+# `gui_apps_linux_install_gaming_apps`. Valve's repo publishes an amd64
+# `steam-launcher` package and an i386 transitional package; adding i386 is
+# required so Steam can resolve its 32-bit runtime libraries. Avoid hard-coding
+# old package names like `libgl1-mesa-glx`, which no longer exists on Ubuntu
+# 24.04 — let apt resolve current dependencies/recommends from the package.
+# =============================================================================
+
+- name: Skip Steam on non-x86_64 Linux
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture != 'x86_64'
+  ansible.builtin.debug:
+    msg: >-
+      Steam is only installed on x86_64 here. Valve's Ubuntu launcher and
+      game runtime expect amd64/i386 packages; skipping on {{ target_architecture }}.
+
+- name: Skip Steam in noRoot mode
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture == 'x86_64'
+    - gui_apps_linux_no_root | bool
+  ansible.builtin.debug:
+    msg: >-
+      installGamingApps=true, but Steam requires sudo to add Valve's apt repo,
+      enable i386, and install steam-launcher. Skipping in noRoot mode.
+
+- name: Install Steam via Valve apt repo
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - gui_apps_linux_install_gaming_apps | bool
+    - target_architecture == 'x86_64'
+    - not (gui_apps_linux_no_root | bool)
+  block:
+    - name: Check enabled foreign architectures (Steam)
+      ansible.builtin.command: dpkg --print-foreign-architectures
+      register: steam_foreign_arches
+      changed_when: false
+      failed_when: false
+
+    - name: Enable i386 architecture for Steam runtime
+      when: "'i386' not in (steam_foreign_arches.stdout_lines | default([]))"
+      become: true
+      tags: [sudo]
+      ansible.builtin.command: dpkg --add-architecture i386
+
+    - name: Ensure /usr/share/keyrings exists (Steam)
+      become: true
+      tags: [sudo]
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install Valve Steam apt signing key
+      become: true
+      tags: [sudo]
+      ansible.builtin.get_url:
+        url: https://repo.steampowered.com/steam/archive/stable/steam.gpg
+        dest: /usr/share/keyrings/steam.gpg
+        mode: '0644'
+        force: true
+        timeout: 120
+
+    - name: Remove legacy Steam apt source list files
+      become: true
+      tags: [sudo]
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/steam.list
+        - /etc/apt/sources.list.d/steam-stable.list
+
+    - name: Add Valve Steam apt repository
+      become: true
+      tags: [sudo]
+      ansible.builtin.deb822_repository:
+        name: steam
+        types: deb
+        uris: https://repo.steampowered.com/steam/
+        suites: stable
+        components: steam
+        architectures:
+          - amd64
+          - i386
+        signed_by: /usr/share/keyrings/steam.gpg
+
+    - name: Refresh apt cache (Steam repo)
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Steam launcher
+      become: true
+      tags: [sudo]
+      ansible.builtin.apt:
+        name: steam-launcher
+        state: present
+        install_recommends: true
+        update_cache: false
+  rescue:
+    - name: Warn Steam install failed
+      ansible.builtin.debug:
+        msg: >-
+          Steam install failed. Manual fallback: follow Valve's apt repo
+          instructions at https://repo.steampowered.com/steam/ or install the
+          latest launcher package from
+          https://repo.steampowered.com/steam/archive/stable/steam_latest.deb.
 
 # =============================================================================
 # Zen Browser — Firefox-based browser, shipped as an AppImage

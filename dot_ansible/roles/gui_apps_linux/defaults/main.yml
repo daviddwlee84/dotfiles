@@ -7,3 +7,7 @@
 # `--extra-vars "gui_apps_linux_no_root=true"` (the run_onchange wrapper does
 # this automatically when profile=noRoot).
 gui_apps_linux_no_root: false
+
+# Desktop gaming bundle. Currently installs Steam only. Plumbed from the
+# `installGamingApps` chezmoi prompt on ubuntu_desktop.
+gui_apps_linux_install_gaming_apps: false

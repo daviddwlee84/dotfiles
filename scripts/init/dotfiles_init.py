@@ -11,8 +11,8 @@
 dotfiles_init.py — Interactive wrapper around `chezmoi init` inspired by
 Vercel Labs' `skills` CLI (https://github.com/vercel-labs/skills).
 
-The existing `.chezmoi.toml.tmpl` defines ~19 prompts (profile, email, name,
-16 feature flags). `chezmoi init` asks them sequentially, which works but
+The existing `.chezmoi.toml.tmpl` defines the prompt set (profile, email,
+name, feature flags, and preferences). `chezmoi init` asks them sequentially, which works but
 hides the feature flags from each other and makes "set up a new machine
 the way I always do" a manual checklist. This wrapper:
 
@@ -305,6 +305,15 @@ PROMPTS: tuple[Prompt, ...] = (
            prompt_text="Install general GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)",
            comment=("是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)\n"
                     "Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。")),
+    Prompt("installGamingApps", "bool", "System & apps",
+           "Gaming apps",
+           "Steam for desktop profiles: Homebrew cask on macOS, Valve apt repo on Ubuntu Desktop.",
+           default=False,
+           condition=When(profile=_DESKTOP_PROFILES), else_value=False,
+           prompt_text="Install gaming apps (Steam)",
+           comment=("是否安裝遊戲相關桌面應用（目前先裝 Steam）。Desktop-class only（macos /\n"
+                    "ubuntu_desktop）；macOS 走 Homebrew Cask，Ubuntu Desktop 走 Valve 官方 apt repo /\n"
+                    "steam-launcher。headless server 直接 false。")),
     Prompt("installInputMethod", "bool", "System & apps",
            "Traditional Chinese IME",
            "McBopomofo + RIME for zh-TW input. Desktop-class profiles only (macos / ubuntu_desktop).",
@@ -451,8 +460,9 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installJsCliTools": True,
         "installExtraRuntimes": True,
         "installBrewApps": True,
+        "installGamingApps": False,
         "backupMode": "smart",
-        # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden
+        # deliberately off: installLlmTools, installAiDesktopApps, installBitwarden, installGamingApps
     },
     "server-linux": {
         "installCodingAgents": True,
@@ -462,6 +472,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNetworkingTools": True,
         "installAuditd": True,
         "installHomelabTools": True,
+        "installGamingApps": False,
         "backupMode": "smart",
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
     },
@@ -482,6 +493,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installBitwarden": False,
         "installNetworkingTools": False,
         "installMediaTools": False,
+        "installGamingApps": False,
         "installAuditd": False,
         "installHomelabTools": False,
         "backupMode": "off",  # fresh VM — nothing worth backing up
@@ -501,6 +513,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installIacTools": False,
         "installBitwarden": False,
         "installBrewApps": False,
+        "installGamingApps": False,
         "installInputMethod": False,
         "installNiri": False,
         "installNetworkingTools": False,
