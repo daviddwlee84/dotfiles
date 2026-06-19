@@ -715,12 +715,16 @@
           - i386
         signed_by: /usr/share/keyrings/steam.gpg
 
+    # No cache_valid_time here: the `base` role already runs `apt-get update`
+    # near the start of the same play, so any non-zero cache_valid_time would
+    # mark the cache "fresh" and SKIP this refresh — leaving the just-added
+    # Valve repo unindexed and `steam-launcher` unresolvable. Force the update
+    # unconditionally so the new repo is always fetched before the install.
     - name: Refresh apt cache (Steam repo)
       become: true
       tags: [sudo]
       ansible.builtin.apt:
         update_cache: true
-        cache_valid_time: 3600
 
     - name: Install Steam launcher
       become: true
