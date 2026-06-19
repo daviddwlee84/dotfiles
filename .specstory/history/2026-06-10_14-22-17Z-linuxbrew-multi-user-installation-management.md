@@ -685,3 +685,128 @@ Status: **completed**
 <summary>Tool use: **todo_write**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Adding official links to the Related section...我已完成新增一节，现在将在"Related"一节补充官方链接。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "在 pitfall 文档新增 'Why this is NOT an ad-hoc hack' 一节",
+      "id": "doc-section",
+      "status": "completed"
+    },
+    {
+      "content": "补充 Homebrew Support Tiers / Homebrew-on-Linux 官方链接",
+      "id": "doc-links",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "在 pitfall 文档新增 'Why this is NOT an ad-hoc hack' 一节",
+      "id": "doc-section",
+      "status": "in_progress"
+    },
+    {
+      "content": "补充 Homebrew Support Tiers / Homebrew-on-Linux 官方链接",
+      "id": "doc-links",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Let me do a final pass through the document to make sure everything flows well.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /home/daweilee/.local/share/chezmoi/pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+已完成，两项 to-do 都已落实到 [pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md](pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md)：
+
+1. **新增 "Why this is NOT an ad-hoc hack" 一节**（位于 "Fix (shipped)" 与 "Things that do NOT fix it" 之间），包含五个论点：
+   - 服务器端治理与客户端 dotfiles 正交，本 repo 只能也只该管后者
+   - 即使按官方推荐架构（dedicated `linuxbrew` owner + 755）部署，compaudit 对非 owner 用户照样失败，`compinit -u` 是必然配套
+   - Homebrew 官方将 multi-user shared installation 列为 unsupported；`/home/linuxbrew/.linuxbrew` 是固定 prefix，路径写死合理
+   - 推荐架构的全局 `/etc/profile.d/linuxbrew.sh` 反而把触发面从 nested shell 扩大到所有 shell
+   - 剔除 fpath 的"外科手术"替代方案已评估并放弃（会丢失全部 brew 补全）
+
+2. **Related 一节补充官方链接**：Homebrew Support Tiers 和 Homebrew on Linux 两个文档链接。
+
+代码（`dot_zshrc.tmpl`、`dot_zshenv.tmpl`）按计划维持原样，`pitfalls/README.md` 索引也无需变更。

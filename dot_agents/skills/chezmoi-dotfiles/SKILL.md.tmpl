@@ -1,0 +1,164 @@
+---
+name: chezmoi-dotfiles
+description: Operate and navigate THIS machine's chezmoi-managed dotfiles from any directory. Use when the user asks how to apply/edit/diff dotfile changes, where a config or custom tool lives, how a keybinding/keymap works (tmux, shell, fzf), what custom in-house CLIs exist (fleet, mlf, pqsum, x, mi-router, …), what Television (tv) channels are available, which tools/features are installed on this host, or how to use chezmoi / ansible / just in this repo. Most detail lives in the repo's docs/, reachable via `chezmoi source-path`.
+---
+<!-- managed-by: chezmoi-dotfiles (chezmoi source: dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl) — do not hand-edit the deployed copy; it re-renders on every `chezmoi apply`. -->
+
+# chezmoi-dotfiles
+
+This machine's `$HOME` is managed by a **chezmoi** (configs) + **ansible** (system
+deps) dotfiles repo. This skill is the agent-facing map: how to drive it, and what
+custom tooling exists that you wouldn't otherwise know about. It is rendered per-host
+— the "What's enabled on THIS machine" section reflects what the user actually
+selected at init.
+
+## Orientation (read this first)
+
+- **Repo root**: `chezmoi source-path` (no args) prints the source dir. Work there
+  to edit: `cd "$(chezmoi source-path)"`.
+- **Source path of one file**: `chezmoi source-path ~/.config/foo/bar` → the
+  managed source file for that target.
+- **`docs/**` is NOT deployed to `$HOME`** (it's chezmoi-ignored). Read detail via
+  `"$(chezmoi source-path)/docs/..."`. A *subset* is deployed to `~/.config/docs/`
+  (e.g. keybindings, cli-tools) for runtime helpers.
+- **Read the contract before editing**: `"$(chezmoi source-path)/CLAUDE.md"` holds
+  Hard invariants and cross-file maintenance rules. Honor them.
+- This host: profile `{{ dig "profile" "" . }}`, OS `{{ .chezmoi.os }}`/`{{ .chezmoi.arch }}`, primary shell `{{ dig "primaryShell" "zsh" . }}`.
+
+## chezmoi essentials
+
+```bash
+chezmoi diff                 # preview changes (also: just chezmoi-diff)
+chezmoi apply                # deploy + run scripts (also: cas, or just chezmoi-apply)
+chezmoi status               # modified/added/removed targets
+chezmoi edit ~/.zshrc        # edit the SOURCE of a target
+chezmoi add  ~/.config/x     # start managing an existing file
+chezmoi re-add               # pull live edits back into source
+chezmoi managed | grep foo   # is X managed?
+chezmoi cat ~/.config/x      # render a target without applying
+chezmoi data | jq            # the template data (ground truth for the toggles below)
+```
+
+- **`cas`** = `chezmoi apply` + reload hint; **`cau`** = update from remote then apply
+  (defined in `dot_config/shell/99_chezmoi_reload.sh`).
+- **`dotcfg`** = reconfigure the init prompts on an already-set-up machine
+  (`dotcfg` for the TUI, `dotcfg --set installLlmTools=true --yes` for one toggle,
+  `dotcfg --dry-run` to preview). Shell twin: `czcfg`.
+- **Never `chezmoi add` a `modify_`/`create_` target** — it overwrites the script.
+- Full command cheat-sheet: `docs/this_repo/cheatsheet.md`. Install-vs-upgrade is
+  split: `chezmoi apply`/ansible is **install-only**; upgrades go through
+  `just upgrade-*`.
+
+## What's enabled on THIS machine
+
+(Rendered from this host's selections. For live truth: `chezmoi data | jq`.)
+{{- if dig "installCodingAgents" false . }}
+- **Coding agents** — Claude Code, OpenCode, Cursor, Codex, Gemini, Copilot (configs + CLIs). See `docs/tools/agent-overlays.md`, `docs/tools/agent-skills.md`.
+{{- end }}
+{{- if dig "installPythonUvTools" false . }}
+- **Python uv tools** — mlflow, marimo, jupyter, etc. (powers the `mlf` CLI). See `docs/this_repo/uv-bootstrap.md`.
+{{- end }}
+{{- if dig "installExtraRuntimes" false . }}
+- **Extra runtimes** — rust, bun, ruby via mise (+ cargo/gem tools). Node is always present.
+{{- end }}
+{{- if dig "installLlmTools" false . }}
+- **LLM tools** — Ollama / LiteLLM / local models.
+{{- end }}
+{{- if dig "installJsCliTools" false . }}
+- **JS CLI tools** — standalone npm CLIs (e.g. readability-cli).
+{{- end }}
+{{- if dig "installDotnetTools" false . }}
+- **.NET tools** — .NET SDK (mise) + dotnet global tools.
+{{- end }}
+{{- if dig "installIacTools" false . }}
+- **IaC** — Azure CLI, Terraform, OpenTofu.
+{{- end }}
+{{- if dig "installMediaTools" false . }}
+- **Media** — ffmpeg, ImageMagick, exiftool, libvips.
+{{- end }}
+{{- if dig "installNetworkingTools" false . }}
+- **Networking** — nmap, mtr, httpie, gping, trippy.
+{{- end }}
+{{- if dig "installTunnelTools" false . }}
+- **Tunnels** — ngrok, cloudflared.
+{{- end }}
+{{- if dig "installBitwarden" false . }}
+- **Bitwarden** — `bw` CLI (+ SSH agent integration). See `docs/tools` Bitwarden notes.
+{{- end }}
+{{- if dig "installBrewApps" false . }}
+- **GUI apps (brew)** — terminals/browsers/utilities (macOS also: AeroSpace).
+{{- end }}
+{{- if dig "installInputMethod" false . }}
+- **Input method** — McBopomofo + RIME (Traditional Chinese).
+{{- end }}
+{{- if dig "installNiri" false . }}
+- **niri** — Wayland compositor (built from source). See pitfalls/ for niri PATH traps.
+{{- end }}
+{{- if dig "installHomelabTools" false . }}
+- **Homelab** — lm-sensors, smartmontools, ipmitool, nvme-cli, storcli.
+{{- end }}
+{{- if dig "installAuditd" false . }}
+- **auditd** — Linux audit framework + baseline rules (see `tv audit-events`).
+{{- end }}
+{{- if dig "enableVimMode" true . }}
+- **Vim mode** — shell modal editing + tmux vim nav (NOT Neovim/editors — those are always vim).
+{{- end }}
+
+## Custom in-house CLIs (always deployed to `~/.dotfiles/bin`, on PATH)
+
+Each works from any cwd. Run with `--help`, or read `docs/tools/<name>.md`. Full list: `ls "$(chezmoi source-path)/dot_dotfiles/bin/"`.
+
+- **`fleet`** — cross-host ops over your machines: `fleet chezmoi apply`, `fleet hosts`, `fleet tmux`, `fleet info`, `fleet pueue`, `fleet exec`. See `docs/this_repo/fleet-apply.md`, `docs/tools/fleet-exec.md`, `docs/tools/fleet-hosts.md`.
+- **`mlf`** — MLflow umbrella CLI + TUI dashboard (needs Python uv tools). Picker twin: `tv mlflow`.
+- **`pqsum`** — pueue queue summary (text / AI / JSON). See `docs/tools/pueue.md`.
+- **`x`** — clipboard/file copy-paste-open with cross-platform fallbacks.
+- **`mi-router`** / **`reyee`** / **`sms`** — read-only router CLIs (Xiaomi MiWiFi / Ruijie Reyee / Huawei HiLink SMS). See `docs/tools/{mi-router,reyee,sms}.md`.
+- **`ping-monitor`** — record ping over time, flag latency spikes. See `docs/tools/ping-monitor.md`.
+- **`dotcfg`** — reconfigure dotfiles prompts (above).
+- **`sesh-preview`** — preview helper for the sesh picker.
+
+## Television (`tv`) — fuzzy pickers with custom channels
+
+There are ~40 **custom** channels (system state, fleet, services, infra, agents…)
+that you won't discover otherwise. Browse them:
+
+```bash
+tv                      # default picker
+tv list-channels        # list everything available
+tv <channel>            # open one, e.g. tv fleet-hosts | tv mlflow | tv pueue
+ls "$(chezmoi source-path)/dot_config/television/cable/"   # the channel definitions
+```
+
+Handy ones: `fleet-hosts`, `mlflow`, `pueue`, `ports`, `kill-process`, `services`,
+`sessions`, `keybindings`, `aliases`, `git-ops`, `mac-apps`/`linux-apps`. Full
+reference: `docs/tools/tv.md`.
+
+## Keybindings & keymaps
+
+- **`bindings`** (shell function) or **`tv keybindings`** — interactive reference.
+- **tmux**: `prefix + Space` (or `prefix + e`) opens the action menu;
+  `prefix + T` = sesh picker, `prefix + U` = tools. Deep ref: `docs/tools/tmux/keybindings.md`.
+- **shell ZLE widgets**: `Alt+S` sesh sessions, `Alt+T` tools, `Ctrl+R` history (atuin).
+- Master reference: `docs/shells/keybindings.md` (also deployed to `~/.config/docs/shells/keybindings.md`).
+
+## Aliases & functions
+
+`alias` to list shell aliases, or `tv aliases`. Catalog: `docs/shells/aliases.md`.
+Helpers worth knowing: `chezmoi-cd` (jump to source), `run-for` (time-box a command),
+`bindings` (above). App control: `applaunch`/`appquit`/`apprestart`/… (cross-platform).
+
+## just recipes (run from the source dir)
+
+```bash
+cd "$(chezmoi source-path)" && just --list
+```
+
+Categories: `chezmoi-*`, `ansible-*`, `upgrade-*` (brew/mise/uv/npm/cargo/…),
+`fleet`/`fleet-*`, `gen-prompts` (regenerate prompt scaffolding), `check`/`lint`,
+`docker-*`. See `docs/this_repo/cheatsheet.md`.
+
+## Editing rules (don't skip)
+
+Before changing anything under the repo, read `CLAUDE.md` Hard invariants and the
+"Cross-file maintenance rules" table — many surfaces have mandatory mirror updates
+in the same commit (docs, completions, tool-managers index, this very skill, …).

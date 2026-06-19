@@ -9,6 +9,7 @@ agent skills two ways, with sharply different scopes.
 |---|---|---|---|
 | **Global** (every project, every shell) | `~/.agents/.skill-lock.json` (chezmoi-managed) | `~/.agents/skills/<name>/` | `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` on every `chezmoi apply` |
 | **Project** (only inside this repo's working tree, for editing skills) | `./skills-lock.json` (git-tracked) | `./.agents/skills/<name>/` | `.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl` on every `chezmoi apply` (when source dir == repo); manual fallback: `just bootstrap-skills` |
+| **First-party templated** (`chezmoi-dotfiles`) | none — chezmoi-managed | `~/.agents/skills/chezmoi-dotfiles/` (+ symlink in `~/.claude/skills/`) | `chezmoi apply` (re-renders per host from `.chezmoi.toml`) — see [§ First-party templated skill](#first-party-templated-skill-chezmoi-dotfiles) |
 
 The two scopes happen to overlap today (both install
 `project-knowledge-harness`), but they serve different purposes — see "Why two
@@ -125,6 +126,45 @@ itself targets *any* project so it belongs globally, and (b) we want to use it
 on the chezmoi repo immediately, which the global install covers but
 project-scope makes the lock-file dependency explicit for anyone reading
 `skills-lock.json` here.
+
+## First-party templated skill (`chezmoi-dotfiles`)
+
+Everything above is about **npx-pulled** skills (static clones from external
+repos, in chezmoi-ignored `.agents/skills/**`). There is exactly one **first-party,
+chezmoi-managed, *templated*** skill that breaks that mould:
+
+| | npx skills | `chezmoi-dotfiles` |
+|---|---|---|
+| Source | external git repo, cloned by `npx skills` | `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl` in this repo |
+| Owner | `npx skills` CLI (`~/.agents/.skill-lock.json`) | chezmoi (a normal managed target) |
+| Per-host content | identical everywhere | **rendered from `.chezmoi.toml`** — only lists tools this host selected |
+| Updates | `npx skills` / `just upgrade-skills` | **re-renders on every `chezmoi apply`** |
+
+**Why it exists:** so an agent opened in *any* directory can operate these dotfiles
+and discover the repo's custom tooling (in-house CLIs, `tv` channels, keymaps, `just`
+recipes) — most of which live under `docs/**`, which is **not** deployed to `$HOME`
+and is only reachable via `chezmoi source-path`. The skill is deliberately **lean
+and self-discovering** (it points at `docs/`, `tv list-channels`, `just --list`,
+`ls $(chezmoi source-path)/dot_dotfiles/bin/`) so it rarely needs editing.
+
+**Deployment:**
+
+- Real file → `~/.agents/skills/chezmoi-dotfiles/SKILL.md` (the universal,
+  cross-agent dir). Symlink `~/.claude/skills/chezmoi-dotfiles →
+  ../../.agents/skills/chezmoi-dotfiles` (source: `dot_claude/skills/symlink_chezmoi-dotfiles`)
+  so Claude Code discovers it — same per-agent-symlink shape `npx skills` uses.
+- Re-included past the broad npx ignore in `.chezmoiignore.tmpl` using **single-`*`**
+  globs (`.agents/skills/*` + `.agents/skills/*/**`, not a bare `**`). This is
+  load-bearing: a recursive `**` (or a bare `.agents/skills` dir line) excludes the
+  *parent* directory, after which chezmoi — like gitignore — silently ignores the
+  `!` re-include. Verify with `chezmoi managed | grep chezmoi-dotfiles`.
+- It is **not** in any npx lock file (chezmoi-owned), so it never collides with an
+  npx skill — provided the name stays namespaced (hence `chezmoi-dotfiles`, not a
+  bare `dotfiles`, which could clash in the flat skill namespace).
+
+**Keeping it in sync:** see the `CLAUDE.md` cross-file maintenance row. Short
+version: freshness is automatic; only edit the `.tmpl` when a section must be gated
+on a **new prompt key** or a stable new CLI is worth naming.
 
 ## How `npx skills` actually wires agents (mechanism reference)
 

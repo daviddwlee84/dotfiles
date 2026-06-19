@@ -3156,7 +3156,7 @@ Status: **completed**
 _**Agent (claude-fable-5)**_
 
 <tool-use data-tool-type="read" data-tool-name="read_file_v2">
-<details><summary>Tool use: **read_file_v2** • Read file: </summary>
+<details><summary>Tool use: **read_file_v2** • Read file: /home/daweilee/.local/share/chezmoi/dot_zshrc.tmpl</summary>
 
 </details>
 </tool-use>
@@ -3165,3 +3165,1266 @@ _**Agent (claude-fable-5)**_
 <summary>Tool use: **read_file_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Looking at the zsh prompt issue — the user is seeing a raw `compinit` security warning that's separate from oh-my-zsh's own compfix message. The first prompt is zsh's native interactive prompt asking whether to ignore insecure directories and continue or abort, which suggests something is calling `compinit` without the `-u` or `-i` flags that would suppress this check.
+
+The root cause appears to be that linuxbrew directories are owned by a different user (`taa`), and `compaudit` is flagging them as insecure since they're not owned by root or the current user. I need to find where `compinit` is being called without flags — possibly in a zsh config file or through `brew shellenv`, which adds linuxbrew's site-functions to the FPATH. The fix would be either disabling the oh-my-zsh compfix with `ZSH_DISABLE_COMPFIX=true` or adding the `-u` flag to that other `compinit` call, but first I need to locate where `brew shellenv` is being sourced in the shell initialization.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 3,
+  "outputMode": "content",
+  "path": "/home/daweilee/.local/share/chezmoi",
+  "pattern": "compinit"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/home/daweilee/.local/share/chezmoi",
+  "pattern": "compinit",
+  "topFiles": [
+    {
+      "matchCount": 21,
+      "uri": "./.specstory/history/2026-06-10_13-09-18Z-chzmo-installation-issue.md"
+    },
+    {
+      "matchCount": 6,
+      "uri": "./dot_config/zsh/tools/51_dotcfg_completion.zsh"
+    },
+    {
+      "matchCount": 41,
+      "uri": "./docs/zsh/zsh-completions.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./run_once_before_02_fix_intel_homebrew.sh.tmpl"
+    },
+    {
+      "matchCount": 17,
+      "uri": "./dot_zshrc.tmpl"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./dot_config/zsh/tools/50_ping_monitor_completion.zsh"
+    },
+    {
+      "matchCount": 6,
+      "uri": "./dot_config/zsh/tools/49_x_completion.zsh"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./dot_config/zsh/tools/37_worktrunk.zsh"
+    },
+    {
+      "matchCount": 6,
+      "uri": "./dot_config/zsh/tools/90_completions.zsh"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./dot_config/zsh/tools/12_television.zsh"
+    },
+    {
+      "matchCount": 14,
+      "uri": "./dot_config/shell/48_reyee.sh"
+    },
+    {
+      "matchCount": 14,
+      "uri": "./dot_config/shell/47_mi_router.sh"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./dot_config/shell/10_aliases.sh"
+    },
+    {
+      "matchCount": 25,
+      "uri": "./docs/zsh/zsh-completions.zh-TW.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./docs/tools/sesh.zh-TW.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./docs/tools/sesh.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./docs/shells/adhoc-and-secrets.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./backlog/fish-shell-evaluation.md"
+    },
+    {
+      "matchCount": 14,
+      "uri": "./.specstory/history/2026-05-28_09-05-18Z-x-copy-dot-dotfiles.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "./.specstory/history/2026-05-29_08-01-49Z-infinity-loop-chatgpt-sigint.md"
+    }
+  ],
+  "totalFiles": 22,
+  "totalMatches": 534
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 3,
+  "outputMode": "content",
+  "path": "/home/daweilee/.local/share/chezmoi/dot_config",
+  "pattern": "linuxbrew.*shellenv|shellenv"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/home/daweilee/.local/share/chezmoi/dot_config",
+  "pattern": "linuxbrew.*shellenv|shellenv",
+  "topFiles": [
+    {
+      "matchCount": 20,
+      "uri": "dot_config/shell/00_exports.sh.tmpl"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 5
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm tracing through the shell initialization order: oh-my-zsh gets sourced first in the zshrc and runs compinit, then the modular config layer loads afterward, which means Linuxbrew's site-functions get added to FPATH after oh-my-zsh has already initialized completions.
+
+But the real issue is that nested zsh sessions (like from tmux or launching a shell within a shell) inherit the FPATH environment variable from the parent, so they see Linuxbrew directories before their own compinit runs, triggering the security warnings. The raw compinit prompt appearing before oh-my-zsh's warning suggests something else is calling compinit earlier in the initialization chain — possibly zsh-vi-mode, atuin, or an earlier line in the zshrc itself. I need to trace through the full dot_zshrc.tmpl to find what's triggering that first prompt, then figure out the most robust fix that handles both the initial shell and nested sessions.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /home/daweilee/.local/share/chezmoi/dot_zshrc.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: rg -n 'compinit' ~/.oh-my-zsh/oh-my-zsh.sh ~/.oh-my-zsh/lib/compfix.zsh 2>/dev/null</summary>
+
+```bash
+rg -n 'compinit' ~/.oh-my-zsh/oh-my-zsh.sh ~/.oh-my-zsh/lib/compfix.zsh 2>/dev/null
+```
+
+```
+/home/daweilee/.oh-my-zsh/oh-my-zsh.sh:79:autoload -U compaudit compinit zrecompile
+/home/daweilee/.oh-my-zsh/oh-my-zsh.sh:89:# before running compinit.
+/home/daweilee/.oh-my-zsh/oh-my-zsh.sh:127:  compinit -i -d "$ZSH_COMPDUMP"
+/home/daweilee/.oh-my-zsh/oh-my-zsh.sh:132:  compinit -u -d "$ZSH_COMPDUMP"
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: sed -n 85,135p ~/.oh-my-zsh/oh-my-zsh.sh</summary>
+
+```bash
+sed -n 85,135p ~/.oh-my-zsh/oh-my-zsh.sh
+```
+
+```
+    || builtin test -f $base_dir/plugins/$name/_$name
+}
+
+# Add all defined plugins to fpath. This must be done
+# before running compinit.
+for plugin ($plugins); do
+  if is_plugin "$ZSH_CUSTOM" "$plugin"; then
+    fpath=("$ZSH_CUSTOM/plugins/$plugin" $fpath)
+  elif is_plugin "$ZSH" "$plugin"; then
+    fpath=("$ZSH/plugins/$plugin" $fpath)
+  else
+    echo "[oh-my-zsh] plugin '$plugin' not found"
+  fi
+done
+
+# Figure out the SHORT hostname
+if [[ "$OSTYPE" = darwin* ]]; then
+  # macOS's $HOST changes with dhcp, etc. Use LocalHostName if possible.
+  SHORT_HOST=$(scutil --get LocalHostName 2&gt;/dev/null) || SHORT_HOST="${HOST/.*/}"
+else
+  SHORT_HOST="${HOST/.*/}"
+fi
+
+# Save the location of the current completion dump file.
+if [[ -z "$ZSH_COMPDUMP" ]]; then
+  ZSH_COMPDUMP="${ZDOTDIR:-$HOME}/.zcompdump-${SHORT_HOST}-${ZSH_VERSION}"
+fi
+
+# Construct zcompdump OMZ metadata
+zcompdump_revision="#omz revision: $(builtin cd -q "$ZSH"; git rev-parse HEAD 2&gt;/dev/null)"
+zcompdump_fpath="#omz fpath: $fpath"
+
+# Delete the zcompdump file if OMZ zcompdump metadata changed
+if ! command grep -q -Fx "$zcompdump_revision" "$ZSH_COMPDUMP" 2&gt;/dev/null \
+   || ! command grep -q -Fx "$zcompdump_fpath" "$ZSH_COMPDUMP" 2&gt;/dev/null; then
+  command rm -f "$ZSH_COMPDUMP"
+  zcompdump_refresh=1
+fi
+
+if [[ "$ZSH_DISABLE_COMPFIX" != true ]]; then
+  source "$ZSH/lib/compfix.zsh"
+  # Load only from secure directories
+  compinit -i -d "$ZSH_COMPDUMP"
+  # If completion insecurities exist, warn the user
+  handle_completion_insecurities &amp;|
+else
+  # If the user wants it, load from all found directories
+  compinit -u -d "$ZSH_COMPDUMP"
+fi
+
+# Append zcompdump metadata if missing
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ So oh-my-zsh runs `compinit -i` without prompting and displays that big warning about insecure directories, but the raw compinit prompt asking whether to ignore the issue must be coming from a separate `compinit` call happening before oh-my-zsh loads. That initial prompt appeared first in the user's terminal, so something in their shell configuration is sourcing compinit before oh-my-zsh gets to it.
+
+Looking at the terminal output more carefully, the raw prompt is definitely from zsh's compinit itself, but `compinit -i` should silently ignore insecure directories without prompting. The fact that a prompt appeared means something is calling bare `compinit` without the `-i` flag — possibly a plugin like zsh-vi-mode, or maybe something in the modular completion layer like carapace or atuin that reinitializes compinit if it hasn't been loaded yet.
+
+To track this down, I should run a traced zsh session with `zsh -x -i -c exit` and redirect the trace output to find exactly which file is calling compinit and triggering that initial prompt.发现 oh-my-zsh 用的是 `compinit -i` 不会触发交互式询问，但终端里先出现了原生 `compinit` 的 y/n 提示，说明在 oh-my-zsh 之前还有其他地方调用了裸 `compinit`。现在直接跟踪一次新 zsh 启动来定位问题源头。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: zsh -x -i -c exit 2>/tmp/zsh-trace.txt </dev/null >/dev/null; rg -n 'compinit' /tmp/zsh-trace.txt | head -20</summary>
+
+```bash
+zsh -x -i -c exit 2>/tmp/zsh-trace.txt </dev/null >/dev/null; rg -n 'compinit' /tmp/zsh-trace.txt | head -20
+```
+
+```
+257:+/etc/zsh/zshrc:111&gt; autoload -U compinit
+258:+/etc/zsh/zshrc:112&gt; compinit
+259:+compinit:70&gt; emulate -L zsh
+260:+compinit:71&gt; setopt extendedglob
+261:+compinit:73&gt; typeset _i_dumpfile _i_files _i_line _i_done _i_dir _i_autodump=1
+262:+compinit:74&gt; typeset _i_tag _i_file _i_addfiles _i_fail=ask _i_check=yes _i_name
+263:+compinit:76&gt; [[ 0 -gt 0 ]]
+264:+compinit:108&gt; typeset -gHA _comps _services _patcomps _postpatcomps
+265:+compinit:113&gt; typeset -gHA _compautos
+266:+compinit:118&gt; typeset -gHA _lastcomp
+267:+compinit:121&gt; [[ -n '' ]]
+268:+compinit:125&gt; typeset -g _comp_dumpfile=/home/daweilee/.zcompdump
+269:+compinit:130&gt; typeset -gHa _comp_options
+270:+compinit:131&gt; _comp_options=( bareglobqual extendedglob glob multibyte multifuncdef nullglob rcexpandparam unset NO_allexport NO_aliases NO_cshnullglob NO_cshjunkiequotes NO_errexit NO_errreturn NO_globassign NO_globsubst NO_histsubstpattern NO_ignorebraces NO_ignoreclosebraces NO_kshglob NO_ksharrays NO_kshtypeset NO_markdirs NO_octalzeroes NO_posixbuiltins NO_posixidentifiers NO_shwordsplit NO_shglob NO_warnnestedvar NO_warncreateglobal ) 
+271:+compinit:170&gt; typeset -gH _comp_setup=$'local -A _comp_caller_options;\n             _comp_caller_options=(${(kv)options[@]});\n             setopt localoptions localtraps localpatterns ${_comp_options[@]};\n             local IFS=$\' \\t\\r\\n\\0\';\n             builtin enable -p \\| \\~ \\( \\? \\* \\[ \\&lt; \\^ \\# 2&gt;&amp;-;\n             exec &lt;/dev/null;\n             trap - ZERR;\n             local -a reply;\n             local REPLY;\n             local REPORTTIME;\n             unset REPORTTIME'
+272:+compinit:185&gt; typeset -ga compprefuncs comppostfuncs
+273:+compinit:186&gt; compprefuncs=( ) 
+274:+compinit:187&gt; comppostfuncs=( ) 
+275:+compinit:191&gt; : compinit /etc/zsh/zshrc
+276:+compinit:440&gt; typeset _i_wdirs _i_wfiles
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I found the culprit in the system-wide zshrc at line 111-112, which runs a bare `compinit` call. This is triggering the interactive prompt because the FPATH environment variable inherited from the parent shell contains something that makes compinit think it needs to rebuild its cache, and with the default `_i_fail=ask` setting, it's asking for confirmation.
+
+The key insight is that `/etc/zsh/zshrc` runs before `~/.zshrc`, but `~/.zshenv` actually runs before `/etc/zsh/zshrc`. So I can intercept and clean up the FPATH in my user's `.zshenv` file to remove any problematic directories before the system-wide zshrc even gets a chance to call compinit. The real issue is that compaudit is rejecting certain directories in FPATH because they're not owned by the current user or root, which is what's causing the prompt in the first place. The real issue is ownership: compaudit flags directories owned by taa (the brew admin) rather than root or the current user, even though they're not writable by group/others. Homebrew's own recommendation to chmod the share/zsh directory won't help here since the problem is ownership, not permissions. Chowning to root would satisfy compaudit for all users, but that breaks brew's ability to upgrade completions since taa needs to own the prefix. The cleanest path forward is either accepting the compaudit warnings (they're harmless—the dirs are trusted), using `compinit -u` to skip the audit, or removing those directories from fpath to silence the noise, though that loses completions for brew-installed tools. Actually, I should verify what's really in /etc/zsh/zshrc at that line and whether the repo already manages dot_zshenv, since that affects which approach makes sense.找到了第一处裸 `compinit` 的来源：`/etc/zsh/zshrc:111-112`（系统级文件）。现在我来检查该文件内容，并确认仓库是否管理 `~/.zshenv`。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: sed -n 100,120p /etc/zsh/zshrc; echo "==="; ls -la /etc/zsh/; echo "==="; ls ~/.zshenv 2>&1; chezmoi managed | rg -i 'zshenv|zprofile' || echo "zshenv not managed"</summary>
+
+```bash
+sed -n 100,120p /etc/zsh/zshrc; echo "==="; ls -la /etc/zsh/; echo "==="; ls ~/.zshenv 2>&1; chezmoi managed | rg -i 'zshenv|zprofile' || echo "zshenv not managed"
+```
+
+```
+                                           /bin            \
+                                           /usr/X11R6/bin
+
+(( ${+aliases[run-help]} )) &amp;&amp; unalias run-help
+autoload -Uz run-help
+
+# If you don't want compinit called here, place the line
+# skip_global_compinit=1
+# in your $ZDOTDIR/.zshenv
+if (( ${${(@f)"$(&lt;/etc/os-release)"}[(I)ID*=*ubuntu]} )) &amp;&amp;
+   [[ -z "$skip_global_compinit" ]]; then
+  autoload -U compinit
+  compinit
+fi
+===
+.rw-r--r-- 1.3k root 13 Feb  2022 newuser.zshrc.recommended
+.rw-r--r--  344 root 13 Feb  2022 zlogin
+.rw-r--r--   58 root 13 Feb  2022 zlogout
+.rw-r--r--  264 root 13 Feb  2022 zprofile
+.rw-r--r--  623 root 13 Feb  2022 zshenv
+.rw-r--r-- 3.9k root 13 Feb  2022 zshrc
+===
+/home/daweilee/.zshenv
+.zshenv
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The Ubuntu zshrc file has a built-in escape hatch documented right there—I can set `skip_global_compinit=1` in the `.zshenv` file that chezmoi manages to prevent the slow completion initialization from running.
+
+For the second part, I'm weighing whether to unconditionally disable the compfix check or make it conditional. The existing template already has a commented-out `ZSH_DISABLE_COMPFIX` for Intel Macs, but blanket-disabling a security check isn't ideal practice. The real issue only surfaces on shared linuxbrew boxes where the prefix is owned by another user, so I could detect that at runtime instead—checking if the linuxbrew directory exists and isn't owned by the current user, then conditionally setting the flag only in that case.
+
+But there's a timing subtlety here: on fresh login shells, the linuxbrew site-functions directory isn't even in FPATH when compinit runs (brew shellenv loads after oh-my-zsh), so compaudit wouldn't flag it anyway. The warning only appears in nested shells that inherit the FPATH. With a runtime conditional check, nested shells would get the flag and load completions properly, while fresh shells would run compinit normally without the warning. That's the cleanest approach—set the flag only when needed.
+
+I should also gate this on Linux using the chezmoi template syntax, since the Intel Mac has its own separate block. And I need to add `skip_global_compinit=1` to the managed .zshenv file to prevent the system-wide compinit from running first. The user just wants the fix committed, so I'll skip the pitfalls documentation for now. I'll go with one commit that includes both the zsh fix and the earlier changes, since the user said "一起git commit" — commit everything together. I need to make sure the .specstory history files are included since the repo tracks them and the pre-commit hook scans them anyway. Now I'll locate the .zshenv file that chezmoi manages — it's likely named dot_zshenv or dot_zshenv.tmpl.找到根因了：系统级和 oh-my-zsh 的两个 `compinit` 调用冲突，加上共享 Linuxbrew 的属主检查失败导致补全加载被拒。现在我来检查 `.zshenv` 的源文件。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi source-path ~/.zshenv && cat "$(chezmoi source-path ~/.zshenv)"</summary>
+
+```bash
+chezmoi source-path ~/.zshenv && cat "$(chezmoi source-path ~/.zshenv)"
+```
+
+```
+/home/daweilee/.local/share/chezmoi/dot_zshenv.tmpl
+# ~/.zshenv - Loaded for all shells (interactive and non-interactive)
+# Keep minimal - only essential environment variables
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I need to make two template edits: adding the `skip_global_compinit=1` variable to the zshenv file with a comment explaining it's Ubuntu's escape hatch, and then gating a Linux-specific runtime check in the zshrc file before sourcing oh-my-zsh to set `ZSH_DISABLE_COMPFIX=true`.
+
+For the first edit, I'm deciding whether to gate the variable on Linux or leave it unconditional—since it's just an unused variable on non-Linux systems, it's harmless either way, but gating it keeps the zshenv cleaner on macOS and aligns with the auto-detectable predicates rule. I'll gate it on Linux.
+
+The second consideration is that with `skip_global_compinit=1` in place, compinit only runs through oh-my-zsh, which also speeds up startup and avoids double-running compinit. In nested shells where linuxbrew is detected, `ZSH_DISABLE_COMPFIX=true` lets oh-my-zsh run compinit without warnings and load completions properly.
+
+I'm also noting that the user's existing zshrc has a commented Intel-mac block around lines 72-75 that I'll replace with the new logic.
+
+Writing template blocks... I'm debating whether to document this compinit behavior change in the docs or keep the commit focused on the template fix itself. The pitfall might warrant its own file since this is a non-obvious fix that could silently affect users, so I should check if the pitfalls directory has a README index that needs updating.找到了根因：Ubuntu 系统级 zshrc 和 oh-my-zsh 各自调用 compinit，后者因 Linuxbrew 前缀属于其他用户而触发所有权检查失败。我会在 .zshenv 跳过全局 compinit，并在 .zshrc 检测到共享 Linuxbrew 时禁用 compfix。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/dot_zshenv.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/dot_zshrc.tmpl</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: head -20 pitfalls/README.md; ls pitfalls | head -5</summary>
+
+```bash
+head -20 pitfalls/README.md; ls pitfalls | head -5
+```
+
+```
+head: cannot open 'pitfalls/README.md' for reading: No such file or directory
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd ~/.local/share/chezmoi && ls pitfalls/ | head; ls pitfalls/README* 2>/dev/null</summary>
+
+```bash
+cd ~/.local/share/chezmoi && ls pitfalls/ | head; ls pitfalls/README* 2>/dev/null
+```
+
+```
+ansible-js-cli-tools-old-system-node.md
+ansible-missing-sudo-tag.md
+ansible-when-regex-replace-backslash-strip.md
+apt-update-fails-base-role-empty-error.md
+blesh-set-v-leaks-gexec-wrapper.md
+bootstrap-curl-bash-hangs-after-reattaching-tty.md
+bootstrap-no-tty-sudo-prompt-skipped.md
+brew-bundle-redownloads-manually-installed-cask.md
+brew-cask-slow-github-release-assets.md
+btop-themes-permission-denied-core-dumped.md
+pitfalls/README.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: head -30 pitfalls/README.md; rg -n 'zsh|compinit' pitfalls/README.md | head</summary>
+
+```bash
+head -30 pitfalls/README.md; rg -n 'zsh|compinit' pitfalls/README.md | head
+```
+
+```
+# Pitfalls
+
+Past traps we've stepped on. Symptoms-first knowledge base — the goal is that
+when a problem recurs (on a new machine, after an upgrade, with a new tool
+combo), grepping the symptom here lands you on the root cause and workaround
+in seconds, instead of re-debugging from scratch.
+
+This folder is &#96;chezmoi&#96;-ignored (see &#96;.chezmoiignore.tmpl&#96; → &#96;pitfalls/**&#96;); it
+is repo metadata for maintainers, not user-facing config to deploy.
+
+## Pitfalls vs the rest
+
+This repo has four sibling surfaces with overlapping shapes; pick the right one:
+
+| Surface | Time direction | Question it answers | Access pattern |
+|---|---|---|---|
+| &#96;docs/tools/&lt;tool&gt;.md&#96; | Present | "How does this tool work / how do I configure it?" | Read top to bottom |
+| &#96;docs/this_repo/&lt;topic&gt;.md&#96; | Present | "Why did we architect it this way?" | Read top to bottom |
+| &#96;pitfalls/&lt;slug&gt;.md&#96; | **Past** | **"I see error X — has this happened before?"** | **Grep symptoms** |
+| &#96;backlog/&lt;slug&gt;.md&#96; | Future | "We thought about doing Y — what was the analysis?" | Index in &#96;TODO.md&#96; |
+| &#96;AGENTS.md&#96; Hard invariants | Present | "What rules MUST agents follow?" | Read top to bottom |
+
+A pitfall **graduates** to a Hard invariant in &#96;AGENTS.md&#96; when the trap is
+serious enough that you can't rely on memory or grep — typically when (a) it
+recurs across machines, (b) it silently corrupts state, or (c) the workaround
+is non-obvious and easy to undo by accident. When graduating, leave a
+&#96;pitfalls/&lt;slug&gt;.md&#96; as historical record and link to it from the invariant.
+
+## When to add a pitfall doc
+
+121:| [&#96;mrun-autoname-collides-zsh-random-subshell&#96;](mrun-autoname-collides-zsh-random-subshell.md) | back-to-back &#96;mrun&#96; / &#96;tmrun&#96; / &#96;zjrun&#96; without &#96;-n NAME&#96; produce the same &#96;run-&lt;dir&gt;-&lt;hex&gt;&#96; suffix; second call errors &#96;tmux session 'run-X-NNNN' already exists&#96;; &#96;zsh -c 'echo $(echo $RANDOM) $(echo $RANDOM)'&#96; returns identical numbers | fixed in &#96;dot_config/zsh/tools/23_mrun.zsh&#96; (read &#96;$RANDOM&#96; into a parent-shell local before the &#96;$(…)&#96; boundary) |
+132:| [&#96;tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper&#96;](tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper.md) | tmux pane built with &#96;cmd; exec $SHELL&#96; wrapper closes on Ctrl+C inside btop/htop/less even though clean quit (&#96;q&#96;/&#96;:q&#96;) lands in shell as designed | fixed in &#96;dot_config/zsh/tools/22_sesh.zsh&#96; (&#96;trap '' INT;&#96; prefix in &#96;_sesh_on_exit_wrap&#96;) |
+141:| [&#96;zoxide-doctor-warning&#96;](zoxide-doctor-warning.md) | &#96;zoxide: detected a possible configuration issue.&#96; / &#96;Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).&#96; / &#96;Disable this message by setting _ZO_DOCTOR=0.&#96; printed on every prompt; coding-agent bash output mixes warning with unrelated &#96;Exit code 2&#96; from build script; agents start prefixing every &#96;chezmoi apply&#96; with &#96;_ZO_DOCTOR=0&#96; defensively | fixed (&#96;export _ZO_DOCTOR=0&#96; added to &#96;dot_config/shell/20_zoxide.sh&#96;) |
+142:| [&#96;zsh-osc133-precmd-printf-a-not-stored&#96;](zsh-osc133-precmd-printf-a-not-stored.md) | &#96;tmux send-keys -X next-prompt&#96; doesn't move cursor even though zsh precmd emits OSC 133 A; C markers from preexec work fine; shell-function cpout/cpcmd/cpblock returns 1 byte | workaround documented (embed A in &#96;$PROMPT&#96; via &#96;%{...%}&#96;, not printf from precmd) |
+143:| [&#96;zsh-autosuggestions-postdisplay-clobber&#96;](zsh-autosuggestions-postdisplay-clobber.md) | custom ZLE widget sets &#96;POSTDISPLAY=...&#96; + &#96;region_highlight&#96; then exits; ghost text never renders; &#96;add-zle-hook-widget line-pre-redraw&#96; shows POSTDISPLAY=&#96;[]&#96; despite widget setting it microseconds earlier; affects any widget name not prefixed with &#96;_&#96; / &#96;.&#96; / &#96;autosuggest-&#96; | fixed in &#96;dot_config/zsh/tools/05_aisuggest.zsh&#96; (&#96;ZSH_AUTOSUGGEST_IGNORE_WIDGETS+=(...)&#96;) |
+144:| [&#96;zsh-star-slice-substring-not-element&#96;](zsh-star-slice-substring-not-element.md) | &#96;zsh:1: command not found: o&#96; from &#96;svibe N opencode&#96;; &#96;[o exited — back in shell. Re-run with: o]&#96;; only the **first** agent pane broken; agent name truncated to first char; zsh-only (bash fine) | fixed in &#96;dot_config/shell/22_sesh.sh&#96; (&#96;${agents[*]:0:1}&#96; → &#96;${agents[@]:0:1}&#96;) |
+145:| [&#96;zsh-tied-array-path-shadowing&#96;](zsh-tied-array-path-shadowing.md) | &#96;command not found&#96; only inside one zsh function, works at prompt; &#96;hash -r&#96; / &#96;rehash&#96; doesn't help | fixed in &#96;dot_config/zsh/tools/22_sesh.zsh&#96; (rename local &#96;path&#96; → &#96;target&#96;) |
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I need to add a new row to the README's index table and create the corresponding pitfall file. Let me check an existing pitfall file to understand the structure, then figure out where to insert my entry alphabetically—my slug `zsh-insecure-directories-prompt-shared-linuxbrew` should go after zoxide entries but before other zsh entries.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cat pitfalls/zoxide-doctor-warning.md; echo ====; sed -n 138,146p pitfalls/README.md</summary>
+
+```bash
+cat pitfalls/zoxide-doctor-warning.md; echo ====; sed -n 138,146p pitfalls/README.md
+```
+
+```
+# zoxide prints "detected a possible configuration issue" warning on every shell / script invocation
+
+**Symptoms** (grep this section): &#96;zoxide: detected a possible configuration issue.&#96;, &#96;Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).&#96;, &#96;Disable this message by setting _ZO_DOCTOR=0.&#96;, coding-agent bash tool output mixes the warning with unrelated &#96;Exit code 2&#96; from a build script, every other line of &#96;chezmoi apply&#96; stderr is the same 6-line zoxide warning, agents start prefixing &#96;_ZO_DOCTOR=0 chezmoi apply ...&#96; defensively in every command.
+
+**First seen**: 2026-04 (recurring across many SpecStory sessions; ~140 &#96;_ZO_DOCTOR=0&#96; workaround prefixes accumulated in &#96;.specstory/history/&#96; before being root-caused)
+**Affects**: zoxide ≥ 0.9 (when the doctor heuristic was added) on any host running this repo's &#96;dot_config/shell/20_zoxide.sh&#96;. Both zsh and bash. Fires more often inside coding-agent bash tools because they spawn fresh interactive-ish shells per command.
+**Status**: fixed — &#96;export _ZO_DOCTOR=0&#96; added to &#96;dot_config/shell/20_zoxide.sh&#96; immediately after &#96;zoxide init&#96;.
+
+## Symptom
+
+Coding-agent shell tool returns:
+
+&#96;&#96;&#96;text
+Bash(cd /some/path &amp;&amp; mkdir -p /tmp/foo &amp;&amp; ./scripts/build.sh)
+  ⎿  Error: Exit code 2
+     zoxide: detected a possible configuration issue.
+     Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).
+
+     If the issue persists, consider filing an issue at:
+     https://github.com/ajeetdsouza/zoxide/issues
+
+     Disable this message by setting _ZO_DOCTOR=0.
+
+     scripts/build.sh: line 62: syntax error near unexpected token &#96;&lt;'
+&#96;&#96;&#96;
+
+Two unrelated things conflated:
+
+1. The 6-line zoxide warning is printed to stderr by &#96;__zoxide_hook&#96; on every prompt.
+2. The actual &#96;Exit code 2&#96; is from the inner build script's bash syntax error.
+
+The agent (and human reader) sees them as one block and assumes zoxide caused the failure. It didn't — but the warning's presence in every command's stderr makes it noise on every other diagnostic.
+
+## Root cause
+
+&#96;zoxide init zsh|bash&#96; registers a hook (&#96;__zoxide_hook&#96;) and includes a doctor check that fires on every prompt:
+
+- **zsh** version checks &#96;precmd_functions[-1] == __zoxide_hook&#96;
+- **bash** version checks the tail of &#96;PROMPT_COMMAND&#96;
+
+If anything else is registered AFTER zoxide, the warning fires.
+
+This repo deliberately registers hooks after zoxide:
+
+| Shell | Loaded after &#96;20_zoxide.sh&#96; | Adds hook? |
+|---|---|---|
+| zsh | &#96;dot_config/zsh/tools/02_shell_integration.zsh&#96; (&#96;add-zsh-hook precmd _osc133_precmd&#96;) | yes — appends to &#96;precmd_functions&#96; |
+| bash | &#96;dot_bashrc.tmpl&#96; step 8: &#96;eval "$(atuin init bash --disable-up-arrow)"&#96; | yes — extends &#96;PROMPT_COMMAND&#96; |
+| bash | &#96;dot_bashrc.tmpl&#96; step 10: &#96;ble-attach&#96; | yes — installs ble.sh's own DEBUG/RETURN trap chain |
+
+The reasons each one MUST come after zoxide:
+
+- **OSC 133** must run after starship so &#96;add-zsh-hook precmd&#96; chain order lands &#96;_osc133_precmd&#96; after &#96;prompt_starship_precmd&#96;. Otherwise OSC 133's PROMPT-wrap step has no rendered prompt to wrap.
+- **atuin** must run after ble.sh has been sourced (&#96;--attach=none --noattach&#96;) but before &#96;ble-attach&#96;, otherwise atuin's &#96;__atuin_history&#96; fights ble.sh's &#96;_ble_*&#96; history layer.
+- **ble-attach** must be the very last hook installer in bashrc — that's a hard ble.sh requirement (documented at &lt;https://github.com/akinomyoga/ble.sh/wiki/&gt;).
+
+So the load order is correct *for our architecture*; zoxide's heuristic just doesn't know about it.
+
+The functional impact of the "wrong" order is **zero**: &#96;__zoxide_hook&#96; only writes the current &#96;$PWD&#96; into the frecency DB on each prompt, and that write happens regardless of whether the hook is first, middle, or last in the chain.
+
+## Workaround
+
+Set &#96;_ZO_DOCTOR=0&#96; immediately next to the zoxide init in the shared shell layer:
+
+&#96;&#96;&#96;sh
+# dot_config/shell/20_zoxide.sh
+export _ZO_RESOLVE_SYMLINKS=1
+export _ZO_DOCTOR=0  # see pitfalls/zoxide-doctor-warning.md
+if [ -n "$ZSH_VERSION" ]; then
+    eval "$(zoxide init zsh)"
+elif [ -n "$BASH_VERSION" ]; then
+    eval "$(zoxide init bash)"
+fi
+alias cd="z"
+&#96;&#96;&#96;
+
+After &#96;chezmoi apply&#96; (or &#96;source ~/.zshrc&#96; / &#96;source ~/.bashrc&#96;), the warning stops appearing in every prompt. Existing agent sessions need a new shell to pick it up; coding-agent bash tools that spawn fresh shells per command pick it up immediately.
+
+&#96;zoxide&#96; itself is unaffected. &#96;z &lt;query&gt;&#96;, &#96;zi&#96;, frecency tracking — all behave identically before and after.
+
+## Prevention
+
+If a future addition to the load chain has its own doctor-style "must be last" check, prefer **disabling the heuristic** over re-architecting the load order. The order in &#96;dot_zshrc.tmpl&#96; and &#96;dot_bashrc.tmpl&#96; is load-bearing for several non-negotiable reasons (ble.sh attach order, OSC 133 wrapping starship's prompt, atuin needing ble.sh as a peer, etc.).
+
+Things to NOT do, and why:
+
+- **Don't** move zoxide init to the very end of &#96;~/.zshrc&#96; / &#96;~/.bashrc&#96; — breaks the &#96;dot_config/shell/*.sh&#96; shared-tier convention (the whole point is one file works in both shells, sourced from the same loader callsite). Also still wouldn't help: &#96;~/.shellrc.adhoc&#96; / &#96;~/.zshrc.adhoc&#96; / &#96;~/.bashrc.adhoc&#96; may register their own precmd hooks and there's no way to guarantee user adhoc files don't.
+- **Don't** monkey-patch &#96;precmd_functions&#96; to push &#96;__zoxide_hook&#96; to the end — fragile, breaks again the moment another tool re-orders.
+- **Don't** ask agents to prefix every command with &#96;_ZO_DOCTOR=0&#96; — that's the symptom, not the fix. Past sessions accumulated ~140 such prefixes in &#96;.specstory/history/&#96; before this was root-caused.
+
+If you ever need to actually re-enable the doctor (e.g. to debug whether zoxide's frecency tracking has stopped working): &#96;_ZO_DOCTOR=1 zsh&#96; for one session.
+
+## Related
+
+- [&#96;dot_config/shell/20_zoxide.sh&#96;](../dot_config/shell/20_zoxide.sh) — the fix lives here, next to the init
+- [&#96;dot_config/zsh/tools/02_shell_integration.zsh&#96;](../dot_config/zsh/tools/02_shell_integration.zsh) — OSC 133 hook that's the proximate cause on zsh side
+- [&#96;dot_bashrc.tmpl&#96;](../dot_bashrc.tmpl) — load-bearing 12-step init order on bash side; see [&#96;docs/shells/bash.md&#96;](../docs/shells/bash.md) for the rationale
+- [zoxide#723 — "Disable doctor message"](https://github.com/ajeetdsouza/zoxide/issues/723) — upstream tracking issue for the heuristic's false positives
+- Sibling pitfall: [&#96;zsh-osc133-precmd-printf-a-not-stored.md&#96;](zsh-osc133-precmd-printf-a-not-stored.md) — same &#96;_osc133_precmd&#96; hook, different failure mode
+(eval):1: === not found
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm ready to write the pitfall documentation file, keeping it concise and aligned with the house style while including the actual error messages verbatim.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /home/daweilee/.local/share/chezmoi/pitfalls/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /home/daweilee/.local/share/chezmoi/pitfalls/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+现在我将用真实 zsh 验证应用效果，模拟嵌套 shell 继承被污染的 FPATH 场景。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi apply ~/.zshenv ~/.zshrc && echo "--- zshenv:" && head -16 ~/.zshenv && echo "--- zshrc snippet:" && sed -n '/linuxbrew/,+3p' ~/.zshrc | head -8</summary>
+
+```bash
+chezmoi apply ~/.zshenv ~/.zshrc && echo "--- zshenv:" && head -16 ~/.zshenv && echo "--- zshrc snippet:" && sed -n '/linuxbrew/,+3p' ~/.zshrc | head -8
+```
+
+```
+--- zshenv:
+# ~/.zshenv - Loaded for all shells (interactive and non-interactive)
+# Keep minimal - only essential environment variables
+
+# Ubuntu's /etc/zsh/zshrc runs a bare &#96;compinit&#96; before ~/.zshrc. When the
+# inherited FPATH contains dirs that fail compaudit (e.g. a shared Linuxbrew's
+# site-functions owned by another user — exported by &#96;brew shellenv&#96;, so every
+# NESTED zsh inherits them), that bare compinit blocks on an interactive
+# "Ignore insecure directories and files ... [y]/[n]?" prompt. Skip it via the
+# escape hatch documented in /etc/zsh/zshrc itself — oh-my-zsh runs compinit
+# in ~/.zshrc anyway, so this also drops a duplicate compinit at startup.
+# See pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md.
+skip_global_compinit=1
+--- zshrc snippet:
+# See pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md.
+if [[ -e /home/linuxbrew/.linuxbrew/bin/brew &amp;&amp; ! -O /home/linuxbrew/.linuxbrew ]]; then
+    ZSH_DISABLE_COMPFIX=true
+fi
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: rm -f ~/.zcompdump*; export FPATH="/home/linuxbrew/.linuxbrew/share/zsh/site-functions:${FPATH:-/usr/share/zsh/functions}"; timeout 60 zsh -i -c 'echo COMPFIX=$ZSH_DISABLE_COMPFIX; echo SHELL_OK' </dev/null 2>&1 | rg -i 'insecure|Ignore|COMPFIX|SHELL_OK|error' | head -10; echo "exit=$?"</summary>
+
+```bash
+rm -f ~/.zcompdump*; export FPATH="/home/linuxbrew/.linuxbrew/share/zsh/site-functions:${FPATH:-/usr/share/zsh/functions}"; timeout 60 zsh -i -c 'echo COMPFIX=$ZSH_DISABLE_COMPFIX; echo SHELL_OK' </dev/null 2>&1 | rg -i 'insecure|Ignore|COMPFIX|SHELL_OK|error' | head -10; echo "exit=$?"
+```
+
+```
+[[31mERROR[0m] - (starship::print): Under a 'dumb' terminal (TERM=dumb).
+COMPFIX=true
+SHELL_OK
+exit=0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm verifying the behavior with a polluted FPATH where linuxbrew site-functions are inherited—interactive zsh starts without prompting for compinit or showing oh-my-zsh warnings, and ZSH_DISABLE_COMPFIX gets correctly set to true. The starship dumb-terminal error doesn't matter here since TERM is set to dumb in the test environment. I should also check the single-user path where linuxbrew is either owned by the current user or absent, which would leave the flag unset, but on this machine brew exists and is owned by taa so the flag stays true. I can verify the unset branch works by examining the conditional logic directly. Finally, I want to confirm completions are still functional and compinit actually ran by checking if the completion system initialized properly.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: timeout 60 zsh -i -c 'whence -w compdef; whence -w _brew | head -1' </dev/null 2>/dev/null</summary>
+
+```bash
+timeout 60 zsh -i -c 'whence -w compdef; whence -w _brew | head -1' </dev/null 2>/dev/null
+```
+
+```
+compdef: function
+_brew: function
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I see the FPATH pollution from the persistent shell was actually simulating a nested environment, which allowed the brew completions to load properly this time — that's the confirmation I needed. Now I'm ready to commit everything together as requested, so let me check the status of the modified files.两处验证都通过了——嵌套 shell 不再出现提示和警告，brew 补全也能正常加载。现在准备提交。</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short</summary>
+
+```bash
+git status --short
+```
+
+```
+ M .specstory/history/2026-06-09_12-26-56Z-terminal-ui-options-in-bootstrap.sh.md
+ M .specstory/history/2026-06-10_06-47-10Z-configuration-management-for-chezmoi.md
+ M .specstory/history/2026-06-10_08-20-41Z-this.md
+ M .specstory/statistics.json
+ M dot_ansible/roles/lazyvim_deps/tasks/main.yml
+ M dot_zshenv.tmpl
+ M dot_zshrc.tmpl
+ M pitfalls/README.md
+ M pitfalls/mise-rust-cargo-shim-dead.md
+?? .specstory/history/2026-06-10_13-09-18Z-chzmo-installation-issue.md
+?? .specstory/history/2026-06-10_13-36-47Z-development-machine-setup-with-docker-and-azure.md
+?? pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git diff --stat</summary>
+
+```bash
+git diff --stat
+```
+
+```
+ ...2-26-56Z-terminal-ui-options-in-bootstrap.sh.md |   32 +-
+ ...-47-10Z-configuration-management-for-chezmoi.md | 1208 +++++++++++++++++++-
+ .specstory/history/2026-06-10_08-20-41Z-this.md    |  566 ++++++++-
+ .specstory/statistics.json                         |   34 +-
+ dot_ansible/roles/lazyvim_deps/tasks/main.yml      |   29 +-
+ dot_zshenv.tmpl                                    |   12 +
+ dot_zshrc.tmpl                                     |   14 +
+ pitfalls/README.md                                 |    1 +
+ pitfalls/mise-rust-cargo-shim-dead.md              |   25 +-
+ 9 files changed, 1907 insertions(+), 14 deletions(-)
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git log --oneline -8</summary>
+
+```bash
+git log --oneline -8
+```
+
+```
+651ed8b fix(ansible): tolerate TPM plugin download failures and broken cargo shim
+12d7610 Fix some deprecated upstream
+d02a9dd fix(init): emit flags for ALL prompts so --prompt can't leak; add dotcfg
+e893b3d feat(init): add reconfigure subcommand to change settings after init
+ee120ec refactor(init): make PROMPTS the single source of truth + fix snap chezmoi
+e4d8789 fix(init): stop chezmoi falling back to interactive prompts
+4958da1 fix(bootstrap): redirect /dev/tty only on final &#96;exec uv run&#96;, not bash's own fd 0
+4803d80 feat(shell): add run-for time-box wrapper for long-running commands
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add -A && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+
+Two unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):
+
+- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable
+  yet, `mise install rust@latest` 404s and every later `mise exec -- npm`
+  (coding_agents, js_cli_tools) fails the play via mise's auto-install
+  cascade. Retry `mise install --yes` against the official rustup server,
+  same fallback pattern as rust_cargo_tools.
+- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is
+  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit
+  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership
+  failure — chmod can't fix it). Set skip_global_compinit=1 and enable
+  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.
+
+Pitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new
+zsh-insecure-directories-prompt-shared-linuxbrew.md.
+EOF
+)"</summary>
+
+```bash
+git add -A && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+
+Two unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):
+
+- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable
+  yet, `mise install rust@latest` 404s and every later `mise exec -- npm`
+  (coding_agents, js_cli_tools) fails the play via mise's auto-install
+  cascade. Retry `mise install --yes` against the official rustup server,
+  same fallback pattern as rust_cargo_tools.
+- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is
+  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit
+  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership
+  failure — chmod can't fix it). Set skip_global_compinit=1 and enable
+  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.
+
+Pitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new
+zsh-insecure-directories-prompt-shared-linuxbrew.md.
+EOF
+)"
+```
+
+```
+[INFO] Initializing environment for https://github.com/gitleaks/gitleaks.
+[INFO] Initializing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Initializing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Initializing environment for https://github.com/scop/pre-commit-shfmt.
+[INFO] Installing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+]633;P;Cwd=/home/daweilee/.local/share/chezmoi]633;P;HasRichCommandDetection=True]633;A$ ]633;B]633;E;git add -A &amp;&amp; git commit --trailer "Co-authored-by: Cursor &lt;cursoragent@cursor.com&gt;" -m "$(cat &lt;&lt;'EOF'\x0afix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew\x0a\x0aTwo unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):\x0a\x0a- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable\x0a  yet, &#96;mise install rust@latest&#96; 404s and every later &#96;mise exec -- npm&#96;\x0a  (coding_agents, js_cli_tools) fails the play via mise's auto-install\x0a  cascade. Retry &#96;mise install --yes&#96; against the official rustup server,\x0a  same fallback pattern as rust_cargo_tools.\x0a- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is\x0a  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit\x0a  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership\x0a  failure — chmod can't fix it). Set skip_global_compinit=1 and enable\x0a  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.\x0a\x0aPitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new\x0azsh-insecure-directories-prompt-shared-linuxbrew.md.\x0aEOF\x0a)"git add -A &amp;&amp; git commit --trailer "Co-authored-by: Cursor &lt;cursoragent@cursor.com&gt;" -m "$(cat &lt;&lt;'EOF'
+fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+
+Two unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):
+
+- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable
+  yet, &#96;mise install rust@latest&#96; 404s and every later &#96;mise exec -- npm&#96;
+  (coding_agents, js_cli_tools) fails the play via mise's auto-install
+  cascade. Retry &#96;mise install --yes&#96; against the official rustup server,
+  same fallback pattern as rust_cargo_tools.
+- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is
+  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit
+  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership
+  failure — chmod can't fix it). Set skip_global_compinit=1 and enable
+  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.
+
+Pitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new
+zsh-insecure-directories-prompt-shared-linuxbrew.md.
+EOF
+)"
+]633;C[INFO] Initializing environment for https://github.com/gitleaks/gitleaks.
+[INFO] Initializing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Initializing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Initializing environment for https://github.com/scop/pre-commit-shfmt.
+[INFO] Installing environment for https://github.com/pre-commit/pre-commit-hooks.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+An unexpected error has occurred: CalledProcessError: command: ('/home/daweilee/.cache/pre-commit/repopuabym_i/py_env-python3/bin/python', '-mpip', 'install', '.')
+return code: 1
+stdout:
+    Processing ./.
+      Installing build dependencies: started
+      Installing build dependencies: finished with status 'done'
+      Getting requirements to build wheel: started
+      Getting requirements to build wheel: finished with status 'done'
+      Installing backend dependencies: started
+      Installing backend dependencies: finished with status 'done'
+      Preparing metadata (pyproject.toml): started
+      Preparing metadata (pyproject.toml): finished with status 'done'
+    Building wheels for collected packages: shellcheck_py
+      Building wheel for shellcheck_py (pyproject.toml): started
+      Building wheel for shellcheck_py (pyproject.toml): still running...
+      Building wheel for shellcheck_py (pyproject.toml): finished with status 'error'
+    Failed to build shellcheck_py
+stderr:
+      error: subprocess-exited-with-error
+      
+      × Building wheel for shellcheck_py (pyproject.toml) did not run successfully.
+      │ exit code: 1
+      ╰─&gt; [20 lines of output]
+          /tmp/pip-build-env-lfevijwt/overlay/lib/python3.13/site-packages/setuptools/_vendor/wheel/bdist_wheel.py:4: FutureWarning: The 'wheel' package is no longer the canonical location of the 'bdist_wheel' command, and will be removed in a future release. Please update to setuptools v70.1 or later which contains an integrated version of this command.
+            warn(
+          /tmp/pip-build-env-lfevijwt/overlay/lib/python3.13/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+          !!
+          
+                  ********************************************************************************
+                  Please consider removing the following classifiers in favor of a SPDX license expression:
+          
+                  License :: OSI Approved :: MIT License
+          
+                  See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+                  ********************************************************************************
+          
+          !!
+            self._finalize_license_expression()
+          running bdist_wheel
+          running build
+          running setuptools_download
+          =&gt; downloading shellcheck...
+          error: &lt;urlopen error [Errno 110] Connection timed out&gt;
+          [end of output]
+      
+      note: This error originates from a subprocess, and is likely not a problem with pip.
+      ERROR: Failed building wheel for shellcheck_py
+    error: failed-wheel-build-for-install
+    
+    × Failed to build installable wheels for some pyproject.toml based projects
+    ╰─&gt; shellcheck_py
+Check the log at /home/daweilee/.cache/pre-commit/pre-commit.log
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Pre-commit is setting up hook environments for the first time on this machine, so I'll need to wait for that to complete.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="await">
+<details>
+<summary>Tool use: **await**</summary>
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="await"><details>
+<summary>Tool use: **await**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /home/daweilee/.cursor/projects/home-daweilee-local-share-chezmoi/terminals/220922.txt</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The pre-commit hook failed because shellcheck_py couldn't download the binary from GitHub due to a connection timeout—it needs a proxy to work. I need to fix this by setting the proxy environment variables before running the commit, since the shell session where I exported HTTPS_PROXY was separate from the one executing the pre-commit hook.The pre-commit hook timed out downloading shellcheck on first install due to direct GitHub connection issues, so the commit wasn't created. I'll retry with a proxy configured.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: export HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890 && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+
+Two unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):
+
+- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable
+  yet, `mise install rust@latest` 404s and every later `mise exec -- npm`
+  (coding_agents, js_cli_tools) fails the play via mise's auto-install
+  cascade. Retry `mise install --yes` against the official rustup server,
+  same fallback pattern as rust_cargo_tools.
+- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is
+  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit
+  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership
+  failure — chmod can't fix it). Set skip_global_compinit=1 and enable
+  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.
+
+Pitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new
+zsh-insecure-directories-prompt-shared-linuxbrew.md.
+EOF
+)"</summary>
+
+```bash
+export HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890 && git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+
+Two unrelated fresh-box failures observed on ta-stg (Ubuntu 22.04):
+
+- lazyvim_deps: when TUNA's rustup mirror hasn't synced the newest stable
+  yet, `mise install rust@latest` 404s and every later `mise exec -- npm`
+  (coding_agents, js_cli_tools) fails the play via mise's auto-install
+  cascade. Retry `mise install --yes` against the official rustup server,
+  same fallback pattern as rust_cargo_tools.
+- zshenv/zshrc: nested zsh on a box whose /home/linuxbrew/.linuxbrew is
+  owned by another user blocked on Ubuntu's /etc/zsh/zshrc bare-compinit
+  y/n prompt and printed the oh-my-zsh insecure-directories wall (ownership
+  failure — chmod can't fix it). Set skip_global_compinit=1 and enable
+  ZSH_DISABLE_COMPFIX only when the brew prefix isn't ours.
+
+Pitfalls updated: mise-rust-cargo-shim-dead.md (cascade variant) + new
+zsh-insecure-directories-prompt-shared-linuxbrew.md.
+EOF
+)"
+```
+
+```
+[INFO] Installing environment for https://github.com/shellcheck-py/shellcheck-py.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+[INFO] Installing environment for https://github.com/scop/pre-commit-shfmt.
+[INFO] Once installed this environment will be reused.
+[INFO] This may take a few minutes...
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...................................................................Passed
+check toml...............................................(no files to check)Skipped
+check json...................................................................Passed
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+[main e6f1127] fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+ 12 files changed, 5863 insertions(+), 14 deletions(-)
+ create mode 100644 .specstory/history/2026-06-10_13-09-18Z-chzmo-installation-issue.md
+ create mode 100644 .specstory/history/2026-06-10_13-36-47Z-development-machine-setup-with-docker-and-azure.md
+ create mode 100644 pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short && git log --oneline -2</summary>
+
+```bash
+git status --short && git log --oneline -2
+```
+
+```
+e6f1127 fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+651ed8b fix(ansible): tolerate TPM plugin download failures and broken cargo shim
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The changes are committed and the working directory is clean.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+已修复并提交完成(`e6f1127`,工作区干净,未推送)。
+
+## 根因 —— 其实是两个叠加的 compinit
+
+1. **阻塞式 y/n 询问**不是 oh-my-zsh 发出的,而是 Ubuntu 原生 `/etc/zsh/zshrc:111-112` 的裸 `compinit`(在 `~/.zshrc` 之前运行,默认遇到不安全目录就交互式询问)。用 `zsh -x -i -c exit` 跟踪定位的。
+2. **oh-my-zsh 的警告墙**:`/home/linuxbrew/.linuxbrew/share/zsh*` 由用户 `taa` 拥有(共享 Linuxbrew),compaudit 检查的是**所有权**(必须 root 或当前用户),不只是写权限——所以提示里建议的 `compaudit | xargs chmod g-w,o-w` 根本无效(目录本来就是 755),chown 又会弄坏 taa 的 `brew upgrade`。
+3. **为什么只有"新开的 zsh"中招**:`brew shellenv` 会 `export FPATH`,嵌套 shell(tmux 分屏、shell 里再开 zsh)继承了被污染的 FPATH,在 compinit 时就能看到这些目录;新登录的 shell 则是干净的(brew shellenv 在 compinit 之后才跑)。
+
+## 修复(均按系统/场景门控)
+
+- **`dot_zshenv.tmpl`**(Linux):`skip_global_compinit=1` —— 这是 `/etc/zsh/zshrc` 自己文档化的逃生口,杀掉阻塞询问,顺带省掉一次重复 compinit。
+- **`dot_zshrc.tmpl`**(Linux,oh-my-zsh 之前):仅当 *brew prefix 存在且不属于当前用户* 时才设 `ZSH_DISABLE_COMPFIX=true` —— 共享前缀视为可信,oh-my-zsh 改用 `compinit -u`,嵌套 shell 里 brew 的补全(`_brew`、`_bat`、`_delta`…)现在反而能正常加载了;单用户机器保留完整审计。
+- 新增 `pitfalls/zsh-insecure-directories-prompt-shared-linuxbrew.md` + README 索引行。
+
+## 验证
+
+模拟嵌套 shell(注入 linuxbrew site-functions 到 FPATH 后启动交互式 zsh):无 y/n 询问、无 insecure 警告、`ZSH_DISABLE_COMPFIX=true` 正确自动生效,且 `_brew` 补全函数可加载。
+
+提交包含了上一轮的 ansible rust 镜像回退修复和两个 pitfall 文档,以及 .specstory 历史。小插曲:首次提交时 pre-commit 安装 shellcheck 钩子环境从 GitHub 下载超时,带上 `127.0.0.1:7890` 代理后通过——这台机器跑涉及 GitHub 下载的操作时建议都带代理。

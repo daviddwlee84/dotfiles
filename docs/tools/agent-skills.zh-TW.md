@@ -14,6 +14,7 @@ agent skills，兩者的範圍迥異。
 |---|---|---|---|
 | **全域** (Global)（每個專案、每個 shell） | `~/.agents/.skill-lock.json`（chezmoi 管理） | `~/.agents/skills/<name>/` | 每次 `chezmoi apply` 由 `.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl` 執行 |
 | **專案** (Project)（僅在本 repo 工作目錄內，用於編輯 skills） | `./skills-lock.json`（git 追蹤） | `./.agents/skills/<name>/` | 每次 `chezmoi apply` 由 `.chezmoiscripts/repo/run_onchange_after_45_bootstrap_skills.sh.tmpl` 執行（當 source dir == repo 時）；手動備援：`just bootstrap-skills` |
+| **第一方模板** (First-party templated)（`chezmoi-dotfiles`） | 無——由 chezmoi 管理 | `~/.agents/skills/chezmoi-dotfiles/`（外加 `~/.claude/skills/` 內的 symlink） | `chezmoi apply`（依各主機的 `.chezmoi.toml` 重新算繪 (render)）——見 [§ 第一方模板 skill](#第一方模板-skillchezmoi-dotfiles) |
 
 兩個範圍今天碰巧重疊（都會安裝
 `project-knowledge-harness`），但用途不同——見下方「為什麼兩個範圍？」。
@@ -109,6 +110,45 @@ just bootstrap-skills
 | 還在本機原型階段、尚未決定的 skill | 專案，穩定後再升級為全域 |
 
 `project-knowledge-harness` 今天同時在**兩個**範圍中存在，因為（a）這個 harness 本身針對*任何*專案，所以屬於全域；（b）我們想立刻在 chezmoi repo 上使用它，全域安裝涵蓋了這點，但專案範圍讓 lock 檔依賴對任何讀 `skills-lock.json` 的人都明確可見。
+
+## 第一方模板 skill（`chezmoi-dotfiles`）
+
+以上全部都在講 **npx 拉取**的 skills（從外部 repo clone 來的靜態副本，放在被
+chezmoi 忽略的 `.agents/skills/**`）。有且僅有一個**第一方、由 chezmoi 管理、
+*經模板算繪 (templated)*** 的 skill 打破了這個模式：
+
+| | npx skills | `chezmoi-dotfiles` |
+|---|---|---|
+| 來源 | 外部 git repo，由 `npx skills` clone | 本 repo 的 `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl` |
+| 擁有者 | `npx skills` CLI（`~/.agents/.skill-lock.json`） | chezmoi（一個普通的 managed target） |
+| 各主機內容 | 到處都一樣 | **依 `.chezmoi.toml` 算繪**——只列出該主機選裝的工具 |
+| 更新 | `npx skills` / `just upgrade-skills` | **每次 `chezmoi apply` 重新算繪** |
+
+**為什麼需要它：** 讓在*任意*目錄打開的 agent 都能操作這套 dotfiles，並發現
+本 repo 的自訂工具（in-house CLIs、`tv` channels、keymaps、`just` recipes）——
+這些大多放在 `docs/**` 之下，而 `docs/**` **不會**部署到 `$HOME`，只能透過
+`chezmoi source-path` 抵達。這個 skill 刻意保持**精簡且自我探索 (self-discovering)**
+（指向 `docs/`、`tv list-channels`、`just --list`、
+`ls $(chezmoi source-path)/dot_dotfiles/bin/`），所以很少需要修改。
+
+**部署方式：**
+
+- 實體檔 → `~/.agents/skills/chezmoi-dotfiles/SKILL.md`（跨 agent 通用目錄）。
+  symlink `~/.claude/skills/chezmoi-dotfiles → ../../.agents/skills/chezmoi-dotfiles`
+  （source：`dot_claude/skills/symlink_chezmoi-dotfiles`）讓 Claude Code 找得到——
+  與 `npx skills` 用的 per-agent symlink 形狀相同。
+- 在 `.chezmoiignore.tmpl` 中以**單 `*`** glob（`.agents/skills/*` +
+  `.agents/skills/*/**`，而非裸 `**`）把它從廣域 npx 忽略中重新納入。這點是關鍵：
+  遞迴 `**`（或裸 `.agents/skills` 目錄行）會排除**父目錄**，之後 chezmoi——如同
+  gitignore——會默默忽略 `!` 重新納入。用 `chezmoi managed | grep chezmoi-dotfiles`
+  驗證。詳見 [pitfalls/chezmoiignore-negation-noop-under-recursive-glob](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/chezmoiignore-negation-noop-under-recursive-glob.md)。
+- 它**不在**任何 npx lock 檔內（由 chezmoi 擁有），所以不會跟 npx skill 衝突——
+  前提是名稱保持有命名空間（因此用 `chezmoi-dotfiles`，而非裸 `dotfiles`，後者在
+  扁平的 skill 命名空間中可能撞名）。
+
+**如何保持同步：** 見 `CLAUDE.md` 的 cross-file maintenance 那一列。簡言之：新鮮度
+自動維持；只有在某段內容必須以**新的 prompt key** 做 gate、或有穩定的新 CLI 值得列出時，
+才需要編輯 `.tmpl`。
 
 ## `npx skills` 實際如何接到 agent（機制參考）
 

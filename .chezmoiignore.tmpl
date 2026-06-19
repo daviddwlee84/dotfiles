@@ -59,11 +59,28 @@ pitfalls/** # ignore past-pitfalls knowledge base (repo metadata, not user confi
 #   it is owned by the npx skills CLI and re-populated by
 #   run_onchange_after_install_global_skills.sh.tmpl whenever the lock changes,
 #   so we do NOT want chezmoi to manage skills/ contents directly.
-.agents/skills
-.agents/skills/**
-.claude/skills
-.claude/skills/**
+#
+# Patterns use single-`*` (direct child) + `*/**` (its contents) form instead of a
+# bare `**`. This is load-bearing: a recursive `**` (or a bare `.agents/skills`
+# dir line) excludes the PARENT dir, and chezmoi — like gitignore — then refuses to
+# re-include anything beneath it (the `!` negations below silently no-op). The
+# `*` form leaves `.agents/skills` itself un-excluded so the one first-party skill
+# can be re-included. Coverage for npx skills is unchanged (they're `name/...`,
+# all matched by `*` + `*/**`).
+.agents/skills/*
+.agents/skills/*/**
+.claude/skills/*
+.claude/skills/*/**
 skills-lock.json
+
+# Exception: the first-party, chezmoi-managed, *templated* skill (NOT npx-owned).
+# Re-include it past the npx ignore above (last match wins). It renders per-host
+# from .chezmoi.toml and re-renders on every `chezmoi apply` — unlike the npx
+# clones, which is why it must be chezmoi-managed. The .claude/ entry is a symlink
+# into the universal ~/.agents/skills/ copy. See docs/tools/agent-skills.md.
+!.agents/skills/chezmoi-dotfiles
+!.agents/skills/chezmoi-dotfiles/**
+!.claude/skills/chezmoi-dotfiles
 
 scripts/**
 

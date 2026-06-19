@@ -354,4 +354,1951 @@ _**Agent (claude-fable-5)**_
 <think><details><summary>Thought Process</summary>
  The user is sharing an OpenCode session transcript about the `~/snap/nvim` directory on Ubuntu and wants me to evaluate whether snap-based installations could cause issues, help document snap-related knowledge, and make a git commit at the end. I need to be careful about only committing changes relevant to this task, though the user's instruction about the final commit seems to trail off mid-thought.
 
-I should check the agent-history-hygiene skill since there are untracked specstory files and the user mentioned committing. I'll need to read AGENTS.md and the repo conventions, then evaluate the snap approach for both neovim and bitwarden in this context. The main concerns with snap are auto-refresh behavior, the snapd dependency, the ~/snap directory clutter, and potential startup overhead — though classic confinement snaps avoid most sandboxing issues. After that, I'll write documentation about snap-related pitfalls and decide whether to recommend the tarball approach over snap for servers and devboxes.</details></think>
+I should check the agent-history-hygiene skill since there are untracked specstory files and the user mentioned committing. I'll need to read AGENTS.md and the repo conventions, then evaluate the snap approach for both neovim and bitwarden in this context. The main concerns with snap are auto-refresh behavior, the snapd dependency, the ~/snap directory clutter, and potential startup overhead — though classic confinement snaps avoid most sandboxing issues. After that, I'll write documentation about snap-related pitfalls and decide whether to recommend the tarball approach over snap for servers and devboxes. Snap works fine for nvim since it's classic confinement without the stdin/stdout issues that affected chezmoi, and auto-updates keep it current. But given the user's frustration with ~/snap clutter and the repo's existing wariness of snap, sticking with the GitHub tarball as primary and snap as fallback seems more aligned with the project's philosophy—though both approaches are defensible.
+
+I'll document this balanced assessment and recommend flipping the order to tarball-first for server/devbox use cases, then commit the documentation without changing the role itself since the user asked for evaluation rather than a fix.
+
+But mkdocs.yml is already modified, so I need to check what's already changed there and potentially stage hunks selectively to avoid committing unrelated changes. Let me read the agent-history-hygiene skill first since it triggers on commit, then examine the git diff and the docs structure.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+I'll start by reading the repo rules, the relevant skill (since a commit is requested and there are untracked SpecStory files), and the snap-related code.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/AGENTS.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/.agents/skills/agent-history-hygiene/SKILL.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm examining the bitwarden role snap section and reviewing the mkdocs.yml structure along with the docs layout to see what's already been modified. I should also check the pitfalls directory for any snap-related chezmoi notes and look through tool-managers.md for existing snap references.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now let me look at the bitwarden snap usage, docs structure, and existing snap-related knowledge in the repo.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/dot_ansible/roles/bitwarden/tasks/main.yml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs",
+  "pattern": "snap"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs",
+  "pattern": "snap",
+  "topFiles": [
+    {
+      "matchCount": 2,
+      "uri": "docs/this_repo/fleet-apply.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "docs/this_repo/tool-managers.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": "docs/shells/aliases.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/tools/agent-overlays.zh-TW.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/tools/agent-overlays.md"
+    },
+    {
+      "matchCount": 7,
+      "uri": "docs/this_repo/tool-managers.zh-TW.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/this_repo/architecture.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/this_repo/vim-mode.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/tools/tmux/keybindings.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": "docs/tools/btop.zh-TW.md"
+    },
+    {
+      "matchCount": 4,
+      "uri": "docs/tools/btop.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/tools/pueue.zh-TW.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/tools/pueue.md"
+    },
+    {
+      "matchCount": 10,
+      "uri": "docs/tools/macos-swap.zh-TW.md"
+    },
+    {
+      "matchCount": 11,
+      "uri": "docs/tools/macos-swap.md"
+    }
+  ],
+  "totalFiles": 15,
+  "totalMatches": 229
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "files_with_matches",
+  "path": "/Users/david/.local/share/chezmoi/pitfalls",
+  "pattern": "snap"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "files_with_matches",
+  "path": "/Users/david/.local/share/chezmoi/pitfalls",
+  "pattern": "snap",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tmux-copy-mode-double-free-3.6a.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/redact-secrets-loop-with-active-specstory-writer.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tmux-scrollback-tui-repaint-ghosting.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/linux-app-control-gapplication-zero-coverage.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/zsh-autosuggestions-postdisplay-clobber.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/centos7-neovim-apt-register-defined.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/macos-swap-files-never-shrink.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/btop-themes-permission-denied-core-dumped.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/bootstrap-curl-bash-hangs-after-reattaching-tty.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tmux-continuum-restores-on-intentional-quit.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/brew-cask-slow-github-release-assets.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tmux2k-bandwidth-uint64-underflow.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/README.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tv-binary-glibc-2-39-not-found.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "pitfalls/tuna-nodejs-mirror-aggressive-gc.md"
+    }
+  ],
+  "totalFiles": 15,
+  "totalMatches": 15
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git diff mkdocs.yml | head -80</summary>
+
+```bash
+git diff mkdocs.yml | head -80
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The `git diff mkdocs.yml` is showing nothing, which suggests the file might have been staged already or committed since the snapshot was taken. Let me check the current git status to see what's actually changed. I also notice there's an existing `docs/linux-package-sources.md` file that's referenced in the architecture documentation, which covers comparisons of different Linux package sources and related Ansible roles.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short && echo --- && git log --oneline -5</summary>
+
+```bash
+git status --short && echo --- && git log --oneline -5
+```
+
+```
+ M .specstory/statistics.json
+?? .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+---
+dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+96ba462 Investigate linuxbrew for multi-user server
+e6f1127 fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+651ed8b fix(ansible): tolerate TPM plugin download failures and broken cargo shim
+12d7610 Fix some deprecated upstream
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "" • **2** results in **1** directory</summary>
+
+Directory: **** (2 files)
+
+| File |
+|------|
+| `docs/linux-package-sources.zh-TW.md` |
+| `docs/linux-package-sources.md` |
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="search" data-tool-name="glob_file_search"><details>
+<summary>Tool use: **glob_file_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The earlier commits are already in place with a clean working tree aside from the new transcript. I should check the existing `docs/linux-package-sources.md` file since that's where snap documentation naturally belongs.The working tree is clean and there's already a docs file for Linux package sources. I'll read that file, its Chinese translation, and the mkdocs navigation to understand the current structure.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/docs/linux-package-sources.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "context": 3,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/mkdocs.yml",
+  "pattern": "linux-package-sources"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/mkdocs.yml",
+  "pattern": "linux-package-sources",
+  "topFiles": [
+    {
+      "matchCount": 7,
+      "uri": "mkdocs.yml"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm noticing a contradiction in the documentation — the linux-package-sources file explicitly states that the server profile avoids snapd, but the neovim role actually installs nvim via snap on Debian systems when apt is outdated, which directly conflicts with that stated policy. This means the user's devbox setup is hitting this undocumented behavior.
+
+The snap nvim issue goes deeper than just AppArmor confinement (which doesn't apply since it's classic confinement anyway) — the real problem is that auto-refresh violates the repo's core invariant that installs and upgrades are deliberately separated with explicit upgrade paths. A snap can update overnight outside the controlled `just upgrade-*` workflow, and it also leaves behind the `~/snap` directory clutter that the user is experiencing. The documented policy clearly states CLI tools should use Linuxbrew or GitHub binaries, not snaps, so this is a significant deviation from the repo's own principles.
+
+The GitHub tarball fallback already exists and is well-tested across other tools like btop and tmux, making it the consistent choice here. Bitwarden Desktop is different — it's a GUI app that matches the policy's exception for sandboxed or closed-source graphical applications, so keeping it as a snap makes sense.
+
+The user is asking for a recommendation on which approach is better, plus documentation updates and a commit, so I should provide the assessment and suggest the change to prioritize the tarball over snap for nvim. Snap has auto-refresh which keeps nvim current, but that conflicts with the repo's philosophy of controlled updates via `just upgrade-*`. The tarball approach is feasible using the stable tag (no API call needed), though it leaves a migration gap for existing snap-installed systems — I'd document a manual cleanup for those. I'm leaning toward replacing the snap path entirely with tarball as the fallback when apt is too old, which simplifies the role and aligns with the repo's design principles. Let me ask the user which approach they prefer.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+I now have the full picture. Before writing docs, let me give you my assessment and confirm scope, since the answer affects what the docs should say.
+
+## Assessment: snap 相關安裝會不會有問題？
+
+This repo has exactly two snap installs, and they deserve **different verdicts**:
+
+**1. Bitwarden Desktop (snap → `.deb` fallback) — 沒問題, keep it.**
+It's opt-in (`installBitwarden`), GUI-only, and matches the repo's own documented policy in `docs/linux-package-sources.md`: "Sandboxed or closed-source GUI → snap … auto-updates + confinement are a fit". GUI apps are exactly what snap is good at.
+
+**2. Neovim (apt 太舊 → snap classic) — 有問題, this is the weak spot.** It contradicts the repo's own rules in three ways:
+
+- **Contradicts documented policy.** `docs/linux-package-sources.md` says "**Server profile avoids snapd** — `ubuntu_server` deliberately keeps snapd out of the loop" and "CLI tools → Linuxbrew / GitHub binary". Yet your `devbox-1` (a server/devbox) got snap nvim — the role and the doc disagree, and the doc even uses `snap install nvim` as its cautionary example.
+- **Violates the "install vs upgrade is split on purpose" hard invariant.** Snaps auto-refresh on their own cadence — nvim can change version overnight, outside the explicit `just upgrade-*` path. The repo's whole philosophy is that nothing upgrades implicitly.
+- **Practical annoyances**: the `~/snap` clutter you just noticed (long-standing non-XDG snapd issue), the `nvim` snap is community-published (Canonical employee, not the Neovim project), squashfs adds startup latency, and the repo already has a snap-burn history (chezmoi snap stdin bug in `dotfiles_init.py`, btop snap AppArmor crash pitfall).
+
+The GitHub-tarball path **already exists and is battle-tested** in the same role (it's the no-snap fallback and the noRoot path), so dropping the snap branch is low-risk: apt too old → tarball to `/opt/nvim` directly. Existing snap-nvim hosts are unaffected (version check passes, role does nothing) — cleanup is a one-liner I'd document.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ask_question">
+<details>
+<summary>Tool use: **ask_question**</summary>
+
+
+Parameters:
+
+```json
+{
+  "questions": [
+    {
+      "id": "scope",
+      "options": [
+        {
+          "id": "drop_snap",
+          "label": "Drop the snap branch entirely — apt too old → GitHub tarball directly (Recommended)"
+        },
+        {
+          "id": "flip_order",
+          "label": "Keep snap but demote it — tarball first, snap only as fallback"
+        },
+        {
+          "id": "docs_only",
+          "label": "Docs only — keep the role behavior as-is for now"
+        }
+      ],
+      "prompt": "Besides updating docs, should I also change the neovim ansible role?"
+    }
+  ],
+  "title": "Scope of the snap fix"
+}
+```
+Additional data:
+
+```json
+{
+  "currentSelections": {
+    "scope": [
+      "drop_snap"
+    ]
+  },
+  "freeformTexts": {
+    "scope": ""
+  },
+  "status": "submitted"
+}
+```
+Result:
+
+```json
+{
+  "answers": [
+    {
+      "freeformText": "",
+      "questionId": "scope",
+      "selectedOptionIds": [
+        "drop_snap"
+      ]
+    }
+  ]
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ask_question"><details>
+<summary>Tool use: **ask_question**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The user wants to remove the snap installation path entirely, so I need to update the Ansible task file by deleting the snap check and its associated block, then modify the GitHub tarball section to trigger when the apt version is outdated instead. I should also consider whether to use the stable tag for consistency across both system and user-level installations rather than making an API call.
+
+Beyond the code changes, I need to update the documentation across multiple files: the tool-managers.md file (updating the neovim row and decision tree references), expanding the snap knowledge section in linux-package-sources.md with details about the snap directory, confinement modes, auto-refresh behavior, and a migration guide for removing snap neovim, plus mirroring all these changes to the zh-TW versions. I should also check if the README needs updates to reflect this architectural change.
+
+Then I'll validate that mkdocs builds cleanly, commit the specstory transcript and statistics along with all changes, and run an ansible syntax check on the playbook.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+I'll drop the snap branch from the neovim role, update the docs (including the snap knowledge page), and commit everything together with the session transcript.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Remove snap branch from neovim ansible role (apt too old → GitHub tarball)",
+      "id": "role",
+      "status": "in_progress"
+    },
+    {
+      "content": "Expand snap knowledge in docs/linux-package-sources.md (+ zh-TW mirror)",
+      "id": "docs_pkg",
+      "status": "pending"
+    },
+    {
+      "content": "Update tool-managers.md neovim rows (+ zh-TW mirror) and other doc mentions",
+      "id": "docs_tools",
+      "status": "pending"
+    },
+    {
+      "content": "Validate: ansible syntax check + mkdocs build --strict",
+      "id": "validate",
+      "status": "pending"
+    },
+    {
+      "content": "Commit changes + session transcript (secret scan first)",
+      "id": "commit",
+      "status": "pending"
+    }
+  ],
+  "success": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md",
+  "pattern": "snap|neovim|nvim"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md",
+  "pattern": "snap|neovim|nvim",
+  "topFiles": [
+    {
+      "matchCount": 12,
+      "uri": "docs/this_repo/tool-managers.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 12
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/README.md",
+  "pattern": "snap|neovim"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/README.md",
+  "pattern": "snap|neovim",
+  "topFiles": [
+    {
+      "matchCount": 10,
+      "uri": "README.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 10
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm refactoring the neovim role to simplify the installation logic by removing the snap availability check entirely. The new flow will keep the apt install with its version verification, then have the GitHub fallback trigger directly if the apt version is too old, without the snap condition gating it. I should also update the task descriptions and consider any implications for hosts that previously relied on snap.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now I'll edit the neovim role.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I should verify the file header comment on line 2 is appropriate and make sure there are no other snap package references lurking elsewhere in the role or its default variables.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_ansible/roles/neovim",
+  "pattern": "snap"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_ansible/roles/neovim",
+  "pattern": "snap",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": "dot_ansible/roles/neovim/tasks/main.yml"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 3
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm realizing there's a PATH ordering issue here — when a host previously had snap nvim installed, the version check initially finds the snap version which meets the minimum requirement. But then the apt task reinstalls the older apt neovim package since it was removed by the snap branch earlier. The subsequent version check runs against whichever nvim is first in PATH, and on Ubuntu that's typically /snap/bin before /usr/bin, so the snap version would still be detected even though apt just reinstalled the older package.
+
+Actually, wait — I need to reconsider the PATH order. On default Ubuntu, /snap/bin comes at the end, so /usr/bin/nvim (the old apt version) would actually be found first, triggering the version check to fail and the GitHub tarball installation to proceed. This leaves both snap and tarball versions installed with the tarball winning via /usr/local/bin precedence. The snap version becomes stale, so I should document the manual cleanup command for users.
+
+Looking back, this oscillation between apt and snap actually existed in the old code too — the apt task was unconditional, so on subsequent runs it would reinstall after being removed. The new behavior just converges to a tarball install with a leftover snap. I'll keep the role simple and document the manual cleanup rather than adding snap detection logic.
+
+For the docs, I'm planning a new section in `docs/linux-package-sources.md` to explain the snap migration behavior and cleanup steps.The role now handles migration from snap to tarball installs, which leaves stale snaps behind that need cleanup documentation. I'll check the zh-TW mirror of the package-sources doc before writing the snap knowledge section.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/docs/linux-package-sources.zh-TW.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm adding a new section about snap usage in the repository for both English and Traditional Chinese versions, covering where snap is currently used (only Bitwarden Desktop with a .deb fallback option) and its history with Neovim, which removed snap classic support due to conflicts between auto-refresh and the install/upgrade workflow.
+
+I'm explaining the `~/snap` directory structure—how each snap gets its own user data folder that persists across revisions—and noting that it doesn't follow XDG standards, a long-standing upstream issue since 2016. I'm also clarifying the difference between classic and strict confinement modes: strict uses AppArmor sandboxing with interface restrictions, while classic runs without confinement like a normal installation, so Neovim's problems weren't sandbox-related but stemmed from refresh behavior and directory clutter. Finally, I'm covering how users can control auto-refresh using `snap refresh --hold` for indefinite pauses and system-level refresh policies.
+
+Now I'm walking through the practical migration steps: removing the snap package, cleaning up the user data directory (with a critical warning about checking what other snaps exist first—Firefox on desktop systems stores its profile in `~/snap/firefox`), then reinstalling via tarball through the configuration management tool. I'm also noting that the documentation example at line 158 conflates confinement issues with Neovim, which is actually a classic snap and thus unconfined, so I should reword that section to use a strictly-confined example like btop instead and clarify that classic snaps bypass confinement entirely but still suffer from the auto-refresh problem.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now I'll add the snap knowledge section to `docs/linux-package-sources.md`.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/linux-package-sources.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+Now the zh-TW mirror.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/linux-package-sources.zh-TW.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I'm moving on to update the tool-managers.md file, starting with several rows that reference snap installations. I need to remove or modify snap references in the neovim entry at line 368, and then update lines 823, 842, and 1017 to remove snap from the installation path sequences. I should also check line 690 for context and look for any per-manager snap catalog sections.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now the `tool-managers.md` rows (EN + zh-TW).
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Looking at the specific line numbers in the zh-TW tool-managers mirror to identify which entries need editing.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now the zh-TW `tool-managers` mirror.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md",
+  "pattern": "neovim|nvim"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md",
+  "pattern": "neovim|nvim",
+  "topFiles": [
+    {
+      "matchCount": 9,
+      "uri": "docs/this_repo/tool-managers.zh-TW.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 9
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/this_repo/tool-managers.zh-TW.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Looking at the README table, I notice the Ubuntu Desktop row mentions snap for Bitwarden, but the server row also lists "apt + snap" — I need to verify whether the server profile actually uses snap or if that's outdated since the bitwarden role's desktop installation flag likely gates it to desktop-only systems.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now check the README platform table and Bitwarden desktop gating.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/README.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi",
+  "pattern": "bitwarden_install_desktop"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi",
+  "pattern": "bitwarden_install_desktop",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "./docs/this_repo/tool-managers.zh-TW.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./docs/this_repo/tool-managers.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./.specstory/history/2026-05-21_08-25-55Z-at-specstory-history-2026.md"
+    },
+    {
+      "matchCount": 5,
+      "uri": "./.specstory/history/2026-05-21_05-19-56Z-dotfile-dev-machine-heavy.md"
+    }
+  ],
+  "totalFiles": 6,
+  "totalMatches": 257
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ With the neovim change, Ubuntu Server no longer needs snap, so I'm updating the README to reflect that Ubuntu Desktop stays with "apt + snap" while Ubuntu Server switches to just "apt + GitHub bin".
+
+I'll verify the existing README mentions are accurate — the Bitwarden note on line 283 is fine since it correctly specifies snap/deb for Linux desktop profiles, and the neovim version requirement on line 272 is also correct. Now I'll make the edits to the table.Bitwarden Desktop is the only snap left and it's gated to desktop platforms, so Ubuntu Server has no snaps. I'm updating the README table to reflect this.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/README.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm checking the documentation for other references to the neovim installation chain across the codebase—looking through upgrades.md, ansible_customization.md, and fleet docs to see if there are any snap or neovim-related mentions that need verification, similar to the PATH reference I found in fleet-apply.md.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_ansible",
+  "pattern": "snap"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_ansible",
+  "pattern": "snap",
+  "topFiles": [
+    {
+      "matchCount": 3,
+      "uri": "dot_ansible/roles/neovim/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/devtools/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/gui_apps_linux/tasks/main.yml"
+    },
+    {
+      "matchCount": 10,
+      "uri": "dot_ansible/roles/bitwarden/tasks/main.yml"
+    },
+    {
+      "matchCount": 1,
+      "uri": "dot_ansible/roles/bitwarden/defaults/main.yml"
+    }
+  ],
+  "totalFiles": 5,
+  "totalMatches": 16
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs",
+  "pattern": "apt → snap|snap → |then snap|snap if|snap nvim|nvim snap"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs",
+  "pattern": "apt → snap|snap → |then snap|snap if|snap nvim|nvim snap",
+  "topFiles": [
+    {
+      "matchCount": 2,
+      "uri": "docs/linux-package-sources.md"
+    },
+    {
+      "matchCount": 2,
+      "uri": "docs/linux-package-sources.zh-TW.md"
+    },
+    {
+      "matchCount": 3,
+      "uri": "docs/this_repo/tool-managers.zh-TW.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/playbooks/linux-gui-apps.md"
+    },
+    {
+      "matchCount": 3,
+      "uri": "docs/this_repo/tool-managers.md"
+    },
+    {
+      "matchCount": 1,
+      "uri": "docs/playbooks/linux-gui-apps.zh-TW.md"
+    }
+  ],
+  "totalFiles": 6,
+  "totalMatches": 12
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ Now I need to validate the remaining configuration by running an ansible syntax check on the playbooks in dot_ansible/playbooks/linux.yml using `ansible-playbook --syntax-check`, making sure to check for an ansible.cfg file in the dot_ansible directory and running from there. I'll also need to run mkdocs build with strict mode and lint the YAML files using ReadLints.The remaining snap references are all Bitwarden/GUI-related and still valid. Now I'll validate the changes.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: ansible-playbook --syntax-check playbooks/linux.yml 2>&1 | tail -5</summary>
+
+```bash
+ansible-playbook --syntax-check playbooks/linux.yml 2>&1 | tail -5
+```
+
+```
+
+playbook: playbooks/linux.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/david/.local/share/chezmoi/dot_ansible/roles/neovim/tasks/main.yml"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: uv run mkdocs build --strict 2>&1 | tail -15</summary>
+
+```bash
+uv run mkdocs build --strict 2>&1 | tail -15
+```
+
+```
+INFO    -  Doc file 'tools/tmux/themes.zh-TW.md' contains a link '#responsive-status-bar-catppuccin', but there is no such anchor on this page.
+INFO    -  Doc file 'tools/tmux/vim.zh-TW.md' contains a link './keybindings.md#copy-mode-vim-style', but the doc 'tools/tmux/keybindings.zh-TW.md' does not contain an anchor '#copy-mode-vim-style'.
+WARNING -  mkdocs_llmstxt: Page URI 'index.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/aicapture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/zsh-inline-ai.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/tmux/README.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/sesh.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/clipboard.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'tools/agent-overlays.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'playbooks/workflow.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/architecture.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/fleet-apply.md' not found in the generated pages. Skipping.
+WARNING -  mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+
+Aborted with 11 warnings in strict mode!
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The build is failing with mkdocs_llmstxt warnings about missing page URIs, but I'm not sure if these are new issues from my changes or pre-existing problems. I need to test against the clean HEAD state to see if these warnings were already there before my modifications.The warnings appear to be pre-existing issues with the llmstxt plugin unrelated to my changes. I'll verify this by checking against HEAD.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git stash && uv run mkdocs build --strict 2>&1 | tail -3; git stash pop</summary>
+
+```bash
+git stash && uv run mkdocs build --strict 2>&1 | tail -3; git stash pop
+```
+
+```
+Saved working directory and index state WIP on main: dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+Error: Config file 'mkdocs.yml' does not exist.
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm realizing the issue — `git stash` must have stashed mkdocs.yml itself, which means it's actually untracked despite what git status showed earlier, or there's something odd about how the stash operation worked. The missing config file after the stash is the real problem here.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git stash list && git status --short && ls mkdocs.yml</summary>
+
+```bash
+git stash list && git status --short && ls mkdocs.yml
+```
+
+```
+stash@{0}: WIP on main: dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+?? ../.specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+"mkdocs.yml": No such file or directory (os error 2)
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The working directory is still stuck in `dot_ansible` from the earlier ansible command, which explains the mkdocs error. The `git stash pop` likely failed silently since the stash is still there, so I need to navigate back to the repo root and pop the changes from there.I see the issue — I was in the wrong directory. Let me restore my stashed changes now.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/david/.local/share/chezmoi && git stash pop && git status --short</summary>
+
+```bash
+cd /Users/david/.local/share/chezmoi && git stash pop && git status --short
+```
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .specstory/statistics.json
+	modified:   README.md
+	modified:   docs/linux-package-sources.md
+	modified:   docs/linux-package-sources.zh-TW.md
+	modified:   docs/this_repo/tool-managers.md
+	modified:   docs/this_repo/tool-managers.zh-TW.md
+	modified:   dot_ansible/roles/neovim/tasks/main.yml
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	.specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (cadae20a0bc560e732a8499a6bc2289e4a5ecb70)
+ M .specstory/statistics.json
+ M README.md
+ M docs/linux-package-sources.md
+ M docs/linux-package-sources.zh-TW.md
+ M docs/this_repo/tool-managers.md
+ M docs/this_repo/tool-managers.zh-TW.md
+ M dot_ansible/roles/neovim/tasks/main.yml
+?? .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I need to verify whether the strict build actually fails on HEAD itself, since those 11 warnings about missing pages look like they might be pre-existing environmental issues unrelated to my changes. Let me stash my changes again from the repo root and test the build on the original state to confirm.The working directory is now clean. I'll run the strict build comparison again from the repo root to get accurate results.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git stash && uv run mkdocs build --strict 2>&1 | tail -2 ; git stash pop</summary>
+
+```bash
+git stash && uv run mkdocs build --strict 2>&1 | tail -2 ; git stash pop
+```
+
+```
+Saved working directory and index state WIP on main: dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+
+Aborted with 11 warnings in strict mode!
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The exit code 1 is coming from the `git stash pop` command itself, not the warnings — but the output doesn't show the expected "Dropped..." message, which is odd and suggests something might have gone wrong with the stash operation.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git stash list; git status --short | head</summary>
+
+```bash
+git stash list; git status --short | head
+```
+
+```
+stash@{0}: WIP on main: dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+?? .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git stash pop && git status --short</summary>
+
+```bash
+git stash pop && git status --short
+```
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .specstory/statistics.json
+	modified:   README.md
+	modified:   docs/linux-package-sources.md
+	modified:   docs/linux-package-sources.zh-TW.md
+	modified:   docs/this_repo/tool-managers.md
+	modified:   docs/this_repo/tool-managers.zh-TW.md
+	modified:   dot_ansible/roles/neovim/tasks/main.yml
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	.specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (7570da063089cf534f770e6def3adf1eb9336224)
+ M .specstory/statistics.json
+ M README.md
+ M docs/linux-package-sources.md
+ M docs/linux-package-sources.zh-TW.md
+ M docs/this_repo/tool-managers.md
+ M docs/this_repo/tool-managers.zh-TW.md
+ M dot_ansible/roles/neovim/tasks/main.yml
+?? .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ The baseline confirms those 11 llmstxt warnings are already present on HEAD, so I need to verify my changes don't introduce any new warnings—particularly checking that my new anchor links like the one in tool-managers.md pointing to linux-package-sources.md#snap actually resolve correctly.The baseline shows those 11 warnings are pre-existing, so now I'll verify my changes don't introduce any new warnings or broken anchors.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: uv run mkdocs build --strict 2>&1 | grep -Ei "linux-package-sources|tool-managers|snap" ; uv run mkdocs build --strict 2>&1 | grep -c WARNING</summary>
+
+```bash
+uv run mkdocs build --strict 2>&1 | grep -Ei "linux-package-sources|tool-managers|snap" ; uv run mkdocs build --strict 2>&1 | grep -c WARNING
+```
+
+```
+INFO    -  Doc file 'linux-package-sources.md' contains a link '../CLAUDE.md#install-vs-upgrade-is-split-on-purpose', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'linux-package-sources.zh-TW.md' contains a link '../CLAUDE.md#install-vs-upgrade-is-split-on-purpose', but the target '../CLAUDE.md' is not found among documentation files.
+INFO    -  Doc file 'linux-package-sources.zh-TW.md' contains a link 'this_repo/ansible_customization.md#glibc_2xx-not-found-when-running-an-installed-cli-ubuntu-2204--older-distros', but the doc 'this_repo/ansible_customization.zh-TW.md' does not contain an anchor '#glibc_2xx-not-found-when-running-an-installed-cli-ubuntu-2204--older-distros'.
+INFO    -  Doc file 'this_repo/ansible_customization.zh-TW.md' contains a link '../linux-package-sources.md#github-binary-asset-selection-policy', but the doc 'linux-package-sources.zh-TW.md' does not contain an anchor '#github-binary-asset-selection-policy'.
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm noticing that the pre-existing relative links to CLAUDE.md were already in place, like the one in the glibc example section, while my new addition used an absolute GitHub URL following the AGENTS.md convention for repo-root files. The new anchors I created don't trigger any warnings.
+
+The grep command output seems incomplete — the second count didn't print, but an earlier run showed exactly 11 llmstxt warnings matching the HEAD baseline, so this isn't something I introduced. Now I'm moving forward with the commit workflow: staging code files, running the agent-history-hygiene scripts to add the specstory transcript and any artifacts, scanning for secrets, then committing with a message that follows the repo's style.Build state matches HEAD baseline with no new warnings. Now I'll stage the code and artifacts, run a secret scan, then commit.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add README.md docs/linux-package-sources.md docs/linux-package-sources.zh-TW.md docs/this_repo/tool-managers.md docs/this_repo/tool-managers.zh-TW.md dot_ansible/roles/neovim/tasks/main.yml && bash .agents/skills/agent-history-hygiene/scripts/stage-agent-artifacts.sh && git add .specstory/statistics.json && git status --short</summary>
+
+```bash
+git add README.md docs/linux-package-sources.md docs/linux-package-sources.zh-TW.md docs/this_repo/tool-managers.md docs/this_repo/tool-managers.zh-TW.md dot_ansible/roles/neovim/tasks/main.yml && bash .agents/skills/agent-history-hygiene/scripts/stage-agent-artifacts.sh && git add .specstory/statistics.json && git status --short
+```
+
+```
+staged: .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+1 artifact(s) would be staged.
+A  .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+M  .specstory/statistics.json
+M  README.md
+M  docs/linux-package-sources.md
+M  docs/linux-package-sources.zh-TW.md
+M  docs/this_repo/tool-managers.md
+M  docs/this_repo/tool-managers.zh-TW.md
+M  dot_ansible/roles/neovim/tasks/main.yml
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash .agents/skills/agent-history-hygiene/scripts/scan-staged.sh; echo "scan exit: $?"</summary>
+
+```bash
+bash .agents/skills/agent-history-hygiene/scripts/scan-staged.sh; echo "scan exit: $?"
+```
+
+```
+scan exit: 0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git log --oneline -8 | cat</summary>
+
+```bash
+git log --oneline -8 | cat
+```
+
+```
+dff59ed feat(azure): az-dev-vm provision chain — mise runtime gating + cloud-vm bundle + dev_vm.py
+96ba462 Investigate linuxbrew for multi-user server
+e6f1127 fix(ansible,zsh): survive TUNA rustup mirror lag + silence compaudit noise on shared Linuxbrew
+651ed8b fix(ansible): tolerate TPM plugin download failures and broken cargo shim
+12d7610 Fix some deprecated upstream
+d02a9dd fix(init): emit flags for ALL prompts so --prompt can't leak; add dotcfg
+e893b3d feat(init): add reconfigure subcommand to change settings after init
+ee120ec refactor(init): make PROMPTS the single source of truth + fix snap chezmoi
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm ready to commit with a conventional commit message, and the pre-commit hooks should run without issues to handle secret redaction and prompt generation checks.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible): drop snap tier from neovim role — apt too old goes straight to GitHub tarball
+
+Snap nvim auto-refreshes outside the explicit `just upgrade-*` path
+(violates the install/upgrade split), pollutes $HOME with ~/snap, and
+contradicted the documented "server profile avoids snapd" policy.
+Bitwarden Desktop stays on snap (opt-in GUI, where snap is a fit).
+Documents snap knowledge (~/snap layout, classic vs strict confinement,
+refresh holds) + migration cleanup in docs/linux-package-sources.md.
+EOF
+)" && git status --short</summary>
+
+```bash
+git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+fix(ansible): drop snap tier from neovim role — apt too old goes straight to GitHub tarball
+
+Snap nvim auto-refreshes outside the explicit `just upgrade-*` path
+(violates the install/upgrade split), pollutes $HOME with ~/snap, and
+contradicted the documented "server profile avoids snapd" policy.
+Bitwarden Desktop stays on snap (opt-in GUI, where snap is a fit).
+Documents snap knowledge (~/snap layout, classic vs strict confinement,
+refresh holds) + migration cleanup in docs/linux-package-sources.md.
+EOF
+)" && git status --short
+```
+
+```
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check).......................Passed
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...................................................................Passed
+check toml...............................................(no files to check)Skipped
+check json...................................................................Passed
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+[main 371c331] fix(ansible): drop snap tier from neovim role — apt too old goes straight to GitHub tarball
+ 8 files changed, 536 insertions(+), 42 deletions(-)
+ create mode 100644 .specstory/history/2026-06-11_20-40-11Z-snap-installation-evaluation-and-documentation.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Remove snap branch from neovim ansible role (apt too old → GitHub tarball)",
+      "id": "role",
+      "status": "completed"
+    },
+    {
+      "content": "Expand snap knowledge in docs/linux-package-sources.md (+ zh-TW mirror)",
+      "id": "docs_pkg",
+      "status": "completed"
+    },
+    {
+      "content": "Update tool-managers.md neovim rows (+ zh-TW mirror) and other doc mentions",
+      "id": "docs_tools",
+      "status": "completed"
+    },
+    {
+      "content": "Validate: ansible syntax check + mkdocs build --strict",
+      "id": "validate",
+      "status": "completed"
+    },
+    {
+      "content": "Commit changes + session transcript (secret scan first)",
+      "id": "commit",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Remove snap branch from neovim ansible role (apt too old → GitHub tarball)",
+      "id": "role",
+      "status": "in_progress"
+    },
+    {
+      "content": "Expand snap knowledge in docs/linux-package-sources.md (+ zh-TW mirror)",
+      "id": "docs_pkg",
+      "status": "pending"
+    },
+    {
+      "content": "Update tool-managers.md neovim rows (+ zh-TW mirror) and other doc mentions",
+      "id": "docs_tools",
+      "status": "pending"
+    },
+    {
+      "content": "Validate: ansible syntax check + mkdocs build --strict",
+      "id": "validate",
+      "status": "pending"
+    },
+    {
+      "content": "Commit changes + session transcript (secret scan first)",
+      "id": "commit",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+ I'm wrapping up with a final summary that covers the evaluation results, what was modified, the validation status including the pre-existing mkdocs warnings that were already present, the commit hash, and the cleanup command for devbox-1, all in a mix of Traditional Chinese and English to match how the user communicated.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Committed as `371c331`. Summary:
+
+## 評估結論
+
+- **Bitwarden Desktop 的 snap（保留）** — opt-in、僅 `ubuntu_desktop`/macOS、GUI app 正是 snap 擅長的類別，且本來就有 `.deb` fallback。沒問題。
+- **Neovim 的 snap tier（已移除）** — 有三個問題：snap 自動 refresh 違反 repo 的 install/upgrade 拆分鐵則（沒有任何其他工具會隱式升級）；和文件中「`ubuntu_server` 刻意避開 snapd」的政策自相矛盾；以及你看到的 `~/snap` 弄髒 home。GitHub tarball 路徑本來就是現成且久經考驗的 fallback，所以直接刪掉中間層即可。
+
+## 改動內容
+
+1. `dot_ansible/roles/neovim/tasks/main.yml` — 刪除 snap 偵測 + `snap install nvim --classic` 區塊；apt 太舊現在直接走 GitHub tarball（`/opt/nvim` + `/usr/local/bin/nvim` symlink）。其餘層級（macOS brew、noRoot user tarball、oldEL fork）不變。
+2. `docs/linux-package-sources.md`（+ zh-TW 鏡像）— 新增「snap in this repo」一節：移除 snap nvim 的五個理由、`~/snap/<name>/` 目錄結構知識（per-user 資料目錄、非安裝目錄、無視 XDG）、classic vs strict confinement、`snap refresh --hold`、以及舊主機的清理步驟。也修正了原本拿 nvim 當 confinement 反例的不精確說法（nvim snap 是 classic，問題從來不是 sandbox）。
+3. `docs/this_repo/tool-managers.md`（+ zh-TW）— 四處 neovim 安裝鏈的行全部更新。
+4. `README.md` — Supported Platforms 表：Ubuntu Server 改為 `apt + GitHub binaries`（no snap）。
+
+## 驗證
+
+- `ansible-playbook --syntax-check playbooks/linux.yml` 通過；無 linter 錯誤。
+- `mkdocs build --strict` 目前在乾淨的 HEAD 上就會以 11 個 `mkdocs_llmstxt` plugin 警告失敗（與本次改動無關的 pre-existing 問題）；我的頁面與新 anchor 沒有產生任何新警告。
+- Commit 前跑過 gitleaks staged scan（clean），transcript 一併入庫，pre-commit 全數通過。
+
+## devbox-1 手動收斂
+
+既有的 snap nvim 不會被 role 自動移除（版本檢查會通過），要收斂的話：
+
+```bash
+sudo snap remove nvim
+rm -rf ~/snap/nvim     # 只刪 nvim 的,不要刪整個 ~/snap
+chezmoi apply          # 或 just fleet-apply devbox-1 → 改裝 tarball 版
+```
