@@ -1,5 +1,4 @@
 personality = "pragmatic"
-model = "gpt-5.4"
 model_reasoning_effort = "xhigh"
 
 [features]
@@ -8,6 +7,9 @@ unified_exec = true
 shell_snapshot = true
 steer = true
 multi_agent = true
+
+[tui.keymap.editor]
+insert_newline = ["ctrl-j", "shift-enter", "alt-enter"]
 
 [plugins."github@openai-curated"]
 enabled = true

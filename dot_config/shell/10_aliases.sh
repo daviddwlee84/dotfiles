@@ -350,8 +350,9 @@ brew-mirror() {
 # Also offers to import "orphan" plans — plans previously written under the
 # global ~/.claude/plans/ that belong to this project. Detection: scan
 # ~/.claude/projects/<encoded-cwd>/*.jsonl (where Claude Code logs sessions
-# per cwd; encoding maps '/' and '.' to '-') for Write/Edit tool_use entries
-# whose file_path points into ~/.claude/plans/. This avoids false positives
+# per cwd; encoding maps '/' and '.' to '-') for authoritative write records:
+# Write/Edit/MultiEdit tool_use file paths, newer toolUseResult.filePath
+# records, and ExitPlanMode planFilePath fields. This avoids false positives
 # from sessions that merely *mentioned* a plan path in conversation.
 #
 # Usage: claude-plans-here [-f] [-y]
@@ -420,8 +421,8 @@ EOF
 }
 
 # Internal: scan ~/.claude/projects/<encoded-cwd|encoded-git-root>/*.jsonl
-# for Write/Edit tool_use entries that wrote into ~/.claude/plans/, list the
-# ones still living in the global dir and not yet copied locally, prompt y/N.
+# for authoritative records that wrote into ~/.claude/plans/, list the ones
+# still living in the global dir and not yet copied locally, prompt y/N.
 _claude_plans_here_import_orphans() {
 	force="$1"
 	global_plans="$HOME/.claude/plans"
@@ -440,28 +441,19 @@ _claude_plans_here_import_orphans() {
 	proj_dirs=""
 	[ -d "$HOME/.claude/projects/$enc_cwd" ] && proj_dirs="$HOME/.claude/projects/$enc_cwd"
 	[ -n "$enc_root" ] && [ -d "$HOME/.claude/projects/$enc_root" ] &&
-		proj_dirs="$proj_dirs $HOME/.claude/projects/$enc_root"
+		proj_dirs="${proj_dirs}
+$HOME/.claude/projects/$enc_root"
 	[ -z "$proj_dirs" ] && return 0
 
-	jsonl_files=""
-	for d in $proj_dirs; do
-		for f in "$d"/*.jsonl; do
-			[ -r "$f" ] || continue
-			jsonl_files="$jsonl_files $f"
+	jsonl_files="$(
+		printf '%s\n' "$proj_dirs" | while IFS= read -r d; do
+			[ -n "$d" ] || continue
+			find "$d" -maxdepth 1 -type f -name '*.jsonl' 2>/dev/null
 		done
-	done
+	)"
 	[ -z "$jsonl_files" ] && return 0
 
-	# Two-stage filter: only lines containing a Write/Edit tool_use, then
-	# extract any plan-path within them. Authoritative — avoids matching plan
-	# paths that merely appeared in user/assistant text.
-	re_prefix="$(printf '%s' "$global_plans" | sed 's/[.[\*^$()+?{|]/\\&/g')"
-	matches="$(
-		# shellcheck disable=SC2086
-		grep -hE '"name":"(Write|Edit)"' $jsonl_files 2>/dev/null |
-			grep -oE "${re_prefix}/[A-Za-z0-9_.+-]+\.md" |
-			sort -u
-	)"
+	matches="$(_claude_plans_here_find_plan_paths "$global_plans" "$jsonl_files")"
 	[ -z "$matches" ] && return 0
 
 	candidates=""
@@ -496,10 +488,54 @@ EOF
 	esac
 
 	copied=0
-	printf '%s\n' "$candidates" | while IFS= read -r m; do
+	while IFS= read -r m; do
 		[ -z "$m" ] && continue
 		cp -n "$m" .claude/plans/ 2>/dev/null && copied=$((copied + 1))
-	done
+	done <<EOF
+$candidates
+EOF
 	echo "Copied plan(s) into $PWD/.claude/plans/"
-	unset force global_plans enc_cwd enc_root proj_dirs jsonl_files re_prefix matches candidates count m base ans copied
+	unset force global_plans enc_cwd enc_root groot proj_dirs jsonl_files matches candidates count m base ans copied
+}
+
+_claude_plans_here_find_plan_paths() {
+	global_plans="$1"
+	jsonl_files="$2"
+
+	if command -v jq >/dev/null 2>&1; then
+		printf '%s\n' "$jsonl_files" | while IFS= read -r f; do
+			[ -r "$f" ] || continue
+			jq -r --arg gp "$global_plans" '
+				def planpath:
+					select(type == "string")
+					| select(startswith($gp + "/") and test("\\.md$"));
+				[
+					(.message.content[]?
+						| select(.type == "tool_use")
+						| select(.name == "Write" or .name == "Edit" or .name == "MultiEdit")
+						| (.input.file_path?, .input.filePath?, .input.path?)),
+					(.message.content[]?
+						| select(.type == "tool_use" and .name == "ExitPlanMode")
+						| (.input.planFilePath?, .input.plan_file_path?)),
+					(.toolUseResult.filePath?, .toolUseResult.file_path?, .toolUseResult.path?),
+					(.toolUseResult.planFilePath?, .toolUseResult.plan_file_path?),
+					(.planFilePath?, .plan_file_path?)
+				]
+				| .[]?
+				| planpath
+			' "$f" 2>/dev/null
+		done | sort -u
+	else
+		# Cold-start fallback for hosts without jq. Less precise than the JSON
+		# parser, but still scoped to lines that contain write/result markers.
+		re_prefix="$(printf '%s' "$global_plans" | sed 's/[.[\*^$()+?{|]/\\&/g')"
+		printf '%s\n' "$jsonl_files" | while IFS= read -r f; do
+			[ -r "$f" ] || continue
+			grep -hE '"name"[[:space:]]*:[[:space:]]*"(Write|Edit|MultiEdit)"|"toolUseResult"|"planFilePath"' "$f" 2>/dev/null
+		done |
+			grep -oE "${re_prefix}/[A-Za-z0-9_.+-]+\.md" |
+			sort -u
+	fi
+
+	unset global_plans jsonl_files f re_prefix
 }

@@ -759,7 +759,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | Scaffold/update `./.claude/settings.json` so Claude Code's `/plan` files land in `./.claude/plans/` (in-repo). Also `mkdir -p .claude/plans/` and offers to import "orphan" plans previously written under the global `~/.claude/plans/` that belong to this cwd or git-root (detected by scanning `~/.claude/projects/<encoded-path>/*.jsonl` for `Write`/`Edit` `tool_use` entries — only authoritative writes, not chat mentions). `-f` auto-yes the settings merge prompt; `-y` auto-yes the orphan copy prompt. Originals in `~/.claude/plans/` are kept |
+| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | Scaffold/update `./.claude/settings.json` so Claude Code's `/plan` files land in `./.claude/plans/` (in-repo). Also `mkdir -p .claude/plans/` and offers to import "orphan" plans previously written under the global `~/.claude/plans/` that belong to this cwd or git-root. Detection parses `~/.claude/projects/<encoded-path>/*.jsonl` for authoritative write/result fields (`Write`/`Edit`/`MultiEdit` paths, `toolUseResult.filePath`, `ExitPlanMode.planFilePath`), not chat mentions. `-f` auto-yes the settings merge prompt; `-y` auto-yes the orphan copy prompt. Originals in `~/.claude/plans/` are kept |
 
 ---
 

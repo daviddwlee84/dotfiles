@@ -628,7 +628,7 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | 建構/更新 `./.claude/settings.json`，使 Claude Code 的 `/plan` 檔案落在 `./.claude/plans/`（在 repo 內）。同時 `mkdir -p .claude/plans/` 並提供匯入「孤兒」(orphan) plans 的選項 —— 也就是先前寫在全域 `~/.claude/plans/` 中、屬於本 cwd 或 git-root 的 plans（透過掃描 `~/.claude/projects/<encoded-path>/*.jsonl` 中的 `Write`/`Edit` `tool_use` 條目來偵測 —— 只算權威性寫入，不含聊天提及）。`-f` 自動同意 settings 合併提示；`-y` 自動同意孤兒複製提示。`~/.claude/plans/` 中的原始檔案會保留 |
+| `claude-plans-here [-f] [-y]` | function | `dot_config/shell/10_aliases.sh` | 建構/更新 `./.claude/settings.json`，使 Claude Code 的 `/plan` 檔案落在 `./.claude/plans/`（在 repo 內）。同時 `mkdir -p .claude/plans/` 並提供匯入「孤兒」(orphan) plans 的選項 —— 也就是先前寫在全域 `~/.claude/plans/` 中、屬於本 cwd 或 git-root 的 plans。偵測會解析 `~/.claude/projects/<encoded-path>/*.jsonl` 中的權威寫入/結果欄位（`Write`/`Edit`/`MultiEdit` 路徑、`toolUseResult.filePath`、`ExitPlanMode.planFilePath`），不採計聊天提及。`-f` 自動同意 settings 合併提示；`-y` 自動同意孤兒複製提示。`~/.claude/plans/` 中的原始檔案會保留 |
 
 ---
 

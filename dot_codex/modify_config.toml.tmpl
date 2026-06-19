@@ -5,8 +5,11 @@
 # (`[projects."<absolute-path>"]`) and marketplace paths
 # (`[marketplaces.<id>]`) that are machine-specific. Tracking the whole file
 # would create constant diff and bake one machine's paths into another's apply.
-# We enforce only stable preferences (model, personality, [features],
-# [plugins.*]) and round-trip the live machine state untouched.
+# We enforce only stable preferences (personality, reasoning effort,
+# [features], [tui.keymap.*], [plugins.*]) and round-trip the live machine
+# state untouched. The default model is deliberately not pinned here so Codex
+# can follow the account/CLI default unless the live config already has a
+# user-chosen model.
 #
 # How: chezmoi pipes the current target file into stdin; this script prints
 # the new contents on stdout. The merge runs in a small Python program because:
@@ -128,6 +131,17 @@ def prune_deprecated_features(live: dict) -> None:
         del live["features"]
 
 
+def prune_stale_managed_model(live: dict) -> None:
+    """Drop old model pins previously managed by this dotfiles overlay.
+
+    The overlay no longer pins Codex's default model; users can still keep a
+    live `model = ...` of their own. Only remove exact stale values this repo
+    is known to have written, so custom model choices survive the merge.
+    """
+    if live.get("model") in {"gpt-5.4"}:
+        del live["model"]
+
+
 def fmt_scalar(v) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -174,6 +188,7 @@ live = parse(os.environ.get("CODEX_LIVE", ""))
 overlay = parse(os.environ.get("CODEX_OVERLAY", ""))
 prune_reserved_builtin_providers(live)
 prune_deprecated_features(live)
+prune_stale_managed_model(live)
 
 # Pull machine-local subtrees out before merge; re-attach last so they win.
 state = {}

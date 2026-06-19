@@ -151,11 +151,15 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
   [ "$status" -eq 0 ]
 
-  # Overlay wins on managed keys.
+  # Overlay wins on managed keys, but no longer pins the default model.
   echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
-  echo "$output" | yq -p toml -e '.model == "gpt-5.4"' >/dev/null
+  echo "$output" | yq -p toml -e '.model == "old-model"' >/dev/null
+  echo "$output" | yq -p toml -e '.model_reasoning_effort == "xhigh"' >/dev/null
   echo "$output" | yq -p toml -e '.features.hooks == true' >/dev/null
   echo "$output" | yq -p toml -e '.features.unified_exec == true' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[0] == "ctrl-j"' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[1] == "shift-enter"' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[2] == "alt-enter"' >/dev/null
   # Deprecated live key must be pruned, not preserved beside `hooks`.
   echo "$output" | yq -p toml -e '.features | has("codex_hooks") | not' >/dev/null
   # User-added [features] keys outside overlay survive.
@@ -178,7 +182,34 @@ source = "/Users/me/.codex/.tmp/bundled-marketplaces/openai-bundled"
   run bash -c "printf '' | '$script'"
   [ "$status" -eq 0 ]
   echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
+  echo "$output" | yq -p toml -e '. | has("model") | not' >/dev/null
   echo "$output" | yq -p toml -e '.features.steer == true' >/dev/null
+  echo "$output" | yq -p toml -e '.tui.keymap.editor.insert_newline[1] == "shift-enter"' >/dev/null
+}
+
+@test "codex modify_config.toml: stale managed model is pruned but custom model survives" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
+
+  local script="$RENDER_DIR/codex.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+
+  local stale_live='model = "gpt-5.4"
+model_reasoning_effort = "low"
+'
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$stale_live"
+  [ "$status" -eq 0 ]
+  echo "$output" | yq -p toml -e '. | has("model") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.model_reasoning_effort == "xhigh"' >/dev/null
+
+  local custom_live='model = "gpt-5.5"
+model_reasoning_effort = "low"
+'
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$custom_live"
+  [ "$status" -eq 0 ]
+  echo "$output" | yq -p toml -e '.model == "gpt-5.5"' >/dev/null
+  echo "$output" | yq -p toml -e '.model_reasoning_effort == "xhigh"' >/dev/null
 }
 
 @test "codex modify_config.toml: useChineseMirror does not persist reserved OpenAI provider override" {
