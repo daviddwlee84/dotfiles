@@ -104,10 +104,19 @@ def script_path() -> Path:
     return Path(__file__).resolve()
 
 
-def run(cmd: list[str], *, check: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
-    )
+def run(
+    cmd: list[str], *, check: bool = False, timeout: float | None = None
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=check, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        # 124 mirrors coreutils `timeout`; callers treat non-zero as failure.
+        return subprocess.CompletedProcess(
+            cmd, 124, exc.stdout or "", (exc.stderr or "") + "\n[agent-warmup: command timed out]"
+        )
 
 
 def notify(title: str, message: str) -> None:
@@ -121,10 +130,16 @@ def notify(title: str, message: str) -> None:
         run(["notify-send", title, message])
 
 
-# --- tmux helpers (dedicated socket) ----------------------------------------
+# --- tmux helpers (per-run socket) ------------------------------------------
+# cmd_run sets _active_socket to a unique per-run socket so a leftover --keep
+# session (or a wedged prior run) can never block a later unattended run, and
+# every tmux call has a timeout so a hung tmux server can't wedge us forever.
 
-def _tmux(*args: str) -> subprocess.CompletedProcess[str]:
-    return run(["tmux", "-L", SOCKET, *args])
+_active_socket = SOCKET
+
+
+def _tmux(*args: str, timeout: float = 15) -> subprocess.CompletedProcess[str]:
+    return run(["tmux", "-L", _active_socket, *args], timeout=timeout)
 
 
 def _session_alive(session: str) -> bool:
@@ -196,8 +211,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         notify("agent-warmup", "claude CLI not found on PATH; cannot warm up")
         return 127
 
+    global _active_socket
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     session = f"warmup-{ts}"
+    # Unique per-run socket: leftover --keep sessions / wedged prior runs can
+    # never block this one, and cleanup just kills this socket's server.
+    _active_socket = f"{SOCKET}-{ts}"
     log = cache_dir() / f"run-{ts}.log"
     cwd = isolated_cwd()
     model = args.model or os.environ.get("AICAP_CLAUDE_MODEL") or "haiku"
@@ -208,11 +227,6 @@ def cmd_run(args: argparse.Namespace) -> int:
     env = dict(os.environ)
     env.pop("ANTHROPIC_API_KEY", None)
 
-    # Reap any stale warmup sessions from a previous crashed run.
-    for line in _tmux("list-sessions", "-F", "#{session_name}").stdout.splitlines():
-        if line.startswith("warmup-") and line != session:
-            _tmux("kill-session", "-t", line)
-
     started = datetime.now().astimezone()
 
     def write_log(status: str, capture: str, usage: str = "") -> None:
@@ -221,7 +235,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             fh.write(f"status: {status}\n")
             fh.write(f"model: {model}\n")
             fh.write(f"prompt: {prompt}\n")
-            fh.write(f"session: {session} (socket {SOCKET})\n")
+            fh.write(f"session: {session} (socket {_active_socket})\n")
             fh.write(f"cwd: {cwd}\n")
             if usage:
                 fh.write("\n## /usage panel\n")
@@ -231,50 +245,63 @@ def cmd_run(args: argparse.Namespace) -> int:
             fh.write(capture)
             fh.write("\n")
 
-    claude_cmd = f"exec claude --model {shlex.quote(model)}"
-    cp = subprocess.run(
-        ["tmux", "-L", SOCKET, "new-session", "-d", "-s", session, "-x", "200", "-y", "50",
-         "-c", str(cwd), claude_cmd],
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-    )
-    if cp.returncode != 0:
-        write_log("error: tmux new-session failed", cp.stderr or cp.stdout)
-        notify("agent-warmup", f"failed to spawn claude session: {cp.stderr.strip()}")
-        return 1
-
-    ready, capture = _wait_ready(session, time.time() + READY_TIMEOUT)
-    if not ready:
-        write_log("error: claude not ready / auth required", capture)
+    def cleanup() -> None:
         if not args.keep:
-            _tmux("kill-session", "-t", session)
-        notify("agent-warmup", "claude did not become ready (auth or startup issue) — check the log")
-        print(f"agent-warmup: not ready; log {log}", file=sys.stderr)
-        return 2
+            _tmux("kill-server")  # tears down this socket's server + claude
 
-    _send_text(session, prompt)
-    capture = _wait_response(session, time.time() + args.timeout)
+    try:
+        claude_cmd = f"exec claude --model {shlex.quote(model)}"
+        cp = subprocess.run(
+            ["tmux", "-L", _active_socket, "new-session", "-d", "-s", session,
+             "-x", "200", "-y", "50", "-c", str(cwd), claude_cmd],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+            timeout=30,
+        )
+        if cp.returncode != 0:
+            write_log("error: tmux new-session failed", cp.stderr or cp.stdout)
+            notify("agent-warmup", f"failed to spawn claude session: {cp.stderr.strip()}")
+            return 1
 
-    usage = ""
-    if args.verify:
-        _send_text(session, "/usage")
-        time.sleep(2.0)
-        usage = _wait_response(session, time.time() + 30)
+        ready, capture = _wait_ready(session, time.time() + READY_TIMEOUT)
+        if not ready:
+            write_log("error: claude not ready / auth required", capture)
+            notify("agent-warmup", "claude did not become ready (auth or startup issue) — check the log")
+            print(f"agent-warmup: not ready; log {log}", file=sys.stderr)
+            return 2
 
-    write_log("ok", capture, usage)
-    if not args.keep:
-        _tmux("kill-session", "-t", session)
-        print(f"agent-warmup: warmup sent; log {log}")
-    else:
-        print(f"agent-warmup: warmup sent; session kept ({session}); log {log}")
-        print(f"  attach with: tmux -L {SOCKET} attach -t {session}")
-    return 0
+        _send_text(session, prompt)
+        capture = _wait_response(session, time.time() + args.timeout)
+
+        usage = ""
+        if args.verify:
+            _send_text(session, "/usage")
+            time.sleep(2.0)
+            usage = _wait_response(session, time.time() + 30)
+
+        write_log("ok", capture, usage)
+        if args.keep:
+            print(f"agent-warmup: warmup sent; session kept ({session}); log {log}")
+            print(f"  attach with: tmux -L {_active_socket} attach -t {session}")
+        else:
+            print(f"agent-warmup: warmup sent; log {log}")
+        return 0
+    finally:
+        cleanup()
 
 
 # --- pueue one-shot ---------------------------------------------------------
 
 def _run_argv(args: argparse.Namespace) -> list[str]:
-    """Reconstruct a `run` invocation from shared run flags."""
-    argv = [str(script_path()), "run"]
+    """Reconstruct a `run` invocation for unattended (pueue / launchd / systemd) use.
+
+    Invokes the resolved Python interpreter directly on the script instead of
+    going through the `uv run` shebang. The uv launcher can HANG under launchd's
+    bootstrap context (observed 2026-06-20: a 05:00 job wedged in uv before
+    Python ever started — no session, no log, no exit). The script is
+    stdlib-only (dependencies = []), so sys.executable — the uv-built env's
+    python while `install`/`at` run — is sufficient and starts instantly.
+    """
+    argv = [sys.executable, str(script_path()), "run"]
     if args.model:
         argv += ["--model", args.model]
     if args.prompt:
