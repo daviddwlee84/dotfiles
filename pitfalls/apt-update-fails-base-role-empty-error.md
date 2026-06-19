@@ -41,6 +41,13 @@ Two stacked problems:
      proxy) makes python-apt raise `FetchFailedException` with an **empty
      message** → exactly the symptom above. So the trigger on GFW hosts is an
      unreachable repo host, not a 404.
+   - a **truncated / 0-byte signing key** is the nastiest variant: if a
+     `curl … | gpg --dearmor -o /etc/apt/keyrings/<x>.gpg` is cut off mid-stream
+     (flaky proxy), gpg has already created the output file, so a **0-byte key**
+     is left behind. The matching `.list`/`.sources` still has `signed-by=`, so
+     **every** later `apt-get update` dies with `NO_PUBKEY …` until the key is
+     fixed. Seen 2026-06: a failed OpenTofu install left `opentofu.gpg` at 0
+     bytes → `NO_PUBKEY 70DF59811A8B9109` wedged every subsequent apply.
 2. **We planted the broken sources ourselves**: `lazyvim_deps` still added
    `ppa:lazygit-team/release`, which upstream deprecated in **2021**
    ([jesseduffield/lazygit#1399](https://github.com/jesseduffield/lazygit/issues/1399))
@@ -80,12 +87,19 @@ chezmoi apply
   partially-failed update is "success with warnings".)
 - `deb822_repository` needs `python3-debian` on the target → added to the base
   package list.
-- `roles/docker` / `roles/media_tools`: install tasks no longer inline
-  `update_cache: true`. They install **main-archive/universe** packages already
-  covered by base's best-effort refresh at play start, so they now use
-  `update_cache: false` — a transient proxy/source drop can no longer abort the
-  play here. (Same fix applies to any other role inlining `update_cache: true`
-  for main-archive packages; extend as needed.)
+- `roles/docker`, `roles/media_tools`, `roles/niri`, `roles/input_method`,
+  `roles/auditd`, `roles/ruby_gem_tools`, `roles/homelab_tools`: install tasks
+  no longer inline `update_cache: true`. They install **main-archive/universe**
+  packages already covered by base's best-effort refresh at play start, so they
+  now use `update_cache: false` — a transient proxy/source drop (or a broken
+  sibling source like the 0-byte key above) can no longer abort the play here.
+- `roles/iac_tools` (OpenTofu): hardened against the 0-byte-key trap — the key
+  is dearmored to `opentofu.gpg.tmp`, **verified non-empty (`test -s`)**, then
+  atomically `mv`'d into place; the live keyring is never truncated on a failed
+  download, and its `apt-get update` is **scoped to `opentofu.list` only**
+  (`-o Dir::Etc::sourcelist=… -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0`).
+  A pre-existing 0-byte key self-heals on the next successful apply. To unwedge
+  immediately: `sudo rm -f /etc/apt/keyrings/opentofu.gpg /etc/apt/sources.list.d/opentofu.list && chezmoi apply`.
 - `roles/gui_apps_linux` (Steam): the Valve repo is new (base's refresh hasn't
   seen it) so it MUST update after adding the source — but instead of a full
   `apt-get update` (which re-fetches every flaky third-party source), it runs a

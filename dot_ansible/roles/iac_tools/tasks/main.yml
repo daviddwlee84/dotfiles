@@ -219,20 +219,25 @@
     # carrying it in signed-by= bought nothing. `deb-src` is dropped because
     # this Cloudsmith-style repo has no source packages and apt-get update
     # fails on the missing Sources file.
+    # Dearmor the key to a temp file on the SAME dir, verify it is non-empty,
+    # then atomically mv it into place. A cut-off download (flaky proxy / GFW)
+    # otherwise leaves a 0-byte /etc/apt/keyrings/opentofu.gpg; since the .list
+    # references it via signed-by=, every later apt-get update on the whole
+    # machine then dies with NO_PUBKEY 70DF59811A8B9109 and wedges unrelated
+    # roles. Never truncate the live keyring on a failed download. The refresh
+    # is scoped to this one source so a sibling flaky repo cannot fail it.
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
     - name: Install OpenTofu repo and package
       ansible.builtin.shell: |
         set -eo pipefail
-        # gpg --dearmor -o <file> refuses to overwrite without --yes; on a
-        # re-apply the keyring file exists from the previous run. Use --yes
-        # so the task is idempotent.
-        curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey \
-          | gpg --no-tty --batch --yes --dearmor -o /etc/apt/keyrings/opentofu.gpg
-        # Clean up the orphan keyring from the old dual-key layout so a
-        # stale sources.list entry referencing it cannot wedge apt-get update.
+        tmpkey=/etc/apt/keyrings/opentofu.gpg.tmp
+        rm -f "$tmpkey"
+        curl -fsSL https://packages.opentofu.org/opentofu/tofu/gpgkey | gpg --no-tty --batch --yes --dearmor -o "$tmpkey"
+        test -s "$tmpkey"
+        mv -f "$tmpkey" /etc/apt/keyrings/opentofu.gpg
         rm -f /etc/apt/keyrings/opentofu-repo.gpg
-        echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" \
-          > /etc/apt/sources.list.d/opentofu.list
-        apt-get update
+        echo "deb [signed-by=/etc/apt/keyrings/opentofu.gpg] https://packages.opentofu.org/opentofu/tofu/any/ any main" > /etc/apt/sources.list.d/opentofu.list
+        apt-get update -o Dir::Etc::sourcelist=sources.list.d/opentofu.list -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0
         apt-get install -y tofu
       args:
         executable: /bin/bash

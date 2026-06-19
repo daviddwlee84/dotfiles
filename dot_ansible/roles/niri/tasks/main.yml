@@ -80,7 +80,10 @@
       - libpango1.0-dev
       - libdisplay-info-dev
     state: present
-    update_cache: true
+    # Main-archive build deps covered by base's best-effort cache refresh; don't
+    # re-run apt-get update here (a broken/flaky source would abort the play).
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
 
 # --- Decide whether we need to (re)build -------------------------------------
 

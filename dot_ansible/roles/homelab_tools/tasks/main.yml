@@ -33,8 +33,10 @@
       - pciutils
       - dmidecode
     state: present
-    update_cache: true
-    cache_valid_time: 3600
+    # Main-archive packages covered by base's best-effort cache refresh; don't
+    # re-run apt-get update here (a broken/flaky source would abort the play).
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
 
 - name: Install detection prerequisites (RHEL / CentOS / Rocky / Alma)
   when: ansible_facts["os_family"] == "RedHat"
@@ -130,8 +132,10 @@
   ansible.builtin.apt:
     name: "{{ homelab_pkgs }}"
     state: present
-    update_cache: true
-    cache_valid_time: 3600
+    # Main-archive packages covered by base's best-effort cache refresh; don't
+    # re-run apt-get update here (a broken/flaky source would abort the play).
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
 
 - name: Install homelab hardware tools (RHEL / CentOS / Rocky / Alma)
   when:
