@@ -715,16 +715,25 @@
           - i386
         signed_by: /usr/share/keyrings/steam.gpg
 
-    # No cache_valid_time here: the `base` role already runs `apt-get update`
-    # near the start of the same play, so any non-zero cache_valid_time would
-    # mark the cache "fresh" and SKIP this refresh — leaving the just-added
-    # Valve repo unindexed and `steam-launcher` unresolvable. Force the update
-    # unconditionally so the new repo is always fetched before the install.
-    - name: Refresh apt cache (Steam repo)
+    # Refresh ONLY the Steam source, not the whole apt config. A plain
+    # `apt-get update` re-fetches every third-party source (vscode, cursor,
+    # azure, hashicorp, ngrok, tailscale, …); on a flaky network/proxy any one
+    # of them can make the update exit non-zero and (via the block rescue)
+    # leave the just-added Valve repo unindexed → `steam-launcher` unresolvable.
+    # Scoping to sources.list.d/steam.sources keeps this immune to sibling
+    # sources. (No ansible.builtin.apt equivalent — it can't target one source.)
+    # cache_valid_time is irrelevant here too: base already refreshed the cache
+    # at play start, so an unscoped module call would skip and never index Steam.
+    - name: Refresh apt cache for the Steam source only
       become: true
       tags: [sudo]
-      ansible.builtin.apt:
-        update_cache: true
+      ansible.builtin.command:
+        cmd: >-
+          apt-get update
+          -o Dir::Etc::sourcelist=sources.list.d/steam.sources
+          -o Dir::Etc::sourceparts=-
+          -o APT::Get::List-Cleanup=0
+      changed_when: false
 
     - name: Install Steam launcher
       become: true

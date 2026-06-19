@@ -1,9 +1,9 @@
 # `Failed to update apt cache after 5 retries: ''` kills the whole play at the base role
 
-**Symptoms** (grep this section): `Failed to update cache after 5 retries due to , retrying` / `Sleeping for 13 seconds, before attempting to refresh the cache again` / `fatal: [localhost]: FAILED!` `msg: 'Failed to update apt cache after 5 retries: '` (empty reason) / `Failed to update apt cache: unknown reason` — at `roles/base/tasks/main.yml` "Install base packages (Debian/Ubuntu)"; `chezmoi init` exits 1; ansible script `20_ansible_roles.sh: exit status 2`
-**First seen**: 2026-06 (Ubuntu 22.04 `ta-stg`, `useChineseMirror=true`)
-**Affects**: any Debian/Ubuntu host with one broken/unreachable third-party apt source; especially GFW hosts
-**Status**: fixed (base role best-effort cache update + diagnostics; dead lazygit PPA removed + purged; deb822 repos verified + rolled back)
+**Symptoms** (grep this section): `Failed to update cache after 5 retries due to , retrying` / `Sleeping for 13 seconds, before attempting to refresh the cache again` / `fatal: [localhost]: FAILED!` `msg: 'Failed to update apt cache after 5 retries: '` (empty reason) / `Failed to update apt cache: unknown reason` — at `roles/base/tasks/main.yml` "Install base packages (Debian/Ubuntu)", **or any other role that inlines `update_cache: true` in an install task** (seen at `roles/docker` "Install rootless Docker prerequisites", `roles/media_tools` "Install media/AV tools from apt"); `chezmoi init` exits 1; ansible script `20_ansible_roles.sh: exit status 2`
+**First seen**: 2026-06 (Ubuntu 22.04 `ta-stg`, `useChineseMirror=true`); recurred 2026-06 on Ubuntu 24.04 `David-Ubuntu` behind a Clash/socks proxy (`HTTP_PROXY=http://127.0.0.1:7890`) — the proxy dropped for >30s mid-play, so `docker`/`media_tools` cache updates failed and aborted the play before `gui_apps_linux` (Steam) ran.
+**Affects**: any Debian/Ubuntu host with one broken/unreachable/slow third-party apt source — broken PPA, GFW-blackholed host, OR a flaky local proxy that drops connections intermittently
+**Status**: fixed (base role best-effort cache update + diagnostics; dead lazygit PPA removed + purged; deb822 repos verified + rolled back; `docker`/`media_tools` no longer inline `update_cache`; Steam refresh scoped to its own source)
 
 ## Symptom
 
@@ -80,6 +80,19 @@ chezmoi apply
   partially-failed update is "success with warnings".)
 - `deb822_repository` needs `python3-debian` on the target → added to the base
   package list.
+- `roles/docker` / `roles/media_tools`: install tasks no longer inline
+  `update_cache: true`. They install **main-archive/universe** packages already
+  covered by base's best-effort refresh at play start, so they now use
+  `update_cache: false` — a transient proxy/source drop can no longer abort the
+  play here. (Same fix applies to any other role inlining `update_cache: true`
+  for main-archive packages; extend as needed.)
+- `roles/gui_apps_linux` (Steam): the Valve repo is new (base's refresh hasn't
+  seen it) so it MUST update after adding the source — but instead of a full
+  `apt-get update` (which re-fetches every flaky third-party source), it runs a
+  **source-scoped** `apt-get update -o Dir::Etc::sourcelist=sources.list.d/steam.sources -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0`.
+  This is immune to sibling sources and has no `ansible.builtin.apt` equivalent
+  (the module can't target a single source). Verify on a host with:
+  `sudo apt-get update -o Dir::Etc::sourcelist=sources.list.d/steam.sources -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0 && apt-cache policy steam-launcher`
 
 ## Related
 

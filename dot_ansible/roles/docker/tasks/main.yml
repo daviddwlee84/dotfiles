@@ -47,7 +47,12 @@
       # userland firewall (required by rootlesskit for port forwarding)
       - iptables
     state: present
-    update_cache: true
+    # Don't re-run apt-get update here: these are all main-archive packages
+    # already covered by the base role's best-effort cache refresh at play
+    # start. An inlined update_cache would let a single transient proxy/source
+    # failure abort the whole play before later roles (e.g. gui_apps Steam)
+    # ever run. See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
 
 - name: Check if Docker CLI is installed (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"

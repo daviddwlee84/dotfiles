@@ -39,4 +39,9 @@
       - libimage-exiftool-perl       # provides /usr/bin/exiftool
       - libvips-tools                # vips, vipsthumbnail, vipsedit
     state: present
-    update_cache: true
+    # Don't re-run apt-get update here: these are all main-archive/universe
+    # packages already covered by the base role's best-effort cache refresh at
+    # play start. An inlined update_cache would let a single transient
+    # proxy/source failure abort the whole play (it did on a flaky proxy).
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
