@@ -1,8 +1,28 @@
 # Agent quota warmup at a scheduled time
 
-**Status**: P? research captured (2026-06)
+**Status**: SHIPPED (2026-06-20) as `agent-warmup` — see
+[docs/tools/agent-warmup.md](../docs/tools/agent-warmup.md)
 **Effort**: S/M
-**Related**: [backlog/agent-quota-auto-loop.md](agent-quota-auto-loop.md), [backlog/agent-delayed-run-scheduler.md](agent-delayed-run-scheduler.md), [backlog/agent-session-dashboard-tui.md](agent-session-dashboard-tui.md), [pitfalls/claude-hud-usage-statusline-stale.md](../pitfalls/claude-hud-usage-statusline-stale.md)
+**Related**: [backlog/agent-quota-auto-loop.md](agent-quota-auto-loop.md), [backlog/agent-delayed-run-scheduler.md](agent-delayed-run-scheduler.md), [backlog/agent-session-dashboard-tui.md](agent-session-dashboard-tui.md), [pitfalls/claude-hud-usage-statusline-stale.md](../pitfalls/claude-hud-usage-statusline-stale.md), [pitfalls/headless-claude-p-does-not-move-5h-window.md](../pitfalls/headless-claude-p-does-not-move-5h-window.md)
+
+## Outcome (2026-06-20)
+
+The open empirical question below ("does a minimal `claude -p` run start the
+same five-hour window?") **resolved to NO.** As of the **2026-06-15** Anthropic
+billing split, only *interactive* Claude Code advances the 5-hour subscription
+window; headless `claude -p` / Agent SDK draws from a separate metered credit
+pool. So the candidate v1 design (isolated cwd + `claude -p`) is **obsolete** —
+it would burn metered credit and never move the window. See
+[pitfalls/headless-claude-p-does-not-move-5h-window.md](../pitfalls/headless-claude-p-does-not-move-5h-window.md).
+
+Shipped design pivoted to **interactive-tmux warmup**: `agent-warmup`
+(`dot_dotfiles/bin/executable_agent-warmup`) spawns a detached tmux session
+running real interactive `claude` (dedicated socket, isolated cwd, subscription
+auth, `--model haiku`), sends a tiny prompt + Enter, logs + notifies. Backends:
+pueue one-shot (`at`), launchd/systemd recurring timer (`install`). The
+interactive-via-tmux classification is itself unverified — `agent-warmup verify`
+exists to confirm empirically near a reset boundary before trusting the recurring
+install. The original research below is kept for history.
 
 ## Context
 

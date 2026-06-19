@@ -277,6 +277,7 @@ nav:
       - Editor & agents:
           - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
           - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
+          - Agent quota warmup (agent-warmup): tools/agent-warmup.md
           - Agent skills: tools/agent-skills.md
           - Claude Code keybindings: tools/claude-code-keybindings.md
           - Language servers (LSP): tools/lsp.md

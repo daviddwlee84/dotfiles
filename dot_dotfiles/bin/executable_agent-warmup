@@ -1,0 +1,629 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""agent-warmup — start the Claude Pro/Max 5-hour subscription window on a schedule.
+
+Why interactive (and not ``claude -p``):
+  Since the 2026-06-15 Anthropic billing split, only *interactive* Claude Code
+  usage advances the rolling 5-hour subscription window. Headless ``claude -p``
+  (and the Agent SDK) draw from a separate metered credit pool and do NOT move
+  the window. So to "warm up" the window we must drive a real interactive
+  ``claude`` TUI: this tool launches one in a detached tmux session (dedicated
+  socket, isolated cwd, subscription auth), sends a tiny prompt + Enter, then
+  tears the session down. See pitfalls/headless-claude-p-does-not-move-5h-window.md.
+
+  Whether a *tmux-driven* interactive session still counts as interactive to
+  Anthropic is unverified — run ``agent-warmup verify`` near a reset boundary and
+  eyeball the captured /usage panel before trusting the recurring install.
+
+Subcommands:
+  run        Spawn interactive claude, send the warmup prompt, log the result.
+  at         Queue a one-shot ``run`` via pueue (--at / --delay).
+  install    Generate + load a recurring timer (macOS launchd / Linux systemd).
+  uninstall  Unload + remove the recurring timer.
+  status     Show pending one-shots, the installed timer, and recent run logs.
+  cancel     Remove pending pueue one-shots.
+  verify     run --verify --keep — the empirical experiment helper.
+
+Run flags (shared by run / at / install):
+  --model M     Claude model (default: $AICAP_CLAUDE_MODEL or "haiku" — keeps
+                window-token consumption tiny).
+  --prompt P    Warmup prompt (default: a one-line "reply hi").
+  --timeout S   Seconds to wait for a reply before giving up (default 120).
+  --verify      After the reply, send /usage and capture the panel into the log.
+  --keep        Do not kill the tmux session afterwards (for inspection).
+
+Env:
+  AGENT_WARMUP_SOCKET   tmux socket name (default: agent-warmup)
+  AICAP_CLAUDE_MODEL    default model (mirrors dot_config/shell/04_ai_agents.sh)
+
+Cache / logs: $XDG_CACHE_HOME/agent-warmup/ (run-*.log, launchd/systemd output).
+"""
+from __future__ import annotations
+
+import argparse
+import getpass
+import json
+import os
+import plistlib
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+GROUP = "agent-warmup"
+LABEL_PREFIX = "agent-warmup:"
+SOCKET = os.environ.get("AGENT_WARMUP_SOCKET", "agent-warmup")
+LAUNCHD_LABEL = f"com.{getpass.getuser()}.agent-warmup"
+SYSTEMD_UNIT = "agent-warmup"
+DEFAULT_PROMPT = "Reply with just: hi"
+DEFAULT_TIMEOUT = 120
+READY_TIMEOUT = 45
+STABLE_SECS = 4.0
+
+# Mirror scripts/fleet/exec.py:_PATH_PRELUDE so tmux/claude/pueue/launchctl are
+# found in the minimal env launchd/systemd hand us (deliberately puts package
+# manager dirs ahead of legacy ~/bin). Expanded and merged into PATH at startup.
+_PATH_PRELUDE = [
+    "~/.dotfiles/bin", "~/.cargo/bin", "~/.local/bin", "~/bin",
+    "/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin",
+    "~/.linuxbrew/bin",
+]
+
+
+def _augment_path() -> None:
+    extra = [str(Path(p).expanduser()) for p in _PATH_PRELUDE]
+    current = os.environ.get("PATH", "").split(os.pathsep)
+    merged = extra + [p for p in current if p and p not in extra]
+    os.environ["PATH"] = os.pathsep.join(merged)
+
+
+def cache_dir() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    d = Path(base) / "agent-warmup"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def isolated_cwd() -> Path:
+    d = cache_dir() / "claude"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def script_path() -> Path:
+    override = os.environ.get("AGENT_WARMUP_SCRIPT")
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve()
+
+
+def run(cmd: list[str], *, check: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
+    )
+
+
+def notify(title: str, message: str) -> None:
+    """Best-effort desktop notification; always also echo to stderr."""
+    print(f"{title}: {message}", file=sys.stderr)
+    if sys.platform == "darwin" and shutil.which("osascript"):
+        body = message.replace('"', "'")
+        head = title.replace('"', "'")
+        run(["osascript", "-e", f'display notification "{body}" with title "{head}"'])
+    elif shutil.which("notify-send"):
+        run(["notify-send", title, message])
+
+
+# --- tmux helpers (dedicated socket) ----------------------------------------
+
+def _tmux(*args: str) -> subprocess.CompletedProcess[str]:
+    return run(["tmux", "-L", SOCKET, *args])
+
+
+def _session_alive(session: str) -> bool:
+    return _tmux("has-session", "-t", session).returncode == 0
+
+
+def _capture(session: str, lines: int = 200) -> str:
+    cp = _tmux("capture-pane", "-p", "-S", f"-{lines}", "-t", session)
+    return cp.stdout if cp.returncode == 0 else ""
+
+
+def _send_text(session: str, text: str) -> None:
+    # Clear any pre-filled input, type the text literally, pause, then submit.
+    _tmux("send-keys", "-t", session, "C-u")
+    _tmux("send-keys", "-t", session, "-l", text)
+    time.sleep(0.4)
+    _tmux("send-keys", "-t", session, "Enter")
+
+
+# --- run --------------------------------------------------------------------
+
+_TRUST_MARKERS = ("do you trust", "trust the files", "trust this folder")
+_READY_MARKERS = ("for shortcuts", "? for", "› ", "│ >", "welcome to claude")
+_AUTH_MARKERS = ("setup-token", "please run /login", "invalid api key", "authentication", "logged out")
+
+
+def _wait_ready(session: str, deadline: float) -> tuple[bool, str]:
+    """Wait for the claude TUI input box; accept a first-run folder-trust prompt."""
+    trusted = False
+    while time.time() < deadline:
+        if not _session_alive(session):
+            return False, _capture(session)
+        text = _capture(session).lower()
+        if not trusted and any(m in text for m in _TRUST_MARKERS):
+            _tmux("send-keys", "-t", session, "Enter")
+            trusted = True
+            time.sleep(1.0)
+            continue
+        if any(m in text for m in _AUTH_MARKERS):
+            return False, _capture(session)
+        if any(m in text for m in _READY_MARKERS):
+            return True, _capture(session)
+        time.sleep(1.0)
+    # Fall back to "probably ready" if the session is still alive after settling.
+    return _session_alive(session), _capture(session)
+
+
+def _wait_response(session: str, deadline: float) -> str:
+    """Wait until the pane output stabilises (reply finished) or timeout."""
+    last = ""
+    last_change = time.time()
+    while time.time() < deadline:
+        if not _session_alive(session):
+            break
+        text = _capture(session)
+        if text != last:
+            last, last_change = text, time.time()
+        elif time.time() - last_change >= STABLE_SECS:
+            break
+        time.sleep(1.0)
+    return last
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    if not shutil.which("tmux"):
+        notify("agent-warmup", "tmux not found on PATH; cannot warm up")
+        return 127
+    if not shutil.which("claude"):
+        notify("agent-warmup", "claude CLI not found on PATH; cannot warm up")
+        return 127
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    session = f"warmup-{ts}"
+    log = cache_dir() / f"run-{ts}.log"
+    cwd = isolated_cwd()
+    model = args.model or os.environ.get("AICAP_CLAUDE_MODEL") or "haiku"
+    prompt = args.prompt or DEFAULT_PROMPT
+
+    # Subscription auth only: an API key would route this to metered credit and
+    # would NOT advance the 5-hour subscription window.
+    env = dict(os.environ)
+    env.pop("ANTHROPIC_API_KEY", None)
+
+    # Reap any stale warmup sessions from a previous crashed run.
+    for line in _tmux("list-sessions", "-F", "#{session_name}").stdout.splitlines():
+        if line.startswith("warmup-") and line != session:
+            _tmux("kill-session", "-t", line)
+
+    started = datetime.now().astimezone()
+
+    def write_log(status: str, capture: str, usage: str = "") -> None:
+        with log.open("w") as fh:
+            fh.write(f"# agent-warmup run {started.isoformat()}\n")
+            fh.write(f"status: {status}\n")
+            fh.write(f"model: {model}\n")
+            fh.write(f"prompt: {prompt}\n")
+            fh.write(f"session: {session} (socket {SOCKET})\n")
+            fh.write(f"cwd: {cwd}\n")
+            if usage:
+                fh.write("\n## /usage panel\n")
+                fh.write(usage)
+                fh.write("\n")
+            fh.write("\n## final pane capture\n")
+            fh.write(capture)
+            fh.write("\n")
+
+    claude_cmd = f"exec claude --model {shlex.quote(model)}"
+    cp = subprocess.run(
+        ["tmux", "-L", SOCKET, "new-session", "-d", "-s", session, "-x", "200", "-y", "50",
+         "-c", str(cwd), claude_cmd],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    if cp.returncode != 0:
+        write_log("error: tmux new-session failed", cp.stderr or cp.stdout)
+        notify("agent-warmup", f"failed to spawn claude session: {cp.stderr.strip()}")
+        return 1
+
+    ready, capture = _wait_ready(session, time.time() + READY_TIMEOUT)
+    if not ready:
+        write_log("error: claude not ready / auth required", capture)
+        if not args.keep:
+            _tmux("kill-session", "-t", session)
+        notify("agent-warmup", "claude did not become ready (auth or startup issue) — check the log")
+        print(f"agent-warmup: not ready; log {log}", file=sys.stderr)
+        return 2
+
+    _send_text(session, prompt)
+    capture = _wait_response(session, time.time() + args.timeout)
+
+    usage = ""
+    if args.verify:
+        _send_text(session, "/usage")
+        time.sleep(2.0)
+        usage = _wait_response(session, time.time() + 30)
+
+    write_log("ok", capture, usage)
+    if not args.keep:
+        _tmux("kill-session", "-t", session)
+        print(f"agent-warmup: warmup sent; log {log}")
+    else:
+        print(f"agent-warmup: warmup sent; session kept ({session}); log {log}")
+        print(f"  attach with: tmux -L {SOCKET} attach -t {session}")
+    return 0
+
+
+# --- pueue one-shot ---------------------------------------------------------
+
+def _run_argv(args: argparse.Namespace) -> list[str]:
+    """Reconstruct a `run` invocation from shared run flags."""
+    argv = [str(script_path()), "run"]
+    if args.model:
+        argv += ["--model", args.model]
+    if args.prompt:
+        argv += ["--prompt", args.prompt]
+    if args.timeout != DEFAULT_TIMEOUT:
+        argv += ["--timeout", str(args.timeout)]
+    if getattr(args, "verify", False):
+        argv.append("--verify")
+    return argv
+
+
+def _ensure_group() -> None:
+    run(["pueue", "group", "add", GROUP])
+    run(["pueue", "parallel", "-g", GROUP, "1"])
+
+
+def cmd_at(args: argparse.Namespace) -> int:
+    if not shutil.which("pueue"):
+        print("agent-warmup: pueue not installed", file=sys.stderr)
+        return 127
+    if not args.at and not args.delay:
+        print("agent-warmup at: pass --at or --delay", file=sys.stderr)
+        return 2
+    delay = args.delay or args.at
+    command = " ".join(shlex.quote(p) for p in _run_argv(args))
+    label = f"{LABEL_PREFIX}oneshot:{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    if args.dry_run:
+        print(f"pueue add -g {GROUP} --label {shlex.quote(label)} "
+              f"--delay {shlex.quote(delay)} {shlex.quote(command)}")
+        return 0
+    _ensure_group()
+    cp = run(["pueue", "add", "-g", GROUP, "--label", label,
+              "--delay", delay, "--print-task-id", command])
+    if cp.returncode != 0:
+        print(cp.stderr or cp.stdout, file=sys.stderr, end="")
+        return cp.returncode
+    print(f"scheduled {label} at {delay} (task {cp.stdout.strip()})")
+    return 0
+
+
+def _pueue_oneshots() -> list[tuple[str, str, str]]:
+    """Return (task_id, status, label) for pending agent-warmup one-shots."""
+    if not shutil.which("pueue"):
+        return []
+    cp = run(["pueue", "status", "--json"])
+    if cp.returncode != 0:
+        return []
+    try:
+        data = json.loads(cp.stdout)
+    except json.JSONDecodeError:
+        return []
+    out = []
+    for tid, task in (data.get("tasks") or {}).items():
+        if not isinstance(task, dict):
+            continue
+        label = str(task.get("label") or "")
+        if not label.startswith(LABEL_PREFIX):
+            continue
+        status = task.get("status")
+        name = next(iter(status)) if isinstance(status, dict) and status else str(status)
+        if name == "Done":
+            continue
+        out.append((str(task.get("id", tid)), name, label))
+    return out
+
+
+def cmd_cancel(args: argparse.Namespace) -> int:
+    tasks = _pueue_oneshots()
+    if not tasks:
+        print("no pending agent-warmup one-shots")
+        return 0
+    for tid, _status, label in tasks:
+        cp = run(["pueue", "remove", tid])
+        if cp.returncode != 0:
+            run(["pueue", "kill", tid])
+            cp = run(["pueue", "remove", tid])
+        print(f"removed task {tid} ({label})" if cp.returncode == 0
+              else (cp.stderr or cp.stdout))
+    return 0
+
+
+# --- recurring timer install ------------------------------------------------
+
+_WEEKDAY_NAMES = {
+    "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6, "sun": 0,
+}
+_SYSTEMD_DAY = {1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 0: "Sun"}
+
+
+def _parse_days(spec: str) -> list[int]:
+    """Return launchd Weekday integers (Sun=0..Sat=6). Empty list = every day."""
+    spec = (spec or "daily").strip().lower()
+    if spec in ("daily", "everyday", "all"):
+        return []
+    if spec == "weekdays":
+        return [1, 2, 3, 4, 5]
+    if spec == "weekends":
+        return [0, 6]
+    days = []
+    for tok in re.split(r"[,\s]+", spec):
+        if tok[:3] in _WEEKDAY_NAMES:
+            days.append(_WEEKDAY_NAMES[tok[:3]])
+    return sorted(set(days))
+
+
+def _parse_hhmm(s: str) -> tuple[int, int]:
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", s.strip())
+    if not m:
+        raise SystemExit(f"agent-warmup install: bad --time {s!r} (want HH:MM)")
+    hh, mm = int(m.group(1)), int(m.group(2))
+    if hh > 23 or mm > 59:
+        raise SystemExit(f"agent-warmup install: time out of range {s!r}")
+    return hh, mm
+
+
+def _launchd_plist_path() -> Path:
+    return Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
+
+
+def _install_launchd(args: argparse.Namespace, days: list[int], hh: int, mm: int) -> int:
+    program = _run_argv(args)
+    if days:
+        cal = [{"Weekday": d, "Hour": hh, "Minute": mm} for d in days]
+    else:
+        cal = {"Hour": hh, "Minute": mm}
+    plist = {
+        "Label": LAUNCHD_LABEL,
+        "ProgramArguments": program,
+        "StartCalendarInterval": cal,
+        "EnvironmentVariables": {"PATH": os.environ["PATH"]},
+        "StandardOutPath": str(cache_dir() / "launchd.out.log"),
+        "StandardErrorPath": str(cache_dir() / "launchd.err.log"),
+        "RunAtLoad": False,
+    }
+    path = _launchd_plist_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as fh:
+        plistlib.dump(plist, fh)
+    # Validate with the platform tool (repo invariant: validate config with the app).
+    if shutil.which("plutil"):
+        cp = run(["plutil", "-lint", str(path)])
+        if cp.returncode != 0:
+            print(cp.stdout or cp.stderr, file=sys.stderr, end="")
+            return 1
+    uid = os.getuid()
+    run(["launchctl", "bootout", f"gui/{uid}/{LAUNCHD_LABEL}"])
+    cp = run(["launchctl", "bootstrap", f"gui/{uid}", str(path)])
+    if cp.returncode != 0:
+        # Older macOS fallback.
+        run(["launchctl", "unload", str(path)])
+        cp = run(["launchctl", "load", "-w", str(path)])
+    if cp.returncode != 0:
+        print(cp.stderr or cp.stdout, file=sys.stderr, end="")
+        return cp.returncode
+    print(f"installed launchd agent {LAUNCHD_LABEL} → {path}")
+    return 0
+
+
+def _systemd_dir() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    d = Path(base) / "systemd" / "user"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _install_systemd(args: argparse.Namespace, days: list[int], hh: int, mm: int) -> int:
+    program = " ".join(shlex.quote(p) for p in _run_argv(args))
+    if days:
+        names = ",".join(_SYSTEMD_DAY[d] for d in sorted(days))
+        oncal = f"{names} *-*-* {hh:02d}:{mm:02d}:00"
+    else:
+        oncal = f"*-*-* {hh:02d}:{mm:02d}:00"
+    d = _systemd_dir()
+    (d / f"{SYSTEMD_UNIT}.service").write_text(
+        "[Unit]\n"
+        "Description=Claude quota-window warmup\n\n"
+        "[Service]\n"
+        "Type=oneshot\n"
+        f"ExecStart={program}\n"
+    )
+    (d / f"{SYSTEMD_UNIT}.timer").write_text(
+        "[Unit]\n"
+        "Description=Claude quota-window warmup timer\n\n"
+        "[Timer]\n"
+        f"OnCalendar={oncal}\n"
+        "Persistent=true\n\n"
+        "[Install]\n"
+        "WantedBy=timers.target\n"
+    )
+    if shutil.which("systemd-analyze"):
+        cp = run(["systemd-analyze", "verify", str(d / f"{SYSTEMD_UNIT}.timer")])
+        if cp.returncode != 0:
+            print(cp.stderr or cp.stdout, file=sys.stderr, end="")
+            return 1
+    run(["systemctl", "--user", "daemon-reload"])
+    cp = run(["systemctl", "--user", "enable", "--now", f"{SYSTEMD_UNIT}.timer"])
+    if cp.returncode != 0:
+        print(cp.stderr or cp.stdout, file=sys.stderr, end="")
+        return cp.returncode
+    print(f"installed systemd user timer {SYSTEMD_UNIT}.timer (OnCalendar={oncal})")
+    return 0
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    days = _parse_days(args.daily)
+    hh, mm = _parse_hhmm(args.time)
+    if sys.platform == "darwin":
+        return _install_launchd(args, days, hh, mm)
+    return _install_systemd(args, days, hh, mm)
+
+
+def cmd_uninstall(args: argparse.Namespace) -> int:
+    if sys.platform == "darwin":
+        uid = os.getuid()
+        run(["launchctl", "bootout", f"gui/{uid}/{LAUNCHD_LABEL}"])
+        path = _launchd_plist_path()
+        run(["launchctl", "unload", str(path)])
+        if path.exists():
+            path.unlink()
+            print(f"removed launchd agent {LAUNCHD_LABEL}")
+        else:
+            print("no launchd agent installed")
+        return 0
+    run(["systemctl", "--user", "disable", "--now", f"{SYSTEMD_UNIT}.timer"])
+    d = _systemd_dir()
+    removed = False
+    for name in (f"{SYSTEMD_UNIT}.timer", f"{SYSTEMD_UNIT}.service"):
+        f = d / name
+        if f.exists():
+            f.unlink()
+            removed = True
+    run(["systemctl", "--user", "daemon-reload"])
+    print("removed systemd user timer" if removed else "no systemd timer installed")
+    return 0
+
+
+# --- status -----------------------------------------------------------------
+
+def _timer_state() -> str:
+    if sys.platform == "darwin":
+        path = _launchd_plist_path()
+        if not path.exists():
+            return "not installed"
+        uid = os.getuid()
+        cp = run(["launchctl", "print", f"gui/{uid}/{LAUNCHD_LABEL}"])
+        return f"launchd {LAUNCHD_LABEL} ({'loaded' if cp.returncode == 0 else 'present, not loaded'})"
+    if not (_systemd_dir() / f"{SYSTEMD_UNIT}.timer").exists():
+        return "not installed"
+    cp = run(["systemctl", "--user", "list-timers", "--no-pager", f"{SYSTEMD_UNIT}.timer"])
+    next_line = ""
+    for line in cp.stdout.splitlines():
+        if SYSTEMD_UNIT in line:
+            next_line = line.strip()
+    return f"systemd {SYSTEMD_UNIT}.timer ({next_line or 'enabled'})"
+
+
+def _recent_runs(limit: int = 5) -> list[tuple[str, str]]:
+    logs = sorted(cache_dir().glob("run-*.log"), reverse=True)[:limit]
+    out = []
+    for log in logs:
+        status = "?"
+        for line in log.read_text(errors="replace").splitlines():
+            if line.startswith("status:"):
+                status = line.split(":", 1)[1].strip()
+                break
+        out.append((log.name, status))
+    return out
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    if args.json:
+        print(json.dumps({
+            "timer": _timer_state(),
+            "oneshots": [{"task_id": t, "status": s, "label": l} for t, s, l in _pueue_oneshots()],
+            "recent_runs": [{"log": n, "status": s} for n, s in _recent_runs()],
+        }, indent=2))
+        return 0
+    print(f"timer:    {_timer_state()}")
+    oneshots = _pueue_oneshots()
+    print(f"oneshots: {len(oneshots)} pending")
+    for tid, status, label in oneshots:
+        print(f"  task {tid}  {status}  {label}")
+    runs = _recent_runs()
+    print(f"recent:   {len(runs)} run log(s) in {cache_dir()}")
+    for name, status in runs:
+        print(f"  {name}  status={status}")
+    return 0
+
+
+# --- arg parsing ------------------------------------------------------------
+
+def _add_run_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--model", help="Claude model (default $AICAP_CLAUDE_MODEL or haiku)")
+    p.add_argument("--prompt", help=f"Warmup prompt (default: {DEFAULT_PROMPT!r})")
+    p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="Reply wait seconds")
+    p.add_argument("--verify", action="store_true", help="Send /usage and capture the panel")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="agent-warmup", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=False)
+
+    s = sub.add_parser("run", help="Spawn interactive claude and send the warmup prompt")
+    _add_run_flags(s)
+    s.add_argument("--keep", action="store_true", help="Keep the tmux session afterwards")
+    s.set_defaults(func=cmd_run)
+
+    s = sub.add_parser("at", help="Queue a one-shot run via pueue")
+    s.add_argument("--at", help="Absolute time for pueue --delay (e.g. '06:00', 'tomorrow 06:00')")
+    s.add_argument("--delay", help="Relative delay for pueue --delay (e.g. 8h, 30m)")
+    s.add_argument("--dry-run", action="store_true")
+    _add_run_flags(s)
+    s.set_defaults(func=cmd_at)
+
+    s = sub.add_parser("install", help="Install a recurring launchd/systemd timer")
+    s.add_argument("--daily", default="weekdays",
+                   help="daily | weekdays | weekends | comma list (mon,wed,fri)")
+    s.add_argument("--time", default="06:00", help="HH:MM (24h)")
+    _add_run_flags(s)
+    s.set_defaults(func=cmd_install)
+
+    s = sub.add_parser("uninstall", help="Remove the recurring timer")
+    s.set_defaults(func=cmd_uninstall)
+
+    s = sub.add_parser("status", help="Show timer, pending one-shots, recent runs")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(func=cmd_status)
+
+    s = sub.add_parser("cancel", help="Remove pending pueue one-shots")
+    s.set_defaults(func=cmd_cancel)
+
+    s = sub.add_parser("verify", help="run --verify --keep (empirical experiment helper)")
+    _add_run_flags(s)
+    s.set_defaults(func=lambda a: cmd_run(argparse.Namespace(
+        **{**vars(a), "keep": True, "verify": True})))
+
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    _augment_path()
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not hasattr(args, "func"):
+        parser.print_help()
+        return 0
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
