@@ -31,12 +31,17 @@ So `agent-warmup run` drives a **real interactive `claude` TUI**:
 Default model is `$AICAP_CLAUDE_MODEL` (→ `haiku`) to keep window-token
 consumption tiny.
 
-!!! note "Unverified assumption — confirm empirically"
-    Whether Anthropic still classifies a *tmux-driven* interactive session as
-    "interactive" is unconfirmed. The billing system most likely keys off
-    client/session **type**, not who physically pressed Enter — but run
-    `agent-warmup verify` near a reset boundary and eyeball the captured
-    `/usage` panel **before** trusting the recurring install.
+!!! note "Preliminary confirmation (2026-06-20) — cold-start still pending"
+    A live `agent-warmup verify` run confirmed the mechanics end-to-end and gave
+    strong evidence the tmux-driven session counts as **interactive subscription
+    usage**: the session reported as a *Claude Max* account, `/usage` attributed
+    the usage to the **"Current session"** (the 5-hour window) bucket, and the
+    metered **"Usage credits" pool was off** (untouched). What is *not* yet
+    proven is the **cold start** — that run joined an already-active window, so
+    it has not been shown to *start* a fresh window from cold. Run
+    `agent-warmup verify` when no window is active (e.g. just after a reset) and
+    eyeball the captured `/usage` panel **before** trusting the recurring
+    install.
 
 ## Commands
 

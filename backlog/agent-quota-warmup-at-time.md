@@ -24,6 +24,13 @@ interactive-via-tmux classification is itself unverified — `agent-warmup verif
 exists to confirm empirically near a reset boundary before trusting the recurring
 install. The original research below is kept for history.
 
+**Live test (2026-06-20):** `agent-warmup verify` confirmed mechanics end-to-end
+and showed strong evidence the tmux session counts as interactive subscription
+usage — reported as *Claude Max*, usage attributed to the `/usage` "Current
+session" (5-hour) bucket, metered "Usage credits" pool off. Still pending: the
+**cold-start** case (the test run joined an already-active window). Scheduled a
+05:00 cold-start `verify` to close it out.
+
 ## Context
 
 There is a separate use case from quota recovery and delayed work:
