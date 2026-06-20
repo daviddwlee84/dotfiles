@@ -36,7 +36,6 @@ Run flags (shared by run / at / install):
   --keep        Do not kill the tmux session afterwards (for inspection).
 
 Env:
-  AGENT_WARMUP_SOCKET   tmux socket name (default: agent-warmup)
   AICAP_CLAUDE_MODEL    default model (mirrors dot_config/shell/04_ai_agents.sh)
 
 Cache / logs: $XDG_CACHE_HOME/agent-warmup/ (run-*.log, launchd/systemd output).
@@ -47,7 +46,6 @@ import argparse
 import getpass
 import json
 import os
-import plistlib
 import re
 import shlex
 import shutil
@@ -59,7 +57,6 @@ from pathlib import Path
 
 GROUP = "agent-warmup"
 LABEL_PREFIX = "agent-warmup:"
-SOCKET = os.environ.get("AGENT_WARMUP_SOCKET", "agent-warmup")
 LAUNCHD_LABEL = f"com.{getpass.getuser()}.agent-warmup"
 SYSTEMD_UNIT = "agent-warmup"
 DEFAULT_PROMPT = "Reply with just: hi"
@@ -130,16 +127,21 @@ def notify(title: str, message: str) -> None:
         run(["notify-send", title, message])
 
 
-# --- tmux helpers (per-run socket) ------------------------------------------
-# cmd_run sets _active_socket to a unique per-run socket so a leftover --keep
-# session (or a wedged prior run) can never block a later unattended run, and
-# every tmux call has a timeout so a hung tmux server can't wedge us forever.
-
-_active_socket = SOCKET
-
+# --- tmux helpers -----------------------------------------------------------
+# We operate on the user's DEFAULT tmux server (the one their GUI login created),
+# NOT a private `-L` socket. Critical finding (2026-06-20): claude's TUI renders
+# nothing when its tmux server was created by a background daemon (launchd/pueue)
+# — same env, same flags. But a daemon CONNECTING to the already-running
+# GUI-session server and spawning claude there renders fine. So the scheduled
+# run injects a transient session into the existing server. Every tmux call has
+# a timeout so a hung server can't wedge us forever. See the pitfall.
 
 def _tmux(*args: str, timeout: float = 15) -> subprocess.CompletedProcess[str]:
-    return run(["tmux", "-L", _active_socket, *args], timeout=timeout)
+    return run(["tmux", *args], timeout=timeout)
+
+
+def _server_alive() -> bool:
+    return _tmux("list-sessions").returncode == 0
 
 
 def _session_alive(session: str) -> bool:
@@ -211,21 +213,22 @@ def cmd_run(args: argparse.Namespace) -> int:
         notify("agent-warmup", "claude CLI not found on PATH; cannot warm up")
         return 127
 
-    global _active_socket
+    # claude's TUI only renders in a tmux server created by the GUI login
+    # session. A daemon (launchd/pueue) that spawns its OWN server gets a blank
+    # pane, so we require the user's existing default server and inject into it.
+    # When attended (a real TTY), creating the server here is fine — it inherits
+    # this interactive GUI-session context.
+    if not _server_alive() and not sys.stdout.isatty():
+        notify("agent-warmup", "no running tmux server to inject into — leave a tmux session open for scheduled warmups")
+        print("agent-warmup: no tmux server (and not a TTY); cannot warm up", file=sys.stderr)
+        return 4
+
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     session = f"warmup-{ts}"
-    # Unique per-run socket: leftover --keep sessions / wedged prior runs can
-    # never block this one, and cleanup just kills this socket's server.
-    _active_socket = f"{SOCKET}-{ts}"
     log = cache_dir() / f"run-{ts}.log"
     cwd = isolated_cwd()
     model = args.model or os.environ.get("AICAP_CLAUDE_MODEL") or "haiku"
     prompt = args.prompt or DEFAULT_PROMPT
-
-    # Subscription auth only: an API key would route this to metered credit and
-    # would NOT advance the 5-hour subscription window.
-    env = dict(os.environ)
-    env.pop("ANTHROPIC_API_KEY", None)
 
     started = datetime.now().astimezone()
 
@@ -235,7 +238,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             fh.write(f"status: {status}\n")
             fh.write(f"model: {model}\n")
             fh.write(f"prompt: {prompt}\n")
-            fh.write(f"session: {session} (socket {_active_socket})\n")
+            fh.write(f"session: {session} (default tmux server)\n")
             fh.write(f"cwd: {cwd}\n")
             if usage:
                 fh.write("\n## /usage panel\n")
@@ -247,16 +250,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     def cleanup() -> None:
         if not args.keep:
-            _tmux("kill-server")  # tears down this socket's server + claude
+            _tmux("kill-session", "-t", session)  # only our transient session
 
     try:
-        claude_cmd = f"exec claude --model {shlex.quote(model)}"
-        cp = subprocess.run(
-            ["tmux", "-L", _active_socket, "new-session", "-d", "-s", session,
-             "-x", "200", "-y", "50", "-c", str(cwd), claude_cmd],
-            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-            timeout=30,
-        )
+        # `env -u ANTHROPIC_API_KEY`: force subscription auth (an API key would
+        # route to metered credit and NOT advance the 5-hour window). Done in the
+        # command because the session inherits the server's env, not ours.
+        claude_cmd = f"exec env -u ANTHROPIC_API_KEY claude --model {shlex.quote(model)}"
+        cp = _tmux("new-session", "-d", "-s", session, "-x", "200", "-y", "50",
+                   "-c", str(cwd), claude_cmd, timeout=30)
         if cp.returncode != 0:
             write_log("error: tmux new-session failed", cp.stderr or cp.stdout)
             notify("agent-warmup", f"failed to spawn claude session: {cp.stderr.strip()}")
@@ -278,10 +280,15 @@ def cmd_run(args: argparse.Namespace) -> int:
             time.sleep(2.0)
             usage = _wait_response(session, time.time() + 30)
 
-        write_log("ok", capture, usage)
+        # A blank capture means claude never rendered (the daemon-server trap) —
+        # report it instead of a false "ok".
+        status = "ok" if capture.strip() else "warning: blank pane (claude did not render)"
+        write_log(status, capture, usage)
+        if not capture.strip():
+            notify("agent-warmup", "warmup ran but claude rendered nothing — check the log")
         if args.keep:
             print(f"agent-warmup: warmup sent; session kept ({session}); log {log}")
-            print(f"  attach with: tmux -L {_active_socket} attach -t {session}")
+            print(f"  attach with: tmux attach -t {session}")
         else:
             print(f"agent-warmup: warmup sent; log {log}")
         return 0
@@ -291,17 +298,36 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 # --- pueue one-shot ---------------------------------------------------------
 
-def _run_argv(args: argparse.Namespace) -> list[str]:
-    """Reconstruct a `run` invocation for unattended (pueue / launchd / systemd) use.
+def _scheduled_python() -> str:
+    """Pick a Python interpreter safe to launch from a daemon (pueue/launchd/systemd).
 
-    Invokes the resolved Python interpreter directly on the script instead of
-    going through the `uv run` shebang. The uv launcher can HANG under launchd's
-    bootstrap context (observed 2026-06-20: a 05:00 job wedged in uv before
-    Python ever started — no session, no log, no exit). The script is
-    stdlib-only (dependencies = []), so sys.executable — the uv-built env's
-    python while `install`/`at` run — is sufficient and starts instantly.
+    Two traps, both observed 2026-06-20 (see the pitfall):
+    1. The `uv run` shebang launcher hangs under launchd before Python starts —
+       so we invoke a Python interpreter directly on the script.
+    2. The uv-MANAGED interpreter often lives on a secondary volume
+       (e.g. /Volumes/Data/.../uv-share/python/cpython-*/bin/python3.11). Memory-
+       mapping its binary / C-extension .so files from that volume BLOCKS in dyld
+       under a daemon bootstrap (a volume-access/TCC gate the GUI session has but
+       daemons don't), wedging the run forever with no session and no log.
+
+    So prefer a Python on the main system volume. The script is stdlib-only
+    (dependencies = []), so any python3.11+ works.
     """
-    argv = [sys.executable, str(script_path()), "run"]
+    if sys.platform == "darwin":
+        candidates = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3"]
+    else:
+        candidates = ["/usr/bin/python3", "/usr/local/bin/python3"]
+    for cand in candidates:
+        if os.path.exists(cand):
+            return cand
+    # Last resort: whatever is on PATH, else the current interpreter (may be on a
+    # secondary volume — better to try than to emit nothing).
+    return shutil.which("python3") or sys.executable
+
+
+def _run_argv(args: argparse.Namespace) -> list[str]:
+    """Reconstruct a `run` invocation for unattended (pueue / launchd / systemd) use."""
+    argv = [_scheduled_python(), str(script_path()), "run"]
     if args.model:
         argv += ["--model", args.model]
     if args.prompt:
@@ -422,6 +448,11 @@ def _launchd_plist_path() -> Path:
 
 
 def _install_launchd(args: argparse.Namespace, days: list[int], hh: int, mm: int) -> int:
+    # Lazy import: plistlib pulls in the pyexpat C-extension, whose load triggers
+    # macOS amfid code-sign verification that can STALL under a daemon (launchd /
+    # pueue) bootstrap. The scheduled `run` hot path must never import it — only
+    # `install` (always invoked interactively) needs it. See the pitfall.
+    import plistlib
     program = _run_argv(args)
     if days:
         cal = [{"Weekday": d, "Hour": hh, "Minute": mm} for d in days]
