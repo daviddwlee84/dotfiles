@@ -71,13 +71,12 @@ Check whether a new 5-hour session window started. If it did **not**, the
 tmux-driven session is also being classified as non-interactive — stop and
 rethink (there may be no automatable way to warm the window).
 
-**Preliminary finding (2026-06-20):** a live `verify` run reported as a *Claude
-Max* account, `/usage` attributed the usage to the **"Current session"** (5-hour
-window) bucket, and the metered **"Usage credits" pool was off** — strong
-evidence the tmux interactive session counts as subscription usage, not metered
-Agent SDK credit. NOT yet proven: the **cold start** (that run joined an
-already-active window, so it has not been shown to *start* a fresh window). The
-open check is to run `verify` when no window is active.
+**Confirmed (2026-06-20):** live `verify` plus scheduled pueue/launchd runs all
+reported as a *Claude Max* account with usage on the **"Current session"** (5-hour
+window) bucket and the metered **"Usage credits" pool off** — the tmux interactive
+session counts as subscription usage, not metered Agent SDK credit. (Bringing up
+the *scheduled* path had its own four-trap saga — see
+[agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md](agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md).)
 
 ## References
 

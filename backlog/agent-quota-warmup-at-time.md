@@ -25,11 +25,20 @@ exists to confirm empirically near a reset boundary before trusting the recurrin
 install. The original research below is kept for history.
 
 **Live test (2026-06-20):** `agent-warmup verify` confirmed mechanics end-to-end
-and showed strong evidence the tmux session counts as interactive subscription
-usage — reported as *Claude Max*, usage attributed to the `/usage` "Current
-session" (5-hour) bucket, metered "Usage credits" pool off. Still pending: the
-**cold-start** case (the test run joined an already-active window). Scheduled a
-05:00 cold-start `verify` to close it out.
+and showed the tmux session counts as interactive subscription usage — reported
+as *Claude Max*, usage attributed to the `/usage` "Current session" (5-hour)
+bucket, metered "Usage credits" pool off.
+
+**Unattended brought up (2026-06-20):** the scheduled path took four stacked
+fixes to work under a daemon bootstrap — uv-launcher hang, `pyexpat`/amfid stall,
+uv interpreter on a secondary volume, and (the big one) claude's TUI rendering a
+**blank pane** in any daemon-created tmux server. Resolved by injecting into the
+user's existing GUI-session tmux server. **Both pueue (one-shot) and launchd
+(recurring) now verified end-to-end**: claude renders, replies, `/usage` shows
+the usage on the 5-hour "Current session" bucket. Full story:
+[pitfalls/agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md](../pitfalls/agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md).
+Remaining constraint: a tmux server must be running in the login session at
+warmup time.
 
 ## Context
 
