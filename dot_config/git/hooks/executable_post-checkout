@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Global git-lfs post-checkout hook — managed by chezmoi (do not edit directly).
+#
+# Differs from the stock `git lfs install` hook in two deliberate ways, because
+# core.hooksPath is GLOBAL (set in ~/.gitconfig so the managed pre-commit hook
+# covers every repo) — so this runs for EVERY clone/checkout, including the ones
+# `brew tap` performs in Homebrew's stripped superenv PATH where /usr/local/bin
+# (and thus git-lfs) is invisible:
+#   1. Augment PATH with the Homebrew prefixes + ~/.local/bin so git-lfs is found
+#      even under a restricted PATH.
+#   2. If git-lfs is still genuinely absent, exit 0 silently instead of `exit 2`
+#      — a missing optional tool must never abort the host git operation.
+# See pitfalls/git-lfs-global-hook-breaks-brew-tap.md
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin"; export PATH
+command -v git-lfs >/dev/null 2>&1 || exit 0
+git lfs post-checkout "$@"
