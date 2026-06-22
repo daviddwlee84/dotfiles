@@ -3,7 +3,9 @@
 # - litellm: uv tool install
 # - llmfit: Homebrew on macOS, official local installer on Linux
 # - models: Homebrew when available, cargo fallback on Linux
-# - ollama: Homebrew formula on macOS unless Brewfile GUI install is enabled;
+# - ollama: Homebrew formula on macOS unless Brewfile GUI install is enabled
+#            OR an ollama CLI is already present (e.g. the ollama-app cask, which
+#            ships /usr/local/bin/ollama and would otherwise break `brew link`);
 #            official installer on Linux when sudo/root is available
 
 - name: Ensure ~/.local/bin exists for local LLM tools
@@ -87,10 +89,22 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/mise/shims:{{ ansible_facts['env']['HOME'] }}/.cargo/bin:{{ ansible_facts['env']['PATH'] }}"
 
+- name: Check whether an ollama CLI is already present (macOS)
+  # The ollama-app cask (GUI runtime) installs /usr/local/bin/ollama as a symlink
+  # into Ollama.app. Installing the CLI-only formula on top of it makes `brew link`
+  # collide on that path and abort the play. If any ollama is already on PATH, the
+  # user already has a working CLI — skip the formula instead of fighting it.
+  when: ansible_facts["os_family"] == "Darwin"
+  ansible.builtin.command: which ollama
+  register: llm_tools_ollama_macos_check
+  changed_when: false
+  failed_when: false
+
 - name: Install Ollama via Homebrew formula (macOS CLI install)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - not (llm_tools_install_brew_apps | bool)
+    - llm_tools_ollama_macos_check.rc != 0
   community.general.homebrew:
     name: ollama
     state: present
