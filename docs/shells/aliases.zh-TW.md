@@ -528,6 +528,7 @@
 | `portscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 透過 rustscan 的快速 port 掃描 *(需要 rustscan)* |
 | `lanscan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 對 LAN 完整掃描裝置 + port，輸出至 `~/.cache/tv/`（餵給 `tv lan-devices`） |
 | `tv-lan` | alias | `dot_config/zsh/tools/50_networking.zsh` | 開啟 `lan-devices` Television 頻道 |
+| `ssh-setup-remote` | function | `dot_config/shell/96_ssh_setup.sh` | 互動式精靈：選擇／建立 SSH 金鑰、`ssh-copy-id`，再把金鑰接進本機 `~/.ssh/config` —— 若別名**已設定過**就**就地編輯既有 `Host` 區塊**（會遞迴沿 `Include config.d/*` 找到正確檔案），否則附加新別名並可補上缺漏的 `Include`。就地編輯需 `python3`，否則退回僅附加。 |
 
 ### Proxy 輔助
 

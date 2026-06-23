@@ -234,9 +234,20 @@ It will prompt you to:
 2. **ssh-copy-id** the public key to enable passwordless login
 3. **Copy the key pair** to the remote (optional, for GitHub access)
 4. **Add GitHub SSH config** on the remote (optional)
-5. **Add a host alias** to your local `~/.ssh/config` (with `IdentitiesOnly` option)
+5. **Wire the key into your local `~/.ssh/config`** — the wizard recognizes two cases:
+   - If the alias is **already configured** (it follows `Include ~/.ssh/config.d/*` recursively to
+     find the right file), it **adds the `IdentityFile` into the existing `Host` block in place**
+     instead of appending a duplicate. If the block already has an `IdentityFile`, it asks whether
+     to *replace* / *add another* / *skip*, and re-running with the same key is a no-op.
+   - If it's a **new host** (e.g. `user@ip`), it appends a fresh alias block (to `~/.ssh/config`
+     or a `~/.ssh/config.d/` drop-in) with an optional `IdentitiesOnly yes`. When it writes a
+     drop-in but your `~/.ssh/config` lacks the `Include` line, it offers to add it so the entry
+     actually loads.
 
-Source: `~/.config/zsh/tools/96_ssh_setup.zsh`
+   > In-place editing uses `python3`; if it is unavailable the wizard falls back to the
+   > append-only behavior.
+
+Source: `~/.config/shell/96_ssh_setup.sh`
 
 ## Troubleshooting
 

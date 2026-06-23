@@ -14,6 +14,232 @@
 # Walks through: create key → ssh-copy-id → copy key to remote → add SSH config entries.
 # See docs/tutorials/setup_ssh_key_on_remote.md for the full tutorial.
 
+# _ssh_cfg_py — python3-backed SSH-config parse/edit helper used by ssh-setup-remote.
+# Operates on the config tree rooted at ${SSH_CFG_ROOT:-~/.ssh/config}, following
+# `Include` directives RECURSIVELY (glob + ~/relative/absolute), so a Host defined in a
+# config.d/ drop-in is found and edited in the file it actually lives in. Returns 127 when
+# python3 is absent so callers can fall back to a plain append.
+#
+# Subcommands:
+#   find <alias> [keypath]                 stdout: kv lines, then "---BLOCK---", then the
+#                                          matched block. rc 0 = found, 3 = not found.
+#   insert <file> <alias> <key> <action> [--identities-only]
+#                                          action: insert | replace | add. Edits the block
+#                                          in <file> in place (atomic, mode 0600).
+#   ensure-include                         rc 0 if ~/.ssh/config.d is reachable via Include,
+#                                          else rc 1.
+#   add-include                            prepend `Include ~/.ssh/config.d/*` to the root
+#                                          config (idempotent).
+_ssh_cfg_py() {
+  command -v python3 >/dev/null 2>&1 || return 127
+  python3 - "$@" <<'PY'
+import os, re, sys, glob, pathlib, tempfile
+
+ROOT = pathlib.Path(os.environ.get("SSH_CFG_ROOT") or os.path.expanduser("~/.ssh/config"))
+SSH_DIR = ROOT.parent
+HOME = os.path.expanduser("~")
+
+HOST_RE  = re.compile(r"(?i)^(\s*)host\s+(.+?)\s*$")
+BREAK_RE = re.compile(r"(?i)^\s*(host|match)\b")
+IDF_RE   = re.compile(r"(?i)^(\s*)identityfile\s+(.+?)\s*$")
+IDO_RE   = re.compile(r"(?i)^\s*identitiesonly\b")
+INC_RE   = re.compile(r"(?i)^\s*include\s+(.+?)\s*$")
+
+
+def expand(pat):
+    pat = os.path.expanduser(pat)
+    if not os.path.isabs(pat):
+        pat = os.path.join(str(SSH_DIR), pat)
+    return pat
+
+
+def resolve_includes(start):
+    seen, files = set(), []
+
+    def walk(path):
+        rp = os.path.realpath(path)
+        if rp in seen:
+            return
+        seen.add(rp)
+        p = pathlib.Path(path)
+        if not p.is_file():
+            return
+        files.append(p)
+        for line in p.read_text(errors="replace").splitlines():
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            m = INC_RE.match(line)
+            if not m:
+                continue
+            for pat in m.group(1).split():
+                for f in sorted(glob.glob(expand(pat))):
+                    walk(f)
+
+    walk(str(start))
+    return files
+
+
+def norm(path):
+    return os.path.realpath(os.path.expanduser(path.strip().strip('"')))
+
+
+def host_patterns(line):
+    m = HOST_RE.match(line)
+    return m.group(2).split() if m else None
+
+
+def block_matches(line, alias):
+    pats = host_patterns(line)
+    if not pats:
+        return False
+    return any(p == alias and not re.search(r"[*?!]", p) for p in pats)
+
+
+def find_block(alias, files):
+    for f in files:
+        lines = f.read_text(errors="replace").splitlines()
+        i = 0
+        while i < len(lines):
+            if block_matches(lines[i], alias):
+                j = i + 1
+                while j < len(lines) and not BREAK_RE.match(lines[j]):
+                    j += 1
+                return f, lines, i, j
+            i += 1
+    return None
+
+
+def tildify(path):
+    ap = os.path.abspath(os.path.expanduser(path))
+    rel = os.path.relpath(ap, HOME)
+    if not rel.startswith(".."):
+        return "~/" + rel
+    return path
+
+
+def write_atomic(f, lines):
+    fd, tmp = tempfile.mkstemp(dir=str(f.parent))
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write("\n".join(lines) + "\n")
+        os.replace(tmp, str(f))
+        os.chmod(str(f), 0o600)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def configd_reachable():
+    target = os.path.realpath(str(SSH_DIR / "config.d"))
+    for f in resolve_includes(ROOT):
+        for line in f.read_text(errors="replace").splitlines():
+            s = line.strip()
+            if not s or s.startswith("#"):
+                continue
+            m = INC_RE.match(line)
+            if not m:
+                continue
+            for pat in m.group(1).split():
+                if os.path.realpath(os.path.dirname(expand(pat))) == target:
+                    return True
+    return False
+
+
+def cmd_find(alias, keypath):
+    res = find_block(alias, resolve_includes(ROOT))
+    if not res:
+        print("found=0")
+        return 3
+    f, lines, i, j = res
+    block = lines[i:j]
+    idf = [m for m in (IDF_RE.match(b) for b in block) if m]
+    keyn = norm(keypath) if keypath else ""
+    present = bool(keyn) and any(norm(m.group(2)) == keyn for m in idf)
+    print("found=1")
+    print("file=%s" % f)
+    print("has_identityfile=%d" % (1 if idf else 0))
+    print("has_identitiesonly=%d" % (1 if any(IDO_RE.match(b) for b in block) else 0))
+    print("key_present=%d" % (1 if present else 0))
+    print("---BLOCK---")
+    sys.stdout.write("\n".join(block) + "\n")
+    return 0
+
+
+def cmd_insert(file, alias, keypath, action, identities_only):
+    f = pathlib.Path(file)
+    lines = f.read_text(errors="replace").splitlines()
+    res = find_block(alias, [f])
+    if not res:
+        sys.stderr.write("block for %s not found in %s\n" % (alias, file))
+        return 2
+    _, _, i, j = res
+    block = lines[i:j]
+
+    indent = "    "
+    for b in block[1:]:
+        if b.strip() and b[0] in " \t":
+            indent = b[: len(b) - len(b.lstrip())]
+            break
+
+    idf_line = "%sIdentityFile %s" % (indent, tildify(keypath))
+    idf_idx = [k for k, b in enumerate(block) if IDF_RE.match(b)]
+
+    if action == "replace" and idf_idx:
+        block[idf_idx[0]] = idf_line
+    elif action == "add" or not idf_idx:
+        ins = len(block)
+        while ins > 1 and not block[ins - 1].strip():
+            ins -= 1
+        block.insert(ins, idf_line)
+    else:  # action == insert but an IdentityFile already exists -> replace first
+        block[idf_idx[0]] = idf_line
+
+    if identities_only and not any(IDO_RE.match(b) for b in block):
+        pos = next((k for k, b in enumerate(block) if IDF_RE.match(b)), len(block) - 1)
+        block.insert(pos + 1, "%sIdentitiesOnly yes" % indent)
+
+    write_atomic(f, lines[:i] + block + lines[j:])
+    return 0
+
+
+def cmd_add_include():
+    if configd_reachable():
+        return 0
+    target = tildify(str(SSH_DIR / "config.d"))
+    inc = ["# Load drop-in host configs from %s/" % target, "Include %s/*" % target, ""]
+    lines = ROOT.read_text(errors="replace").splitlines() if ROOT.is_file() else []
+    k = 0
+    while k < len(lines) and (not lines[k].strip() or lines[k].lstrip().startswith("#")):
+        k += 1
+    ROOT.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(ROOT, lines[:k] + inc + lines[k:])
+    return 0
+
+
+def main(argv):
+    if not argv:
+        return 2
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "find":
+        return cmd_find(rest[0], rest[1] if len(rest) > 1 else "")
+    if cmd == "insert":
+        return cmd_insert(rest[0], rest[1], rest[2], rest[3], "--identities-only" in rest[4:])
+    if cmd == "ensure-include":
+        return 0 if configd_reachable() else 1
+    if cmd == "add-include":
+        return cmd_add_include()
+    sys.stderr.write("unknown subcommand: %s\n" % cmd)
+    return 2
+
+
+sys.exit(main(sys.argv[1:]))
+PY
+}
+
 ssh-setup-remote() {
   if [ -n "$ZSH_VERSION" ]; then
     emulate -L zsh
@@ -186,64 +412,148 @@ EOF
 
   # ── Step 3: Local SSH config ───────────────────────────────────────────
   printf '\n--- Local SSH config ---\n'
-  printf 'Add host alias to local ~/.ssh/config? [Y/n] '
+  local host_alias=""
+  printf 'Add/update host alias in local ~/.ssh/config? [Y/n] '
   local do_config
   read -r do_config
   if [[ ! "$do_config" =~ ^[Nn] ]]; then
-    local host_alias="$remote_host"
-    printf 'Host alias [%s]: ' "$host_alias"
-    local alias_input
-    read -r alias_input
-    [ -n "$alias_input" ] && host_alias="$alias_input"
+    # Detect whether the target alias is ALREADY a configured Host, following
+    # `Include` recursively into config.d/. rc 0 = found (edit in place);
+    # rc 3 = not found; rc 127 = no python3 (fall back to append).
+    local alias="$remote_host"
+    local find_out find_rc
+    find_out="$(_ssh_cfg_py find "$alias" "$key_path")"
+    find_rc=$?
 
-    local hostname="$remote_host"
-    printf 'HostName (IP or FQDN) [%s]: ' "$hostname"
-    local hostname_input
-    read -r hostname_input
-    [ -n "$hostname_input" ] && hostname="$hostname_input"
+    if [ "$find_rc" -eq 0 ]; then
+      # ── Mode B: alias already configured — add key to the existing block ──
+      host_alias="$alias"
+      local kv block cfg_file="" has_idf=0 has_ido=0 key_present=0
+      kv="${find_out%%---BLOCK---*}"
+      block="${find_out#*---BLOCK---}"
+      local _k _v
+      while IFS='=' read -r _k _v; do
+        case "$_k" in
+          file)               cfg_file="$_v" ;;
+          has_identityfile)   has_idf="$_v" ;;
+          has_identitiesonly) has_ido="$_v" ;;
+          key_present)        key_present="$_v" ;;
+        esac
+      done <<EOF
+$kv
+EOF
 
-    local config_user="${remote_user:-$USER}"
-    printf 'User [%s]: ' "$config_user"
-    local user_input
-    read -r user_input
-    [ -n "$user_input" ] && config_user="$user_input"
+      printf '\nHost "%s" is already configured in %s:\n' "$alias" "$cfg_file"
+      printf '%s\n' "$block"
 
-    printf 'Add IdentitiesOnly yes? [y/N] '
-    local do_identonly
-    read -r do_identonly
-    local identonly_line=""
-    [[ "$do_identonly" =~ ^[Yy] ]] && identonly_line=$'\n    IdentitiesOnly yes'
+      if [ "$key_present" = "1" ]; then
+        printf '\nThis key (%s) is already set for %s — nothing to do.\n' "$key_path" "$alias"
+      else
+        local action="insert"
+        if [ "$has_idf" = "1" ]; then
+          printf '\nThis host already has an IdentityFile. [r]eplace / [a]dd another / [s]kip? [r] '
+          local idf_choice
+          read -r idf_choice
+          case "$idf_choice" in
+            [Aa]*) action="add" ;;
+            [Ss]*) action="" ;;
+            *)     action="replace" ;;
+          esac
+        fi
 
-    # Determine config file (support config.d/ if Include exists)
-    local config_file="$HOME/.ssh/config"
-    if [ -d "$HOME/.ssh/config.d" ]; then
-      printf 'Write to ~/.ssh/config.d/ instead of ~/.ssh/config? [Y/n] '
-      local use_configd
-      read -r use_configd
-      if [[ ! "$use_configd" =~ ^[Nn] ]]; then
-        config_file="$HOME/.ssh/config.d/host_${host_alias}"
-        printf 'Config file [%s]: ' "$config_file"
-        local cf_input
-        read -r cf_input
-        [ -n "$cf_input" ] && config_file="$cf_input"
+        if [ -n "$action" ]; then
+          local ido_flag=""
+          if [ "$has_ido" != "1" ]; then
+            printf 'Also add `IdentitiesOnly yes` so only this key is offered? [y/N] '
+            local do_ido
+            read -r do_ido
+            [[ "$do_ido" =~ ^[Yy] ]] && ido_flag="--identities-only"
+          fi
+          if _ssh_cfg_py insert "$cfg_file" "$alias" "$key_path" "$action" $ido_flag; then
+            printf 'Updated %s.\n' "$cfg_file"
+            if ssh -G "$alias" >/dev/null 2>&1; then
+              printf 'Config parses OK (ssh -G %s).\n' "$alias"
+            else
+              printf 'Warning: `ssh -G %s` reported a problem — please review %s.\n' "$alias" "$cfg_file" >&2
+            fi
+          else
+            printf 'Failed to update %s.\n' "$cfg_file" >&2
+          fi
+        fi
       fi
-    fi
+    else
+      # ── Mode A: new host (not found, or no python3) — append a fresh block ──
+      host_alias="$remote_host"
+      printf 'Host alias [%s]: ' "$host_alias"
+      local alias_input
+      read -r alias_input
+      [ -n "$alias_input" ] && host_alias="$alias_input"
 
-    local config_block="
+      local hostname="$remote_host"
+      printf 'HostName (IP or FQDN) [%s]: ' "$hostname"
+      local hostname_input
+      read -r hostname_input
+      [ -n "$hostname_input" ] && hostname="$hostname_input"
+
+      local config_user="${remote_user:-$USER}"
+      printf 'User [%s]: ' "$config_user"
+      local user_input
+      read -r user_input
+      [ -n "$user_input" ] && config_user="$user_input"
+
+      printf 'Add IdentitiesOnly yes? [y/N] '
+      local do_identonly
+      read -r do_identonly
+      local identonly_line=""
+      [[ "$do_identonly" =~ ^[Yy] ]] && identonly_line=$'\n    IdentitiesOnly yes'
+
+      # Determine config file (prefer a config.d/ drop-in if that dir exists)
+      local config_file="$HOME/.ssh/config"
+      local wrote_configd=0
+      if [ -d "$HOME/.ssh/config.d" ]; then
+        printf 'Write to ~/.ssh/config.d/ instead of ~/.ssh/config? [Y/n] '
+        local use_configd
+        read -r use_configd
+        if [[ ! "$use_configd" =~ ^[Nn] ]]; then
+          config_file="$HOME/.ssh/config.d/host_${host_alias}"
+          printf 'Config file [%s]: ' "$config_file"
+          local cf_input
+          read -r cf_input
+          [ -n "$cf_input" ] && config_file="$cf_input"
+          wrote_configd=1
+        fi
+      fi
+
+      local config_block="
 Host $host_alias
     HostName $hostname
     User $config_user
     IdentityFile $key_path${identonly_line}"
 
-    printf '\nWill append to %s:\n' "$config_file"
-    printf '%s\n' "$config_block"
-    printf '\nConfirm? [Y/n] '
-    local confirm
-    read -r confirm
-    if [[ ! "$confirm" =~ ^[Nn] ]]; then
-      printf '%s\n' "$config_block" >> "$config_file"
-      chmod 600 "$config_file"
-      printf 'Config written.\n'
+      printf '\nWill append to %s:\n' "$config_file"
+      printf '%s\n' "$config_block"
+      printf '\nConfirm? [Y/n] '
+      local confirm
+      read -r confirm
+      if [[ ! "$confirm" =~ ^[Nn] ]]; then
+        printf '%s\n' "$config_block" >> "$config_file"
+        chmod 600 "$config_file"
+        printf 'Config written.\n'
+
+        # If we wrote into config.d/ but the entry-point config never Includes
+        # it, the drop-in silently won't load. Offer to wire it up.
+        if [ "$wrote_configd" = "1" ] && command -v python3 >/dev/null 2>&1; then
+          if ! _ssh_cfg_py ensure-include; then
+            printf '\nNote: ~/.ssh/config has no `Include` for config.d/* — this entry will not load.\n'
+            printf 'Add `Include ~/.ssh/config.d/*` to ~/.ssh/config now? [Y/n] '
+            local do_inc
+            read -r do_inc
+            if [[ ! "$do_inc" =~ ^[Nn] ]]; then
+              _ssh_cfg_py add-include && printf 'Include directive added.\n'
+            fi
+          fi
+        fi
+      fi
     fi
   fi
 

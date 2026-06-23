@@ -552,6 +552,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `wifiscan` | alias | `dot_config/shell/50_networking.sh` | Scan nearby Wi-Fi networks into `~/.cache/tv/` (feeds `tv wifi-scan`) |
 | `tv-wifi` | alias | `dot_config/shell/50_networking.sh` | Open the `wifi-scan` Television channel |
 | `pinggw` | alias | `dot_config/shell/50_networking.sh` | `ping-monitor --gateway` — spike-watch the default gateway *(requires ping-monitor)* |
+| `ssh-setup-remote` | function | `dot_config/shell/96_ssh_setup.sh` | Interactive wizard: select/create an SSH key, `ssh-copy-id`, then wire it into local `~/.ssh/config` — **edits the existing `Host` block in place** if the alias is already configured (following `Include config.d/*` recursively), else appends a new alias and offers to add a missing `Include`. Needs `python3` for in-place edits; falls back to append-only otherwise. |
 
 ### Proxy helpers
 

@@ -240,9 +240,17 @@ ssh-setup-remote user@hostname
 2. **ssh-copy-id** 公鑰以啟用免密碼登入
 3. **複製金鑰對**到遠端（可選，用於 GitHub 存取）
 4. **在遠端加入 GitHub SSH 設定**（可選）
-5. **在本機 `~/.ssh/config` 加入主機別名**（含 `IdentitiesOnly` 選項）
+5. **把金鑰接進本機 `~/.ssh/config`** —— 精靈會分辨兩種情況：
+   - 若該別名**已經設定過**（會遞迴沿著 `Include ~/.ssh/config.d/*` 找到實際所在的檔案），就
+     **直接在既有的 `Host` 區塊內就地加入 `IdentityFile`**，而非附加重複區塊。若區塊已有
+     `IdentityFile`，會詢問要*取代* / *再加一條* / *略過*；用同一把金鑰重跑則為無動作。
+   - 若是**新主機**（例如 `user@ip`），則附加一個全新的別名區塊（寫到 `~/.ssh/config` 或
+     `~/.ssh/config.d/` drop-in），並可選擇加上 `IdentitiesOnly yes`。當寫入 drop-in 但你的
+     `~/.ssh/config` 沒有對應的 `Include` 行時，會主動詢問是否補上，讓該設定真正生效。
 
-來源：`~/.config/zsh/tools/96_ssh_setup.zsh`
+   > 就地編輯需要 `python3`；若環境中沒有 `python3`，精靈會退回到僅附加（append-only）的行為。
+
+來源：`~/.config/shell/96_ssh_setup.sh`
 
 ## 疑難排解 (Troubleshooting)
 
