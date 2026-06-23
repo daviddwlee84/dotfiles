@@ -297,6 +297,15 @@ PROMPTS: tuple[Prompt, ...] = (
                     "ubuntu_desktop / macOS profile 上同時也會裝 Bitwarden Desktop（snap 優先、\n"
                     ".deb fallback / Homebrew Cask）。詳細邏輯見 docs/playbooks/linux-gui-apps.md\n"
                     "和 dot_ansible/roles/bitwarden/。")),
+    Prompt("installMediaControl", "bool", "System & apps",
+           "System media-control CLIs",
+           "nowplaying-cli + switchaudio-osx (macOS), playerctl (Linux). Unlocks full sysplay/sysnow + output-device switching; built-in sysvol/sysmute work without it.",
+           default=False,
+           prompt_text="Install system media-control CLIs (nowplaying-cli/switchaudio-osx on macOS, playerctl on Linux) for the sys* shell helpers",
+           comment=("是否安裝系統媒體控制 CLI（macOS: nowplaying-cli, switchaudio-osx；Linux: playerctl）。\n"
+                    "搭配 sys* shell helpers（sysvol/sysmute/sysplay/sysnow）。不裝也能用 built-in\n"
+                    "的 sysvol/sysmute（音量/靜音）；裝了才有完整 sysplay/sysnow（播放控制/查正在播放）。\n"
+                    "詳見 docs/tools/media-control.md。")),
     Prompt("installBrewApps", "bool", "System & apps",
            "Homebrew GUI apps",
            "Terminals, browsers, utilities via Brewfile (excl. AI desktop). Desktop-class profiles only (macos / ubuntu_desktop).",

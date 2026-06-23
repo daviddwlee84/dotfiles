@@ -1,0 +1,185 @@
+{{- if eq .chezmoi.os "linux" -}}
+# shellcheck shell=sh
+# sys* helpers — control system audio + media playback from the shell (Linux).
+#
+# Linux counterpart to dot_config/shell/57_macos_audio.sh.tmpl. SAME public verb
+# names (sysvol / sysmute / sysplay / sysnow) for cross-platform muscle memory;
+# backends diverge by necessity.
+#
+# Two tiers, autodetected at call time:
+#   built-in (volume/mute) — first available of wpctl (PipeWire) → pactl
+#                            (Pulse, also fronts PipeWire via pipewire-pulse) →
+#                            amixer (ALSA). pactl ships with pulseaudio-utils.
+#   extended (playback)    — `playerctl` (MPRIS over D-Bus) drives play/pause/
+#                            next and reads now-playing for any compliant player
+#                            (Spotify/VLC/mpv/Firefox/Chrome). Installed by the
+#                            `media_control` ansible role (installMediaControl=true).
+#
+# ⚠ D-Bus-over-SSH caveat: sysplay/sysnow need DBUS_SESSION_BUS_ADDRESS, which
+# background SSH sessions usually lack — so `fleet exec` can mute (sysvol/sysmute
+# go through wpctl/pactl, unaffected) but may not drive playback. Docs:
+# docs/tools/media-control.md
+
+_sysaudio_is_linux() { [ "$(uname -s 2>/dev/null)" = "Linux" ]; }
+_sysaudio_have() { command -v "$1" >/dev/null 2>&1; }
+
+_sysaudio_guard_linux() {
+    if ! _sysaudio_is_linux; then
+        printf 'sys-audio: Linux-only (current OS: %s)\n' \
+            "$(uname -s 2>/dev/null || echo unknown)" >&2
+        return 1
+    fi
+}
+
+# _sysaudio_backend — echo the first available mixer backend (cached per shell).
+# Override with SYSAUDIO_BACKEND=wpctl|pactl|amixer.
+_sysaudio_backend() {
+    if [ -n "${SYSAUDIO_BACKEND:-}" ]; then
+        printf '%s\n' "$SYSAUDIO_BACKEND"
+        return 0
+    fi
+    if [ -z "${_sysaudio_backend_cache:-}" ]; then
+        if _sysaudio_have wpctl; then _sysaudio_backend_cache=wpctl
+        elif _sysaudio_have pactl; then _sysaudio_backend_cache=pactl
+        elif _sysaudio_have amixer; then _sysaudio_backend_cache=amixer
+        else _sysaudio_backend_cache=none
+        fi
+    fi
+    printf '%s\n' "$_sysaudio_backend_cache"
+    [ "$_sysaudio_backend_cache" != none ]
+}
+
+_sysaudio_backend_hint() {
+    printf 'sys-audio: no mixer backend (wpctl/pactl/amixer) found.\n' >&2
+    printf '  sudo apt install pulseaudio-utils   # provides pactl (works on PipeWire too)\n' >&2
+}
+
+# ---------------------------------------------------------------------------
+# Public: volume + mute (built-in)
+# ---------------------------------------------------------------------------
+
+# sysvol [N|+N|-N] — get (no arg) or set output volume (0-100). ± is relative.
+sysvol() {
+    case "$1" in -h|--help)
+        printf 'usage: sysvol [N|+N|-N]\n'
+        printf '  no arg   print current output volume (0-100)\n'
+        printf '  N        set absolute volume (0-100)\n'
+        printf '  +N / -N  adjust relative to current\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_linux || return 1
+    _sysaudio_be=$(_sysaudio_backend) || { _sysaudio_backend_hint; return 1; }
+
+    # --- get (no arg) ---
+    if [ -z "$1" ]; then
+        case "$_sysaudio_be" in
+            wpctl)  wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{printf "%d\n", $2*100}' ;;
+            pactl)  pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -o '[0-9]\{1,3\}%' | head -1 | tr -d '%' ;;
+            amixer) amixer get Master 2>/dev/null | grep -o '[0-9]\{1,3\}%' | head -1 | tr -d '%' ;;
+        esac
+        unset _sysaudio_be
+        return 0
+    fi
+
+    # --- set / adjust ---
+    case "$1" in
+        +*) _sysaudio_dir=up;   _sysaudio_mag=${1#+} ;;
+        -*) _sysaudio_dir=down; _sysaudio_mag=${1#-} ;;
+        *)  _sysaudio_dir=abs;  _sysaudio_mag=$1 ;;
+    esac
+    case "$_sysaudio_mag" in
+        ''|*[!0-9]*) printf 'sysvol: not a number: %s\n' "$1" >&2
+                     unset _sysaudio_be _sysaudio_dir _sysaudio_mag; return 2 ;;
+    esac
+    case "$_sysaudio_be" in
+        wpctl)
+            case "$_sysaudio_dir" in
+                up)   wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${_sysaudio_mag}%+" ;;
+                down) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${_sysaudio_mag}%-" ;;
+                abs)  wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${_sysaudio_mag}%" ;;
+            esac ;;
+        pactl)
+            case "$_sysaudio_dir" in
+                up)   pactl set-sink-volume @DEFAULT_SINK@ "+${_sysaudio_mag}%" ;;
+                down) pactl set-sink-volume @DEFAULT_SINK@ "-${_sysaudio_mag}%" ;;
+                abs)  pactl set-sink-volume @DEFAULT_SINK@ "${_sysaudio_mag}%" ;;
+            esac ;;
+        amixer)
+            case "$_sysaudio_dir" in
+                up)   amixer -q set Master "${_sysaudio_mag}%+" ;;
+                down) amixer -q set Master "${_sysaudio_mag}%-" ;;
+                abs)  amixer -q set Master "${_sysaudio_mag}%" ;;
+            esac ;;
+    esac
+    unset _sysaudio_be _sysaudio_dir _sysaudio_mag
+}
+
+# sysmute [on|off|toggle] — mute the system output. Default: toggle.
+# Remote one-key mute primitive: fleet exec --login -- sysmute on
+sysmute() {
+    case "$1" in -h|--help)
+        printf 'usage: sysmute [on|off|toggle]\n  Default toggle. Remote: fleet exec --login -- sysmute on\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_linux || return 1
+    _sysaudio_be=$(_sysaudio_backend) || { _sysaudio_backend_hint; return 1; }
+    _sysaudio_act=${1:-toggle}
+    case "$_sysaudio_act" in on|1|true) _sysaudio_act=on ;; off|0|false) _sysaudio_act=off ;; toggle) ;; \
+        *) printf 'sysmute: expected on|off|toggle, got: %s\n' "$1" >&2; unset _sysaudio_be _sysaudio_act; return 2 ;; esac
+    case "$_sysaudio_be" in
+        wpctl)  case "$_sysaudio_act" in on) wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 ;; off) wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 ;; toggle) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;; esac ;;
+        pactl)  case "$_sysaudio_act" in on) pactl set-sink-mute @DEFAULT_SINK@ 1 ;; off) pactl set-sink-mute @DEFAULT_SINK@ 0 ;; toggle) pactl set-sink-mute @DEFAULT_SINK@ toggle ;; esac ;;
+        amixer) case "$_sysaudio_act" in on) amixer -q set Master mute ;; off) amixer -q set Master unmute ;; toggle) amixer -q set Master toggle ;; esac ;;
+    esac
+    unset _sysaudio_be _sysaudio_act
+}
+
+# ---------------------------------------------------------------------------
+# Public: playback + now-playing (extended — needs playerctl / MPRIS)
+# ---------------------------------------------------------------------------
+
+_sysaudio_playerctl_hint() {
+    printf 'sys-audio: playerctl not installed (needed for %s).\n' "$1" >&2
+    printf '  chezmoi init with installMediaControl=true, or: sudo apt install playerctl\n' >&2
+}
+
+# sysplay [next|previous|prev] — toggle play/pause (default) or skip track.
+sysplay() {
+    case "$1" in -h|--help)
+        printf 'usage: sysplay [next|previous|prev]\n  No arg toggles play/pause via playerctl (MPRIS).\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_linux || return 1
+    _sysaudio_have playerctl || { _sysaudio_playerctl_hint sysplay; return 1; }
+    case "${1:-}" in
+        next)          playerctl next ;;
+        previous|prev) playerctl previous ;;
+        '')            playerctl play-pause ;;
+        *) printf 'sysplay: expected next|previous, got: %s\n' "$1" >&2; return 2 ;;
+    esac
+}
+
+# sysnow — print what's currently playing ("Artist - Title") + status.
+sysnow() {
+    case "$1" in -h|--help)
+        printf 'usage: sysnow\n  Print the currently playing track via playerctl (MPRIS).\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_linux || return 1
+    _sysaudio_have playerctl || { _sysaudio_playerctl_hint sysnow; return 1; }
+    _sysaudio_status=$(playerctl status 2>/dev/null) || {
+        printf 'sysnow: no active MPRIS player.\n' >&2; unset _sysaudio_status; return 1
+    }
+    _sysaudio_artist=$(playerctl metadata artist 2>/dev/null)
+    _sysaudio_title=$(playerctl metadata title 2>/dev/null)
+    if [ -n "$_sysaudio_artist" ] && [ -n "$_sysaudio_title" ]; then
+        printf '%s - %s [%s]\n' "$_sysaudio_artist" "$_sysaudio_title" "$_sysaudio_status"
+    elif [ -n "$_sysaudio_title" ]; then
+        printf '%s [%s]\n' "$_sysaudio_title" "$_sysaudio_status"
+    else
+        printf '%s\n' "$_sysaudio_status"
+    fi
+    unset _sysaudio_status _sysaudio_artist _sysaudio_title
+}
+
+{{ end -}}

@@ -1,0 +1,193 @@
+{{- if eq .chezmoi.os "darwin" -}}
+# shellcheck shell=sh
+# sys* helpers — control system audio + media playback from the shell (macOS).
+#
+# Two tiers, autodetected at call time:
+#   built-in (always works) — volume + mute via `osascript` (Apple Events).
+#                             play/pause + now-playing via per-app AppleScript
+#                             to whichever of Music/Spotify is running.
+#   extended (opt-in)       — `nowplaying-cli` gives app-agnostic transport +
+#                             now-playing; `SwitchAudioSource` switches output
+#                             device. Installed by the `media_control` ansible
+#                             role (chezmoi init: installMediaControl=true).
+#
+# ⚠ now-playing caveat: Apple locked the private MediaRemote framework in
+# macOS 15.4+, so `nowplaying-cli get` returns empty on current macOS. `sysnow`
+# degrades to per-app AppleScript (Music/Spotify only — not Safari/Chrome web
+# audio) and prints a one-line caveat rather than failing silently.
+#
+# Linux counterpart: dot_config/shell/57_linux_audio.sh.tmpl. SAME public verb
+# names (sysvol / sysmute / sysplay / sysnow) for cross-platform muscle memory;
+# backends diverge (osascript here vs wpctl/pactl/amixer + playerctl there).
+#
+# fleet: `fleet exec --login --group all -- sysmute on` for a remote one-key
+# mute (--login so rc files load these functions). Docs: docs/tools/media-control.md
+
+_sysaudio_is_darwin() { [ "$(uname -s 2>/dev/null)" = "Darwin" ]; }
+_sysaudio_have() { command -v "$1" >/dev/null 2>&1; }
+
+_sysaudio_guard_darwin() {
+    if ! _sysaudio_is_darwin; then
+        printf 'sys-audio: macOS-only (current OS: %s)\n' \
+            "$(uname -s 2>/dev/null || echo unknown)" >&2
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Public: volume + mute (fully built-in — no extra tools needed)
+# ---------------------------------------------------------------------------
+
+# sysvol [N|+N|-N] — get (no arg) or set output volume (0-100). ± is relative.
+sysvol() {
+    case "$1" in -h|--help)
+        printf 'usage: sysvol [N|+N|-N]\n'
+        printf '  no arg   print current output volume (0-100)\n'
+        printf '  N        set absolute volume (clamped 0-100)\n'
+        printf '  +N / -N  adjust relative to current\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_darwin || return 1
+
+    _sysaudio_cur=$(osascript -e 'output volume of (get volume settings)' 2>/dev/null)
+    if [ -z "$1" ]; then
+        printf '%s\n' "$_sysaudio_cur"
+        unset _sysaudio_cur
+        return 0
+    fi
+
+    case "$1" in
+        +*) _sysaudio_new=$((_sysaudio_cur + ${1#+})) ;;
+        -*) _sysaudio_new=$((_sysaudio_cur - ${1#-})) ;;
+        ''|*[!0-9]*)
+            printf 'sysvol: not a number: %s\n' "$1" >&2
+            unset _sysaudio_cur
+            return 2 ;;
+        *) _sysaudio_new=$1 ;;
+    esac
+    [ "$_sysaudio_new" -lt 0 ] && _sysaudio_new=0
+    [ "$_sysaudio_new" -gt 100 ] && _sysaudio_new=100
+    osascript -e "set volume output volume $_sysaudio_new"
+    unset _sysaudio_cur _sysaudio_new
+}
+
+# sysmute [on|off|toggle] — mute the system output. Default: toggle.
+# This is the remote one-key mute primitive (fleet exec --login -- sysmute on).
+sysmute() {
+    case "$1" in -h|--help)
+        printf 'usage: sysmute [on|off|toggle]\n  Default toggle. Remote: fleet exec --login -- sysmute on\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_darwin || return 1
+    case "${1:-toggle}" in
+        on|1|true)   osascript -e 'set volume output muted true' ;;
+        off|0|false) osascript -e 'set volume output muted false' ;;
+        toggle)      osascript -e 'set volume output muted (not (output muted of (get volume settings)))' ;;
+        *) printf 'sysmute: expected on|off|toggle, got: %s\n' "$1" >&2; return 2 ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Public: playback + now-playing (built-in per-app; richer with nowplaying-cli)
+# ---------------------------------------------------------------------------
+
+# _sysaudio_running_player — echo "Music" or "Spotify" if one is running, else nothing.
+_sysaudio_running_player() {
+    for _sysaudio_app in Spotify Music; do
+        _sysaudio_r=$(osascript \
+            -e 'on run argv' \
+            -e 'tell application "System Events" to return (exists (processes where name is (item 1 of argv)))' \
+            -e 'end run' \
+            -- "$_sysaudio_app" 2>/dev/null)
+        if [ "$_sysaudio_r" = "true" ]; then
+            printf '%s\n' "$_sysaudio_app"
+            unset _sysaudio_app _sysaudio_r
+            return 0
+        fi
+    done
+    unset _sysaudio_app _sysaudio_r
+    return 1
+}
+
+# sysplay [next|previous|prev] — toggle play/pause (default) or skip track.
+sysplay() {
+    case "$1" in -h|--help)
+        printf 'usage: sysplay [next|previous|prev]\n  No arg toggles play/pause. Built-in covers Music/Spotify;\n  nowplaying-cli (installMediaControl) covers any app.\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_darwin || return 1
+
+    if _sysaudio_have nowplaying-cli; then
+        case "${1:-}" in
+            next)            nowplaying-cli next ;;
+            previous|prev)   nowplaying-cli previous ;;
+            '')              nowplaying-cli togglePlayPause ;;
+            *) printf 'sysplay: expected next|previous, got: %s\n' "$1" >&2; return 2 ;;
+        esac
+        return $?
+    fi
+
+    # built-in fallback: drive whichever player is running
+    _sysaudio_app=$(_sysaudio_running_player) || {
+        printf 'sysplay: no Music/Spotify running. For app-agnostic control:\n' >&2
+        printf '  chezmoi init with installMediaControl=true (installs nowplaying-cli)\n' >&2
+        return 1
+    }
+    case "${1:-}" in
+        next)          osascript -e "tell application \"$_sysaudio_app\" to next track" ;;
+        previous|prev) osascript -e "tell application \"$_sysaudio_app\" to previous track" ;;
+        '')            osascript -e "tell application \"$_sysaudio_app\" to playpause" ;;
+        *) printf 'sysplay: expected next|previous, got: %s\n' "$1" >&2; unset _sysaudio_app; return 2 ;;
+    esac
+    unset _sysaudio_app
+}
+
+# sysnow — print what's currently playing ("Artist - Title").
+sysnow() {
+    case "$1" in -h|--help)
+        printf 'usage: sysnow\n  Print the currently playing track. macOS 15.4+ locked the\n  MediaRemote API, so this covers Music/Spotify only (not web audio).\n'
+        return 0 ;;
+    esac
+    _sysaudio_guard_darwin || return 1
+
+    # extended: nowplaying-cli (may return empty on macOS 15.4+ — guard it)
+    if _sysaudio_have nowplaying-cli; then
+        _sysaudio_title=$(nowplaying-cli get title 2>/dev/null)
+        if [ -n "$_sysaudio_title" ] && [ "$_sysaudio_title" != "null" ]; then
+            _sysaudio_artist=$(nowplaying-cli get artist 2>/dev/null)
+            [ "$_sysaudio_artist" = "null" ] && _sysaudio_artist=
+            if [ -n "$_sysaudio_artist" ]; then
+                printf '%s - %s\n' "$_sysaudio_artist" "$_sysaudio_title"
+            else
+                printf '%s\n' "$_sysaudio_title"
+            fi
+            unset _sysaudio_title _sysaudio_artist
+            return 0
+        fi
+        unset _sysaudio_title
+        # fall through: MediaRemote locked on this macOS — try per-app
+    fi
+
+    # built-in fallback: per-app AppleScript
+    _sysaudio_app=$(_sysaudio_running_player) || {
+        printf 'sysnow: nothing detected (no Music/Spotify running).\n' >&2
+        printf '  macOS 15.4+ locks system-wide now-playing; web/other apps are not visible.\n' >&2
+        return 1
+    }
+    _sysaudio_state=$(osascript -e "tell application \"$_sysaudio_app\" to player state as text" 2>/dev/null)
+    if [ "$_sysaudio_state" != "playing" ] && [ "$_sysaudio_state" != "paused" ]; then
+        printf '%s: stopped\n' "$_sysaudio_app"
+        unset _sysaudio_app _sysaudio_state
+        return 0
+    fi
+    _sysaudio_title=$(osascript -e "tell application \"$_sysaudio_app\" to name of current track" 2>/dev/null)
+    _sysaudio_artist=$(osascript -e "tell application \"$_sysaudio_app\" to artist of current track" 2>/dev/null)
+    if [ -n "$_sysaudio_artist" ]; then
+        printf '%s - %s\n' "$_sysaudio_artist" "$_sysaudio_title"
+    else
+        printf '%s\n' "$_sysaudio_title"
+    fi
+    unset _sysaudio_app _sysaudio_state _sysaudio_title _sysaudio_artist
+}
+
+{{ end -}}

@@ -1036,6 +1036,7 @@ list.
 | **neovim** | brew (`state: latest`) | apt → GitHub release → user → oldEL fork | neovim |
 | **ngrok** | brew cask | vendor apt repo → user tgz / RedHat tgz | networking_tools (tunnel) |
 | **node** | brew (via `lazyvim_deps`) | mise | mise + lazyvim_deps |
+| **nowplaying-cli** | brew (gated `installMediaControl`) | n/a | media_control |
 | **nvme-cli** (`nvme`) | n/a | apt/yum (gated on NVMe detected) | homelab_tools |
 | **obsidian** | brew cask | n/a | Brewfile.darwin |
 | **ollama** | brew formula `ollama` (CLI) + cask `ollama-app` (GUI) | curl `ollama.com/install.sh` | llm_tools |
@@ -1045,7 +1046,7 @@ list.
 | **opentofu** (`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
-| **playerctl / wmctrl / xdotool** | n/a | apt | gui_apps_linux |
+| **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
 | **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
 | **procps** | (system) | apt | bootstrap (Linux) |
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
@@ -1072,6 +1073,7 @@ list.
 | **steam** | brew cask (gated by `installGamingApps`) | Valve apt repo (`steam-launcher`, x86_64, gated by `installGamingApps`) | Brewfile.darwin / gui_apps_linux |
 | **storcli** | n/a | vendor/mirror download to `~/.local/bin` (gated on RAID controller detected + `homelab_storcli_url`; not in distro repos) | homelab_tools |
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
+| **switchaudio-osx** (`SwitchAudioSource`) | brew (gated `installMediaControl`) | n/a | media_control |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask (arm64) | n/a | Brewfile.darwin |
 | **tailscale** (CLI) | brew (shared Brewfile, macOS) | (Linux: via system pkg outside repo) | Brewfile.tmpl |

@@ -1,0 +1,45 @@
+---
+# System media-control role — CLIs that back the sys* shell helpers
+# (dot_config/shell/57_{macos,linux}_audio.sh.tmpl: sysvol/sysmute/sysplay/sysnow).
+#
+# Gated on the installMediaControl chezmoi prompt (tag: media_control). NOT
+# installed by default: the built-in tier (sysvol/sysmute via osascript on
+# macOS, wpctl/pactl/amixer on Linux) works with zero extra tools. This role
+# only adds the *extended* tier — app-agnostic transport + now-playing.
+#
+# Distinct from the media_tools role (ffmpeg/ImageMagick — file processing).
+#
+# noRoot=true on Linux: the upstream run_onchange script injects
+# `--skip-tags sudo`, stripping the apt block below (it carries `tags: [sudo]`).
+
+# =============================================================================
+# macOS — Homebrew
+# =============================================================================
+
+- name: Install media-control CLIs (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name:
+      - nowplaying-cli     # app-agnostic transport (play/pause/next) + `get`
+                           # ⚠ now-playing `get` is empty on macOS 15.4+
+                           # (Apple locked MediaRemote); sysnow degrades to
+                           # per-app AppleScript. Transport still works.
+      - switchaudio-osx    # SwitchAudioSource — list/switch output devices
+    state: present
+
+# =============================================================================
+# Linux (Debian/Ubuntu) — apt
+# =============================================================================
+
+- name: Install media-control CLIs from apt (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - playerctl          # MPRIS over D-Bus: sysplay/sysnow for any compliant
+                           # player (Spotify/VLC/mpv/Firefox/Chrome)
+      - pulseaudio-utils   # provides pactl — guarantees a sysvol/sysmute backend
+                           # even on a PipeWire box (via pipewire-pulse)
+    state: present
+    update_cache: false

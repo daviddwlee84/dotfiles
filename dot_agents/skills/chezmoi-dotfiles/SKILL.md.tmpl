@@ -76,6 +76,9 @@ chezmoi data | jq            # the template data (ground truth for the toggles b
 {{- if dig "installMediaTools" false . }}
 - **Media** — ffmpeg, ImageMagick, exiftool, libvips.
 {{- end }}
+{{- if dig "installMediaControl" false . }}
+- **Media control** — nowplaying-cli + switchaudio-osx (macOS) / playerctl (Linux); unlocks full `sysplay`/`sysnow` (built-in `sysvol`/`sysmute` work regardless).
+{{- end }}
 {{- if dig "installNetworkingTools" false . }}
 - **Networking** — nmap, mtr, httpie, gping, trippy.
 {{- end }}
@@ -146,6 +149,7 @@ reference: `docs/tools/tv.md`.
 `alias` to list shell aliases, or `tv aliases`. Catalog: `docs/shells/aliases.md`.
 Helpers worth knowing: `chezmoi-cd` (jump to source), `run-for` (time-box a command),
 `bindings` (above). App control: `applaunch`/`appquit`/`apprestart`/… (cross-platform).
+System audio (cross-platform, built-in): `sysvol`/`sysmute` (+ `sysplay`/`sysnow` with `installMediaControl`); remote mute via `fleet exec --login -- sysmute on`.
 
 ## just recipes (run from the source dir)
 

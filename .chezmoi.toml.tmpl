@@ -75,6 +75,11 @@ installMediaTools = {{ promptBoolOnce . "installMediaTools" "Install media/AV CL
 # .deb fallback / Homebrew Cask）。詳細邏輯見 docs/playbooks/linux-gui-apps.md
 # 和 dot_ansible/roles/bitwarden/。
 installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI (and Desktop on ubuntu_desktop/macOS — snap or .deb on Linux, Cask on macOS) with SSH Agent integration" false }}
+# 是否安裝系統媒體控制 CLI（macOS: nowplaying-cli, switchaudio-osx；Linux: playerctl）。
+# 搭配 sys* shell helpers（sysvol/sysmute/sysplay/sysnow）。不裝也能用 built-in
+# 的 sysvol/sysmute（音量/靜音）；裝了才有完整 sysplay/sysnow（播放控制/查正在播放）。
+# 詳見 docs/tools/media-control.md。
+installMediaControl = {{ promptBoolOnce . "installMediaControl" "Install system media-control CLIs (nowplaying-cli/switchaudio-osx on macOS, playerctl on Linux) for the sys* shell helpers" false }}
 # 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
 # Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。
 {{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}

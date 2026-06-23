@@ -27,6 +27,7 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 - [Data Viewers](#data-viewers)
 - [macOS apps](#macos-apps)
 - [Media / AV](#media--av)
+- [System audio & playback](#system-audio--playback)
 - [Clipboard History](#clipboard-history)
 - [Shell Utilities](#shell-utilities)
 - [Tmux Integration](#tmux-integration)
@@ -685,6 +686,19 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | `compress-image <input> [<mb>=1]` | function | `dot_config/shell/29_media.sh` | Re-encode to JPEG under target MB → `<name>_<mb>mb.jpg`; uses ImageMagick `-define jpeg:extent=NMB` (single-shot, no manual quality search). Alpha flattened to white. |
 | `resize-image <input> <width_px>` | function | `dot_config/shell/29_media.sh` | Resize so width = `<width_px>`, preserves aspect → `<name>_<width>w.<ext>`; output keeps source format |
 | `media-pick` | function | `dot_config/shell/29_media.sh` | Interactive launcher: [gum](../tools/gum.md) `file` picker → action chooser → (optional) param input. Wires every helper above; only loaded when `gum` is on `$PATH`. |
+
+---
+
+## System audio & playback
+
+> Control **system volume / mute / playback / now-playing** from the shell. Cross-platform `sys*` verbs with the same names on both OSes (macOS `osascript`; Linux `wpctl`/`pactl`/`amixer` + `playerctl`). Two tiers: `sysvol`/`sysmute` are **built-in** (always work, no extra tools); `sysplay`/`sysnow` need the **extended** tools from `installMediaControl=true`, degrading gracefully with an install hint otherwise. Remote one-key mute: `fleet exec --login --group all -- sysmute on`. Full story + caveats: [docs/tools/media-control.md](../tools/media-control.md).
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `sysvol [N\|+N\|-N]` | function | `dot_config/shell/57_macos_audio.sh.tmpl` (macOS), `dot_config/shell/57_linux_audio.sh.tmpl` (Linux) | **Cross-platform, built-in.** No arg prints current output volume (0–100); `N` sets absolute; `+N`/`-N` adjusts relative. macOS via `osascript`; Linux via first of `wpctl`/`pactl`/`amixer` (override `SYSAUDIO_BACKEND`). |
+| `sysmute [on\|off\|toggle]` | function | same as above | **Cross-platform, built-in.** Mute system output; default `toggle`. The remote one-key-mute primitive. |
+| `sysplay [next\|previous]` | function | same as above | **Cross-platform, extended.** No arg toggles play/pause; `next`/`previous` skip. macOS: `nowplaying-cli` (any app) or per-app AppleScript fallback (Music/Spotify). Linux: `playerctl` (MPRIS). Prints install hint if the extended tool is absent. |
+| `sysnow` | function | same as above | **Cross-platform, extended.** Print the currently playing track (`Artist - Title`). ⚠ macOS 15.4+ locked the MediaRemote API, so this covers Music/Spotify only (not web audio); Linux reads any MPRIS player via `playerctl`. |
 
 ---
 

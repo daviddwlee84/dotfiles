@@ -84,6 +84,9 @@
     - role: media_tools
       tags: [media_tools]
 
+    - role: media_control
+      tags: [media_control]
+
     - role: dotnet_tools
       tags: [dotnet_tools]
 

@@ -256,6 +256,7 @@ nav:
           - Warp: tools/warp.md
           - Starship: tools/starship.md
           - Clipboard: tools/clipboard.md
+          - System audio & media control (sys*): tools/media-control.md
           - XDG: tools/xdg.md
           - Fzf: tools/fzf.md
           - Atuin (shell history): tools/atuin.md
