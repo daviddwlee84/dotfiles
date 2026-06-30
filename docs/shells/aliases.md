@@ -540,7 +540,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `ports` | alias | `dot_config/shell/50_networking.sh` | List all listening ports (`lsof -i -P -n \| grep LISTEN`) |
-| `myip` | alias | `dot_config/shell/50_networking.sh` | Show public IP address |
+| `myip` | alias | `dot_config/shell/50_networking.sh` | Show public IP address (raw IP only, scriptable) |
+| `ipgeo` | function | `dot_config/shell/50_networking.sh` | Public IP + city / country / ISP via ipinfo.io; jq-pretty if available, raw JSON fallback |
+| `vpncheck` | alias | `dot_config/shell/50_networking.sh` | Alias for `ipgeo` — one-glance check that VPN exit node is the expected country/ISP |
+| `speedtest-info` | function | `dot_config/shell/50_networking.sh` | Show ISP / external IP / VPN flag from Ookla's `testStart` JSON; aborts before download via SIGPIPE *(requires speedtest)* |
 | `localip` | alias | `dot_config/shell/50_networking.sh` | Show local IP address (platform-aware) |
 | `pingsweep` | function | `dot_config/shell/50_networking.sh` | Ping sweep local `/24` subnet via `nmap -sn` *(requires nmap)* |
 | `arpscan` | alias | `dot_config/shell/50_networking.sh` | ARP scan local network (`sudo arp-scan -l`) *(requires arp-scan)* |

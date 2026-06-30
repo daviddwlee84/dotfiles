@@ -14,6 +14,17 @@ else
   alias localip='hostname -I | awk "{print \$1}"'
 fi
 
+# ipinfo.io returns JSON (ip/city/region/country/org) in one call; use for VPN
+# exit-node verification where you need country + ISP at a glance.
+ipgeo() {
+  if command -v jq &>/dev/null; then
+    curl -s https://ipinfo.io | jq -r '"IP:      \(.ip)\nCity:    \(.city)\nRegion:  \(.region)\nCountry: \(.country)\nOrg:     \(.org)"'
+  else
+    curl -s https://ipinfo.io
+  fi
+}
+alias vpncheck='ipgeo'
+
 # --- nmap shortcuts ---
 if command -v nmap &>/dev/null; then
   # Quick ping sweep of local /24 subnet
@@ -58,6 +69,18 @@ fi
 
 # --- speedtest (Ookla CLI) ---
 # speedtest is already short enough, no alias needed
+if command -v speedtest &>/dev/null; then
+  # head -1 triggers SIGPIPE after the testStart object, aborting before download.
+  # testStart carries isp/externalIp/isVpn — Ookla's own VPN detection.
+  speedtest-info() {
+    if command -v jq &>/dev/null; then
+      speedtest --format=jsonl --progress=no 2>/dev/null | head -1 \
+        | jq -r '"ISP:     \(.isp)\nIP:      \(.interface.externalIp)\nVPN:     \(.interface.isVpn)"'
+    else
+      speedtest --format=jsonl --progress=no 2>/dev/null | head -1
+    fi
+  }
+fi
 
 # --- LAN device scanner (feeds `tv lan-devices`) ---
 if [[ -x "$HOME/.config/television/lan-scan.sh" ]]; then
