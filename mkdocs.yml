@@ -250,6 +250,7 @@ nav:
           - Keybindings: tools/tmux/keybindings.md
           - Themes: tools/tmux/themes.md
           - Vim integration: tools/tmux/vim.md
+      - herdr (tmux alternative, trial): tools/herdr.md
       - Shell & terminal:
           - Ghostty: tools/ghostty.md
           - Warp: tools/warp.md

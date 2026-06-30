@@ -254,6 +254,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 - `~/.config/tmuxinator/chezmoi.yml` - tmuxinator workspace for chezmoi session (shell + lazygit + nvim overrides, native sesh integration)
 - `~/.config/zellij/config.kdl` - Zellij config (locked default mode for coding agent compatibility, kitty keyboard protocol)
 - `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
+- `~/.config/herdr/config.toml` - Herdr config (Rust terminal multiplexer + AI-agent orchestrator; **trial tool that coexists with tmux**, not a replacement). Catppuccin theme, tmux-like keybindings, `tv`/lazygit command-panes, herdr-plus Projects layouts, and native agent-state indicators. Seeded once (`create_` — herdr writes UI settings back into it). Feasibility matrix + documented gaps (seamless nvim nav, OSC133 copy-mode) in [docs/tools/herdr.md](docs/tools/herdr.md)
 - `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.

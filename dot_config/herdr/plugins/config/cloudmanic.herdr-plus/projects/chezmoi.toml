@@ -1,0 +1,24 @@
+# herdr-plus Project template — mirrors this repo's tmuxinator "chezmoi"
+# session (shell + lazygit + nvim). Launch from the Projects fuzzy picker
+# (prefix+O) after installing the plugin:
+#
+#   herdr plugin install cloudmanic/herdr-plus
+#
+# Add your own per-repo projects alongside this file. A tab uses EITHER
+# `command` OR a `[[tabs.panes]]` block (max 4 panes/tab). `working_dir`
+# expands ~ and $ENV. Schema: https://github.com/cloudmanic/herdr-plus
+name = "chezmoi"
+description = "Dotfiles repo — editor, git, shell"
+working_dir = "~/.local/share/chezmoi"
+
+[[tabs]]
+name = "editor"
+command = "nvim"
+
+[[tabs]]
+name = "git"
+command = "lazygit"
+
+[[tabs]]
+name = "shell"
+# no command → empty interactive shell

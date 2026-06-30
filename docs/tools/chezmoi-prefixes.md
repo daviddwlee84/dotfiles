@@ -204,6 +204,7 @@ Track normally, `chezmoi add` freely, let `chezmoi re-add` pick up drift.
 Files that an app rewrites in-place after first launch, and where you only care about the initial state.
 
 - **`~/.config/nvim/lazy-lock.json`** → `create_lazy-lock.json`. See the [case study below](#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite). Refresh baseline with `cp … "$(chezmoi source-path …)"`.
+- **`~/.config/herdr/config.toml`** → `create_config.toml`. herdr writes UI/runtime settings back into it (`onboarding = false`, theme/sound/toasts on *apply*), so a plain managed file would be clobbered every `chezmoi apply` (re-triggering onboarding). See [docs/tools/herdr.md → Config writeback](herdr.md#config-writeback-why-create_).
 - **`~/.ssh/config`** → create-only template that `Include ~/.ssh/config.d/*` and ships conservative defaults. See the SSH notes in [README.md](../../README.md).
 - First-run app JSONs where further changes are user-local (settings files that are a mix of state and preferences).
 

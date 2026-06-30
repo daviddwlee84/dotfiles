@@ -1,0 +1,101 @@
+# Live agent panes cable channel for herdr (tv) — herdr-aware variant
+#
+# herdr-native counterpart of `agent-panes.toml` (which is tmux-coupled). Lists
+# panes from the running herdr server and lets you jump to the one running an
+# agent. Use under herdr (bound to `prefix+A` in ~/.config/herdr/config.toml).
+#
+# herdr has no "focus pane by id" command (pane focus is directional only), so
+# Enter jumps to the pane's WORKSPACE + TAB (`herdr workspace focus` +
+# `herdr tab focus`) — tab-level granularity, which is enough when there's one
+# agent per tab. See docs/tools/herdr.md.
+#
+# Source: TSV from `herdr pane list` via jq:
+#   0. pane_id        (w1:p1)
+#   1. workspace_id   (w1)
+#   2. tab_id         (w1:t1)
+#   3. agent_status   (working / idle / blocked / unknown)
+#   4. cwd            (foreground cwd, falling back to pane cwd)
+
+[metadata]
+name = "herdr-agent-panes"
+description = "Live panes across the herdr server — jump to a running agent's workspace/tab"
+requirements = ["herdr", "jq"]
+
+[source]
+command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.agent_status)\t\(.foreground_cwd // .cwd)"' '''
+display = "{split:\t:0}  [{split:\t:3}]  {split:\t:4|split:/:-1}"
+output = "{split:\t:0}"
+
+[preview]
+command = '''
+pane='{split:\t:0}'
+printf '\033[1m%s\033[0m  [%s]\n' "$pane" '{split:\t:3}'
+printf '\033[2mworkspace:\033[0m %s   \033[2mtab:\033[0m %s\n' '{split:\t:1}' '{split:\t:2}'
+printf '\033[2mcwd:\033[0m %s\n' '{split:\t:4}'
+printf '\n\033[1m─── pane (herdr pane read, last ~80) ───\033[0m\n'
+herdr pane read "$pane" --source visible --lines 80 2>/dev/null \
+  || echo "(pane $pane no longer exists — press Ctrl+R to reload)"
+'''
+
+[ui]
+input_header = "Live herdr Agent Panes"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:focus"
+alt-t = "actions:focus"
+alt-k = "actions:close_pane"
+ctrl-y = "actions:copy_id"
+alt-p = "actions:copy_dir"
+
+[actions.focus]
+description = "Jump to the pane's workspace + tab"
+command = '''
+ws='{split:\t:1}'; tab='{split:\t:2}'
+[ -n "$ws" ] && herdr workspace focus "$ws" >/dev/null 2>&1
+[ -n "$tab" ] && herdr tab focus "$tab" >/dev/null 2>&1
+'''
+mode = "fork"
+
+[actions.close_pane]
+description = "Close the pane (confirm prompt)"
+command = '''
+p='{split:\t:0}'
+[ -z "$p" ] && exit 0
+printf 'Close pane %s? [y/N] ' "$p"
+read -r ans
+case "$ans" in
+  y|Y|yes|YES) herdr pane close "$p" >/dev/null 2>&1 && echo "closed $p" || echo "failed (already gone?)" ;;
+  *) echo "aborted" ;;
+esac
+echo "[Press Enter]"; read -r _
+'''
+mode = "execute"
+
+[actions.copy_id]
+description = "Copy pane id to clipboard"
+command = '''
+d='{split:\t:0}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy directory path to clipboard"
+command = '''
+d='{split:\t:4}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"

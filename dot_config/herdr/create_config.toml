@@ -1,0 +1,106 @@
+# Herdr — Rust terminal multiplexer + AI-agent orchestrator.
+#
+# TRIAL config that mirrors the tmux experience as closely as herdr's
+# primitives allow. herdr COEXISTS with tmux — you run one or the other, never
+# nested. Nothing here touches the tmux / sesh / tmuxp / workmux setup.
+#
+# Schema: https://herdr.dev/docs/configuration/
+# Validate after editing: herdr server reload-config
+# Full feasibility matrix + documented gaps: docs/tools/herdr.md
+#
+# NOT gated by enableVimMode: that flag governs shell + tmux modal editing;
+# herdr's copy mode (prefix+[) is vi-style natively (h/j/k/l, w/b/e, {/}, v, y).
+#
+# Prefix is ctrl+b (herdr default, same as tmux). herdr's built-in defaults are
+# already close to tmux (prefix+c new tab, prefix+1..9 switch, prefix+h/j/k/l
+# focus pane, prefix+v / prefix+minus split, prefix+z zoom, prefix+x close,
+# prefix+g session navigator, prefix+w workspace nav, prefix+q detach), so we
+# only rebind a couple of keys and add command panes for the tv/lazygit popups.
+
+[theme]
+name = "catppuccin"          # mocha (dark)
+auto_switch = true            # follow OS light/dark
+light_name = "catppuccin-latte"
+dark_name = "catppuccin"
+
+[ui]
+mouse_capture = true
+pane_borders = true
+pane_gaps = true
+confirm_close = true
+show_agent_labels_on_pane_borders = true
+
+[terminal]
+shell_mode = "auto"           # login/non-login auto-detect; follows $SHELL
+new_cwd = "follow"            # new panes inherit the focused pane's cwd
+
+# --- Built-in action rebinds (tmux muscle memory) ---
+# Only existing actions can be rebound; we keep herdr defaults for everything
+# not listed here.
+[keys]
+split_vertical = "prefix+|"        # side-by-side, like tmux prefix+|
+split_horizontal = "prefix+minus"  # stacked, like tmux prefix+- (also the default)
+reload_config = "prefix+shift+r"   # tmux: prefix+R
+rename_tab = "prefix+,"            # tmux: prefix+, (rename window) — frees prefix+shift+t for the sesh popup below
+new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be lazygit (worktrees handled by wt/wm + herdr-plus auto-layout)
+
+# --- Custom command panes (the tmux-popup recreations) ---
+# type = "pane": opens a temporary pane that closes when the command exits —
+# herdr's analog of `tmux display-popup -E`. The command runs from the focused
+# pane's cwd and gets $HERDR_SOCKET_PATH / $HERDR_ACTIVE_PANE_ID /
+# $HERDR_ACTIVE_PANE_CWD in its environment.
+
+[[keys.command]]
+key = "prefix+G"
+type = "pane"
+command = "lazygit"
+description = "lazygit (popup pane)"
+
+[[keys.command]]
+key = "prefix+`"
+type = "pane"
+command = "$SHELL"
+description = "scratch shell (popup pane)"
+
+[[keys.command]]
+key = "prefix+U"
+type = "pane"
+command = "tv tools"
+description = "CLI tools launcher (tv tools)"
+
+[[keys.command]]
+key = "prefix+T"
+type = "pane"
+command = "tv herdr-sesh"
+description = "Session / workspace / dir switcher (herdr-aware tv channel)"
+
+[[keys.command]]
+key = "prefix+a"
+type = "pane"
+command = "tv herdr-agent-panes"
+description = "Live agent panes (herdr-aware tv channel)"
+
+[[keys.command]]
+key = "prefix+f"
+type = "pane"
+command = "tv fleet-hosts"
+description = "Fleet hosts SSH picker (tv)"
+
+# --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
+# Requires: herdr plugin install cloudmanic/herdr-plus
+# Projects = declarative multi-pane workspace templates (see
+# dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/).
+# Quick Actions = fuzzy command launcher. If the plugin is not installed these
+# bindings simply no-op.
+
+[[keys.command]]
+key = "prefix+O"
+type = "plugin_action"
+command = "cloudmanic.herdr-plus.projects"
+description = "herdr-plus: Projects (layout launcher)"
+
+[[keys.command]]
+key = "prefix+y"
+type = "plugin_action"
+command = "cloudmanic.herdr-plus.quick-actions"
+description = "herdr-plus: Quick Actions"

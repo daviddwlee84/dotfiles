@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -77,6 +77,10 @@
       - worktrunk
       - workmux
       - zellij
+      # herdr — Rust terminal multiplexer + AI-agent orchestrator. Trial tool
+      # that COEXISTS with tmux/zellij (you run one or the other); not a
+      # replacement. Config in ~/.config/herdr/config.toml. See docs/tools/herdr.md.
+      - herdr
       - btop
       - htop
       - duckdb
@@ -4229,3 +4233,133 @@
       ansible.builtin.file:
         path: /tmp/fastfetch.deb
         state: absent
+
+# --- herdr (Rust terminal multiplexer + AI-agent orchestrator) ---
+# Trial tool that COEXISTS with tmux/zellij; not a replacement. macOS gets it
+# from the brew list above (homebrew-core formula). On Linux, releases ship a
+# SINGLE static binary (herdr-linux-{x86_64,aarch64}) — no tarball, so this is
+# simpler than the workmux/worktrunk release tasks (no unarchive, sidesteps the
+# macOS BSD-tar .tar.gz pitfall entirely). Config in ~/.config/herdr/config.toml
+# (chezmoi-managed). Self-managed installs upgrade via `herdr update`.
+- name: Check if herdr is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: herdr --version
+  register: herdr_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install herdr from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - herdr_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (herdr)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Set herdr architecture mapping
+      ansible.builtin.set_fact:
+        herdr_arch: >-
+          {{
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Skip herdr on unsupported architecture
+      when: herdr_arch | trim == ''
+      ansible.builtin.debug:
+        msg: "herdr skipped: no release for {{ target_architecture }}"
+
+    - name: Get latest herdr release
+      when: herdr_arch | trim != ''
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/ogulcancelik/herdr/releases/latest
+        return_content: true
+      register: herdr_release
+
+    - name: Set herdr download URL fact
+      when: herdr_arch | trim != ''
+      ansible.builtin.set_fact:
+        herdr_download_url: >-
+          {{
+            (
+              herdr_release.json.assets
+              | selectattr('name', 'equalto', 'herdr-linux-' ~ herdr_arch)
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip herdr if download URL could not be determined
+      when:
+        - herdr_arch | trim != ''
+        - herdr_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "herdr skipped: could not determine download URL for architecture {{ herdr_arch }}"
+
+    - name: Download herdr binary to ~/.local/bin
+      when: herdr_download_url | default('') | trim != ''
+      ansible.builtin.get_url:
+        url: "{{ herdr_download_url }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/herdr"
+        mode: '0755'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+  rescue:
+    - name: Warn herdr installation failed
+      ansible.builtin.debug:
+        msg: "herdr installation failed (likely network timeout) - skipping"
+
+# --- herdr-plus plugin (Projects + Quick Actions; sesh/tmuxp/menu analog) ---
+# Installed via `herdr plugin install`, which downloads a prebuilt release binary
+# when no Go toolchain is found, so it works with or without Go. When a Go build
+# IS attempted it needs a modern Go; we prepend brew's Go (if present) so a stale
+# system Go (e.g. an old /usr/local/go) does not break the build. OS-agnostic
+# (runs on macOS + Linux once herdr is installed). Idempotent (skipped when the
+# plugin is already present) and wrapped in rescue so a network/build hiccup
+# never fails the play — it's a trial nicety. See docs/tools/herdr.md.
+- name: Check herdr-plus plugin status
+  ansible.builtin.shell: |
+    set -o pipefail
+    command -v herdr >/dev/null 2>&1 || { echo "no-herdr"; exit 0; }
+    if herdr plugin list --json 2>/dev/null | grep -q 'cloudmanic.herdr-plus'; then
+      echo "present"
+    else
+      echo "absent"
+    fi
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: herdr_plus_check
+  changed_when: false
+  failed_when: false
+
+- name: Install herdr-plus plugin (herdr present, plugin absent)
+  when: herdr_plus_check.stdout | default('') | trim == "absent"
+  block:
+    - name: Resolve brew Go prefix for the herdr-plus build (optional; prebuilt fallback otherwise)
+      ansible.builtin.command: brew --prefix go
+      register: herdr_go_prefix
+      changed_when: false
+      failed_when: false
+
+    - name: herdr plugin install cloudmanic/herdr-plus
+      ansible.builtin.command: herdr plugin install cloudmanic/herdr-plus --yes
+      environment:
+        PATH: "{{ ((herdr_go_prefix.stdout | trim) ~ '/bin:') if (herdr_go_prefix.rc | default(1)) == 0 else '' }}{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+      register: herdr_plus_install
+      changed_when: "'Installed' in (herdr_plus_install.stdout | default(''))"
+  rescue:
+    - name: Warn herdr-plus install failed (non-fatal)
+      ansible.builtin.debug:
+        msg: "herdr-plus plugin install failed (network/build) — skipping. Run manually: herdr plugin install cloudmanic/herdr-plus"
