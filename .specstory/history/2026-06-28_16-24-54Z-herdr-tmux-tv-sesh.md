@@ -16352,3 +16352,541 @@ restored from backup
 (mashed state recoverable at the 601099d reflog entry if ever needed)
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:05:49Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:06:02Z)**_
+
+救回來了 — 現在回到動手腳之前的乾淨狀態:
+
+```
+7035059 fix(shell): prefer Intel brew Go…   ← HEAD
+8510d73 feat(herdr): …                        ← 純 herdr,沒被污染
+ebfae55 feat(ssh-setup): …
+882cd3e fix(git): git-lfs hooks…
+```
+working tree:mise WIP 還在(`rust=stable`)、plan 檔還在(untracked)。被搞亂的版本仍留在 reflog(`601099d`),真的要也救得回。
+
+## 為什麼 lazygit 失敗 —— 對,選項選錯了(而且不只一個地方)
+
+1. **那個 `f Fixup` / `c Fixup and use this commit's message` 選單,是「把選中的 commit 壓進它下面那個 commit」** —— 是合併**兩個既有 commit**,不是把工作區的檔案塞進某個舊 commit。所以它把你的 `feat(herdr)` 跟下面的 ssh-setup、git-lfs commit 全攪在一起了。
+2. **lazygit 在 fixup 前自動跑了 `git add -A`**(命令日誌看得到),把不相干的 `mise`、`.specstory` 也一起 stage 進去,雪上加霜。
+
+## 正確的 lazygit 做法(把工作區檔案併進舊 commit)
+
+> 不是用 `f`,是用 **`A`(amend)**。
+
+1. **Files 面板**:游標移到 `herdr-tmux-tv-enchanted-yao.md`,按 **`空白鍵`** 只 stage 這一個檔(**不要按 `a`** —— `a` 是 stage 全部,就是這次惹禍的元凶)。
+2. **Commits 面板**:選到 `feat(herdr)` 那個 commit,按 **`A`(shift+a)= "Amend commit with staged changes"**,確認。lazygit 會自動用 rebase 幫你 amend 進去,mise WIP 它會自動 stash/還原。
+
+(對應的 CLI 就是我上次給的 `git commit --fixup=8510d73` + `git rebase --autosquash`。)
+
+要怎麼進行?
+
+_**Agent (claude-opus-4-8 2026-06-30 11:07:54Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**plan 檔(herdr-tmux-tv-enchanted-yao.md)要怎麼處理?**
+
+Options:
+- **我用 CLI 幫你乾淨併入 8510d73** - 我直接跑 git add <只有 plan 檔> + git commit --fixup=8510d73 + 非互動 autosquash rebase(--autostash 保住 mise WIP)。完成後 8510d73 會含 plan 檔,其他都不動。
+- **我自己用 lazygit 的 A 做** - 照上面步驟:空白鍵只 stage plan 檔 → Commits 面板按 A amend 進 feat(herdr)。你練手,我不動。
+- **plan 檔不要進 git** - 維持現狀:plan 檔留在 working tree(untracked),不併進任何 commit。.claude/plans/ 本來很多人也不納版控。
+
+
+**Answer:** 我已經用 lazygit 的 A 做了 （git commit --fixup=8510d73 + git rebase --autosquash 看起來爲啥以爲是 fixup...）
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:08:06Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:08:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify lazygit A amend result is clean
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== log ==="; git log --oneline -3
+echo; echo "=== herdr commit (HEAD~1) now contains the plan file? + still pure? ==="
+git show --stat HEAD~1 | rg '\.claude/plans/herdr-tmux|mise|specstory|ssh_setup|git/hooks|via-v3' | sed 's/^/  /' || true
+echo; echo "=== herdr commit file count + any non-herdr junk? ==="
+git show --stat HEAD~1 --format="" | rg '\|' | wc -l | sed 's/^/files in herdr commit: /'
+git show --stat HEAD~1 --format="" | rg -i 'mise|statistics|via-v3|setup_ssh|git/hooks|git-lfs' && echo "!!! junk found" || echo "no unrelated junk — clean"
+echo; echo "=== working tree (mise WIP should remain) ==="; git status --short
+```
+
+```text
+=== log ===
+8024b85 fix(shell): prefer Intel brew Go over stale manual /usr/local/go
+d803fab feat(herdr): trial herdr terminal multiplexer alongside tmux
+ebfae55 feat(ssh-setup): edit existing ~/.ssh/config Host in place instead of duplicating
+
+=== herdr commit (HEAD~1) now contains the plan file? + still pure? ===
+   .claude/plans/herdr-tmux-tv-enchanted-yao.md       |    95 +
+   dot_config/mise/config.toml.tmpl                   |     5 +-
+
+=== herdr commit file count + any non-herdr junk? ===
+files in herdr commit:       13
+ dot_config/mise/config.toml.tmpl                   |     5 +-
+!!! junk found
+
+=== working tree (mise WIP should remain) ===
+ M .specstory/history/2026-06-28_16-24-54Z-herdr-tmux-tv-sesh.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:09:03Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:09:19Z)**_
+
+plan 檔成功進去了 ✅ —— `d803fab feat(herdr)` 現在含 `.claude/plans/herdr-tmux-tv-enchanted-yao.md`,而且這次**沒有**把 ssh-setup / git-lfs / via-v3 / statistics 那些攪進來。lazygit 的 `A` 用對了。
+
+順帶解釋你那句疑惑:**lazygit 的 `A`(amend with staged changes)底層跑的就是 `git commit --fixup=<目標>` + `git rebase --autosquash`** —— 所以命令日誌會出現 "fixup" 字樣。它跟你之前踩到的 `f`(squash 兩個既有 commit)是完全不同的東西,只是名字都叫 fixup,容易混。記法:**`A` = 把工作區檔案塞進舊 commit;`f` = 把兩個 commit 合併**。
+
+不過有個小瑕疵要告訴你:**`mise/config.toml.tmpl`(rust=stable 那個改動)也被一起 amend 進 herdr commit 了**:
+
+```
+d803fab feat(herdr):
+  .claude/plans/herdr-tmux-tv-enchanted-yao.md   | 95 +   ← 對
+  dot_config/mise/config.toml.tmpl               |  5 +-  ← 不相干,跟著進來了
+```
+
+(amend 只會收**已 staged** 的東西 —— 所以下次按 `A` 前,先在 Files 面板確認只有目標檔是 staged,其他用空白鍵取消 stage。)
+
+要不要處理?兩條路:
+
+- **(A) 我幫你把 mise 抽回 working tree**(乾淨,推薦):我用 `git rebase` 把 `d803fab` 標 edit → 把 mise 退出該 commit → `--amend` → continue。結果:herdr commit 只剩 herdr+plan,mise 變回未 commit 的 WIP。沒推送過,安全可逆。
+- **(B) 不管它**:mise 這個改動很小,跟著 herdr commit 一起也沒功能問題,只是 commit scope 不純。
+
+你說一聲。如果選 (A) 我就直接跑。
+
+---
+
+_**User (2026-06-30 11:11:53Z)**_
+
+[Image #12] mise dot_config/mise/config.toml.tmpl 那個能教我怎麽通過 lazygit 處理嗎？ 就是把它從這種還沒push的commit中挪出來 做爲現在Changes not staged for commit的一部分
+
+_**User (2026-06-30 11:11:53Z)**_
+
+[Image: source: /var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/clipboard-2026-06-30-191016-946A3891.png]
+
+---
+
+_**Agent (claude-opus-4-8 2026-06-30 11:13:45Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:13:46Z)**_
+
+Good question — this is the inverse of `A`: pulling one file's changes **out** of an old commit and back into the working tree. lazygit has a proper native feature for this (the **custom patch**), but I want to give you the exact keys for your version (0.59.0), so let me confirm them against lazygit's keybindings rather than guess.
+
+_**Agent (claude-opus-4-8 2026-06-30 11:13:55Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="WebFetch"><details>
+<summary>Tool use: **WebFetch**</summary>
+ `https://raw.githubusercontent.com/jesseduffield/lazygit/master/docs/keybindings/Keybindings_en.md`
+
+```text
+# Lazygit Commit Files Panel Keybindings
+
+## Core File Management Keys
+
+In the "Commit files" panel, these keybindings are essential:
+
+- **`<space>`** — "Toggle file included in patch" — adds/removes files from the custom patch
+- **`<enter>`** — "Enter file / Toggle directory collapsed" — opens a file for line-by-line selection
+- **`<ctrl+p>`** — "View custom patch options" — accesses the patch menu (found in Global keybindings)
+
+## Custom Patch Options Menu
+
+The documentation references custom patch functionality but does **not provide a dedicated menu section** listing specific patch option items. The keybinding `<ctrl+p>` is listed under Global keybindings as "View custom patch options," yet the actual menu contents with options like "move patch out into index" or "apply patch" are not enumerated in the provided keybindings reference.
+
+The document notes that custom patch details are documented separately: "See https://github.com/jesseduffield/lazygit#rebase-magic-custom-patches" — suggesting the full menu specification exists in external documentation.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:14:14Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:14:33Z)**_
+
+確認好了 —— lazygit 有專門做這件事的功能叫 **custom patch(自訂補丁)**,用它把單一檔案從某個 commit「抽」回工作區,正是你要的。對應的鍵在 0.59.0 也一樣。
+
+## lazygit 步驟:把 mise 從 `d803fab` 抽回未 staged
+
+1. **Commits 面板(`4`)**:選到 `d803fab feat(herdr)`。
+2. 按 **`Enter`** → 進入這個 commit 的檔案清單(Commit files 視圖)。
+3. 游標移到 **`dot_config/mise/config.toml.tmpl`** → 按 **`空白鍵`**,把「整個檔案」加進 custom patch(會看到它變色/被標記,代表已納入補丁)。
+   - (如果只想抽某幾行,改按 `Enter` 進去逐行選;這裡整檔都要,空白鍵即可。)
+4. 按 **`Ctrl+P`** → 打開 **"View custom patch options"** 選單。
+5. 選 **`move patch out into index`** → `Enter`。
+   - lazygit 會在底層用 interactive rebase 把 `d803fab` 重寫成**不含 mise**,並把 mise 的改動放進 **index(已 staged)**。
+
+此時 mise 在「Changes to be committed」。再做最後一步變成「**not staged**」:
+
+6. 回 **Files 面板(`2`)**,選 `dot_config/mise/config.toml.tmpl`,按 **`空白鍵`** 取消 stage → 它就變成 **Changes not staged for commit**。✅
+
+## 記憶法 / 它在做什麼
+
+custom patch 選單那幾個選項對照:
+- **`move patch out into index`** = 從原 commit 移除這些改動,放到暫存區(你要的就是這個,再 `空白鍵` 取消 stage)。
+- `remove patch from original commit` = 直接從 commit 砍掉(**會丟失**,別選)。
+- `move patch into new commit` / `move patch to selected commit` = 移到新的/別的 commit。
+
+CLI 等價(理解用,不用跑):lazygit 其實是 `git rebase` 把 `d803fab` 標 `edit` → `git reset HEAD^ -- dot_config/mise/config.toml.tmpl` → `git commit --amend` → `git rebase --continue`。
+
+## 注意
+
+- 這會**重寫 `d803fab` 的 SHA**(沒 push 過,安全)。`8024b85 fix(shell)` 會自動 replay 在上面。
+- 完成後 `d803fab` 應該只剩 herdr 檔 + plan 檔;`git status` 看到 mise 在「not staged」、`.specstory/history/…` 那個 transient 也還在(可不管)。
+- 萬一中途卡在 rebase,lazygit 狀態列會顯示 rebasing,按 **`m`** 開 rebase 選單可以 continue / abort;真的亂了也還能用 reflog 回到現在這個 `d803fab`。
+
+你照著做;我不動手,讓你練。完成後想確認結果的話我可以幫你看 `git show --stat`。
+
+---
+
+_**User (2026-06-30 11:18:04Z)**_
+
+[Image #13] 好像成功了 你可以幫我寫最新的commit嗎 for this mise change
+（感覺這些操作不靠lazygit 手寫command根本記不住）
+（看看這個notes能不能幫我記到docs裡看放哪裡 雖然跟dotfiles無關比較像小技巧 不過可能也可以有個section放這些我們有裝的工具的小技巧等等）
+
+_**User (2026-06-30 11:18:04Z)**_
+
+[Image: source: /var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/clipboard-2026-06-30-191643-25050BD4.png]
+
+---
+
+_**Agent (claude-opus-4-8 2026-06-30 11:18:58Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:19:01Z)**_
+
+成功了 —— custom patch 把 mise 抽回工作區,herdr commit(現在 `fffda46`)乾淨了。我來幫你做三件事:(1) 把 mise 改動單獨 commit,(2) 找個合適的 docs 位置,(3) 把這些 git/lazygit 小技巧寫進去。先看一下現狀和 docs 結構。
+
+_**Agent (claude-opus-4-8 2026-06-30 11:19:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect state and docs structure for lazygit tips
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== working tree (confirm only mise is the real change to commit) ==="; git status --short
+echo; echo "=== herdr commit now pure? (no mise) ==="; git show --stat HEAD~1 --format="%h %s" | rg -i 'mise|herdr-tmux-tv-enchanted|via-v3' | head
+echo; echo "=== the mise change to be committed ==="; git diff dot_config/mise/config.toml.tmpl
+echo; echo "=== does a lazygit doc exist? where would tips go? ==="
+ls docs/tools/lazygit.md docs/tools/git*.md 2>/dev/null || echo "(no lazygit/git doc yet)"
+rg -n 'lazygit' docs/this_repo/tool-managers.md | head -3
+echo; echo "=== mkdocs nav: git/lazygit area ==="; rg -n -i 'lazygit|git-|Git:' mkdocs.yml | head
+```
+
+```text
+=== working tree (confirm only mise is the real change to commit) ===
+MM .specstory/history/2026-06-28_16-24-54Z-herdr-tmux-tv-sesh.md
+M  dot_config/mise/config.toml.tmpl
+
+=== herdr commit now pure? (no mise) ===
+ .claude/plans/herdr-tmux-tv-enchanted-yao.md       |    95 +
+
+=== the mise change to be committed ===
+
+=== does a lazygit doc exist? where would tips go? ===
+docs/tools/git_diff_workflow.md
+docs/tools/git_diff_workflow.zh-TW.md
+(no lazygit/git doc yet)
+41:| **GitHub-release downloads** | ~30 Linux user-level fallbacks for ripgrep/fd/jq/git-lfs/gh/glab/bat/eza/git-delta/diffnav/glow/gum/vhs/freeze/yazi/superfile/btop/zellij/sesh/worktrunk/workmux/tailspin/dasel/yq/jnv/doggo/gping/trippy/bandwhich/rustscan/cloudflared/ngrok/speedtest/gitleaks/lazygit/neovim + macOS fallbacks for specstory/codexbar | Each role's `_release_fallback` block | **none** (install-only — see [Coverage gaps](#coverage-gaps-install-only-no-automated-upgrade)) |
+370:| `lazyvim_deps` | `fzf`, `lazygit`, `tree-sitter`, `node` | macOS: brew · Linux: mise (`node@lts` general; `node@20` + `rust@latest` on armv7l); fzf built from chezmoi external clone (Linux); lazygit GitHub release (its PPA was deprecated upstream in 2021 and broke `apt update`; the role now also purges leftover lazygit PPA source files); tree-sitter-cli via `mise exec -- npm install -g tree-sitter-cli` (timeout 180) → cargo fallback with `libclang-dev`/`clang-devel` |
+692:- `lazyvim_deps`: `lazygit` fallback
+
+=== mkdocs nav: git/lazygit area ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:19:37Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:19:38Z)**_
+
+Two things to note: the mise change is **staged** (lazygit's "move patch into index" left it in the index), and `.specstory/history/…` is also partially staged — I must commit **only** mise. There's no lazygit doc yet (closest is `docs/tools/git_diff_workflow.md`). Let me confirm the staged mise content and find the nav placement.
+
+_**Agent (claude-opus-4-8 2026-06-30 11:19:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm staged mise diff and nav placement
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== staged mise change (git diff --cached) ==="; git diff --cached dot_config/mise/config.toml.tmpl
+echo "=== where does git_diff_workflow sit in mkdocs nav? ==="; rg -n 'git_diff_workflow|git-diff|Git diff' mkdocs.yml
+```
+
+```text
+=== staged mise change (git diff --cached) ===
+diff --git a/dot_config/mise/config.toml.tmpl b/dot_config/mise/config.toml.tmpl
+index ba7485d..a582e60 100644
+--- a/dot_config/mise/config.toml.tmpl
++++ b/dot_config/mise/config.toml.tmpl
+@@ -57,8 +57,9 @@ node = "lts"
+ {{ if $extraRuntimes -}}
+ # Bun for bunx CLI tools
+ bun = "latest"
+-# Rust toolchain for cargo tools
+-rust = "latest"
++# Rust toolchain for cargo tools. Use the channel name so rustup-backed builds
++# see RUSTUP_TOOLCHAIN=stable instead of a concrete version.
++rust = "stable"
+ {{ else -}}
+ # bun/rust skipped: installExtraRuntimes=false (lean VM / CI)
+ {{ end -}}
+=== where does git_diff_workflow sit in mkdocs nav? ===
+292:          - git diff workflow: tools/git_diff_workflow.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:20:11Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:20:12Z)**_
+
+Confirmed. Let me commit the mise change cleanly (only mise — unstage everything first so the transient specstory file is excluded).
+
+_**Agent (claude-opus-4-8 2026-06-30 11:20:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit only the mise change
+
+```bash
+cd /Users/david/.local/share/chezmoi
+git reset -q                                            # unstage all (keeps working tree)
+git add dot_config/mise/config.toml.tmpl                # stage ONLY mise
+git commit -m 'fix(mise): pin rust to the "stable" channel, not "latest"' \
+  -m 'Use the rustup channel name so rust-toolchain-aware builds see RUSTUP_TOOLCHAIN=stable, instead of mise resolving "latest" to a pinned concrete version that drifts on every toolchain bump.' \
+  -m 'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>'
+echo "=== result ==="; git log --oneline -3; echo "---"; git status --short
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1782818416-32054.
+Auto-redact secrets in agent artifacts...................(no files to check)Skipped
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...............................................(no files to check)Skipped
+check toml...............................................(no files to check)Skipped
+check json...............................................(no files to check)Skipped
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1782818416-32054.
+[main 581c3ca] fix(mise): pin rust to the "stable" channel, not "latest"
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+=== result ===
+581c3ca fix(mise): pin rust to the "stable" channel, not "latest"
+b63cf2e fix(shell): prefer Intel brew Go over stale manual /usr/local/go
+fffda46 feat(herdr): trial herdr terminal multiplexer alongside tmux
+---
+ M .specstory/history/2026-06-28_16-24-54Z-herdr-tmux-tv-sesh.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:20:43Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:20:44Z)**_
+
+Committed cleanly as `581c3ca` (only mise; pre-commit passed). Now the lazygit recipes doc — I'll put it at `docs/tools/lazygit.md` (the natural home for tool recipes, next to `git_diff_workflow.md`), with **CLI equivalents alongside every lazygit key** since that's your memory need.
+
+_**Agent (claude-opus-4-8 2026-06-30 11:21:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# lazygit — history-surgery recipes (cheatsheet)
+
+[lazygit](https://github.com/jesseduffield/lazygit) is the git TUI used here (installed via the `lazyvim_deps` role; bound to `lg`). The everyday stuff (stage, commit, branch) is obvious — this page is the **rebase/amend "surgery" that's hard to remember**, with the **lazygit keys and the equivalent CLI side by side** so you can do it either way.
+
+> **Golden rule: only rewrite commits that have NOT been pushed.** All recipes below rewrite history (new SHAs). If a commit is already on a shared remote, don't — or you'll need `git push --force-with-lease` and coordination.
+
+## The mental model: two different "fixup"s
+
+The word *fixup* shows up in two unrelated lazygit operations — confusing them is the #1 way to mangle history:
+
+| Goal | lazygit | What it does |
+|---|---|---|
+| Add **working-tree changes** into an existing commit | **`A`** (Commits panel) = *amend commit with staged changes* | Runs `git commit --fixup` + `git rebase --autosquash` under the hood |
+| Merge **two existing commits** into one | **`f`** / **`c`** (Commits panel) = *fixup / squash* | Squashes the **selected** commit **into the one below it** (older) |
+
+So `A` = "put my edits into that old commit"; `f` = "glue these two commits together". Reaching for `f` to add a file will mash neighbouring commits instead.
+
+## Recipe: add an uncommitted file into an OLDER commit
+
+**lazygit**
+1. **Files** panel: press **`<space>`** on *only* the file you want. **Do not press `a`** — that's *stage all* and will sweep unrelated edits into the amend.
+2. **Commits** panel: select the target commit → **`A`**.
+
+**CLI**
+\```bash
+git add path/to/file
+git commit --fixup=<target-sha>
+git rebase --autosquash --autostash <target-sha>~1
+# non-interactive (skip the editor): prefix with  GIT_SEQUENCE_EDITOR=true
+\```
+
+## Recipe: pull ONE file OUT of a commit, back to the working tree
+
+The inverse — un-commit a single file from an unpushed commit into "not staged" changes. lazygit's **custom patch** is the native tool.
+
+**lazygit**
+1. **Commits** panel: select the commit → **`<enter>`** to view its files.
+2. Highlight the file → **`<space>`** (adds the whole file to the custom patch — it gets marked).
+3. **`<ctrl+p>`** → *View custom patch options* → **`move patch out into index`**. This rewrites the commit without the file and stages the change.
+4. **Files** panel: **`<space>`** on the file to **unstage** it → now it's a *Changes not staged* edit.
+
+> In the patch menu, `move patch out into index` is what you want. `remove patch from original commit` **discards** the change (lost) — don't pick that if you want to keep it.
+
+**CLI**
+\```bash
+git rebase -i <sha>~1                 # mark <sha> as 'edit', save & quit
+git reset HEAD^ -- path/to/file       # un-commit just that file -> working-tree change
+git commit --amend --no-edit          # re-make the commit without it
+git rebase --continue
+\```
+
+## Recipe: recover from a botched rebase
+
+**lazygit** — **`z`** undo / **`Z`** redo (works on branch/commit ops; the worktree must be clean). For deeper recovery use the reflog via CLI:
+
+**CLI**
+\```bash
+git reflog                       # find the good SHA from before the mess (e.g. the original HEAD)
+git reset --hard <good-sha>      # restore branch + worktree to that point
+\```
+
+- **Gotcha:** `git reset --hard` **deletes files that were staged as new adds** (e.g. a freshly `git add`ed plan file) — back them up first. It leaves *plain untracked* files alone.
+- Re-apply any uncommitted WIP you want to keep afterwards (e.g. `git diff > /tmp/wip.patch` before, `git apply /tmp/wip.patch` after).
+
+## Footguns
+
+- **`a` = stage ALL** in lazygit. It silently sweeps unrelated edits (e.g. a transient config tweak) into whatever amend/fixup you do next. Stage one file with **`<space>`**.
+- After any of these, the commit's **SHA changes**. Fine for local commits; push normally (force only if it was already pushed).
+- Commit discipline when files are partially staged: `git reset` to clear the index, then `git add` exactly what you mean before `git commit`.
+
+## See also
+
+- [git diff workflow](git_diff_workflow.md)
+- Per-tool tips/recipes live under `docs/tools/<tool>.md` — this page is the home for git/lazygit recipes.
+
+```
+
+```text
+File created successfully at: /Users/david/.local/share/chezmoi/docs/tools/lazygit.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:21:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/mkdocs.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:21:17Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:21:17Z)**_
+
+Now validate the doc builds clean (no new link warnings), clean up the build output, and commit it.
+
+_**Agent (claude-opus-4-8 2026-06-30 11:21:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate docs build, commit lazygit doc + nav
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== mkdocs: any lazygit-related warnings from the new doc? ==="
+timeout 300 uv run mkdocs build 2>&1 | rg -i 'lazygit' || echo "(no lazygit warnings — clean)"
+rm -rf site/
+echo "=== commit the docs (only the 2 doc files) ==="
+git reset -q
+git add docs/tools/lazygit.md mkdocs.yml
+git commit -m 'docs(lazygit): add history-surgery recipes (amend, custom-patch extract, rebase recovery)' \
+  -m 'Cheatsheet for the rebase/amend operations that are hard to remember, with lazygit keys and CLI equivalents side by side: add a working-tree file into an old commit (A / --fixup+autosquash), pull one file back out of a commit (custom patch / rebase edit+reset), recover from a botched rebase (reflog/reset --hard), plus the A-vs-f "two fixups" distinction and the stage-all footgun.' \
+  -m 'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>'
+echo "=== result ==="; git log --oneline -4; echo "---"; git status --short
+```
+
+```text
+=== mkdocs: any lazygit-related warnings from the new doc? ===
+(no lazygit warnings — clean)
+=== commit the docs (only the 2 doc files) ===
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1782818509-33932.
+Auto-redact secrets in agent artifacts...................(no files to check)Skipped
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...................................................................Passed
+check toml...............................................(no files to check)Skipped
+check json...............................................(no files to check)Skipped
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1782818509-33932.
+[main 2d16ae0] docs(lazygit): add history-surgery recipes (amend, custom-patch extract, rebase recovery)
+ 2 files changed, 75 insertions(+)
+ create mode 100644 docs/tools/lazygit.md
+=== result ===
+2d16ae0 docs(lazygit): add history-surgery recipes (amend, custom-patch extract, rebase recovery)
+581c3ca fix(mise): pin rust to the "stable" channel, not "latest"
+b63cf2e fix(shell): prefer Intel brew Go over stale manual /usr/local/go
+fffda46 feat(herdr): trial herdr terminal multiplexer alongside tmux
+---
+ M .specstory/history/2026-06-28_16-24-54Z-herdr-tmux-tv-sesh.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-06-30 11:22:07Z)**_
+
+_**Agent (claude-opus-4-8 2026-06-30 11:22:23Z)**_
+
+兩個 commit 都乾淨落地,你的 git 也完全理順了:
+
+```
+2d16ae0  docs(lazygit): add history-surgery recipes …
+581c3ca  fix(mise): pin rust to the "stable" channel, not "latest"   ← 只含 mise
+b63cf2e  fix(shell): prefer Intel brew Go over stale manual /usr/local/go
+fffda46  feat(herdr): trial herdr … (純 herdr + plan 檔,無 mise)
+ebfae55  feat(ssh-setup): …
+```
+
+working tree 現在只剩 `.specstory/history/…`(自動逐字稿,不用管)。pre-commit 兩次都過。
+
+## 1. mise commit
+`581c3ca fix(mise):` —— 我先 `git reset` 清空 index、只 `git add` mise 再 commit,所以那個 transient 的 specstory 沒被一起帶進去。
+
+## 2. lazygit 小技巧 → 放哪 & 寫了什麼
+放在 **`docs/tools/lazygit.md`**(mkdocs nav 的 Tools → 緊接 `git diff workflow` 後面)。你說的「**放安裝工具小技巧的 section**」其實就是 `docs/tools/<tool>.md` 這個既有 pattern —— lazygit.md 是第一篇 recipe 型的,之後別的工具照樣一個檔。
+
+針對你「不靠 lazygit 手寫 command 記不住」的痛點,**每招都並列 lazygit 鍵位 + CLI 等價**,內容正好是我們這次踩過的:
+
+- **兩種 "fixup" 的心智模型**:`A`(把工作區檔塞進舊 commit)vs `f`(合併兩個既有 commit)—— 就是你那次選錯的根因。
+- **把未 commit 的檔加進舊 commit**:`A` ↔ `git commit --fixup` + `git rebase --autosquash`。
+- **把單一檔從 commit 抽回工作區**:custom patch(`<enter>`→`<space>`→`<ctrl+p>`→`move patch out into index`→`<space>` 取消 stage)↔ `rebase -i edit` + `git reset HEAD^ -- <file>` + `--amend` + `--continue`。
+- **rebase 搞砸怎麼救**:`z`/`Z` 或 `git reflog` + `git reset --hard`;附帶那個坑(`reset --hard` 會刪「staged 的新檔」)。
+- **地雷**:lazygit 的 `a` = stage 全部(會把不相干改動掃進來);只改寫沒 push 的 commit。
+
+這四個 local commit 都還沒 push(`main` 領先 origin)。要推的時候正常 `git push` 即可,不用 force。需要我幫你 push 再說一聲。

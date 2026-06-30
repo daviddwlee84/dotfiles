@@ -290,6 +290,7 @@ nav:
           - LLM: tools/llm.md
       - Git & DevOps:
           - git diff workflow: tools/git_diff_workflow.md
+          - lazygit (history-surgery recipes): tools/lazygit.md
           - GitHub CLI (gh) auth: tools/gh-cli.md
           - pre-commit: tools/pre-commit.md
           - Infrastructure-as-Code: tools/infrastructure-as-code.md
