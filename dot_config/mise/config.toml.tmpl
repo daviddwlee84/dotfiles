@@ -57,8 +57,9 @@ node = "lts"
 {{ if $extraRuntimes -}}
 # Bun for bunx CLI tools
 bun = "latest"
-# Rust toolchain for cargo tools
-rust = "latest"
+# Rust toolchain for cargo tools. Use the channel name so rustup-backed builds
+# see RUSTUP_TOOLCHAIN=stable instead of a concrete version.
+rust = "stable"
 {{ else -}}
 # bun/rust skipped: installExtraRuntimes=false (lean VM / CI)
 {{ end -}}
