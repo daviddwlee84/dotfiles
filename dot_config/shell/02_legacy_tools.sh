@@ -9,9 +9,15 @@
 export GOPATH="${GOPATH:-$HOME/go}"
 [[ -d "$GOPATH/bin" ]] && export PATH="$GOPATH/bin:$PATH"
 
-# Homebrew Go or system Go
+# Homebrew Go (Apple Silicon, then Intel), falling back to a manual /usr/local/go
+# install only when neither brew Go exists. Order matters: the Intel brew path
+# (/usr/local/opt/go/bin) MUST come before the manual /usr/local/go fallback, or
+# a stale hand-installed Go (e.g. an old go1.15 from a 2020 .pkg) shadows brew's
+# current Go on Intel Macs. See memory: homebrew-aliyun-autoupdate-hang.
 if [[ -d "/opt/homebrew/opt/go/bin" ]]; then
     export PATH="/opt/homebrew/opt/go/bin:$PATH"
+elif [[ -d "/usr/local/opt/go/bin" ]]; then
+    export PATH="/usr/local/opt/go/bin:$PATH"
 elif [[ -d "/usr/local/go/bin" ]]; then
     export PATH="/usr/local/go/bin:$PATH"
 fi
