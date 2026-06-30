@@ -73,7 +73,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 herdr plugin install cloudmanic/herdr-plus   # manual fallback / what the role runs
 ```
 
-`herdr plugin install` **downloads a prebuilt release binary when no Go toolchain is present**, so it works with or without Go. The one trap: if a *stale* Go is on `PATH` (e.g. an old `/usr/local/go` shadowing a newer one) herdr tries to build from source and fails (`invalid go version … must match format 1.23`) instead of falling back. The ansible task sidesteps this by prepending brew's Go (`brew --prefix go`) when available; to fix it by hand, put a modern Go first: `PATH="$(brew --prefix go)/bin:$PATH" herdr plugin install cloudmanic/herdr-plus`.
+`herdr plugin install` **downloads a prebuilt release binary when no Go toolchain is present**, so it works with or without Go. The one trap: if a *stale* Go is on `PATH` (e.g. an old `/usr/local/go` shadowing a newer one) herdr tries to build from source and fails (`invalid go version … must match format 1.23`) instead of falling back. The ansible task sidesteps this by prepending mise's Go (`mise which go` → its bin dir) when available; to fix it by hand, put a modern Go first: `PATH="$(dirname "$(mise which go)"):$PATH" herdr plugin install cloudmanic/herdr-plus`. (Go is mise-managed now, gated on `installExtraRuntimes`.)
 
 Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → the same path under `~/.config/`. The shipped `chezmoi.toml` mirrors this repo's tmuxinator `chezmoi` session (editor/git/shell tabs). Bind `prefix+O` → Projects and `prefix+y` → Quick Actions (already in the config).
 

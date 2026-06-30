@@ -4322,8 +4322,9 @@
 # --- herdr-plus plugin (Projects + Quick Actions; sesh/tmuxp/menu analog) ---
 # Installed via `herdr plugin install`, which downloads a prebuilt release binary
 # when no Go toolchain is found, so it works with or without Go. When a Go build
-# IS attempted it needs a modern Go; we prepend brew's Go (if present) so a stale
-# system Go (e.g. an old /usr/local/go) does not break the build. OS-agnostic
+# IS attempted it needs a modern Go; we prepend mise's Go (if present) so a stale
+# system Go (e.g. an old /usr/local/go) does not break the build. Go is managed
+# by mise now (not brew), so we resolve it via `mise which go`. OS-agnostic
 # (runs on macOS + Linux once herdr is installed). Idempotent (skipped when the
 # plugin is already present) and wrapped in rescue so a network/build hiccup
 # never fails the play — it's a trial nicety. See docs/tools/herdr.md.
@@ -4347,16 +4348,26 @@
 - name: Install herdr-plus plugin (herdr present, plugin absent)
   when: herdr_plus_check.stdout | default('') | trim == "absent"
   block:
-    - name: Resolve brew Go prefix for the herdr-plus build (optional; prebuilt fallback otherwise)
-      ansible.builtin.command: brew --prefix go
-      register: herdr_go_prefix
+    - name: Resolve mise Go bin dir for the herdr-plus build (optional; prebuilt fallback otherwise)
+      # `mise which go` prints the absolute path to the managed go binary
+      # (e.g. ~/.local/share/mise/installs/go/<ver>/bin/go); dirname is the bin
+      # dir we prepend. Empty/failed → prebuilt download path inside herdr.
+      ansible.builtin.shell: |
+        set -o pipefail
+        gobin="$(mise which go 2>/dev/null)" || exit 0
+        [ -n "$gobin" ] && dirname "$gobin"
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+      register: herdr_go_bindir
       changed_when: false
       failed_when: false
 
     - name: herdr plugin install cloudmanic/herdr-plus
       ansible.builtin.command: herdr plugin install cloudmanic/herdr-plus --yes
       environment:
-        PATH: "{{ ((herdr_go_prefix.stdout | trim) ~ '/bin:') if (herdr_go_prefix.rc | default(1)) == 0 else '' }}{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+        PATH: "{{ ((herdr_go_bindir.stdout | trim) ~ ':') if (herdr_go_bindir.stdout | default('') | trim) else '' }}{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
       register: herdr_plus_install
       changed_when: "'Installed' in (herdr_plus_install.stdout | default(''))"
   rescue:

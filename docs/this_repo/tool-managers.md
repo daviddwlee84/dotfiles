@@ -31,7 +31,7 @@ If you want to know:
 | **Homebrew formulae** | General macOS GUI helpers (`tailscale`, `mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
 | **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
 | **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release) |
-| **mise** | Runtime versions: `node`, `bun`, `rust`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
+| **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
@@ -196,7 +196,7 @@ Most CLI formulae land via ansible roles, not the Brewfile. Examples:
 - `media_tools/`: `ffmpeg`, `imagemagick`, `exiftool`, `vips`
 - `iac_tools/`: `azure-cli`, `hashicorp/tap/terraform`, `opentofu`
 - `llm_tools/`: `llmfit`, `models`, `ollama`
-- `security_tools/`: `gitleaks`, `go`
+- `security_tools/`: `gitleaks`
 - `starship/`, `atuin/`, `neovim/`, `bash/` (gawk), `zsh/` — each installs its primary tool via homebrew formula on macOS
 - `pueue` (from `rust_cargo_tools/`): macOS uses homebrew formula
 
@@ -387,7 +387,7 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 | `docker` | OrbStack (macOS), Docker rootless (Linux) | macOS: brew cask `orbstack` (skips if `/Applications/Docker.app` exists) · Debian/Ubuntu: `apt` prereqs (`uidmap`, `dbus-user-session`, `fuse-overlayfs`, `slirp4netns`, `iptables`) → `curl https://get.docker.com \| sh` → `docker-ce-rootless-extras` → `dockerd-rootless-setuptool.sh install` user systemd unit |
 | `gui_apps_linux` (Linux Debian + `ubuntu_desktop` profile) | Alacritty, libfuse2, AppImageLauncher, VSCode, Cursor, Discord, Zen Browser, CopyQ, playerctl/wmctrl/xdotool | Alacritty: cargo build (apt deps `cmake`, `pkg-config`, font/X libs) · AppImageLauncher: PPA → GitHub `.deb` → Lite AppImage to `~/Applications/` · VSCode: Microsoft apt repo · Cursor: `.deb` from `cursor.com/api/download` · Discord: flatpak (Flathub user-scope, default) or `.deb` via `discordChannel` chooser · Zen Browser: AppImage to `~/Applications/zen.AppImage` |
 | `auditd` (Linux, gated `installAuditd`) | `auditd` + `audispd-plugins` (Debian) / `audit` (RedHat); rule files `00-baseline.rules`, `05-privileged.rules`, optional `10-execve.rules`, `99-finalize.rules` | apt / yum |
-| `security_tools` | `pre-commit`, `gitleaks`, `go` | macOS: brew (`gitleaks`, `go`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit |
+| `security_tools` | `pre-commit`, `gitleaks` | macOS: brew (`gitleaks`) + uv (`pre-commit`) · Linux: gitleaks from GitHub release (system → `/usr/local/bin`; user fallback → `~/.local/bin`) + uv pre-commit. **Go is no longer here** — it moved to mise (`go = "latest"`, gated `installExtraRuntimes`). |
 | `bitwarden` (gated `installBitwarden`) | `@bitwarden/cli` + Bitwarden Desktop (when `bitwarden_install_desktop=true`) | CLI: `mise exec -- npm install -g @bitwarden/cli` (preferred) / system npm fallback · Desktop: macOS brew cask · Linux: snap → `.deb` fallback |
 | `input_method` (gated `installInputMethod`) | `mcbopomofo`, `squirrel` (macOS) · `ibus-rime` (Debian) | macOS: brew cask · Linux: apt |
 | `atuin` | (see [§ 3.1 base/shared](#31-base--shared-cli)) | — |
@@ -401,13 +401,26 @@ purpose" hard invariant for the audit one-liner and the pitfall.
 
 **Modern hosts** (default):
 
-| Runtime | Version |
-|---|---|
-| `node` | `lts` |
-| `bun` | `latest` |
-| `rust` | `latest` |
-| `dotnet` | `latest` |
-| `ruby` | `3` |
+| Runtime | Version | Gated on |
+|---|---|---|
+| `node` | `lts` | always |
+| `bun` | `1` | `installExtraRuntimes` |
+| `rust` | `stable` | `installExtraRuntimes` |
+| `go` | `latest` | `installExtraRuntimes` |
+| `dotnet` | `10` | `installDotnetTools` |
+| `ruby` | `3` | `installExtraRuntimes` (+ not `noRoot`) |
+
+**Version-pinning rationale**: `node=lts` / `rust=stable` / `go=latest` use
+moving channels because each promises backward compatibility (Go's
+[go1compat](https://go.dev/doc/go1compat) makes `latest` as safe as
+rust's `stable`). `bun=1` and `dotnet=10` pin the **major** instead —
+neither guarantees no-break across majors (bun ships behavior changes on
+minors; .NET majors bump TFMs / SDK behavior), and `dotnet=10` is also the
+current LTS (8/9 are at/near EOL by mid-2026). Bump `dotnet` deliberately
+when the next LTS (12) lands. `ruby=3` tracks the 3.x line.
+
+`go` replaces the old macOS-only brew install from the `security_tools`
+role, so Linux hosts now get a managed Go too (previously a gap).
 
 Ruby is **skipped in noRoot mode** (`profile=ubuntu_server` without
 sudo) because it needs `libffi-dev` / `libyaml-dev` to build, which
@@ -984,7 +997,7 @@ list.
 | **gitleaks** | brew | GitHub release | security_tools |
 | **glab** | brew | vendor apt (.deb) → GitHub tarball | devtools |
 | **glow** | brew | GitHub release tarball | devtools |
-| **go** | brew | (Linux only when needed; brew via security_tools) | security_tools |
+| **go** | mise (`go = "latest"`) | same (mise) | mise (`installExtraRuntimes`) |
 | **google-drive** | brew cask | n/a | Brewfile.darwin |
 | **github-copilot-cli** (`@githubnext/github-copilot-cli`) | npm global | `mise exec -- npm install -g` | coding_agents |
 | **gping** | brew | GitHub release musl | networking_tools |

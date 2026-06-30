@@ -33,7 +33,7 @@
 | **Homebrew formulae** | macOS 共用 CLI (`tailscale`, `mas`) + role 驅動的（在 `base`, `devtools`, `coding_agents` 等之中） | `dot_config/homebrew/Brewfile.tmpl` + 散布在各處的 `community.general.homebrew:` task | `brew` |
 | **Homebrew casks** | macOS GUI 應用程式（~25 個；AI 類由 `installAiDesktopApps` 控管） | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
 | **Ansible roles** | 主要部分——26 個 role，涵蓋 shells、devtools、agents、語言工具鏈、網路、安全 | `dot_ansible/roles/*/tasks/main.yml` | 間接（每個 role 呼叫 brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release 之一） |
-| **mise** | Runtime 版本：`node`、`bun`、`rust`、`dotnet`、`ruby`（oldEL：只有 ruby） | `dot_config/mise/config.toml.tmpl` | `mise` |
+| **mise** | Runtime 版本：`node`、`bun`、`rust`、`go`、`dotnet`、`ruby`（oldEL：只有 ruby） | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI 工具（`python_uv_tools` ~13 個 + `llm_tools` 1 個 + `litellm`） | `dot_ansible/roles/python_uv_tools/defaults/main.yml`、`dot_ansible/roles/llm_tools/defaults/main.yml`、`coding_agents` 中的 ad-hoc `uv tool install`（specify-cli）+ `security_tools`（pre-commit） | `uv` (`uv tool upgrade --all`) |
 | **npm** (全域) | JS CLI（~5 個：copilot-cli、codex、gemini-cli、openchamber、bitwarden、readability-cli）+ `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`、散布的 `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates：`recon`、`pueue`（Linux）、`tree-sitter-cli`（fallback）、`alacritty`（Linux 編譯）、`modelsdev`（Linux fallback） | `rust_cargo_tools/defaults/main.yml`（目前為 `[]`）+ 在 task 中硬寫 | `cargo` (`cargo install-update -a`) |
@@ -190,7 +190,7 @@ Linux Brewfile 是空的,Linuxbrew 的使用是 role-by-role。
 - `media_tools/`:`ffmpeg`、`imagemagick`、`exiftool`、`vips`
 - `iac_tools/`:`azure-cli`、`hashicorp/tap/terraform`、`opentofu`
 - `llm_tools/`:`llmfit`、`models`、`ollama`
-- `security_tools/`:`gitleaks`、`go`
+- `security_tools/`:`gitleaks`
 - `starship/`、`atuin/`、`neovim/`、`bash/`(gawk)、`zsh/` — 每個都在 macOS 上透過 homebrew formula 安裝主要工具
 - `pueue`(來自 `rust_cargo_tools/`):macOS 走 homebrew formula
 
@@ -380,7 +380,7 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 | `docker` | OrbStack(macOS)、Docker rootless(Linux) | macOS:brew cask `orbstack`(`/Applications/Docker.app` 存在則跳過) · Debian/Ubuntu:`apt` 前置條件(`uidmap`、`dbus-user-session`、`fuse-overlayfs`、`slirp4netns`、`iptables`)→ `curl https://get.docker.com \| sh` → `docker-ce-rootless-extras` → `dockerd-rootless-setuptool.sh install` 使用者 systemd unit |
 | `gui_apps_linux`(Linux Debian + `ubuntu_desktop` profile) | Alacritty、libfuse2、AppImageLauncher、VSCode、Cursor、Discord、Zen Browser、CopyQ、playerctl/wmctrl/xdotool | Alacritty:cargo 編譯(apt 依賴 `cmake`、`pkg-config`、字型/X 函式庫) · AppImageLauncher:PPA → GitHub `.deb` → Lite AppImage 到 `~/Applications/` · VSCode:Microsoft apt repo · Cursor:`.deb` 來自 `cursor.com/api/download` · Discord:flatpak(Flathub user-scope,預設)或 `.deb`,由 `discordChannel` 選擇 · Zen Browser:AppImage 到 `~/Applications/zen.AppImage` |
 | `auditd`(Linux,`installAuditd` 控管) | `auditd` + `audispd-plugins`(Debian)/ `audit`(RedHat);rule 檔 `00-baseline.rules`、`05-privileged.rules`、選用 `10-execve.rules`、`99-finalize.rules` | apt / yum |
-| `security_tools` | `pre-commit`、`gitleaks`、`go` | macOS:brew(`gitleaks`、`go`)+ uv(`pre-commit`) · Linux:gitleaks 來自 GitHub release(系統 → `/usr/local/bin`;使用者 fallback → `~/.local/bin`)+ uv pre-commit |
+| `security_tools` | `pre-commit`、`gitleaks` | macOS:brew(`gitleaks`)+ uv(`pre-commit`) · Linux:gitleaks 來自 GitHub release(系統 → `/usr/local/bin`;使用者 fallback → `~/.local/bin`)+ uv pre-commit。**Go 已不在此** — 移到 mise(`go = "latest"`,gate 於 `installExtraRuntimes`)。 |
 | `bitwarden`(`installBitwarden` 控管) | `@bitwarden/cli` + Bitwarden Desktop(`bitwarden_install_desktop=true` 時) | CLI:`mise exec -- npm install -g @bitwarden/cli`(優先)/ 系統 npm fallback · Desktop:macOS brew cask · Linux:snap → `.deb` fallback |
 | `input_method`(`installInputMethod` 控管) | `mcbopomofo`、`squirrel`(macOS)· `ibus-rime`(Debian) | macOS:brew cask · Linux:apt |
 | `atuin` | (見 [§ 3.1 基礎/共用](#31-基礎--共用-cli)) | — |
@@ -394,13 +394,26 @@ purpose" hard invariant 的稽核 one-liner 與相關 pitfall。
 
 **現代主機**(預設):
 
-| Runtime | 版本 |
-|---|---|
-| `node` | `lts` |
-| `bun` | `latest` |
-| `rust` | `latest` |
-| `dotnet` | `latest` |
-| `ruby` | `3` |
+| Runtime | 版本 | gate 條件 |
+|---|---|---|
+| `node` | `lts` | 一律安裝 |
+| `bun` | `1` | `installExtraRuntimes` |
+| `rust` | `stable` | `installExtraRuntimes` |
+| `go` | `latest` | `installExtraRuntimes` |
+| `dotnet` | `10` | `installDotnetTools` |
+| `ruby` | `3` | `installExtraRuntimes`(且非 `noRoot`) |
+
+**版本釘選理由**:`node=lts` / `rust=stable` / `go=latest` 使用浮動
+channel,因為它們各自承諾向後相容(Go 的
+[go1compat](https://go.dev/doc/go1compat) 讓 `latest` 如同 rust 的
+`stable` 一樣安全)。`bun=1` 與 `dotnet=10` 改為釘住**主版號** —
+兩者都不保證跨主版號不破壞(bun 在 minor 就會有行為變更;.NET 主版號
+會 bump TFM / SDK 行為),且 `dotnet=10` 也是目前的 LTS(8/9 在 2026
+年中已到/接近 EOL)。下一個 LTS(12)推出時再刻意 bump `dotnet`。
+`ruby=3` 追蹤 3.x 線。
+
+`go` 取代了原本 `security_tools` role 中僅限 macOS 的 brew 安裝,因此
+Linux 主機現在也有受管的 Go(先前是缺口)。
 
 Ruby 在 noRoot 模式下**會跳過**(`profile=ubuntu_server` 無 sudo),
 因為它需要 `libffi-dev` / `libyaml-dev` 才能編譯,而那需要 apt。
@@ -956,7 +969,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **gitleaks** | brew | GitHub release | security_tools |
 | **glab** | brew | 廠商 apt(.deb)→ GitHub tarball | devtools |
 | **glow** | brew | GitHub release tarball | devtools |
-| **go** | brew | (Linux 僅在需要時;brew 透過 security_tools) | security_tools |
+| **go** | mise(`go = "latest"`) | 同左(mise) | mise(`installExtraRuntimes`) |
 | **google-drive** | brew cask | n/a | Brewfile.darwin |
 | **github-copilot-cli**(`@githubnext/github-copilot-cli`) | npm 全域 | `mise exec -- npm install -g` | coding_agents |
 | **gping** | brew | GitHub release musl | networking_tools |

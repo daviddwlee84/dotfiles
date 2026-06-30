@@ -30,12 +30,14 @@
   register: precommit_install
   changed_when: "'already installed' not in (precommit_install.stdout | default('') ~ precommit_install.stderr | default(''))"
 
-- name: Install gitleaks + go (macOS)
+- name: Install gitleaks (macOS)
+  # Go is managed by mise (dot_config/mise/config.toml.tmpl, gated on
+  # installExtraRuntimes), not brew — keeps the language runtime cross-platform
+  # and out of the security_tools role. Only gitleaks belongs here.
   when: ansible_facts["os_family"] == "Darwin"
   community.general.homebrew:
     name:
       - gitleaks
-      - go
     state: present
 
 - name: Check if gitleaks is installed

@@ -55,17 +55,28 @@ ruby = "3"
 # (nvim LSP/treesitter + npm-based coding agents hard-depend on it).
 node = "lts"
 {{ if $extraRuntimes -}}
-# Bun for bunx CLI tools
-bun = "latest"
+# Bun for bunx CLI tools. Pin the major: bun is pre-1.x-mindset and ships
+# behavior changes on minors, so "latest" can break tooling — "1" tracks the
+# 1.x line and picks up patches without surprise majors.
+bun = "1"
 # Rust toolchain for cargo tools. Use the channel name so rustup-backed builds
 # see RUSTUP_TOOLCHAIN=stable instead of a concrete version.
 rust = "stable"
+# Go toolchain (replaces the macOS-only brew install in the security_tools
+# role; gives Linux hosts a managed Go too). "latest" is safe here the way
+# rust="stable" is: Go's compatibility promise (https://go.dev/doc/go1compat)
+# means new releases don't break existing code — unlike bun/dotnet, which
+# get pinned majors below.
+go = "latest"
 {{ else -}}
-# bun/rust skipped: installExtraRuntimes=false (lean VM / CI)
+# bun/rust/go skipped: installExtraRuntimes=false (lean VM / CI)
 {{ end -}}
 {{ if $dotnet -}}
-# .NET SDK (installDotnetTools=true)
-dotnet = "latest"
+# .NET SDK (installDotnetTools=true). Pin the major to the current LTS (10):
+# .NET majors are not drop-in (TFM bumps, SDK behavior changes) and 8/9 are at
+# or near EOL by mid-2026, so "latest" risks both breakage and an unsupported
+# train. Bump this deliberately when the next LTS (12) ships.
+dotnet = "10"
 {{ else -}}
 # .NET SDK skipped: installDotnetTools=false
 {{ end -}}
