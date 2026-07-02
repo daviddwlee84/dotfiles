@@ -191,15 +191,29 @@ copy_backend() {
 copy_file_macos() {
     command -v osascript >/dev/null 2>&1 || return 1
 
-    if osascript - "$@" <<'APPLESCRIPT'
-on run argv
-    set fileList to {}
-    repeat with p in argv
-        set end of fileList to (POSIX file p)
-    end repeat
-    set the clipboard to fileList
-end run
-APPLESCRIPT
+    # JXA + NSPasteboard.writeObjects, not AppleScript's `set the clipboard to
+    # {POSIX file p}`: the latter only writes a legacy Apple Event 'furl'
+    # descriptor. macOS advertises public.file-url/NSFilenamesPboardType as
+    # available on it, but only old Carbon-coercion-aware readers (Finder,
+    # AppleScript itself) can actually resolve that promise. Modern readers
+    # (Raycast clipboard history, Chromium/Electron incl. Discord) call
+    # NSPasteboardItem.string(forType:) directly and get nil. writeObjects
+    # writes a real per-file public.file-url string up front, matching what
+    # Finder's own Cmd+C produces.
+    if osascript -l JavaScript - "$@" <<'JXA'
+ObjC.import("AppKit");
+function run(argv) {
+    var pb = $.NSPasteboard.generalPasteboard;
+    pb.clearContents;
+    var urls = $.NSMutableArray.alloc.init;
+    for (var i = 0; i < argv.length; i++) {
+        urls.addObject($.NSURL.fileURLWithPath(argv[i]));
+    }
+    if (!pb.writeObjects(urls)) {
+        throw new Error("writeObjects failed");
+    }
+}
+JXA
     then
         return 0
     fi
