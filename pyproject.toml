@@ -8,6 +8,10 @@ requires-python = ">=3.11"
 docs = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
+    # [imaging] pulls cairosvg + pillow for the `social` plugin (OG/Twitter
+    # cards). Needs system cairo/pango/libffi too — installed via brew locally
+    # and apt in .github/workflows/docs.yml (see the social-cards step there).
+    "mkdocs-material[imaging]>=9.5",
     "mkdocs-llmstxt>=0.2",
     "mkdocs-copy-to-llm>=0.1",
     "mkdocs-static-i18n>=1.2",

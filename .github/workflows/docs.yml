@@ -29,6 +29,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # System libs for the mkdocs `social` plugin (OG/Twitter cards): cairo +
+      # pango render the SVG card layout, the rest back cairosvg/pillow. Without
+      # these the plugin aborts the build with a libcairo load error.
+      - name: Install Cairo/Pango for social cards
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libcairo2-dev libpango1.0-dev libfreetype6-dev \
+            libffi-dev libjpeg-dev libpng-dev
+      # Cache rendered cards + the downloaded Noto Sans TC font so only changed
+      # pages re-render (cold build renders ~290 cards, ~2.5 min; warm is
+      # seconds). Key on the plugin config + page-title source.
+      - name: Cache social cards
+        uses: actions/cache@v4
+        with:
+          path: .cache/plugin/social
+          key: social-${{ hashFiles('mkdocs.yml') }}-${{ hashFiles('docs/**/*.md') }}
+          restore-keys: |
+            social-${{ hashFiles('mkdocs.yml') }}-
+            social-
       - run: uv sync --extra docs
       - run: uv run mkdocs build
       - uses: actions/upload-pages-artifact@v3

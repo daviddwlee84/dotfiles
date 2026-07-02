@@ -44,6 +44,17 @@ theme:
     - toc.follow
   language: en
 plugins:
+  # Social cards: generates a per-page OG/Twitter preview image and injects
+  # og:* / twitter:* meta so links unfurl as rich cards (Discord/Slack/X).
+  # Requires the [imaging] extra (cairosvg/pillow) + system cairo/pango —
+  # see pyproject.toml `docs` extra and the CI social-cards apt step.
+  - social:
+      cards_layout_options:
+        background_color: "#3f51b5" # Material indigo 500, matches theme.palette
+        # Noto Sans TC covers Latin + Traditional-Chinese (79 zh-TW page
+        # titles) + → / fullwidth punctuation. Roboto/Noto Sans (Latin-only)
+        # render CJK and → as tofu boxes. Do NOT switch to a Latin-only family.
+        font_family: Noto Sans TC
   - i18n:
       docs_structure: suffix
       fallback_to_default: true
