@@ -33,6 +33,7 @@ declare -a rows=(
   "Send pane to window... (h-split)" S "choose-tree -Zw -F '#{window_name}' \"join-pane -h -s '#{pane_id}' -t '%%' ; display-message 'Sent pane to target'\""
   "Break to new window" B "break-pane ; display-message 'Broke pane out to window #{window_index} (#{window_name})'"
   "" "" ""
+  "Copy pane path" y "set-buffer -w '#{session_name}:#{window_index}.#{pane_index}' ; display-message 'Copied pane path: #{session_name}:#{window_index}.#{pane_index}'"
   "Enter copy mode" "[" "copy-mode"
   "Respawn"     R "respawn-pane -k"
   "Kill pane"   X "confirm-before -p 'Kill pane? (y/n)' kill-pane"

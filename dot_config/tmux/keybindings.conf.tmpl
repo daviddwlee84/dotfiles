@@ -47,6 +47,7 @@ bind-key -n MouseDown3Pane \
         "Break to new window" \
           B { break-pane ; display-message "Broke pane out to window #{window_index} (#{window_name})" } \
         "" \
+        "Copy pane path" y { set-buffer -w "#{session_name}:#{window_index}.#{pane_index}" ; display-message "Copied pane path: #{session_name}:#{window_index}.#{pane_index}" } \
         "Enter copy mode" "[" { copy-mode } \
         "Respawn"     R { respawn-pane -k } \
         "Kill pane"   X { confirm-before -p "Kill pane? (y/n)" kill-pane } } }
@@ -184,6 +185,13 @@ bind C-y run-shell "\
   tmux capture-pane -pS - | fzf-tmux -p 80%,70% --multi --tac --no-sort \
     --header 'Select lines to copy (Tab=multi, Enter=copy)' \
     | tmux load-buffer -w - && tmux display-message 'Selected lines copied'"
+
+# prefix + C-p: copy the current pane's path (session:window.pane) to clipboard.
+# (Capital P is taken by tmux-floax's scratchpad; lowercase p is previous-window.)
+# Handy for reconnecting later or telling an AI agent which pane to operate on
+# (`tmux capture-pane -pt <target>` / `tmux send-keys -t <target> ...`). Same
+# keyboard equivalent lives in the MouseDown3Pane right-click menu and menu-pane.sh.
+bind C-p run-shell "tmux set-buffer -w \"#{session_name}:#{window_index}.#{pane_index}\" ; tmux display-message \"Copied pane path: #{session_name}:#{window_index}.#{pane_index}\""
 
 # prefix + M-y: copy the LAST command's OUTPUT to clipboard (Warp-style).
 # Requires OSC 133 markers — if the shell doesn't emit them (non-zsh shell,
