@@ -22,9 +22,14 @@ Already deployed via chezmoi:
 - `~/.dotfiles/bin/pqsum` — the uv-script binary (this work).
 - `~/.dotfiles/bin/fleet` — adds the `pueue` subcommand (this work).
 
-The pueue daemon is **not** autostarted on macOS yet (run `pueued` once by
-hand, or under tmux/launchd). On Linux it's managed by a user-level systemd
-unit.
+On macOS the daemon is managed by a Homebrew launchd service — start it with
+`brew services start pueue` (or run `pueued -d` by hand). Note the formula ships
+`keep_alive false` + `RunAtLoad`-only, so if `brew services start` coincides with
+an upgrade/relink the daemon may load but never execute (client then reports
+`Couldn't find a configuration file` or a missing `pueue_<you>.socket`). Recover
+with `launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.pueue` — see
+[`pitfalls/pueue-macos-launchd-not-autostarted-no-socket.md`](../../pitfalls/pueue-macos-launchd-not-autostarted-no-socket.md).
+On Linux it's managed by a user-level systemd unit.
 
 ## `pqsum` — local summary
 
