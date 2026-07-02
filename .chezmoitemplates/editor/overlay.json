@@ -4,5 +4,6 @@
   "editor.lineNumbers": "relative",
   "editor.formatOnSave": true,
   "editor.acceptSuggestionOnEnter": "smart",
-  "terminal.integrated.fontFamily": "Hack Nerd Font Mono"
+  "terminal.integrated.fontFamily": "Hack Nerd Font Mono",
+  "terminal.integrated.mouseWheelScrollSensitivity": 3
 }
