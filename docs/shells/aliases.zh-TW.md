@@ -635,12 +635,15 @@
 
 ## Copilot → Claude Code 代理 (proxy)
 
-> 用 **GitHub Copilot** 訂閱裡的 Claude 模型來驅動 Claude Code，透過本機 [copilot-api](https://github.com/ericc-ch/copilot-api) 代理 (proxy)（經 `bunx` 執行，版本已釘選 (pinned)）。完整指南與 **服務條款 (ToS) / 速率限制 (rate-limit) 風險**：[docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。首次需執行 `copilot-proxy auth`（裝置登入 device login）。切換模型會修改 `./.claude/settings.json` 且需重啟 Claude Code —— Claude Code 內建的 `/model` 選單會送出 Copilot 後端不接受的 Anthropic id。
+> 用 **GitHub Copilot** 訂閱裡的 Claude 模型來驅動 Claude Code，透過本機 [copilot-api](https://github.com/ericc-ch/copilot-api) 代理 (proxy)（經 `bunx` 執行，版本已釘選 (pinned)）。完整指南、**服務條款 (ToS) / 速率限制 (rate-limit) 風險** 與設定分層設計：[docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。首次需執行 `copilot-proxy auth`（裝置登入 device login）。兩層啟用方式，都可隨時撤回，且都不碰會 commit 的 `./.claude/settings.json`（由 `claude-plans-here` 擁有）與 chezmoi 管理的 `~/.claude/settings.json`：`claude-copilot`（單一 session 環境變數、零檔案寫入）與 `copilot-here`（專案級、gitignored `settings.local.json`）。Claude Code 內建的 `/model` 選單會送出 Copilot 後端不接受的 Anthropic id —— 改用 `copilot-model` 釘選。
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `copilot-proxy [start\|stop\|restart\|status\|logs [N]\|whoami\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理 copilot-api 代理 (proxy)。`start` 在 `$COPILOT_PROXY_PORT`（預設 4141）背景啟動，帶 `--rate-limit $COPILOT_PROXY_RATE`（預設 15 秒）並等到能回應為止；`status` 顯示它提供的 Claude id；`whoami` 拿儲存的 token 對 GitHub 驗證並印出帳號/plan/quota（真正的登入檢查）；`auth` 執行一次性的裝置登入 (device login)（儲存 `ghu_` token）。環境變數：`COPILOT_PROXY_PORT`、`COPILOT_PROXY_RATE`、`COPILOT_API_PKG`（bunx 套件規格，預設 `copilot-api@0.7.0`） |
-| `copilot-model [<id>\|-l\|-c]` | function | `dot_config/shell/43_copilot_proxy.sh` | 切換 `./.claude/settings.json` 釘選的 Copilot 模型（`ANTHROPIC_MODEL` + `ANTHROPIC_DEFAULT_OPUS_MODEL`）。支援模糊 id（`opus-4.8` → `claude-opus-4.8`），會對照即時的代理 `/v1/models` 驗證（代理未啟動時用靜態 Claude fallback 清單）；拒絕打錯字/不明確的輸入。無參數 → `fzf` 選單。`-l` 列出、`-c` 目前值。需要 `jq`。會印出重啟提醒（變更在啟動時才生效） |
+| `claude-copilot [--no-specstory] [args...]` | function | `dot_config/shell/43_copilot_proxy.sh` | 一次性走代理的 Claude Code session，**零檔案寫入**：自動啟動代理，以 per-process 方式注入 `ANTHROPIC_*` 環境變數（shell 環境變數蓋過所有 settings 檔的 `env` 區塊）。有 specstory 時自動包成 `specstory run claude`（`--no-specstory` 退出）；額外參數透過 specstory 的 `-c` 傳給 claude。還原 = 下次直接跑 `claude` 即可 |
+| `copilot-run <cmd...>` | function | `dot_config/shell/43_copilot_proxy.sh` | 泛用積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令（例如 `copilot-run specstory run claude`、`copilot-run claude --resume`） |
+| `copilot-here [on\|off\|status]` | function | `dot_config/shell/43_copilot_proxy.sh` | 專案級持續開關，透過 **gitignored** 的 `./.claude/settings.local.json`（覆蓋會 commit 的專案設定，所以 `plansDirectory` 完全不受影響）。`on` 用 jq 合併代理 env 區塊並確保 git 忽略該檔（`.git/info/exclude`）；`off` 只移除那些 key（保留其他內容，檔案清空才刪除）；`status` 顯示釘選狀態 + 模型，代理沒跑時警告。需要 `jq` |
+| `copilot-model [<id>\|-l\|-c]` | function | `dot_config/shell/43_copilot_proxy.sh` | 切換釘選的 Copilot 模型（`ANTHROPIC_MODEL` + `ANTHROPIC_DEFAULT_OPUS_MODEL`）。`copilot-here` 開啟時寫 `./.claude/settings.local.json`，否則寫全域狀態檔 `~/.local/state/copilot-proxy/model`（由 `claude-copilot`/`copilot-run` 讀取；`$COPILOT_CLAUDE_MODEL` 可覆寫）。永遠不碰會 commit 的 `./.claude/settings.json`。支援模糊 id（`opus-4.8` → `claude-opus-4.8`），會對照即時的代理 `/v1/models` 驗證（代理未啟動時用靜態 Claude fallback 清單）；拒絕打錯字/不明確的輸入。無參數 → `fzf` 選單。`-l` 列出、`-c` 目前值 + 來源層。需要 `jq`。會印出重啟提醒（變更在啟動時才生效） |
 
 ---
 
