@@ -122,7 +122,7 @@ Ansible roles 小節再依主題切分,因為 26 個 role 擠在同一個表格�
 
 | 工具 | 機制 | OS 差異 |
 |---|---|---|
-| **Homebrew** | `Homebrew/install` curl 腳本 | macOS 永遠安裝;Linux 只在 `installBrewApps=true` 且非 noRoot 且 arch∈{amd64,arm64} 時安裝。`useChineseMirror=true` 時透過 `HOMEBREW_*_GIT_REMOTE` 走 Aliyun / USTC / BFSU / TUNA 鏡像 |
+| **Homebrew** | `Homebrew/install` curl 腳本 | macOS 永遠安裝;Linux 只在 `installBrewApps=true` 且非 noRoot 且 arch∈{amd64,arm64} 時安裝。`useChineseMirror=true` 時透過 `HOMEBREW_BREW_GIT_REMOTE` + bottle/API domain 走鏡像（**BFSU** 基準;`brew-mirror` 可切到 USTC/Aliyun/TUNA）。Aliyun 的 `brew.git` 壞掉（會卡住），`HOMEBREW_CORE_GIT_REMOTE` 保持 unset（API 模式）—— 見 [mirrors.md](../tools/mirrors.md) |
 | **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | 全 OS,缺失時 |
 | **mise** | `curl https://mise.run \| sh`,加上直接從 `mise.jdx.dev/mise-latest-linux-${arch}[-musl]` 下載的 fallback(glibc < 2.28 時強制 musl) | 全 OS;arch 自動偵測 (x64/arm64/armv7) |
 | **ansible-core** | `uv tool install --force --python 3.13 ansible-core` | 全 OS;若現有 ansible 跑在 Python < 3.10 上會強制刷新 |

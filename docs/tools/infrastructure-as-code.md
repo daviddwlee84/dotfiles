@@ -176,23 +176,23 @@ The `iac_tools` role already retries each brew install 3 times with a 20s delay 
    brew install azure-cli terraform opentofu
    ```
 
-2. **Enable the built-in TUNA mirror** (recommended for GFW). If you answered `y` to `useChineseMirror` at `chezmoi init`, the four `HOMEBREW_*` env vars below are already exported in three places — see the full coverage map in [docs/tools/mirrors.md](./mirrors.md):
+2. **Enable the built-in mirror** (recommended for GFW). If you answered `y` to `useChineseMirror` at `chezmoi init`, the `HOMEBREW_*` env vars below are already exported in three places — see the full coverage map in [docs/tools/mirrors.md](./mirrors.md):
 
-   - `~/.config/zsh/00_exports.zsh` — for interactive shells
+   - `dot_config/shell/00_exports.sh` — for interactive shells
    - `run_once_before_00_bootstrap.sh` — for the first-run Homebrew installer
    - `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh` — so ansible's `community.general.homebrew` subprocess inherits them
 
    If you didn't enable it at init, re-run `chezmoi init` (or edit `~/.config/chezmoi/chezmoi.toml` and set `useChineseMirror = true`) then `chezmoi apply`. To set it manually for a one-off session:
 
    ```bash
-   # Tsinghua mirror (中国大陆) — see https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
-   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
-   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+   # BFSU mirror (中国大陆, fastest per 2026-07 benchmark) — see https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
+   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+   # NOTE: do NOT set HOMEBREW_CORE_GIT_REMOTE — brew 4.x uses the JSON API; setting it forces a ~1 GB homebrew-core clone.
    ```
 
-   See [Homebrew docs on environment variables](https://docs.brew.sh/Manpage#environment) for alternatives (USTC, SJTU, etc.).
+   Or use the `brew-mirror {bfsu|ustc|aliyun|tuna}` helper to switch live. Aliyun's `brew.git` is broken (hangs) — bottles only. See [Homebrew docs on environment variables](https://docs.brew.sh/Manpage#environment) for other mirrors.
 
 3. **Fall back to Terraform/OpenTofu from GitHub releases** — they're single static binaries, no Homebrew needed:
 

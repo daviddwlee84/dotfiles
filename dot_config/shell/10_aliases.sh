@@ -271,50 +271,57 @@ ghostty-ssh-terminfo() {
 }
 
 # --- Homebrew mirror switch (GFW workaround) -------------------------------
-# Default baseline (Aliyun) is set in 00_exports.sh.tmpl; use this only when
-# a mirror misbehaves.
+# Default baseline (BFSU) is set in 00_exports.sh.tmpl; use this only when a
+# mirror misbehaves. Benchmarks (2026-07, CN network): BFSU fastest overall
+# (git 1.1s, bottles 31 MB/s) > USTC (git 1.0s, 11 MB/s) > Aliyun (git BROKEN —
+# upload-pack hangs — bottles fine) > TUNA (git timeout, both slow).
+#
+# NB: this intentionally does NOT touch HOMEBREW_CORE_GIT_REMOTE — it *unsets*
+# it. In Homebrew 4.x the JSON API (HOMEBREW_API_DOMAIN) is the source of truth;
+# setting HOMEBREW_CORE_GIT_REMOTE forces a full ~1 GB homebrew-core git clone
+# on the next `brew update` for zero benefit. See
+# pitfalls/homebrew-aliyun-brew-git-hang-core-clone-bloat.md.
 # Usage: brew-mirror                    # show current endpoints
-#        brew-mirror {aliyun|ustc|bfsu|tuna}
+#        brew-mirror {bfsu|ustc|aliyun|tuna}
 brew-mirror() {
 	mirror="${1:-}"
 	case "$mirror" in
-	aliyun)
-		api="https://mirrors.aliyun.com/homebrew-bottles/api"
-		bottles="https://mirrors.aliyun.com/homebrew-bottles"
-		brew_git="https://mirrors.aliyun.com/homebrew/brew.git"
-		core_git="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
+	bfsu)
+		api="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+		bottles="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+		brew_git="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
 		;;
 	ustc)
 		api="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 		bottles="https://mirrors.ustc.edu.cn/homebrew-bottles"
 		brew_git="https://mirrors.ustc.edu.cn/brew.git"
-		core_git="https://mirrors.ustc.edu.cn/homebrew-core.git"
 		;;
-	bfsu)
-		api="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
-		bottles="https://mirrors.bfsu.edu.cn/homebrew-bottles"
-		brew_git="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
-		core_git="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
+	aliyun)
+		# Bottles/API only — Aliyun's brew.git upload-pack hangs, so keep the
+		# git remote on the current value rather than switching it to Aliyun.
+		api="https://mirrors.aliyun.com/homebrew-bottles/api"
+		bottles="https://mirrors.aliyun.com/homebrew-bottles"
+		brew_git="${HOMEBREW_BREW_GIT_REMOTE:-https://mirrors.bfsu.edu.cn/git/homebrew/brew.git}"
+		echo "brew-mirror: note — Aliyun brew.git is broken; keeping git remote at $brew_git" >&2
 		;;
 	tuna)
 		api="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
 		bottles="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
 		brew_git="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-		core_git="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
 		;;
 	"")
 		echo "Current Homebrew mirror env vars:"
 		echo "  HOMEBREW_API_DOMAIN      = ${HOMEBREW_API_DOMAIN:-<unset>}"
 		echo "  HOMEBREW_BOTTLE_DOMAIN   = ${HOMEBREW_BOTTLE_DOMAIN:-<unset>}"
 		echo "  HOMEBREW_BREW_GIT_REMOTE = ${HOMEBREW_BREW_GIT_REMOTE:-<unset>}"
-		echo "  HOMEBREW_CORE_GIT_REMOTE = ${HOMEBREW_CORE_GIT_REMOTE:-<unset>}"
+		echo "  HOMEBREW_CORE_GIT_REMOTE = ${HOMEBREW_CORE_GIT_REMOTE:-<unset>} (should be unset — API mode)"
 		echo
-		echo "Usage: brew-mirror {aliyun|ustc|bfsu|tuna}"
+		echo "Usage: brew-mirror {bfsu|ustc|aliyun|tuna}"
 		return 0
 		;;
 	*)
 		echo "brew-mirror: unknown mirror '$mirror'" >&2
-		echo "Usage: brew-mirror {aliyun|ustc|bfsu|tuna}" >&2
+		echo "Usage: brew-mirror {bfsu|ustc|aliyun|tuna}" >&2
 		return 1
 		;;
 	esac
@@ -322,23 +329,31 @@ brew-mirror() {
 	export HOMEBREW_API_DOMAIN="$api"
 	export HOMEBREW_BOTTLE_DOMAIN="$bottles"
 	export HOMEBREW_BREW_GIT_REMOTE="$brew_git"
-	export HOMEBREW_CORE_GIT_REMOTE="$core_git"
+	# Never set HOMEBREW_CORE_GIT_REMOTE — it forces a ~1 GB homebrew-core clone
+	# in API mode. Clear any inherited value so `brew update` stays lean.
+	unset HOMEBREW_CORE_GIT_REMOTE
 
-	# Rewrite origin of existing clones. `brew --repo homebrew/core` only exists
-	# if the user has tapped homebrew/core (optional in Homebrew 4.x — API/JSON
-	# is default), so guard on .git presence.
+	# Rewrite origin of the brew.git clone (always a real clone). Do NOT rewrite
+	# homebrew/core: in API mode it's an ~8 KB stub; if a previous misconfig left
+	# a full git clone, untap it to restore lean API mode instead of re-pointing.
 	if command -v brew >/dev/null 2>&1; then
 		brew_repo="$(brew --repo 2>/dev/null)"
 		[ -n "$brew_repo" ] && [ -d "$brew_repo/.git" ] &&
 			git -C "$brew_repo" remote set-url origin "$brew_git" 2>/dev/null
 		core_repo="$(brew --repo homebrew/core 2>/dev/null)"
-		[ -n "$core_repo" ] && [ -d "$core_repo/.git" ] &&
-			git -C "$core_repo" remote set-url origin "$core_git" 2>/dev/null
+		if [ -n "$core_repo" ] && [ -d "$core_repo/.git" ]; then
+			# >100 MB ⇒ it's a full clone, not the API stub → untap to slim down.
+			core_kb="$(du -sk "$core_repo/.git" 2>/dev/null | cut -f1)"
+			if [ -n "$core_kb" ] && [ "$core_kb" -gt 102400 ]; then
+				echo "brew-mirror: found ~$((core_kb / 1024)) MB homebrew/core git clone; untapping to restore API mode" >&2
+				HOMEBREW_NO_AUTO_UPDATE=1 brew untap homebrew/core >/dev/null 2>&1
+			fi
+		fi
 	fi
 
 	echo "brew-mirror: switched to $mirror"
 	echo "  Run 'brew update' to re-sync indexes."
-	unset mirror api bottles brew_git core_git brew_repo core_repo
+	unset mirror api bottles brew_git brew_repo core_repo core_kb
 }
 
 # --- claude-plans-here -----------------------------------------------------

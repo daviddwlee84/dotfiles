@@ -639,7 +639,7 @@
 |---------|------|-------------|-------------|
 | `load-nvm` | alias | `dot_config/shell/10_aliases.sh` | 將 NVM 延遲載入 (lazy-load) 到當前 session（啟動時通常會略過） |
 | `bw-update-completion` | alias | `dot_config/shell/10_aliases.sh` | 重新產生快取的 Bitwarden zsh 補全檔案 |
-| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {aliyun\|ustc\|bfsu\|tuna}`。更新環境變數 + 改寫既有的 clone origin；無參數時印出當前 endpoints。預設基準為 Aliyun（在 `dot_config/shell/00_exports.sh.tmpl` 中設定） |
+| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {bfsu\|ustc\|aliyun\|tuna}`。設定 bottle/API + brew.git 環境變數，並 unset `HOMEBREW_CORE_GIT_REMOTE`（同時自動 untap 殘留的 >100 MB homebrew/core clone）；無參數時印出當前 endpoints。預設基準為 **BFSU**（在 `dot_config/shell/00_exports.sh.tmpl` 中設定;2026-07 benchmark 最快）。Aliyun 的 brew.git 壞掉，所以它的 preset 會保留既有的 git remote |
 
 ---
 

@@ -181,23 +181,23 @@ Homebrew 會從 `ghcr.io` 下載 bottle，在某些網路環境（ISP 限速、G
    brew install azure-cli terraform opentofu
    ```
 
-2. **啟用內建 TUNA 鏡像**（針對 GFW 建議使用）。若你在 `chezmoi init` 時對 `useChineseMirror` 回答 `y`，下方四個 `HOMEBREW_*` 環境變數已經在三個地方匯出 —— 完整覆蓋對應表請看 [docs/tools/mirrors.md](./mirrors.md)：
+2. **啟用內建鏡像**（針對 GFW 建議使用）。若你在 `chezmoi init` 時對 `useChineseMirror` 回答 `y`，下方 `HOMEBREW_*` 環境變數已經在三個地方匯出 —— 完整覆蓋對應表請看 [docs/tools/mirrors.md](./mirrors.md)：
 
-   - `~/.config/zsh/00_exports.zsh` —— 給互動式 shell 使用
+   - `dot_config/shell/00_exports.sh` —— 給互動式 shell 使用
    - `run_once_before_00_bootstrap.sh` —— 給首次執行的 Homebrew 安裝程式使用
    - `.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh` —— 讓 ansible 的 `community.general.homebrew` 子行程也能繼承
 
    如果你在 init 時沒有啟用，重跑 `chezmoi init`（或編輯 `~/.config/chezmoi/chezmoi.toml` 設定 `useChineseMirror = true`），然後 `chezmoi apply`。要為單次工作階段手動設定：
 
    ```bash
-   # 清華鏡像（中国大陆） —— 參見 https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
-   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
-   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+   # BFSU 鏡像（中国大陆, 2026-07 benchmark 最快） —— 參見 https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
+   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+   # 注意：不要設定 HOMEBREW_CORE_GIT_REMOTE —— brew 4.x 用 JSON API；設了它會強迫下載 ~1 GB 的 homebrew-core clone。
    ```
 
-   其他選擇（USTC、SJTU 等）請見 [Homebrew 環境變數文件](https://docs.brew.sh/Manpage#environment)。
+   或用 `brew-mirror {bfsu|ustc|aliyun|tuna}` 即時切換。Aliyun 的 `brew.git` 壞掉（會卡住）—— 只能用它的 bottles。其他鏡像請見 [Homebrew 環境變數文件](https://docs.brew.sh/Manpage#environment)。
 
 3. **退而求其次：從 GitHub releases 取得 Terraform/OpenTofu** —— 它們是單一靜態執行檔，不需要 Homebrew：
 

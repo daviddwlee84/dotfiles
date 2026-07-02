@@ -34,7 +34,7 @@ chezmoi apply
 | **crates.io** (Cargo) | `~/.cargo/config.toml` | TUNA sparse index | [crates.io-index](https://mirrors.tuna.tsinghua.edu.cn/help/crates.io-index/) |
 | **RubyGems** | `~/.gemrc` | `mirrors.tuna.tsinghua.edu.cn/rubygems/` | [rubygems](https://mirrors.tuna.tsinghua.edu.cn/help/rubygems/) |
 | **Anaconda / Mamba** | `~/.condarc` | `mirrors.tuna.tsinghua.edu.cn/anaconda/{pkgs,cloud}` | [anaconda](https://mirrors.tuna.tsinghua.edu.cn/help/anaconda/) |
-| **Homebrew** (bottles + brew.git + core.git) | `$HOMEBREW_*` env vars (`~/.config/zsh/00_exports.zsh` + 2 bootstrap scripts) | `mirrors.tuna.tsinghua.edu.cn/homebrew-*` | [homebrew](https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/) |
+| **Homebrew** (bottles/API + brew.git; **no** core.git — see note) | `$HOMEBREW_*` env vars (`dot_config/shell/00_exports.sh.tmpl` + 2 bootstrap scripts) | **BFSU** `mirrors.bfsu.edu.cn/homebrew-*` (fastest, 2026-07 benchmark); switch live with `brew-mirror {bfsu\|ustc\|aliyun\|tuna}` | [bfsu](https://mirrors.bfsu.edu.cn/help/homebrew-bottles/) / [ustc](https://mirrors.ustc.edu.cn/help/brew.git.html) |
 | **Rustup** (dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` env vars | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` env vars | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` env var | `goproxy.cn` (Qiniu; TUNA has no Go proxy) | — |
@@ -127,6 +127,44 @@ When adding a new ansible task that runs `npm install -g <pkg>`:
 ### `curl: (18) Transferred a partial file` during brew install
 
 See [infrastructure-as-code.md → Troubleshooting](./infrastructure-as-code.md#troubleshooting).
+
+### `brew update` / any `brew` command hangs for 60s+ then does nothing
+
+The `HOMEBREW_BREW_GIT_REMOTE` git mirror's smart-HTTP `upload-pack` is broken:
+`git ls-remote` (ref advertisement) succeeds so the mirror *looks* healthy, but the
+actual packfile fetch stalls. **Aliyun's `brew.git` has this bug** — it was the
+default baseline until 2026-07 and froze every `brew update` (and every
+auto-update before `brew install`/`brew upgrade`) until `unset
+HOMEBREW_BREW_GIT_REMOTE`.
+
+Fix: switch to a working mirror. Benchmark (2026-07, CN network — `brew.git`
+shallow fetch + ~30 MB bottle-index download):
+
+| Mirror | brew.git fetch | bottle throughput | verdict |
+|---|---|---|---|
+| **BFSU** | 1.1s | 31 MB/s | fastest — **current baseline** |
+| USTC | 1.0s | 11 MB/s | solid fallback |
+| Aliyun | **FAIL** (upload-pack) | 17 MB/s | git broken, bottles fine |
+| TUNA | **timeout 45s** | 6 MB/s | queueing, both slow |
+
+Switch on-the-fly with `brew-mirror {bfsu|ustc|aliyun|tuna}` then `brew update`.
+Baseline lives in `dot_config/shell/00_exports.sh.tmpl` (+ the two bootstrap
+scripts). Full debug story: `pitfalls/homebrew-aliyun-brew-git-hang-core-clone-bloat.md`.
+
+### `brew` disk usage ballooned / `brew update` got slow after being fast
+
+Check `du -sh "$(brew --repo homebrew/core)/.git"`. If it's ~1 GB, homebrew/core
+got converted from the API stub (~8 KB) into a full git clone — this happens
+whenever `HOMEBREW_CORE_GIT_REMOTE` is **set** and `brew update` runs. Homebrew
+4.x uses the JSON API (`HOMEBREW_API_DOMAIN`) as the source of truth, so
+`HOMEBREW_CORE_GIT_REMOTE` should stay **unset**. Restore lean API mode:
+
+```bash
+brew untap homebrew/core     # removes the ~1 GB clone; formulae still resolve via the API
+unset HOMEBREW_CORE_GIT_REMOTE
+```
+
+The `brew-mirror` helper unsets it and auto-untaps a stray >100 MB clone.
 
 ### Conda / Mamba: slow or failing channel refresh after toggling `useChineseMirror`
 

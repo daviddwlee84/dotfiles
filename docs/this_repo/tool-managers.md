@@ -125,7 +125,7 @@ assumes:
 
 | Tool | Mechanism | Per-OS |
 |---|---|---|
-| **Homebrew** | `Homebrew/install` curl script | macOS always; Linux only when `installBrewApps=true` & non-noRoot & arch∈{amd64,arm64}. Mirrors via `HOMEBREW_*_GIT_REMOTE` (Aliyun / USTC / BFSU / TUNA) when `useChineseMirror=true` |
+| **Homebrew** | `Homebrew/install` curl script | macOS always; Linux only when `installBrewApps=true` & non-noRoot & arch∈{amd64,arm64}. Mirrors via `HOMEBREW_BREW_GIT_REMOTE` + bottle/API domains (**BFSU** baseline; `brew-mirror` switches to USTC/Aliyun/TUNA) when `useChineseMirror=true`. Aliyun's `brew.git` is broken (hangs) and `HOMEBREW_CORE_GIT_REMOTE` stays unset (API mode) — see [mirrors.md](../tools/mirrors.md#brew-update--any-brew-command-hangs-for-60s-then-does-nothing) |
 | **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | all OSes if missing |
 | **mise** | `curl https://mise.run \| sh`, with direct `mise.jdx.dev/mise-latest-linux-${arch}[-musl]` fallback (musl forced when glibc < 2.28) | all OSes; arch detection (x64/arm64/armv7) |
 | **ansible-core** | `uv tool install --force --python 3.13 ansible-core` | all OSes; force-refreshes if existing ansible runs on Python < 3.10 |

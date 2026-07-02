@@ -86,38 +86,49 @@ export HOMEBREW_BUNDLE_FILE="$HOME/.config/homebrew/Brewfile"
 # live in their own templates under dot_config/ and dot_cargo/.
 # =============================================================================
 
-# Homebrew: bottles (ghcr.io default → partial-transfer errors) + brew.git + core.
-# Mirrors ordered by typical reliability behind GFW:
-#   - Aliyun (ACTIVE): commercial CDN, least queueing
-#       https://developer.aliyun.com/mirror/homebrew
-#   - USTC:  university mirror, low queueing; path is top-level (no /git/homebrew/)
-#       https://mirrors.ustc.edu.cn/help/brew.git.html
-#   - BFSU:  mirrors TUNA content but less congested
-#       https://mirrors.bfsu.edu.cn/help/homebrew-bottles/
-#   - TUNA:  Tsinghua, upstream of BFSU; frequent "Waiting in queue" on brew.git
-#       https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/
-# NOTE: Homebrew env vars are single-value — no native fallback like uv's
-# extra-index-url. To switch, comment out the active block and uncomment
-# another, then `brew update` once to re-sync remotes.
-export HOMEBREW_API_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles/api"
-export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
-export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
-export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/homebrew-core.git"
-# USTC alternative:
+# Homebrew: bottles (ghcr.io default → partial-transfer errors) + brew.git.
+#
+# Benchmarked 2026-07 on this Mac (China network) — brew.git shallow fetch +
+# ~30 MB bottle-index download, all four mirrors back-to-back:
+#   mirror   brew.git fetch          bottle throughput
+#   BFSU     OK  1.1s   (ACTIVE)     31 MB/s   ← fastest overall
+#   USTC     OK  1.0s                11 MB/s   ← solid fallback
+#   Aliyun   FAIL (upload-pack)      17 MB/s   ← git BROKEN, bottles fine
+#   TUNA     TIMEOUT 45s             6 MB/s    ← queueing, both slow
+# Aliyun's git smart-HTTP upload-pack hangs (ref advertisement / `ls-remote`
+# succeeds, packfile streaming stalls → 60s+), so every `brew update` /
+# auto-update froze until `unset HOMEBREW_BREW_GIT_REMOTE`. See
+# pitfalls/homebrew-aliyun-brew-git-hang-core-clone-bloat.md.
+#
+# CRITICAL — do NOT set HOMEBREW_CORE_GIT_REMOTE. Homebrew 4.x defaults to the
+# JSON API (HOMEBREW_API_DOMAIN); homebrew/core stays a ~8 KB stub and formulae
+# come from the API. Setting HOMEBREW_CORE_GIT_REMOTE forces `brew update` to
+# maintain a FULL ~1 GB homebrew-core git clone (slow fetch every update + disk
+# bloat) for zero benefit. USTC already dropped homebrew-core.git (2026-06) for
+# this reason. Bottle/API mirror is what actually matters for downloads.
+#
+# Homebrew env vars are single-value (no uv-style extra-index fallback). To
+# switch mirrors on-the-fly use the `brew-mirror {bfsu|ustc|aliyun|tuna}`
+# helper (dot_config/shell/10_aliases.sh) then `brew update`.
+export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+# Defensively clear any inherited/legacy HOMEBREW_CORE_GIT_REMOTE (older configs
+# exported it) so already-open shells re-sourcing this file don't keep forcing
+# the ~1 GB homebrew-core clone. New shells start clean anyway.
+unset HOMEBREW_CORE_GIT_REMOTE
+# USTC alternative (solid, well-known university mirror):
 #   export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 #   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 #   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
-#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
-# BFSU alternative:
-#   export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
-#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
-#   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
-#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/homebrew-core.git"
-# TUNA alternative:
+# Aliyun alternative (bottles fast, but brew.git is BROKEN — bottles only):
+#   export HOMEBREW_API_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles/api"
+#   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+#   # (do NOT set HOMEBREW_BREW_GIT_REMOTE to Aliyun — it hangs)
+# TUNA alternative (upstream of BFSU; frequent "Waiting in queue"):
 #   export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
 #   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
 #   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-#   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
 
 # Rustup: affects `rustup install`, `rustup update`, `rustup self update`,
 # and mise's rust plugin (which invokes rustup internally).
