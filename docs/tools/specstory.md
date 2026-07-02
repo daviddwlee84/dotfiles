@@ -21,6 +21,9 @@ SpecStory reads configuration in this order:
 
 Later sources override earlier ones. That means the dotfile provides global defaults, while a repo-specific `.specstory/cli/config.toml` can override them when a project needs different behavior.
 
+!!! note "Seeded once, not continuously managed"
+    The user-level config is a chezmoi `create_` file (`private_dot_specstory/private_cli/create_config.toml`): chezmoi writes it on first `apply` and then **never touches it again**. This is deliberate — the SpecStory CLI writes runtime UI state back into the file (e.g. a `[resume]` block with `view_mode` / `last_agent` after `specstory resume`), which would otherwise show up as permanent chezmoi drift. To change the shipped defaults, edit the source and re-seed: `cp ~/.specstory/cli/config.toml "$(chezmoi source-path ~/.specstory/cli/config.toml)"`.
+
 ## Managed Defaults
 
 The managed config keeps the upstream sample sections as commented documentation, but only enables `[providers]` defaults.

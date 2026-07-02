@@ -26,6 +26,9 @@
 
 後者覆蓋前者。也就是說 dotfile 提供全域預設值，而 repo 專屬的 `.specstory/cli/config.toml` 可在專案需要不同行為時覆寫之。
 
+!!! note "只種一次 (seed once)，不持續管理"
+    使用者層級設定是 chezmoi 的 `create_` 檔（`private_dot_specstory/private_cli/create_config.toml`）：chezmoi 只在第一次 `apply` 時寫入，之後**不再更動它**。這是刻意設計的 —— SpecStory CLI 會把執行期的 UI 狀態寫回這個檔（例如 `specstory resume` 之後產生的 `[resume]` 區塊，含 `view_mode` / `last_agent`），若持續管理就會變成永久的 chezmoi drift。要修改內建預設值，請改 source 檔再重新種一次：`cp ~/.specstory/cli/config.toml "$(chezmoi source-path ~/.specstory/cli/config.toml)"`。
+
 ## 受管理的預設值
 
 受管理的設定保留上游範例區塊作為註解文件，但只啟用 `[providers]` 預設值。
