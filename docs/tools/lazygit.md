@@ -4,6 +4,19 @@
 
 > **Golden rule: only rewrite commits that have NOT been pushed.** All recipes below rewrite history (new SHAs). If a commit is already on a shared remote, don't — or you'll need `git push --force-with-lease` and coordination.
 
+## Managed pull behavior
+
+This dotfiles repo sets Git's global baseline to:
+
+```gitconfig
+[pull]
+    rebase = true
+[rebase]
+    autoStash = true
+```
+
+So LazyGit's normal **`p`** pull runs as a rebase pull, and dirty working-tree changes are stashed before the rebase and re-applied afterwards. If the re-applied stash conflicts, Git keeps the autostash instead of dropping it; inspect `git status` and `git stash list`, resolve any worktree conflicts, then drop the autostash only after confirming your changes are back.
+
 ## The mental model: two different "fixup"s
 
 The word *fixup* shows up in two unrelated lazygit operations — confusing them is the #1 way to mangle history:

@@ -25527,3 +25527,122 @@ Check what the redact hook changed in the specstory file
  1 file changed, 105 insertions(+)
 ```
 </details></tool-use>
+
+_**Agent (claude-sonnet-5 2026-07-02 04:54:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Re-stage the specstory file growth and retry the commit
+
+```bash
+git add .specstory/history/2026-07-02_03-57-00Z-https-sshpass-com-https.md
+git commit -m "$(cat <<'EOF'
+feat(fleet): opt-in SSH-login password fallback via asyncssh native auth
+
+fleet SSH login was key/agent-only, so hosts that flatly disallow pubkey
+auth (e.g. zyc_friend, an IDC server with PubkeyAuthentication no and only
+keyboard-interactive/PAM) permanently showed unreachable — TODO.md:80.
+Rather than adding an sshpass/expect dependency (the original sketch),
+asyncssh (already a hard dependency) natively supports password=/
+preferred_auth= kwargs including PAM auto-answer, so connect_host() tries
+key/agent first and retries once on PermissionDenied only for hosts that
+opt in via the new, independent ssh_login_password_source field. Zero new
+binaries installed; verified end-to-end against a throwaway Docker sshd
+reproducing zyc_friend's exact auth flow.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+EOF
+)"
+git status --short
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1782968017-95265.
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...............................................(no files to check)Skipped
+check toml...............................................(no files to check)Skipped
+check json...............................................(no files to check)Skipped
+check that executables have shebangs.........................................Passed
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1782968017-95265.
+[main 1ada8ae] feat(fleet): opt-in SSH-login password fallback via asyncssh native auth
+ 15 files changed, 26191 insertions(+), 116 deletions(-)
+ create mode 100644 .claude/plans/https-sshpass-com-https-github-com-kevin-proud-volcano.md
+ create mode 100644 .specstory/history/2026-07-02_03-57-00Z-https-sshpass-com-https.md
+ create mode 100644 backlog/fleet-ssh-password-login.md
+ M .specstory/history/2026-07-02_03-57-00Z-https-sshpass-com-https.md
+```
+</details></tool-use>
+
+_**Agent (claude-sonnet-5 2026-07-02 04:54:13Z)**_
+
+Committed as `1ada8ae`. Now for your second question — let me check what's authoritative for general-purpose sshpass/expect usage (outside the fleet context).
+
+_**Agent (claude-sonnet-5 2026-07-02 04:54:22Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="WebSearch"><details>
+<summary>Tool use: **WebSearch**</summary>
+ `expect scripting official documentation tutorial autoexpect basics`
+
+```text
+Web search results for query: "expect scripting official documentation tutorial autoexpect basics"
+
+Links: [{"title":"Expect - Wikipedia","url":"https://en.wikipedia.org/wiki/Expect"},{"title":"How to automate interactive cli commands with expect","url":"https://linuxconfig.org/how-to-automate-interactive-cli-commands-with-expect"},{"title":"Linux expect Command (Basic Use With Variables and Commands)","url":"https://phoenixnap.com/kb/linux-expect"},{"title":"autoexpect: generate an Expect script from watching a session - Linux Manuals (1)","url":"https://www.systutorials.com/docs/linux/man/1-autoexpect/"},{"title":"Using Expect Scripts to Automate Tasks » ADMIN Magazine","url":"https://www.admin-magazine.com/Articles/Automating-with-Expect-Scripts"},{"title":"How to Automate Interactive Commands with expect on Ubuntu","url":"https://oneuptime.com/blog/post/2026-01-15-automate-interactive-commands-expect-ubuntu/view"},{"title":"autoexpect(1) - Linux man page","url":"https://linux.die.net/man/1/autoexpect"},{"title":"Automating Linux Interactions with Expect | Secsys","url":"https://secsys.pages.dev/posts/expect/"},{"title":"Expect command and how to automate shell scripts like magic","url":"https://likegeeks.com/expect-command/"},{"title":"Automating responses to scripts on Linux using expect and autoexpect | Network World","url":"https://www.networkworld.com/article/969513/automating-responses-to-scripts-on-linux-using-expect-and-autoexpect.html"}]
+
+Based on the search results, here's information about Expect scripting and autoexpect:
+
+## Expect Scripting Basics
+
+Expect is an extension to the Tcl scripting language that automates interactions with programs that expose a text terminal interface. Expect is used to automate control of interactive applications such as Telnet, FTP, passwd, fsck, rlogin, tip, SSH, and others.
+
+### Core Commands
+
+The three main commands are spawn, expect and send. The spawn command runs a new process and connects its standard output, standard input and standard error file descriptors to expect. The expect command waits until a certain pattern matches the output of the executable launched with the spawn command. The send command sends a string to the process.
+
+## Autoexpect Tool
+
+Autoexpect watches you interacting with another program and creates an Expect script that reproduces your interactions. For straightline scripts, autoexpect saves substantial time over writing scripts by hand.
+
+### How to Use Autoexpect
+
+The simplest way to use autoexpect is to call it from the command line with no arguments. By default, autoexpect spawns a shell for you. Given a program name and arguments, autoexpect spawns that program.
+
+### Conservative Mode
+
+Conservative mode makes autoexpect automatically pause briefly (one tenth of a second) before sending each character, which pacifies every program.
+
+For more detailed official documentation, you can refer to the expect manual pages and the official Expect resources online.
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+```
+</details></tool-use>
+
+_**Agent (claude-sonnet-5 2026-07-02 04:54:36Z)**_
+
+Committed. On the docs question — this repo has **no general-purpose docs for sshpass/expect** since neither is installed or managed anywhere here (confirmed during the fleet research: not in `tool-managers.md`, no ansible task, no Brewfile entry). If you want to play with them, the authoritative references are external:
+
+**sshpass**: no real "docs" beyond the man page — it's a tiny wrapper. `man sshpass` covers it fully (the `-p`/`-e`/`-f` flags we discussed). On your Mac it's just `brew install sshpass` (confirmed live on this machine earlier — it's back in `homebrew/core`, no tap needed).
+
+**expect**: the real depth is here — it's a Tcl extension, not a single-purpose tool.
+- Already installed on your Mac at `/usr/bin/expect` (macOS ships it) — nothing to `brew install`.
+- Core mental model: three commands — `spawn` (launch a process), `expect` (wait for a pattern in its output), `send` (write a response). Everything else is Tcl control flow around those three.
+- The genuinely useful trick for playing with it: **`autoexpect`** — run `autoexpect ssh someHost`, do the login/interaction manually once, and it generates a working `.exp` script from what it observed. Much faster than writing `expect`/`send` pairs by hand.
+- [Expect on Wikipedia](https://en.wikipedia.org/wiki/Expect) for the concept overview, [autoexpect(1) man page](https://linux.die.net/man/1/autoexpect) for that specific tool, and `man expect` locally has the full command reference once installed.
+
+Since you're not blocked on a real host anymore (fleet now handles the PAM-only case natively), this would purely be for tinkering — a fun starter exercise is `autoexpect`-recording an SSH login to something like the Docker container I spun up for verification (PAM/keyboard-interactive prompt, no pubkey), then hand-editing the generated script to see how `expect`/`send` map to what you did interactively.
+
+Sources:
+- [Expect - Wikipedia](https://en.wikipedia.org/wiki/Expect)
+- [autoexpect(1) - Linux man page](https://linux.die.net/man/1/autoexpect)
+- [How to automate interactive cli commands with expect](https://linuxconfig.org/how-to-automate-interactive-cli-commands-with-expect)

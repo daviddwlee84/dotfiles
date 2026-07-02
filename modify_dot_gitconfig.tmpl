@@ -39,6 +39,10 @@ cat <<'CHEZMOI_BASELINE_EOF'
     defaultBranch = main
 [core]
     hooksPath = ~/.config/git/hooks
+[pull]
+    rebase = true
+[rebase]
+    autoStash = true
 {{- if lookPath "delta" }}
     pager = delta
 [interactive]
