@@ -6,7 +6,7 @@
 # Full guide + risks: docs/tools/copilot-claude-proxy.md.
 #
 # Public surface:
-#   copilot-proxy [start|stop|status|restart|logs|auth]   - manage the proxy
+#   copilot-proxy [start|stop|status|restart|logs|whoami|auth]   - manage the proxy
 #   copilot-model [<id>|-l|-c]                             - switch model in a
 #                                                            project's .claude/settings.json
 #
@@ -128,8 +128,17 @@ copilot-proxy() {
       printf '%s\n' "copilot-proxy: launching copilot-api device login ..."
       bunx "$pkg" auth
       ;;
+    whoami|usage)
+      # Real login check: exchanges the stored token against GitHub and prints
+      # the account / plan / quota. Fails loudly if the token is missing/expired.
+      if [ ! -f "$HOME/.local/share/copilot-api/github_token" ]; then
+        printf '%s\n' "copilot-proxy: not authenticated — run 'copilot-proxy auth' first." >&2
+        return 1
+      fi
+      bunx "$pkg" check-usage
+      ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N]|auth]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]"
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2

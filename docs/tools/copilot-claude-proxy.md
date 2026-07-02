@@ -46,7 +46,7 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|logs [N]|auth]`
+### `copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]`
 
 Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 
@@ -59,6 +59,11 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 Set these in `~/.shellrc.adhoc` (or the per-shell secrets files). `start` refuses
 to run until `copilot-proxy auth` has stored a token, and waits up to ~20s for the
 proxy to answer before returning.
+
+`copilot-proxy whoami` is the real login check: it exchanges the stored token
+against GitHub and prints your account / plan / quota (fails loudly if the token
+is missing or expired). Use it instead of eyeballing the token file — the token
+is a plaintext credential and should not be opened in an editor.
 
 ### `copilot-model [<id>|-l|-c]`
 
@@ -142,8 +147,8 @@ gemini-3.1-pro-preview, …) are also served — see `copilot-model -l` or
 
 ```sh
 copilot-proxy status                 # up? which Claude models?
+copilot-proxy whoami                 # validate token → account / plan / quota
 copilot-proxy logs 60                # tail the proxy log
-bunx copilot-api@0.7.0 check-usage   # Copilot quota/usage in terminal
 # usage dashboard:
 #   https://ericc-ch.github.io/copilot-api?endpoint=http://localhost:4141/usage
 ```

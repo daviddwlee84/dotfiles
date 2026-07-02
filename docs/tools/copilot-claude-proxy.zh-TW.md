@@ -50,7 +50,7 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|logs [N]|auth]`
+### `copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]`
 
 在 `$COPILOT_PROXY_PORT`（預設 `4141`）管理背景代理。
 
@@ -62,6 +62,10 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
 
 這些設在 `~/.shellrc.adhoc`（或 per-shell secrets 檔案）。在 `copilot-proxy auth`
 儲存 token 之前，`start` 會拒絕執行；啟動後最多等 ~20 秒直到代理能回應才返回。
+
+`copilot-proxy whoami` 是真正的登入檢查：它拿儲存的 token 對 GitHub 交換，並印出你的
+帳號 / plan / quota（token 缺失或過期時會明確報錯）。用它取代直接看 token 檔案 —— token
+是明文憑證 (plaintext credential)，不應在編輯器裡打開。
 
 ### `copilot-model [<id>|-l|-c]`
 
@@ -139,8 +143,8 @@ gemini-3.1-pro-preview…）也有提供 —— 見 `copilot-model -l` 或 `GET 
 
 ```sh
 copilot-proxy status                 # 有沒有在跑？提供哪些 Claude 模型？
+copilot-proxy whoami                 # 驗證 token → 帳號 / plan / quota
 copilot-proxy logs 60                # tail 代理的 log
-bunx copilot-api@0.7.0 check-usage   # 在終端機看 Copilot 額度/用量
 # 用量儀表板 (dashboard)：
 #   https://ericc-ch.github.io/copilot-api?endpoint=http://localhost:4141/usage
 ```
