@@ -44,3 +44,8 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # Pages backend has been slow/queued (observed 7m52s and a 10m
+          # timeout abort); default is 600000 (10 min). Bump to 20 min so
+          # transient queue backlogs don't fail an otherwise-healthy deploy.
+          timeout: 1200000
