@@ -58,8 +58,9 @@ from rich.text import Text
 from scripts.fleet import (
     DEFAULT_CONFIG_PATH,
     Host,
-    _connect_kwargs,
+    connect_host,
     load_hosts,
+    resolve_ssh_login_passwords,
 )
 
 err = Console(stderr=True)
@@ -254,9 +255,7 @@ async def _run_one(
             stdout = stdout_b.decode("utf-8", errors="replace")
             stderr = stderr_b.decode("utf-8", errors="replace")
         else:
-            connect_kw = _connect_kwargs(host)
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**connect_kw)
+            conn = await connect_host(host, connect_timeout)
             try:
                 async with asyncio.timeout(cmd_timeout):
                     result = await conn.run(cmd, check=False)
@@ -791,6 +790,7 @@ def main() -> int:
     if not selected:
         err.print("[yellow]no hosts matched filter[/yellow]")
         return 0
+    resolve_ssh_login_passwords(selected, err)
 
     parallelism = 1 if args.serial else (args.max_parallel or min(8, len(selected)))
     results = asyncio.run(discover_exec(

@@ -81,6 +81,7 @@ fleet metadata:
   no_root_machine      false
   chezmoi_path         auto
   password_source      bitwarden (item=ssh-lab-box-sudo)
+  ssh_login_password_source  none
   extra_env            (none)
 
 ssh -G 'lab-box' (resolved by ssh_config):
@@ -97,9 +98,10 @@ local key check (offline):
 - The `ssh -G` block is omitted for hosts that don't use an `ssh_alias` —
   for those, the explicit fields in the `connection:` section already are
   the resolved values.
-- **`password_source` deliberately redacts `type = "plain"` values**. The
-  TOML file itself is 0600, but the preview output scrolls into logs /
-  screenshots; the type label suffices for triage.
+- **Both `password_source` and `ssh_login_password_source` deliberately
+  redact `type = "plain"` values**. The TOML file itself is 0600, but the
+  preview output scrolls into logs / screenshots; the type label suffices
+  for triage.
 
 ## Subset selection from the picker
 
@@ -132,11 +134,16 @@ for the future-work list.
 - **`tv fleet-hosts` shows no rows**: run `fleet hosts --list-tsv` directly.
   If output is empty, every host has `local = true` (picker hides them).
   Override with `fleet hosts --list-tsv --include-local`.
-- **`fleet hosts NAME` prompts for password**: fleet always uses
-  non-interactive SSH (key / agent auth). A password prompt means `ssh
-  <name>` would also prompt. Fix with `ssh-copy-id`, agent forwarding, or
-  the 1Password SSH agent — same fix as
-  [`fleet chezmoi apply` unreachable hosts](../this_repo/fleet-apply.md).
+- **`fleet hosts NAME` prompts for password**: `fleet hosts NAME` itself is a
+  real interactive `ssh` process (via `os.execvp`), so it happily handles a
+  password prompt on its own. The symptom matters for the *other* fleet
+  subcommands (`fleet chezmoi status`/`apply`, `fleet exec`/`tmux`/`info`/
+  `pueue`) — those use asyncssh and default to non-interactive key/agent
+  auth only, so a password prompt there means the connection will fail. Fix
+  with `ssh-copy-id`, agent forwarding, or the 1Password SSH agent where
+  possible; if the remote flatly disallows pubkey auth, set the opt-in
+  `ssh_login_password_source` field instead — same fix as
+  [`fleet chezmoi apply` unreachable hosts](../this_repo/fleet-apply.md#ssh-login-password-sources-opt-in-fallback).
 - **Preview pane shows `(ssh -G unavailable or returned nothing)`**: the
   alias isn't in `~/.ssh/config` (or its includes). Either add it, or
   switch the host entry to explicit `hostname`/`user`/`port` fields.

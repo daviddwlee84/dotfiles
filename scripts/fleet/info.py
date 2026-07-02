@@ -34,8 +34,9 @@ from rich.table import Table
 from scripts.fleet import (
     DEFAULT_CONFIG_PATH,
     Host,
-    _connect_kwargs,
+    connect_host,
     load_hosts,
+    resolve_ssh_login_passwords,
 )
 
 
@@ -301,9 +302,7 @@ async def _run_one(host: Host, want_ff: bool, connect_timeout: float, cmd_timeou
                 raise TimeoutError(f"local probe exceeded {cmd_timeout}s")
             out = stdout.decode("utf-8", errors="replace")
         else:
-            connect_kw = _connect_kwargs(host)
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**connect_kw)
+            conn = await connect_host(host, connect_timeout)
             try:
                 async with asyncio.timeout(cmd_timeout):
                     result = await conn.run(cmd, check=False)
@@ -474,6 +473,7 @@ def cli(
     if not selected:
         err.print("[yellow]no hosts matched filter[/yellow]")
         return 0
+    resolve_ssh_login_passwords(selected, err)
 
     selected_modules = _select_modules(full, modules, err)
     parallelism = 1 if serial else (max_parallel or min(8, len(selected)))

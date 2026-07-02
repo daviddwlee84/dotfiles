@@ -23,8 +23,10 @@ from scripts.fleet.apply import (
     REMOTE_SUDO_PASS_PATH,
     Host,
     _connect_kwargs,
+    connect_host,
     load_hosts,
     resolve_passwords,
+    resolve_ssh_login_passwords,
 )
 
 __all__ = [
@@ -34,6 +36,8 @@ __all__ = [
     "REMOTE_SUDO_PASS_PATH",
     "Host",
     "_connect_kwargs",
+    "connect_host",
     "load_hosts",
     "resolve_passwords",
+    "resolve_ssh_login_passwords",
 ]

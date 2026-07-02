@@ -7,10 +7,15 @@
 #
 # IMPORTANT: `password_source` is for the REMOTE `sudo` password ONLY (fed to
 # chezmoi via CHEZMOI_SUDO_PASSWORD_FILE for `run_*` scripts). It does NOT
-# authenticate the SSH login itself — fleet always uses non-interactive SSH
-# (key / agent auth). If `ssh <host>` prompts you for a password, the host
-# will show as `unreachable` in `just fleet-status`. Fix with `ssh-copy-id`.
-# See `pitfalls/fleet-apply-password-source-not-for-ssh-login.md` for context.
+# authenticate the SSH login itself — fleet always tries key/agent auth
+# FIRST for SSH login. If `ssh <host>` prompts you for a password, the host
+# will show as `unreachable` in `just fleet-status`. Fix with `ssh-copy-id`
+# where possible. If the remote flatly disallows pubkey auth (e.g. corporate/
+# IDC sshd with `PubkeyAuthentication no`), set the separate, opt-in
+# `ssh_login_password_source` field (example 6 below) — independent of
+# `password_source`, since a host's SSH login password may differ from its
+# sudo password. See `pitfalls/fleet-apply-password-source-not-for-ssh-login.md`
+# for context.
 #
 # Schema reference: docs/this_repo/fleet-apply.md
 # Run: `just fleet-apply` (parallel) | `just fleet-apply-dry-run` (chezmoi diff)
@@ -84,3 +89,20 @@ no_root_machine = {{ .noRoot }}
 # name            = "self"
 # local           = true
 # no_root_machine = true                                    # set false if your local apply needs sudo
+
+# 6) SSH LOGIN itself is password-only (e.g. IDC/corporate sshd with
+#    `PubkeyAuthentication no` — real trigger: `zyc_friend`, an IDC server
+#    whose sshd only offers `keyboard-interactive`/PAM, so even
+#    `ssh-copy-id` doesn't help). Opt-in only; every example above keeps
+#    today's key/agent-only login behaviour unchanged.
+#    `ssh_login_password_source` is INDEPENDENT of `password_source` (that
+#    one is sudo-only) — a host's SSH login password may differ from its
+#    sudo password. Same 4-way schema as password_source. fleet always
+#    tries key/agent auth first; only falls back to password/
+#    keyboard-interactive (PAM) auth if that's flatly rejected.
+# [[hosts]]
+# name                       = "zyc-friend"
+# hostname                   = "203.0.113.99"
+# user                       = "dwlee"
+# no_root_machine            = true
+# ssh_login_password_source  = { type = "bitwarden", item = "zyc-friend-ssh-login" }

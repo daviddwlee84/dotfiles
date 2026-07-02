@@ -154,14 +154,18 @@ def _cmd_list_json(hosts: list[Host], config: Path) -> int:
     payload = []
     for h in hosts:
         d = dataclasses.asdict(h)
-        # Never leak a resolved sudo_password (it'd be None at this point —
-        # resolve_passwords() never ran — but be defensive in case that
-        # changes).
+        # Never leak a resolved sudo_password / ssh_login_password (they'd
+        # be None at this point — resolve_passwords()/
+        # resolve_ssh_login_passwords() never ran — but be defensive in
+        # case that changes).
         d.pop("sudo_password", None)
+        d.pop("ssh_login_password", None)
         # For plain-type password sources, the TOML file itself is 0600 but
         # JSON dump goes to stdout (could be piped into logs/screenshots).
         if d.get("password_source_type") == "plain":
             d["password_source_arg"] = "(redacted — type=plain)"
+        if d.get("ssh_login_password_source_type") == "plain":
+            d["ssh_login_password_source_arg"] = "(redacted — type=plain)"
         payload.append(d)
     json.dump(
         {"config": str(config), "hosts": payload},
@@ -248,6 +252,12 @@ def _cmd_describe(name: str, hosts: list[Host], config: Path) -> int:
     elif h.password_source_type == "plain":
         ps_label += " (value redacted)"
     print(f"  password_source      {ps_label}")
+    ssh_ps_label = h.ssh_login_password_source_type
+    if h.ssh_login_password_source_arg and h.ssh_login_password_source_type != "plain":
+        ssh_ps_label += f" (item={h.ssh_login_password_source_arg})"
+    elif h.ssh_login_password_source_type == "plain":
+        ssh_ps_label += " (value redacted)"
+    print(f"  ssh_login_password_source  {ssh_ps_label}")
     if h.extra_env:
         print(f"  extra_env            {', '.join(h.extra_env.keys())}")
     else:

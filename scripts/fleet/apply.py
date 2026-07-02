@@ -89,6 +89,16 @@ class Host:
     password_source_arg: str | None = None  # plain value, bw item id, etc.
     sudo_password: str | None = None  # populated by resolve_passwords()
 
+    # Opt-in SSH LOGIN password fallback — independent of the sudo fields
+    # above (a host's SSH login password may differ from its sudo
+    # password). Only consulted by connect_host() as a retry AFTER
+    # key/agent auth is rejected with asyncssh.PermissionDenied. Hosts
+    # that never set this see zero behaviour change. Same 4-way schema
+    # as password_source (plain/prompt/bitwarden/none).
+    ssh_login_password_source_type: PasswordSourceType = "none"
+    ssh_login_password_source_arg: str | None = None
+    ssh_login_password: str | None = None  # populated by resolve_ssh_login_passwords()
+
 
 # ---------------------------------------------------------------------------
 # TOML loading
@@ -100,11 +110,31 @@ DEFAULT_CONFIG_PATH = Path(
 ).expanduser()
 
 
+def _parse_password_source_table(
+    raw_table: dict | None, *, field_name: str, path: Path, host_name: str,
+) -> tuple[PasswordSourceType, str | None]:
+    """Normalize a `{type=..., value=|item=...}` TOML table into (type, arg).
+
+    Shared by `password_source` (sudo) and `ssh_login_password_source`
+    (SSH transport auth fallback) — identical 4-way schema, different
+    Host attribute names / error-message prefixes.
+    """
+    t = raw_table or {}
+    ps_type = (t.get("type") or "none").lower()
+    if ps_type not in ("plain", "prompt", "bitwarden", "none"):
+        raise ValueError(
+            f"{path}: host {host_name!r} has invalid {field_name}.type={ps_type!r}"
+        )
+    ps_arg = t.get("value") if ps_type == "plain" else t.get("item")
+    return ps_type, ps_arg  # type: ignore[return-value]
+
+
 def load_hosts(path: Path) -> tuple[list[Host], dict]:
     """Parse machines.toml -> ([Host, ...], defaults dict).
 
     Merges [defaults] into each host (host overrides defaults). The
-    `password_source` table is normalized into (type, arg) on Host.
+    `password_source` / `ssh_login_password_source` tables are normalized
+    into (type, arg) pairs on Host.
     """
     if not path.exists():
         raise FileNotFoundError(
@@ -131,13 +161,14 @@ def load_hosts(path: Path) -> tuple[list[Host], dict]:
         seen_names.add(name)
 
         merged = {**defaults, **raw}
-        ps = merged.pop("password_source", None) or {}
-        ps_type = (ps.get("type") or "none").lower()
-        if ps_type not in ("plain", "prompt", "bitwarden", "none"):
-            raise ValueError(
-                f"{path}: host {name!r} has invalid password_source.type={ps_type!r}"
-            )
-        ps_arg = ps.get("value") if ps_type == "plain" else ps.get("item")
+        ps_type, ps_arg = _parse_password_source_table(
+            merged.pop("password_source", None),
+            field_name="password_source", path=path, host_name=name,
+        )
+        ssh_ps_type, ssh_ps_arg = _parse_password_source_table(
+            merged.pop("ssh_login_password_source", None),
+            field_name="ssh_login_password_source", path=path, host_name=name,
+        )
 
         # Drop keys that aren't Host fields (e.g. defaults-only knobs we read elsewhere).
         host_fields = {f.name for f in dataclasses.fields(Host)}
@@ -146,6 +177,8 @@ def load_hosts(path: Path) -> tuple[list[Host], dict]:
             **host_kwargs,
             password_source_type=ps_type,  # type: ignore[arg-type]
             password_source_arg=ps_arg,
+            ssh_login_password_source_type=ssh_ps_type,  # type: ignore[arg-type]
+            ssh_login_password_source_arg=ssh_ps_arg,
         )
 
         # Validation: at least one of ssh_alias / hostname (skipped for local hosts).
@@ -178,8 +211,8 @@ def _bw_get_password(item: str) -> str:
     except FileNotFoundError as e:
         raise RuntimeError(
             "`bw` (Bitwarden CLI) not found in PATH — install with "
-            "`npm install -g @bitwarden/cli` or set password_source.type to "
-            "'plain'/'prompt'/'none'."
+            "`npm install -g @bitwarden/cli` or use a non-bitwarden password "
+            "source ('plain'/'prompt'/'none')."
         ) from e
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
@@ -188,6 +221,50 @@ def _bw_get_password(item: str) -> str:
             f"Hint: run `bw unlock` first; ensure BW_SESSION is exported."
         )
     return result.stdout.strip("\n")
+
+
+def _resolve_one_password(
+    h: Host, type_: PasswordSourceType, arg: str | None, *,
+    field_name: str, prompt_label: str, console: Console,
+) -> str | None:
+    """Resolve a single (type, arg) pair to a password value, or None.
+
+    Shared dispatch for both `password_source` (sudo) and
+    `ssh_login_password_source` (SSH transport auth fallback). `field_name`
+    is used verbatim in warn/error text so messages stay grep-able;
+    `prompt_label` is the human-readable prefix for the interactive
+    getpass() prompt.
+    """
+    if type_ == "none":
+        return None
+    if type_ == "plain":
+        value = arg or ""
+        if not value:
+            console.print(
+                f"[yellow]warn[/]: host {h.name!r} {field_name}=plain but value is empty"
+            )
+        return value
+    if type_ == "prompt":
+        try:
+            return getpass.getpass(
+                f"{prompt_label} for [{h.name}] {h.user or ''}@"
+                f"{h.ssh_alias or h.hostname}: "
+            )
+        except (EOFError, KeyboardInterrupt):
+            console.print(f"[yellow]warn[/]: host {h.name!r} {prompt_label} prompt cancelled")
+            return None
+    if type_ == "bitwarden":
+        if not arg:
+            console.print(
+                f"[red]error[/]: host {h.name!r} {field_name}=bitwarden missing `item`"
+            )
+            return None
+        try:
+            return _bw_get_password(arg)
+        except RuntimeError as e:
+            console.print(f"[red]error[/]: {h.name}: {e}")
+            return None
+    return None  # unreachable — load_hosts() already validated type_
 
 
 def resolve_passwords(hosts: list[Host], console: Console) -> list[Host]:
@@ -200,38 +277,37 @@ def resolve_passwords(hosts: list[Host], console: Console) -> list[Host]:
     Hosts whose resolution FAILS keep sudo_password=None; run_one() then treats
     them as "no password available" (fail-fast at sudo phase unless
     no_root_machine=true).
+
+    Sudo-only — call this from the apply/update/diff path. Do NOT call from
+    subcommands that never touch sudo (exec/tmux/info/pueue, --kill-orphans/
+    --status/--compact/--tail, fleet-status) — see resolve_ssh_login_passwords
+    for the SSH-transport-auth counterpart those subcommands need instead.
     """
     for h in hosts:
-        if h.password_source_type == "none":
-            continue
-        if h.password_source_type == "plain":
-            h.sudo_password = h.password_source_arg or ""
-            if not h.sudo_password:
-                console.print(
-                    f"[yellow]warn[/]: host {h.name!r} password_source=plain but value is empty"
-                )
-            continue
-        if h.password_source_type == "prompt":
-            try:
-                h.sudo_password = getpass.getpass(
-                    f"sudo password for [{h.name}] {h.user or ''}@"
-                    f"{h.ssh_alias or h.hostname}: "
-                )
-            except (EOFError, KeyboardInterrupt):
-                console.print(f"[yellow]warn[/]: host {h.name!r} prompt cancelled")
-                h.sudo_password = None
-            continue
-        if h.password_source_type == "bitwarden":
-            if not h.password_source_arg:
-                console.print(
-                    f"[red]error[/]: host {h.name!r} password_source=bitwarden missing `item`"
-                )
-                continue
-            try:
-                h.sudo_password = _bw_get_password(h.password_source_arg)
-            except RuntimeError as e:
-                console.print(f"[red]error[/]: {h.name}: {e}")
-                h.sudo_password = None
+        h.sudo_password = _resolve_one_password(
+            h, h.password_source_type, h.password_source_arg,
+            field_name="password_source", prompt_label="sudo password",
+            console=console,
+        )
+    return hosts
+
+
+def resolve_ssh_login_passwords(hosts: list[Host], console: Console) -> list[Host]:
+    """Mutates each host.ssh_login_password in-place. Returns the same list.
+
+    Opt-in SSH transport-auth fallback (independent of the sudo password
+    above). Call this from EVERY fleet subcommand's entry point that may
+    open an SSH connection — connect_host() depends on it having already
+    run, synchronously, before asyncio.gather()/asyncio.run(). Hosts with
+    ssh_login_password_source_type == 'none' (the default) resolve to
+    None at negligible cost — no prompt, no bw call, no behaviour change.
+    """
+    for h in hosts:
+        h.ssh_login_password = _resolve_one_password(
+            h, h.ssh_login_password_source_type, h.ssh_login_password_source_arg,
+            field_name="ssh_login_password_source", prompt_label="SSH login password",
+            console=console,
+        )
     return hosts
 
 
@@ -578,6 +654,43 @@ def _connect_kwargs(host: Host) -> dict:
     return kwargs
 
 
+async def connect_host(host: Host, connect_timeout: float) -> asyncssh.SSHClientConnection:
+    """Connect to `host`: key/agent auth first (today's only path,
+    unchanged), with an opt-in password/keyboard-interactive (PAM) retry
+    for hosts that set ssh_login_password_source.
+
+    Both attempts share ONE connect_timeout-second budget — this function
+    owns the asyncio.timeout() context, so callers no longer wrap it
+    themselves. Hosts without host.ssh_login_password see byte-for-byte
+    identical behaviour to before this function existed: the first
+    attempt's exception propagates unchanged.
+
+    Without a `password` kwarg, asyncssh's password/keyboard-interactive
+    auth callbacks synchronously decline (return None), so the first
+    attempt never blocks or prompts even against a server that offers
+    keyboard-interactive — the existing key/agent-only behaviour for
+    opted-out hosts is unaffected.
+
+    Only asyncssh.PermissionDenied triggers the retry (a clean
+    userauth-failure rejection — e.g. `PubkeyAuthentication no`). A
+    theoretical edge case (many ssh-agent identities + a server's low
+    MaxAuthTries disconnecting with a generic protocol error) could
+    surface as ProtocolError/ConnectionLost instead and skip the retry;
+    broaden the except clause if that's observed in practice — safe to do
+    since hosts without ssh_login_password set always re-raise unchanged.
+    """
+    async with asyncio.timeout(connect_timeout):
+        try:
+            return await asyncssh.connect(**_connect_kwargs(host))
+        except asyncssh.PermissionDenied:
+            if not host.ssh_login_password:
+                raise
+            kwargs = _connect_kwargs(host)
+            kwargs["password"] = host.ssh_login_password
+            kwargs["preferred_auth"] = ("keyboard-interactive", "password")
+            return await asyncssh.connect(**kwargs)
+
+
 def _gc_local_logs(keep: int) -> None:
     """Trim LOCAL_LOG_DIR to the `keep` most recent .log files (+ .exit).
 
@@ -871,8 +984,7 @@ async def run_one(
     conn = None
     try:
         status.state = "connecting"
-        async with asyncio.timeout(connect_timeout):
-            conn = await asyncssh.connect(**_connect_kwargs(host))
+        conn = await connect_host(host, connect_timeout)
         try:
             status.state = "running"
             # Feed password (if any) via stdin: build_remote_command's `cat >`
@@ -1392,6 +1504,8 @@ def cli(
         console.print("[yellow]no hosts selected[/]")
         return 0
 
+    resolve_ssh_login_passwords(selected, console)
+
     if kill_orphans:
         return _run_kill(console, selected, connect_timeout)
 
@@ -1496,8 +1610,7 @@ def _run_kill(
             return
         target = h.ssh_alias or h.hostname
         try:
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**_connect_kwargs(h))
+            conn = await connect_host(h, connect_timeout)
             async with conn:
                 result = await conn.run(kill_cmd, check=False)
             console.print(
@@ -1713,8 +1826,7 @@ def _run_status(
         if h.local:
             return h, *_probe_local()
         try:
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**_connect_kwargs(h))
+            conn = await connect_host(h, connect_timeout)
             async with conn:
                 result = await conn.run(_STATUS_PROBE_CMD, check=False)
             stdout = result.stdout or ""
@@ -2444,8 +2556,7 @@ def _collect_readiness_rows(
             row["notes"] = notes
             return row
         try:
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**_connect_kwargs(h))
+            conn = await connect_host(h, connect_timeout)
             async with conn:
                 result = await conn.run(probe_cmd, check=False)
             stdout = result.stdout or ""
@@ -2749,8 +2860,7 @@ def _run_compact(
             return row
 
         try:
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**_connect_kwargs(h))
+            conn = await connect_host(h, connect_timeout)
             async with conn:
                 result = await conn.run(_fetch_cmd(run_id), check=False)
             stdout = result.stdout or ""
@@ -2955,8 +3065,7 @@ def _run_tail(
 
     async def _do_tail() -> int:
         try:
-            async with asyncio.timeout(connect_timeout):
-                conn = await asyncssh.connect(**_connect_kwargs(host))
+            conn = await connect_host(host, connect_timeout)
         except (asyncssh.Error, OSError, TimeoutError) as e:
             console.print(f"[red]✗[/] connect {host.name}: {type(e).__name__}: {e}")
             return 1

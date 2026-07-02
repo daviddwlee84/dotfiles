@@ -252,7 +252,7 @@ more secondary notes (e.g. a `behind` host with drift will show
 | `not-init` | ✗ red | `~/.config/chezmoi/chezmoi.toml` doesn't exist — host was never `chezmoi init`'d | ssh in & run `chezmoi init` interactively (one-off; needs TTY) |
 | `no-source` | ✗ red | `chezmoi source-path` returns nothing or the path is not a git repo | ssh in & re-init (or fix custom `chezmoi.toml` `sourceDir =`) |
 | `no-chezmoi` | ✗ red | `chezmoi` binary not found in augmented PATH | ssh in & install chezmoi (`curl https://chezmoi.io/get \| sh`) |
-| `unreachable` | ✗ red | SSH connection failed (timeout, auth, host key, network) | check ssh_alias / network / sudo / 1Password agent |
+| `unreachable` | ✗ red | SSH connection failed (timeout, auth, host key, network) | check ssh_alias / network / sudo / 1Password agent; or set the opt-in `ssh_login_password_source` if the remote flatly disallows pubkey auth (see [§ SSH login password sources](#ssh-login-password-sources-opt-in-fallback)) |
 
 ### Output format
 
@@ -380,6 +380,24 @@ password_source = { type = "...", ... }   # see "Password sources" below
 | `prompt` | — | `getpass()` once at startup, never persisted to disk. |
 | `bitwarden` | `item = "ssh-host-sudo"` | `bw get password <item>` at startup. Requires `bw unlock` + `BW_SESSION` exported. |
 
+### SSH login password sources (opt-in fallback)
+
+Independent of `password_source` above (that one is sudo-only) — a host's SSH login password may
+differ from its sudo password. `ssh_login_password_source` uses the identical 4-way schema:
+
+| `type` | Extra keys | Behaviour |
+|---|---|---|
+| `none` (default) | — | No SSH-login password fallback. **Byte-identical to today's key/agent-only behaviour.** |
+| `plain` | `value = "..."` | Read straight from TOML. Relies on file mode 0600. |
+| `prompt` | — | `getpass()` once at startup, never persisted to disk. |
+| `bitwarden` | `item = "ssh-host-login"` | `bw get password <item>` at startup. Requires `bw unlock` + `BW_SESSION` exported. |
+
+`none` is the default for every host that doesn't set this field, so this is purely additive — it only
+changes behaviour for hosts that opt in. See the schema example in
+[`create_private_machines.toml.tmpl`](../../dot_config/fleet/create_private_machines.toml.tmpl) (example
+6) and [§ How the SSH login password reaches asyncssh](#how-the-ssh-login-password-reaches-asyncssh)
+below for the connection mechanics.
+
 ### `no_root_machine` semantics
 
 This flag **describes** the remote, it does not change it. Each remote was
@@ -414,6 +432,33 @@ Pass file lifecycle:
 - `$XDG_RUNTIME_DIR/chezmoi-sudo-$UID/sudo.pass` is the shared state dir
   managed by `sudo_shared.sh`; cleaned up by the existing watchdog when the
   ancestor `chezmoi` PID exits.
+
+## How the SSH login password reaches asyncssh
+
+This is a **completely different, and much simpler, mechanism** than the sudo path above — no file
+write, no stdin, no subprocess, no `sshpass`. `scripts/fleet/apply.py`'s `connect_host()` (the single
+helper every fleet subcommand uses to open a connection) does:
+
+1. Try `asyncssh.connect(**_connect_kwargs(host))` — today's key/agent-only path, unchanged.
+2. If that raises `asyncssh.PermissionDenied` **and** the host has an `ssh_login_password_source`
+   configured, retry once with `password=<resolved value>` and
+   `preferred_auth=("keyboard-interactive", "password")` added to the same kwargs — both passed
+   in-process, straight to `asyncssh.connect()`. The password lives only in the orchestrator's own
+   memory for the duration of the call; it is never written to disk, piped over stdin, or shelled out to
+   an external binary.
+3. Hosts that never set `ssh_login_password_source` never take this branch — the original exception
+   propagates unchanged, so `unreachable` classification for password-only hosts without the field set
+   is identical to before this feature existed.
+
+`preferred_auth=("keyboard-interactive", "password")` matters for PAM-only sshds (the `zyc_friend`
+case: `PubkeyAuthentication no`, only `keyboard-interactive` offered) — asyncssh auto-answers a
+single-prompt keyboard-interactive challenge whose text contains "password"/"passcode" using the same
+`password` value, so one field covers both plain-`password`-method servers and PAM/`keyboard-interactive`
+servers.
+
+Both connection attempts share **one** `connect_timeout`-second budget (the same timeout that already
+governs every other fleet SSH call) — a host whose first (key/agent) attempt is itself slow won't get a
+doubled worst-case latency budget for the retry.
 
 ## Connection: ssh_config alias vs explicit
 
