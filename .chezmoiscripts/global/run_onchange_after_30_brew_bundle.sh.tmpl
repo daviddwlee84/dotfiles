@@ -332,6 +332,31 @@ clear_brew_download_locks() {
         | head -20 \
         | while IFS= read -r f; do info "  cleared stale lock: $(basename "$f")"; done
 }
+
+trust_bundle_taps() {
+    local file="$1"
+    local taps tap info_out
+    [[ -f "$file" ]] || return 0
+    taps="$(brew bundle list --taps --file="$file" 2>/dev/null || true)"
+    [[ -n "$taps" ]] || return 0
+
+    while IFS= read -r tap; do
+        [[ -n "$tap" ]] || continue
+        if ! brew tap | grep -qFx -- "$tap"; then
+            if ! brew tap "$tap"; then
+                warn "Could not tap $tap before brew bundle; brew bundle will retry normally"
+                continue
+            fi
+        fi
+
+        info_out="$(brew tap-info "$tap" 2>/dev/null || true)"
+        if [[ "$info_out" == *Untrusted* ]]; then
+            info "Trusting Homebrew tap $tap"
+            brew trust "$tap"
+        fi
+    done <<< "$taps"
+}
+
 run_bundle_with_retry() {
     local file="$1"
     local label="$2"
@@ -343,6 +368,7 @@ run_bundle_with_retry() {
             info "Retrying $label (attempt $attempt/$BUNDLE_MAX_ATTEMPTS, only missing items)..."
             clear_brew_download_locks
         fi
+        trust_bundle_taps "$file"
         if brew bundle --file="$file" --no-upgrade; then
             return 0
         fi

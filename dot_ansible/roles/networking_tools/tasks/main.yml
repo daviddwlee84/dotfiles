@@ -34,6 +34,17 @@
       ansible.builtin.command: brew tap teamookla/speedtest
       when: "'teamookla/speedtest' not in speedtest_taps.stdout_lines"
 
+    - name: Check trust state of teamookla/speedtest tap (Homebrew >= 6.0 trust gate)
+      ansible.builtin.command: brew tap-info teamookla/speedtest
+      register: speedtest_tap_info
+      changed_when: false
+      failed_when: false
+
+    - name: Trust teamookla/speedtest tap when Homebrew marks it untrusted
+      when: "'Untrusted' in speedtest_tap_info.stdout"
+      ansible.builtin.command: brew trust teamookla/speedtest
+      changed_when: true
+
     - name: Install speedtest
       community.general.homebrew:
         name: speedtest

@@ -210,6 +210,12 @@ explicit `when: ansible_facts["os_family"] == "Darwin"` guard.
 `teamookla/speedtest`, `specstoryai/tap`, `steipete/tap` (CodexBar),
 `marcus/tap` (td, sidecar), `dlvhdr/formulae`, `raine/workmux`.
 
+Homebrew 6+ refuses formulae/casks from untrusted third-party taps. Role-driven
+taps must run a `brew tap-info <tap>` → `brew trust <tap>` check before installing
+from that tap; Brewfile taps are handled by the brew-bundle run-script before it
+calls `brew bundle`. See
+[`pitfalls/homebrew-6-refuses-untrusted-tap-formula.md`](../../pitfalls/homebrew-6-refuses-untrusted-tap-formula.md).
+
 **Adding via homebrew**: prefer a brew formula/cask only when the tool
 is macOS-shipped and Linux equivalents go via apt or release tarball.
 Linux-first tools rarely belong in the Brewfile.
