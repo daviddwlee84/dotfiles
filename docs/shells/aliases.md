@@ -781,6 +781,17 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 
 ---
 
+## Copilot → Claude Code proxy
+
+> Back Claude Code with a **GitHub Copilot** subscription's Claude models via a local [copilot-api](https://github.com/ericc-ch/copilot-api) proxy (runs through `bunx`, pinned version). Full guide + **ToS/rate-limit risks**: [docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md). One-time `copilot-proxy auth` (device login) is required. Model switching edits `./.claude/settings.json` and needs a Claude Code restart — Claude Code's own `/model` picker sends Anthropic ids the Copilot backend rejects.
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `copilot-proxy [start\|stop\|restart\|status\|logs [N]\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | Manage the copilot-api proxy. `start` background-launches on `$COPILOT_PROXY_PORT` (default 4141) with `--rate-limit $COPILOT_PROXY_RATE` (default 15s) and waits until it answers; `status` shows the Claude ids it serves; `auth` runs the one-time device login (stores a `ghu_` token). Env: `COPILOT_PROXY_PORT`, `COPILOT_PROXY_RATE`, `COPILOT_API_PKG` (bunx spec, default `copilot-api@0.7.0`) |
+| `copilot-model [<id>\|-l\|-c]` | function | `dot_config/shell/43_copilot_proxy.sh` | Switch which Copilot model `./.claude/settings.json` pins (`ANTHROPIC_MODEL` + `ANTHROPIC_DEFAULT_OPUS_MODEL`). Fuzzy id (`opus-4.8` → `claude-opus-4.8`), validated against the live proxy `/v1/models` (static Claude fallback if the proxy is down); rejects typos/ambiguous. No arg → `fzf` picker. `-l` list, `-c` current. Needs `jq`. Prints a restart reminder (change is startup-time) |
+
+---
+
 ## Package Managers & Runtime
 
 | Command | Type | Source File | Description |

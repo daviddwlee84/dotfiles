@@ -282,6 +282,7 @@ nav:
           - Agent quota warmup (agent-warmup): tools/agent-warmup.md
           - Agent skills: tools/agent-skills.md
           - Claude Code keybindings: tools/claude-code-keybindings.md
+          - Copilot → Claude Code proxy: tools/copilot-claude-proxy.md
           - Language servers (LSP): tools/lsp.md
           - OpenCode: tools/opencode.md
           - specify-cli: tools/specify_cli.md

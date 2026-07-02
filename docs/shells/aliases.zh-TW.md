@@ -633,6 +633,17 @@
 
 ---
 
+## Copilot → Claude Code 代理 (proxy)
+
+> 用 **GitHub Copilot** 訂閱裡的 Claude 模型來驅動 Claude Code，透過本機 [copilot-api](https://github.com/ericc-ch/copilot-api) 代理 (proxy)（經 `bunx` 執行，版本已釘選 (pinned)）。完整指南與 **服務條款 (ToS) / 速率限制 (rate-limit) 風險**：[docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。首次需執行 `copilot-proxy auth`（裝置登入 device login）。切換模型會修改 `./.claude/settings.json` 且需重啟 Claude Code —— Claude Code 內建的 `/model` 選單會送出 Copilot 後端不接受的 Anthropic id。
+
+| Command | Type | Source File | Description |
+|---------|------|-------------|-------------|
+| `copilot-proxy [start\|stop\|restart\|status\|logs [N]\|auth]` | function | `dot_config/shell/43_copilot_proxy.sh` | 管理 copilot-api 代理 (proxy)。`start` 在 `$COPILOT_PROXY_PORT`（預設 4141）背景啟動，帶 `--rate-limit $COPILOT_PROXY_RATE`（預設 15 秒）並等到能回應為止；`status` 顯示它提供的 Claude id；`auth` 執行一次性的裝置登入 (device login)（儲存 `ghu_` token）。環境變數：`COPILOT_PROXY_PORT`、`COPILOT_PROXY_RATE`、`COPILOT_API_PKG`（bunx 套件規格，預設 `copilot-api@0.7.0`） |
+| `copilot-model [<id>\|-l\|-c]` | function | `dot_config/shell/43_copilot_proxy.sh` | 切換 `./.claude/settings.json` 釘選的 Copilot 模型（`ANTHROPIC_MODEL` + `ANTHROPIC_DEFAULT_OPUS_MODEL`）。支援模糊 id（`opus-4.8` → `claude-opus-4.8`），會對照即時的代理 `/v1/models` 驗證（代理未啟動時用靜態 Claude fallback 清單）；拒絕打錯字/不明確的輸入。無參數 → `fzf` 選單。`-l` 列出、`-c` 目前值。需要 `jq`。會印出重啟提醒（變更在啟動時才生效） |
+
+---
+
 ## Package Managers & Runtime
 
 | Command | Type | Source File | Description |
