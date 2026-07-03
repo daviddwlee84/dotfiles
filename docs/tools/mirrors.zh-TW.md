@@ -34,7 +34,7 @@ chezmoi apply
 | **crates.io**（Cargo） | `~/.cargo/config.toml` | TUNA sparse index | [crates.io-index](https://mirrors.tuna.tsinghua.edu.cn/help/crates.io-index/) |
 | **RubyGems** | `~/.gemrc` | `mirrors.tuna.tsinghua.edu.cn/rubygems/` | [rubygems](https://mirrors.tuna.tsinghua.edu.cn/help/rubygems/) |
 | **Anaconda / Mamba** | `~/.condarc` | `mirrors.tuna.tsinghua.edu.cn/anaconda/{pkgs,cloud}` | [anaconda](https://mirrors.tuna.tsinghua.edu.cn/help/anaconda/) |
-| **Homebrew**（bottles + brew.git + core.git） | `$HOMEBREW_*` 環境變數（`~/.config/zsh/00_exports.zsh` + 2 個 bootstrap 腳本） | `mirrors.tuna.tsinghua.edu.cn/homebrew-*` | [homebrew](https://mirrors.tuna.tsinghua.edu.cn/help/homebrew/) |
+| **Homebrew**（bottles/API + brew.git；**不含** core.git —— 見備註） | `$HOMEBREW_*` 環境變數（`dot_config/shell/00_exports.sh.tmpl` + 2 個 bootstrap 腳本） | **BFSU** `mirrors.bfsu.edu.cn/homebrew-*`（最快，2026-07 benchmark）；用 `brew-mirror {bfsu\|ustc\|aliyun\|tuna}` 即時切換 | [bfsu](https://mirrors.bfsu.edu.cn/help/homebrew-bottles/) / [ustc](https://mirrors.ustc.edu.cn/help/brew.git.html) |
 | **Rustup**(dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` 環境變數 | `goproxy.cn`（Qiniu；TUNA 沒有 Go proxy） | — |
@@ -136,6 +136,32 @@ npm registry 已被鏡像 (`registry.npmmirror.com`)，但**有少數 npm 套件
 ### brew install 過程中出現 `curl: (18) Transferred a partial file`
 
 見 [infrastructure-as-code.md → Troubleshooting](./infrastructure-as-code.md#troubleshooting)。
+
+### `brew update` / 任何 `brew` 指令卡住 60 秒以上然後什麼都沒做
+
+`HOMEBREW_BREW_GIT_REMOTE` git 鏡像的 smart-HTTP `upload-pack` 壞掉了：`git ls-remote`（ref advertisement）會成功，所以鏡像**看起來**健康，但實際的 packfile fetch 會卡住。**Aliyun 的 `brew.git` 就有這個 bug** —— 它在 2026-07 之前是預設基準，凍結了每次 `brew update`（以及每次 `brew install` / `brew upgrade` 前的 auto-update），直到 `unset HOMEBREW_BREW_GIT_REMOTE` 才解。
+
+修法：換一個可用的鏡像。Benchmark（2026-07，中國網路 —— `brew.git` shallow fetch + ~30 MB bottle-index 下載）：
+
+| 鏡像 | brew.git fetch | bottle 吞吐 | 結論 |
+|---|---|---|---|
+| **BFSU** | 1.1s | 31 MB/s | 最快 —— **目前基準** |
+| USTC | 1.0s | 11 MB/s | 穩定 fallback |
+| Aliyun | **FAIL**（upload-pack） | 17 MB/s | git 壞了，bottles 正常 |
+| TUNA | **timeout 45s** | 6 MB/s | 排隊中，兩者都慢 |
+
+用 `brew-mirror {bfsu|ustc|aliyun|tuna}` 即時切換後 `brew update`。基準設在 `dot_config/shell/00_exports.sh.tmpl`（+ 兩個 bootstrap 腳本）。完整除錯過程：`pitfalls/homebrew-aliyun-brew-git-hang-core-clone-bloat.md`。
+
+### `brew` 磁碟用量暴增 / `brew update` 從快變慢
+
+檢查 `du -sh "$(brew --repo homebrew/core)/.git"`。如果是 ~1 GB，表示 homebrew/core 從 API stub（~8 KB）被轉成了完整的 git clone —— 這會在 `HOMEBREW_CORE_GIT_REMOTE` 被**設定**且 `brew update` 執行時發生。Homebrew 4.x 以 JSON API（`HOMEBREW_API_DOMAIN`）為事實來源，所以 `HOMEBREW_CORE_GIT_REMOTE` 應保持**未設定**。恢復精簡的 API 模式：
+
+```bash
+brew untap homebrew/core     # 移除 ~1 GB 的 clone；formulae 仍透過 API 解析
+unset HOMEBREW_CORE_GIT_REMOTE
+```
+
+`brew-mirror` helper 會 unset 它，並自動 untap 殘留的 >100 MB clone。
 
 ### Conda / Mamba：切換 `useChineseMirror` 後 channel 刷新很慢或失敗
 
