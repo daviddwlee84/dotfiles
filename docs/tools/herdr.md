@@ -49,6 +49,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + w` / `prefix + g` | workspace nav / session navigator | built-in default |
 | `prefix + [` | vi copy mode (`hjkl`, `w/b/e`, `{/}`, `v`, `y`) | built-in default |
 | `prefix + q` | detach | built-in default |
+| `prefix + ?` | keybinds help overlay — lists every active binding with labels (herdr's native which-key; manually invoked, not an auto-timeout hint) | built-in default |
 | `prefix + ,` | rename tab | rebound (tmux muscle memory) |
 | `prefix + shift + r` | reload config (`prefix + r` stays resize mode) | rebound |
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
@@ -62,6 +63,23 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > Uppercase letters resolve to `prefix+shift+<letter>`, which herdr reserves for built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
+
+## Session helpers: `hvibe` / `hcode` (herdr analogs of `svibe` / `scode`)
+
+Two shell functions in [`dot_config/shell/24_herdr.sh`](../shells/aliases.md#session-management) spin up a whole coding workspace in one motion — the herdr counterparts of the tmux `svibe` / `scode` helpers. They shell out to the native `herdr workspace|tab|pane` CLI and **reuse svibe's pure logic verbatim** (specstory wrapping, `--on-exit shell|kill|restart`, git-root resolution, agent-CLI detection) from `22_sesh.sh`; only the layout calls differ. Need the `herdr` server running + `jq`.
+
+| Command | Builds workspace | Layout |
+|---|---|---|
+| `hvibe [N] [CLI]` / `hvibe --agents claude,codex,opencode` | `vibe/<repo>` | tab `agents` (N even-width agent panes) + tab `git` (lazygit) + tab `edit` (nvim) |
+| `hvibe --tab-per-agent …` | `vibe/<repo>` | one tab **per agent** + `git` + `edit` tabs |
+| `hcode [CLI]` | `coding-agent/<repo>` | tab `editor` (nvim 75% \| agent 25%) + tab `monitor` (btop) |
+
+- **Idempotent per repo**: re-running focuses the existing `vibe/<repo>` / `coding-agent/<repo>` workspace instead of duplicating (matches svibe's "attach if exists").
+- **Agent visibility**: herdr tracks agent state **per pane**, so in the default splits layout every agent still surfaces individually in herdr's agent tracking (verified: two agents in one tab appear as two separate entries in `herdr agent list`). The compact left sidebar rolls a *tab's* status into one dot — use `--tab-per-agent` if you want each agent to own a tab-level status dot.
+- **Even columns**: herdr has no `select-layout even-horizontal`, so `hvibe` sets each split's `--ratio` explicitly (`1/(N-m+1)`) to keep the agent panes even; `hcode` uses `--ratio 0.75` to give nvim 75%.
+- Same flags as svibe/scode: `--on-exit`, `--no-specstory`, `--no-attach`, `-p/--path`; `hvibe` also takes `--min-width` / `--tab-per-agent` and honors `$HVIBE_MIN_WIDTH` / `$HVIBE_LAUNCH_STAGGER`. Full flag help: `hvibe -h` / `hcode -h`.
+
+The tmux `svibe` / `scode` remain the tmux-side equivalents (see [sesh](sesh.md)); the two families coexist — `hvibe`/`hcode` only touch herdr, `svibe`/`scode` only touch tmux.
 
 ## herdr-plus plugin (sesh + tmuxp + menu analog)
 
@@ -112,6 +130,17 @@ These integration files are **not** vendored into the repo, so they do **not** r
 ### Config writeback (why `create_`)
 
 herdr **writes UI/runtime settings back into `~/.config/herdr/config.toml`** — e.g. finishing onboarding prepends `onboarding = false`, and the in-app *settings* popups (theme / sound / toasts / pane labels) persist there on *apply*. It edits in place and keeps existing comments, but it owns the file at runtime. That is why chezmoi manages it as **`create_` (seed-once)**: a plain managed file would be clobbered on every `chezmoi apply` (re-removing `onboarding=false` → the onboarding screen reappears, and reverting any UI change). Consequence: edits to `create_config.toml` in the repo do **not** auto-propagate to a machine that already has the file — refresh it deliberately with `cp ~/.config/herdr/config.toml "$(chezmoi source-path ~/.config/herdr/config.toml)"` (then strip the runtime `onboarding`/state lines).
+
+## Persistence & restore (accidental close)
+
+Two native layers, no plugin needed:
+
+- **Client/terminal close ≠ session loss.** herdr runs a persistent **server** (named session `default`, socket `~/.config/herdr/herdr.sock`). Closing the terminal window just detaches — workspaces/tabs/panes and their running processes stay alive. Reattach with bare `herdr` (or `herdr session attach default`); `herdr session list` shows it `running`. This is tmux detach/reattach, built in.
+- **Full server restart / reboot / crash.** `[session]` in the config exposes `resume_agents_on_restore = true` — resumes supported AI-agent panes back into their *native conversation sessions* after a server restart (requires the official `herdr integration install <agent>` hooks) — plus an option to save recent pane screen history across restarts. This covers the tmux-resurrect/continuum case natively, gated on those keys + integrations.
+
+## AI usage / quota status
+
+herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into. A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
 
 ## Gaps (no clean herdr equivalent)
 
