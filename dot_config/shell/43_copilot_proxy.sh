@@ -15,6 +15,8 @@
 #                                (auto-starts the proxy first)
 #   claude-copilot [args...]   - one-off Claude Code session on the proxy
 #                                (specstory-wrapped when available; zero file writes)
+#   claude-copilot-once [args...] - one-shot session via the copilot-here pin
+#                                (settings.local.json; auto-reverted, even on Ctrl-C)
 #   copilot-here [on|off|status] - sticky per-project toggle via the gitignored
 #                                ./.claude/settings.local.json (never touches the
 #                                committed .claude/settings.json)
@@ -373,11 +375,18 @@ copilot-here() {
         return 1
       fi
       # Claude Code only auto-gitignores settings.local.json when IT creates the
-      # file — since we created it, belt-and-braces via .git/info/exclude.
+      # file — since we created it, belt-and-braces via .git/info/exclude (a
+      # per-clone, never-committed ignore, so the proxy toggle leaves nothing to
+      # commit — unlike Claude Code's own root-.gitignore entry).
       if command git rev-parse --git-dir >/dev/null 2>&1; then
         if ! command git check-ignore -q "$settings" 2>/dev/null; then
           local exclude; exclude="$(command git rev-parse --git-dir)/info/exclude"
-          printf '%s\n' ".claude/settings.local.json" >>"$exclude"
+          # MUST be the un-anchored **/ form, NOT a bare .claude/settings.local.json:
+          # a pattern with an internal slash is anchored to the repo ROOT, so it
+          # would not ignore the file when THIS project lives in a subdirectory of
+          # a larger repo (e.g. skills/foo/.claude/…). **/ matches at any depth —
+          # one idempotent line covers root + every nested project.
+          printf '%s\n' "**/.claude/settings.local.json" >>"$exclude"
         fi
       fi
       printf '%s\n' "copilot-here: ON — $settings pins Claude Code to $(_copilot_base) (model: $model)"
@@ -426,6 +435,82 @@ copilot-here() {
       return 1
       ;;
   esac
+}
+
+# --- one-shot pinned session (Layer 2, auto-reverted) ---------------------------
+
+# Combine copilot-here (settings.local.json pin — beats inherited env, see Gotchas)
+# with claude-copilot's ephemerality: pin THIS project, run ONE specstory-wrapped
+# session, then unpin — even on Ctrl-C / kill. The proxy must already be up (we only
+# notify; start it with `copilot-proxy start`). If copilot-here is already ON here,
+# the existing pin is left untouched on exit (safe to run inside a pinned project).
+# Example:
+#   claude-copilot-once                 # pin, run, auto-unpin
+#   claude-copilot-once -c              # continue last session
+#   claude-copilot-once --no-specstory  # raw claude, no markdown auto-save
+claude-copilot-once() {
+  case "${1:-}" in
+    -h|--help)
+      printf '%s\n' "Usage: claude-copilot-once [--no-specstory] [claude args...]"
+      printf '%s\n' "  Pin THIS project to the proxy (copilot-here on), run one Claude Code"
+      printf '%s\n' "  session, then auto-unpin (copilot-here off) — even on Ctrl-C."
+      printf '%s\n' "  Needs the proxy already running:  copilot-proxy start"
+      return 0 ;;
+  esac
+
+  # 1. Proxy must already be answering — notify only, never auto-start.
+  if ! _copilot_alive; then
+    printf '%s\n' "claude-copilot-once: proxy not reachable on port $(_copilot_port)." >&2
+    printf '%s\n' "  start it first:  copilot-proxy start" >&2
+    return 1
+  fi
+  # copilot-here needs jq — fail early with a clear message.
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "claude-copilot-once: jq is required (used by copilot-here)" >&2
+    return 1
+  fi
+
+  # 2. Don't clobber an existing pin: only turn OFF what we turn ON.
+  local _cco_was_on=0
+  if [ -f ".claude/settings.local.json" ] \
+     && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' ".claude/settings.local.json" 2>/dev/null)" != "" ]; then
+    _cco_was_on=1
+  fi
+
+  if [ "$_cco_was_on" = "0" ]; then
+    copilot-here on || return 1
+    # Auto-unpin even on Ctrl-C / kill. Mirror tmux_status_run's INT/TERM/HUP
+    # trap + explicit normal-path cleanup; a bare function-scope EXIT trap would
+    # fire on the wrong event when bash sources this file.
+    trap '_copilot_once_trap' INT TERM HUP
+  else
+    printf '%s\n' "claude-copilot-once: copilot-here already ON here — leaving the pin in place on exit."
+  fi
+
+  # 3. One session — specstory-wrapped + arg passthrough (reuses claude-copilot).
+  claude-copilot "$@"
+  local _rc=$?
+
+  # 4. Revert only what we enabled.
+  if [ "$_cco_was_on" = "0" ]; then
+    trap - INT TERM HUP
+    copilot-here off
+  fi
+
+  # 5. We never auto-stop the proxy — remind how.
+  printf '%s\n' "claude-copilot-once: session ended. Proxy still running on $(_copilot_base)."
+  printf '%s\n' "  stop it when done:  copilot-proxy stop"
+  return $_rc
+}
+
+# Internal: INT/TERM/HUP handler — unpin, clear trap, re-raise INT so the
+# interactive shell sees correct exit semantics (mirrors _tmux_status_run_trap
+# in dot_config/shell/60_tmux_status.sh).
+_copilot_once_trap() {
+  copilot-here off >/dev/null 2>&1
+  trap - INT TERM HUP
+  printf '\n%s\n' "claude-copilot-once: interrupted — unpinned (copilot-here off). Proxy still up." >&2
+  kill -INT $$ 2>/dev/null
 }
 
 # --- model switcher -------------------------------------------------------------

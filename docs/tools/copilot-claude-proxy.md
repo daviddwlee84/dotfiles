@@ -11,7 +11,7 @@ points at the fork) but still works via `COPILOT_API_PKG=copilot-api@0.7.0`.
 Both packages share the same token file
 (`~/.local/share/copilot-api/github_token`), so switching needs **no re-auth**.
 
-- **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`, `claude-copilot`, `copilot-run`, `copilot-here`, `copilot-model`)
+- **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`, `claude-copilot`, `claude-copilot-once`, `copilot-run`, `copilot-here`, `copilot-model`)
 - **Runner**: `bunx @jeffreycao/copilot-api` (pinned; matches the `bunx` convention in `07_bunx_cli.sh`)
 - **Not installed by ansible** — pulled on demand via `bunx`, so it stays off the
   provisioning path.
@@ -31,6 +31,7 @@ Both packages share the same token file
 copilot-proxy auth      # one-time: GitHub device login (stores a ghu_ token)
 
 claude-copilot          # one-off session on the proxy (auto-starts it; no file writes)
+claude-copilot-once     # pin THIS project, run one session, then auto-unpin (proxy must be up)
 
 copilot-here on         # OR: pin THIS project — plain `claude` uses the proxy
 copilot-here off        # unpin — back to the real Anthropic backend
@@ -83,6 +84,7 @@ So the proxy uses the two layers nobody else owns:
 | Enable | Mechanism | Scope | Disable |
 |---|---|---|---|
 | `claude-copilot` / `copilot-run` | per-process env vars | one session | just run plain `claude` next time |
+| `claude-copilot-once` | `./.claude/settings.local.json` pin, auto-reverted | one session | automatic — unpins on exit |
 | `copilot-here on` | `./.claude/settings.local.json` (gitignored) | this project, sticky | `copilot-here off` |
 
 ```
@@ -133,6 +135,23 @@ project-level settings files — but **not** an active `copilot-here` pin in
   `--no-specstory`. Extra args reach the claude CLI via specstory's
   `-c "custom command"` passthrough: `claude-copilot -c` → continue session.
 - Revert = nothing to revert; plain `claude` next time is untouched.
+
+### `claude-copilot-once [--no-specstory] [claude args...]` — one-shot pinned session
+
+Layer 1's ephemerality with Layer 2's reliability: pin **this project** via
+`copilot-here on`, run one `claude-copilot` session, then `copilot-here off` on
+exit — even on Ctrl-C. Use it when pure env injection isn't enough because
+`settings.local.json` outranks shell env (see Gotchas), but you don't want to
+leave a sticky pin behind.
+
+- **Precondition:** the proxy must already be running — unlike `claude-copilot`
+  this does **not** auto-start it; it prints a `copilot-proxy start` hint and
+  returns non-zero if the proxy isn't answering.
+- **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
+  left in place on exit (nothing is unpinned that you didn't ask for).
+- The session itself is just `claude-copilot "$@"`, so specstory auto-save,
+  `--no-specstory`, and `-c` (continue) all work the same way.
+- On exit it reminds you the proxy is still up and how to `copilot-proxy stop`.
 
 ### `copilot-run <cmd...>` — generic env injector
 
@@ -315,6 +334,7 @@ or `GET /v1/models`.
 
 ```sh
 claude-copilot                       # one-off proxy session (specstory-wrapped)
+claude-copilot-once                  # one-shot session via the settings.local.json pin (auto-reverted)
 copilot-here status                  # is this project pinned to the proxy?
 copilot-model -c                     # current model + which layer it came from
 copilot-proxy status                 # up? which Claude models?
@@ -326,6 +346,8 @@ copilot-proxy logs 60                # tail the proxy log
 
 ## See also
 
+- [Copilot embeddings → semantic search](copilot-embeddings.md) — the same proxy's
+  `/v1/embeddings` endpoint wired into `copilot-embed` + `semsearch` (local semantic search)
 - [caozhiyuan/copilot-api](https://github.com/caozhiyuan/copilot-api) — the
   maintained fork this setup runs (npm `@jeffreycao/copilot-api`)
 - [ericc-ch/copilot-api](https://github.com/ericc-ch/copilot-api) — the
