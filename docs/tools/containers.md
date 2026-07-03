@@ -177,9 +177,7 @@ Native Docker mechanism. `daemon.json`:
     "https://docker.mirrors.ustc.edu.cn",
     "https://docker.nju.edu.cn",
     "https://mirror.iscas.ac.cn",
-    "https://mirror.baidubce.com",
-    "https://dockerhub.azk8s.cn",
-    "https://dockerproxy.com"
+    "https://mirror.baidubce.com"
   ]
 }
 ```
@@ -193,8 +191,8 @@ Order matters: Docker tries mirrors sequentially and falls back to `docker.io` o
 - `docker.m.daocloud.io` — primary for most users. Known issue tracked at [DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328) (large image pulls sometimes stall); workaround is retry or fall through to the next mirror.
 - `docker.mirrors.ustc.edu.cn`, `docker.nju.edu.cn`, `mirror.iscas.ac.cn` — academic mirrors; generally reliable, sometimes slower.
 - `mirror.baidubce.com` — Baidu Cloud; reliable but rate-limited.
-- `dockerhub.azk8s.cn` — Azure China. Previously deprecated; may or may not still work on your network.
-- `dockerproxy.com` — community mirror; ToS changed in the past, keep as fallback.
+
+**Removed for supply-chain safety** (2026-07): `dockerhub.azk8s.cn` (deprecated Azure-China mirror) and `dockerproxy.com` (third-party, ToS-churned) were dropped from the managed list. A pull-through mirror resolves `tag→digest`, and Docker Content Trust is off by default, so a dead/third-party mirror domain that lapses and gets re-registered by an attacker becomes a malicious pull-through cache that can serve a tampered image for a tag like `latest`. If you re-add any mirror, prefer high-reputation operators; for sensitive images pull by digest (`repo@sha256:…`) or enable Content Trust. See [mirrors.md → Security and trust model](mirrors.md#security-and-trust-model).
 
 Verify after apply + daemon restart:
 

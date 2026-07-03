@@ -38,8 +38,47 @@ chezmoi apply
 | **Rustup**(dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` 環境變數 | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` 環境變數 | `goproxy.cn`（Qiniu；TUNA 沒有 Go proxy） | — |
-| **Docker Hub**（Linux 上的 rootless Docker） | `~/.config/docker/daemon.json`，透過 `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu / azk8s（fallback chain） | — |
+| **Docker Hub**（Linux 上的 rootless Docker） | `~/.config/docker/daemon.json`，透過 `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu（fallback chain） | — |
 | **Ubuntu apt**（僅 Docker image） | `Dockerfile` | 華為雲 (Huawei Cloud) | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
+
+## 安全性與信任模型 (Security and trust model)
+
+鏡像 (mirror) 是用一道信任邊界 (trust boundary) 換取速度。決定你到底信任鏡像多少的關鍵只有一個問題：**套件完整性 (integrity) 是不是由「鏡像以外的來源」獨立驗證，還是鏡像連「用來比對的 checksum」也一起提供？**
+
+- **若驗證是獨立的**，惡意或被入侵的鏡像無法在不被發現的情況下竄改 —— 被動過的檔案會對不上一個「不是鏡像給的」checksum。
+- **若鏡像同時提供「檔案」與「預期 checksum／index」**（沒有 lockfile 的**全新安裝**就是這種情況），你就是在信任該營運方。這是**所有**鏡像或 proxy 的共通性質 —— 公司內部的 Artifactory 也一樣 —— 不是中國鏡像獨有。
+
+第三方在網路上竄改（MITM，中間人攻擊）是另一條軸線，且已被關閉：**此處每個鏡像都是 HTTPS**（沒有明文 `http://`）。
+
+### 第一級 —— 獨立加密驗證（鏡像無法竄改）
+
+| 生態系 | 為何安全 |
+|---|---|
+| **Go modules** | `GOPROXY=goproxy.cn` 負責提供 module，但 `GOSUMDB=sum.golang.google.cn`（Google 營運、對已簽章 checksum database 的鏡像）會針對 `go.sum` 獨立驗證每個 module。即使 proxy 是惡意的也會被抓到。這是黃金標準 —— 保持 `GOSUMDB` 設定，絕不要關掉。 |
+
+### 第二級 —— 全新安裝時 checksum 與檔案來自同一個鏡像
+
+對**全新**安裝而言這些鏡像是被信任的；而 **lockfile 會把它們升級成第一級**（對已鎖定的東西而言）。
+
+| 生態系 | 鏡像提供的 checksum 來源 | 你擁有的獨立防護 |
+|---|---|---|
+| **Cargo** | crates.io index（SHA256） | `Cargo.lock` 能抓到已鎖定依賴被竄改 |
+| **npm / Bun** | registry metadata | 已鎖定依賴的 `package-lock.json` `integrity`（sha512） |
+| **PyPI**（uv/pip） | `simple` index hashes | `uv.lock` 或 hash-pinned 的 `requirements.txt`（`--require-hashes`） |
+| **Homebrew** | 透過 `HOMEBREW_API_DOMAIN` 的 formula JSON（API domain **同時**是 bottle checksum 來源，所以鏡像兩者都控制） | 營運方信譽（BFSU = 大學） |
+| **RubyGems / conda / Rustup / mise-node** | index／manifest／`SHASUMS256.txt`，皆來自同一鏡像 | 營運方信譽；conda/gem 的 checksum 可放進 lockfile |
+
+第二級的實際防護 = **營運方信譽 + HTTPS + lockfile**。此處所有營運方皆高信譽（TUNA=清華、USTC=中科大、BFSU=北外、SJTU=上交、ZJU=浙大、NJU=南大 等大學；Alibaba/Tencent/Huawei/Baidu/Qiniu 等大廠雲），蓄意投毒有巨大的法律與名譽代價，且它們都是上游的 bit-for-bit rsync 複本。**安全敏感的東西請用 lockfile 釘住**，信任就降到第一級。
+
+### 第三級 —— 解析／中繼資料信任（最該盯的一項）
+
+- **Docker Hub `registry-mirrors`**：pull-through 鏡像負責解析 `tag→digest`，而 Docker Content Trust **預設關閉**，所以是鏡像決定 `latest` 這類 tag 對映到哪個 image。一旦你**以 digest 拉取**（`repo@sha256:…`）就是內容定址、安全。敏感 image 請以 digest 拉取或啟用 Content Trust。`dockerhub.azk8s.cn` 與 `dockerproxy.com` 已於 2026-07 **移除**：失效／第三方的鏡像域名可能註冊過期並被攻擊者重新註冊成惡意的 pull-through cache。
+
+### 殘餘風險（即使用可信鏡像也存在）
+
+- **時效落後 (staleness)** —— 鏡像可能落後上游，延遲安全修補，或短暫供應一個上游已撤回 (yanked) 的版本。
+- **全新安裝的信任** —— 沒有 lockfile 的第二級是在信任營運方；被入侵的鏡像伺服器才是現實威脅（而非營運方蓄意作惡）。
+- **依賴混淆 (dependency confusion)** —— 只有在你於 `uv.toml` 的公開 PyPI 鏡像旁再加入**私有** index 時才會發生；那裡的 `index-strategy = "unsafe-first-match"` 之所以安全，**僅**因三個 index 都是公開的。見 `dot_config/uv/uv.toml.tmpl` 內的警告。
 
 ## 環境變數匯出於何處（三層）
 

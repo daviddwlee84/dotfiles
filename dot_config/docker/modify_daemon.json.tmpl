@@ -31,14 +31,21 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 {{ if and (eq .chezmoi.os "linux") .useChineseMirror -}}
+# Curated Docker Hub pull-through mirrors (5), high-reputation operators only.
+# Trust note: a pull-through mirror resolves tag->digest, and Docker Content
+# Trust is OFF by default, so a compromised/hijacked mirror can serve a
+# malicious image for a tag like `latest`. For sensitive images pull by digest
+# (repo@sha256:...) or enable Content Trust. Deliberately EXCLUDED:
+# dockerhub.azk8s.cn (deprecated Azure-China) and dockerproxy.com (third-party,
+# ToS-churned) -- dead/third-party domains risk lapsing and being re-registered
+# into a malicious pull-through cache. See
+# docs/tools/mirrors.md#security-and-trust-model.
 printf '%s' "$input" | jq '.["registry-mirrors"] = [
   "https://docker.m.daocloud.io",
   "https://docker.mirrors.ustc.edu.cn",
   "https://docker.nju.edu.cn",
   "https://mirror.iscas.ac.cn",
-  "https://mirror.baidubce.com",
-  "https://dockerhub.azk8s.cn",
-  "https://dockerproxy.com"
+  "https://mirror.baidubce.com"
 ]'
 {{- else -}}
 printf '%s' "$input" | jq 'del(.["registry-mirrors"]) | if . == {} then empty else . end'

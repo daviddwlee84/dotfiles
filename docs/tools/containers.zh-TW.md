@@ -182,9 +182,7 @@ Docker 原生機制。`daemon.json`：
     "https://docker.mirrors.ustc.edu.cn",
     "https://docker.nju.edu.cn",
     "https://mirror.iscas.ac.cn",
-    "https://mirror.baidubce.com",
-    "https://dockerhub.azk8s.cn",
-    "https://dockerproxy.com"
+    "https://mirror.baidubce.com"
   ]
 }
 ```
@@ -198,8 +196,8 @@ Docker 原生機制。`daemon.json`：
 - `docker.m.daocloud.io` —— 多數使用者的首選。已知問題追蹤於 [DaoCloud/public-image-mirror#2328](https://github.com/DaoCloud/public-image-mirror/issues/2328)（大型 image 拉取偶爾會卡住）；解法是重試或換下一個 mirror。
 - `docker.mirrors.ustc.edu.cn`、`docker.nju.edu.cn`、`mirror.iscas.ac.cn` —— 學術 mirror；通常可靠，有時較慢。
 - `mirror.baidubce.com` —— 百度雲；可靠但有限速。
-- `dockerhub.azk8s.cn` —— Azure China。先前已棄用；在你的網路上可能可用也可能不行。
-- `dockerproxy.com` —— 社群 mirror；ToS 過去變更過，留作 fallback。
+
+**為供應鏈安全已移除 (removed for supply-chain safety，2026-07)**：`dockerhub.azk8s.cn`（已棄用的 Azure-China 鏡像）與 `dockerproxy.com`（第三方、ToS 反覆變更）已從受管清單移除。pull-through 鏡像負責解析 `tag→digest`，而 Docker Content Trust 預設關閉，因此一個失效／第三方的鏡像域名一旦註冊過期並被攻擊者重新註冊，就會變成惡意的 pull-through cache，可對 `latest` 之類的 tag 供應被竄改的 image。若要重新加入任何鏡像，請優先選擇高信譽營運方；敏感 image 請以 digest 拉取（`repo@sha256:…`）或啟用 Content Trust。見 mirrors.md 的「安全性與信任模型 (Security and trust model)」一節。
 
 apply + daemon 重啟後驗證：
 

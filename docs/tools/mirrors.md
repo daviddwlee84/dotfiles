@@ -38,8 +38,72 @@ chezmoi apply
 | **Rustup** (dist + self-update) | `RUSTUP_DIST_SERVER` / `RUSTUP_UPDATE_ROOT` env vars | `mirrors.tuna.tsinghua.edu.cn/rustup` | [rustup](https://mirrors.tuna.tsinghua.edu.cn/help/rustup/) |
 | **mise** Node.js prebuilt | `MISE_NODE_MIRROR_URL` / `NODE_BUILD_MIRROR_URL` env vars | `mirrors.tuna.tsinghua.edu.cn/nodejs-release/` | [nodejs-release](https://mirrors.tuna.tsinghua.edu.cn/help/nodejs-release/) |
 | **Go modules** | `GOPROXY` env var | `goproxy.cn` (Qiniu; TUNA has no Go proxy) | — |
-| **Docker Hub** (rootless Docker on Linux) | `~/.config/docker/daemon.json` via `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu / azk8s (fallback chain) | — |
+| **Docker Hub** (rootless Docker on Linux) | `~/.config/docker/daemon.json` via `modify_daemon.json.tmpl` | DaoCloud / USTC / NJU / ISCAS / Baidu (fallback chain) | — |
 | **Ubuntu apt** (Docker image only) | `Dockerfile` | Huawei Cloud | [ubuntu](https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/) |
+
+## Security and trust model
+
+Mirrors trade a trust boundary for speed. The one question that decides how much
+you're trusting a mirror: **is package integrity verified independently of the
+mirror, or does the mirror also supply the checksum it's checked against?**
+
+- **If verification is independent**, a malicious or compromised mirror cannot
+  tamper undetected — a changed artifact fails a checksum that the mirror did
+  not provide.
+- **If the mirror supplies both the artifact and its expected checksum/index**
+  (the common case for a *fresh* install with no lockfile), you are trusting the
+  operator. This is inherent to *any* mirror or proxy — a corporate Artifactory
+  is the same — not something specific to Chinese mirrors.
+
+Third-party network tampering (MITM) is a separate axis and is already closed:
+**every mirror here is HTTPS** (no plaintext `http://`).
+
+### Tier 1 — independent cryptographic verification (mirror cannot tamper)
+
+| Ecosystem | Why it's safe |
+|---|---|
+| **Go modules** | `GOPROXY=goproxy.cn` serves modules, but `GOSUMDB=sum.golang.google.cn` (Google-operated mirror of the signed checksum database) verifies every module against `go.sum` independently. Even a malicious proxy is caught. This is the gold standard — keep `GOSUMDB` set, never disable it. |
+
+### Tier 2 — checksum ships with the artifact from the same mirror on fresh install
+
+For a *brand-new* install these mirrors are trusted; a **lockfile turns them into
+Tier-1** for anything already pinned.
+
+| Ecosystem | Mirror-supplied checksum source | Independent protection you have |
+|---|---|---|
+| **Cargo** | crates.io index (SHA256) | `Cargo.lock` catches tampering of already-pinned deps |
+| **npm / Bun** | registry metadata | `package-lock.json` `integrity` (sha512) for pinned deps |
+| **PyPI** (uv/pip) | `simple` index hashes | `uv.lock` or hash-pinned `requirements.txt` (`--require-hashes`) |
+| **Homebrew** | formula JSON via `HOMEBREW_API_DOMAIN` (the API domain is *also* the bottle checksum source, so the mirror controls both) | operator reputation (BFSU = university) |
+| **RubyGems / conda / Rustup / mise-node** | index / manifest / `SHASUMS256.txt` from the same mirror | operator reputation; conda/gem checksums in a lockfile |
+
+Real-world protection for Tier 2 = **operator reputation + HTTPS + lockfiles**.
+All operators here are high-reputation (TUNA=Tsinghua, USTC, BFSU, SJTU, ZJU,
+NJU universities; Alibaba/Tencent/Huawei/Baidu/Qiniu major clouds) with strong
+legal and reputational disincentives against injecting malware, and they are
+bit-for-bit rsync copies of upstream. **Pin with a lockfile for anything
+security-sensitive** and the trust drops to Tier 1.
+
+### Tier 3 — resolution/metadata trust (the one to watch)
+
+- **Docker Hub `registry-mirrors`**: a pull-through mirror resolves `tag→digest`,
+  and Docker Content Trust is **off by default**, so the mirror decides which
+  image a tag like `latest` maps to. Once you pull **by digest**
+  (`repo@sha256:…`) it's content-addressed and safe. For sensitive images, pull
+  by digest or enable Content Trust. `dockerhub.azk8s.cn` and `dockerproxy.com`
+  were **removed** (2026-07): a dead/third-party mirror domain can lapse and be
+  re-registered by an attacker into a malicious pull-through cache.
+
+### Residual risks (true even with reputable mirrors)
+
+- **Staleness** — a mirror can lag upstream, delaying a security fix or briefly
+  serving a version that was yanked upstream.
+- **Fresh-install trust** — Tier 2 without a lockfile trusts the operator; a
+  breached mirror server is the realistic (not deliberate-vendor-malice) threat.
+- **Dependency confusion** — only if you add a *private* index alongside the
+  public PyPI mirrors in `uv.toml`; the `index-strategy = "unsafe-first-match"`
+  there is safe *only* because all three indexes are public. See the warning in
+  `dot_config/uv/uv.toml.tmpl`.
 
 ## Where env vars are exported (three layers)
 

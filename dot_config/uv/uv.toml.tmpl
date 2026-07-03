@@ -11,8 +11,18 @@
 #   - Huawei: https://repo.huaweicloud.com/repository/pypi/simple/
 #   - Tencent: https://mirrors.cloud.tencent.com/pypi/simple/
 
-# Enable fallback to next mirror if primary fails
-# "unsafe-first-match" is safe for public mirrors (all sync from PyPI)
+# Enable fallback to next mirror if primary fails.
+# "unsafe-first-match" = take the first index that has ANY matching version,
+# rather than querying every index for the best version. Safe HERE because all
+# three indexes below are PUBLIC PyPI mirrors that rsync from upstream, so
+# "first that has it" and "best across all" resolve to the same artifact.
+#
+# ⚠ Dependency-confusion foot-gun: this stops being safe the moment you add a
+# PRIVATE / internal index to this file. With "unsafe-first-match" + a public
+# mirror listed first, an attacker who registers a PUBLIC package that shadows
+# one of your internal names can get it pulled ahead of the private one. If you
+# ever mix a private index in here, switch back to `index-strategy = "first-match"`
+# (or pin the internal package to its own index via `[[tool.uv.sources]]`).
 index-strategy = "unsafe-first-match"
 
 # Mirrors in priority order (first available wins)
