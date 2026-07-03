@@ -592,6 +592,8 @@
 |---------|------|-------------|-------------|
 | `zsh-profile` | alias | `dot_config/zsh/10_aliases.zsh` | 對 zsh 啟動時間做效能剖析 (`ZSH_PROF=1 zsh -i -c exit`) |
 | `ghostty-ssh-terminfo` | function | `dot_config/shell/10_aliases.sh` | 透過 SSH 在遠端主機上安裝 `xterm-ghostty` terminfo（無需特權） |
+| `source-rc` | function | `dot_config/shell/10_aliases.sh` | **就地**重新載入目前 shell 的 rc（`~/.zshrc` 或 `~/.bashrc`，依 `$ZSH_VERSION`/`$BASH_VERSION` 自動偵測）—— `chezmoi apply` 後不必開新 login shell 就能吃到新的 alias/function。是 `exec` 型 `cas`/`cau` 的輕量版本；與手動 `source ~/.zshrc` 有相同的注意事項 |
+| `reload` | alias | `dot_config/shell/10_aliases.sh` | `source-rc` 的簡短別名。現已跨 shell（先前僅 bash 的 `. ~/.bashrc`） |
 | `tldrf` | function | `dot_config/zsh/tools/28_tldr.zsh` | 帶語言退回的 `tldr`：zh_TW → zh → en *(需要 tldr)* |
 
 ---

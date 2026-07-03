@@ -90,6 +90,39 @@ run-for() {
 	"$to" --signal="${RUN_FOR_SIGNAL:-INT}" --kill-after="${RUN_FOR_KILL_AFTER:-5s}" "$dur" "$@"
 }
 
+# --- Reload shell config (source-rc / reload) ------------------------------
+# Re-source the CURRENT shell's rc entry point in place, so a running session
+# picks up new aliases/functions after `chezmoi apply` — without exec'ing a
+# fresh login shell (that heavier, guaranteed-clean path is `cas`/`cau` in
+# 99_chezmoi_reload.sh). Dispatches on the live interpreter
+# ($ZSH_VERSION/$BASH_VERSION), NOT $SHELL (which lags `chsh` until next login).
+# `function` keyword (not `name()`) is deliberate: source-rc re-parses this file
+# on every call, so its definition must be immune to the ALIAS_FUNC_DEF
+# re-source `parse error near \`()'` — see
+# pitfalls/zsh-parse-error-on-resource-after-bw-completion-aliased-name.md.
+# Re-sourcing only *redefines* source-rc (never re-calls it → no recursion) and
+# inherits the same caveats as a manual `source ~/.zshrc`.
+function source-rc {
+	if [ -n "${ZSH_VERSION:-}" ]; then
+		_rc="$HOME/.zshrc"
+	elif [ -n "${BASH_VERSION:-}" ]; then
+		_rc="$HOME/.bashrc"
+	else
+		printf 'source-rc: unsupported shell (need zsh or bash)\n' >&2
+		return 1
+	fi
+	if [ ! -f "$_rc" ]; then
+		printf 'source-rc: %s not found (run chezmoi apply first?)\n' "$_rc" >&2
+		unset _rc
+		return 1
+	fi
+	printf 'source-rc: reloading %s\n' "$_rc"
+	# shellcheck source=/dev/null
+	. "$_rc"
+	unset _rc
+}
+alias reload='source-rc'
+
 # --- Chezmoi ---------------------------------------------------------------
 # https://www.chezmoi.io/user-guide/frequently-asked-questions/design/#why-does-chezmoi-cd-spawn-a-shell-instead-of-just-changing-directory
 chezmoi-cd() {

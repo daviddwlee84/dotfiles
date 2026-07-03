@@ -8,5 +8,6 @@
 # Sister to zsh's `zsh-profile` alias.
 alias bash-profile='BASH_PROF=1 bash -ic exit'
 
-# Re-source bashrc in current shell (handy after editing config).
-alias reload='. ~/.bashrc'
+# `reload` (re-source the current shell's rc) is now cross-shell — defined once
+# in dot_config/shell/10_aliases.sh as `alias reload='source-rc'`, which loads
+# after this file for bash, so the shared definition wins. See `source-rc` there.

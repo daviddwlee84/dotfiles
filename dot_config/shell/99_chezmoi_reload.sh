@@ -51,20 +51,27 @@ _chezmoi_reload_check() {
     [[ "$_CZ_RELOAD_SENTINEL" -nt "$_CZ_RELOAD_BIRTH" ]] || return 0
 
     _CZ_RELOAD_SHOWN=1
-    local sh rc
+    local sh reload_cmd
     sh="$(_chezmoi_reload_current_shell)"
-    rc="~/.${sh}rc"
+    # Prefer the `source-rc` helper (dot_config/shell/10_aliases.sh) when this
+    # shell already has it; a session predating that helper's deployment falls
+    # back to the explicit `source ~/.<sh>rc` it can always run.
+    if command -v source-rc >/dev/null 2>&1; then
+        reload_cmd="source-rc"
+    else
+        reload_cmd="source ~/.${sh}rc"
+    fi
 
     if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
         local y c r
         y="$(tput setaf 3 2>/dev/null)"
         c="$(tput setaf 6 2>/dev/null)"
         r="$(tput sgr0 2>/dev/null)"
-        printf '%sℹ%s chezmoi applied changes — run %sexec %s -l%s or %ssource %s%s to reload\n' \
-            "$y" "$r" "$c" "$sh" "$r" "$c" "$rc" "$r"
+        printf '%sℹ%s chezmoi applied changes — run %s%s%s (or %sexec %s -l%s) to reload\n' \
+            "$y" "$r" "$c" "$reload_cmd" "$r" "$c" "$sh" "$r"
     else
-        printf 'i chezmoi applied changes - run `exec %s -l` or `source %s` to reload\n' \
-            "$sh" "$rc"
+        printf 'i chezmoi applied changes - run `%s` (or `exec %s -l`) to reload\n' \
+            "$reload_cmd" "$sh"
     fi
 }
 
