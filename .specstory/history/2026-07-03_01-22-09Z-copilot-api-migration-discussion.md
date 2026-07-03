@@ -550,3 +550,1870 @@ _**Agent (claude-fable-5)**_
 <summary>Tool use: **edit_file_v2**</summary>
 
 </details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update the settings-layer design comment to fix the precedence issue and revise the Env section in the header.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+Now the package default and flavor helper.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "in_progress"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "pending"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "pending"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "pending"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "pending"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "in_progress"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "pending"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "pending"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "pending"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "pending"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "pending"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+Now I'm handling the `whoami` command, which checks if the user is authenticated by verifying the GitHub token file exists, then calls the usage check command. For the fork approach, I'm considering whether the proxy is running and if so, making a curl request to the `/usage` endpoint instead.
+
+I'm thinking through what the GitHub Copilot usage endpoint returns — it includes quota snapshots with chat and completions data, plan information, and reset dates. I'll write a jq filter to parse and summarize this defensively with fallbacks for missing fields.
+
+Writing the shell logic...I'm checking the `whoami` conditional next.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "in_progress"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "pending"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "pending"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "in_progress"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "pending"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "pending"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "pending"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "pending"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm setting up the copilot-run function to conditionally add environment variables based on a quiet mode flag, using a bash conditional to check if COPILOT_PROXY_QUIET is enabled before passing extra configuration to the command env invocation.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now the opt-in quiet env in `copilot-run`, plus the precedence comment fix there.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I need to add the quiet keys to the `_copilot_here_keys` collection and then conditionally merge them into the `on` object.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now `copilot-here`: extend the owned-keys list and conditionally merge the quiet keys in `on`.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I've checked the header and copilot-run precedence comments, and now I'm looking at the claude-copilot docstring to see if there are other references to "shell env beats" that I should account for.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh",
+  "pattern": "shell env|beat|settings-file"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh",
+  "pattern": "shell env|beat|settings-file",
+  "topFiles": [
+    {
+      "matchCount": 2,
+      "uri": "dot_config/shell/43_copilot_proxy.sh"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 2
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+Both fixes are in place — the shell environment precedence note was in the docs, not the script, so that's confirmed. I'm marking the quiet-env and precedence-comments tasks as done, then I'll run a quick lint check on the script before moving to the docs.Script changes are complete. Now I'll check for lint issues and then update the docs.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "in_progress"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "pending"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "pending"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I found a docstring issue in the claude-copilot docs that needs fixing, and now I'm updating the documentation file with several key changes: clarifying that this is a maintained proxy fork with links to both repositories and issue #233, noting the shared token situation, revising the environment variable table to include the new COPILOT_API_PKG default and COPILOT_PROXY_QUIET option while marking COPILOT_PROXY_RATE as original-only, explaining how it works as a native /v1/messages passthrough, and updating the dashboard URL to reference the local instance.
+
+I also need to add a new gotchas section covering the precedence rules (settings.local.json beats shell env), the absence of a rate limiter, context_management 400 errors, and hyphenated IDs, then fix the conflicting precedence claims scattered throughout the "Settings-layer design" and claude-copilot sections.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now the docs. I'll make a series of edits to `docs/tools/copilot-claude-proxy.md`.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm moving on to the "How it works" section.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I need to revisit the Settings-layer design section around lines 50-72 and correct the claim about shell environment variables overriding the env block in every settings file — the actual testing shows something different, so I'll update that with the real findings and fix the accompanying diagram.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now the settings-layer design precedence fix.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+Now the env-var table and `whoami` description in the `copilot-proxy` section.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing there's a confusing note about the shell environment precedence in the claude-copilot section—it says shell env beats settings-file env blocks "even where copilot-here is off," which doesn't quite capture the actual gotcha here. I should clarify that this precedence applies regardless of the copilot-here setting, making it a potential surprise for users.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+Now I'm adding the COPILOT_PROXY_QUIET environment variable details, expanding the gotchas section with new edge cases, including the dashboard URL in the useful commands, and updating the see also links.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Now update the "Injected env" section to document the quiet extras.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+Now the Gotchas section — add the new ones and update the `/model` picker note.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I've added the dashboard URL to the useful commands and included relevant "See also" links.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I should double-check the available Claude model IDs section and the quick start guide to make sure everything looks good, then scan through the docs one more time for any lingering references to "ericc-ch" that need cleaning up.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md",
+  "pattern": "ericc-ch|copilot-api@0.7.0|rate limit|rate-limit"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md",
+  "pattern": "ericc-ch|copilot-api@0.7.0|rate limit|rate-limit",
+  "topFiles": [
+    {
+      "matchCount": 15,
+      "uri": "docs/tools/copilot-claude-proxy.md"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 15
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+Documentation is complete. Now I need to verify the setup by checking if the proxy is running on port 4141 with the old package, then restart it with the new default. Since the changes were made in the chezmoi source directory, I can test by sourcing the file directly in a bash subshell, though applying the changes system-wide would require running `chezmoi apply`.
+
+The plan also includes committing these changes to git once verification is done. I'll start by checking the current proxy status and then proceed with the restart and verification steps outlined in the plan.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Docs done. Now verification — first syntax-check the script in both shells and see whether a proxy is currently running.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "in_progress"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "pending"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -n dot_config/shell/43_copilot_proxy.sh && zsh -n dot_config/shell/43_copilot_proxy.sh && echo SYNTAX_OK; curl -fsS --max-time 2 http://localhost:4141/v1/models >/dev/null 2>&1 && echo PROXY_UP || echo PROXY_DOWN</summary>
+
+```bash
+bash -n dot_config/shell/43_copilot_proxy.sh && zsh -n dot_config/shell/43_copilot_proxy.sh && echo SYNTAX_OK; curl -fsS --max-time 2 http://localhost:4141/v1/models >/dev/null 2>&1 && echo PROXY_UP || echo PROXY_DOWN
+```
+
+```
+SYNTAX_OK
+PROXY_UP
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The proxy on port 4141 is running, likely from earlier testing. I need to restart it with the updated configuration by sourcing the edited file and running the restart command.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Syntax is clean in both shells and a proxy is already up on 4141 (the old one). Restarting on the new fork default.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-proxy restart && copilot-proxy status'</summary>
+
+```bash
+bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-proxy restart && copilot-proxy status'
+```
+
+```
+copilot-proxy: stopped (port 4141 free)
+copilot-proxy: starting (@jeffreycao/copilot-api@1.13.14) on port 4141 ...
+copilot-proxy: up → http://localhost:4141  (logs: copilot-proxy logs)
+copilot-proxy: RUNNING on http://localhost:4141
+  models: claude-opus-4-6 claude-opus-4-7 claude-opus-4-8 claude-sonnet-4-6 claude-sonnet-5 claude-sonnet-4-5 claude-opus-4-5 claude-haiku-4-5 
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The fork is serving models with hyphenated IDs like `claude-opus-4-8` instead of the dot notation, which means the default model configuration and fallback lists need to account for this difference. Since the fork normalizes hyphenated IDs, the original `claude-opus-4.8` format should still work through that normalization layer.I see the fork is using hyphenated IDs like `claude-opus-4-8` instead of the dotted format in our default state. I'll verify both ID styles work and test the `whoami` endpoint.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: for m in claude-opus-4.8 claude-opus-4-8 claude-haiku-4.5; do printf '%s => ' "$m"; curl -sS --max-time 30 http://localhost:4141/v1/messages -H 'content-type: application/json' -H 'x-api-key: dummy' -d "{\"model\":\"$m\",\"max_tokens\":16,\"messages\":[{\"role\":\"user\",\"content\":\"Say OK\"}]}" | head -c 220; echo; done</summary>
+
+```bash
+for m in claude-opus-4.8 claude-opus-4-8 claude-haiku-4.5; do printf '%s => ' "$m"; curl -sS --max-time 30 http://localhost:4141/v1/messages -H 'content-type: application/json' -H 'x-api-key: dummy' -d "{\"model\":\"$m\",\"max_tokens\":16,\"messages\":[{\"role\":\"user\",\"content\":\"Say OK\"}]}" | head -c 220; echo; done
+```
+
+```
+claude-opus-4.8 =&gt; {"content":[{"text":"OK","type":"text"}],"copilot_usage":{"token_details":[{"batch_size":1000000,"cost_per_batch":500000000000,"token_count":10,"token_type":"input"},{"batch_size":1000000,"cost_per_batch":50000000000,"to
+claude-opus-4-8 =&gt; {"content":[{"text":"OK","type":"text"}],"copilot_usage":{"token_details":[{"batch_size":1000000,"cost_per_batch":500000000000,"token_count":10,"token_type":"input"},{"batch_size":1000000,"cost_per_batch":50000000000,"to
+claude-haiku-4.5 =&gt; {"content":[{"text":"OK","type":"text"}],"copilot_usage":{"token_details":[{"batch_size":1000000,"cost_per_batch":100000000000,"token_count":9,"token_type":"input"},{"batch_size":1000000,"cost_per_batch":10000000000,"tok
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The fork handles both dotted and hyphenated model IDs, so the existing `claude-opus-4.8` format still works fine. The model list from the fork uses hyphens (`claude-opus-4-8`), while the fallback list uses dots, but both formats are compatible. Let me test the whoami command to verify everything's working.Both dotted and hyphenated model IDs work on the fork. Now I'll check the `/usage` endpoint to see what model identity it reports.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-proxy whoami'</summary>
+
+```bash
+bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-proxy whoami'
+```
+
+```
+{
+  "plan": "enterprise",
+  "quota_reset": "2026-08-01",
+  "quotas": {
+    "chat": {
+      "remaining": 0,
+      "entitlement": 0,
+      "percent_remaining": 100,
+      "unlimited": true
+    },
+    "completions": {
+      "remaining": 0,
+      "entitlement": 0,
+      "percent_remaining": 100,
+      "unlimited": true
+    },
+    "premium_interactions": {
+      "remaining": 0,
+      "entitlement": 0,
+      "percent_remaining": 100,
+      "unlimited": true
+    }
+  }
+}
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The fork is working with whoami, so now I'll test the original package on a separate port to avoid interfering with it. Instead of restarting via the plan's command (which would shut down the fork), I'll spin up the original on port 4143 using COPILOT_PROXY_PORT, run the test, then stop it while keeping the fork running on 4141.The whoami check confirmed the plan and quota are correct. Now I'll set up the rollback test by running the original package on a spare port while keeping the fork on 4141.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -c 'source dot_config/shell/43_copilot_proxy.sh && export COPILOT_API_PKG=copilot-api@0.7.0 COPILOT_PROXY_PORT=4143 && copilot-proxy start && copilot-proxy status && pgrep -fl "copilot-api.*--port 4143" | head -3 && copilot-proxy stop'</summary>
+
+```bash
+bash -c 'source dot_config/shell/43_copilot_proxy.sh && export COPILOT_API_PKG=copilot-api@0.7.0 COPILOT_PROXY_PORT=4143 && copilot-proxy start && copilot-proxy status && pgrep -fl "copilot-api.*--port 4143" | head -3 && copilot-proxy stop'
+```
+
+```
+copilot-proxy: starting (copilot-api@0.7.0) on port 4143 (rate-limit 15s) ...
+copilot-proxy: up → http://localhost:4143  (logs: copilot-proxy logs)
+copilot-proxy: RUNNING on http://localhost:4143
+  models: claude-opus-4.6 claude-opus-4.7 claude-opus-4.8 claude-sonnet-4.6 claude-sonnet-5 claude-sonnet-4.5 claude-opus-4.5 claude-haiku-4.5 
+59379 node /var/folders/dq/zbxks7r975j049mj8jk19wtw0000gp/T/bunx-502-copilot-api@0.7.0/node_modules/.bin/copilot-api start --port 4143 --rate-limit 15 --wait
+copilot-proxy: stopped (port 4143 free)
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The rollback path is working correctly with the original flags. Now I'm testing the quiet environment variable round trip in a scratch directory, checking that setting `COPILOT_PROXY_QUIET=1` properly injects the environment, then unsetting it removes the keys and cleans up the file, and finally verifying the env injection works correctly with `copilot-run` in both quiet and non-quiet modes.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Rollback path verified — original gets `--rate-limit 15 --wait`. Now the quiet-env round-trip in a scratch dir plus `copilot-run` injection.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -c '
+set -e
+cd "$(mktemp -d)"
+git init -q .
+source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh
+echo "--- quiet=1 copilot-here on ---"
+COPILOT_PROXY_QUIET=1 copilot-here on >/dev/null
+jq -r ".env | keys[]" .claude/settings.local.json
+echo "--- copilot-here off (quiet unset) ---"
+copilot-here off
+ls .claude/settings.local.json 2>/dev/null || echo "settings.local.json gone"
+echo "--- copilot-run quiet=0 vs quiet=1 ---"
+copilot-run env | grep -cE "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=" || echo "0 quiet vars (expected)"
+COPILOT_PROXY_QUIET=1 copilot-run env | grep -E "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS|ANTHROPIC_BASE_URL)="
+'</summary>
+
+```bash
+bash -c '
+set -e
+cd "$(mktemp -d)"
+git init -q .
+source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh
+echo "--- quiet=1 copilot-here on ---"
+COPILOT_PROXY_QUIET=1 copilot-here on >/dev/null
+jq -r ".env | keys[]" .claude/settings.local.json
+echo "--- copilot-here off (quiet unset) ---"
+copilot-here off
+ls .claude/settings.local.json 2>/dev/null || echo "settings.local.json gone"
+echo "--- copilot-run quiet=0 vs quiet=1 ---"
+copilot-run env | grep -cE "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=" || echo "0 quiet vars (expected)"
+COPILOT_PROXY_QUIET=1 copilot-run env | grep -E "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS|ANTHROPIC_BASE_URL)="
+'
+```
+
+```
+--- quiet=1 copilot-here on ---
+ANTHROPIC_AUTH_TOKEN
+ANTHROPIC_BASE_URL
+ANTHROPIC_DEFAULT_HAIKU_MODEL
+ANTHROPIC_DEFAULT_OPUS_MODEL
+ANTHROPIC_DEFAULT_SONNET_MODEL
+ANTHROPIC_MODEL
+ANTHROPIC_SMALL_FAST_MODEL
+CLAUDE_CODE_ATTRIBUTION_HEADER
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+CLAUDE_CODE_ENABLE_AWAY_SUMMARY
+CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION
+DISABLE_NON_ESSENTIAL_MODEL_CALLS
+--- copilot-here off (quiet unset) ---
+copilot-here: OFF — removed .claude/settings.local.json (it held only proxy config)
+  plain &#96;claude&#96; is back on the real Anthropic backend (restart any running session)
+settings.local.json gone
+--- copilot-run quiet=0 vs quiet=1 ---
+0
+0 quiet vars (expected)
+ANTHROPIC_BASE_URL=http://localhost:4141
+CLAUDE_CODE_ATTRIBUTION_HEADER=0
+CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false
+CLAUDE_CODE_ENABLE_AWAY_SUMMARY=0
+DISABLE_NON_ESSENTIAL_MODEL_CALLS=1
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I've verified the quiet-env behavior works as expected, and now I should test that zsh handles the `set --` syntax correctly within copilot-run's function injection—I've syntax-checked it but a functional test would confirm it works. I also need to run the claude-copilot smoke test from step 4, though that's tricky since it spawns an interactive session; I could try a non-interactive approach with a simple prompt to verify it's working.
+
+Since the repo has copilot-here enabled and points to the same port, a headless run would validate the full pipeline. I'll keep it cheap and use haiku instead of a premium model, running a command that asks Claude to reply with exactly "OK" from the chezmoi repo directory.The quiet-env setup is working correctly. Now I'll run a quick zsh functional check and then test the end-to-end headless Claude Code flow.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: zsh -c 'source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh && COPILOT_PROXY_QUIET=1 copilot-run env | grep -cE "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=" && _copilot_pkg_flavor && echo && COPILOT_API_PKG=copilot-api _copilot_pkg_flavor'</summary>
+
+```bash
+zsh -c 'source /Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh && COPILOT_PROXY_QUIET=1 copilot-run env | grep -cE "^(CLAUDE_CODE_ATTRIBUTION_HEADER|CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION|CLAUDE_CODE_ENABLE_AWAY_SUMMARY|DISABLE_NON_ESSENTIAL_MODEL_CALLS)=" && _copilot_pkg_flavor && echo && COPILOT_API_PKG=copilot-api _copilot_pkg_flavor'
+```
+
+```
+4
+fork
+original
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-run claude -p "Reply with exactly: OK" --model claude-haiku-4.5'</summary>
+
+```bash
+bash -c 'source dot_config/shell/43_copilot_proxy.sh && copilot-run claude -p "Reply with exactly: OK" --model claude-haiku-4.5'
+```
+
+```
+⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login · Unset it to load your organization's connectors
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: &lt; /dev/null to skip, or wait longer.
+OK
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm verifying that all the key functionality is working correctly across different scenarios: the fork initialization and model listing with both hyphenated and dotted ID formats, the usage endpoint for plan and quota information, the original package rollback with rate limiting options, the environment variable round trip in both bash and zsh shells with the copilot-here toggle, and a headless Claude Code session.
+
+I'm noticing a discrepancy in model ID formatting — the fork returns hyphenated IDs like `claude-opus-4-8` while our default is dotted `claude-opus-4.8`. Both formats work at request time due to normalization, but the fork's model list won't match the dotted format when users try to validate with `copilot-model`. I should update the documentation to clarify that both forms are accepted and note which format the fork uses, while keeping the functional defaults as-is since they're already verified working.Verification passed, and I found that the fork lists hyphenated model IDs while our defaults use dotted notation—both work at request time. I'll update the docs to clarify this.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing the fork uses hyphenated model IDs in its `/v1/models` endpoint while the original uses dotted ones, which means fuzzy matching for `copilot-model` won't find exact matches—like `opus-4.8` won't match `claude-opus-4-8` in the live list. However, both formats work at request time, and the static fallback still has the dotted versions, so this isn't a breaking issue. Also, this repo has `copilot-here on` enabled.
+
+The `.claude/settings.local.json` still points to port 4141 with dotted models, which continue to work fine. Now I'm considering whether to apply these changes to the live config using chezmoi—the shell file at `~/.config/shell/43_copilot_proxy.sh` is managed by chezmoi, and applying it would make the changes live for interactive shells. The original plan didn't explicitly include a `chezmoi apply` step, but it's the natural final step to ensure the user's shells pick up the updates. Since the proxy is already running the fork on 4141 and the old shell functions still work with the existing package defaults, nothing breaks either way, but applying via chezmoi would be consistent with the migration intent.
+
+I'll apply the shell file via chezmoi, then commit the changes as noted in the plan.Verification passed and the fork handles both hyphenated and dotted ID formats, so I've updated the docs. Now I'll apply the shell file to the live config and run lints before committing.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: chezmoi apply ~/.config/shell/43_copilot_proxy.sh && zsh -c 'source ~/.config/shell/43_copilot_proxy.sh && _copilot_pkg'</summary>
+
+```bash
+chezmoi apply ~/.config/shell/43_copilot_proxy.sh && zsh -c 'source ~/.config/shell/43_copilot_proxy.sh && _copilot_pkg'
+```
+
+```
+@jeffreycao/copilot-api@1.13.14
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh",
+    "/Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/david/.local/share/chezmoi/dot_config/shell/43_copilot_proxy.sh"
+    },
+    {
+      "relativeWorkspacePath": "/Users/david/.local/share/chezmoi/docs/tools/copilot-claude-proxy.md"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+Verification is done. I need to handle the extra todo from the plan—committing the changes. The user explicitly requested this, and I notice there are untracked specstory files in git status. The agent-history-hygiene skill is designed for exactly this situation: committing specstory transcripts alongside feature changes when untracked history files are present.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Verification passed. The plan also has a "git commit changes" todo — the repo has untracked SpecStory transcripts, so let me read the history-hygiene skill first.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "in_progress"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "in_progress"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "pending"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/david/.local/share/chezmoi/.agents/skills/agent-history-hygiene/SKILL.md</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm following Workflow A to stage the feature files and agent artifacts, then scan and commit. First, I need to check the git status, diff stats, and log to follow the commit protocol. The plan file is located at .cursor/plans/migrate_copilot-proxy_to_fork_b970ec09.plan.md in the workspace, so I'll run those git commands in parallel to see what's changed.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+Following the hygiene skill's Workflow A. First, the standard pre-commit checks.
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git status --short && echo --- && git diff --stat && echo --- && git log --oneline -8</summary>
+
+```bash
+git status --short && echo --- && git diff --stat && echo --- && git log --oneline -8
+```
+
+```
+ M .specstory/statistics.json
+ M docs/tools/copilot-claude-proxy.md
+ M dot_config/shell/43_copilot_proxy.sh
+?? .cursor/plans/migrate_copilot-proxy_to_fork_b970ec09.plan.md
+?? .specstory/history/2026-07-03_01-22-09Z-copilot-api-migration-discussion.md
+?? .specstory/history/2026-07-03_01-46-47Z-reply-with-exactly-ok.md
+---
+ .specstory/statistics.json           |  18 +++++
+ docs/tools/copilot-claude-proxy.md   | 141 +++++++++++++++++++++++++++--------
+ dot_config/shell/43_copilot_proxy.sh | 116 ++++++++++++++++++++++------
+ 3 files changed, 222 insertions(+), 53 deletions(-)
+---
+a6cc799 feat(docs): OG/Twitter social cards via mkdocs Material social plugin
+100ae71 docs(specstory): document seed-once (create_) config management
+ea1443e feat(editor): manage terminal scroll sensitivity + Shift+Enter soft-newline
+0b6ecf2 ci(docs): bump Pages deploy timeout to 20m for slow queue backend
+7471b38 feat(shell): frictionless copilot-proxy enable/disable for Claude Code
+33d8203 feat(shell): add 'copilot-proxy whoami' login check
+42505bc feat(shell): copilot-proxy + copilot-model for Copilot-backed Claude Code
+4646a76 feat(git): rebase pulls with autostash
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing that some earlier git history files from July 2nd have already been committed, but there are still dirty artifacts in the working directory—statistics.json has been modified, along with the plan file and a couple of new specstory transcripts from this session and another one.</details></think>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add dot_config/shell/43_copilot_proxy.sh docs/tools/copilot-claude-proxy.md && bash .agents/skills/agent-history-hygiene/scripts/stage-agent-artifacts.sh && git status --short</summary>
+
+```bash
+git add dot_config/shell/43_copilot_proxy.sh docs/tools/copilot-claude-proxy.md && bash .agents/skills/agent-history-hygiene/scripts/stage-agent-artifacts.sh && git status --short
+```
+
+```
+staged: .specstory/history/2026-07-03_01-22-09Z-copilot-api-migration-discussion.md
+staged: .specstory/history/2026-07-03_01-46-47Z-reply-with-exactly-ok.md
+staged: .cursor/plans/migrate_copilot-proxy_to_fork_b970ec09.plan.md
+3 artifact(s) would be staged.
+A  .cursor/plans/migrate_copilot-proxy_to_fork_b970ec09.plan.md
+A  .specstory/history/2026-07-03_01-22-09Z-copilot-api-migration-discussion.md
+A  .specstory/history/2026-07-03_01-46-47Z-reply-with-exactly-ok.md
+ M .specstory/statistics.json
+M  docs/tools/copilot-claude-proxy.md
+M  dot_config/shell/43_copilot_proxy.sh
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git add .specstory/statistics.json && bash .agents/skills/agent-history-hygiene/scripts/scan-staged.sh; echo "scan exit: $?"</summary>
+
+```bash
+git add .specstory/statistics.json && bash .agents/skills/agent-history-hygiene/scripts/scan-staged.sh; echo "scan exit: $?"
+```
+
+```
+scan exit: 0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(shell): migrate copilot-proxy to maintained copilot-api fork
+
+The original ericc-ch/copilot-api is unmaintained (its #233 points at
+caozhiyuan/copilot-api), so default COPILOT_API_PKG flips to the fork
+(@jeffreycao/copilot-api, pinned) whose native /v1/messages passthrough
+fixes thinking blocks, WebSearch, and tool-retry loops. Dual-package
+support stays: flavor detection gates --rate-limit/--wait and the
+whoami implementation (fork: /usage endpoint), so the original remains
+one env var away. Adds opt-in COPILOT_PROXY_QUIET quota savers and
+documents the empirical settings.local.json-beats-shell-env gotcha.
+EOF
+)" && git status --short</summary>
+
+```bash
+git commit --trailer "Co-authored-by: Cursor <cursoragent@cursor.com>" -m "$(cat <<'EOF'
+feat(shell): migrate copilot-proxy to maintained copilot-api fork
+
+The original ericc-ch/copilot-api is unmaintained (its #233 points at
+caozhiyuan/copilot-api), so default COPILOT_API_PKG flips to the fork
+(@jeffreycao/copilot-api, pinned) whose native /v1/messages passthrough
+fixes thinking blocks, WebSearch, and tool-retry loops. Dual-package
+support stays: flavor detection gates --rate-limit/--wait and the
+whoami implementation (fork: /usage endpoint), so the original remains
+one env var away. Adds opt-in COPILOT_PROXY_QUIET quota savers and
+documents the empirical settings.local.json-beats-shell-env gotcha.
+EOF
+)" && git status --short
+```
+
+```
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...............................................(no files to check)Skipped
+check toml...............................................(no files to check)Skipped
+check json...................................................................Passed
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)...........................Passed
+shfmt....................................................(no files to check)Skipped
+[main 2655173] feat(shell): migrate copilot-proxy to maintained copilot-api fork
+ 6 files changed, 886 insertions(+), 53 deletions(-)
+ create mode 100644 .cursor/plans/migrate_copilot-proxy_to_fork_b970ec09.plan.md
+ create mode 100644 .specstory/history/2026-07-03_01-22-09Z-copilot-api-migration-discussion.md
+ create mode 100644 .specstory/history/2026-07-03_01-46-47Z-reply-with-exactly-ok.md
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write">
+<details>
+<summary>Tool use: **todo_write**</summary>
+
+
+Parameters:
+
+```json
+{
+  "merge": true
+}
+```
+Result:
+
+```json
+{
+  "finalTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "completed"
+    }
+  ],
+  "initialTodos": [
+    {
+      "content": "Add _copilot_pkg_flavor helper; flip default COPILOT_API_PKG to @jeffreycao/copilot-api@1.13.14",
+      "id": "pkg-default",
+      "status": "completed"
+    },
+    {
+      "content": "Make copilot-proxy start pass --rate-limit/--wait only for the original package",
+      "id": "start-flags",
+      "status": "completed"
+    },
+    {
+      "content": "Make whoami use check-usage (original) vs /usage curl or debug (fork)",
+      "id": "whoami",
+      "status": "completed"
+    },
+    {
+      "content": "Add opt-in COPILOT_PROXY_QUIET env injection to copilot-run and copilot-here (off removes keys unconditionally)",
+      "id": "quiet-env",
+      "status": "completed"
+    },
+    {
+      "content": "Fix settings.local.json-beats-shell-env precedence comments in the script header and copilot-run",
+      "id": "precedence-comments",
+      "status": "completed"
+    },
+    {
+      "content": "Update docs/tools/copilot-claude-proxy.md: fork default, env table, dashboard URL, new gotchas",
+      "id": "docs",
+      "status": "completed"
+    },
+    {
+      "content": "Restart proxy on fork default, verify status/whoami, rollback test with original pkg, quiet-env on/off round-trip",
+      "id": "verify",
+      "status": "completed"
+    },
+    {
+      "content": "git commit changes",
+      "id": "todo-1783042747011-xrz5cj80t",
+      "status": "in_progress"
+    }
+  ],
+  "success": true,
+  "wasMerge": true
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="todo_write"><details>
+<summary>Tool use: **todo_write**</summary>
+
+</details></tool-use>
+
+_**Agent (claude-fable-5)**_
+
+Migration is complete, verified live, applied to `~/.config/shell`, and committed as `2655173`.
+
+**What changed in [dot_config/shell/43_copilot_proxy.sh](dot_config/shell/43_copilot_proxy.sh):**
+- Default package is now `@jeffreycao/copilot-api@1.13.14` (the maintained fork). A new `_copilot_pkg_flavor()` helper detects the exact original `copilot-api` package from `COPILOT_API_PKG`, so rollback is still one env var.
+- `copilot-proxy start` only passes `--rate-limit`/`--wait` for the original; the fork gets a plain `start --port`.
+- `copilot-proxy whoami` on the fork queries the running proxy's `/usage` endpoint (jq-summarized plan/quota) and falls back to `bunx <pkg> debug` when the proxy is down; the original keeps `check-usage`.
+- New opt-in `COPILOT_PROXY_QUIET=1` (default off, per your preference) injects the fork-README quota savers (`CLAUDE_CODE_ATTRIBUTION_HEADER=0`, prompt-suggestion/away-summary off, `DISABLE_NON_ESSENTIAL_MODEL_CALLS=1`) into both `copilot-run` and `copilot-here on`. The keys were added to `_copilot_here_keys`, so `copilot-here off` always removes them regardless of the knob.
+- Precedence comments now document the empirical gotcha: `settings.local.json` env beats inherited shell env, so the wrappers can't override an active `copilot-here` pin.
+
+**Docs** ([docs/tools/copilot-claude-proxy.md](docs/tools/copilot-claude-proxy.md)) got the fork/original repo links, updated env table, native `/v1/messages` passthrough explanation, the local `/usage-viewer` dashboard URL, and three new gotchas (env precedence, no rate limiter on the fork, the `context_management` 400 wart from caozhiyuan#305).
+
+**Verification results (all passed):**
+- Fork started on 4141 and serves the Claude models; live `/v1/messages` probes confirmed both dotted (`claude-opus-4.8`) and hyphenated (`claude-opus-4-8`) ids work — I noted this in the docs since the fork *lists* hyphenated ids, meaning the dotted defaults in the helpers still work.
+- `whoami` printed your enterprise plan/quota via `/usage`.
+- Rollback test: `COPILOT_API_PKG=copilot-api@0.7.0` on port 4143 started with `--rate-limit 15 --wait` and stopped cleanly.
+- Quiet-env round trip in a scratch repo: `on` with quiet adds the 4 extra keys, `off` (quiet unset) removes the file entirely; `copilot-run` injects them only when quiet is set. Checked under both bash and zsh.
+- End-to-end headless `copilot-run claude -p` through the fork returned correctly.
+
+The commit includes this session's SpecStory transcripts and the plan file, staged via the history-hygiene skill with a clean gitleaks scan.
+
+---
+
+_**User**_
+
+跟之前的發現很類似 可能我們API proxy沒有正確設置model name 導致Claude Code中以爲是Legacy Opus 4 （其實是4.8）
+也導致 Claude Hud 顯示context > 100% （看起來以200k來算 實際Copilot中的之前測試都是1M）
+就是我們有沒有辦法讓 Claude Code中 /model 能夠讀到正確的model name呢？
+
+---
+
+_**Agent (claude-fable-5)**_
+
+<think><details><summary>Thought Process</summary>
+The issue is that Claude Code's model identifier doesn't match what's actually being served—it shows "Opus 4" and displays a retirement warning because the model ID `claude-opus-4.8` isn't in its lookup table, and the HUD incorrectly calculates context usage at over 100% since it assumes 200k context when Copilot actually provides 1M. With the fork now available, there might be a way to update the `/model` endpoint to return the correct model information instead of treating this as purely cosmetic.
+
+The fork's README actually has the answer: it recommends configuring model IDs with hyphens instead of dots—`claude-opus-4-8` rather than `claude-opus-4.8`. Claude Code pattern-matches against model strings and recognizes the hyphenated format through prefix matching, whereas the dotted format fails to match and falls back to the legacy "Opus 4" display. So the fix is straightforward: switch the default model IDs to hyphenated versions like `claude-opus-4-8`, `claude-sonnet-5`, and `claude-haiku-4-5`. This way Claude Code will properly recognize the model family, display the correct name, handle the 1M context window appropriately, and enable thinking support.</details></think>

@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: todo-1783042747011-xrz5cj80t
     content: git commit changes
-    status: in_progress
+    status: completed
 isProject: false
 ---
 

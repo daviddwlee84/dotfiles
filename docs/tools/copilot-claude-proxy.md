@@ -169,11 +169,15 @@ committed `.claude/settings.json`:
 - otherwise → writes the global state file
   `~/.local/state/copilot-proxy/model`, which `claude-copilot`, `copilot-run`
   and the next `copilot-here on` pick up. (`$COPILOT_CLAUDE_MODEL` overrides
-  the state file; final fallback is `claude-opus-4.8`.)
+  the state file; final fallback is `claude-opus-4-8[1m]`.)
 
 Behavior:
 
-- Fuzzy id: `copilot-model opus-4.8` resolves to `claude-opus-4.8`.
+- Fuzzy id: `copilot-model opus-4-8` resolves to `claude-opus-4-8`; dotted
+  input is normalized (`opus-4.8` works too).
+- A `[1m]` suffix (`copilot-model 'opus-4-8[1m]'`) is stripped for validation
+  and re-appended — it's a Claude Code-only 1M-context hint, see the model-id
+  section below.
 - Validated against the live proxy `/v1/models` (falls back to a static Claude
   list if the proxy is down); typos and ambiguous prefixes are rejected.
 - No argument → `fzf` picker. `-c` prints the current model and which layer it
@@ -189,11 +193,11 @@ Behavior:
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4.5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4.5",
+    "ANTHROPIC_MODEL": "claude-opus-4-8[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
@@ -249,26 +253,36 @@ you see unexplained 400s on long sessions, check that issue first.
 
 ### Do not use Claude Code's `/model` picker
 
-It sends Anthropic's *official* ids (e.g. `claude-opus-4-8-YYYYMMDD`), but the
-Copilot backend only knows its own ids (`claude-opus-4.8`). Picking from the menu
-produces:
+It sends Anthropic's *official* dated ids (e.g. `claude-opus-4-8-YYYYMMDD`),
+which the Copilot backend rejects:
 
 ```
 API Error: 400 {"error":{"message":"The requested model is not supported.",
 "code":"model_not_supported", ...}}
 ```
 
-Pin the model with `copilot-model` instead. (The fork does normalize
-*hyphenated* ids like `claude-opus-4-8` / `claude-haiku-4-5` — the Claude Code
-2.1.x hyphenation incompatibility is gone — but dated Anthropic ids from the
-`/model` picker still fail.)
+Pin the model with `copilot-model` instead — undated hyphenated ids
+(`claude-opus-4-8`) work; only the picker's dated ids fail.
 
-### The "Opus 4 retired" warning is cosmetic
+### Dotted ids cause the "[Opus 4] retired" warning and a >100% context HUD
 
-Claude Code shows `[Opus 4]` and warns *"Claude Opus 4 was retired"* — it fails to
-match the Copilot id against its built-in Anthropic table and falls back to the
-nearest known (retired) name. Requests are still routed correctly to
-`claude-opus-4.8`. There is no clean way to remove the warning; ignore it.
+Historic gotcha, fixed by the hyphenated defaults. With a **dotted** id
+(`claude-opus-4.8`, the only shape the original proxy accepted), Claude Code
+fails to match its built-in model table, so it:
+
+- displays `[Opus 4]` and warns *"Claude Opus 4 was retired"* (falls back to
+  the nearest known, retired name), and
+- assumes a **200k** context window, while Copilot actually serves opus-4-8 /
+  sonnet-5 with **1M** (`max_context_window_tokens: 1000000` in `/v1/models`)
+  — so HUD/statusline context can read >100% and compaction triggers on the
+  wrong budget.
+
+The fix is the id shape the helpers now inject by default:
+**`claude-opus-4-8[1m]`** — hyphenated so Claude Code recognizes the family
+(correct display name, no retirement warning), plus the `[1m]` suffix so it
+sizes context to 1M. Claude Code strips `[1m]` before sending, so the proxy
+sees a valid id (a *literal* `...[1m]` in a raw API call is rejected —
+`copilot-model` handles the stripping when validating).
 
 ### The token gotcha: `gho_` vs `ghu_`
 
@@ -286,13 +300,16 @@ reuse OpenCode's.** Token is stored at `~/.local/share/copilot-api/github_token`
 
 ## Available Claude model ids
 
-Verified via `/v1/messages` (2026-07): `claude-opus-4.5`, `claude-opus-4.6`,
-`claude-opus-4.7`, `claude-opus-4.8`, `claude-sonnet-4.5`, `claude-sonnet-4.6`,
-`claude-sonnet-5`, `claude-haiku-4.5`. Note the fork *lists* hyphenated ids in
-`/v1/models` (`claude-opus-4-8`, …) but accepts **both** dotted and hyphenated
-forms at request time (verified), so the dotted defaults baked into the shell
-helpers keep working. Non-Claude models (gpt-5.5, gemini-3.1-pro-preview, …)
-are also served — see `copilot-model -l` or `GET /v1/models`.
+Verified via `/v1/models` + `/v1/messages` (2026-07): `claude-opus-4-5`,
+`claude-opus-4-6`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-sonnet-4-5`,
+`claude-sonnet-4-6`, `claude-sonnet-5`, `claude-haiku-4-5`. The fork accepts
+both hyphenated and legacy dotted (`claude-opus-4.8`) forms at request time,
+but **use hyphenated ids in Claude Code** — dotted ids break its model
+detection (see Gotchas). Context windows from `/v1/models` capabilities:
+opus-4-8 and sonnet-5 are **1M** (`max_prompt_tokens: 936000`), haiku-4-5 is
+200k — append `[1m]` to the 1M models so Claude Code knows. Non-Claude models
+(gpt-5.5, gemini-3.1-pro-preview, …) are also served — see `copilot-model -l`
+or `GET /v1/models`.
 
 ## Useful commands
 

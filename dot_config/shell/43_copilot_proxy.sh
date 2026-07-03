@@ -76,13 +76,23 @@ _copilot_model_state() {
 }
 
 # Resolve the model for env injection: $COPILOT_CLAUDE_MODEL > state file > default.
+#
+# Model-id shape matters (verified 2026-07):
+#   - HYPHENATED ids (claude-opus-4-8), not dotted (claude-opus-4.8): Claude
+#     Code only recognizes hyphenated family names — dotted ids fall back to
+#     a legacy "[Opus 4] retired" label AND a 200k context assumption.
+#   - "[1m]" suffix: Copilot serves opus-4-8 / sonnet-5 with a 1M context
+#     window; the suffix makes Claude Code strip it, send the context-1m
+#     beta header, and size HUD/compaction to 1M (otherwise it assumes 200k
+#     and shows >100% context). Claude Code-only: raw API clients must send
+#     the plain id — the proxy rejects a literal "...[1m]" model.
 _copilot_default_model() {
   if [ -n "${COPILOT_CLAUDE_MODEL:-}" ]; then
     printf '%s' "$COPILOT_CLAUDE_MODEL"
   elif [ -f "$(_copilot_model_state)" ]; then
     command head -n 1 "$(_copilot_model_state)"
   else
-    printf '%s' "claude-opus-4.8"
+    printf '%s' "claude-opus-4-8[1m]"
   fi
 }
 
@@ -270,9 +280,9 @@ copilot-run() {
     ANTHROPIC_AUTH_TOKEN="dummy" \
     ANTHROPIC_MODEL="$model" \
     ANTHROPIC_DEFAULT_OPUS_MODEL="$model" \
-    ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5" \
-    ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4.5" \
-    ANTHROPIC_SMALL_FAST_MODEL="claude-haiku-4.5" \
+    ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5[1m]" \
+    ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5" \
+    ANTHROPIC_SMALL_FAST_MODEL="claude-haiku-4-5" \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1" \
     "$@"
 }
@@ -346,9 +356,9 @@ copilot-here() {
             ANTHROPIC_AUTH_TOKEN: "dummy",
             ANTHROPIC_MODEL: $model,
             ANTHROPIC_DEFAULT_OPUS_MODEL: $model,
-            ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-5",
-            ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4.5",
-            ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4.5",
+            ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-5[1m]",
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4-5",
+            ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4-5",
             CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           } + (if $quiet == "1" then {
             CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
@@ -421,16 +431,20 @@ copilot-here() {
 # --- model switcher -------------------------------------------------------------
 
 # Switch which Copilot model is pinned. Claude Code's own /model picker sends
-# Anthropic ids the Copilot backend rejects (model_not_supported), so pin here.
+# dated Anthropic ids the Copilot backend rejects (model_not_supported), so pin
+# here. Use the HYPHENATED ids the proxy lists (claude-opus-4-8); an optional
+# "[1m]" suffix tells Claude Code the model has a 1M context window (see
+# _copilot_default_model) — it is stripped before validating against the proxy.
 #
 # Write target (never the committed .claude/settings.json):
 #   - copilot-here is ON in this project → ./.claude/settings.local.json
 #   - otherwise → global state file (~/.local/state/copilot-proxy/model), which
 #     claude-copilot / copilot-run / the next `copilot-here on` pick up.
 # Example:
-#   copilot-model opus-4.8       # fuzzy → claude-opus-4.8
-#   copilot-model -l             # list available (live from proxy)
-#   copilot-model -c             # print current (+ where it came from)
+#   copilot-model opus-4-8         # fuzzy → claude-opus-4-8 (opus-4.8 works too)
+#   copilot-model 'opus-4-8[1m]'   # same + 1M-context hint for Claude Code
+#   copilot-model -l               # list available (live from proxy)
+#   copilot-model -c               # print current (+ where it came from)
 copilot-model() {
   if [ -n "$ZSH_VERSION" ]; then
     emulate -L zsh
@@ -456,8 +470,8 @@ copilot-model() {
       printf '%s\n' "$json" | command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command sort
     else
       printf '%s\n' \
-        claude-opus-4.8 claude-opus-4.7 claude-opus-4.6 claude-opus-4.5 \
-        claude-sonnet-5 claude-sonnet-4.6 claude-sonnet-4.5 claude-haiku-4.5
+        claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
+        claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5
       printf '%s\n' "copilot-model: proxy not reachable — showing fallback list" >&2
     fi
   }
@@ -507,14 +521,26 @@ copilot-model() {
     [ -n "$want" ] || { printf '%s\n' "cancelled"; return 0; }
     resolved="$want"
   else
+    # "[1m]" is a Claude Code-only 1M-context hint, not a real proxy id:
+    # strip it for validation, re-append on the resolved id.
+    local suffix="" base="$arg"
+    case "$arg" in
+      *"[1m]") suffix="[1m]"; base="${arg%\[1m\]}" ;;
+    esac
+    # Proxy ids are hyphenated (claude-opus-4-8) but muscle memory says
+    # opus-4.8 — normalize dots to hyphens and accept both.
+    local norm; norm="$(printf '%s' "$base" | command tr '.' '-')"
     # Resolve: exact, else claude-<arg>, else unique substring.
-    if printf '%s\n' "$models" | command grep -qxF "$arg"; then
-      resolved="$arg"
-    elif printf '%s\n' "$models" | command grep -qxF "claude-$arg"; then
-      resolved="claude-$arg"
-    else
+    local cand; resolved=""
+    for cand in "$base" "claude-$base" "$norm" "claude-$norm"; do
+      if printf '%s\n' "$models" | command grep -qxF "$cand"; then
+        resolved="$cand"
+        break
+      fi
+    done
+    if [ -z "$resolved" ]; then
       local hits count
-      hits="$(printf '%s\n' "$models" | command grep -F "$arg" || true)"
+      hits="$(printf '%s\n' "$models" | command grep -F "$norm" || true)"
       count="$(printf '%s\n' "$hits" | command grep -c . )"
       if [ "$count" = "1" ] && [ -n "$hits" ]; then
         resolved="$hits"
@@ -523,6 +549,7 @@ copilot-model() {
         return 1
       fi
     fi
+    resolved="$resolved$suffix"
   fi
 
   local old; old="$(_copilot_model_current)"
