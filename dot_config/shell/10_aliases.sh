@@ -119,6 +119,20 @@ function source-rc {
 	printf 'source-rc: reloading %s\n' "$_rc"
 	# shellcheck source=/dev/null
 	. "$_rc"
+	# oh-my-zsh's lib/key-bindings.zsh runs `bindkey -e` on EVERY source, and
+	# zsh-vi-mode's re-entrancy guard (`command -v zvm_version && return` at the
+	# top of the plugin) makes it skip re-init on re-source — so the main keymap
+	# silently reverts to emacs and vim mode never returns (ZVM_INIT_DONE stays
+	# true, so the pending precmd zvm_init early-returns forever). Force a
+	# one-shot in-place re-init, which also replays zvm_after_init (fzf/atuin/
+	# aisuggest/keys-picker rebinds). No-op when enableVimMode=false or the
+	# plugin isn't loaded (zvm_init absent). POSIX-safe: the ZSH_VERSION guard
+	# keeps bash out of the zsh-only branch. See
+	# pitfalls/zsh-vim-mode-lost-after-source-rc.md.
+	if [ -n "${ZSH_VERSION:-}" ] && command -v zvm_init >/dev/null 2>&1; then
+		ZVM_INIT_DONE=false
+		zvm_init
+	fi
 	unset _rc
 }
 alias reload='source-rc'
