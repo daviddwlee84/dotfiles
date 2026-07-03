@@ -103,6 +103,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`ai-capture-non-tmux-output`](ai-capture-non-tmux-output.md) | P2 deferred / P3 rejected | "aicapture: non-tmux output capture (Tier 2 tee / Tier 3 script/PTY)" |
 | [`ansible-env-proxy-var-case-sensitivity`](ansible-env-proxy-var-case-sensitivity.md) | P2 ready | "ansible env-var lookup: handle `HTTPS_PROXY` (uppercase) hosts" |
 | [`chezmoi-diff-pager-agent`](chezmoi-diff-pager-agent.md) | P? deferred | "chezmoi diff pager: TTY-aware delta fallback" |
+| [`copilot-proxy-supervisor`](copilot-proxy-supervisor.md) | P? deferred 2026-07 | "copilot-proxy: replace nohup start with a real supervisor (launchd/systemd/pueue)" |
 | [`mkdocs-anchor-drift`](mkdocs-anchor-drift.md) | P3 ready | "mkdocs site: ~20 stale in-page anchor links to clean up before re-enabling strict `anchors: warn`" |
 | [`chezmoiscripts-namespace-refactor`](chezmoiscripts-namespace-refactor.md) | P2 ready | "Migrate run_onchange scripts into .chezmoiscripts/{global,repo}/" |
 | [`fish-shell-evaluation`](fish-shell-evaluation.md) | P? declined 2026-05 | "Add `fish` as a third primaryShell choice" |
