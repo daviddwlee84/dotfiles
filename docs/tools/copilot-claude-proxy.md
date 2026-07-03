@@ -2,20 +2,28 @@
 
 Back [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the
 **Claude models from a GitHub Copilot subscription**, via a local
-reverse-engineered proxy ([`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api)).
+reverse-engineered proxy — the maintained fork
+[`caozhiyuan/copilot-api`](https://github.com/caozhiyuan/copilot-api)
+(npm `@jeffreycao/copilot-api`). The original
+[`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api) is
+officially unmaintained ([issue #233](https://github.com/ericc-ch/copilot-api/issues/233)
+points at the fork) but still works via `COPILOT_API_PKG=copilot-api@0.7.0`.
+Both packages share the same token file
+(`~/.local/share/copilot-api/github_token`), so switching needs **no re-auth**.
 
 - **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`, `claude-copilot`, `copilot-run`, `copilot-here`, `copilot-model`)
-- **Runner**: `bunx copilot-api` (pinned; matches the `bunx` convention in `07_bunx_cli.sh`)
+- **Runner**: `bunx @jeffreycao/copilot-api` (pinned; matches the `bunx` convention in `07_bunx_cli.sh`)
 - **Not installed by ansible** — pulled on demand via `bunx`, so it stays off the
   provisioning path.
 
 !!! warning "This violates GitHub Copilot's Terms of Service"
     Using a Copilot subscription to power a non-GitHub agent is not permitted, and
-    copilot-api is reverse-engineered/unofficial. copilot-api's own README warns it
-    can trigger GitHub's **abuse detection** and lead to **temporary suspension of
-    Copilot access**. Claude Code is token-hungry (frequent background calls, large
-    context) — always run with a rate limit. Use at your own risk; prefer a personal
-    account over a corporate seat.
+    copilot-api is reverse-engineered/unofficial. It can trigger GitHub's
+    **abuse detection** and lead to **temporary suspension of Copilot access**.
+    Claude Code is token-hungry (frequent background calls, large context) —
+    note the fork has **no rate limiter** (see Gotchas); `COPILOT_PROXY_QUIET=1`
+    reduces background chatter. Use at your own risk; prefer a personal account
+    over a corporate seat.
 
 ## Quick start
 
@@ -32,15 +40,23 @@ copilot-here off        # unpin — back to the real Anthropic backend
 
 ```
 Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
-                                          │ translates Anthropic <-> Copilot
+                                          │ native /v1/messages passthrough
                                           │ Authorization: Bearer <copilot token>
                                           ▼
                                    api.githubcopilot.com  (your Copilot sub)
 ```
 
 - Claude Code speaks only the **Anthropic Messages API** (`/v1/messages`).
-- Copilot's chat endpoint is **OpenAI-compatible** (`/chat/completions`).
-- copilot-api translates between them and injects the Copilot auth.
+- The fork prefers Copilot's **native Anthropic-style `/v1/messages`
+  endpoint** when available (Enterprise plans:
+  `api.enterprise.githubcopilot.com/v1/messages`) and only falls back to
+  translating through the OpenAI-compatible `/chat/completions`. Native
+  passthrough is what fixes **extended-thinking blocks**, **WebSearch**
+  (routed through a Responses-capable GPT model, default `gpt-5-mini`), and
+  the **infinite tool-retry loops** the original's Anthropic→OpenAI→Anthropic
+  translation caused.
+- The original (`copilot-api@0.7.0`) always translates through
+  `/chat/completions` — thinking blocks are dropped and WebSearch doesn't work.
 - Claude Code is pointed at the proxy via `ANTHROPIC_BASE_URL` — injected either
   as per-process env (`claude-copilot`) or via the gitignored
   `./.claude/settings.local.json` (`copilot-here on`). See "Settings-layer design".
@@ -49,8 +65,11 @@ Claude Code ──Anthropic /v1/messages──▶ copilot-api (localhost:4141)
 
 Claude Code merges settings low → high: `~/.claude/settings.json` (user) →
 `./.claude/settings.json` (project, committed) → `./.claude/settings.local.json`
-(local, gitignored) → CLI flags — and **shell env vars beat the `env` block of
-every settings file** ([docs](https://code.claude.com/docs/en/settings)).
+(local, gitignored) → CLI flags. The
+[docs](https://code.claude.com/docs/en/settings) (and third-party writeups)
+claim shell env vars beat every settings-file `env` block, but **empirically
+(verified 2026-07) current Claude Code lets the `settings.local.json` `env`
+block beat inherited shell env** — see Gotchas.
 
 Two of those layers are already owned by other tooling and must stay clean:
 
@@ -67,9 +86,13 @@ So the proxy uses the two layers nobody else owns:
 | `copilot-here on` | `./.claude/settings.local.json` (gitignored) | this project, sticky | `copilot-here off` |
 
 ```
-~/.claude/settings.json          .claude/settings.json         .claude/settings.local.json      shell env
-(chezmoi: hooks/plugins)    <    (git: plansDirectory)     <   (copilot-here on/off)        <   (claude-copilot)
+~/.claude/settings.json          .claude/settings.json         shell env                    .claude/settings.local.json
+(chezmoi: hooks/plugins)    <    (git: plansDirectory)     <   (claude-copilot)         <   (copilot-here on/off)
 ```
+
+(Shell env still beats the user- and project-level settings files, so
+`claude-copilot` works everywhere `copilot-here` is off — it just cannot
+*override* an active `copilot-here` pin.)
 
 ## Shell helpers
 
@@ -80,24 +103,30 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 | Env var | Default | Meaning |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
-| `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds (throttle; be gentle) |
-| `COPILOT_API_PKG` | `copilot-api@0.7.0` | `bunx` package spec (pin / upgrade) |
+| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@1.13.14` | `bunx` package spec (pin / upgrade; `copilot-api@0.7.0` = old original) |
+| `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
+| `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
 
 Set these in `~/.shellrc.adhoc` (or the per-shell secrets files). `start` refuses
 to run until `copilot-proxy auth` has stored a token, and waits up to ~20s for the
-proxy to answer before returning.
+proxy to answer before returning. `start` detects the package flavor from
+`COPILOT_API_PKG`: only the exact original `copilot-api` gets
+`--rate-limit`/`--wait` (the fork's `start` doesn't have those flags).
 
-`copilot-proxy whoami` is the real login check: it exchanges the stored token
-against GitHub and prints your account / plan / quota (fails loudly if the token
-is missing or expired). Use it instead of eyeballing the token file — the token
-is a plaintext credential and should not be opened in an editor.
+`copilot-proxy whoami` is the real login check: it prints your plan / quota
+(fails loudly if the token is missing or expired). On the fork it queries the
+running proxy's `/usage` endpoint (jq-summarized) and falls back to
+`bunx <pkg> debug` when the proxy is down; on the original it runs
+`check-usage`. Use it instead of eyeballing the token file — the token is a
+plaintext credential and should not be opened in an editor.
 
 ### `claude-copilot [--no-specstory] [claude args...]` — one-off session
 
 Layer 1: run a single Claude Code session on the proxy with **zero file
 writes**. Auto-starts the proxy if it isn't answering, then launches `claude`
-with the `ANTHROPIC_*` env injected per-process (shell env beats every
-settings-file `env` block, so this wins even where `copilot-here` is off).
+with the `ANTHROPIC_*` env injected per-process (shell env beats the user- and
+project-level settings files — but **not** an active `copilot-here` pin in
+`settings.local.json`; see Gotchas).
 
 - Wraps in `specstory run claude` when specstory is installed (markdown
   auto-save — same convention as `scode`/`svibe`); opt out with
@@ -175,7 +204,48 @@ Behavior:
 rate limits). Do **not** paste this into the committed `.claude/settings.json` —
 use `copilot-here on` instead.
 
+With `COPILOT_PROXY_QUIET=1` (opt-in, default off), both layers additionally
+inject the fork-README quota savers:
+
+| Extra env | Effect | UX cost |
+|---|---|---|
+| `CLAUDE_CODE_ATTRIBUTION_HEADER=0` | no billing/version info in system prompts → avoids prompt-cache invalidation | none noticeable |
+| `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` | no prompt-suggestion calls | no suggestions |
+| `CLAUDE_CODE_ENABLE_AWAY_SUMMARY=0` | no away-summary calls | no away summaries |
+| `DISABLE_NON_ESSENTIAL_MODEL_CALLS=1` | fewer background model calls | fewer niceties (haiku flavor text etc.) |
+
+`copilot-here off` removes these keys regardless of the current
+`COPILOT_PROXY_QUIET` value.
+
 ## Gotchas (these cost real debugging time)
+
+### `settings.local.json` env beats shell env (docs say otherwise)
+
+Verified empirically (2026-07): current Claude Code lets the `env` block of
+`./.claude/settings.local.json` **override inherited shell env vars** — the
+opposite of what the official settings docs imply. Consequences:
+
+- `claude-copilot` / `copilot-run` **cannot** redirect a project where
+  `copilot-here on` is active (harmless when both point at the same proxy,
+  silently wrong when they don't).
+- Trialing another proxy/port via the wrapper requires `copilot-here off`
+  first.
+
+### The fork has no rate limiter
+
+The fork's `start` dropped `--rate-limit`/`--wait`. Its README's mitigation is
+reducing Claude Code's chatter instead — that's exactly what
+`COPILOT_PROXY_QUIET=1` injects (off by default here; we prioritize UX over
+Copilot quota). If you really want request throttling, fall back to the
+original: `COPILOT_API_PKG=copilot-api@0.7.0`.
+
+### Fork wart: `context_management` can 400
+
+Newer Claude Code context-editing may inject `context_management`, which
+Copilot's native `/v1/messages` endpoint rejects with a 400
+([caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305),
+version-dependent). Real Claude Code runs didn't trigger it in testing, but if
+you see unexplained 400s on long sessions, check that issue first.
 
 ### Do not use Claude Code's `/model` picker
 
@@ -188,7 +258,10 @@ API Error: 400 {"error":{"message":"The requested model is not supported.",
 "code":"model_not_supported", ...}}
 ```
 
-Pin the model with `copilot-model` instead.
+Pin the model with `copilot-model` instead. (The fork does normalize
+*hyphenated* ids like `claude-opus-4-8` / `claude-haiku-4-5` — the Claude Code
+2.1.x hyphenation incompatibility is gone — but dated Anthropic ids from the
+`/model` picker still fail.)
 
 ### The "Opus 4 retired" warning is cosmetic
 
@@ -213,11 +286,13 @@ reuse OpenCode's.** Token is stored at `~/.local/share/copilot-api/github_token`
 
 ## Available Claude model ids
 
-Verified via `/v1/models` (2026-07): `claude-opus-4.5`, `claude-opus-4.6`,
+Verified via `/v1/messages` (2026-07): `claude-opus-4.5`, `claude-opus-4.6`,
 `claude-opus-4.7`, `claude-opus-4.8`, `claude-sonnet-4.5`, `claude-sonnet-4.6`,
-`claude-sonnet-5`, `claude-haiku-4.5`. Non-Claude models (gpt-5.5,
-gemini-3.1-pro-preview, …) are also served — see `copilot-model -l` or
-`GET /v1/models`.
+`claude-sonnet-5`, `claude-haiku-4.5`. Note the fork *lists* hyphenated ids in
+`/v1/models` (`claude-opus-4-8`, …) but accepts **both** dotted and hyphenated
+forms at request time (verified), so the dotted defaults baked into the shell
+helpers keep working. Non-Claude models (gpt-5.5, gemini-3.1-pro-preview, …)
+are also served — see `copilot-model -l` or `GET /v1/models`.
 
 ## Useful commands
 
@@ -228,13 +303,17 @@ copilot-model -c                     # current model + which layer it came from
 copilot-proxy status                 # up? which Claude models?
 copilot-proxy whoami                 # validate token → account / plan / quota
 copilot-proxy logs 60                # tail the proxy log
-# usage dashboard:
-#   https://ericc-ch.github.io/copilot-api?endpoint=http://localhost:4141/usage
+# usage dashboard (bundled locally by the fork):
+#   http://localhost:4141/usage-viewer?endpoint=http://localhost:4141/usage
 ```
 
 ## See also
 
-- [copilot-api](https://github.com/ericc-ch/copilot-api) — the proxy
+- [caozhiyuan/copilot-api](https://github.com/caozhiyuan/copilot-api) — the
+  maintained fork this setup runs (npm `@jeffreycao/copilot-api`)
+- [ericc-ch/copilot-api](https://github.com/ericc-ch/copilot-api) — the
+  unmaintained original ([#233](https://github.com/ericc-ch/copilot-api/issues/233));
+  still usable via `COPILOT_API_PKG=copilot-api@0.7.0`
 - [`bunx` CLI aliases](../shells/aliases.md#copilot--claude-code-proxy)
 - [Claude Code settings precedence](https://code.claude.com/docs/en/settings) — why
   `settings.local.json` / env vars are the right injection layers

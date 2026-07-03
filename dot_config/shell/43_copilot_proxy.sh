@@ -1,9 +1,13 @@
 # 43_copilot_proxy.sh - GitHub Copilot -> Anthropic/OpenAI proxy for Claude Code
 #   (shared bash + zsh).
 #
-# Runs ericc-ch/copilot-api (a reverse-engineered proxy) so a GitHub Copilot
-# subscription can back Claude Code (and any OpenAI/Anthropic-compatible client).
-# Full guide + risks: docs/tools/copilot-claude-proxy.md.
+# Runs the maintained copilot-api fork (caozhiyuan/copilot-api, npm
+# @jeffreycao/copilot-api) so a GitHub Copilot subscription can back Claude Code
+# (and any OpenAI/Anthropic-compatible client). The original ericc-ch/copilot-api
+# is unmaintained (its issue #233 points at the fork) but still works via
+# COPILOT_API_PKG=copilot-api@0.7.0 — flags differ per package, see
+# _copilot_pkg_flavor. Both packages share the same token file, so switching
+# needs no re-auth. Full guide + risks: docs/tools/copilot-claude-proxy.md.
 #
 # Public surface:
 #   copilot-proxy [start|stop|status|restart|logs|whoami|auth]   - manage the proxy
@@ -24,7 +28,10 @@
 #   - ./.claude/settings.json is committed (claude-plans-here puts plansDirectory
 #     there) — proxy config must not leak into git.
 #   - Claude Code precedence (low→high): user < project < settings.local.json
-#     (gitignored) < CLI flags; shell env vars beat every settings-file env block.
+#     (gitignored) < CLI flags. GOTCHA (verified 2026-07): current Claude Code
+#     lets the settings.local.json env block BEAT inherited shell env vars —
+#     so copilot-run/claude-copilot cannot override a project where
+#     `copilot-here on` points elsewhere (run `copilot-here off` first).
 #
 # Portability notes (POSIX subset, both shells source this file):
 #   - runs the proxy via `bunx` (matches 07_bunx_cli.sh); pinned version avoids a
@@ -33,14 +40,31 @@
 #
 # Env (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}):
 #   COPILOT_PROXY_PORT   default: 4141        - port the proxy listens on
-#   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds (be gentle;
-#                                               Claude Code is chatty → abuse risk)
-#   COPILOT_API_PKG      default: copilot-api@0.7.0  - bunx package spec (pin/upgrade)
+#   COPILOT_API_PKG      default: @jeffreycao/copilot-api@1.13.14
+#                                             - bunx package spec (pin/upgrade;
+#                                               copilot-api@0.7.0 = old original)
+#   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
+#                                               by the original package (the fork
+#                                               has no rate limiter)
+#   COPILOT_PROXY_QUIET  default: 0           - 1 = inject extra quota-saving env
+#                                               (fewer background calls, but a
+#                                               slightly degraded Claude Code UX)
 
 # --- shared constants / helpers -------------------------------------------------
 
 _copilot_port() { printf '%s' "${COPILOT_PROXY_PORT:-4141}"; }
-_copilot_pkg()  { printf '%s' "${COPILOT_API_PKG:-copilot-api@0.7.0}"; }
+_copilot_pkg()  { printf '%s' "${COPILOT_API_PKG:-@jeffreycao/copilot-api@1.13.14}"; }
+
+# CLI flavor from the package spec: the ORIGINAL bare `copilot-api` takes
+# --rate-limit/--wait and has `check-usage`; the fork (and anything else)
+# doesn't. Strips a trailing @version, but not the @scope/ prefix.
+_copilot_pkg_flavor() {
+  local name; name="$(_copilot_pkg)"
+  case "$name" in
+    copilot-api|copilot-api@*) printf 'original' ;;
+    *) printf 'fork' ;;
+  esac
+}
 _copilot_base() { printf 'http://localhost:%s' "$(_copilot_port)"; }
 _copilot_logfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).log"; }
 _copilot_pidfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).pid"; }
@@ -102,13 +126,22 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: not authenticated yet — run 'copilot-proxy auth' first." >&2
         return 1
       fi
-      printf '%s\n' "copilot-proxy: starting ($pkg) on port $port (rate-limit ${COPILOT_PROXY_RATE:-15}s) ..."
-      # nohup + background; detach so it survives the shell. Log to a file.
-      nohup bunx "$pkg" start \
-        --port "$port" \
-        --rate-limit "${COPILOT_PROXY_RATE:-15}" \
-        --wait \
-        >"$logf" 2>&1 &
+      # Flag sets differ per package: only the original has --rate-limit/--wait
+      # (the fork ships no rate limiter — mitigate with COPILOT_PROXY_QUIET=1).
+      if [ "$(_copilot_pkg_flavor)" = "original" ]; then
+        printf '%s\n' "copilot-proxy: starting ($pkg) on port $port (rate-limit ${COPILOT_PROXY_RATE:-15}s) ..."
+        # nohup + background; detach so it survives the shell. Log to a file.
+        nohup bunx "$pkg" start \
+          --port "$port" \
+          --rate-limit "${COPILOT_PROXY_RATE:-15}" \
+          --wait \
+          >"$logf" 2>&1 &
+      else
+        printf '%s\n' "copilot-proxy: starting ($pkg) on port $port ..."
+        nohup bunx "$pkg" start \
+          --port "$port" \
+          >"$logf" 2>&1 &
+      fi
       printf '%s\n' "$!" >"$pidf"
       # Wait up to ~20s for it to answer.
       local i=0
@@ -168,7 +201,28 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: not authenticated — run 'copilot-proxy auth' first." >&2
         return 1
       fi
-      bunx "$pkg" check-usage
+      if [ "$(_copilot_pkg_flavor)" = "original" ]; then
+        bunx "$pkg" check-usage
+      elif _copilot_alive; then
+        # Fork has no check-usage subcommand; its /usage endpoint serves the
+        # GitHub quota payload (same data as the bundled /usage-viewer).
+        if command -v jq >/dev/null 2>&1; then
+          command curl -fsS --max-time 5 "$(_copilot_base)/usage" | jq '{
+            plan: (.copilot_plan // .access_type_sku // "unknown"),
+            quota_reset: (.quota_reset_date // null),
+            quotas: ((.quota_snapshots // {}) | map_values(
+              if type == "object" then
+                {remaining, entitlement, percent_remaining, unlimited}
+              else . end))
+          }'
+        else
+          command curl -fsS --max-time 5 "$(_copilot_base)/usage"
+        fi
+      else
+        # Proxy down → the fork's `debug` still validates auth state / paths.
+        printf '%s\n' "copilot-proxy: not running — showing auth/debug info instead of quota." >&2
+        bunx "$pkg" debug
+      fi
       ;;
     -h|--help|help)
       printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]"
@@ -184,8 +238,9 @@ copilot-proxy() {
 
 # Run any command with the copilot-proxy env injected (per-process only —
 # nothing is written to disk). Auto-starts the proxy when it isn't answering.
-# Shell env vars beat every settings-file env block, so this wins even inside
-# a project that pins something else.
+# GOTCHA (verified 2026-07): current Claude Code lets the settings.local.json
+# env block beat inherited shell env, so this does NOT win inside a project
+# where `copilot-here on` pins something else — `copilot-here off` first.
 # Example:
 #   copilot-run claude                      # raw Claude Code on the proxy
 #   copilot-run specstory run claude        # specstory-wrapped session
@@ -198,6 +253,16 @@ copilot-run() {
     copilot-proxy start || return 1
   fi
   local model; model="$(_copilot_default_model)"
+  # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
+  # to `env`. Off by default — they degrade the Claude Code UX a little.
+  if [ "${COPILOT_PROXY_QUIET:-0}" = "1" ]; then
+    set -- \
+      CLAUDE_CODE_ATTRIBUTION_HEADER="0" \
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION="false" \
+      CLAUDE_CODE_ENABLE_AWAY_SUMMARY="0" \
+      DISABLE_NON_ESSENTIAL_MODEL_CALLS="1" \
+      "$@"
+  fi
   # `command env` (not bare var-prefix) so the vars are strictly per-process:
   # POSIX var-prefix on a *function* call would leak into the current shell.
   command env \
@@ -246,8 +311,9 @@ claude-copilot() {
 # --- per-project toggle (Layer 2: sticky, gitignored settings.local.json) --------
 
 # Env keys we own in .claude/settings.local.json (kept in one place so `off`
-# removes exactly what `on` added).
-_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"]'
+# removes exactly what `on` added — including the COPILOT_PROXY_QUIET extras,
+# regardless of the knob's value at `off` time).
+_copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
 
 # Pin THIS project to the Copilot proxy via ./.claude/settings.local.json —
 # the gitignored local layer that overrides the committed .claude/settings.json
@@ -271,9 +337,10 @@ copilot-here() {
       [ -f "$settings" ] && base="$(command cat "$settings")"
       [ -n "$base" ] || base='{}'
       local model; model="$(_copilot_default_model)"
+      local quiet="${COPILOT_PROXY_QUIET:-0}"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
       if printf '%s' "$base" | jq \
-          --arg base_url "$(_copilot_base)" --arg model "$model" '
+          --arg base_url "$(_copilot_base)" --arg model "$model" --arg quiet "$quiet" '
           .env = ((.env // {}) + {
             ANTHROPIC_BASE_URL: $base_url,
             ANTHROPIC_AUTH_TOKEN: "dummy",
@@ -283,7 +350,12 @@ copilot-here() {
             ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4.5",
             ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4.5",
             CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-          })' >"$tmp"; then
+          } + (if $quiet == "1" then {
+            CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
+            CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "false",
+            CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
+            DISABLE_NON_ESSENTIAL_MODEL_CALLS: "1"
+          } else {} end))' >"$tmp"; then
         command mv -- "$tmp" "$settings"
       else
         command rm -f -- "$tmp"
