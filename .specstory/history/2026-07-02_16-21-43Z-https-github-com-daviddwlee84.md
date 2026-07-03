@@ -6870,3 +6870,1938 @@ _**Agent (claude-opus-4-8 2026-07-03 02:00:55Z)**_
 3. 先只驗證現在線上的狀態,push 晚點再說。
 
 要走哪個?
+
+---
+
+_**User (2026-07-03 02:51:56Z)**_
+
+just pushed you can double check now
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Fetch and check for new triggered Docs run
+
+```bash
+cd /Users/david/.local/share/chezmoi
+git fetch origin 2>&1 | tail -2
+echo "=== branch vs origin ==="
+git status -sb | head -1
+echo "=== latest Docs runs ==="
+gh run list --repo daviddwlee84/dotfiles --workflow Docs --limit 3 2>&1
+```
+
+```text
+=== branch vs origin ===
+## main...origin/main
+=== latest Docs runs ===
+completed	success	fix(shell): hyphenated [1m] model ids so Claude Code detects model + …	Docs	main	push	28635124600	1m9s	2026-07-03T02:49:19Z
+completed	success	feat(docs): OG/Twitter social cards via mkdocs Material social plugin	Docs	main	push	28631993344	16s	2026-07-03T01:56:07Z
+completed	success	feat(shell): frictionless copilot-proxy enable/disable for Claude Code	Docs	main	push	28604400648	10m5s	2026-07-02T16:26:52Z
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:30Z)**_
+
+<think><details><summary>Thought Process</summary>
+The branch is synced with origin, but the latest Docs run succeeded with a different commit than mine — the run shows "fix(shell): hyphenated model ids..." which doesn't match my commit hash. I need to check the commit history to see what actually got pushed and whether my changes triggered a run.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:32Z)**_
+
+Branch is now in sync with origin (`## main...origin/main`, no ahead/behind). The latest Docs run `28635124600` **succeeded in 1m9s** — including deploy this time, no flakiness. But its title is a commit I haven't seen (`fix(shell): hyphenated [1m] model ids…`). Let me confirm my timeout fix actually made it to origin and check that run's deploy.
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm timeout fix on origin and latest run deploy status
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== is my timeout fix on origin? ==="
+git log --oneline -6 origin/main
+echo "=== did the latest run deploy cleanly? ==="
+gh run view 28635124600 --repo daviddwlee84/dotfiles 2>&1 | grep -A6 JOBS
+```
+
+```text
+=== is my timeout fix on origin? ===
+cf0c002 fix(shell): hyphenated [1m] model ids so Claude Code detects model + 1M context
+905ea82 ci(docs): drop ineffective deploy-pages timeout override
+2655173 feat(shell): migrate copilot-proxy to maintained copilot-api fork
+a6cc799 feat(docs): OG/Twitter social cards via mkdocs Material social plugin
+100ae71 docs(specstory): document seed-once (create_) config management
+ea1443e feat(editor): manage terminal scroll sensitivity + Shift+Enter soft-newline
+=== did the latest run deploy cleanly? ===
+JOBS
+✓ build in 56s (ID 84919771027)
+✓ deploy in 8s (ID 84919860871)
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@v4, actions/checkout@v4, actions/setup-python@v5, actions/upload-artifact@v4, astral-sh/setup-uv@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+build: .github#2
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+My timeout fix is live on origin, and the user's newer commit with hyphenated model IDs is stacked on top of it. The latest pipeline run succeeded with no timeout warnings—just the Node.js deprecation notice—confirming the invalid timeout configuration has been removed.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 02:52:57Z)**_
+
+All confirmed green. Everything's landed and working:
+
+## ✅ 全部完成並驗證
+
+**Origin 現況** — 我的修正 `905ea82` 在 origin 上,你又在上面疊了一個 `cf0c002`(hyphenated `[1m]` model ids,你自己的 commit)。
+
+**最新 Docs run `28635124600`(由 `cf0c002` 觸發):**
+| Job | 結果 | 時間 |
+|---|---|---|
+| build | ✓ | 56s(social cards + cairo,warm cache 比冷啟快) |
+| deploy | ✓ | **8s**(乾淨,沒有排隊/瞬斷) |
+
+**兩個關鍵改善都生效了:**
+1. **deploy 一次就過** —— 這次後端沒抽風,8 秒完成。
+2. **timeout-clamp warning 消失了** —— annotations 現在只剩 Node.js deprecation 那條(無法避免),我移除無效的 `timeout: 1200000` 後,那個 `timeout value is greater than the allowed maximum` 的噪音警告不再出現。
+
+## 收尾
+
+- **OG/social cards**:線上活著,build/deploy 穩定。
+- **timeout 修正**:已上 origin,已驗證生效。
+- **memory**:已記錄兩個坑(Pages deploy 抽風只能重跑、social cards 需 cairo+CJK 字型),以後不用重查。
+
+**唯一還在你手上的一步**:Discord 對**已經貼過**的舊連結還是會顯示快取的舊 embed。貼個帶 `?v=1` 的變體、或貼一個沒貼過的新頁面,就會看到新卡片。線上頁面本身已經 100% 正確了。
+
+沒別的事了 — 需要我再看什麼嗎?
+
+---
+
+_**User (2026-07-03 05:31:02Z)**_
+
+關於我們之前在 ~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap 裡面更新的skills 會有這個問題嗎？
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:23Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to figure out which problem the user is referring to when they ask if the updated skill will have "this problem." We've covered a few different issues—the GitHub Pages deployment flakiness, the invalid timeout value that gets clamped, and the social cards font rendering issue. The most recent fix we made was addressing that invalid timeout configuration in the docs setup.
+
+When I updated the skill's `docs-workflow.yml.template`, I actually added the same problematic `timeout: 1200000` configuration that I just reverted in the dotfiles repo. So yes, the skill template has inherited the exact same bug. I need to remove that invalid timeout from the skill's template to match the fix I just applied elsewhere. I should also double-check the recipe documentation to see if I added the timeout there as well, since I updated the workflow YAML in that file too.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:23Z)**_
+
+Good catch — yes, it does. When I mirrored the OG setup into the skill, I copied the **same invalid `timeout: 1200000`** into its workflow template, before I'd discovered that the action caps it at 10 min. Let me verify exactly where it leaked.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the invalid timeout across the skill
+
+```bash
+cd ~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+echo "=== grep the bad timeout across the whole skill ==="
+grep -rn "timeout: 1200000\|1200000\|20m gives\|queue backlog\|deployment_queued" . 2>/dev/null
+echo "=== show deploy block in the workflow template ==="
+grep -n -A8 'deploy-pages@v5' assets/docs-workflow.yml.template
+echo "=== and in the recipe doc ==="
+grep -n -A6 'deploy-pages@v5' references/docs-stack-recipe.md
+```
+
+```text
+=== grep the bad timeout across the whole skill ===
+assets/docs-workflow.yml.template:67:          # GitHub Pages deployments can sit in "deployment_queued" for a long
+assets/docs-workflow.yml.template:69:          # an otherwise-healthy deploy. 20m gives queue backlogs room.
+assets/docs-workflow.yml.template:70:          timeout: 1200000
+=== show deploy block in the workflow template ===
+65:        uses: actions/deploy-pages@v5
+66-        with:
+67-          # GitHub Pages deployments can sit in "deployment_queued" for a long
+68-          # time when the backend is busy; the default 10m timeout then aborts
+69-          # an otherwise-healthy deploy. 20m gives queue backlogs room.
+70-          timeout: 1200000
+=== and in the recipe doc ===
+199:        uses: actions/deploy-pages@v5
+200-```
+201-
+202-You also need to enable Pages in your repo settings: **Settings → Pages
+203-→ Build and deployment → Source: GitHub Actions**. One-time setup.
+204-
+205-## Linking rules inside `docs/`
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:56Z)**_
+
+<think><details><summary>Thought Process</summary>
+I found the same timeout bug in the skill's template file that I fixed in the dotfiles repo, so I'll apply the same correction there. After that, I need to tackle the bigger design question about OG tag overhead and whether it should be enabled by default.
+
+Looking at the actual costs: the social plugin adds system dependencies (cairo/pango) that take about 10-20 seconds to install in CI, and rendering cards takes roughly 75 seconds for 290 pages but scales with page count. For a new small site bootstrapped with just 2-3 pages, the overhead is minimal—mostly just the fixed apt install cost. The tradeoff is between the UX win of having OG cards ready for sharing versus the complexity of requiring system dependencies and network access at build time, which could break a local build with a cryptic error if someone doesn't have cairo installed. The skill's philosophy leans toward being minimal and consent-gated, which pulls toward making it opt-in rather than default. I should give a clear recommendation on whether to default the social plugin on or off, grounded in the concrete overhead and system dependency friction, then let them steer the implementation. First though, I need to fix the timeout bug in the skill template by matching the dotfiles fix — removing the problematic `with:` block and adding a clarifying note.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:56Z)**_
+
+Confirmed — the skill's `docs-workflow.yml.template` (lines 65-70) has the **exact same invalid `timeout: 1200000`** I just reverted in the dotfiles. The recipe doc's deploy block is clean. Let me fix the template to match.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:31:56Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template`
+
+```text
+55	          path: site
+56	
+57	  deploy:
+58	    needs: build
+59	    runs-on: ubuntu-latest
+60	    environment:
+61	      name: github-pages
+62	      url: ${{ steps.deployment.outputs.page_url }}
+63	    steps:
+64	      - id: deployment
+65	        uses: actions/deploy-pages@v5
+66	        with:
+67	          # GitHub Pages deployments can sit in "deployment_queued" for a long
+68	          # time when the backend is busy; the default 10m timeout then aborts
+69	          # an otherwise-healthy deploy. 20m gives queue backlogs room.
+70	          timeout: 1200000
+71
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:32:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:32:16Z)**_
+
+Now let me commit the skill fix, then answer your OG overhead / default question (which needs a proper analysis).
+
+_**Agent (claude-opus-4-8 2026-07-03 05:32:17Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit skill timeout fix
+
+```bash
+cd ~/Documents/Program/agent-skills
+git add skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template
+git commit -m "$(cat <<'EOF'
+fix(mkdocs-site-bootstrap): drop invalid deploy-pages timeout from template
+
+The social-cards mirror copied a `timeout: 1200000` (20m) into the
+workflow template, but deploy-pages hard-caps timeout at 600000ms (10m)
+— the value is silently clamped and warns every run, and it does NOT fix
+the "Deployment failed, try again later" backend flakiness it claimed to
+(that's a finalErrorStatus with no retry). Remove it and document that a
+job re-run is the only remedy. Mirrors the same fix in daviddwlee84/dotfiles.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)" && git log --oneline -1
+```
+
+```text
+[main 33b4522] fix(mkdocs-site-bootstrap): drop invalid deploy-pages timeout from template
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+33b4522 fix(mkdocs-site-bootstrap): drop invalid deploy-pages timeout from template
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:32:51Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I'm gathering concrete overhead numbers from my observations—the dotfiles repo showed a cold build of 75 seconds for 289 pages with the TC font, plus around 15-20 seconds for apt install and a 70MB cache footprint, while a fresh bootstrapped site with just 2 pages took 52 seconds on a cold build.
+
+Most of that 52-second overhead is actually fixed costs: the font download from Google Fonts (around 5-10 seconds, network-dependent) and the cairo/pango initialization, not per-page rendering. The real bottlenecks are the hard system dependency on cairo and pango (which fails locally with a cryptic error if users haven't installed them via brew), the network dependency on Google Fonts (especially problematic for users behind firewalls), the build time overhead of 15-60 seconds depending on site size, and the 70MB cache that needs gitignore and CI configuration. Against these costs, the main benefit is rich link unfurls. Given this is a bootstrap skill meant to "just work," I'm leaning toward defaulting this feature OFF with an opt-in flag instead. I'll present the overhead breakdown and my recommendation clearly, then use AskUserQuestion to let them decide since this genuinely changes the implementation — whether to restructure the skill for opt-in via a `--social` flag or keep it defaulting on like the dotfiles version.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:33:11Z)**_
+
+Skill timeout bug fixed (`33b4522`). Now your OG overhead question — this is a genuine design decision, so let me give you concrete numbers from what I measured, then a recommendation.
+
+## OG social cards 的 overhead(實測)
+
+| 成本 | 大小 | 說明 |
+|---|---|---|
+| **系統依賴(硬性)** | cairo/pango/freetype | ⚠️ 最關鍵。本地 `mkdocs build` 若沒裝這些,會直接以 `libcairo` load error **失敗**,不是 warning |
+| **CI apt install** | ~15-20s | 固定成本,每次 build |
+| **字型下載** | ~7MB / 5-10s | 從 Google Fonts 抓 Noto Sans TC。**冷快取時走網路** —— 你在 GFW 後面,這點是真風險 |
+| **卡片渲染** | ~0.1-0.2s/頁 | 小站可忽略;我們 dotfiles 289 頁冷啟 ~75s,新站 2 頁其實幾乎全是上面的固定成本 |
+| **快取** | ~70MB | `.cache/plugin/social`,要 gitignore + CI cache |
+| **runtime overhead** | **0** | 純 build-time,對訪客/網站速度**零**影響。卡片是靜態 PNG |
+
+**重點**:對「網站本身」零 overhead,全部是 **build-time** 成本。真正的痛點只有一個 —— **它引入了硬性系統依賴**,沒裝 cairo 就本地 build 不起來。
+
+## 我的建議:dotfiles 保持 ON,但 skill 改成 **opt-in(default OFF)**
+
+理由是這兩者用途不同:
+
+- **dotfiles(你自己的站)**:已經設好、CI 跑通、你要 OG 卡片 → **保持 ON**,不用動。
+- **bootstrap skill(給任意新專案 scaffold)**:一個 scaffolding 工具的核心承諾是「生出來就能 `mkdocs build` 跑」。social 外掛的 cairo 硬依賴會讓**新使用者第一次本地 build 就爆**(而且錯誤訊息很隱晦),這正是這個 consent-gated skill 一直想避免的「驚喜」。加上你在 GFW 後、字型要走 Google 網路,更不該預設開。
+
+所以我傾向:skill 預設**不開** social,提供一個 `--social` flag 讓知道自己要、也會裝 cairo 的人一鍵開啟。目前 skill 是我無條件塞進模板的(等於 default ON),要改成 opt-in 需要把 social 區塊在 `init-docs-site.sh` 裡做成條件式。
+
+這是你的 skill、影響所有未來的站,所以想讓你拍板:
+
+_**Agent (claude-opus-4-8 2026-07-03 05:33:11Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+
+```text
+<tool_use_error>InputValidationError: AskUserQuestion failed due to the following issue:
+The required parameter `questions[0].question` is missing</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:34:21Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**mkdocs-site-bootstrap skill 的 OG social cards 要預設開還是改成 opt-in?(dotfiles 自己維持 ON 不變)**
+
+Options:
+- **改成 opt-in (推薦)** - skill 預設不開 social;加 --social flag 開啟。新站 scaffold 出來零系統依賴、本地 build 一定過。dotfiles 自己維持 ON 不變。
+- **維持 default ON** - skill 跟 dotfiles 一致,新站直接有 OG 卡片。但使用者本地要先裝 cairo/pango,否則 mkdocs build 會以隱晦錯誤失敗;冷啟需 Google Fonts 網路。
+- **default ON + 優雅降級** - 維持預設開,但改成 build 時偵測不到 cairo 就自動略過 social(印警告而非爆掉)。折衷但實作較複雜、行為較隱性。
+
+
+```text
+No response after 60s — the user may be away from keyboard. Proceed using your best judgment based on the context so far; you can re-ask this question later if it's still relevant.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:35:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+Since the user hasn't responded, I'm leaning toward the recommended approach: making social cards opt-in through a `--social` flag while keeping dotfiles enabled by default. But implementing this would require meaningful changes to the skill—conditionally handling the social plugin in the initialization script, adding the flag logic, and adjusting the CI pipeline for the imaging dependency. That's substantial work, and the user is unavailable right now, so I'm second-guessing whether I should tackle this larger refactor.
+
+The core tension is that my recommendation is clear and low-risk, but the implementation is nontrivial and reversible. Since the user explicitly asked the question but is away, and this is their skill to decide on, I think the safer move is to hold off on the speculative restructuring. If they ultimately prefer keeping social enabled by default, I'd have done unnecessary work and need to revert it. Instead, I'll confirm the timeout fix is complete and document my recommendation clearly for when they return. The implementation would get messy with YAML templating, so I'm going to hold off on the restructure. The timeout fix is already done and ready, and since the user is away, I'll document my recommendation for opt-in and let them decide when they're back rather than making a large speculative change to a feature they originally requested.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:35:07Z)**_
+
+The user stepped away, so I'll use best judgment rather than make a large speculative change to their skill. Here's my reasoning and where I've left things.
+
+**Decision: I'm leaving the skill as default-ON for now** (not doing the opt-in restructure yet), because:
+- You drove the whole OG feature — undoing it to opt-in based on my own inference, while you're away, would be the bigger surprise.
+- The opt-in restructure is nontrivial (conditionally stripping the social plugin block, imaging dep, and cairo CI steps across 3 templates via fragile YAML surgery) and speculative — if you'd rather keep it ON, that work gets reverted.
+- The cairo requirement is already **documented** in SKILL.md (the gotcha I added), so it's not a silent trap.
+
+## 現況總結
+
+**已修好並 commit 的真 bug**(`33b4522`):skill 的 `docs-workflow.yml.template` 有跟 dotfiles 一樣的無效 `timeout: 1200000`,已移除。這個跟 on/off 無關,不論你怎麼決定都該修。
+
+**OG overhead 的結論**(回答你的問題):
+- **對網站訪客/runtime:零 overhead** —— 卡片是 build 時生成的靜態 PNG。
+- **只有 build-time 成本**:cairo/pango 硬依賴(最關鍵)、CI +15-20s、字型 ~7MB 走 Google 網路(你在 GFW 後是風險)、~70MB 快取。
+- 小站(新 scaffold 出來 2 頁)per-page 成本可忽略,痛點純粹是「多一個系統依賴」。
+
+**我的建議仍是**:dotfiles 保持 ON(已跑通),skill 改 opt-in —— 但這步等你回來拍板,我再動手(約 10 分鐘的模板改造)。
+
+## 待你處理
+1. **skill 那個 timeout 修正 commit `33b4522` 還沒 push**(agent-skills repo)—— 要我 push 嗎?
+2. **skill social 預設 on/off** —— 上面問題還開著,你回來選一下,選「opt-in」我就實作。
+
+你回來再回我即可,沒有急事卡著。
+
+---
+
+_**User (2026-07-03 05:37:45Z)**_
+
+skill 可改 opt-in
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:29Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user selected opt-in for social cards, so I need to refactor how the skill templates handle this feature. Currently, social functionality is hardcoded into the configuration files—the MkDocs config includes the social plugin, the Python dependencies specify the imaging extra, and the workflow includes the necessary system dependencies. I need to restructure these templates so social cards are only included when explicitly enabled.
+
+I'm weighing three approaches: stripping social from templates by default (messy), injecting it with a flag (fragile with sed/yq), or using placeholder substitution like the existing template pattern. The placeholder approach seems cleanest since it mirrors how the templates already handle variable substitution, though multi-line YAML substitution is trickier than simple string replacements. Let me examine how the current substitution mechanism works to determine the most robust implementation. Removing social cards via yq for the workflow file (targeting steps by name) and sed for the pyproject.toml line, though I need to be careful with yq on TOML since it might reformat the file — safer to stick with sed there. The workflow removal is tricky because yq strips comments during round-trip, so I'll need to handle that carefully.
+
+Actually, a cleaner approach: instead of stripping social from templates, keep the base templates minimal and use `--social` to *inject* the social pieces when needed. For mkdocs.yml and the workflow, I can use yq to prepend the social plugin and insert the Cairo/cache steps into the right array positions. For pyproject.toml, I'll append the imaging dependency line. This avoids fragile removal logic and comment loss issues.
+
+But wait — the workflow still has the yq-comment-loss problem. Let me think differently: what if the Cairo installation step is always in the workflow template but conditionally executes? I can make it self-skipping by having it grep for the social plugin in mkdocs.yml and only run apt-get if it's actually enabled. That way the workflow template never needs editing, and the step gracefully skips when social isn't used.
+
+The cache step would be harmless too — just an empty directory when social is off. So the real design simplifies to: `--social` only controls whether mkdocs.yml includes the social plugin block and whether pyproject.toml has the imaging dependency. The workflow stays untouched.
+
+For mkdocs.yml itself, I'd still need yq to inject the social plugin, which brings back the comment-loss issue. But actually, add-language.sh already does yq operations on mkdocs.yml for i18n and theme settings, so if comments are being lost there, that's a pre-existing problem in this skill.
+
+The cleanest approach: keep social in the base template with its nice comments. Then when `--social` isn't passed, I strip it out using sed or yq. This way the default site gets a clean mkdocs.yml with preserved comments, and enabling social via yq is consistent with how the skill already handles other modifications.
+
+Actually, flipping it makes more sense — remove social from the base templates entirely so the default path (no --social) stays pristine and commented. When someone passes `--social`, I use yq to inject the social plugin and sed to add the imaging dependency. The workflow can self-skip the cairo step via a grep check, so it doesn't need editing either.
+
+For the workflow, I'm reconsidering whether to gate both the cache and cairo steps on a condition, or just leave them as self-skipping. A grep-guarded step with a clear echo message might be cleaner than having mysterious steps that users don't understand.
+
+But actually, if social is truly opt-in and most sites won't use it, cluttering every workflow with cairo-related steps contradicts that lean-by-default philosophy. So I should conditionally include them instead. The trick is doing this without yq mangling comments. I'm thinking of using a marker line in the template workflow that init-docs-site.sh either replaces with the actual steps or deletes entirely, depending on whether --social is passed.
+
+Same approach works for mkdocs.yml and pyproject.toml — marker lines that get replaced or removed. It's more implementation work and needs a helper function for multi-line marker replacement, but it keeps everything clean and comment-preserving.
+
+Though I should weigh whether that effort is worth it versus just removing social from the base templates entirely and injecting everything with sed and yq when --social is used. That's simpler to implement, even if it's slightly less elegant.
+
+Actually, markers are the right call here since this is a reusable skill that other people will use — the output quality matters. I'll go with markers in all three templates and build out the injection logic with proper TODO tracking.
+
+Adding marker lines to workflow template... is the marker approach worth the complexity, or should I just inject directly into clean templates using yq and awk? The marker method avoids anchor dependencies, but for mkdocs.yml a yq prepend is straightforward, and for pyproject.toml I can insert after the mkdocs-material reference. I need to weigh the trade-offs carefully before committing to the implementation. For the workflow, I'll keep the grep-guarded cairo step so it's always present and ready to support social cards without requiring additional edits during the retrofit. This way enable-social.sh only needs to handle the mkdocs.yml configuration and Python dependencies, keeping the script focused and the workflow self-contained. I'm realizing the CJK font logic needs to work regardless of whether social gets enabled before or after a language is added — enable-social.sh should detect existing languages and set the font, while add-language.sh does the same if social is already present. Both paths cover the ordering.
+
+This retrofit approach is solid architecturally but adds complexity with a new script. The user asked for opt-in, which a `--social` flag on init-docs-site.sh achieves more simply — inject everything at scaffold time rather than retrofitting later. That keeps the logic in one place and meets the requirement without overscoping.
+
+The tricky part is preserving template formatting when injecting social blocks. Using markers (like `# __SOCIAL_PLUGIN__`) that get replaced or deleted based on the `--social` flag avoids yq reformatting the whole file and losing comments, so both the default and opt-in paths stay clean.
+
+I'll create snippet files in `assets/social/` with pre-indented content for the mkdocs plugin, pyproject dependency, and CI steps, then have `init-docs-site.sh` use a helper function to either inject them at the marker lines or strip the markers entirely. I also need to handle `.gitignore` for the cache directory when social is enabled, document the feature in SKILL.md and docs-stack-recipe.md, and make sure `add-language.sh` works correctly whether social was initialized first or languages are added later. I'm going to read through the full init-docs-site.sh script to understand its current structure before implementing the opt-in social feature with marker-based snippet replacement.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:29Z)**_
+
+You chose opt-in. Let me implement it cleanly. First let me read `init-docs-site.sh` in full to understand its structure (flag parsing, helpers) before designing the change.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:29Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh`
+
+```text
+1	#!/usr/bin/env bash
+2	# init-docs-site.sh — Scaffold a MkDocs Material docs site in the current repo.
+3	#
+4	# Bash 3.2 compatible. See SKILL.md for the full workflow including consent
+5	# gates and existing-docs handling (which the agent does, not this script).
+6	
+7	set -euo pipefail
+8	
+9	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+10	SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+11	ASSETS="$SKILL_DIR/assets"
+12	
+13	usage() {
+14	  cat <<'EOF'
+15	Usage: init-docs-site.sh [OPTIONS]
+16	
+17	Scaffold mkdocs.yml, pyproject.toml (docs extras), .github/workflows/docs.yml,
+18	and a starter docs/ tree in the current repo (or --target-dir).
+19	
+20	Options:
+21	  --site-name NAME         Display name for the site (required).
+22	  --site-description DESC  One-paragraph site description (default: derived from --site-name).
+23	  --site-url URL           Public URL (e.g., https://owner.github.io/repo/) (required).
+24	  --repo-slug owner/repo   GitHub slug (required).
+25	  --repo-name NAME         Python package-ish name for pyproject.toml (default: repo basename).
+26	  --target-dir DIR         Repo root (default: walk up from CWD looking for .git).
+27	  --existing skip|wrap     How to handle existing docs/ (default: skip — leave as-is, empty nav).
+28	                           wrap: add files to nav alphabetically.
+29	  --no-workflow            Don't create .github/workflows/docs.yml.
+30	  --no-skeleton            Don't create the docs/ skeleton (use existing docs/ as-is).
+31	  --dry-run                Print actions without writing.
+32	  --force                  Overwrite existing files (mkdocs.yml, pyproject.toml).
+33	  --help, -h               Show this help and exit.
+34	
+35	Examples:
+36	  init-docs-site.sh \
+37	    --site-name "My Project" \
+38	    --site-url https://owner.github.io/repo/ \
+39	    --repo-slug owner/repo
+40	
+41	  init-docs-site.sh --dry-run --site-name X --site-url https://x.io/ --repo-slug a/b
+42	
+43	Exit codes:
+44	  0  success
+45	  1  invalid arguments
+46	  2  target dir not found
+47	  3  refusing to overwrite (use --force)
+48	  4  template missing
+49	EOF
+50	}
+51	
+52	log()  { printf '%s\n' "$*" >&2; }
+53	die()  { printf 'error: %s\n' "$*" >&2; exit "${2:-1}"; }
+54	
+55	SITE_NAME=""
+56	SITE_DESC=""
+57	SITE_URL=""
+58	REPO_SLUG=""
+59	REPO_NAME=""
+60	TARGET=""
+61	EXISTING="skip"
+62	NO_WORKFLOW=0
+63	NO_SKELETON=0
+64	DRY_RUN=0
+65	FORCE=0
+66	
+67	while [ $# -gt 0 ]; do
+68	  case "$1" in
+69	    --site-name)        SITE_NAME="${2:-}"; shift 2 ;;
+70	    --site-description) SITE_DESC="${2:-}"; shift 2 ;;
+71	    --site-url)         SITE_URL="${2:-}"; shift 2 ;;
+72	    --repo-slug)        REPO_SLUG="${2:-}"; shift 2 ;;
+73	    --repo-name)        REPO_NAME="${2:-}"; shift 2 ;;
+74	    --target-dir)       TARGET="${2:-}"; shift 2 ;;
+75	    --existing)         EXISTING="${2:-}"; shift 2 ;;
+76	    --no-workflow)      NO_WORKFLOW=1; shift ;;
+77	    --no-skeleton)      NO_SKELETON=1; shift ;;
+78	    --dry-run)          DRY_RUN=1; shift ;;
+79	    --force)            FORCE=1; shift ;;
+80	    --help|-h)          usage; exit 0 ;;
+81	    -*)                 die "unknown flag: $1 (try --help)" 1 ;;
+82	    *)                  die "unexpected positional argument: $1" 1 ;;
+83	  esac
+84	done
+85	
+86	[ -n "$SITE_NAME" ] || die "--site-name is required (try --help)" 1
+87	[ -n "$SITE_URL" ]  || die "--site-url is required" 1
+88	[ -n "$REPO_SLUG" ] || die "--repo-slug is required (e.g. owner/repo)" 1
+89	case "$EXISTING" in skip|wrap) ;; *) die "--existing must be 'skip' or 'wrap'" 1 ;; esac
+90	
+91	[ -n "$SITE_DESC" ] || SITE_DESC="Documentation for $SITE_NAME"
+92	
+93	# Resolve target dir.
+94	if [ -z "$TARGET" ]; then
+95	  cur="$(pwd)"
+96	  while [ "$cur" != "/" ]; do
+97	    if [ -d "$cur/.git" ]; then TARGET="$cur"; break; fi
+98	    cur="$(dirname "$cur")"
+99	  done
+100	  [ -n "$TARGET" ] || TARGET="$(pwd)"
+101	fi
+102	[ -d "$TARGET" ] || die "target dir not found: $TARGET" 2
+103	
+104	[ -n "$REPO_NAME" ] || REPO_NAME="$(basename "$TARGET")"
+105	
+106	log "Target: $TARGET"
+107	log "Site:   $SITE_NAME @ $SITE_URL"
+108	log "Repo:   $REPO_SLUG"
+109	
+110	# --- helper: substitute {{VAR}} placeholders ---
+111	substitute() {
+112	  local file="$1"
+113	  if [ "$DRY_RUN" = "1" ]; then
+114	    log "[dry-run] would substitute placeholders in $file"
+115	    return 0
+116	  fi
+117	  sed -i.bak \
+118	    -e "s|{{SITE_NAME}}|${SITE_NAME}|g" \
+119	    -e "s|{{SITE_DESCRIPTION}}|${SITE_DESC}|g" \
+120	    -e "s|{{SITE_URL}}|${SITE_URL}|g" \
+121	    -e "s|{{REPO_SLUG}}|${REPO_SLUG}|g" \
+122	    -e "s|{{REPO_NAME}}|${REPO_NAME}|g" \
+123	    "$file"
+124	  rm -f "${file}.bak"
+125	}
+126	
+127	# --- helper: copy template, refusing to overwrite unless --force ---
+128	copy_template() {
+129	  local src="$1" dst="$2"
+130	  [ -f "$src" ] || die "template missing: $src" 4
+131	  if [ -e "$dst" ] && [ "$FORCE" = "0" ]; then
+132	    die "exists, refusing to overwrite: $dst (use --force)" 3
+133	  fi
+134	  if [ "$DRY_RUN" = "1" ]; then
+135	    log "[dry-run] cp $src → $dst"
+136	    return 0
+137	  fi
+138	  mkdir -p "$(dirname "$dst")"
+139	  cp "$src" "$dst"
+140	}
+141	
+142	# --- 1. mkdocs.yml ---
+143	copy_template "$ASSETS/mkdocs.yml.template" "$TARGET/mkdocs.yml"
+144	substitute "$TARGET/mkdocs.yml"
+145	
+146	# --- 2. pyproject.toml ---
+147	if [ -e "$TARGET/pyproject.toml" ]; then
+148	  log "Note: $TARGET/pyproject.toml already exists; not modifying it."
+149	  log "      Add this to your [project.optional-dependencies]:"
+150	  log "        docs = [\"mkdocs>=1.6\", \"mkdocs-material>=9.5\","
+151	  log "                \"mkdocs-material[imaging]>=9.5\",  # social/OG cards"
+152	  log "                \"mkdocs-llmstxt>=0.2\", \"mkdocs-copy-to-llm>=0.1\","
+153	  log "                \"pymdown-extensions>=10.7\"]"
+154	  log "      The social plugin also needs system Cairo/Pango — see the"
+155	  log "      'social cards' step in docs-workflow.yml.template."
+156	else
+157	  copy_template "$ASSETS/pyproject.toml.template" "$TARGET/pyproject.toml"
+158	  substitute "$TARGET/pyproject.toml"
+159	fi
+160	
+161	# --- 3. .github/workflows/docs.yml ---
+162	if [ "$NO_WORKFLOW" = "0" ]; then
+163	  copy_template "$ASSETS/docs-workflow.yml.template" "$TARGET/.github/workflows/docs.yml"
+164	fi
+165	
+166	# --- 4. docs/ skeleton ---
+167	if [ "$NO_SKELETON" = "0" ]; then
+168	  if [ -d "$TARGET/docs" ] && [ "$(ls -A "$TARGET/docs" 2>/dev/null)" != "" ]; then
+169	    log "Note: docs/ already has content. Honoring --existing=$EXISTING:"
+170	    case "$EXISTING" in
+171	      skip)
+172	        log "  Skipping skeleton creation (existing files left alone)."
+173	        log "  mkdocs.yml has empty nav: — MkDocs will auto-generate from filesystem."
+174	        ;;
+175	      wrap)
+176	        log "  Existing files will be picked up by MkDocs auto-nav."
+177	        log "  Edit mkdocs.yml's nav: block to reorder."
+178	        ;;
+179	    esac
+180	  else
+181	    if [ "$DRY_RUN" = "1" ]; then
+182	      log "[dry-run] would copy docs-skeleton/* → $TARGET/docs/"
+183	    else
+184	      mkdir -p "$TARGET/docs/_snippets" "$TARGET/docs/assets/copy-to-llm"
+185	      copy_template "$ASSETS/docs-skeleton/index.md" "$TARGET/docs/index.md"
+186	      substitute "$TARGET/docs/index.md"
+187	      copy_template "$ASSETS/docs-skeleton/getting-started.md" "$TARGET/docs/getting-started.md"
+188	      substitute "$TARGET/docs/getting-started.md"
+189	      copy_template "$ASSETS/docs-skeleton/_snippets/README.md" "$TARGET/docs/_snippets/README.md"
+190	      cp "$ASSETS/docs-skeleton/assets/copy-to-llm/"* "$TARGET/docs/assets/copy-to-llm/"
+191	    fi
+192	  fi
+193	fi
+194	
+195	if [ "$DRY_RUN" = "1" ]; then
+196	  log "Dry run complete."
+197	  exit 0
+198	fi
+199	
+200	# Structured success output.
+201	printf '{"target":"%s","site_name":"%s","site_url":"%s","next_steps":[' "$TARGET" "$SITE_NAME" "$SITE_URL"
+202	printf '"uv sync --extra docs",'
+203	printf '"uv run mkdocs build --strict",'
+204	printf '"git add and commit the new files",'
+205	printf '"Run enable-pages.sh to deploy to GitHub Pages"]}\n'
+206
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:41Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm settling on a marker-based approach where templates use placeholder comments at the points where social configuration needs to be injected, keeping the output clean across both generation paths and avoiding any issues with comment stripping in tools like yq.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:41Z)**_
+
+Now I understand the structure. I'll use a **marker + snippet** approach so both paths produce clean output (no yq comment-stripping). Let me set up tasks and implement.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:43Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Create assets/social/{mkdocs-plugin.yml, pyproject-dep.txt, ci-steps.yml} — pre-indented snippet blocks that init-docs-site.sh injects at markers when --social is passed.
+
+```text
+Task #6 created successfully: Create social snippet files
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:45Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Replace the baked-in social bits in mkdocs.yml.template (social plugin), pyproject.toml.template (imaging dep), docs-workflow.yml.template (cairo+cache steps) with __SOCIAL_*__ marker comment lines so the default scaffold is social-free.
+
+```text
+Task #7 created successfully: Add markers to 3 templates
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:46Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Add --social flag (default off) + expand_marker helper (awk-insert snippet if --social, else delete marker line). Apply to the 3 files. When --social: also add .cache/ to .gitignore and fix the pyproject-exists hint. Update usage + success next_steps.
+
+```text
+Task #8 created successfully: Add --social flag to init-docs-site.sh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:47Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Scaffold a site WITHOUT --social (verify clean, no social, builds without cairo) and WITH --social (verify social plugin + imaging dep + CI steps present, builds cards). Validate YAML.
+
+```text
+Task #9 created successfully: Test both scaffold paths
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:48Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Document social as opt-in via --social in SKILL.md (workflow step, available scripts, gotchas moved under 'only if --social') and make social an optional subsection in references/docs-stack-recipe.md.
+
+```text
+Task #10 created successfully: Update SKILL.md + recipe docs
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:40:52Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #6 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:02Z)**_
+
+Now let me create the three snippet files, pre-indented for their insertion points.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```yaml
+  # Social cards: per-page OG/Twitter preview image + og:*/twitter: meta so
+  # shared links unfurl as rich cards (Discord/Slack/X). Needs the [imaging]
+  # extra (cairosvg/pillow) + system cairo/pango — see pyproject.toml and the
+  # docs.yml CI "social cards" step. For CJK sites the default Latin font
+  # renders titles as tofu boxes; add-language.sh sets a CJK font_family when
+  # you add zh-TW/zh-CN/ja/ko.
+  - social:
+      cards_layout_options:
+        background_color: "#3f51b5" # Material indigo 500, matches theme.palette
+
+```
+
+```text
+File created successfully at: /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/social/mkdocs-plugin.yml (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:08Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```txt
+    # [imaging] pulls cairosvg + pillow for the `social` plugin (OG/Twitter
+    # cards). Also needs system cairo/pango/libffi — installed via apt in the
+    # docs.yml "social cards" step (and brew/apt locally).
+    "mkdocs-material[imaging]>=9.5,<10",
+
+```
+
+```text
+File created successfully at: /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/social/pyproject-dep.txt (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```yaml
+      # System libs for the mkdocs `social` plugin (OG/Twitter cards): cairo +
+      # pango render the card layout. Without them the build aborts on a
+      # libcairo load error.
+      - name: Install Cairo/Pango for social cards
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libcairo2-dev libpango1.0-dev libfreetype6-dev \
+            libffi-dev libjpeg-dev libpng-dev
+      # Cache rendered cards + the downloaded card font so only changed pages
+      # re-render (cold build renders one card per page; warm is seconds).
+      - name: Cache social cards
+        uses: actions/cache@v4
+        with:
+          path: .cache/plugin/social
+          key: social-${{ hashFiles('mkdocs.yml') }}-${{ hashFiles('docs/**/*.md') }}
+          restore-keys: |
+            social-${{ hashFiles('mkdocs.yml') }}-
+            social-
+
+```
+
+```text
+File created successfully at: /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/social/ci-steps.yml (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:22Z)**_
+
+Now let me add the markers to the three templates. First, mkdocs.yml.template — replace the social plugin block with a marker.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #6 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:22Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #7 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/mkdocs.yml.template has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:33Z)**_
+
+Now pyproject.toml.template — replace the imaging dep with a marker.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/pyproject.toml.template has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:43Z)**_
+
+Now the workflow template — replace the cairo + cache steps with a marker.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:43Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template`
+
+```text
+23	jobs:
+24	  build:
+25	    runs-on: ubuntu-latest
+26	    steps:
+27	      - uses: actions/checkout@v4
+28	      - uses: astral-sh/setup-uv@v5
+29	      - uses: actions/setup-python@v5
+30	        with:
+31	          python-version: '3.12'
+32	      # System libs for the mkdocs `social` plugin (OG/Twitter cards): cairo +
+33	      # pango render the card layout. Without them the build aborts on a
+34	      # libcairo load error.
+35	      - name: Install Cairo/Pango for social cards
+36	        run: |
+37	          sudo apt-get update
+38	          sudo apt-get install -y --no-install-recommends \
+39	            libcairo2-dev libpango1.0-dev libfreetype6-dev \
+40	            libffi-dev libjpeg-dev libpng-dev
+41	      # Cache rendered cards + the downloaded card font so only changed pages
+42	      # re-render (cold build renders one card per page; warm is seconds).
+43	      - name: Cache social cards
+44	        uses: actions/cache@v4
+45	        with:
+46	          path: .cache/plugin/social
+47	          key: social-${{ hashFiles('mkdocs.yml') }}-${{ hashFiles('docs/**/*.md') }}
+48	          restore-keys: |
+49	            social-${{ hashFiles('mkdocs.yml') }}-
+50	            social-
+51	      - run: uv sync --extra docs
+52	      - run: uv run mkdocs build --strict
+53	      - uses: actions/upload-pages-artifact@v3
+54	        with:
+55	          path: site
+56	
+57	  deploy:
+58	    needs: build
+59	    runs-on: ubuntu-latest
+60	    environment:
+61	      name: github-pages
+62	      url: ${{ steps.deployment.outputs.page_url }}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:58Z)**_
+
+Now the core work — add `--social` flag and the `expand_marker` helper to `init-docs-site.sh`. Let me make the edits: flag parsing, usage, helper, and apply to the 3 files + gitignore.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:58Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #7 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:41:58Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #8 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:25Z)**_
+
+Now add the `expand_marker` helper after the `copy_template` helper, and log the social state.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:26Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to apply the expand_marker function to the three files after the copy and substitute operations, handle the pyproject-exists hint conditionally based on the --social flag, set up .gitignore handling, and update the success message. Let me review the current state of the file body to see what I'm working with.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:42:47Z)**_
+
+Now wire `expand_marker` into the file-generation steps. Let me update the mkdocs.yml, pyproject, and workflow sections plus add gitignore handling.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:09Z)**_
+
+<think><details><summary>Thought Process</summary>
+I should update the success output to include the social status, but I'll skip recording the preference since the agent handles that per the skill documentation—keeping the scope focused on what this script needs to do.
+
+Let me run shellcheck on the script first, then test both the social enabled and disabled paths.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:09Z)**_
+
+Now let me shellcheck the modified script and update the success output to reflect social status.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:09Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh`
+
+```text
+228	    if [ "$DRY_RUN" = "1" ]; then
+229	      log "[dry-run] would copy docs-skeleton/* → $TARGET/docs/"
+230	    else
+231	      mkdir -p "$TARGET/docs/_snippets" "$TARGET/docs/assets/copy-to-llm"
+232	      copy_template "$ASSETS/docs-skeleton/index.md" "$TARGET/docs/index.md"
+233	      substitute "$TARGET/docs/index.md"
+234	      copy_template "$ASSETS/docs-skeleton/getting-started.md" "$TARGET/docs/getting-started.md"
+235	      substitute "$TARGET/docs/getting-started.md"
+236	      copy_template "$ASSETS/docs-skeleton/_snippets/README.md" "$TARGET/docs/_snippets/README.md"
+237	      cp "$ASSETS/docs-skeleton/assets/copy-to-llm/"* "$TARGET/docs/assets/copy-to-llm/"
+238	    fi
+239	  fi
+240	fi
+241	
+242	if [ "$DRY_RUN" = "1" ]; then
+243	  log "Dry run complete."
+244	  exit 0
+245	fi
+246	
+247	# Structured success output.
+248	printf '{"target":"%s","site_name":"%s","site_url":"%s","next_steps":[' "$TARGET" "$SITE_NAME" "$SITE_URL"
+249	printf '"uv sync --extra docs",'
+250	printf '"uv run mkdocs build --strict",'
+251	printf '"git add and commit the new files",'
+252	printf '"Run enable-pages.sh to deploy to GitHub Pages"]}\n'
+253
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:21Z)**_
+
+Now let me shellcheck the script, then test both scaffold paths end-to-end.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Shellcheck the modified init-docs-site.sh
+
+```bash
+cd ~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+shellcheck -S warning scripts/init-docs-site.sh 2>&1 | head -20; echo "shellcheck exit=$?"
+```
+
+```text
+shellcheck exit=0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:27Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #8 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:27Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:36Z)**_
+
+Now the critical test — **path 1: default (no `--social`)** should produce a clean, social-free, dependency-free site.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test default scaffold has no social bits
+
+```bash
+cd /tmp && rm -rf nosocial && mkdir nosocial && cd nosocial
+SK=~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+bash "$SK/scripts/init-docs-site.sh" --site-name "No Social" --repo-slug me/nosocial --site-url https://me.github.io/nosocial/ 2>&1 | tail -3
+echo "=== mkdocs.yml: social present? (should be NO, marker gone) ==="
+grep -c 'social\|__SOCIAL' mkdocs.yml; echo "(0 = clean)"
+echo "=== plugins block ==="; sed -n '/^plugins:/,/^markdown_extensions:/p' mkdocs.yml | head -8
+echo "=== pyproject: imaging present? (should be NO) ==="; grep -c 'imaging\|__SOCIAL' pyproject.toml
+echo "=== workflow: cairo present? (should be NO) ==="; grep -c 'Cairo\|cache\|__SOCIAL' .github/workflows/docs.yml
+echo "=== gitignore created? (should NOT be, no --social) ==="; ls -la .gitignore 2>&1 | head -1
+echo "=== YAML valid? ==="; python3 -c "import yaml; yaml.safe_load(open('mkdocs.yml')); yaml.safe_load(open('.github/workflows/docs.yml')); print('both valid')"
+```
+
+```text
+Exit code 1
+Repo:   me/nosocial
+Social: off (pass --social to enable)
+{"target":"/tmp/nosocial","site_name":"No Social","site_url":"https://me.github.io/nosocial/","social":false,"next_steps":["uv sync --extra docs","uv run mkdocs build --strict","git add and commit the new files","Run enable-pages.sh to deploy to GitHub Pages"]}
+=== mkdocs.yml: social present? (should be NO, marker gone) ===
+6
+(0 = clean)
+=== plugins block ===
+plugins:
+  - search
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: >
+        Documentation for No Social
+      sections:
+        Guides:
+=== pyproject: imaging present? (should be NO) ===
+0
+=== workflow: cairo present? (should be NO) ===
+0
+=== gitignore created? (should NOT be, no --social) ===
+".gitignore": No such file or directory (os error 2)
+=== YAML valid? ===
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import yaml; yaml.safe_load(open('mkdocs.yml')); yaml.safe_load(open('.github/workflows/docs.yml')); print('both valid')
+    ^^^^^^^^^^^
+ModuleNotFoundError: No module named 'yaml'
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+The default configuration is working as expected—the plugins block only includes search and llmstxt without social, and that "6" count is just from the footer's pre-existing `extra.social` configuration, not the plugin itself. The pyproject and workflow files have zero imaging and cairo references respectively, the gitignore wasn't created since we didn't use the social flag, and the YAML validation only failed because the system Python lacks the yaml module, so I'll run it through uv instead.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:48Z)**_
+
+The default path is clean — the "6 social" matches are the pre-existing `extra: social:` footer (GitHub link), not the plugin. Let me confirm that and validate YAML properly.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:43:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm social matches are the footer and validate YAML
+
+```bash
+cd /tmp/nosocial
+echo "=== what are the 'social' matches? (should all be the extra: footer) ==="
+grep -n 'social' mkdocs.yml
+echo "=== marker fully gone? ==="; grep -c '__SOCIAL' mkdocs.yml pyproject.toml .github/workflows/docs.yml
+echo "=== YAML valid (via chezmoi venv python)? ==="
+/Users/david/.local/share/chezmoi/.venv/bin/python -c "import yaml; yaml.safe_load(open('mkdocs.yml')); yaml.safe_load(open('.github/workflows/docs.yml')); print('both valid YAML')"
+```
+
+```text
+=== what are the 'social' matches? (should all be the extra: footer) ===
+3:site_url: https://me.github.io/nosocial/
+4:repo_url: https://github.com/me/nosocial
+5:repo_name: me/nosocial
+48:      repo_url: "https://me.github.io/nosocial/"
+80:  social:
+82:      link: https://github.com/me/nosocial
+=== marker fully gone? ===
+mkdocs.yml:0
+.github/workflows/docs.yml:0
+pyproject.toml:0
+=== YAML valid (via chezmoi venv python)? ===
+both valid YAML
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:44:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+The default configuration looks good—the social footer link is unrelated to the plugin, the substring "social" in the repo name is just a naming coincidence, all markers are removed, and the YAML is valid. Now I need to test the path with the `--social` flag enabled to verify the plugin gets properly included along with its dependencies and configuration.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:44:01Z)**_
+
+Default path is clean and valid (line 80/82 is the `extra:` footer GitHub link, unrelated to the plugin; other matches are the "nosocial" repo name). Now **path 2: `--social`** should inject everything and build cards.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:44:01Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test --social scaffold injects everything
+
+```bash
+cd /tmp && rm -rf withsocial && mkdir withsocial && cd withsocial
+SK=~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+bash "$SK/scripts/init-docs-site.sh" --social --site-name "With Social" --repo-slug me/withsocial --site-url https://me.github.io/withsocial/ 2>&1 | tail -4
+echo "=== mkdocs: social plugin present? ==="; grep -n -A2 '  - social:' mkdocs.yml
+echo "=== pyproject: imaging dep? ==="; grep 'imaging' pyproject.toml
+echo "=== workflow: cairo + cache steps? ==="; grep -c 'libcairo2-dev\|Cache social cards' .github/workflows/docs.yml
+echo "=== gitignore has /.cache/? ==="; grep -n 'cache' .gitignore
+echo "=== markers gone? ==="; grep -c '__SOCIAL' mkdocs.yml pyproject.toml .github/workflows/docs.yml
+echo "=== all YAML valid? ==="; /Users/david/.local/share/chezmoi/.venv/bin/python -c "import yaml; yaml.safe_load(open('mkdocs.yml')); yaml.safe_load(open('.github/workflows/docs.yml')); print('valid')"
+```
+
+```text
+Repo:   me/withsocial
+Social: on (OG cards; needs Cairo/Pango)
+Added /.cache/ to .gitignore (social plugin card cache).
+{"target":"/tmp/withsocial","site_name":"With Social","site_url":"https://me.github.io/withsocial/","social":true,"next_steps":["uv sync --extra docs","uv run mkdocs build --strict","git add and commit the new files","Run enable-pages.sh to deploy to GitHub Pages"]}
+=== mkdocs: social plugin present? ===
+44:  - social:
+45-      cards_layout_options:
+46-        background_color: "#3f51b5" # Material indigo 500, matches theme.palette
+=== pyproject: imaging dep? ===
+    # [imaging] pulls cairosvg + pillow for the `social` plugin (OG/Twitter
+    "mkdocs-material[imaging]>=9.5,<10",
+=== workflow: cairo + cache steps? ===
+2
+=== gitignore has /.cache/? ===
+2:# mkdocs social plugin card+font cache (regenerated every build)
+3:/.cache/
+=== markers gone? ===
+mkdocs.yml:0
+.github/workflows/docs.yml:0
+pyproject.toml:0
+=== all YAML valid? ===
+valid
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:44:11Z)**_
+
+<think><details><summary>Thought Process</summary>
+The --social configuration is working as expected with all dependencies and cache setup in place. Now I need to actually build both versions to verify that the social site renders OG cards correctly and the non-social build works without requiring cairo.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:44:11Z)**_
+
+Both paths generate correct, valid configs. Now the real proof — build both sites: the `--social` one must render cards, and (critically) the **default one must build fine without cairo**.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build both scaffolded sites to verify behavior
+
+```bash
+VENV=/Users/david/.local/share/chezmoi/.venv
+echo "=== BUILD --social site (should produce OG cards) ==="
+cd /tmp/withsocial
+"$VENV/bin/python" -m mkdocs build 2>&1 | grep -iE 'error|built in|social|cairo' | head; echo "exit=${PIPESTATUS[0]}"
+echo "og:image in output?"; grep -o 'og:image[^>]*index.png' site/index.html | head -1
+echo "card rendered?"; ls site/assets/images/social/ 2>/dev/null
+echo
+echo "=== BUILD default site (must succeed with NO social/cairo) ==="
+cd /tmp/nosocial
+"$VENV/bin/python" -m mkdocs build 2>&1 | grep -iE 'error|built in|social' | head; echo "exit=${PIPESTATUS[0]}"
+echo "og:image present? (should be NONE)"; grep -c 'og:image' site/index.html
+```
+
+```text
+=== BUILD --social site (should produce OG cards) ===
+INFO    -  Building documentation to directory: /private/tmp/withsocial/site
+INFO    -  Documentation built in 50.33 seconds
+exit=
+og:image in output?
+og:image" content="https://me.github.io/withsocial/assets/images/social/index.png
+card rendered?
+_snippets
+getting-started.png
+index.png
+
+=== BUILD default site (must succeed with NO social/cairo) ===
+INFO    -  Building documentation to directory: /private/tmp/nosocial/site
+INFO    -  Documentation built in 0.45 seconds
+exit=
+og:image present? (should be NONE)
+0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:19Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've verified both build paths work as expected: the social site takes 50 seconds and generates OG cards with proper og:image tags in the HTML, while the default site builds in just 0.45 seconds without any social plugin overhead or og:image generation. This dramatic speed difference shows exactly why making the social plugin opt-in is valuable. Now I'm checking whether the default build even needs cairo as a dependency.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:19Z)**_
+
+Both paths verified end-to-end:
+- **`--social`**: builds in 50s, produces OG cards + `og:image`. ✓
+- **default**: builds in **0.45s**, zero social, zero og:image — and doesn't touch cairo at all. ✓ (The 50s→0.45s gap nicely illustrates the overhead opt-in avoids.)
+
+Now let me verify the CJK-font interaction still works: `--social` then `add-language zh-TW` should set Noto Sans TC.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify CJK font interaction with social on/off
+
+```bash
+cd /tmp/withsocial
+SK=~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+echo "=== add zh-TW to the --social site ==="
+bash "$SK/scripts/add-language.sh" --lang zh-TW --target-dir . 2>&1 | grep -iE 'font|social|error' | head
+echo "=== resulting social font_family ==="
+yq -r '.plugins[] | select(has("social")) | .social.cards_layout_options.font_family' mkdocs.yml
+echo "=== and default (no-social) site: add zh-TW should NOT try to set font (no social plugin) ==="
+cd /tmp/nosocial
+bash "$SK/scripts/add-language.sh" --lang zh-TW --target-dir . 2>&1 | grep -iE 'font|social|no plugin|error' | head
+echo "social plugin in nosocial mkdocs? (should be empty)"; yq '[.plugins[] | select(has("social"))] | length' mkdocs.yml
+```
+
+```text
+=== add zh-TW to the --social site ===
+Setting social card font_family: Noto Sans TC (CJK-capable; avoids tofu titles)...
+Updated /tmp/withsocial/.skills/preferences.yaml
+=== resulting social font_family ===
+Noto Sans TC
+=== and default (no-social) site: add zh-TW should NOT try to set font (no social plugin) ===
+Updated /tmp/nosocial/.skills/preferences.yaml
+social plugin in nosocial mkdocs? (should be empty)
+0
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:31Z)**_
+
+<think><details><summary>Thought Process</summary>
+The interaction patterns are working as expected—the social site correctly applies the Chinese Traditional font when adding the language, while the default site gracefully skips the font attempt since it lacks the social plugin. Now I'm updating the documentation files to reflect these changes and marking task 9 complete before moving on to task 10.
+
+I need to revert the unconditional social plugin from the recipe since it's now optional, then update both SKILL.md and docs-stack-recipe.md to clarify this. I'll also clean up any temporary directories once I'm done.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:31Z)**_
+
+CJK interaction is correct both ways: `--social` + zh-TW → sets Noto Sans TC; default + zh-TW → gracefully no-ops (no social plugin). All scaffold paths verified. Let me clean temp dirs and update the docs.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Clean up temp test sites
+
+`rm -rf /tmp/nosocial /tmp/withsocial 2>/dev/null; echo "cleaned"`
+
+```text
+cleaned
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:31Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #9 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:31Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:37Z)**_
+
+Now the docs. First, update the SKILL.md gotcha (the social plugin is now opt-in) and add a scaffold-step note. Let me read the current social gotcha I added earlier.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:37Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md`
+
+```text
+292	## Gotchas
+293	
+294	- **The `social` plugin (OG cards) needs system Cairo/Pango + the
+295	  `[imaging]` extra.** `mkdocs-material[imaging]` pulls cairosvg/pillow, but
+296	  those bind to system `libcairo`/`libpango` — without them the build aborts
+297	  with a libcairo load error. The `docs-workflow.yml.template` apt-installs
+298	  them (`libcairo2-dev libpango1.0-dev libfreetype6-dev …`) and caches
+299	  `.cache/plugin/social`. Locally: `brew install cairo pango` (macOS) or the
+300	  same apt packages (Linux). Add `.cache/` to `.gitignore` — the plugin
+301	  writes ~1 card PNG per page (tens of MB) plus a downloaded font there.
+302	- **CJK/arrow page titles render as tofu boxes (□□□) on social cards unless
+303	  the card font covers them.** The plugin's default font (Roboto) and plain
+304	  "Noto Sans" are Latin-only, so Chinese/Japanese/Korean titles — and even a
+305	  `→` in an English title — come out as boxes. `add-language.sh` auto-sets a
+306	  CJK-capable `social.cards_layout_options.font_family` (Noto Sans TC/SC/JP/KR)
+307	  when you add a CJK language, but only if the social plugin is present and no
+308	  font is already set. If you enable social cards on an already-CJK site by
+309	  hand, set the font yourself. Verify by opening a rendered
+310	  `site/assets/images/social/**/<page>.png`, not just by trusting the build.
+311	- **`yq` in these scripts is mikefarah yq (v4), which has NO `if/then/else/end`
+312	  syntax** — that's jq. Use `(.plugins[] | select(has("x")) | .x.y) = z` or
+313	  `+= […]`, never `.plugins |= map(if has("x") then … else . end)` (it dies
+314	  with a `lexer: invalid input text "if …"` error). This bit the i18n
+315	  second-language append path historically; keep new expressions in the
+316	  `select()` form.
+317	- **MkDocs strict mode rejects relative `.md` links pointing outside
+318	  `docs/`.** Inside `docs/` → relative is fine. Outside `docs/` for
+319	  `.md` files (e.g., linking to repo `TODO.md`) → use absolute GitHub URL.
+320	  Outside `docs/` for directories or non-`.md` (`backlog/`, `pyproject.toml`)
+321	  → relative is downgraded to INFO and tolerated. Templates already do this
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:45:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:01Z)**_
+
+Now update the "Available scripts" section and the Scaffold step (step 4) in SKILL.md to mention `--social`.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:02Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md`
+
+```text
+96	
+97	Run `init-docs-site.sh`. It writes (or refuses to overwrite) `mkdocs.yml`,
+98	`pyproject.toml` (with `[project.optional-dependencies] docs = […]`), the
+99	`docs/` skeleton, `.github/workflows/docs.yml`, and stub assets for
+100	copy-to-llm.
+101	
+102	```bash
+103	bash skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh \
+104	  --site-name "My Project" \
+105	  --repo-slug owner/repo \
+106	  --site-url https://owner.github.io/repo/
+107	```
+108	
+109	Use `--dry-run` first to preview. The script always preserves any existing
+110	files unless `--force` is passed.
+111	
+112	After scaffolding, run a local strict build to catch obvious issues:
+113
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:09Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:13Z)**_
+
+Now the "Available scripts" section for `init-docs-site.sh` flags.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:14Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md`
+
+```text
+234	    `--list`, `--dry-run`, `--json`.
+235	- **`scripts/init-docs-site.sh`** — Scaffold the site files.
+236	  - Flags: `--site-name`, `--repo-slug`, `--site-url`, `--existing skip|wrap`,
+237	    `--no-workflow`, `--dry-run`, `--force`.
+238	- **`scripts/enable-pages.sh`** — Enable Pages and trigger first deploy via
+239	  `gh api`. Requires `gh auth status` to pass first.
+240	  - Flags: `--repo OWNER/REPO`, `--no-trigger`, `--dry-run`.
+241	- **`scripts/add-docs-page.sh`** — Create a new page and insert it into
+242	  `mkdocs.yml`'s nav. If multiple languages are configured, also writes
+243	  `*.<LANG>.md` stubs for every non-default language.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update the "Bundled assets" section to include references to the social snippets in the assets/social/ directory.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:27Z)**_
+
+Now update the "Bundled assets" section to document the new `assets/social/` snippets, and fix the recipe doc (social should be optional there now).
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:27Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md`
+
+```text
+277	
+278	## Bundled assets
+279	
+280	Templates the scripts copy from. Edit them here, not in the user's repo.
+281	
+282	- `assets/mkdocs.yml.template` — Material theme + llmstxt + copy-to-llm
+283	  plugins + pymdownx.snippets, parameterized with `{{SITE_NAME}}`,
+284	  `{{REPO_SLUG}}`, `{{SITE_URL}}`.
+285	- `assets/pyproject.toml.template` — Minimal `[project]` block + the docs
+286	  optional-deps group.
+287	- `assets/docs-workflow.yml.template` — `.github/workflows/docs.yml` with
+288	  paths filter, uv setup, strict build, Pages deploy.
+289	- `assets/docs-skeleton/` — `index.md`, `getting-started.md`, `_snippets/`
+290	  examples, `assets/copy-to-llm/` JS+CSS files copied from this repo.
+291	- `assets/page.md.template` — Used by `add-docs-page.sh`.
+292	- `assets/translation-stub.md.template` — Stub used for non-default-language
+293	  pages by `add-language.sh` and `add-docs-page.sh`. Contains the verbatim
+294	  terminology-rule admonition.
+295	- `assets/i18n-plugin.yml.snippet` — Reference YAML block for the
+296	  `mkdocs-static-i18n` plugin (used by `references/i18n-guide.md`; the script
+297	  builds the equivalent block via `yq`).
+298
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/SKILL.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:47Z)**_
+
+Now fix the recipe doc — social should be optional there. Let me update the plugins block and pyproject dep to mark social as opt-in, plus the workflow (currently has cairo unconditionally).
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:47Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md`
+
+```text
+88	    - toc.follow
+89	
+90	plugins:
+91	  - search
+92	  - social:              # OG/Twitter preview cards; needs system cairo/pango
+93	      cards_layout_options:
+94	        background_color: "#3f51b5"
+95	        # font_family: Noto Sans TC   # set a CJK font if titles are CJK
+96	  - mkdocstrings:        # remove this block if no Python API
+97	      handlers:
+98	        python:
+99	          paths: [src]
+100	          options:
+101	            show_source: true
+102	            show_root_heading: true
+103	            members_order: source
+104	            docstring_style: google
+105	            merge_init_into_class: true
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:46:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:04Z)**_
+
+Now the recipe's pyproject dep and the workflow cairo step (both currently unconditional).
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:06Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:10Z)**_
+
+Now the recipe's workflow block — the cairo step should be marked opt-in. Let me view and update it.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:10Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md`
+
+```text
+158	  group: pages
+159	  cancel-in-progress: true
+160	
+161	jobs:
+162	  build:
+163	    runs-on: ubuntu-latest
+164	    steps:
+165	      - uses: actions/checkout@v4
+166	      - uses: astral-sh/setup-uv@v5
+167	        with:
+168	          enable-cache: true
+169	      - uses: actions/setup-python@v5
+170	        with:
+171	          python-version: "3.13"
+172	      # System libs for the `social` plugin (OG cards): cairo + pango render
+173	      # the card; without them the build aborts on a libcairo load error.
+174	      - name: Install Cairo/Pango for social cards
+175	        run: |
+176	          sudo apt-get update
+177	          sudo apt-get install -y --no-install-recommends \
+178	            libcairo2-dev libpango1.0-dev libfreetype6-dev \
+179	            libffi-dev libjpeg-dev libpng-dev
+180	      - name: Cache social cards
+181	        uses: actions/cache@v4
+182	        with:
+183	          path: .cache/plugin/social
+184	          key: social-${{ hashFiles('mkdocs.yml') }}-${{ hashFiles('docs/**/*.md') }}
+185	          restore-keys: |
+186	            social-${{ hashFiles('mkdocs.yml') }}-
+187	            social-
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:21Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:30Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm running through a dry-run test to verify nothing broke, checking the full diff, and then marking task 10 complete before committing.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:30Z)**_
+
+Docs updated. Let me do a final review: dry-run both paths and review the full diff before committing.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Dry-run both paths to verify marker handling messages
+
+```bash
+cd /tmp && rm -rf dryt && mkdir dryt && cd dryt && git init -q 2>/dev/null
+SK=~/Documents/Program/agent-skills/skills/local/mkdocs-site-bootstrap
+echo "=== dry-run WITHOUT --social ==="
+bash "$SK/scripts/init-docs-site.sh" --dry-run --site-name X --repo-slug a/b --site-url https://x.io/ 2>&1 | grep -iE 'social|marker' 
+echo "=== dry-run WITH --social ==="
+bash "$SK/scripts/init-docs-site.sh" --dry-run --social --site-name X --repo-slug a/b --site-url https://x.io/ 2>&1 | grep -iE 'social|marker'
+cd /tmp && rm -rf dryt
+```
+
+```text
+=== dry-run WITHOUT --social ===
+Social: off (pass --social to enable)
+=== dry-run WITH --social ===
+Social: on (OG cards; needs Cairo/Pango)
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:38Z)**_
+
+<think><details><summary>Thought Process</summary>
+The dry-run skips the marker expansion since the copy step returns early and the file doesn't exist, so expand_marker just returns without logging anything — that's expected behavior and the Social on/off line still shows up. Now I'm reviewing the full diff to mark task 10 complete.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:38Z)**_
+
+Dry-run shows the social state correctly. Let me review the full diff and commit.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Review full skill diff before commit
+
+```bash
+cd ~/Documents/Program/agent-skills
+echo "=== status ===" && git status --short
+echo "=== diff stat ===" && git diff --stat; echo "--- untracked ---"; git status --short | grep '^??'
+```
+
+```text
+=== status ===
+ M skills/local/mkdocs-site-bootstrap/SKILL.md
+ M skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template
+ M skills/local/mkdocs-site-bootstrap/assets/mkdocs.yml.template
+ M skills/local/mkdocs-site-bootstrap/assets/pyproject.toml.template
+ M skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md
+ M skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh
+?? skills/local/mkdocs-site-bootstrap/.claude/
+?? skills/local/mkdocs-site-bootstrap/.specstory/
+?? skills/local/mkdocs-site-bootstrap/assets/social/
+=== diff stat ===
+ skills/local/mkdocs-site-bootstrap/SKILL.md        | 51 +++++++++++++++-----
+ .../assets/docs-workflow.yml.template              | 20 +-------
+ .../assets/mkdocs.yml.template                     | 10 +---
+ .../assets/pyproject.toml.template                 |  5 +-
+ .../references/docs-stack-recipe.md                | 17 ++++---
+ .../scripts/init-docs-site.sh                      | 56 ++++++++++++++++++++--
+ 6 files changed, 103 insertions(+), 56 deletions(-)
+--- untracked ---
+?? skills/local/mkdocs-site-bootstrap/.claude/
+?? skills/local/mkdocs-site-bootstrap/.specstory/
+?? skills/local/mkdocs-site-bootstrap/assets/social/
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing there are some untracked directories like `.claude/` and `.specstory/` in the skill directory that were likely created during test runs or from the SpecStory CLI capturing session history, and I need to make sure I don't commit those—only the intended files should go in.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:50Z)**_
+
+There are stray untracked `.claude/` and `.specstory/` dirs in the skill folder (session artifacts, not mine to commit). Let me check them and stage only the intended files.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:47:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect stray dirs and social assets
+
+```bash
+cd ~/Documents/Program/agent-skills
+echo "=== what's in the stray dirs? ==="
+ls -la skills/local/mkdocs-site-bootstrap/.claude/ skills/local/mkdocs-site-bootstrap/.specstory/ 2>&1 | head -20
+echo "=== are they gitignored at repo root? ==="
+git check-ignore skills/local/mkdocs-site-bootstrap/.claude skills/local/mkdocs-site-bootstrap/.specstory 2>&1 || echo "(not ignored)"
+echo "=== assets/social contents (should commit) ==="
+ls -la skills/local/mkdocs-site-bootstrap/assets/social/
+```
+
+```text
+=== what's in the stray dirs? ===
+skills/local/mkdocs-site-bootstrap/.claude/:
+.rw-------@ 436 david  3 Jul 13:26 settings.local.json
+
+skills/local/mkdocs-site-bootstrap/.specstory/:
+drwxr-xr-x@   - david  3 Jul 13:26 cli
+drwxr-xr-x@   - david  3 Jul 13:26 history
+.rw-r--r--@ 196 david  3 Jul 13:26 .project.json
+=== are they gitignored at repo root? ===
+(not ignored)
+=== assets/social contents (should commit) ===
+.rw-r--r--@ 895 david  3 Jul 13:41 ci-steps.yml
+.rw-r--r--@ 537 david  3 Jul 13:41 mkdocs-plugin.yml
+.rw-r--r--@ 256 david  3 Jul 13:41 pyproject-dep.txt
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:02Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to exclude the `.claude/` and `.specstory/` directories since they're session artifacts created during this work, not part of the actual skill. I'll stage only the six modified files along with the assets/social/ directory and commit, leaving those temporary directories untracked.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:02Z)**_
+
+The `.claude/` and `.specstory/` are session artifacts (not part of the skill) — I'll leave them untracked and stage only my intended changes plus the new `assets/social/` snippets.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage intended files only
+
+```bash
+cd ~/Documents/Program/agent-skills
+git add skills/local/mkdocs-site-bootstrap/SKILL.md \
+        skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template \
+        skills/local/mkdocs-site-bootstrap/assets/mkdocs.yml.template \
+        skills/local/mkdocs-site-bootstrap/assets/pyproject.toml.template \
+        skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md \
+        skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh \
+        skills/local/mkdocs-site-bootstrap/assets/social/
+echo "=== staged ==="; git diff --cached --name-status
+```
+
+```text
+=== staged ===
+M	skills/local/mkdocs-site-bootstrap/SKILL.md
+M	skills/local/mkdocs-site-bootstrap/assets/docs-workflow.yml.template
+M	skills/local/mkdocs-site-bootstrap/assets/mkdocs.yml.template
+M	skills/local/mkdocs-site-bootstrap/assets/pyproject.toml.template
+A	skills/local/mkdocs-site-bootstrap/assets/social/ci-steps.yml
+A	skills/local/mkdocs-site-bootstrap/assets/social/mkdocs-plugin.yml
+A	skills/local/mkdocs-site-bootstrap/assets/social/pyproject-dep.txt
+M	skills/local/mkdocs-site-bootstrap/references/docs-stack-recipe.md
+M	skills/local/mkdocs-site-bootstrap/scripts/init-docs-site.sh
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:15Z)**_
+
+Exactly the intended 9 files staged (6 modified + 3 new snippets), no session cruft. Let me commit.
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit opt-in social cards change
+
+```bash
+cd ~/Documents/Program/agent-skills
+git commit -m "$(cat <<'EOF'
+feat(mkdocs-site-bootstrap): make social cards opt-in via --social
+
+The social-cards mirror made OG cards unconditional, which forced a hard
+Cairo/Pango system dependency on every scaffolded site — a plain
+`mkdocs build` would abort with a libcairo error if the user hadn't
+installed them, exactly the kind of surprise this scaffolding skill
+avoids. Make it opt-in instead.
+
+- Templates now carry `__SOCIAL_{PLUGIN,IMAGING,CI}__` marker lines; the
+  social plugin block, mkdocs-material[imaging] dep, and Cairo/Pango +
+  cache CI steps moved into assets/social/ snippets.
+- init-docs-site.sh gains `--social`: an expand_marker helper awk-injects
+  the snippets at the markers when set, or deletes the marker lines when
+  not (default). --social also adds /.cache/ to .gitignore. Default
+  scaffold is now fully dependency-free (verified: builds in <1s with no
+  social output; --social builds cards + emits og:image).
+- add-language.sh's CJK-font logic already guards on "social plugin
+  present", so it no-ops on a social-free site and sets Noto Sans TC when
+  social IS on (verified both orderings).
+- SKILL.md + docs-stack-recipe.md document social as opt-in.
+
+dotfiles keeps social ON (already configured); this only changes the
+skill's default for new sites.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)" && git log --oneline -1
+```
+
+```text
+[main 163cc31] feat(mkdocs-site-bootstrap): make social cards opt-in via --social
+ 9 files changed, 135 insertions(+), 56 deletions(-)
+ create mode 100644 skills/local/mkdocs-site-bootstrap/assets/social/ci-steps.yml
+ create mode 100644 skills/local/mkdocs-site-bootstrap/assets/social/mkdocs-plugin.yml
+ create mode 100644 skills/local/mkdocs-site-bootstrap/assets/social/pyproject-dep.txt
+163cc31 feat(mkdocs-site-bootstrap): make social cards opt-in via --social
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:20Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #10 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-03 05:48:42Z)**_
+
+All done. Here's the summary.
+
+## ✅ Skill 改成 opt-in — 完成並驗證
+
+先回答你原本的問題:**是的,skill 之前有跟 dotfiles 一樣的無效 `timeout: 1200000` bug**(已在 `33b4522` 修掉),而且 social cards 是無條件開啟的 —— 現在改成 opt-in 了。
+
+### 設計:marker + snippet(兩條路徑都乾淨,零 yq 註解流失)
+
+- 三個模板改放 `__SOCIAL_{PLUGIN,IMAGING,CI}__` 標記行
+- social 的實際內容抽到 `assets/social/` 三個 snippet(預先縮排好)
+- `init-docs-site.sh` 加 `--social` flag + `expand_marker` helper:有 `--social` 就用 awk 把 snippet 插進標記;沒有就刪掉標記行
+
+### 實測兩條路徑(都用真 venv build 驗證)
+
+| | 預設(無 `--social`) | `--social` |
+|---|---|---|
+| social 外掛 | ❌ 無 | ✅ 有 |
+| imaging 依賴 | ❌ 無 | ✅ 有 |
+| CI cairo 步驟 | ❌ 無 | ✅ 有 |
+| `.gitignore /.cache/` | ❌ 不建 | ✅ 加 |
+| **build** | **0.45s**,零 og:image,**零系統依賴** | 50s,產生卡片 + og:image |
+| CJK 字型 | add-language 自動 no-op | add-language 自動設 Noto Sans TC |
+
+那個 **0.45s vs 50s** 正好量化了你當初擔心的 overhead —— 預設路徑完全不碰 cairo/字型下載,對不需要 OG 卡片的新站零負擔。
+
+### 文件
+
+SKILL.md(gotchas 改成「social 是 opt-in」+ scaffold 步驟 + scripts + assets 說明)、`docs-stack-recipe.md`(social 全部改成註解/選用)都更新了。
+
+### Commits(agent-skills repo,尚未 push)
+| Hash | 內容 |
+|---|---|
+| `33b4522` | 修掉 skill 模板裡的無效 timeout |
+| `163cc31` | social cards 改 opt-in（marker+snippet，9 檔） |
+
+> 註:我在 skill 目錄裡留了 `.claude/` 和 `.specstory/` 兩個 session 產生的雜物(不是我的改動),**沒有** commit 進去。你可以自行清掉。
+
+**dotfiles 那邊維持 social ON 不變**,這次只改 skill 的預設。要我幫你 push agent-skills 這兩個 commit 嗎?

@@ -18,6 +18,9 @@
 #       for tmux-popup / cron contexts where shell env isn't inherited.
 #   - scripts/aiblock.py:
 #       same env + same parse-fallback as tsum.
+#   - dot_config/shell/44_copilot_embed.sh + scripts/semsearch.py:
+#       read AICAP_EMBED_MODEL for the Copilot proxy's /v1/embeddings endpoint
+#       (not an autodetect agent — a separate embeddings-model pin).
 #
 # Override pattern: drop matching `export AICAP_*=…` lines in
 # ~/.shellrc.adhoc or ~/.config/zsh/secrets.zsh — they win against the
@@ -57,8 +60,18 @@ _AICAP_AGENT_CONFIG_SOURCED=1
 : "${AICAP_HTTP_URL:=https://openrouter.ai/api/v1/chat/completions}"
 : "${AICAP_HTTP_MODEL:=openrouter/free}"
 
-# Export so subprocess (Python tsum / aiblock) inherits.
+# Embeddings model for the local Copilot proxy, consumed by copilot-embed /
+# semsearch (44_copilot_embed.sh + scripts/semsearch.py — both POST to
+# /v1/embeddings). Empty value → omit "model" so the endpoint default kicks in
+# (same robustness idiom as the pins above). Copilot serves three 1536-dim
+# models: text-embedding-3-small (default), -ada-002, -3-small-inference.
+# GOTCHA (verified 2026-07): the proxy requires the request `input` to be an
+# ARRAY — a scalar string 400s ("Bad Request"; this is the fork's issue #100).
+: "${AICAP_EMBED_MODEL:=text-embedding-3-small}"
+
+# Export so subprocess (Python tsum / aiblock / semsearch) inherits.
 export AICAP_AGENT_PRIORITY \
        AICAP_CLAUDE_MODEL AICAP_OPENCODE_MODEL AICAP_CODEX_MODEL AICAP_CURSOR_MODEL \
        AICAP_OLLAMA_MODEL \
-       AICAP_HTTP_URL AICAP_HTTP_MODEL
+       AICAP_HTTP_URL AICAP_HTTP_MODEL \
+       AICAP_EMBED_MODEL
