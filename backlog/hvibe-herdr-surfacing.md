@@ -4,6 +4,8 @@
 **Effort**: S (keybinding) / S–M (tv action) / S (Projects TOML)
 **Related**: `dot_config/shell/24_herdr.sh` (`hvibe`/`hcode`), `dot_config/herdr/create_config.toml`, `dot_config/television/cable/herdr-sesh.toml`, [docs/tools/herdr.md](../docs/tools/herdr.md) → "Session helpers"
 
+> **Update (2026-07)**: `hvibe`/`hcode` now **auto-attach when run from outside herdr** (bare `herdr` / `herdr session attach NAME`, gated on `HERDR_ENV`) and take a **`--session NAME`** flag (routes via `local -x HERDR_SOCKET_PATH`). That's a *different axis* from this backlog (which is about surfacing the launchers **inside** herdr's UI via keybinding/tv/Projects — still open). Net effect on the options below: Option A's `type="pane"` launcher is now a touch cleaner because the transient launcher pane attaches/focuses correctly without a manual `herdr` afterwards.
+
 ## Context
 
 `hvibe`/`hcode` currently launch by *typing* the command in a shell. These follow-ups surface the whole-pack layout from **inside herdr's UI** so you don't have to drop to a prompt. All three are additive and independent — pick whichever earns its keep.

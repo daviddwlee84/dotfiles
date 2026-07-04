@@ -52,6 +52,65 @@ function _herdr_tool_tab() {
     [ -n "$pane" ] && herdr pane run "$pane" "$4" >/dev/null 2>&1
 }
 
+# Resolve the target herdr session for hvibe/hcode from an optional --session
+# value. Echoes "<name><TAB><socket_override_or_empty>". The socket field is
+# non-empty ONLY when the caller must override HERDR_SOCKET_PATH (explicit
+# --session); empty means "use the ambient/default socket untouched". Returns 1
+# (with a message) when an explicit --session names a session that isn't running.
+#
+# A herdr server hosts multiple named sessions (default + `herdr --session NAME`),
+# each with its own socket. The CLI has no --session flag on subcommands; the
+# only lever is the HERDR_SOCKET_PATH env var (verified). `session list --json`
+# is the authoritative name -> socket_path resolver.
+function _herdr_session_target() {
+    local want="$1" js line running socket nm
+    js=$(herdr session list --json 2>/dev/null)
+    if [ -n "$want" ]; then
+        line=$(printf '%s' "$js" \
+            | jq -r --arg n "$want" '.sessions[] | select(.name==$n) | "\(.running)\t\(.socket_path)"' 2>/dev/null \
+            | head -1)
+        if [ -z "$line" ]; then
+            echo "session '$want' not found. Start it with: herdr --session $want" >&2
+            return 1
+        fi
+        running=${line%%$'\t'*}
+        socket=${line#*$'\t'}
+        if [ "$running" != "true" ]; then
+            echo "session '$want' is not running. Start it with: herdr --session $want" >&2
+            return 1
+        fi
+        printf '%s\t%s\n' "$want" "$socket"
+        return 0
+    fi
+    # No explicit --session: inside herdr use the ambient session (no override);
+    # outside, fall back to the default session. Only the NAME matters here (for
+    # the attach path) — socket stays empty so the ambient socket is left as-is.
+    if [ -n "$HERDR_SOCKET_PATH" ]; then
+        nm=$(printf '%s' "$js" \
+            | jq -r --arg s "$HERDR_SOCKET_PATH" '.sessions[] | select(.socket_path==$s) | .name' 2>/dev/null \
+            | head -1)
+        printf '%s\t\n' "${nm:-default}"
+    else
+        printf 'default\t\n'
+    fi
+}
+
+# When hvibe/hcode run from OUTSIDE herdr, bring up a client attached to the
+# session so the just-created/focused workspace is actually visible — the
+# `herdr workspace focus` calls only move an ALREADY-attached client. Inside
+# herdr (HERDR_ENV set) those focus calls already switched the live client, so
+# there is nothing to do. Runs the client as a child (no exec), mirroring
+# svibe's `tmux attach-session`. $1=session_name (default: "default").
+function _herdr_attach_if_outside() {
+    [ -n "$HERDR_ENV" ] && return 0
+    local session="${1:-default}"
+    if [ "$session" = "default" ]; then
+        herdr
+    else
+        herdr session attach "$session"
+    fi
+}
+
 # ── hvibe: parametric multi-agent pack ──────────────────────────────────────
 #
 # A herdr "vibe" workspace: tab "agents" with N agent panes (side-by-side
@@ -88,7 +147,7 @@ function _herdr_tool_tab() {
 function herdr-vibe() {
     command -v jq >/dev/null 2>&1 || { echo "hvibe: jq is required." >&2; return 1; }
 
-    local target="" no_attach=0 on_exit="shell" specstory_mode="auto"
+    local target="" no_attach=0 on_exit="shell" specstory_mode="auto" session_arg=""
     local n_agents=0 n_agents_set=0 agent_cli="claude" agents_csv="" tab_per_agent=0
     local min_width="${HVIBE_MIN_WIDTH:-80}"
     # Stagger between pane launches so agents that share a global resource at
@@ -101,6 +160,7 @@ function herdr-vibe() {
             -p|--path)       target="$2"; shift 2 ;;
             --on-exit)       on_exit="$2"; shift 2 ;;
             --agents)        agents_csv="$2"; shift 2 ;;
+            --session)       session_arg="$2"; shift 2 ;;
             --min-width)     min_width="$2"; shift 2 ;;
             --tab-per-agent) tab_per_agent=1; shift ;;
             --no-specstory)  specstory_mode="never"; shift ;;
@@ -112,9 +172,9 @@ hvibe — herdr multi-agent pack (herdr analog of svibe)
 
 Usage:
   hvibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
-        [--min-width COLS] [--tab-per-agent] [N_AGENTS] [AGENT_CLI]
+        [--min-width COLS] [--tab-per-agent] [--session NAME] [N_AGENTS] [AGENT_CLI]
   hvibe [--path DIR] [--on-exit MODE] [--no-specstory] [--no-attach]
-        [--min-width COLS] [--tab-per-agent] --agents A1,A2,A3[,...]
+        [--min-width COLS] [--tab-per-agent] [--session NAME] --agents A1,A2,A3[,...]
 
 Builds a new herdr workspace `vibe/<repo>`:
   tab "agents" — N agent panes (side-by-side splits; each auto-detected in
@@ -123,6 +183,13 @@ Builds a new herdr workspace `vibe/<repo>`:
   tab "edit"   — nvim
 Idempotent: re-running in the same repo focuses the existing workspace.
 Requires:  a git repo (pass -p DIR, or cd into one).
+
+Attach behavior: run from OUTSIDE herdr → attaches a client to the session so
+the new workspace is visible; run from INSIDE herdr → just focuses it.
+--no-attach builds in the background either way.
+--session NAME targets a running herdr session (default: the current session
+when inside herdr, else the default session). Start a session first with
+`herdr --session NAME`.
 
 Two modes for choosing agents:
   Homogeneous:    hvibe 3 codex → 3 panes all codex
@@ -231,12 +298,24 @@ EOF
     repo=$(basename "$repo_root")
     label=$(_sesh_sanitize "vibe/$repo")
 
+    # Resolve the target herdr session (optional --session; else ambient/default).
+    # A non-empty sess_sock means an explicit --session override — scope it with
+    # `local -x` so child `herdr` calls see it but the user's shell is untouched.
+    local sess_line sess_name sess_sock
+    sess_line=$(_herdr_session_target "$session_arg") || return 1
+    sess_name=${sess_line%%$'\t'*}
+    sess_sock=${sess_line#*$'\t'}
+    [ -n "$sess_sock" ] && local -x HERDR_SOCKET_PATH="$sess_sock"
+
     # Idempotent: focus an existing workspace instead of duplicating.
     local existing
     existing=$(_herdr_ws_by_label "$label")
     if [ -n "$existing" ]; then
         echo "hvibe: workspace '$label' already exists ($existing) — focusing." >&2
-        [ "$no_attach" -eq 1 ] || herdr workspace focus "$existing" >/dev/null 2>&1
+        if [ "$no_attach" -ne 1 ]; then
+            herdr workspace focus "$existing" >/dev/null 2>&1
+            _herdr_attach_if_outside "$sess_name"
+        fi
         return 0
     fi
 
@@ -295,6 +374,7 @@ EOF
     if [ "$no_attach" -ne 1 ]; then
         herdr workspace focus "$ws" >/dev/null 2>&1
         herdr tab focus "$t0" >/dev/null 2>&1
+        _herdr_attach_if_outside "$sess_name"
     fi
 }
 
@@ -315,12 +395,13 @@ EOF
 function herdr-code() {
     command -v jq >/dev/null 2>&1 || { echo "hcode: jq is required." >&2; return 1; }
 
-    local target="" agent="" no_attach=0 on_exit="shell" specstory_mode="auto"
+    local target="" agent="" no_attach=0 on_exit="shell" specstory_mode="auto" session_arg=""
     while [ $# -gt 0 ]; do
         case "$1" in
             -p|--path)      target="$2"; shift 2 ;;
             -a|--agent)     agent="$2"; shift 2 ;;
             --on-exit)      on_exit="$2"; shift 2 ;;
+            --session)      session_arg="$2"; shift 2 ;;
             --no-specstory) specstory_mode="never"; shift ;;
             --specstory)    specstory_mode="auto"; shift ;;
             --no-attach)    no_attach=1; shift ;;
@@ -333,12 +414,17 @@ function herdr-code() {
 hcode — herdr single-agent coding layout (herdr analog of scode)
 
 Usage: hcode [--path DIR] [--agent CLI] [--on-exit MODE] [--no-specstory]
-             [--no-attach] [AGENT]
+             [--no-attach] [--session NAME] [AGENT]
 
 Builds a new herdr workspace `coding-agent/<repo>`:
   tab "editor"  — nvim (left ~75%) | agent (right ~25%)
   tab "monitor" — btop (or htop / top)
 Idempotent per repo; refuses outside a git repo.
+
+Attach behavior: run from OUTSIDE herdr → attaches a client to the session;
+run from INSIDE herdr → just focuses. --no-attach builds in the background.
+--session NAME targets a running herdr session (default: current session when
+inside herdr, else the default session; start one with `herdr --session NAME`).
 
 Agent wrapping (auto, opt out with --no-specstory):
   claude / codex / cursor / droid / gemini  → `specstory run <agent>`
@@ -383,11 +469,21 @@ EOF
     repo=$(basename "$repo_root")
     label=$(_sesh_sanitize "coding-agent/$repo")
 
+    # Resolve target herdr session (optional --session; else ambient/default).
+    local sess_line sess_name sess_sock
+    sess_line=$(_herdr_session_target "$session_arg") || return 1
+    sess_name=${sess_line%%$'\t'*}
+    sess_sock=${sess_line#*$'\t'}
+    [ -n "$sess_sock" ] && local -x HERDR_SOCKET_PATH="$sess_sock"
+
     local existing
     existing=$(_herdr_ws_by_label "$label")
     if [ -n "$existing" ]; then
         echo "hcode: workspace '$label' already exists ($existing) — focusing." >&2
-        [ "$no_attach" -eq 1 ] || herdr workspace focus "$existing" >/dev/null 2>&1
+        if [ "$no_attach" -ne 1 ]; then
+            herdr workspace focus "$existing" >/dev/null 2>&1
+            _herdr_attach_if_outside "$sess_name"
+        fi
         return 0
     fi
 
@@ -424,6 +520,7 @@ EOF
         herdr workspace focus "$ws" >/dev/null 2>&1
         herdr tab focus "$t0" >/dev/null 2>&1
         [ -n "$ap" ] && herdr pane focus --direction left --pane "$ap" >/dev/null 2>&1
+        _herdr_attach_if_outside "$sess_name"
     fi
 }
 

@@ -17,7 +17,18 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
 
 ## Model differences vs tmux
 
-herdr's hierarchy is **Session → Workspace → Tab → Pane** (tmux is Session → Window → Pane). "Workspace" is a project-level container; a "Tab" groups panes. The CLI (`herdr session|workspace|pane|agent …`, most with `--json`) is the scripting surface that replaces `tmux switch-client` / `list-sessions` etc.
+herdr's hierarchy is **Session → Workspace → Tab → Pane** — one level deeper than tmux (Session → Window → Pane). A "Workspace" is a project-level container; a "Tab" groups panes. The CLI (`herdr session|workspace|tab|pane|agent …`, most with `--json`) is the scripting surface that replaces `tmux switch-client` / `list-sessions` etc.
+
+The important twist vs tmux: a single herdr **server hosts multiple named sessions**, each its own persistent tree with its own socket. That top **Session** level is closer to "multiple tmux servers / sockets" than to a tmux session — the tmux thing you'd call a session (`vibe/<repo>`) maps to a herdr **Workspace**, not a herdr Session.
+
+### Named sessions
+
+- `herdr` — launch or attach the **default** session (socket `~/.config/herdr/herdr.sock`).
+- `herdr --session NAME` — launch/attach a **named** session (socket `~/.config/herdr/sessions/<NAME>/herdr.sock`).
+- `herdr session list [--json]` — all sessions with `running` + `socket_path`. **The `--json` `socket_path` is authoritative** — the plain-text table prints `herdr.socket`, but the real socket is `herdr.sock`.
+- `herdr session attach NAME` · `herdr session stop NAME` · `herdr session delete NAME` (`default` is a valid `NAME` for stop).
+
+**Targeting a session from the CLI subcommands**: there is **no `--session`/`--socket` flag** on `workspace`/`tab`/`pane`/`agent`. The only lever is the **`HERDR_SOCKET_PATH`** env var — set it to a session's `socket_path` and every subcommand routes there. Inside a herdr pane it is already exported to the current session's socket, so scripts run *inside* herdr target the current session for free. This is exactly how `hvibe --session NAME` works (see below).
 
 ## Feasibility matrix (current tmux experience → herdr)
 
@@ -39,6 +50,8 @@ herdr's hierarchy is **Session → Workspace → Tab → Pane** (tmux is Session
 ## Keybindings
 
 Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr's action set is fixed); everything else is a `[[keys.command]]` custom command. Custom commands receive `$HERDR_SOCKET_PATH`, `$HERDR_ACTIVE_PANE_ID`, `$HERDR_ACTIVE_PANE_CWD` and run from the focused pane's cwd.
+
+> **Two families of herdr env vars.** The `HERDR_ACTIVE_PANE_*` vars above are injected **only** into `[[keys.command]]` invocations. Every shell *running inside a herdr pane* also gets an **ambient** set: `HERDR_ENV=1`, `HERDR_PANE_ID`, `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID`, and `HERDR_SOCKET_PATH` (the current session's socket). Scripts use `HERDR_ENV` as the "am I inside herdr?" test and inherit `HERDR_SOCKET_PATH` to target the current session — that's what `hvibe`/`hcode` rely on.
 
 | Key | Action | Type |
 |---|---|---|
@@ -75,9 +88,11 @@ Two shell functions in [`dot_config/shell/24_herdr.sh`](../shells/aliases.md#ses
 | `hcode [CLI]` | `coding-agent/<repo>` | tab `editor` (nvim 75% \| agent 25%) + tab `monitor` (btop) |
 
 - **Idempotent per repo**: re-running focuses the existing `vibe/<repo>` / `coding-agent/<repo>` workspace instead of duplicating (matches svibe's "attach if exists").
+- **Attach-aware (like svibe's `$TMUX` branch)**: run from **inside** herdr → the workspace/tab focus calls switch the live client (no new client). Run from a **plain terminal outside** herdr → the helper brings up a client attached to the session so the new workspace is actually visible (herdr's `workspace focus` only moves an *already-attached* client, so without this the pack was built invisibly). `--no-attach` builds detached either way. Detection is the ambient `HERDR_ENV`.
+- **`--session NAME`** targets a specific running herdr session (see [Named sessions](#named-sessions)). Default: the **current** session when inside herdr (via inherited `HERDR_SOCKET_PATH`), else the **default** session. The override is scoped with `local -x HERDR_SOCKET_PATH` so it never leaks into your shell. A `--session` that isn't running errors with a `herdr --session NAME` hint (start it first — hvibe won't spawn a server).
 - **Agent visibility**: herdr tracks agent state **per pane**, so in the default splits layout every agent still surfaces individually in herdr's agent tracking (verified: two agents in one tab appear as two separate entries in `herdr agent list`). The compact left sidebar rolls a *tab's* status into one dot — use `--tab-per-agent` if you want each agent to own a tab-level status dot.
 - **Even columns**: herdr has no `select-layout even-horizontal`, so `hvibe` sets each split's `--ratio` explicitly (`1/(N-m+1)`) to keep the agent panes even; `hcode` uses `--ratio 0.75` to give nvim 75%.
-- Same flags as svibe/scode: `--on-exit`, `--no-specstory`, `--no-attach`, `-p/--path`; `hvibe` also takes `--min-width` / `--tab-per-agent` and honors `$HVIBE_MIN_WIDTH` / `$HVIBE_LAUNCH_STAGGER`. Full flag help: `hvibe -h` / `hcode -h`.
+- Same flags as svibe/scode: `--on-exit`, `--no-specstory`, `--no-attach`, `-p/--path`, plus `--session NAME`; `hvibe` also takes `--min-width` / `--tab-per-agent` and honors `$HVIBE_MIN_WIDTH` / `$HVIBE_LAUNCH_STAGGER`. Full flag help: `hvibe -h` / `hcode -h`.
 
 The tmux `svibe` / `scode` remain the tmux-side equivalents (see [sesh](sesh.md)); the two families coexist — `hvibe`/`hcode` only touch herdr, `svibe`/`scode` only touch tmux.
 
@@ -137,6 +152,34 @@ Two native layers, no plugin needed:
 
 - **Client/terminal close ≠ session loss.** herdr runs a persistent **server** (named session `default`, socket `~/.config/herdr/herdr.sock`). Closing the terminal window just detaches — workspaces/tabs/panes and their running processes stay alive. Reattach with bare `herdr` (or `herdr session attach default`); `herdr session list` shows it `running`. This is tmux detach/reattach, built in.
 - **Full server restart / reboot / crash.** `[session]` in the config exposes `resume_agents_on_restore = true` — resumes supported AI-agent panes back into their *native conversation sessions* after a server restart (requires the official `herdr integration install <agent>` hooks) — plus an option to save recent pane screen history across restarts. This covers the tmux-resurrect/continuum case natively, gated on those keys + integrations.
+
+## Remote sessions (`herdr --remote`)
+
+herdr can run a **local thin client attached to a herdr server on another host over SSH**:
+
+```bash
+herdr --remote <ssh-target> [--session NAME] [--handoff]
+herdr --remote local_ubuntu          # <ssh-target> is any host/alias from ~/.ssh/config
+```
+
+What it does (from <https://herdr.dev/docs/remote>):
+
+- SSHes to `<ssh-target>`, detects the remote platform, and **auto-installs a matching herdr server binary there** — the remote does **not** need herdr pre-installed (it does need SSH access + permission to install/run a binary).
+- Bridges your **local clipboard** (including image paste) to the remote server and keeps your **local keybindings** (`--remote-keybindings server` to use the server's instead).
+- `--session NAME` picks/creates a named session on the remote; `--handoff` opts into live handoff.
+
+**Config** — the `[remote]` block in `config.toml`:
+
+- `manage_ssh_config = true` (default) — herdr runs the bridge SSH through a generated config that includes your `~/.ssh/config` first and adds `ServerAliveInterval`/`ServerAliveCountMax` so idle NAT/network timeouts don't drop the session. Set `false` to run plain SSH against your config unchanged.
+- `remote_image_paste` (`[keys]`) — raw-key image-paste binding, active only under `--remote`.
+
+**Troubleshooting `remote platform detection failed: Connection closed by <host> port 22`**: this is a **transient SSH-level close**, not a herdr config problem. Verify the SSH path herdr uses actually works, then just retry:
+
+```bash
+ssh -o BatchMode=yes -o ConnectTimeout=5 <ssh-target> 'uname -sm'   # should print e.g. "Linux x86_64"
+```
+
+If plain SSH works, retry `herdr --remote <ssh-target>`; if it keeps failing, check `~/.config/herdr/herdr-client.log` / `herdr.log` right after the failure. Common real causes: SSH auth needing an interactive prompt the bridge can't answer, or sshd rate-limiting rapid connections (`MaxStartups`).
 
 ## AI usage / quota status
 
