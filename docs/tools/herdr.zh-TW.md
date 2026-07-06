@@ -14,7 +14,7 @@
   - Linux —— GitHub release 的**單一靜態 binary**（`herdr-linux-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`（由同一 role 中 `# --- herdr ... ---` 區塊管理）。沒有 tarball，所以不需要解壓步驟。
 - **驗證 (Verify)**：`herdr --version`；用 `herdr server reload-config` 驗證設定檔
 - **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `herdr update`
-- **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **只植入一次 (seed-once)**（`dot_config/herdr/create_config.toml`，`create_` 前綴）。herdr 會把 UI 設定寫回這個檔案（見 [設定回寫](#config-writeback-create_)），所以 chezmoi 在新機器上種下它之後就不再碰它。
+- **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
 
 > **不受 `enableVimMode` 控制。** 該 flag 管的是 shell + tmux 的 modal 編輯；herdr 的 copy mode（`prefix+[`）天生就是 vi 風格（`h/j/k/l`、`w/b/e`、`{`/`}`、`v`/Space 選取、`y`/Enter 複製、`q`/Esc 離開），沒有東西需要 gate。
 
@@ -34,6 +34,34 @@ herdr 的階層是 **Session → Workspace → Tab → Pane**——比 tmux（Se
 - `herdr session attach NAME` · `herdr session stop NAME` · `herdr session delete NAME`（stop 時 `default` 是合法的 `NAME`）。
 
 **從 CLI 子指令鎖定某個 session**：`workspace`/`tab`/`pane`/`agent` **沒有 `--session`/`--socket` flag**。唯一的槓桿是 **`HERDR_SOCKET_PATH`** 這個環境變數 (env var)——把它設成某 session 的 `socket_path`，所有子指令就會導向該 session。在 herdr pane 內部它已經被 export 成當前 session 的 socket，所以*在 herdr 內*跑的腳本天生就鎖定當前 session。`hvibe --session NAME` 正是靠這個機制運作（見下文）。
+
+## cwd 與 workspace 命名模型
+
+herdr 追蹤 cwd 的方式跟 tmux 不同,會顛覆兩個常見預期（皆用 `herdr pane list` 驗證）:
+
+- **每個 pane 有兩個 cwd。** `cwd` = shell 的*啟動*目錄（spawn 時固定）;`foreground_cwd` = *即時* cwd,透過 **OSC 7** shell 整合追蹤。shell 裡 `cd` 會更新 `foreground_cwd`;啟動 `cwd` 永不變。
+- **子行程 / 子 shell 裡的 `cd` 不會傳上來。** 因為追蹤是 OSC 7-based,一個沒有再送 OSC 7 的子 shell 裡的 `cd`——例如 `chezmoi cd`,它會在 source 目錄 spawn 一個*新*shell——對 herdr 是隱形的。`foreground_cwd` 不動,所以 space 的 git-repo 偵測與 `prefix+G` lazygit 位置都不跟著子 shell 走。這是 OSC 7 的固有特性,**不是** herdr bug——預期行為。
+- **新 tab 開在 workspace 根目錄,不是聚焦 pane 的 cwd。** 用 `new_cwd = "follow"`（見下）時,*split* 繼承聚焦 pane 的 cwd,但*新 tab* 退回 workspace 的 cwd（通常是 `$HOME`）。已驗證:每個非首 tab 的 root pane `cwd = $HOME`。
+- **workspace（space）label 自動跟隨 root/primary pane 的即時 cwd basename**（例如 → `chezmoi`、`trading-journal`）。在 **tab 1** 裡 `cd` 會改 space 名;在其他 tab 裡 `cd` 不會。沒有 config 旋鈕控制這個。
+
+**`new_cwd` 值**（`[terminal]`）—— 沒給明確 `--cwd` 時,新 pane/tab/workspace 的 CWD 政策:
+
+| 值 | 意義 |
+|---|---|
+| `follow`（預設） | 繼承**來源** pane/workspace（split → 聚焦 pane 的即時 cwd;新 tab → workspace 根） |
+| `home` | `$HOME` |
+| `current` | herdr **自身行程**的目錄（**不是**聚焦 pane） |
+| `"~/path"` | 固定路徑 |
+
+**沒有任何 `new_cwd` 值能讓新 tab 開在聚焦 pane 的即時 cwd**——只有明確的 `herdr tab create --cwd …` 可以（已驗證:`tab create --cwd PATH` 會把新 tab 的 shell spawn 在 `PATH`）。要一個「在此開新 tab」的鍵,綁一個 command pane 到 `herdr tab create --cwd "$HERDR_ACTIVE_PANE_CWD" --focus`（例如綁 `prefix+C`;原生 `prefix+c` 保留 = workspace 根）:
+
+```toml
+[[keys.command]]
+key = "prefix+C"
+type = "pane"
+command = "herdr tab create --cwd \"$HERDR_ACTIVE_PANE_CWD\" --focus"
+description = "在目前 pane 的 cwd 開新 tab"
+```
 
 ## 可行性對照表 (Feasibility matrix)（現有 tmux 體驗 → herdr）
 
@@ -62,7 +90,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 |---|---|---|
 | `prefix + c` / `prefix + 1..9` | 新 tab / 切 tab | built-in default |
 | `prefix + h/j/k/l` | 聚焦 pane | built-in default |
-| `prefix + \|` / `prefix + minus` | 左右分割 / 上下分割 | rebound |
+| `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | 左右分割 / 上下分割（tmux 肌肉記憶——直覺鍵與 tmux 預設鍵都綁） | rebound（陣列 arrays） |
 | `prefix + z` / `prefix + x` | zoom / 關 pane | built-in default |
 | `prefix + w` / `prefix + g` | workspace 導覽 / session navigator | built-in default |
 | `prefix + [` | vi copy mode（`hjkl`、`w/b/e`、`{/}`、`v`、`y`） | built-in default |
@@ -147,9 +175,20 @@ herdr 首次執行的 onboarding 會提議**安裝可選的 agent 整合**（`he
 
 這些整合檔案**未**被 vendored 進 repo，所以**不會**在其他機器上重現（在那些機器再按一次 *install*，或跳過 onboarding）。它們用 herdr 自己的 socket，不會干擾 tmux/workmux（不同機制）。移除方式：`herdr integration uninstall <agent>`——而對 **claude**，之後要再跑一次 `chezmoi apply`，讓 merger 從 `settings.json` 丟掉那個已移除的 hook。
 
-### 設定回寫（為何用 `create_`） {#config-writeback-create_}
+### 設定管理（為何用 `modify_`） {#config-management-modify_}
 
-herdr 會**把 UI/執行期設定寫回 `~/.config/herdr/config.toml`**——例如完成 onboarding 會在檔首插入 `onboarding = false`，而 app 內的*設定*彈窗（theme / sound / toasts / pane labels）在*套用*時也會持久化到那裡。它會就地編輯並保留既有註解，但執行期它擁有這個檔案。這就是為何 chezmoi 用 **`create_`（只植入一次）** 管理它：一般的受管檔案會在每次 `chezmoi apply` 被覆蓋（把 `onboarding=false` 再拔掉 → onboarding 畫面重現，且任何 UI 變更被還原）。後果：repo 裡對 `create_config.toml` 的編輯**不會**自動傳播到已有此檔的機器——要刻意刷新用 `cp ~/.config/herdr/config.toml "$(chezmoi source-path ~/.config/herdr/config.toml)"`（然後把執行期的 `onboarding`/state 行拿掉）。
+herdr 會在執行期改寫 `~/.config/herdr/config.toml`——完成 onboarding 會在檔首插入 `onboarding = false`，而 app 內的*設定*彈窗（theme / sound / toasts / pane labels）在*套用*時也會持久化到那裡。它就地編輯並保留既有註解，但執行期它擁有這個檔案。
+
+這個檔案原本用 `create_` 前綴只植入一次，避免 `chezmoi apply` 蓋掉那些寫回。代價是：**repo 的編輯永遠傳不到已植入的機器**——你在 source 改的分割鍵重綁、註解修正,都得手動 `cp … source-path` 刷新才會抵達,否則悄悄不見。這正是為何一台機器在 `chezmoi diff` 顯示乾淨時仍會感覺「沒同步」（diff 之所以乾淨,*正是因為* `create_` 從不再碰該檔）。這與跨機器無關：source 對每台 live 檔的 `diff` 可以逐字節相同,但 repo 編輯在你刷新前仍不會落地。
+
+現在改成 **`modify_` 覆蓋層**——`dot_config/herdr/modify_config.toml.tmpl`,一個小腳本:
+
+- 以受管本體 `.chezmoitemplates/herdr/config.toml` 為 base（帶註解 + tmux-parity 說明）,每次 apply 強制套用 `[theme]` / `[ui]` / `[terminal]` / `[keys]` 表,並
+- **原樣拉回 (pull through)** live 檔的其他每個頂層 key（`onboarding`、`[session]`、`[remote]`、`[update]`、`[experimental]`…）,讓 herdr 的執行期寫回存活。
+
+TOML 沒有 `jq`,所以合併用 Python 透過 `uv run --with tomlkit` 跑（tomlkit 能來回保留註解**與** `[[keys.command]]` 的 array-of-tables;stdlib `tomllib` 唯讀,而 codex 的 `modify_` emitter 無法輸出 AoT）。它退化到系統 `python3`,再退化到直接輸出原始受管範本,所以沒有 Python 的全新主機仍拿到完整設定。這是繼 `~/.codex/config.toml`（`dot_codex/modify_config.toml.tmpl`）之後第二個 TOML-overlay 先例。
+
+要改 herdr 的受管設定,編輯 `.chezmoitemplates/herdr/config.toml` 再 `chezmoi apply`——它現在會抵達每台主機。用 `herdr server reload-config` 驗證（會在 `diagnostics` 回報快捷鍵衝突;空的 `diagnostics` 陣列 + `"status":"applied"` 代表設定——含陣列鍵綁定——解析乾淨）。
 
 ## 持久化與還原（不小心關掉）
 
@@ -186,6 +225,18 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 <ssh-target> 'uname -sm'   # 應印出�
 
 若純 SSH 通，就重試 `herdr --remote <ssh-target>`；若一直失敗，在失敗當下看 `~/.config/herdr/herdr-client.log` / `herdr.log`。常見的真正原因：SSH 認證需要橋接無法回答的互動提示，或 sshd 對快速連線做速率限制（`MaxStartups`）。
 
+## 在 tmux 內巢狀執行 herdr（多 remote）
+
+本 repo 的預設立場是 herdr **或** tmux,不巢狀。但你可以刻意巢狀——tmux 當外層視窗管理器,內含數個 herdr client,有些本地、有些 `herdr --remote <host>` 連到不同 server。癥結是 **prefix 衝突**:兩者都預設 `Ctrl+b`,所以外層 tmux 吃掉它,內層 herdr 永遠收不到自己的 prefix（[herdr #759](https://github.com/ogulcancelik/herdr/discussions/759)）。
+
+三種解法,依這裡的偏好排序:
+
+1. **雙擊 prefix 轉發（推薦,零設定）。** tmux 保有預設的 `bind -T prefix C-b send-prefix`（已確認本 repo 未覆寫）,所以 **`Ctrl+b Ctrl+b`** 會把一個字面 `Ctrl+b` 轉發給內層 herdr;之後它的 prefix 綁定正常運作（`Ctrl+b Ctrl+b c` = 內層開新 tab）。herdr 與 tmux 都不用改——經典的 tmux-in-tmux 肌肉記憶。
+2. **改內層 herdr 的 prefix。** 設 `keys.prefix`（例如 `"ctrl+a"` / `"ctrl+space"`）讓內層 herdr 用不衝突的 prefix——一次按鍵而非雙擊。代價:即使單獨跑 herdr,prefix 也變了（不再與 tmux 的 `Ctrl+b` 一致）。
+3. **不巢狀——用 herdr 原生遠端。** `herdr --remote <target> [--remote-keybindings local|server]` 跑一個本機 thin client 連到遠端 herdr server,中間沒有 tmux,而 herdr 自己就託管多個具名 session。對純粹「多個 remote」的需求,這通常比巢狀乾淨;`--remote-keybindings local`（預設）沿用你的本機 keymap,`server` 用遠端的。
+
+注意:本 repo 的 tmux 用了很多 root-table `bind -n C-*` 綁定會**遮蔽**內層 app 的 `Ctrl` 鍵,所以 herdr 的 prefix-free *direct* 終端捷徑在 tmux 下不可靠——透過它的 prefix 觸及 herdr action（用 1 或 2）。herdr 自己的 `allow_nested`（config,預設 `false`）只管 herdr-inside-**herdr**（靠 `HERDR_ENV` 偵測）,不是 herdr-inside-tmux。
+
 ## AI 用量 / 額度狀態
 
 herdr **沒有原生的用量/額度/token 顯示**（側欄只顯示 agent *狀態*）。它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去。有一個 Codex-only 的社群 plugin（[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)）已從 [CodexBar](https://github.com/steipete/CodexBar) 讀的同一份 `~/.codex` 資料做到這件事；但沒有東西涵蓋 Claude/ChatGPT 額度。延後——CodexBar 的選單列仍是多供應商的檢視。設計與選項記在 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
@@ -195,6 +246,7 @@ herdr **沒有原生的用量/額度/token 顯示**（側欄只顯示 agent *狀
 - **無縫 `Ctrl-hjkl` nvim↔pane 導覽。** `vim-tmux-navigator` 與 tmux 耦合（`is_vim` 的 `ps`/`pane_tty` 啟發式 + nvim plugin）。herdr 沒有 smart-splits 對應物——它的 pane focus 是 `prefix+h/j/k/l`，在邊界不會穿透進 nvim 的 splits。Workaround：在 nvim 裡用它自己的 `<C-w>hjkl`。這是相對 tmux 最大的 UX 退步。
 - **OSC133 copy-mode**（`cpout` / `cpblock`、prompt 跳轉、最後輸出 yank）是 tmux 專屬。herdr 的 copy mode（`prefix+[`）是 vi 風格但沒有 OSC133 的 prompt 邊界感知。`cpcmd`（zsh history，與多工器無關）仍可用。
 - **狀態列 format 符號 + 書籤**（⭐/📌/🔖）：herdr 沒有 `#{@option}` 的 format-string 插值。原生 agent dots 涵蓋 agent 部分；手動書籤沒有對應物。
+- **逐鍵 pane 縮放。** tmux 把 `prefix+H/J/K/L`（與 `M-hjkl` 微調）直接綁成縮放;herdr 沒有逐鍵縮放——它用模態的 `resize_mode`（`prefix+r`）再按 `h/j/k/l`。不是精確對等,但是相近的對應物。
 
 > **不是缺口：** vi copy-mode 本身*是*原生（`prefix+[`），且逐 pane 的 agent 狀態是原生偵測——我原本以為會缺的兩件事，結果都內建了。
 

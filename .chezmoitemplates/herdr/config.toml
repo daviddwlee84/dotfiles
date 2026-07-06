@@ -1,12 +1,18 @@
 # Herdr — Rust terminal multiplexer + AI-agent orchestrator.
 #
 # TRIAL config that mirrors the tmux experience as closely as herdr's
-# primitives allow. herdr COEXISTS with tmux — you run one or the other, never
-# nested. Nothing here touches the tmux / sesh / tmuxp / workmux setup.
+# primitives allow. herdr COEXISTS with tmux — you run one or the other (or
+# nest deliberately; see docs/tools/herdr.md "nested inside tmux"). Nothing here
+# touches the tmux / sesh / tmuxp / workmux setup.
+#
+# THIS FILE IS THE MANAGED BODY of a chezmoi modify_ overlay
+# (dot_config/herdr/modify_config.toml.tmpl). The overlay enforces the tables
+# below on every `chezmoi apply` and preserves any keys herdr writes back at
+# runtime (onboarding / [session] / [remote] / [update] / [experimental]).
 #
 # Schema: https://herdr.dev/docs/configuration/
 # Validate after editing: herdr server reload-config
-# Full feasibility matrix + documented gaps: docs/tools/herdr.md
+# Full feasibility matrix + behavior model + documented gaps: docs/tools/herdr.md
 #
 # NOT gated by enableVimMode: that flag governs shell + tmux modal editing;
 # herdr's copy mode (prefix+[) is vi-style natively (h/j/k/l, w/b/e, {/}, v, y).
@@ -32,14 +38,22 @@ show_agent_labels_on_pane_borders = true
 
 [terminal]
 shell_mode = "auto"           # login/non-login auto-detect; follows $SHELL
-new_cwd = "follow"            # new panes inherit the focused pane's cwd
+# CWD policy for new panes/tabs/workspaces (no explicit --cwd). Values:
+#   "follow"  = inherit the SOURCE pane/workspace (default)
+#   "home"    = $HOME · "current" = herdr's own process dir · or a fixed path
+# NOTE: a split's source is the focused pane (→ inherits its live cwd), but a
+# NEW TAB's source is the WORKSPACE root, so new tabs open at the workspace cwd
+# (often $HOME), NOT the focused pane's live cwd. No new_cwd value changes that;
+# for "new tab here" use `herdr tab create --cwd …`. See docs/tools/herdr.md.
+new_cwd = "follow"
 
 # --- Built-in action rebinds (tmux muscle memory) ---
 # Only existing actions can be rebound; we keep herdr defaults for everything
-# not listed here.
+# not listed here. An action accepts an ARRAY of bindings (herdr docs), so a
+# single action can carry both the intuitive key and the tmux-default key.
 [keys]
-split_vertical = "prefix+|"        # side-by-side, like tmux prefix+|
-split_horizontal = "prefix+minus"  # stacked, like tmux prefix+- (also the default)
+split_vertical = ["prefix+|", "prefix+%"]         # side-by-side (left/right) = tmux prefix+| and prefix+% (-h)
+split_horizontal = ["prefix+minus", "prefix+\""]  # stacked (top/bottom)      = tmux prefix+- and prefix+" (-v)
 reload_config = "prefix+shift+r"   # tmux: prefix+R
 rename_tab = "prefix+,"            # tmux: prefix+, (rename window) — frees prefix+shift+t for the sesh popup below
 new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be lazygit (worktrees handled by wt/wm + herdr-plus auto-layout)

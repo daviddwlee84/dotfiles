@@ -204,7 +204,6 @@ Track normally, `chezmoi add` freely, let `chezmoi re-add` pick up drift.
 Files that an app rewrites in-place after first launch, and where you only care about the initial state.
 
 - **`~/.config/nvim/lazy-lock.json`** → `create_lazy-lock.json`. See the [case study below](#dot_confignvimcreate_lazy-lockjson--seed-once-never-overwrite). Refresh baseline with `cp … "$(chezmoi source-path …)"`.
-- **`~/.config/herdr/config.toml`** → `create_config.toml`. herdr writes UI/runtime settings back into it (`onboarding = false`, theme/sound/toasts on *apply*), so a plain managed file would be clobbered every `chezmoi apply` (re-triggering onboarding). See [docs/tools/herdr.md → Config writeback](herdr.md#config-writeback-why-create_).
 - **`~/.ssh/config`** → create-only template that `Include ~/.ssh/config.d/*` and ships conservative defaults. See the SSH notes in [README.md](../../README.md).
 - First-run app JSONs where further changes are user-local (settings files that are a mix of state and preferences).
 
@@ -214,6 +213,7 @@ Files an app actively rewrites at runtime (adding keys, reordering, …), where 
 
 - **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`, a `jq` script that deep-merges a managed overlay. See the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq).
 - **`~/.docker/config.json`** → a modify-script that rewrites `proxies.default` while preserving `auths` / `credsStore`. See [docs/tools/containers.md](containers.md).
+- **`~/.config/herdr/config.toml`** → `dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`, a tomlkit overlay that enforces the `[theme]`/`[ui]`/`[terminal]`/`[keys]` tables and pulls through everything herdr writes back at runtime (`onboarding`, `[session]`, `[remote]`, …). Was `create_` (seed-once), but that never propagated repo edits to already-seeded hosts. See [docs/tools/herdr.md → Config management](herdr.md#config-management-why-modify_).
 - Rule of thumb: if an app owns the file and you only care about N keys, `modify_` beats a full managed template.
 
 ### E. Machine-local / runtime / cache — `.chezmoiignore`, not a prefix

@@ -9,7 +9,7 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
   - Linux — GitHub release **single static binary** (`herdr-linux-{x86_64,aarch64}`) into `~/.local/bin/herdr` (managed by the `# --- herdr ... ---` block in the same role). No tarball, so no unarchive step.
 - **Verify**: `herdr --version` · validate config with `herdr server reload-config`
 - **Upgrade**: brew on macOS; `herdr update` for the self-managed Linux binary
-- **Config**: `~/.config/herdr/config.toml` — chezmoi **seed-once** (`dot_config/herdr/create_config.toml`, the `create_` prefix). herdr writes UI settings back into this file (see [Config writeback](#config-writeback-why-create_)), so chezmoi plants it on a fresh machine and then never touches it.
+- **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving whatever herdr writes back at runtime (see [Config management](#config-management-why-modify_)).
 
 > **Not gated by `enableVimMode`.** That flag governs shell + tmux modal editing; herdr's copy mode (`prefix+[`) is vi-style natively regardless (`h/j/k/l`, `w/b/e`, `{`/`}`, `v`/Space to select, `y`/Enter to copy, `q`/Esc to leave), so there is nothing to gate.
 
@@ -29,6 +29,34 @@ The important twist vs tmux: a single herdr **server hosts multiple named sessio
 - `herdr session attach NAME` · `herdr session stop NAME` · `herdr session delete NAME` (`default` is a valid `NAME` for stop).
 
 **Targeting a session from the CLI subcommands**: there is **no `--session`/`--socket` flag** on `workspace`/`tab`/`pane`/`agent`. The only lever is the **`HERDR_SOCKET_PATH`** env var — set it to a session's `socket_path` and every subcommand routes there. Inside a herdr pane it is already exported to the current session's socket, so scripts run *inside* herdr target the current session for free. This is exactly how `hvibe --session NAME` works (see below).
+
+## cwd & workspace-naming model
+
+herdr tracks cwd differently from tmux, which trips up two common expectations (all verified via `herdr pane list`):
+
+- **Every pane has two cwds.** `cwd` = the shell's *startup* directory (fixed at spawn); `foreground_cwd` = the *live* cwd, tracked via **OSC 7** shell integration. A `cd` in the shell updates `foreground_cwd`; the startup `cwd` never changes.
+- **`cd` inside a child process / subshell doesn't propagate.** Because tracking is OSC 7-based, a `cd` in a subshell that doesn't re-emit OSC 7 — e.g. `chezmoi cd`, which spawns a *new* shell in the source dir — is invisible to herdr. `foreground_cwd` stays put, so the space's git-repo detection and the `prefix+G` lazygit location don't follow the subshell. This is inherent to OSC 7, **not** a herdr bug — expected behavior.
+- **New tabs spawn at the workspace root, not the focused pane's cwd.** With `new_cwd = "follow"` (below), a *split* inherits the focused pane's cwd, but a *new tab* falls back to the workspace's cwd (often `$HOME`). Confirmed: every non-first tab's root pane has `cwd = $HOME`.
+- **The workspace ("space") label auto-follows the root/primary pane's live cwd basename** (e.g. → `chezmoi`, `trading-journal`). `cd` in **tab 1** renames the space; `cd` in other tabs does not. No config knob controls this.
+
+**`new_cwd` values** (`[terminal]`) — the CWD policy for new panes/tabs/workspaces when no explicit `--cwd` is given:
+
+| value | meaning |
+|---|---|
+| `follow` (default) | inherit the **source** pane/workspace (split → focused pane's live cwd; new tab → workspace root) |
+| `home` | `$HOME` |
+| `current` | herdr's **own process** directory (NOT the focused pane) |
+| `"~/path"` | a fixed path |
+
+**No `new_cwd` value opens a new tab in the focused pane's live cwd** — only an explicit `herdr tab create --cwd …` does (verified: `tab create --cwd PATH` spawns the new tab's shell in `PATH`). For a "new tab here" key, bind a command pane to `herdr tab create --cwd "$HERDR_ACTIVE_PANE_CWD" --focus` (e.g. on `prefix+C`; native `prefix+c` stays = workspace root):
+
+```toml
+[[keys.command]]
+key = "prefix+C"
+type = "pane"
+command = "herdr tab create --cwd \"$HERDR_ACTIVE_PANE_CWD\" --focus"
+description = "new tab in the current pane's cwd"
+```
 
 ## Feasibility matrix (current tmux experience → herdr)
 
@@ -57,7 +85,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 |---|---|---|
 | `prefix + c` / `prefix + 1..9` | new tab / switch tab | built-in default |
 | `prefix + h/j/k/l` | focus pane | built-in default |
-| `prefix + \|` / `prefix + minus` | split side-by-side / stacked | rebound |
+| `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | split side-by-side / stacked (tmux muscle memory — both the intuitive key and the tmux default) | rebound (arrays) |
 | `prefix + z` / `prefix + x` | zoom / close pane | built-in default |
 | `prefix + w` / `prefix + g` | workspace nav / session navigator | built-in default |
 | `prefix + [` | vi copy mode (`hjkl`, `w/b/e`, `{/}`, `v`, `y`) | built-in default |
@@ -142,9 +170,20 @@ herdr's first-run onboarding offers to **install optional agent integrations** (
 
 These integration files are **not** vendored into the repo, so they do **not** reproduce on other machines (press *install* again there, or skip onboarding). They use herdr's own socket and do not interfere with tmux/workmux (different mechanism). To remove: `herdr integration uninstall <agent>` — and for **claude**, rerun `chezmoi apply` afterwards so the merger drops the now-removed hook from `settings.json`.
 
-### Config writeback (why `create_`)
+### Config management (why `modify_`)
 
-herdr **writes UI/runtime settings back into `~/.config/herdr/config.toml`** — e.g. finishing onboarding prepends `onboarding = false`, and the in-app *settings* popups (theme / sound / toasts / pane labels) persist there on *apply*. It edits in place and keeps existing comments, but it owns the file at runtime. That is why chezmoi manages it as **`create_` (seed-once)**: a plain managed file would be clobbered on every `chezmoi apply` (re-removing `onboarding=false` → the onboarding screen reappears, and reverting any UI change). Consequence: edits to `create_config.toml` in the repo do **not** auto-propagate to a machine that already has the file — refresh it deliberately with `cp ~/.config/herdr/config.toml "$(chezmoi source-path ~/.config/herdr/config.toml)"` (then strip the runtime `onboarding`/state lines).
+herdr can rewrite `~/.config/herdr/config.toml` at runtime — finishing onboarding prepends `onboarding = false`, and the in-app *settings* popups (theme / sound / toasts / pane labels) persist there on *apply*. It edits in place and keeps existing comments, but it owns the file at runtime.
+
+This file was originally seeded once with the `create_` prefix so `chezmoi apply` wouldn't clobber that writeback. The cost: **repo edits never reached an already-seeded machine** — split-key rebinds and comment fixes made in the source silently never arrived without a manual `cp … source-path` refresh. That is the real reason a host could feel "out of sync" while `chezmoi diff` showed clean (the diff was clean *because* `create_` never re-touches the file). Note this is independent of hosts: `chezmoi diff` of the source against each host's live file can be byte-identical yet a repo edit still won't land until you refresh.
+
+It is now a **`modify_` overlay** — `dot_config/herdr/modify_config.toml.tmpl`, a small script that:
+
+- uses the managed body in `.chezmoitemplates/herdr/config.toml` as the base (comments + tmux-parity rationale), enforcing the `[theme]` / `[ui]` / `[terminal]` / `[keys]` tables on every apply, and
+- **pulls through every other top-level key** the live file has (`onboarding`, `[session]`, `[remote]`, `[update]`, `[experimental]`, …) so herdr's runtime writeback survives.
+
+TOML has no `jq`, so the merge runs in Python via `uv run --with tomlkit` (tomlkit round-trips comments **and** the `[[keys.command]]` array-of-tables; stdlib `tomllib` is read-only and the codex `modify_` emitter can't emit AoT). It degrades to system `python3`, then to emitting the raw managed template, so a fresh host without Python still gets a full config. Second TOML-overlay precedent alongside `~/.codex/config.toml` (`dot_codex/modify_config.toml.tmpl`).
+
+To change herdr's managed config, edit `.chezmoitemplates/herdr/config.toml` and `chezmoi apply` — it now reaches every host. Validate with `herdr server reload-config` (reports keybind collisions in its `diagnostics`; an empty `diagnostics` array + `"status":"applied"` means the config — including array key bindings — parsed clean).
 
 ## Persistence & restore (accidental close)
 
@@ -181,6 +220,18 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 <ssh-target> 'uname -sm'   # should pri
 
 If plain SSH works, retry `herdr --remote <ssh-target>`; if it keeps failing, check `~/.config/herdr/herdr-client.log` / `herdr.log` right after the failure. Common real causes: SSH auth needing an interactive prompt the bridge can't answer, or sshd rate-limiting rapid connections (`MaxStartups`).
 
+## Running herdr nested inside tmux (multi-remote)
+
+The repo's default stance is herdr **or** tmux, not nested. But you can deliberately nest — tmux as the outer window manager with several inner herdr clients, some local and some `herdr --remote <host>` to different servers. The catch is the **prefix collision**: both default to `Ctrl+b`, so outer tmux swallows it and inner herdr never sees its prefix ([herdr #759](https://github.com/ogulcancelik/herdr/discussions/759)).
+
+Three ways to resolve it, in order of preference here:
+
+1. **Double-prefix passthrough (recommended, zero config).** tmux keeps its default `bind -T prefix C-b send-prefix` (confirmed present in this repo — not overridden), so **`Ctrl+b Ctrl+b`** forwards a literal `Ctrl+b` to the inner herdr; its prefix bindings then work normally (`Ctrl+b Ctrl+b c` = inner new tab). No herdr or tmux change needed — classic tmux-in-tmux muscle memory.
+2. **Rebind the inner herdr prefix.** Set `keys.prefix` (e.g. `"ctrl+a"` / `"ctrl+space"`) so the inner herdr uses a non-colliding prefix — one keystroke instead of the double-tap. Cost: it changes herdr's prefix even when run standalone (no longer matching tmux's `Ctrl+b`).
+3. **Don't nest — use herdr's native remoting.** `herdr --remote <target> [--remote-keybindings local|server]` runs a local thin client against a remote herdr server without tmux in the middle, and herdr hosts multiple named sessions itself. For a pure "multiple remotes" need this is often cleaner than nesting; `--remote-keybindings local` (default) keeps your local keymap, `server` uses the remote's.
+
+Notes: this repo's tmux uses many root-table `bind -n C-*` bindings that **shadow** inner-app `Ctrl` keys, so herdr's prefix-free *direct* terminal shortcuts aren't reliable under tmux — reach herdr actions through its prefix (via 1 or 2). herdr's own `allow_nested` (config, default `false`) governs herdr-inside-**herdr** only (detected via `HERDR_ENV`), not herdr-inside-tmux.
+
 ## AI usage / quota status
 
 herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into. A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
@@ -190,6 +241,7 @@ herdr has **no native usage/quota/token display** (the sidebar shows agent *stat
 - **Seamless `Ctrl-hjkl` nvim↔pane navigation.** `vim-tmux-navigator` is tmux-coupled (the `is_vim` `ps`/`pane_tty` heuristic + the nvim plugin). herdr has no smart-splits equivalent — its pane focus is `prefix+h/j/k/l`, which won't pass through to nvim splits at the edge. Workaround: inside nvim use its own `<C-w>hjkl`. This is the biggest UX regression vs tmux.
 - **OSC133 copy-mode** (`cpout` / `cpblock`, prompt-jump, last-output yank) is tmux-specific. herdr's copy mode (`prefix+[`) is vi-style but has no OSC133 prompt-boundary awareness. `cpcmd` (zsh history, multiplexer-agnostic) still works.
 - **Status-bar format glyphs + bookmarks** (⭐/📌/🔖): herdr has no `#{@option}` format-string interpolation. Native agent dots cover the agent part; manual bookmarks have no analog.
+- **Per-key pane resize.** tmux binds `prefix+H/J/K/L` (and `M-hjkl` for fine steps) to resize directly; herdr has no per-key resize — it uses a modal `resize_mode` (`prefix+r`), then `h/j/k/l`. Not exact parity, but a close analog.
 
 > **Not a gap:** vi copy-mode itself *is* native (`prefix+[`), and per-pane agent state is detected natively — the two things I expected to be missing turned out to be built in.
 

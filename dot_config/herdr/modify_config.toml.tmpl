@@ -1,0 +1,111 @@
+#!/bin/sh
+# chezmoi modify_ script: overlay a managed herdr config onto ~/.config/herdr/config.toml.
+#
+# Why: herdr can rewrite this file at runtime (onboarding flag, in-app settings
+# popups, [session]/[remote]/[update] state), so tracking it as a plain managed
+# file would clobber that writeback and re-trigger onboarding. It was previously
+# `create_` (seed-once), but that meant repo edits never reached an
+# already-seeded host without a manual refresh. This modify_ overlay enforces
+# our managed tables ([theme], [ui], [terminal], [keys]) on every `chezmoi
+# apply` while preserving every other top-level key herdr writes back.
+#
+# How: chezmoi pipes the current target file into stdin; this script prints the
+# new contents on stdout.
+#
+# Merge model — template-as-base, pull-through unmanaged keys:
+#   - Base = the managed template (.chezmoitemplates/herdr/config.toml), which
+#     carries the comments + the tmux-parity rationale.
+#   - For every TOP-LEVEL key in the live file NOT in {theme, ui, terminal,
+#     keys}, copy it into the base (preserves onboarding, [session], [remote],
+#     [update], [experimental], and any future herdr writeback).
+#   - Managed tables are enforced wholesale (template wins) — this is a managed
+#     dotfile; in-app theme/label overrides are intentionally re-asserted.
+#
+# Why tomlkit (not codex's inline emitter): herdr's config has an
+# array-of-tables ([[keys.command]]) and comments we want to keep; stdlib
+# tomllib is read-only and the codex modify_ emitter can't emit AoT. tomlkit
+# round-trips both.
+#
+# Note: the template is written to a temp file via a heredoc *redirect* (not
+# captured with $(...)), because the config body contains a lone backtick
+# (`key = "prefix+\`"`) that bash mis-parses as command substitution when a
+# quoted heredoc is nested inside $(...). Passing the path to Python sidesteps it.
+#
+# To manage an additional key: edit .chezmoitemplates/herdr/config.toml.
+# Python runtime: prefer `uv` (guarantees Python >=3.11 → stdlib tomllib), fall
+# back to system python3, then to printing the raw template unmodified (a
+# fresh-bootstrap host with neither uv nor python3 still gets a full config —
+# note we print the TEMPLATE, not stdin, because on a fresh host stdin is empty).
+set -eu
+
+tmpl_file=$(mktemp "${TMPDIR:-/tmp}/herdr-config.XXXXXX")
+trap 'rm -f "$tmpl_file"' EXIT INT TERM
+
+cat <<'TOML' > "$tmpl_file"
+{{ template "herdr/config.toml" . }}
+TOML
+
+live=$(cat)
+
+if command -v uv >/dev/null 2>&1; then
+  set -- uv run --no-project --quiet --with tomlkit --python '>=3.11' python -
+elif command -v python3 >/dev/null 2>&1; then
+  set -- python3 -
+else
+  echo "modify_config.toml: neither uv nor python3 found; emitting managed template" >&2
+  cat "$tmpl_file"
+  exit 0
+fi
+
+HERDR_TEMPLATE_FILE="$tmpl_file" HERDR_LIVE="$live" "$@" <<'PYEOF'
+import os
+import sys
+
+tmpl_path = os.environ["HERDR_TEMPLATE_FILE"]
+with open(tmpl_path, "r") as fh:
+    template_text = fh.read()
+
+
+def emit_template():
+    sys.stdout.write(template_text)
+
+
+# Read side: stdlib tomllib (uv guarantees >=3.11); tomli backport otherwise.
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        # No TOML reader → can't safely merge; ship the managed template as-is
+        # (loses runtime-key preservation, but keeps the host configured).
+        emit_template()
+        sys.exit(0)
+
+# Write side: tomlkit preserves comments + array-of-tables. uv installs it via
+# --with tomlkit; a bare system python3 may lack it → fall back to raw template.
+try:
+    import tomlkit
+except ModuleNotFoundError:
+    print(
+        "modify_config.toml: tomlkit unavailable; emitting managed template "
+        "(runtime keys not preserved this run)",
+        file=sys.stderr,
+    )
+    emit_template()
+    sys.exit(0)
+
+MANAGED = {"theme", "ui", "terminal", "keys"}
+
+live_text = os.environ.get("HERDR_LIVE", "").strip()
+doc = tomlkit.parse(template_text)  # base, with comments intact
+live = tomllib.loads(live_text) if live_text else {}
+
+# Pull through every top-level key herdr owns at runtime that we don't manage.
+for key, value in live.items():
+    if key in MANAGED or key in doc:
+        continue
+    doc[key] = value
+
+sys.stdout.write(tomlkit.dumps(doc))
+PYEOF
