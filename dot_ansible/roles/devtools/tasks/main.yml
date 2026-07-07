@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -1215,6 +1215,14 @@
 - name: Install gh-dash extension
   when: gh_cli_path.rc == 0 and gh_auth_status.rc == 0 and (gh_extension_list.rc != 0 or 'dlvhdr/gh-dash' not in gh_extension_list.stdout)
   ansible.builtin.command: gh extension install dlvhdr/gh-dash
+  changed_when: true
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+# --- gh-notify --- (reuses the gh_cli_path / gh_auth_status / gh_extension_list probes above)
+- name: Install gh-notify extension
+  when: gh_cli_path.rc == 0 and gh_auth_status.rc == 0 and (gh_extension_list.rc != 0 or 'meiji163/gh-notify' not in gh_extension_list.stdout)
+  ansible.builtin.command: gh extension install meiji163/gh-notify
   changed_when: true
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"

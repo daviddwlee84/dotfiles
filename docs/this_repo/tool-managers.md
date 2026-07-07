@@ -303,6 +303,7 @@ GitHub release tarball or installer (user)**:
 | `git-delta` | `.deb` (x86_64) → brew aarch64 → user GitHub musl |
 | `diffnav` | user GitHub release |
 | `gh-dash` | `gh extension install dlvhdr/gh-dash` |
+| `gh-notify` | `gh extension install meiji163/gh-notify` |
 | `git-graph` | user GitHub release (x86_64 only) |
 | `tldr` | system npm or `mise exec -- npm install -g tldr` |
 | `glow`, `gum`, `vhs`, `freeze`, `duckdb` | user GitHub release tarballs |
@@ -995,6 +996,7 @@ list.
 | **gemini** (Gemini CLI) | brew formula `gemini-cli` → npm fallback | `mise exec -- npm install -g @google/gemini-cli` | coding_agents |
 | **gh** | brew | vendor apt (.deb) → GitHub tarball | base/devtools |
 | **gh-dash** | `gh extension install dlvhdr/gh-dash` | same | devtools |
+| **gh-notify** | `gh extension install meiji163/gh-notify` | same | devtools |
 | **git** | brew | apt/yum | base |
 | **git-delta** | brew | `.deb` (x86_64) → brew aarch64 → GitHub musl user | devtools |
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |
