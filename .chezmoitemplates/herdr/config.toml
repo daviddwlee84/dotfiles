@@ -58,6 +58,21 @@ reload_config = "prefix+shift+r"   # tmux: prefix+R
 rename_tab = "prefix+,"            # tmux: prefix+, (rename window) — frees prefix+shift+t for the sesh popup below
 new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be lazygit (worktrees handled by wt/wm + herdr-plus auto-layout)
 
+# --- Indexed quick-switch (native herdr actions) ---
+# switch_tab (prefix+1..9) is a herdr built-in; add the workspace + agent analogs
+# so a number key jumps directly, no navigate mode needed. The "N..M" range form
+# is native herdr config syntax (same shape as switch_tab).
+switch_workspace = "prefix+shift+1..9"   # prefix+shift+N → workspace N (tmux prefix+N switches windows; here shift+N = space N)
+focus_agent = "prefix+alt+1..9"          # prefix+alt+N   → jump to agent N's pane (herdr tracks agents per pane natively)
+
+# --- Workspace navigate-mode: vim j/k (entered via prefix+w) ---
+# prefix+w opens the workspace navigator; navigate_workspace_* are the
+# navigate-mode-only movement keys. Add vim j/k alongside the default arrows so
+# hjkl muscle memory carries here too. (These fields can't use prefix+/enter/tab/
+# left/right or unmodified 1-9 — plain j/k are allowed.)
+navigate_workspace_down = ["j", "down"]
+navigate_workspace_up = ["k", "up"]
+
 # --- Custom command panes (the tmux-popup recreations) ---
 # type = "pane": opens a temporary pane that closes when the command exits —
 # herdr's analog of `tmux display-popup -E`. The command runs from the focused

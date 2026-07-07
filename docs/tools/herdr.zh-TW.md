@@ -92,7 +92,9 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + h/j/k/l` | 聚焦 pane | built-in default |
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | 左右分割 / 上下分割（tmux 肌肉記憶——直覺鍵與 tmux 預設鍵都綁） | rebound（陣列 arrays） |
 | `prefix + z` / `prefix + x` | zoom / 關 pane | built-in default |
-| `prefix + w` / `prefix + g` | workspace 導覽 / session navigator | built-in default |
+| `prefix + w` / `prefix + g` | workspace 導覽（navigate-mode:**`j`/`k`** 或方向鍵移動,Enter 選定) / session navigator | built-in;`navigate_workspace_*` 重綁成 `j`/`k` + 方向鍵 |
+| `prefix + shift + 1..9` | 直接跳到 **workspace** N（`switch_workspace`) | rebound (indexed) |
+| `prefix + alt + 1..9` | 直接跳到 **agent** N 的 pane（`focus_agent`) | rebound (indexed) |
 | `prefix + [` | vi copy mode（`hjkl`、`w/b/e`、`{/}`、`v`、`y`） | built-in default |
 | `prefix + q` | detach | built-in default |
 | `prefix + ?` | 快捷鍵說明覆蓋層——列出每個當前綁定與標籤（herdr 原生 which-key；手動觸發，非逾時自動提示） | built-in default |
