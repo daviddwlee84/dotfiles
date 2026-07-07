@@ -1448,3 +1448,543 @@ Restored. Cursor should apply it live (if the icons don't come back immediately:
 
 ---
 一個可選的收尾:這是個會**靜默弄丟設定**的坑(editor modify_ overlay 遇到空/不存在的 live 檔會塌成 overlay-only)。要不要我依這個 repo 的慣例把它記進 `pitfalls/`(用症狀當標題),避免哪天在別台機器又踩到?
+
+---
+
+_**User (2026-07-07 08:30:27Z)**_
+
+sure
+
+---
+
+_**Agent (<synthetic> 2026-07-07 08:30:31Z)**_
+
+API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"diagnostics: Extra inputs are not permitted"},"request_id":"req_011CcnPFKse9LC6PR51vapBQ"}
+
+---
+
+_**User (2026-07-07 09:11:37Z)**_
+
+continue
+
+---
+
+_**Agent (<synthetic> 2026-07-07 09:11:44Z)**_
+
+API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"diagnostics: Extra inputs are not permitted"},"request_id":"req_011CcnSPbyb4X1vBTLzTTVwc"}
+
+---
+
+_**User (2026-07-07 09:57:00Z)**_
+
+Continue from where you left off.
+
+---
+
+_**Agent (<synthetic> 2026-07-07 09:57:00Z)**_
+
+No response requested.
+
+---
+
+_**User (2026-07-07 09:57:02Z)**_
+
+continue
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-07 09:57:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user agreed to record the pitfall, so I'm going to document it using the project-knowledge-harness convention in the pitfalls directory. Let me check what's already there and follow the established format.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:57:14Z)**_
+
+You said "sure" to recording this as a pitfall. Let me do that following the repo's convention (title by symptom, verbatim errors).
+
+_**Agent (claude-opus-4-8 2026-07-07 09:57:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check existing pitfalls and README format
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+echo "=== existing editor/modify pitfalls ===" && ls pitfalls/ | grep -iE 'modify|editor|jq|settings|cursor|overlay'
+echo "=== README head for format ===" && head -40 pitfalls/README.md 2>/dev/null
+```
+
+```text
+=== existing editor/modify pitfalls ===
+modify-script-jq-bootstrap-cycle.md
+=== README head for format ===
+# Pitfalls
+
+Past traps we've stepped on. Symptoms-first knowledge base — the goal is that
+when a problem recurs (on a new machine, after an upgrade, with a new tool
+combo), grepping the symptom here lands you on the root cause and workaround
+in seconds, instead of re-debugging from scratch.
+
+This folder is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `pitfalls/**`); it
+is repo metadata for maintainers, not user-facing config to deploy.
+
+## Pitfalls vs the rest
+
+This repo has four sibling surfaces with overlapping shapes; pick the right one:
+
+| Surface | Time direction | Question it answers | Access pattern |
+|---|---|---|---|
+| `docs/tools/<tool>.md` | Present | "How does this tool work / how do I configure it?" | Read top to bottom |
+| `docs/this_repo/<topic>.md` | Present | "Why did we architect it this way?" | Read top to bottom |
+| `pitfalls/<slug>.md` | **Past** | **"I see error X — has this happened before?"** | **Grep symptoms** |
+| `backlog/<slug>.md` | Future | "We thought about doing Y — what was the analysis?" | Index in `TODO.md` |
+| `AGENTS.md` Hard invariants | Present | "What rules MUST agents follow?" | Read top to bottom |
+
+A pitfall **graduates** to a Hard invariant in `AGENTS.md` when the trap is
+serious enough that you can't rely on memory or grep — typically when (a) it
+recurs across machines, (b) it silently corrupts state, or (c) the workaround
+is non-obvious and easy to undo by accident. When graduating, leave a
+`pitfalls/<slug>.md` as historical record and link to it from the invariant.
+
+## When to add a pitfall doc
+
+Add a `pitfalls/<slug>.md` when you've spent more than ~15 minutes on something
+where the answer wasn't googleable, AND any of:
+
+- The symptom is non-obvious from the root cause (`SSH_CONNECTION` cleared
+  silently → hostname module disappears, no error)
+- The fix is "do nothing different but in a specific order" (sentinel writes
+  must come after `wait $pid` for fleet-apply, etc.)
+- The same trap could be hit by a new agent / new machine / new contributor
+- An upstream bug exists with no ETA — workaround needs to outlive memory
+- A specific tool version is required (or forbidden) and the failure mode at
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:57:22Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'll check an existing pitfall file to understand the format before creating a new one.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:57:23Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./pitfalls/modify-script-jq-bootstrap-cycle.md`
+
+```text
+1	# `modify_*` scripts crash with `jq: command not found` on a fresh-box first apply
+2	
+3	**Symptoms** (grep this section): `jq: command not found`; `chezmoi: .agents/.skill-lock.json: exit status 127`; `chezmoi: .claude/settings.json: exit status 127`; `chezmoi: .config/opencode/opencode.json: exit status 127`; `chezmoi: .cursor/cli-config.json: exit status 127`; `/tmp/<random>..skill-lock.json: line NN: jq: command not found`; `chezmoi update --init` aborts immediately after `[SUCCESS] Bootstrap complete!`
+4	**First seen**: 2026-05 (yzhang@idc-server104, `centos_server` profile, `noRoot=true` — first cold-start after the profile was added in commit `e8de50d`)
+5	**Affects**: every fresh machine where `jq` is not pre-installed (CentOS 7 noRoot, minimal Ubuntu Server, fresh Linux containers, older macOS without `/usr/bin/jq`); macOS Sequoia 15+ ships `/usr/bin/jq` system-side and is *not* affected
+6	**Status**: fixed — every `modify_*` script now `command -v` guards `jq` (and `python3` for editor overlays) and falls back to pass-through
+7	
+8	## Symptom
+9	
+10	On `chezmoi update --init` (or `chezmoi apply`) on a fresh box:
+11	
+12	```
+13	[yzhang@idc-server104 chezmoi]$ chezmoi update --init
+14	Already up to date.
+15	[INFO] useChineseMirror=true: using Aliyun (Homebrew) + TUNA (Rustup / mise) mirrors
+16	[INFO] noRoot mode: Skipping Linuxbrew installation (requires sudo)
+17	[INFO] uv is already installed
+18	[INFO] Installing mise...
+19	…
+20	[INFO] ansible is already installed
+21	[INFO] Installing ansible-galaxy collections...
+22	…
+23	[SUCCESS] Bootstrap complete!
+24	/tmp/934409313..skill-lock.json: line 59: jq: command not found
+25	chezmoi: .agents/.skill-lock.json: exit status 127
+26	```
+27	
+28	`chezmoi apply` halts with exit 127. Subsequent run-scripts (the ansible
+29	roles in `run_onchange_after_20_ansible_roles.sh.tmpl`) never execute, so
+30	`jq` never gets installed, so the next `chezmoi apply` fails the same way.
+31	The user is stuck in a bootstrap cycle that requires manual intervention to
+32	break.
+33	
+34	## Root cause
+35	
+36	`chezmoi apply` runs in three phases, in order:
+37	
+38	1. `run_once_before_*` scripts → `00_bootstrap.sh.tmpl` installs **uv, mise, ansible-core, Linuxbrew (rooted Linux only), Homebrew (macOS)**. Bootstrap **does not install `jq`** (or `ripgrep`, `fd`, `python3` — those come from ansible).
+39	2. **File-application phase** — chezmoi processes every `modify_*` script. `dot_agents/modify_dot_skill-lock.json.tmpl:58` (and several others) hard-call `jq` with `set -eu` and no `command -v` guard.
+40	3. `run_onchange_after_*` scripts → `20_ansible_roles.sh.tmpl` runs the `base` ansible role, which installs `jq` (apt/yum/brew system path + a noRoot user-level GitHub-release fallback at `dot_ansible/roles/base/tasks/main.yml:248-275`).
+41	
+42	On a fresh box, phase 2 needs `jq` but `jq` is only installed in phase 3 →
+43	chicken-and-egg. The `set -eu` in the modify_ script + chezmoi's behaviour
+44	of treating any non-zero exit from a modify_ script as a fatal apply error
+45	means chezmoi aborts before phase 3 runs.
+46	
+47	This was previously masked on personal Macs (Homebrew installs `jq` long
+48	before the dotfiles run) and on Ubuntu desktop (jq usually comes pre-loaded
+49	or via a base apt package the user already installed). It surfaced on
+50	CentOS 7 noRoot — see [`pitfalls/centos7-noroot.md`](centos7-noroot.md),
+51	which lists `jq` as one of the binaries missing on that profile but didn't
+52	yet connect it to a bootstrap-order failure.
+53	
+54	### Audit — `modify_*` scripts and their dependencies
+55	
+56	| File | Calls | Cold-start safe? |
+57	|---|---|---|
+58	| `dot_agents/modify_dot_skill-lock.json.tmpl` | `jq` | ✅ guard added |
+59	| `dot_claude/modify_keybindings.json` | `jq` | ✅ guard added |
+60	| `dot_claude/modify_settings.json` | `jq` | ✅ guard added |
+61	| `dot_config/opencode/modify_opencode.json.tmpl` | `jq` | ✅ guard added |
+62	| `dot_config/opencode/modify_tui.json.tmpl` | `jq` | ✅ guard added |
+63	| `dot_cursor/modify_cli-config.json.tmpl` | `jq` | ✅ guard added |
+64	| `.chezmoitemplates/editor/modify.sh` (covers VSCode + Cursor + Antigravity × Linux + macOS = 6 wrappers) | `python3` + `jq` | ✅ both guarded; uv→python3 fallback chain |
+65	| `dot_codex/modify_config.toml.tmpl` | `uv`/`python3` | ✅ already had guards (`:47-55`) |
+66	| `dot_config/docker/modify_daemon.json.tmpl` | `jq` | ✅ already had guard (`:28-31`) |
+67	| `dot_docker/modify_config.json.tmpl` | `jq` | ✅ already had guard (`:19-21`) |
+68	
+69	## Workaround
+70	
+71	If you're hit by an unfixed version of this repo (i.e. before the guard
+72	commits landed), break the cycle by manually installing `jq` user-level —
+73	same source the `base` ansible role uses (`base/tasks/main.yml:248-275`):
+74	
+75	```sh
+76	mkdir -p ~/.local/bin
+77	ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/armhf/')
+78	curl -fsSL -o ~/.local/bin/jq \
+79	  "https://github.com/jqlang/jq/releases/latest/download/jq-linux-${ARCH}"
+80	chmod +x ~/.local/bin/jq
+81	hash -r
+82	chezmoi apply
+83	```
+84	
+85	After ansible's `base` role runs (during the next `chezmoi apply`), it will
+86	overwrite `~/.local/bin/jq` with the same binary — idempotent.
+87	
+88	On macOS pre-Sequoia, the equivalent is `brew install jq` (or download the
+89	`jq-macos-arm64` / `jq-macos-amd64` binary from the same GitHub releases
+90	page).
+91	
+92	## Prevention
+93	
+94	The guard pattern adopted in this repo, lifted from
+95	[`run_onchange_after_40_install_global_skills.sh.tmpl:32-35`](../.chezmoiscripts/global/run_onchange_after_40_install_global_skills.sh.tmpl):
+96	
+97	```sh
+98	if ! command -v jq >/dev/null 2>&1; then
+99	  printf '%s\n' "modify_<file>: jq not found; passing live file through unchanged. Re-run \`chezmoi apply\` after the base ansible role installs jq." >&2
+100	  printf '%s' "$base"
+101	  exit 0
+102	fi
+103	```
+104	
+105	The `printf '%s' "$base"` is the load-bearing line — chezmoi sees stdout
+106	matching the live file → no-op for that target → apply continues.
+107	
+108	For `editor/modify.sh` (which needs both `python3` and `jq`), the python3
+109	side gets a uv→system-python3 fallback chain mirroring
+110	[`dot_codex/modify_config.toml.tmpl:47-55`](../dot_codex/modify_config.toml.tmpl).
+111	`uv` is bootstrap-guaranteed, so the chain almost always succeeds; if
+112	neither is available, both pass through.
+113	
+114	The contract for future `modify_*` scripts is documented in
+115	[`docs/tools/chezmoi-prefixes.md`](../docs/tools/chezmoi-prefixes.md) →
+116	"Bootstrap-order contract".
+117	
+118	## Related
+119	
+120	- [`pitfalls/centos7-noroot.md`](centos7-noroot.md) — sibling pitfall: lists `jq` (and others) as missing on noRoot CentOS but doesn't enumerate the bootstrap-cycle failure mode this doc covers
+121	- [`docs/tools/chezmoi-prefixes.md`](../docs/tools/chezmoi-prefixes.md) → "Bootstrap-order contract" — design contract for `modify_*` scripts (must tolerate post-bootstrap-installed tools)
+122	- [`docs/this_repo/upgrades.md`](../docs/this_repo/upgrades.md) — separate concern: install vs upgrade split, why `chezmoi apply` is install-only
+123	- [`dot_ansible/roles/base/tasks/main.yml:248-275`](../dot_ansible/roles/base/tasks/main.yml) — the canonical user-level (noRoot) `jq` install path: download from GitHub releases into `~/.local/bin/jq`
+124
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:15Z)**_
+
+Good, I have the format. Now let me write the new pitfall.
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:16Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# Cursor lost its color theme / file icons after `chezmoi apply` — settings.json collapsed to only the 6 overlay keys
+
+**Symptoms** (grep this section): Cursor (or VSCode / Antigravity) loses its `workbench.colorTheme` and `workbench.iconTheme` after `chezmoi apply`; editor reverts to `Dark Modern` + no file icons; `settings.json` is suddenly ~286 bytes containing *only* the overlay keys (`editor.fontFamily`, `editor.fontSize`, `editor.lineNumbers`, `editor.formatOnSave`, `editor.acceptSuggestionOnEnter`, `terminal.integrated.fontFamily`); `keybindings.json` reset to the 5-binding chezmoi template; "theme changed / shortcuts feel weird after reinstall"; user blames the Brewfile cask reinstall (it's **not** the cause)
+**First seen**: 2026-07-02 (daviddwlee84@Da-Weis-Mac-mini, macOS, `chezmoi apply --init`)
+**Affects**: any editor managed by `.chezmoitemplates/editor/modify.sh` (VSCode `Code`, Cursor, Antigravity × macOS + Linux) **when the live `settings.json` is empty or absent at apply time**. A fresh install of the editor, a never-opened editor, or a profile whose `User/settings.json` hasn't been written yet are the common triggers.
+**Status**: **not a bug in the overlay** — working as designed (`jq '. * $overlay'` on an empty base yields overlay-only). No code fix; this doc is the record + the recovery procedure. Could graduate to a guard (see Prevention) if it recurs.
+
+## Symptom
+
+After `chezmoi apply`, Cursor opens with the default `Dark Modern` theme and
+**no file icons** (Material Icon Theme gone). The live file:
+
+\```
+$ stat -f '%Sm  (%z bytes)' ~/Library/Application\ Support/Cursor/User/settings.json
+Jul  2 15:35:37 2026  (286 bytes)
+
+$ cat ~/Library/Application\ Support/Cursor/User/settings.json
+{
+  "editor.fontFamily": "Hack Nerd Font Mono, Menlo, Monaco, 'Courier New', monospace",
+  "editor.fontSize": 12,
+  "editor.lineNumbers": "relative",
+  "editor.formatOnSave": true,
+  "editor.acceptSuggestionOnEnter": "smart",
+  "terminal.integrated.fontFamily": "Hack Nerd Font Mono"
+}
+\```
+
+Exactly the 6 keys in [`.chezmoitemplates/editor/overlay.json`](../.chezmoitemplates/editor/overlay.json)
+— every other user key (theme, icon theme, and everything else) is gone.
+`keybindings.json` is simultaneously the plain chezmoi template (740 bytes,
+`create_` seed).
+
+Crucially, **the other editors are untouched**: VSCode and Antigravity
+`settings.json` are 9–10 KB with their theme keys intact, same shared overlay.
+Only the editor whose live file was empty at apply time got flattened.
+
+## Root cause
+
+Two red herrings to kill first:
+
+1. **The Brewfile cask reinstall did NOT do this.** `brew` installs
+   `/Applications/Cursor.app` (the app binary); user settings live in
+   `~/Library/Application Support/Cursor/User/` and brew never touches them.
+   ("`Using cursor` / skip" is decided by brew's own Caskroom receipt, *not*
+   by whether `/Applications/Cursor.app` exists — a manually-dmg-installed app
+   with no receipt gets *adopted*, which is why `anki`/`aerospace`/`codeisland`
+   threw `bundle short version … mismatch` and were left alone.)
+
+2. **The overlay merge is correct and non-destructive** — *when the base has
+   content*. [`.chezmoitemplates/editor/modify.sh`](../.chezmoitemplates/editor/modify.sh)
+   is a `modify_` script: chezmoi pipes the live file to stdin, the script runs
+   `jq '. * $overlay'`, stdout becomes the new file. `. * $overlay` is a deep
+   merge that enforces **only** the overlay keys and preserves everything else:
+
+   \```
+   # themed base → theme PRESERVED (this is the normal, safe case)
+   echo '{"workbench.colorTheme":"One Dark Pro","editor.fontSize":99}' | jq '. * $overlay'
+   → { "workbench.colorTheme": "One Dark Pro", "editor.fontSize": 12, ...overlay... }
+
+   # EMPTY base → collapses to overlay-only (THE TRAP)
+   echo '{}' | jq '. * $overlay'
+   → { ...overlay keys only... }
+   \```
+
+The trap: when the live `settings.json` is **empty or missing**, the script's
+`base=$(cat); [ -z "$base" ] && base='{}'` turns it into `{}`, and `{} * $overlay`
+= overlay-only. chezmoi then writes that as the managed file. There was never
+any theme key in the base to preserve, so the user's theme (which had been set
+via Cursor's UI *after* some earlier apply, or on a fresh profile that hadn't
+persisted yet) is silently dropped.
+
+Why only Cursor and not VSCode/Antigravity in the 2026-07 incident: at
+apply time Cursor's `User/settings.json` happened to be empty/absent (fresh
+profile state), while the other two had long-lived 9 KB files. Same overlay,
+different base → different outcome. **Nothing is wrong with the overlay; the
+failure is entirely a function of the base file being empty at apply time.**
+
+## Recovery
+
+**No file backup exists** in the general case — check these in order, stop at
+the first hit:
+
+1. **Settings Sync** (best, full restore): `~/Library/Application Support/Cursor/User/sync/`
+   — if present, sign in and pull. In the 2026-07 incident it was absent.
+2. **A sibling editor still has your config.** VSCode/Antigravity share the
+   same theme prefs most users pick. Read the theme keys straight out of the
+   intact file:
+   \```sh
+   grep -nE 'colorTheme|iconTheme' \
+     ~/Library/Application\ Support/Code/User/settings.json
+   \```
+   In the incident both siblings showed `Dark Modern` + `material-icon-theme`,
+   which matched what Cursor's own theme picker still had highlighted.
+3. **A still-running old editor window** holds the original in memory — BUT
+   the moment you touch any setting via its UI (even clicking "Edit in
+   settings.json" on a hint), the editor flushes its in-memory settings to
+   disk, overwriting the last recoverable state. Read the values via the
+   Command Palette (`Preferences: Color Theme` / `File Icon Theme` show the
+   active one highlighted) **before** editing anything.
+4. **Time Machine / APFS snapshots**: `tmutil listlocalsnapshots /`. OS-update
+   snapshots don't contain user Library; only real TM backups help.
+5. `globalStorage/storage.json` `theme` key is **not** reliable — it's rewritten
+   to the *current* (post-wipe) value on the next launch (`vs-dark`).
+
+Then write the two keys back into the live file (extensions stay installed, so
+re-selecting is instant), e.g.:
+
+\```json
+{
+  "...existing overlay keys...": "...",
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.iconTheme": "material-icon-theme"
+}
+\```
+
+The overlay will **preserve** these on every future apply (verified: themed
+base → theme kept). No repo change needed once the base is non-empty.
+
+`keybindings.json` is a `create_` seed (written once, never re-touched) — if
+you had custom bindings before and no backup, they're gone; the current file
+is the repo template.
+
+## Prevention
+
+For the user: **set the editor theme once so `settings.json` is non-empty
+before/after the first apply.** A non-empty base is immune — the overlay only
+ever *adds* its 6 keys and leaves the rest verbatim.
+
+Possible hardening (not implemented — only if this recurs): in
+`.chezmoitemplates/editor/modify.sh`, treat an empty/absent base as
+"pass through nothing to manage yet" instead of seeding overlay-only —
+i.e. `[ -z "$base" ] && { printf ''; exit 0; }` so chezmoi writes an
+*empty* managed file (or, better, skip) rather than a lossy overlay-only
+one. Trade-off: the overlay's font/format keys then won't apply until the
+user has opened the editor once. Decide deliberately before changing — the
+current behavior is arguably correct for a truly fresh box (you *want* the
+fonts), it only bites when a themed profile transiently reads as empty.
+
+## Related
+
+- [`.chezmoitemplates/editor/modify.sh`](../.chezmoitemplates/editor/modify.sh) — the shared overlay script (6 wrappers: VSCode/Cursor/Antigravity × macOS/Linux)
+- [`.chezmoitemplates/editor/overlay.json`](../.chezmoitemplates/editor/overlay.json) — the 6 keys it enforces
+- [`pitfalls/modify-script-jq-bootstrap-cycle.md`](modify-script-jq-bootstrap-cycle.md) — sibling: the *same* script's other failure mode (missing `jq`/`python3` on cold-start → pass-through guard)
+- [`docs/tools/chezmoi-prefixes.md`](../docs/tools/chezmoi-prefixes.md) — `modify_` vs `create_` semantics; why `settings.json` is `modify_` (overlay) and `keybindings.json` is `create_` (seed-once)
+
+```
+
+```text
+File created successfully at: /Users/daviddwlee84/.local/share/chezmoi/pitfalls/editor-overlay-flattens-empty-settings.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:23Z)**_
+
+Now let me add it to the pitfalls README index if there's one.
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check if README indexes pitfall files
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+grep -n 'modify-script-jq-bootstrap-cycle' pitfalls/README.md 2>/dev/null || echo "NO_INDEX_ENTRY (README may not enumerate every file)"
+```
+
+```text
+129:| [`modify-script-jq-bootstrap-cycle`](modify-script-jq-bootstrap-cycle.md) | `jq: command not found` / `chezmoi: .agents/.skill-lock.json: exit status 127` immediately after `[SUCCESS] Bootstrap complete!` on a fresh box; subsequent applies stuck in same loop because ansible never reached | fixed (`command -v` guards added to all 7 `modify_*` scripts that needed them) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:30Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./pitfalls/README.md`
+
+```text
+122	| [`git-lfs-global-hook-breaks-brew-tap`](git-lfs-global-hook-breaks-brew-tap.md) | `brew tap` / `brew bundle` fails: `This repository is configured for Git LFS but 'git-lfs' was not found on your path`, `git clone ... exited with 2`, `Tapping <tap> has failed!`, then `Cask '<name>' is unavailable: No Cask with this name exists`; git-lfs IS installed; stock git-lfs hook in the global `core.hooksPath` `exit 2`s under Homebrew's stripped superenv PATH | fixed (chezmoi-managed git-lfs hooks made PATH-robust + non-fatal) |
+123	| [`headless-claude-p-does-not-move-5h-window`](headless-claude-p-does-not-move-5h-window.md) | scheduled `claude -p 'Reply: hi'` warmup runs clean (exit 0) but the Claude Pro/Max 5-hour window never starts; `/usage` shows no active window at warmup time; metered Agent SDK credit consumed instead of subscription; `--bare` forces `ANTHROPIC_API_KEY` | by design (2026-06-15 billing split) — `agent-warmup` drives an interactive tmux session instead |
+124	| [`homebrew-6-refuses-untrusted-tap-formula`](homebrew-6-refuses-untrusted-tap-formula.md) | `chezmoi apply` dies at `devtools : Install developer CLI tools (macOS)` with `Error: Refusing to load formula raine/workmux/workmux from untrusted tap`; `Run \`brew trust raine/workmux\``; `brew tap-info <tap>` shows `Untrusted`; both `raine/workmux` and `dlvhdr/formulae` affected; worked days earlier | fixed (devtools role auto-`brew trust`s third-party taps; Homebrew 6.0 formula-trust gate) |
+125	| [`homebrew-aliyun-brew-git-hang-core-clone-bloat`](homebrew-aliyun-brew-git-hang-core-clone-bloat.md) | any auto-updating `brew` cmd hangs 60s+ after `HOMEBREW_BREW_GIT_REMOTE set: using https://mirrors.aliyun.com/homebrew/brew.git`; `unset HOMEBREW_BREW_GIT_REMOTE` "fixes" it; `git ls-remote` fast but `git fetch` stalls; SEPARATELY `du -sh "$(brew --repo homebrew/core)/.git"` = ~1 GB after being ~8 KB | fixed (baseline Aliyun→BFSU across 3 layers + `brew-mirror`; `HOMEBREW_CORE_GIT_REMOTE` dropped — brew 4.x API mode) |
+126	| [`macos-tcc-tmux-volumes-permission-denied`](macos-tcc-tmux-volumes-permission-denied.md) | `ls /Volumes/Data/...` in Alacritty or an attached old tmux session prints `Permission denied: . - code: 13` / `Skipped 1 directories due to permission denied: .`, while Cursor can read the same path and Unix perms are normal | workaround documented (Full Disk Access belongs to the app that started the tmux server; kill old server and restart tmux from the authorized app) |
+127	| [`macfuse-too-old-unsupported-macos-version-rclone-mount`](macfuse-too-old-unsupported-macos-version-rclone-mount.md) | macFUSE dialog `Unsupported macOS Version — The installed version of macFUSE is too old for the operating system` on boot / `rclone mount`; `rclone mount --help` works fine (binary not the cause); `brew info --cask macfuse` reports 5.x but Caskroom has 4.x; `brew upgrade` doesn't fix (cask is `auto_updates`) | by design (kext version-locked to macOS major); manual `brew reinstall --cask macfuse` + reboot + GUI approval; not repo-managed |
+128	| [`mkdocs-copy-to-llm-custom-css-no-trailing-newline`](mkdocs-copy-to-llm-custom-css-no-trailing-newline.md) | `git status` always shows `docs/assets/copy-to-llm/copy-to-llm-custom.css` modified after `mkdocs build` / `mkdocs serve`; diff is just `-}` / `+}` `\ No newline at end of file`; `end-of-file-fixer` adds `\n` back, next build strips it; ping-pong forever | workaround documented (gitignore + `git rm --cached`); upstream PR not yet sent |
+129	| [`modify-script-jq-bootstrap-cycle`](modify-script-jq-bootstrap-cycle.md) | `jq: command not found` / `chezmoi: .agents/.skill-lock.json: exit status 127` immediately after `[SUCCESS] Bootstrap complete!` on a fresh box; subsequent applies stuck in same loop because ansible never reached | fixed (`command -v` guards added to all 7 `modify_*` scripts that needed them) |
+130	| [`tmux-continuum-restores-on-intentional-quit`](tmux-continuum-restores-on-intentional-quit.md) | closed tmux on purpose (`kill-server` / "Kill all sessions" / `prefix + M-x` on last session) and the just-killed sessions come back on next `tmux` start; `@continuum-restore 'on'` can't tell intent from crash; `~/.local/share/tmux/resurrect/last` symlink still points at the pre-kill snapshot | workaround documented (clean-quit wrappers `kill-server-clean.sh` / `kill-session-exit.sh` rm the `last` symlink before server dies; crash recovery preserved via untouched history) |
+131	| [`tmux-copy-mode-double-free-3.6a`](tmux-copy-mode-double-free-3.6a.md) | `[server exited unexpectedly]` after long-running session when entering copy-mode; `.ips` shows `___BUG_IN_CLIENT_OF_LIBMALLOC_POINTER_BEING_FREED_WAS_NOT_ALLOCATED` with stack `cmd_copy_mode_exec → window_copy_clone_screen → screen_reinit → grid_clear_lines → grid_free_line`; homebrew bottle `slice_uuid: 1b2d8e7b-bb77-3465-8bab-73f5bbaffe49`; terminal-agnostic | fixed upstream ([`035a2f3`](https://github.com/tmux/tmux/commit/035a2f35d40628dcfe235179220fc0ede848a195) closing [#4777](https://github.com/tmux/tmux/issues/4777)) but not in any tagged release; workaround = `brew install --HEAD tmux` until 3.7 ships |
+132	| [`mrun-autoname-collides-zsh-random-subshell`](mrun-autoname-collides-zsh-random-subshell.md) | back-to-back `mrun` / `tmrun` / `zjrun` without `-n NAME` produce the same `run-<dir>-<hex>` suffix; second call errors `tmux session 'run-X-NNNN' already exists`; `zsh -c 'echo $(echo $RANDOM) $(echo $RANDOM)'` returns identical numbers | fixed in `dot_config/zsh/tools/23_mrun.zsh` (read `$RANDOM` into a parent-shell local before the `$(…)` boundary) |
+133	| [`niri-spawn-cargo-bin-not-on-session-path`](niri-spawn-cargo-bin-not-on-session-path.md) | niri `Mod+T` / any `spawn "<tool>"` opens nothing, no error; binary is in `~/.cargo/bin` (works in your shell) but not on the systemd/Wayland session PATH; the `ln -s … /usr/local/bin` "fix" breaks multi-user | fixed (per-user `environment { PATH … }` in `config.kdl.tmpl`, not a system symlink) |
+134	| [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
+135	| [`sudo-shared-setsid-macos`](sudo-shared-setsid-macos.md) | `[bootstrap]` / `[ansible]` / `[brew]` sudo prompts fire 3× in one `chezmoi apply` on macOS despite "entered once, reused" wording; `keepalive.pid` points to a dead PID; `which setsid` → not found | fixed (`_sudo_spawn_watchdog` falls back to `nohup` when `setsid` is absent) |
+136	| [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
+137	| [`ollama-brew-link-fails-cask-shadows-formula`](ollama-brew-link-fails-cask-shadows-formula.md) | `chezmoi apply` aborts at `llm_tools : Install Ollama via Homebrew formula` with `Error: The \`brew link\` step did not complete successfully` / `Could not symlink bin/ollama` / `Target /usr/local/bin/ollama already exists`; `ollama` formula installed-but-unlinked, `shadowed by /usr/local/bin/ollama`; the target is a symlink into `Ollama.app` (cask `ollama-app`); roles after `llm_tools` silently skipped | fixed (`which ollama` pre-check gates the formula install in `dot_ansible/roles/llm_tools`) |
+138	| [`opencode-concurrent-launch-wal-pragma-fails`](opencode-concurrent-launch-wal-pragma-fails.md) | `Failed to run the query 'PRAGMA journal_mode = WAL'`; one of N simultaneously-launched `opencode` TUIs exits on startup (`svibe N opencode`); log shows several `opencode.db opening database` within ms | upstream concurrency limit; mitigation = stagger launches (`SVIBE_LAUNCH_STAGGER`) |
+139	| [`opencode-docker-opentui-glibc-loader-missing`](opencode-docker-opentui-glibc-loader-missing.md) | `docker run ... ghcr.io/anomalyco/opencode` exits with `Failed to initialize OpenTUI render library: Failed to open library "/tmp/.<hex>-00000001.so": Error loading shared library ld-linux-x86-64.so.2: No such file or directory`; image is Alpine/musl, OpenTUI native lib needs glibc | workaround = `--entrypoint sh ... -c 'apk add --no-cache gcompat && exec opencode "$@"'`; upstream image bug as of 1.15.11 |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:39Z)**_
+
+The README table is alphabetically ordered. Let me insert the new entry between `mkdocs-copy-to-llm...` (line 128) and `modify-script-jq...` (line 129) — `editor-overlay...` actually sorts near the top. Let me find the right alphabetical spot.
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find d/e/f/g rows for alphabetical insertion
+
+```bash
+cd /Users/daviddwlee84/.local/share/chezmoi
+grep -nE '^\| \[`(d|e|f|g)' pitfalls/README.md | head
+```
+
+```text
+121:| [`git-delta-empty-stdin-huge-allocation`](git-delta-empty-stdin-huge-allocation.md) | `delta` / `printf '' \| delta` crashes with `memory allocation of 1970324836974592 bytes failed`; `delta --version` still works; `something is very wrong if the default theme is missing` | fixed (clear incompatible bat cache + delta stdin health check) |
+122:| [`git-lfs-global-hook-breaks-brew-tap`](git-lfs-global-hook-breaks-brew-tap.md) | `brew tap` / `brew bundle` fails: `This repository is configured for Git LFS but 'git-lfs' was not found on your path`, `git clone ... exited with 2`, `Tapping <tap> has failed!`, then `Cask '<name>' is unavailable: No Cask with this name exists`; git-lfs IS installed; stock git-lfs hook in the global `core.hooksPath` `exit 2`s under Homebrew's stripped superenv PATH | fixed (chezmoi-managed git-lfs hooks made PATH-robust + non-fatal) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:47Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to find the right position in the list to insert `editor-overlay` before `git-delta`, which means locating where the 'e' entries should go alphabetically before the 'g' entries.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:47Z)**_
+
+`editor-...` sorts before `git-...`. Let me see line 120 to place it correctly.
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:48Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./pitfalls/README.md`
+
+```text
+119	| [`claude-plans-here-misses-global-plans-jsonl-schema`](claude-plans-here-misses-global-plans-jsonl-schema.md) | `claude-plans-here` prints only `Wrote .../.claude/settings.json`; project `.claude/plans/` stays empty; matching plan still under `~/.claude/plans/*.md`; JSONL uses `toolUseResult.filePath` / `ExitPlanMode.planFilePath` | fixed (find + jq parser; Bats fixture coverage) |
+120	| [`codeisland-auto-approves-permissionrequest`](codeisland-auto-approves-permissionrequest.md) | Claude Code shows `⎿ Allowed by PermissionRequest hook` / `⏺ Plan approved.` instantly with no notch popup, no native confirm dialog; `~/.claude/settings.json` contains a `PermissionRequest` hook pointing at `~/.codeisland/codeisland-hook.sh` with `timeout: 86400` | workaround documented (toggle off auto-approve in the CodeIsland HUD app); repo-enforced subtractive removal designed but deliberately NOT wired up |
+121	| [`git-delta-empty-stdin-huge-allocation`](git-delta-empty-stdin-huge-allocation.md) | `delta` / `printf '' \| delta` crashes with `memory allocation of 1970324836974592 bytes failed`; `delta --version` still works; `something is very wrong if the default theme is missing` | fixed (clear incompatible bat cache + delta stdin health check) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:58:56Z)**_
+
+Insert between `codeisland-...` (120) and `git-delta-...` (121):
+
+_**Agent (claude-opus-4-8 2026-07-07 09:59:00Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/daviddwlee84/.local/share/chezmoi/pitfalls/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-07 09:59:16Z)**_
+
+Done. Recorded the pitfall following the repo's convention.
+
+## What I added
+
+**`pitfalls/editor-overlay-flattens-empty-settings.md`** (+ indexed it alphabetically in `pitfalls/README.md`).
+
+Titled by symptom, with verbatim evidence and a grep-friendly symptoms line. Key contents:
+
+- **Kills the two red herrings**: the Brewfile cask reinstall didn't do it (brew only touches `/Applications/Cursor.app`, not `~/Library/Application Support/…/User/`), and the overlay merge itself is correct — `jq '. * $overlay'` preserves theme keys *when the base has content*. The trap is purely: **empty/absent live `settings.json` at apply time → `{} * $overlay` = overlay-only.**
+- **Why only Cursor** and not VSCode/Antigravity (same shared script, but the siblings had 9 KB files while Cursor's was transiently empty).
+- **Recovery ladder** in priority order: Settings Sync → read theme keys out of a sibling editor → still-running old window (with the warning that touching its UI flushes and destroys the last recoverable state) → Time Machine → why `storage.json` is unreliable.
+- **Prevention**: set a theme once so the base is non-empty (immune thereafter); plus a documented-but-deliberately-unimplemented hardening option (treat empty base as pass-through) with its trade-off, so a future maintainer decides consciously rather than reflexively.
+
+I deliberately did **not** graduate it to a Hard invariant in `CLAUDE.md` — it's "by design, bites only in a transient empty-file state," which is the pitfall tier, not the silently-corrupts-across-machines tier. If it recurs on another box, that's the signal to either graduate it or wire up the guard.
+
+Nothing here changes any tracked config — `settings.json` recovery already happened in the live file earlier, and the repo's overlay is working as intended. These two new files are chezmoi-ignored maintainer metadata (`pitfalls/**`), so no `chezmoi apply` needed.

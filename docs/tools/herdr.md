@@ -88,8 +88,10 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | split side-by-side / stacked (tmux muscle memory — both the intuitive key and the tmux default) | rebound (arrays) |
 | `prefix + z` / `prefix + x` | zoom / close pane | built-in default |
 | `prefix + w` / `prefix + g` | workspace navigator (navigate-mode: **`j`/`k`** *or* arrows to move, Enter to pick) / session navigator | built-in; `navigate_workspace_*` rebound to `j`/`k` + arrows |
-| `prefix + shift + 1..9` | jump directly to **workspace** N (`switch_workspace`) | rebound (indexed) |
+| `prefix + ctrl + 1..9` | jump directly to **workspace** N (`switch_workspace`) | rebound (indexed) |
 | `prefix + alt + 1..9` | jump directly to **agent** N's pane (`focus_agent`) | rebound (indexed) |
+
+> **Why ctrl/alt, not shift, for the indexed jumps**: under the Kitty keyboard protocol (which herdr uses) `shift+1` still carries the printable `!`, so herdr matches the symbol rather than `shift+1` — `prefix+shift+1..9` silently does nothing. `ctrl+digit` / `alt+digit` have no printable form and disambiguate cleanly.
 | `prefix + [` | vi copy mode (`hjkl`, `w/b/e`, `{/}`, `v`, `y`) | built-in default |
 | `prefix + q` | detach | built-in default |
 | `prefix + ?` | keybinds help overlay — lists every active binding with labels (herdr's native which-key; manually invoked, not an auto-timeout hint) | built-in default |

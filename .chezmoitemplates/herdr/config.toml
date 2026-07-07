@@ -62,8 +62,12 @@ new_worktree = "prefix+shift+b"    # moved off prefix+shift+g so prefix+G can be
 # switch_tab (prefix+1..9) is a herdr built-in; add the workspace + agent analogs
 # so a number key jumps directly, no navigate mode needed. The "N..M" range form
 # is native herdr config syntax (same shape as switch_tab).
-switch_workspace = "prefix+shift+1..9"   # prefix+shift+N → workspace N (tmux prefix+N switches windows; here shift+N = space N)
-focus_agent = "prefix+alt+1..9"          # prefix+alt+N   → jump to agent N's pane (herdr tracks agents per pane natively)
+# NOTE on the modifier: prefix+SHIFT+digit does NOT work — under the kitty
+# keyboard protocol (which herdr uses) shift+1 still carries the printable "!", so
+# herdr matches the symbol, not "shift+1". ctrl+digit and alt+digit have no
+# printable form, so they disambiguate cleanly. Hence ctrl (workspace) / alt (agent).
+switch_workspace = "prefix+ctrl+1..9"    # prefix+ctrl+N → workspace N (shift+N would emit !@#… — unusable)
+focus_agent = "prefix+alt+1..9"          # prefix+alt+N  → jump to agent N's pane (herdr tracks agents per pane natively)
 
 # --- Workspace navigate-mode: vim j/k (entered via prefix+w) ---
 # prefix+w opens the workspace navigator; navigate_workspace_* are the
