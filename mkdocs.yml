@@ -153,6 +153,7 @@ plugins:
             "Aliases & functions": 別名與函式
             Completions: 補全
             Floating TUI: 浮動 TUI
+            "Copy reference (@file:line)": "複製檔案 reference (@file:line)"
             # Repo Internals leaves
             Architecture: 架構
             "POSIX, sh, bash, zsh: what's portable": "POSIX、sh、bash、zsh：什麼可攜"
@@ -367,6 +368,7 @@ nav:
       - SSH login banner (MOTD): zsh/motd.md
   - Neovim:
       - Floating TUI: neovim/floating-tui.md
+      - "Copy reference (@file:line)": neovim/copy-reference.md
   - Repo Internals:
       - Architecture: this_repo/architecture.md
       - Config file conventions (XDG, .d/, override layers): this_repo/config-conventions.md
