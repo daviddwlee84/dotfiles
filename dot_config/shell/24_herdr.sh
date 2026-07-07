@@ -524,6 +524,154 @@ EOF
     fi
 }
 
+# ── hhere: plain "open a workspace here + attach" ────────────────────────────
+#
+# herdr analog of `shere` (sesh-here). The lightweight counterpart to
+# hvibe/hcode: create a herdr workspace at $PWD (or -p DIR), focus it, and
+# attach a client when run from outside herdr. NO git requirement and NO agent
+# layout — just a shell in the workspace root pane. This fills the gap where
+# every other herdr entry point forces a git repo + a full agent pack; with
+# tmux `tmux new-session` lands you in $PWD directly, but herdr adds a Workspace
+# layer, so without this you'd launch herdr, create a space (opens at $HOME),
+# then cd manually.
+#
+# Smart argument handling (mirrors shere):
+#   hhere                          # plain shell at $PWD
+#   hhere npm run dev              # bare args → run as the root-pane command
+#   hhere -c "npm run dev"         # explicit --command flag
+#   hhere -p ~/proj                # explicit path, plain shell
+#   hhere -p ~/proj npm run dev    # explicit path + command
+#
+# The command (if any) runs raw — no specstory/on-exit wrapping. That agent
+# treatment stays with hcode/hvibe; hhere is deliberately lightweight.
+#
+# Idempotent per label (bare basename of the dir, matching herdr's own native
+# auto-label convention). Caveat: herdr auto-relabels a workspace to the root
+# pane's LIVE cwd basename after a `cd` in tab 1 (see docs/tools/herdr.md § cwd
+# & workspace-naming), so the reuse is best-effort — if the label has drifted, a
+# re-run creates a fresh workspace (arguably correct: you're elsewhere now).
+#
+# Usage:
+#   hhere [--path DIR] [--command CMD] [--no-attach] [--session NAME] [CMD...]
+function herdr-here() {
+    command -v jq >/dev/null 2>&1 || { echo "hhere: jq is required." >&2; return 1; }
+
+    local cmd="" target="" no_attach=0 session_arg=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -c|--command) cmd="$2"; shift 2 ;;
+            -p|--path)    target="$2"; shift 2 ;;
+            --session)    session_arg="$2"; shift 2 ;;
+            --no-attach)  no_attach=1; shift ;;
+            -h|--help)
+                cat <<'EOF'
+hhere — open a plain herdr workspace here + attach (herdr analog of shere)
+
+Usage: hhere [--path DIR] [--command CMD] [--no-attach] [--session NAME] [CMD...]
+
+Creates a herdr workspace at DIR (default $PWD), focuses it, and — when run
+from OUTSIDE herdr — attaches a client so it is visible. No git repo required
+and no agent layout: just a shell in the workspace root pane. For agent
+layouts use hcode (single-agent) or hvibe (multi-agent).
+
+Smart argument handling:
+  hhere                        # plain shell at $PWD
+  hhere npm run dev            # bare args → run as the root-pane command
+  hhere -c "npm run dev"       # explicit --command flag
+  hhere -p ~/proj              # explicit path, plain shell
+  hhere -p ~/proj npm run dev  # explicit path + command
+
+Idempotent: re-running in the same dir focuses the existing workspace.
+--session NAME targets a running herdr session (default: current session when
+inside herdr, else the default session; start one with `herdr --session NAME`).
+--no-attach builds in the background.
+EOF
+                return 0 ;;
+            -*)           echo "hhere: unknown flag $1" >&2; return 1 ;;
+            *)            break ;;  # remaining args are the command
+        esac
+    done
+    [ $# -gt 0 ] && [ -z "$cmd" ] && cmd="$*"
+    target="${target:-$PWD}"
+
+    local label
+    label=$(_sesh_sanitize "$(basename "$target")")
+
+    # Resolve the target herdr session (optional --session; else ambient/default).
+    local sess_line sess_name sess_sock
+    sess_line=$(_herdr_session_target "$session_arg") || return 1
+    sess_name=${sess_line%%$'\t'*}
+    sess_sock=${sess_line#*$'\t'}
+    [ -n "$sess_sock" ] && local -x HERDR_SOCKET_PATH="$sess_sock"
+
+    # Idempotent: focus an existing workspace instead of duplicating.
+    local existing
+    existing=$(_herdr_ws_by_label "$label")
+    if [ -n "$existing" ]; then
+        echo "hhere: workspace '$label' already exists ($existing) — focusing." >&2
+        if [ "$no_attach" -ne 1 ]; then
+            herdr workspace focus "$existing" >/dev/null 2>&1
+            _herdr_attach_if_outside "$sess_name"
+        fi
+        return 0
+    fi
+
+    local ws_json ws p0
+    ws_json=$(herdr workspace create --cwd "$target" --label "$label" --no-focus 2>/dev/null)
+    ws=$(printf '%s' "$ws_json" | jq -r '.result.workspace.workspace_id // empty')
+    p0=$(printf '%s' "$ws_json" | jq -r '.result.root_pane.pane_id // empty')
+    if [ -z "$ws" ] || [ -z "$p0" ]; then
+        echo "hhere: failed to create workspace (is the herdr server running?)." >&2
+        return 1
+    fi
+
+    # Optional command in the root pane (raw — no specstory/on-exit wrapping).
+    [ -n "$cmd" ] && herdr pane run "$p0" "$cmd" >/dev/null 2>&1
+
+    if [ "$no_attach" -ne 1 ]; then
+        herdr workspace focus "$ws" >/dev/null 2>&1
+        _herdr_attach_if_outside "$sess_name"
+    fi
+}
+
+# ── hroot: like hhere but at the git-root ────────────────────────────────────
+#
+# herdr analog of `sroot` (sesh-root). Same as hhere except the target resolves
+# to the current git top-level (falls back to $PWD outside a repo). Thin wrapper
+# over herdr-here so there is one code path; -p is not accepted (the root IS the
+# path), everything else (-c / bare command / --session / --no-attach) passes
+# through.
+#
+# Usage:
+#   hroot                          # plain shell at git-root (else $PWD)
+#   hroot npm run dev              # + run a command
+#   hroot -c "npm run dev"         # explicit --command flag
+function herdr-root() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+hroot — open a plain herdr workspace at the git-root + attach (analog of sroot)
+
+Usage: hroot [--command CMD] [--no-attach] [--session NAME] [CMD...]
+
+Like hhere, but the workspace opens at the current git top-level (falls back to
+$PWD outside a repo). All flags except --path pass through to hhere.
+
+  hroot                # plain shell at git-root (else $PWD)
+  hroot npm run dev    # + run a command
+EOF
+            return 0 ;;
+        -p|--path)
+            echo "hroot: --path is not accepted (root is derived from git). Use hhere -p DIR." >&2
+            return 1 ;;
+    esac
+    local root
+    root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$PWD
+    herdr-here -p "$root" "$@"
+}
+
 # ── Aliases ─────────────────────────────────────────────────────────────────
 alias hvibe='herdr-vibe'
 alias hcode='herdr-code'
+alias hhere='herdr-here'
+alias hroot='herdr-root'

@@ -110,16 +110,19 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 
 > 大寫字母會解析成 `prefix+shift+<letter>`，herdr 保留給內建（`shift+g` worktree、`shift+t` rename-tab、`shift+h/j/k/l` swap-pane）。`prefix+G`/`prefix+T` 由上面的重綁釋放出來；`herdr server reload-config` 會在它的 `diagnostics` 回報任何殘餘衝突。
 
-## Session 輔助函式：`hvibe` / `hcode`（`svibe` / `scode` 的 herdr 版）
+## Session 輔助函式：`hvibe` / `hcode` / `hhere` / `hroot`（`svibe` / `scode` / `shere` / `sroot` 的 herdr 版）
 
-[`dot_config/shell/24_herdr.sh`](../shells/aliases.md#session-management) 裡有兩個 shell 函式，能一氣呵成拉起整個 coding workspace——就是 tmux 的 `svibe` / `scode` 在 herdr 端的對應物。它們呼叫原生的 `herdr workspace|tab|pane` CLI，並**原封不動重用 svibe 的純邏輯**（specstory 包裝、`--on-exit shell|kill|restart`、git-root 解析、agent-CLI 偵測），這些來自 `22_sesh.sh`；只有 layout 呼叫不同。需要 `herdr` server 正在跑 + `jq`。
+[`dot_config/shell/24_herdr.sh`](../shells/aliases.md#session-management) 裡有四個 shell 函式，就是 tmux 的 `svibe` / `scode` / `shere` / `sroot` 在 herdr 端的對應物。兩個**重量級**的（`hvibe` / `hcode`）能一氣呵成拉起整個 coding workspace；兩個**輕量級**的（`hhere` / `hroot`）只是在某個目錄開一個純 workspace 並 attach——不需要 git repo，也沒有 agent layout。它們呼叫原生的 `herdr workspace|tab|pane` CLI，並**原封不動重用純邏輯**（specstory 包裝、`--on-exit shell|kill|restart`、git-root 解析、agent-CLI 偵測），這些來自 `22_sesh.sh`；只有 layout 呼叫不同。需要 `herdr` server 正在跑 + `jq`。
 
 | 指令 | 建立的 workspace | Layout |
 |---|---|---|
 | `hvibe [N] [CLI]` / `hvibe --agents claude,codex,opencode` | `vibe/<repo>` | tab `agents`（N 個等寬 agent pane）+ tab `git`（lazygit）+ tab `edit`（nvim） |
 | `hvibe --tab-per-agent …` | `vibe/<repo>` | 每個 agent **一個 tab** + `git` + `edit` tab |
 | `hcode [CLI]` | `coding-agent/<repo>` | tab `editor`（nvim 75% \| agent 25%）+ tab `monitor`（btop） |
+| `hhere [CMD...]` | `<basename $PWD>` | 單一 tab，`$PWD`（或 `-p DIR`）的純 shell；`CMD` 選用，會在 root pane 執行 |
+| `hroot [CMD...]` | `<basename git-root>` | 同 `hhere`，但落在當前 git root（不在 repo 時退回 `$PWD`） |
 
+- **純開 pair（`hhere` / `hroot`）** 補上了「其他每個 herdr 入口都強制要 git repo + 完整 agent layout」的缺口。tmux 的 `tmux new-session` 會直接把你丟進 `$PWD`；herdr 多了一層 Workspace，所以少了這對指令，你得先啟動 herdr、建一個 space（會依 `new_cwd` 開在 `$HOME`）、再手動 `cd`。`hhere` 一步到位：`herdr workspace create --cwd "$PWD"` → focus → 在外部就 attach。不需要 git；選用的指令以**原始**方式執行（不做 specstory/on-exit 包裝——那留給 `hcode`/`hvibe`）。flag 見 `hhere -h` / `hroot -h`。**Label 注意事項**：tab 1 裡 `cd` 之後，herdr 會把 workspace 重新命名為 root pane 的*當前* cwd basename（見上方 **cwd & workspace-naming model** 一節），所以冪等聚焦是盡力而為——label 漂移後重跑會開一個新的 workspace。
 - **每 repo 冪等 (idempotent)**：重跑會聚焦既有的 `vibe/<repo>` / `coding-agent/<repo>` workspace，而不是重複建立（對應 svibe 的「存在就 attach」）。
 - **Attach 感知（像 svibe 的 `$TMUX` 分支）**：從 herdr **內部**跑 → workspace/tab 的 focus 呼叫會切換活著的 client（不開新 client）。從 herdr **外部的一般終端**跑 → 輔助函式會拉起一個 attach 到該 session 的 client，讓新 workspace 真的看得到（herdr 的 `workspace focus` 只會移動*已經 attach* 的 client，所以少了這步，整包會被建在看不見的地方）。`--no-attach` 兩種情況都以 detach 方式建立。判斷依據是環境值 `HERDR_ENV`。
 - **`--session NAME`** 鎖定某個正在跑的 herdr session（見 [具名 session](#named-sessions)）。預設值：在 herdr 內部時用**當前** session（透過繼承的 `HERDR_SOCKET_PATH`），否則用 **default** session。這個覆寫用 `local -x HERDR_SOCKET_PATH` 限縮在函式範圍，所以永遠不會外洩到你的 shell。指定一個沒在跑的 `--session` 會報錯，並提示用 `herdr --session NAME` 先啟動（hvibe 不會自己 spawn server）。
