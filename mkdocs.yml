@@ -132,6 +132,7 @@ plugins:
             SpecStory internals: SpecStory 內部運作
             git diff workflow: git diff 工作流程
             GitHub CLI (gh) auth: GitHub CLI (gh) 認證
+            actionlint (GitHub Actions linter): actionlint（GitHub Actions 檢查器）
             Infrastructure-as-Code: Infrastructure-as-Code
             Containers: 容器
             Container config map: 容器設定對應
@@ -306,6 +307,7 @@ nav:
           - lazygit (history-surgery recipes): tools/lazygit.md
           - GitHub CLI (gh) auth: tools/gh-cli.md
           - pre-commit: tools/pre-commit.md
+          - actionlint (GitHub Actions linter): tools/actionlint.md
           - Infrastructure-as-Code: tools/infrastructure-as-code.md
           - Containers: tools/containers.md
           - Container config map: tools/container-config-map.md

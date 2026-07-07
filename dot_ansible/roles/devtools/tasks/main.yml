@@ -107,6 +107,12 @@
       # checking. ~1 MB each, no transitive deps.
       - shellcheck
       - shfmt
+      # actionlint - static checker for GitHub Actions workflows. Type-checks
+      # ${{ }} expressions, validates uses:/runner/cron, and pipes each run:
+      # block through shellcheck (installed above) + Python through pyflakes.
+      # Also driven by the rhysd/actionlint pre-commit hook (actionlint-system,
+      # which reuses this on-PATH binary). See docs/tools/actionlint.md.
+      - actionlint
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -2071,6 +2077,9 @@
 # not in apt main — best-effort install via Linuxbrew if present, else the
 # user can `go install mvdan.cc/sh/v3/cmd/shfmt@latest` or rely on the
 # pre-commit-shfmt hook which bundles its own binary.
+# actionlint (GitHub Actions linter) rides the same Linuxbrew best-effort
+# path — not in apt; on non-Linuxbrew Linux hosts the rhysd/actionlint
+# pre-commit hook still lints workflows (bundles its own binary via Go).
 - name: Install shellcheck (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
   become: true
@@ -2093,6 +2102,14 @@
     - shfmt_brew_probe.stdout | default('') | trim != ''
   community.general.homebrew:
     name: shfmt
+    state: present
+
+- name: Install actionlint via Linuxbrew when available (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - shfmt_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: actionlint
     state: present
 
 # --- direnv ---

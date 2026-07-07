@@ -130,3 +130,17 @@ repos:
       - id: shfmt
         files: '^scripts/[^/]+\.sh$'
         args: [-i, "2", -ci, -bn, -w]
+
+  # actionlint - static checker for GitHub Actions workflow files. Type-checks
+  # ${{ }} expressions, validates uses:/runner/cron/glob, and pipes each run:
+  # block through shellcheck (auto-discovered on PATH — installed above) plus
+  # Python through pyflakes. `actionlint-system` reuses the on-PATH binary
+  # installed by the devtools ansible role (brew on macOS / Linuxbrew on Linux)
+  # so the hook and ad-hoc `actionlint` runs stay on the same version. On a
+  # host without that binary, swap to `id: actionlint` (language: golang,
+  # builds its own). Scoped to workflow files. See docs/tools/actionlint.md.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint-system
+        files: '^\.github/workflows/.*\.ya?ml$'

@@ -931,6 +931,7 @@ list.
 
 | Tool | macOS | Linux | Role |
 |---|---|---|---|
+| **actionlint** | brew | Linuxbrew (best-effort) | devtools |
 | **aerospace** | brew cask (`nikitabobko/tap`) | n/a | Brewfile.darwin |
 | **agy** / **agyc** (Antigravity CLI) | curl `antigravity.google/cli/install.sh` | same | coding_agents |
 | **alacritty** | brew cask | cargo build (apt deps) | Brewfile.darwin / gui_apps_linux |
