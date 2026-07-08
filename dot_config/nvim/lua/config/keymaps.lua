@@ -15,14 +15,51 @@ end, { desc = "Toggle Copilot Auto Trigger" })
 
 -- 複製 Cursor 風格的檔案 reference 到系統剪貼簿，方便貼給 Claude Code / Cursor:
 --   @path  |  @path:12  |  @path:12-40
--- Normal mode -> 游標所在行；Visual mode -> 選取範圍。
+-- Normal mode -> 游標所在行；Visual mode -> 選取範圍；file-explorer -> 游標下的節點。
+
+-- Resolve what the reference should point at: returns (absolute_path, allow_line).
+-- Real file buffers -> the file, with line context. File-explorer buffers
+-- (neo-tree now; snacks explorer after LazyVim's migration) -> the node under
+-- the cursor, without line context. Anything else -> nil (caller warns).
+local function copy_ref_target()
+  if vim.bo.buftype == "" then
+    local name = vim.api.nvim_buf_get_name(0)
+    if name ~= "" then
+      return vim.fn.fnamemodify(name, ":p"), true
+    end
+    return nil
+  end
+
+  local ft = vim.bo.filetype
+  local ok, path = pcall(function()
+    if ft == "neo-tree" then
+      -- mirror neo-tree's own copy-path (Y): node:get_id() is the abs path
+      local mgr = require("neo-tree.sources.manager")
+      local state = mgr.get_state_for_window(vim.api.nvim_get_current_win())
+      local node = state and state.tree and state.tree:get_node()
+      return node and (node.path or node:get_id()) or nil
+    elseif ft == "snacks_picker_list" then
+      -- snacks explorer (LazyVim's neo-tree successor); best-effort
+      local picker = Snacks.picker.get({ source = "explorer" })[1]
+      local item = picker and picker:current()
+      return item and (item.file or item._path) or nil
+    end
+    return nil
+  end)
+
+  -- accept only an absolute path; anything else falls through to the warn
+  if ok and type(path) == "string" and path:sub(1, 1) == "/" then
+    return vim.fn.fnamemodify(path, ":p"), false
+  end
+  return nil
+end
+
 local function copy_reference(opts)
-  local abspath = vim.api.nvim_buf_get_name(0)
-  if abspath == "" then
-    vim.notify("copy-ref: buffer has no file", vim.log.levels.WARN)
+  local abspath, allow_line = copy_ref_target()
+  if not abspath then
+    vim.notify("copy-ref: no file under cursor here", vim.log.levels.WARN)
     return
   end
-  abspath = vim.fn.fnamemodify(abspath, ":p")
 
   -- path component
   local path
@@ -37,11 +74,11 @@ local function copy_reference(opts)
     path = (ok and root and vim.fs.relpath(root, abspath)) or vim.fn.fnamemodify(abspath, ":~:.")
   end
 
-  -- line component
+  -- line component (only meaningful in a real file buffer)
   local mode = vim.fn.mode()
   local visual = mode == "v" or mode == "V" or mode == "\22"
   local suffix = ""
-  if opts.lines then
+  if opts.lines and allow_line then
     if visual then
       local a, b = vim.fn.line("."), vim.fn.line("v")
       if a > b then

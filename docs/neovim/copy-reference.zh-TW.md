@@ -7,7 +7,8 @@
 
 四個 Neovim 快捷鍵 (keymaps)，把 **Cursor / Claude Code 風格的檔案 reference**
 ——`@path`、`@path:12` 或 `@path:12-40`——複製到系統剪貼簿 (clipboard)，內容由目前的
-buffer 加上游標所在行（normal mode）或選取範圍 (visual selection)（visual mode）組成。
+buffer 加上游標所在行（normal mode）、選取範圍 (visual selection)（visual mode），或在
+file explorer 中游標下的節點 (node) 組成。
 `@` 會觸發 agent 的檔案 mention，`:line[-line]` 則指向確切的程式碼，讓你直接貼上精準的
 指標，而不用手動重打路徑與行號。
 
@@ -45,10 +46,23 @@ visual mode 並顯示 `Copied @…` 的提示 (toast)。
 貼給 Claude Code 時通常用相對路徑（它在專案內運作）；絕對路徑則適用於 repo 以外的
 檔案，或某個工具需要完整路徑時。
 
+## 檔案總管 (neo-tree / snacks)
+
+在 **file-explorer** buffer 中觸發快捷鍵時，reference 會改為指向**游標下的節點 (node)**
+（不帶行號）——例如在樹狀項目上按 `<leader>yf` 會複製 `@rel/path/to/that/file`。這與
+neo-tree 自己的 `Y`（copy path）行為一致。
+
+- **neo-tree**：目前已支援（透過 neo-tree 的 manager API 解析節點）。
+- **snacks explorer**——LazyVim 用來取代 neo-tree 的後繼者——以 best-effort 方式處理，
+  讓這組快捷鍵在遷移後仍能運作。
+- 其他任何特殊 buffer（terminal、help、quickfix、未知的 explorer、未命名 buffer）都會被
+  安全地拒絕，顯示 `copy-ref: no file under cursor here` 警告——絕不會產生像
+  `@neo-tree filesystem [1]` 這種垃圾字串。
+
 ## 實作細節
 
-整個功能就是 `lua/config/keymaps.lua` 裡一個約 40 行的 `copy_reference(opts)` helper，
-加上四個 `vim.keymap.set({ "n", "x" }, …)` 呼叫。它重用了下列既有能力，不引入新的依賴
+整個功能就是 `lua/config/keymaps.lua` 裡一組小的 `copy_ref_target()` + `copy_reference()`
+helper，加上四個 `vim.keymap.set({ "n", "x" }, …)` 呼叫。它重用了下列既有能力，不引入新的依賴
 (dependency)：
 
 - `LazyVim.root.git()` — git 根目錄偵測。
@@ -59,9 +73,11 @@ visual mode 並顯示 `Copied @…` 的提示 (toast)。
 - visual range 用 `vim.fn.line(".")` / `vim.fn.line("v")` 取得——與 gitsigns 的
   stage-selection 對映相同的做法。
 
-邊界情況：未命名 / scratch buffer 會顯示 `copy-ref: buffer has no file` 警告且不複製
-任何東西；被刪除的 cwd 以 `pcall` 防護（避開 Neovim 0.12 的 `vim.fs.find` ENOENT
-陷阱），並退回到相對路徑。
+Buffer 的解析放在 `copy_ref_target()` helper：真正的檔案 buffer（`buftype` 為空）會給出
+檔案加上行號 context；已知的 explorer 會給出游標下的節點；其他一律回傳 `nil` 由呼叫端
+發出警告。Explorer 的查詢都用 `pcall` 包起來，所以 API 有變動或不存在時會降級為那個警告，
+而不是崩潰或吐出垃圾路徑。被刪除的 cwd 同樣以 `pcall` 防護（避開 Neovim 0.12 的
+`vim.fs.find` ENOENT 陷阱），並退回到相對路徑。
 
 ## 為什麼選 `<leader>y`
 

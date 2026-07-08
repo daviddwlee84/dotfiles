@@ -2,8 +2,8 @@
 
 Four Neovim keymaps that copy a **Cursor / Claude Code style file reference** —
 `@path`, `@path:12`, or `@path:12-40` — to the system clipboard, built from the
-current buffer plus the cursor line (normal mode) or the visual selection
-(visual mode). The `@` triggers the agent's file-mention and the `:line[-line]`
+current buffer plus the cursor line (normal mode), the visual selection
+(visual mode), or — in a file explorer — the node under the cursor. The `@` triggers the agent's file-mention and the `:line[-line]`
 points it at exact code, so you paste an exact pointer instead of retyping paths
 and line numbers by hand.
 
@@ -43,11 +43,25 @@ Relative is usually what you want for Claude Code (it operates inside the
 project); absolute is for files outside the repo, or when a tool needs the full
 path.
 
+## File explorers (neo-tree / snacks)
+
+Trigger a keymap while focused in a **file-explorer** buffer and the reference
+points at the **node under the cursor** instead (no line number) — e.g.
+`<leader>yf` on a tree entry copies `@rel/path/to/that/file`. This mirrors
+neo-tree's own `Y` (copy path).
+
+- **neo-tree** is supported today (resolves the node via neo-tree's manager API).
+- **snacks explorer** — LazyVim's neo-tree successor — is handled best-effort, so
+  the keymaps keep working after that migration.
+- Any other special buffer (terminal, help, quickfix, an unknown explorer, an
+  unnamed buffer) is safely rejected with a `copy-ref: no file under cursor here`
+  warning — never a bogus `@neo-tree filesystem [1]`.
+
 ## Implementation notes
 
-The feature is a ~40-line `copy_reference(opts)` helper plus four
-`vim.keymap.set({ "n", "x" }, …)` calls in `lua/config/keymaps.lua`. It reuses,
-with no new dependencies:
+The feature is a small `copy_ref_target()` + `copy_reference()` helper pair plus
+four `vim.keymap.set({ "n", "x" }, …)` calls in `lua/config/keymaps.lua`. It
+reuses, with no new dependencies:
 
 - `LazyVim.root.git()` — git-root detection.
 - `vim.fs.relpath(root, abspath)` — built-in relative-path computation.
@@ -58,9 +72,13 @@ with no new dependencies:
 - Visual range via `vim.fn.line(".")` / `vim.fn.line("v")` — the same pattern the
   gitsigns stage-selection maps use.
 
-Edge cases: an unnamed / scratch buffer shows a `copy-ref: buffer has no file`
-warning and copies nothing; a deleted cwd is guarded with `pcall` (avoids the
-Neovim 0.12 `vim.fs.find` ENOENT trap) and falls back to a relative path.
+Buffer resolution lives in a `copy_ref_target()` helper: real file buffers
+(empty `buftype`) yield the file plus line context; known explorers yield the
+node under the cursor; everything else returns `nil` and the caller warns.
+Explorer lookups are `pcall`-wrapped so a changed or absent API degrades to that
+warning instead of crashing or emitting a garbage path. A deleted cwd is likewise
+guarded with `pcall` (avoids the Neovim 0.12 `vim.fs.find` ENOENT trap) and falls
+back to a relative path.
 
 ## Why `<leader>y`
 
