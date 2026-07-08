@@ -169,7 +169,10 @@ class Reyee:
     def __init__(self, host: str, password: str, timeout: float = 8.0):
         self.base = f"http://{host}"
         self.password = password
-        self.client = httpx.Client(timeout=timeout, follow_redirects=False)
+        # LAN device — ignore ambient HTTP(S)/SOCKS proxy env (ALL_PROXY etc.);
+        # otherwise httpx routes LAN traffic through the proxy and, with a
+        # socks:// URL, crashes since httpx has no SOCKS support by default.
+        self.client = httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False)
         self.sid: str | None = None
         self.token: str | None = None
         self.sn: str | None = None

@@ -121,7 +121,10 @@ class MiRouter:
         self.base = f"http://{host}"
         self.username = username
         self.password = password
-        self.client = httpx.Client(timeout=timeout, follow_redirects=False)
+        # LAN device — ignore ambient HTTP(S)/SOCKS proxy env (ALL_PROXY etc.);
+        # otherwise httpx routes LAN traffic through the proxy and, with a
+        # socks:// URL, crashes since httpx has no SOCKS support by default.
+        self.client = httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False)
         self.stok: str | None = None
 
     def login(self) -> None:
