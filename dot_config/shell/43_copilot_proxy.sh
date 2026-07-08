@@ -298,10 +298,16 @@ copilot-proxy() {
       fi
       ;;
     logs)
-      # logs [N] [gen] — gen 1..3 tails a rotated previous session ($logf.gen).
-      local _gen="${3:-}" _lf="$logf"
-      case "$_gen" in 1|2|3) _lf="$logf.$_gen" ;; esac
-      if [ -f "$_lf" ]; then command tail -n "${2:-40}" "$_lf"; else
+      # logs [N] [gen]  — tail the fork log; gen 1..3 = a rotated prev session.
+      # logs shim [N]    — tail the throttle shim's log instead.
+      local _lf _n
+      if [ "${2:-}" = "shim" ]; then
+        _lf="$(_copilot_shim_logfile)"; _n="${3:-40}"
+      else
+        _lf="$logf"; _n="${2:-40}"
+        case "${3:-}" in 1|2|3) _lf="$logf.$3" ;; esac
+      fi
+      if [ -f "$_lf" ]; then command tail -n "$_n" "$_lf"; else
         printf '%s\n' "copilot-proxy: no log file at $_lf" >&2; return 1; fi
       ;;
     auth)
@@ -368,7 +374,7 @@ copilot-proxy() {
       esac
       ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N [gen]]|shim [on|off|status]|whoami|auth]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth]"
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2
