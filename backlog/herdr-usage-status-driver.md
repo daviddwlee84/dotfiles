@@ -20,6 +20,8 @@ herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% �
 
 `--custom-status` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. (`herdr pane report-agent … --custom-status` is the other entry point.) No core/config change required.
 
+> **⚠ Shared field with the review-pending flag (shipped 2026-07).** `custom_status` is a **single value per pane**. The review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, script `dot_config/herdr/executable_review-mark.sh`, `--source review`) already writes `custom_status`. Although this driver would use a different `--source`, `herdr pane get` exposes only ONE flattened `custom_status`, so the two producers contend for the visible label (last-writer / internal priority). When this driver is built, decide the interaction explicitly — e.g. compose both into one string, give the review ⭐ priority when set, or move one producer to `--title` / `--state-label` instead of `--custom-status`.
+
 ## Prior art (herdr plugins)
 
 - **[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)** — closest analog to CodexBar's *Codex* provider. Reads local Codex JSONL at `$CODEX_HOME/sessions` (default `~/.codex/sessions`), finds the newest `rate_limits` event, publishes a compact `"78%5h 64%wk"` label into the agents sidebar via a background service, plus a `codex-usage-watch` refreshing pane. **Same on-disk source CodexBar uses for Codex; no OpenAI API call.** Codex-ONLY.

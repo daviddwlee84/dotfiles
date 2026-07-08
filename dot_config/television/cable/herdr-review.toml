@@ -1,0 +1,100 @@
+# Review-pending inbox cable channel for herdr (tv) — herdr-aware
+#
+# Lists herdr panes carrying a "review-pending" flag (⭐) — the ones whose agent
+# finished but you haven't reviewed yet. Companion to `herdr-agent-panes.toml`;
+# the flag is set by hmark / prefix+m (see dot_config/herdr/executable_review-mark.sh)
+# and stored as the pane's `custom_status` metadata, orthogonal to agent state.
+# Bound to `prefix+i` in ~/.config/herdr/config.toml.
+#
+# Enter jumps to the pane's WORKSPACE + TAB but KEEPS the ⭐ (you may still be
+# mid-review). Alt+C = focus AND clear the flag ("mark read"). herdr has no
+# "focus pane by id" (pane focus is directional only), so we focus at tab
+# granularity — enough with one agent per tab. See docs/tools/herdr.md.
+#
+# Source: TSV from `herdr pane list` (native JSON, NO --json flag) via jq,
+# filtered to panes whose custom_status contains "REVIEW" (glyph-agnostic; keep
+# in sync with the MATCH substring in review-mark.sh):
+#   0. pane_id        (w1:p1)
+#   1. workspace_id   (w1)
+#   2. tab_id         (w1:t1)
+#   3. custom_status  (⭐ REVIEW)
+#   4. cwd            (foreground cwd, falling back to pane cwd)
+
+[metadata]
+name = "herdr-review"
+description = "Review-pending herdr panes (⭐) — jump to sessions you flagged for later"
+requirements = ["herdr", "jq"]
+
+[source]
+command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | select(.custom_status? // "" | test("REVIEW")) | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.custom_status)\t\(.foreground_cwd // .cwd)"' '''
+display = "{split:\t:0}  {split:\t:3}  {split:\t:4|split:/:-1}"
+output = "{split:\t:0}"
+
+[preview]
+command = '''
+pane='{split:\t:0}'
+printf '\033[1m%s\033[0m  %s\n' "$pane" '{split:\t:3}'
+printf '\033[2mworkspace:\033[0m %s   \033[2mtab:\033[0m %s\n' '{split:\t:1}' '{split:\t:2}'
+printf '\033[2mcwd:\033[0m %s\n' '{split:\t:4}'
+printf '\n\033[1m─── pane (herdr pane read, last ~80) ───\033[0m\n'
+herdr pane read "$pane" --source visible --lines 80 2>/dev/null \
+  || echo "(pane $pane no longer exists — press Ctrl+R to reload)"
+'''
+
+[ui]
+input_header = "Review-pending herdr panes (⭐)"
+
+[ui.preview_panel]
+size = 60
+
+[keybindings]
+enter = "actions:focus"
+alt-t = "actions:focus"
+alt-c = ["actions:focus_clear", "reload_source"]
+ctrl-y = "actions:copy_id"
+alt-p = "actions:copy_dir"
+
+[actions.focus]
+description = "Jump to the pane's workspace + tab (keep the ⭐)"
+command = '''
+ws='{split:\t:1}'; tab='{split:\t:2}'
+[ -n "$ws" ] && herdr workspace focus "$ws" >/dev/null 2>&1
+[ -n "$tab" ] && herdr tab focus "$tab" >/dev/null 2>&1
+'''
+mode = "fork"
+
+[actions.focus_clear]
+description = "Jump to the pane AND clear the ⭐ (mark read)"
+command = '''
+pane='{split:\t:0}'; ws='{split:\t:1}'; tab='{split:\t:2}'
+[ -n "$ws" ] && herdr workspace focus "$ws" >/dev/null 2>&1
+[ -n "$tab" ] && herdr tab focus "$tab" >/dev/null 2>&1
+[ -n "$pane" ] && "${XDG_CONFIG_HOME:-$HOME/.config}/herdr/review-mark.sh" clear "$pane" >/dev/null 2>&1
+'''
+mode = "fork"
+
+[actions.copy_id]
+description = "Copy pane id to clipboard"
+command = '''
+d='{split:\t:0}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"
+
+[actions.copy_dir]
+description = "Copy directory path to clipboard"
+command = '''
+d='{split:\t:4}'
+[ -z "$d" ] && exit 0
+if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+fi
+'''
+mode = "fork"

@@ -670,8 +670,58 @@ EOF
     herdr-here -p "$root" "$@"
 }
 
+# ── Review-pending flag (mark-unread / ⭐) ───────────────────────────────────
+# hmark/hunmark toggle a per-pane "I still need to review this" flag via herdr's
+# custom-status metadata — ORTHOGONAL to agent state, so peeking into a done pane
+# (which flips it to idle) does NOT clear the flag. The mark logic lives in
+# ~/.config/herdr/review-mark.sh (dot_config/herdr/executable_review-mark.sh);
+# these are thin CLI wrappers defaulting the pane to the ambient HERDR_PANE_ID.
+# The prefix+m keybind and the `tv herdr-review` inbox share that same script.
+_herdr_review_script="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/review-mark.sh"
+
+# hmark [PANE] — flag a pane for later review (default: current pane).
+function herdr-mark() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'EOF'
+hmark — flag a herdr pane as "review-pending" (⭐), analog of tmux bookmark
+
+Usage: hmark [PANE_ID]
+
+With no PANE_ID, flags the CURRENT pane (ambient $HERDR_PANE_ID). The flag is a
+herdr custom-status, orthogonal to agent state — it survives the pane going idle
+when you peek in. Clear with `hunmark`, toggle with prefix+m, list flagged panes
+with `tv herdr-review` (prefix+i inside herdr).
+EOF
+            return 0 ;;
+    esac
+    local pane="${1:-${HERDR_PANE_ID:-}}"
+    [ -n "$pane" ] || { echo "hmark: no pane id (not inside herdr?). Pass one: hmark w1:p1" >&2; return 1; }
+    "$_herdr_review_script" set "$pane"
+}
+
+# hunmark [PANE] — clear the review flag (default: current pane).
+function herdr-unmark() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'EOF'
+hunmark — clear a herdr pane's "review-pending" (⭐) flag
+
+Usage: hunmark [PANE_ID]
+
+With no PANE_ID, clears the CURRENT pane (ambient $HERDR_PANE_ID).
+EOF
+            return 0 ;;
+    esac
+    local pane="${1:-${HERDR_PANE_ID:-}}"
+    [ -n "$pane" ] || { echo "hunmark: no pane id (not inside herdr?). Pass one: hunmark w1:p1" >&2; return 1; }
+    "$_herdr_review_script" clear "$pane"
+}
+
 # ── Aliases ─────────────────────────────────────────────────────────────────
 alias hvibe='herdr-vibe'
 alias hcode='herdr-code'
 alias hhere='herdr-here'
 alias hroot='herdr-root'
+alias hmark='herdr-mark'
+alias hunmark='herdr-unmark'

@@ -119,6 +119,24 @@ type = "pane"
 command = "tv fleet-hosts"
 description = "Fleet hosts SSH picker (tv)"
 
+# --- Review-pending flag (mark-unread / ⭐) ---
+# prefix+m toggles a per-pane "I still need to review this" flag (herdr
+# custom-status, orthogonal to agent state — survives the pane going idle when
+# you peek in). prefix+i opens the flagged-panes inbox. Uses $HERDR_ACTIVE_PANE_ID
+# (the keybind-context var; NOT the ambient $HERDR_PANE_ID). Logic lives in
+# ~/.config/herdr/review-mark.sh; see docs/tools/herdr.md.
+[[keys.command]]
+key = "prefix+m"
+type = "pane"
+command = "~/.config/herdr/review-mark.sh toggle \"$HERDR_ACTIVE_PANE_ID\""
+description = "toggle review-pending flag (⭐) on the current pane"
+
+[[keys.command]]
+key = "prefix+i"
+type = "pane"
+command = "tv herdr-review"
+description = "Review-pending inbox — flagged panes (herdr-aware tv channel)"
+
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus
 # Projects = declarative multi-pane workspace templates (see
