@@ -6,6 +6,11 @@
 # is absent. gitlab.com by default; export GITLAB_HOST=git.example.com to target
 # a self-hosted instance (glab honors it natively).
 #
+# The repo list is cached (stale-while-revalidate) by the shared source helper
+# ~/.config/television/gl-repos-source.sh, so the picker opens instantly after
+# the first run. Ctrl+R re-reads (TV global reload_source); Alt+R forces a live
+# refresh from the API.
+#
 # Usage:
 #   tv gitlab-repos                 (Enter prints path; Alt+O opens; Ctrl+Y copies URL; Alt+C clones)
 #
@@ -14,6 +19,8 @@
 #   Alt+O      Open the project in the browser           (fork)
 #   Ctrl+Y     Copy the project URL to clipboard         (overrides TV's full-line copy)
 #   Alt+C      Clone into tv's launch cwd                (execute)
+#   Ctrl+R     Reload from cache                         (TV global reload_source)
+#   Alt+R      Force a live refresh from the API, then reload
 #
 # NB: a tv action cannot cd your shell after cloning — use `glrepo` for clone+cd.
 #
@@ -29,7 +36,7 @@ description = "Fuzzy-find your GitLab repos: preview README, open, copy URL, clo
 requirements = ["glab", "jq"]
 
 [source]
-command = "glab repo list --mine --per-page 100 -F json | jq -r '.[] | [.path_with_namespace, (.description // \"\"), .visibility, .web_url] | @tsv'"
+command = "~/.config/television/gl-repos-source.sh"
 display = "{split:\\t:0}  {split:\\t:2}  │  {split:\\t:1}"
 output = "{split:\\t:0}"
 
@@ -47,6 +54,7 @@ header = "{split:\\t:0}"
 alt-o = "actions:open"
 ctrl-y = "actions:copy-url"
 alt-c = "actions:clone"
+alt-r = ["actions:refresh", "reload_source"]
 
 [actions.open]
 description = "Open project in browser"
@@ -61,4 +69,9 @@ mode = "fork"
 [actions.clone]
 description = "Clone project into the current directory"
 command = """repo='{split:\\t:0}'; printf '\\nCloning %s ...\\n' "$repo"; glab repo clone "$repo"; printf '\\n[Press Enter to close]'; read -r _"""
+mode = "execute"
+
+[actions.refresh]
+description = "Force a live refresh of the repo list (bypass cache)"
+command = "printf 'Refreshing GitLab repos ...\\n'; ~/.config/television/gl-repos-source.sh --refresh >/dev/null 2>&1"
 mode = "execute"

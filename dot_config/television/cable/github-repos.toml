@@ -2,8 +2,12 @@
 # shell function (dot_config/shell/41_github.sh).
 #
 # Fuzzy-find your GitHub repos, preview the README, then open in browser, copy
-# the URL, or clone. Needs gh (authenticated) + jq; auto-skipped where either is
-# absent (see `requirements`).
+# the URL, or clone. Needs gh (authenticated); auto-skipped where gh is absent.
+#
+# The repo list is cached (stale-while-revalidate) by the shared source helper
+# ~/.config/television/gh-repos-source.sh, so the picker opens instantly after
+# the first run. Ctrl+R re-reads (TV global reload_source); Alt+R forces a live
+# refresh from the API.
 #
 # Usage:
 #   tv github-repos                 (Enter prints owner/repo; Alt+O opens; Ctrl+Y copies URL; Alt+C clones)
@@ -13,10 +17,11 @@
 #   Alt+O      Open the repo on github.com               (fork — TUI stays open)
 #   Ctrl+Y     Copy the repo URL to clipboard            (overrides TV's full-line copy)
 #   Alt+C      Clone into tv's launch cwd                (execute — shows progress)
+#   Ctrl+R     Reload from cache                         (TV global reload_source)
+#   Alt+R      Force a live refresh from the API, then reload
 #
 # NB: a tv action runs in a subprocess and cannot cd your shell after cloning —
-# use the `ghrepo` function for the clone+cd flow. `--limit 4000` lists *all*
-# repos (plain `gh repo list` stops at 30).
+# use the `ghrepo` function for the clone+cd flow.
 #
 # Source format (TSV columns):
 #   0. nameWithOwner   (raw; printed / previewed / cloned / opened)
@@ -27,10 +32,10 @@
 [metadata]
 name = "github-repos"
 description = "Fuzzy-find your GitHub repos: preview README, open, copy URL, clone"
-requirements = ["gh", "jq"]
+requirements = ["gh"]
 
 [source]
-command = "gh repo list --limit 4000 --no-archived --json nameWithOwner,description,primaryLanguage,visibility --jq '.[] | [.nameWithOwner, (.description // \"\"), (.primaryLanguage.name // \"\"), .visibility] | @tsv'"
+command = "~/.config/television/gh-repos-source.sh"
 display = "{split:\\t:0}  {split:\\t:3}  {split:\\t:2}  │  {split:\\t:1}"
 output = "{split:\\t:0}"
 
@@ -50,6 +55,7 @@ header = "{split:\\t:0}"
 alt-o = "actions:open"
 ctrl-y = "actions:copy-url"
 alt-c = "actions:clone"
+alt-r = ["actions:refresh", "reload_source"]
 
 [actions.open]
 description = "Open repo in browser"
@@ -64,4 +70,9 @@ mode = "fork"
 [actions.clone]
 description = "Clone repo into the current directory"
 command = """repo='{split:\\t:0}'; printf '\\nCloning %s ...\\n' "$repo"; gh repo clone "$repo"; printf '\\n[Press Enter to close]'; read -r _"""
+mode = "execute"
+
+[actions.refresh]
+description = "Force a live refresh of the repo list (bypass cache)"
+command = "printf 'Refreshing GitHub repos ...\\n'; ~/.config/television/gh-repos-source.sh --refresh >/dev/null 2>&1"
 mode = "execute"

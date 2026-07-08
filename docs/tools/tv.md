@@ -294,7 +294,7 @@ Re-run `chezmoi apply` (md is deployed to `~/.config/docs/tools/`); no channel r
 
 ### `github-repos` / `gitlab-repos` channels
 
-Fuzzy-find **your own repos** by name + description, preview the README in the panel, then open in the browser, copy the URL, or clone. `github-repos` is backed by `gh repo list --limit 4000` (lists *all* repos — plain `gh repo list` stops at 30); `gitlab-repos` by `glab repo list --mine`. Both `requirements`-gate on their CLI (`gh`/`glab`) + `jq`, so a host without them simply doesn't surface the channel. Definitions: [`github-repos.toml`](../../dot_config/television/cable/github-repos.toml), [`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml).
+Fuzzy-find **your own repos** by name + description, preview the README in the panel, then open in the browser, copy the URL, or clone. `github-repos` is backed by `gh repo list --limit 4000` (lists *all* repos — plain `gh repo list` stops at 30); `gitlab-repos` by `glab repo list --mine`. `github-repos` gates on `gh`; `gitlab-repos` on `glab` + `jq`. The list is **cached** (stale-while-revalidate via `~/.config/television/g{h,l}-repos-source.sh`) so the picker opens instantly after the first fetch — which takes ~15 s for 300+ repos. Definitions: [`github-repos.toml`](../../dot_config/television/cable/github-repos.toml), [`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml).
 
 | Key | Action |
 |-----|--------|
@@ -302,6 +302,8 @@ Fuzzy-find **your own repos** by name + description, preview the README in the p
 | `Alt+O` | Open the repo/project in the browser (`gh`/`glab repo view --web`) |
 | `Ctrl+Y` | Copy the repo URL to clipboard (overrides TV's full-line copy) |
 | `Alt+C` | Clone into tv's launch cwd (shows progress) |
+| `Ctrl+R` | Reload from cache (TV global `reload_source`) |
+| `Alt+R` | Force a live refresh from the API, then reload |
 
 > A tv action runs in a subprocess and **cannot `cd` your shell** after cloning. For the find → clone → **`cd` in** flow, use the `ghrepo` / `glrepo` shell functions (the picker twins) — see [aliases.md](../shells/aliases.md#github--gitlab) and [gh-cli.md](gh-cli.md#finding--cloning-your-repos). Self-hosted GitLab: `export GITLAB_HOST=git.example.com`.
 

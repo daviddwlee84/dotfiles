@@ -160,27 +160,45 @@ ghget() {
 #   Enter    clone into ${GHREPO_ROOT:-$PWD}/<repo>, then cd into it
 #   Alt-O    open the repo on github.com
 #   Ctrl-Y   copy the repo URL to the clipboard
+#   Ctrl-R   force a live refresh of the (cached) repo list
 #
-# `--limit 4000` lists *all* your repos (plain `gh repo list` stops at 30). The
-# clone+cd happens in the enclosing function (not an fzf `become`/`execute`
-# child) because only the interactive shell can cd the caller. Set GHREPO_ROOT
-# to clone into a fixed repo root instead of the current dir (see docs/tools/gh-cli.md).
+# With no args the list comes from ~/.config/television/gh-repos-source.sh, which
+# caches it (stale-while-revalidate) so the picker opens instantly after the
+# first run; Ctrl-R refetches live. Passing extra `gh repo list` args bypasses
+# the cache and queries live. `--limit 4000` lists *all* repos (plain
+# `gh repo list` stops at 30). The clone+cd happens in the enclosing function
+# (not an fzf `become`/`execute` child) because only the interactive shell can
+# cd the caller. Set GHREPO_ROOT to clone into a fixed repo root instead of the
+# current dir (see docs/tools/gh-cli.md).
 ghrepo() {
   command -v gh  >/dev/null 2>&1 || { printf '%s\n' "ghrepo: gh not found"  >&2; return 1; }
   command -v fzf >/dev/null 2>&1 || { printf '%s\n' "ghrepo: fzf not found" >&2; return 1; }
 
-  local sel repo dest
-  sel=$(
-    gh repo list "$@" --limit 4000 --no-archived \
-       --json nameWithOwner,description,primaryLanguage,visibility \
-       --jq '.[] | [.nameWithOwner, (.description // ""), (.primaryLanguage.name // ""), .visibility] | @tsv' \
-    | fzf --ansi --delimiter='\t' --with-nth=1,2,3,4 \
-          --preview 'gh repo view {1}' --preview-window='right,60%,wrap' \
-          --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url' \
-          --bind 'alt-o:execute-silent(gh repo view {1} --web)' \
-          --bind 'ctrl-y:execute-silent(gh browse -R {1} -n | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))' \
-    | cut -f1
+  local sel repo dest src
+  local -a fzf_args
+  fzf_args=(
+    --ansi --delimiter='\t' --with-nth=1,2,3,4
+    --preview 'gh repo view {1}' --preview-window='right,60%,wrap'
+    --bind 'alt-o:execute-silent(gh repo view {1} --web)'
+    --bind 'ctrl-y:execute-silent(gh browse -R {1} -n | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))'
   )
+
+  src="$HOME/.config/television/gh-repos-source.sh"
+  if [ "$#" -eq 0 ] && [ -x "$src" ]; then
+    fzf_args+=(
+      --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url  ctrl-r=refresh'
+      --bind "ctrl-r:reload($src --refresh)"
+    )
+    sel=$("$src" | fzf "${fzf_args[@]}" | cut -f1)
+  else
+    fzf_args+=(--header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url')
+    sel=$(
+      gh repo list "$@" --limit 4000 --no-archived \
+         --json nameWithOwner,description,primaryLanguage,visibility \
+         --jq '.[] | [.nameWithOwner, (.description // ""), (.primaryLanguage.name // ""), .visibility] | @tsv' \
+      | fzf "${fzf_args[@]}" | cut -f1
+    )
+  fi
 
   [ -n "$sel" ] || return 0
   repo="${sel##*/}"

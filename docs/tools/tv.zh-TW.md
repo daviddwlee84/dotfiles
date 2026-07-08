@@ -282,7 +282,7 @@ tv update-channels
 
 ### `github-repos` / `gitlab-repos` 頻道
 
-依名稱 + 描述模糊搜尋**你自己的 repos**，在面板中預覽 README，然後於瀏覽器開啟、複製 URL 或 clone。`github-repos` 底層為 `gh repo list --limit 4000`（列出*全部* repos — 純 `gh repo list` 只到 30 筆）；`gitlab-repos` 為 `glab repo list --mine`。兩者都以 `requirements` 對其 CLI（`gh`/`glab`）+ `jq` 做 gate，因此缺少對應工具的主機不會出現該頻道。定義檔：[`github-repos.toml`](../../dot_config/television/cable/github-repos.toml)、[`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml)。
+依名稱 + 描述模糊搜尋**你自己的 repos**，在面板中預覽 README，然後於瀏覽器開啟、複製 URL 或 clone。`github-repos` 底層為 `gh repo list --limit 4000`（列出*全部* repos — 純 `gh repo list` 只到 30 筆）；`gitlab-repos` 為 `glab repo list --mine`。`github-repos` 以 `gh` 做 gate；`gitlab-repos` 以 `glab` + `jq`。清單會**快取**（stale-while-revalidate，透過 `~/.config/television/g{h,l}-repos-source.sh`），因此首次抓取後（300+ repos 約 ~15 秒）picker 即瞬間開啟。定義檔：[`github-repos.toml`](../../dot_config/television/cable/github-repos.toml)、[`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml)。
 
 | 鍵位 | 動作 |
 |-----|--------|
@@ -290,6 +290,8 @@ tv update-channels
 | `Alt+O` | 在瀏覽器開啟 repo/project（`gh`/`glab repo view --web`） |
 | `Ctrl+Y` | 複製 repo URL 到剪貼簿（覆寫 TV 預設的整行複製） |
 | `Alt+C` | clone 到 tv 啟動時的 cwd（顯示進度） |
+| `Ctrl+R` | 從快取重載（TV 全域 `reload_source`） |
+| `Alt+R` | 從 API 強制即時刷新後重載 |
 
 > tv 動作在子行程中執行，clone 後**無法 `cd` 你的 shell**。若要 find → clone → **cd 進去** 的流程，請用 `ghrepo` / `glrepo` shell 函式（picker 孿生）— 見 [aliases.md](../shells/aliases.md#github--gitlab)。自架 GitLab：`export GITLAB_HOST=git.example.com`。
 

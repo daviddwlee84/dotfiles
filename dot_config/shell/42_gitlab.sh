@@ -128,22 +128,41 @@ glcreate-ai() {
 #   Enter    clone into ${GLREPO_ROOT:-$PWD}/<repo>, then cd into it
 #   Alt-O    open the project in the browser
 #   Ctrl-Y   copy the project URL to the clipboard
+#   Ctrl-R   force a live refresh of the (cached) repo list
+#
+# With no args the list comes from ~/.config/television/gl-repos-source.sh, which
+# caches it (stale-while-revalidate) so the picker opens instantly after the
+# first run; Ctrl-R refetches live. Passing extra `glab repo list` args bypasses
+# the cache and queries live.
 glrepo() {
   command -v glab >/dev/null 2>&1 || { printf '%s\n' "glrepo: glab not found" >&2; return 1; }
   command -v fzf  >/dev/null 2>&1 || { printf '%s\n' "glrepo: fzf not found"  >&2; return 1; }
   command -v jq   >/dev/null 2>&1 || { printf '%s\n' "glrepo: jq not found"   >&2; return 1; }
 
-  local sel repo dest
-  sel=$(
-    glab repo list --mine --per-page 100 "$@" -F json \
-    | jq -r '.[] | [.path_with_namespace, (.description // ""), .visibility, .web_url] | @tsv' \
-    | fzf --ansi --delimiter='\t' --with-nth=1,2,3 \
-          --preview 'glab repo view {1}' --preview-window='right,60%,wrap' \
-          --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url' \
-          --bind 'alt-o:execute-silent(glab repo view {1} --web)' \
-          --bind 'ctrl-y:execute-silent(printf %s {4} | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))' \
-    | cut -f1
+  local sel repo dest src
+  local -a fzf_args
+  fzf_args=(
+    --ansi --delimiter='\t' --with-nth=1,2,3
+    --preview 'glab repo view {1}' --preview-window='right,60%,wrap'
+    --bind 'alt-o:execute-silent(glab repo view {1} --web)'
+    --bind 'ctrl-y:execute-silent(printf %s {4} | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))'
   )
+
+  src="$HOME/.config/television/gl-repos-source.sh"
+  if [ "$#" -eq 0 ] && [ -x "$src" ]; then
+    fzf_args+=(
+      --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url  ctrl-r=refresh'
+      --bind "ctrl-r:reload($src --refresh)"
+    )
+    sel=$("$src" | fzf "${fzf_args[@]}" | cut -f1)
+  else
+    fzf_args+=(--header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url')
+    sel=$(
+      glab repo list --mine --per-page 100 "$@" -F json \
+      | jq -r '.[] | [.path_with_namespace, (.description // ""), .visibility, .web_url] | @tsv' \
+      | fzf "${fzf_args[@]}" | cut -f1
+    )
+  fi
 
   [ -n "$sel" ] || return 0
   repo="${sel##*/}"

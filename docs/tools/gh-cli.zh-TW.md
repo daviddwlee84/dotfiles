@@ -132,6 +132,8 @@ gh auth logout                  # 清掉 token + helper
 
 GitLab 有完全對應的孿生 — **`glrepo`** + **`tv gitlab-repos`**（透過 `glab repo list --mine`）。自架 GitLab：`export GITLAB_HOST=git.example.com`。
 
+repo 清單會**快取**在 `~/.cache/tv/`（stale-while-revalidate；`GHREPO_CACHE_TTL` 預設 1 小時）：首次抓取 300+ repos 約需 ~15 秒，之後每次啟動都瞬間開啟並在背景重新驗證。在 `ghrepo`/`glrepo` 中按 `Ctrl-R`（或 tv 頻道的 `Alt+R`）可強制即時刷新。快取由共用 helper `~/.config/television/g{h,l}-repos-source.sh` 產生，函式與頻道共用。
+
 設定 `GHREPO_ROOT` / `GLREPO_ROOT` 可 clone 到固定的 repo root 而非當前目錄 — 便於搭配 [try-cli](https://github.com/tobi/try) 的 graduate 流程（`TRY_PROJECTS`）。
 
 ## 相關
