@@ -304,6 +304,7 @@ GitHub release tarball or installer (user)**:
 | `diffnav` | user GitHub release |
 | `gh-dash` | `gh extension install dlvhdr/gh-dash` |
 | `gh-notify` | `gh extension install meiji163/gh-notify` |
+| `gh-select` | `gh extension install remcostoeten/gh-select` |
 | `git-graph` | user GitHub release (x86_64 only) |
 | `tldr` | system npm or `mise exec -- npm install -g tldr` |
 | `glow`, `gum`, `vhs`, `freeze`, `duckdb` | user GitHub release tarballs |
@@ -998,6 +999,7 @@ list.
 | **gh** | brew | vendor apt (.deb) → GitHub tarball | base/devtools |
 | **gh-dash** | `gh extension install dlvhdr/gh-dash` | same | devtools |
 | **gh-notify** | `gh extension install meiji163/gh-notify` | same | devtools |
+| **gh-select** | `gh extension install remcostoeten/gh-select` | same | devtools |
 | **git** | brew | apt/yum | base |
 | **git-delta** | brew | `.deb` (x86_64) → brew aarch64 → GitHub musl user | devtools |
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |

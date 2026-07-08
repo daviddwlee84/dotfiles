@@ -292,6 +292,7 @@ tarball 或 installer(使用者)**:
 | `diffnav` | 使用者 GitHub release |
 | `gh-dash` | `gh extension install dlvhdr/gh-dash` |
 | `gh-notify` | `gh extension install meiji163/gh-notify` |
+| `gh-select` | `gh extension install remcostoeten/gh-select` |
 | `git-graph` | 使用者 GitHub release(僅 x86_64) |
 | `tldr` | 系統 npm 或 `mise exec -- npm install -g tldr` |
 | `glow`、`gum`、`vhs`、`freeze`、`duckdb` | 使用者 GitHub release tarball |
@@ -963,6 +964,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **gh** | brew | 廠商 apt(.deb)→ GitHub tarball | base/devtools |
 | **gh-dash** | `gh extension install dlvhdr/gh-dash` | 同 | devtools |
 | **gh-notify** | `gh extension install meiji163/gh-notify` | 同 | devtools |
+| **gh-select** | `gh extension install remcostoeten/gh-select` | 同 | devtools |
 | **git** | brew | apt/yum | base |
 | **git-delta** | brew | `.deb`(x86_64)→ brew aarch64 → GitHub musl 使用者 | devtools |
 | **git-filter-repo** | uv tool | uv tool | python_uv_tools |

@@ -1233,6 +1233,15 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
+# --- gh-select --- (reuses the gh_cli_path / gh_auth_status / gh_extension_list probes above)
+# Raycast-like TUI repo browser: fuzzy-search your repos, tree view, clone / open.
+- name: Install gh-select extension
+  when: gh_cli_path.rc == 0 and gh_auth_status.rc == 0 and (gh_extension_list.rc != 0 or 'remcostoeten/gh-select' not in gh_extension_list.stdout)
+  ansible.builtin.command: gh extension install remcostoeten/gh-select
+  changed_when: true
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
 # --- git-graph ---
 # Gate broadened to RedHat per pitfalls/centos7-noroot.md — git-graph is a
 # Rust musl binary (no glibc dependency). x86_64-only by upstream choice.

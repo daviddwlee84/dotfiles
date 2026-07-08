@@ -132,6 +132,8 @@ If you need to preserve another section type (e.g. `[includeIf "gitdir:~/work/"]
 
 GitLab has the exact twins — **`glrepo`** + **`tv gitlab-repos`** (via `glab repo list --mine`). Self-hosted GitLab: `export GITLAB_HOST=git.example.com`.
 
+Prefer a full TUI? **`gh select`** ([remcostoeten/gh-select](https://github.com/remcostoeten/gh-select), installed by the devtools role) is a Raycast-like repo browser — fuzzy search, tree view, sparse clone. It's GitHub-only and (like the tv channel) can't `cd` your shell after cloning, so it complements `ghrepo` rather than replacing it.
+
 The list is **cached** in `~/.cache/tv/` (stale-while-revalidate; `GHREPO_CACHE_TTL` default 1 h): the first fetch of 300+ repos takes ~15 s, but every launch after that opens instantly and revalidates in the background. `Ctrl-R` inside `ghrepo`/`glrepo` (or `Alt+R` in the tv channels) forces a live refresh. The cache is produced by the shared helper `~/.config/television/g{h,l}-repos-source.sh`, used by both the functions and the channels.
 
 Set `GHREPO_ROOT` / `GLREPO_ROOT` to clone into a fixed repo root instead of the current dir — handy for pairing with [try-cli](https://github.com/tobi/try)'s graduate flow (`TRY_PROJECTS`). See also [tv.md → github-repos / gitlab-repos channels](tv.md#github-repos--gitlab-repos-channels).
