@@ -26,6 +26,7 @@ Tradeoffs:
 - **Write** is ubiquitous. Most modern terminals allow it by default or with a simple opt-in.
 - **Read** (paste from local clipboard back into remote apps) is much less supported — many terminals refuse for obvious security reasons (a malicious server could exfiltrate your clipboard). Ghostty prompts; Alacritty flat-out ignores it.
 - A terminal multiplexer (tmux, screen, zellij) sits between the inner app and the outer terminal. It must be configured to either **emit** OSC 52 to its host terminal or **pass through** OSC 52 from inner apps.
+- **Text only** — OSC 52 carries base64 *text*; it cannot move an **image** (or file object) from your local clipboard into a remote app, and it flows remote→local, the wrong direction for feeding a screenshot to a remote agent. Getting a local screenshot into a remote coding agent (Claude Code / Neovim) is a separate problem — see [`remote-image-paste.md`](./remote-image-paste.md).
 
 Reference: [tmux Clipboard wiki](https://github.com/tmux/tmux/wiki/Clipboard), [XTerm control sequences (OSC)](https://www.invisible-island.net/xterm/ctlseqs/ctlseqs.html).
 
@@ -231,6 +232,7 @@ The Maccy schema is documented in the [helper file's header comment](../../dot_c
 
 ## Related docs
 
+- [Remote image paste (SSH)](./remote-image-paste.md) — the image-shaped sequel: getting a local screenshot into a remote coding agent (OSC 52 can't)
 - [tmux](./tmux/README.md) — "OSC 52 Clipboard (SSH-friendly yank)" section
 - [Ghostty](./ghostty.md) — terminal-side notes
 - [`dot_dotfiles/bin/executable_x`](../../dot_dotfiles/bin/executable_x) — the `x` wrapper source
