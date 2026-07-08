@@ -59,6 +59,24 @@ neo-tree 自己的 `Y`（copy path）行為一致。
   安全地拒絕，顯示 `copy-ref: no file under cursor here` 警告——絕不會產生像
   `@neo-tree filesystem [1]` 這種垃圾字串。
 
+## Shell 版孿生指令：`cref`
+
+在編輯器以外，[`cref`](../shells/aliases.md#shell-utilities) shell 函式能在命令列
+產生**相同形態的 reference**，並複製到剪貼簿——走 `x` CLI 的 OSC 52 路徑，所以透過
+SSH 也能用：
+
+```sh
+cref src/app.py:42        # 複製 @src/app.py:42
+cref -a src/app.py:10-20  # @/abs/src/app.py:10-20（機器絕對）
+rg -n TODO | cref         # 取 ripgrep 第一筆結果的 reference
+```
+
+它對應同樣的路徑類型——預設 git 根目錄相對（含相同的 cwd/`~`/絕對退回機制）、`-a`
+為絕對——再加一個 `-c` 表示明確以 cwd 為基準。由於 shell 沒有「游標行」的概念，行號
+來自 `FILE:LINE[-LINE]` 參數、尾隨的位置參數（`cref FILE 12 40`），或管線傳入的
+grep/ripgrep 行（`FILE:LINE:…`，`:col` 會被去掉）。原始碼：
+`dot_config/shell/59_cref.sh`。
+
 ## 實作細節
 
 整個功能就是 `lua/config/keymaps.lua` 裡一組小的 `copy_ref_target()` + `copy_reference()`

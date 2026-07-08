@@ -57,6 +57,26 @@ neo-tree's own `Y` (copy path).
   unnamed buffer) is safely rejected with a `copy-ref: no file under cursor here`
   warning — never a bogus `@neo-tree filesystem [1]`.
 
+## Shell twin: `cref`
+
+Outside the editor, the [`cref`](../shells/aliases.md#shell-utilities) shell
+function produces the **same reference shapes** from the command line and copies
+them to the clipboard — through the `x` CLI's OSC 52 path, so it works over SSH
+too:
+
+```sh
+cref src/app.py:42        # copies @src/app.py:42
+cref -a src/app.py:10-20  # @/abs/src/app.py:10-20  (machine-absolute)
+rg -n TODO | cref         # ref from ripgrep's first match line
+```
+
+It mirrors the same path flavors — git-root-relative by default (with the same
+cwd/`~`/absolute fallback), `-a` for absolute — plus a `-c` for an explicitly
+cwd-relative path. A shell has no cursor line, so the line component comes from a
+`FILE:LINE[-LINE]` argument, trailing positionals (`cref FILE 12 40`), or a piped
+grep/ripgrep line (`FILE:LINE:…`, with the `:col` stripped). Source:
+`dot_config/shell/59_cref.sh`.
+
 ## Implementation notes
 
 The feature is a small `copy_ref_target()` + `copy_reference()` helper pair plus
