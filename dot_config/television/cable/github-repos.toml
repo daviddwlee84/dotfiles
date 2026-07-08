@@ -1,0 +1,67 @@
+# GitHub repos cable channel for television (tv) — browse twin of the `ghrepo`
+# shell function (dot_config/shell/41_github.sh).
+#
+# Fuzzy-find your GitHub repos, preview the README, then open in browser, copy
+# the URL, or clone. Needs gh (authenticated) + jq; auto-skipped where either is
+# absent (see `requirements`).
+#
+# Usage:
+#   tv github-repos                 (Enter prints owner/repo; Alt+O opens; Ctrl+Y copies URL; Alt+C clones)
+#
+# Keybindings:
+#   Enter      Print owner/repo to stdout (TV default confirm_selection; for `sel=$(tv github-repos)`)
+#   Alt+O      Open the repo on github.com               (fork — TUI stays open)
+#   Ctrl+Y     Copy the repo URL to clipboard            (overrides TV's full-line copy)
+#   Alt+C      Clone into tv's launch cwd                (execute — shows progress)
+#
+# NB: a tv action runs in a subprocess and cannot cd your shell after cloning —
+# use the `ghrepo` function for the clone+cd flow. `--limit 4000` lists *all*
+# repos (plain `gh repo list` stops at 30).
+#
+# Source format (TSV columns):
+#   0. nameWithOwner   (raw; printed / previewed / cloned / opened)
+#   1. description
+#   2. primaryLanguage
+#   3. visibility
+
+[metadata]
+name = "github-repos"
+description = "Fuzzy-find your GitHub repos: preview README, open, copy URL, clone"
+requirements = ["gh", "jq"]
+
+[source]
+command = "gh repo list --limit 4000 --no-archived --json nameWithOwner,description,primaryLanguage,visibility --jq '.[] | [.nameWithOwner, (.description // \"\"), (.primaryLanguage.name // \"\"), .visibility] | @tsv'"
+display = "{split:\\t:0}  {split:\\t:3}  {split:\\t:2}  │  {split:\\t:1}"
+output = "{split:\\t:0}"
+
+[ui]
+layout = "portrait"
+
+[ui.preview_panel]
+size = 60
+
+[preview]
+command = "gh repo view '{split:\\t:0}'"
+header = "{split:\\t:0}"
+
+[keybindings]
+# Alt+ for side effects (Ctrl+letter is shadowed by tmux root table); Ctrl+Y
+# overrides TV's default full-line copy to copy just the repo URL.
+alt-o = "actions:open"
+ctrl-y = "actions:copy-url"
+alt-c = "actions:clone"
+
+[actions.open]
+description = "Open repo in browser"
+command = "gh repo view '{split:\\t:0}' --web"
+mode = "fork"
+
+[actions.copy-url]
+description = "Copy repo URL to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; gh browse -R '{split:\\t:0}' -n | _clip"""
+mode = "fork"
+
+[actions.clone]
+description = "Clone repo into the current directory"
+command = """repo='{split:\\t:0}'; printf '\\nCloning %s ...\\n' "$repo"; gh repo clone "$repo"; printf '\\n[Press Enter to close]'; read -r _"""
+mode = "execute"

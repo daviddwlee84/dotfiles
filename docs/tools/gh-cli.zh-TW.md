@@ -121,6 +121,19 @@ gh auth logout                  # 清掉 token + helper
 
 - 預期是空的。如果不是,awk filter 大概沒認出 gh 寫的 section header(舊/新版 `gh` 可能用不同的 scope URL)。把 live 檔跟 rendered output 並排看: `chezmoi cat ~/.gitconfig | diff - ~/.gitconfig`。如果 diff 在 `[credential "<URL>"]` 區塊內,代表腳本有 bug — 開 issue。
 
+## 尋找並 clone 你的 repos
+
+`gh repo list` 非互動且只列 30 筆。要依名稱 + 描述模糊瀏覽**全部** repos — 預覽 README，然後 clone／開啟／複製 — 本 repo 提供兩個孿生介面：
+
+- **`ghrepo`**（shell 函式，`dot_config/shell/41_github.sh`）— 以 fzf 包裝 `gh repo list --limit 4000`，並用 `gh repo view` 預覽 README：
+  - `Enter` → clone 到 `${GHREPO_ROOT:-$PWD}/<repo>` 並 **cd 進去**
+  - `Alt-O` → 在 github.com 開啟 · `Ctrl-Y` → 複製 repo URL
+- **`tv github-repos`**（Television 頻道）— 同樣的瀏覽／開啟／複製。tv 動作無法 `cd` 你的 shell（子行程），因此 `Alt+C` 只 clone 到啟動 cwd 而不 cd；clone 後要工作請用 `ghrepo`。
+
+GitLab 有完全對應的孿生 — **`glrepo`** + **`tv gitlab-repos`**（透過 `glab repo list --mine`）。自架 GitLab：`export GITLAB_HOST=git.example.com`。
+
+設定 `GHREPO_ROOT` / `GLREPO_ROOT` 可 clone 到固定的 repo root 而非當前目錄 — 便於搭配 [try-cli](https://github.com/tobi/try) 的 graduate 流程（`TRY_PROJECTS`）。
+
 ## 相關
 
 - [chezmoi prefixes](chezmoi-prefixes.md) — 本 repo 裡 `modify_` / `create_` / `_remove` 的語意

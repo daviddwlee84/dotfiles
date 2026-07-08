@@ -292,6 +292,21 @@ Re-run `chezmoi apply` (md is deployed to `~/.config/docs/tools/`); no channel r
 
 ---
 
+### `github-repos` / `gitlab-repos` channels
+
+Fuzzy-find **your own repos** by name + description, preview the README in the panel, then open in the browser, copy the URL, or clone. `github-repos` is backed by `gh repo list --limit 4000` (lists *all* repos — plain `gh repo list` stops at 30); `gitlab-repos` by `glab repo list --mine`. Both `requirements`-gate on their CLI (`gh`/`glab`) + `jq`, so a host without them simply doesn't surface the channel. Definitions: [`github-repos.toml`](../../dot_config/television/cable/github-repos.toml), [`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml).
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Print `owner/repo` (GitHub) / `group/project` (GitLab) to stdout — e.g. `sel=$(tv github-repos)` |
+| `Alt+O` | Open the repo/project in the browser (`gh`/`glab repo view --web`) |
+| `Ctrl+Y` | Copy the repo URL to clipboard (overrides TV's full-line copy) |
+| `Alt+C` | Clone into tv's launch cwd (shows progress) |
+
+> A tv action runs in a subprocess and **cannot `cd` your shell** after cloning. For the find → clone → **`cd` in** flow, use the `ghrepo` / `glrepo` shell functions (the picker twins) — see [aliases.md](../shells/aliases.md#github--gitlab) and [gh-cli.md](gh-cli.md#finding--cloning-your-repos). Self-hosted GitLab: `export GITLAB_HOST=git.example.com`.
+
+---
+
 ### `pueue` channel
 
 Interactive task manager for [pueue](https://github.com/Nukesor/pueue) — fuzzy-search tasks, preview logs, and pause/resume/kill/restart without leaving the picker. Parses `pueue status --json` at runtime. Requires `pueue` and `jq`.

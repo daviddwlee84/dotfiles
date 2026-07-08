@@ -148,3 +148,42 @@ ghget() {
 
   command rm -rf -- "$tmpdir"
 }
+
+# Fuzzy-find your GitHub repos (name + description), preview the README, then
+# clone+cd / open in browser / copy the URL. Needs: gh (authenticated) + fzf.
+#
+# Usage: ghrepo [owner] [extra `gh repo list` flags]
+#   ghrepo                     # your repos (owner defaults to the authed user)
+#   ghrepo some-org --source   # an org's repos, non-forks only
+#
+# Keys inside the picker:
+#   Enter    clone into ${GHREPO_ROOT:-$PWD}/<repo>, then cd into it
+#   Alt-O    open the repo on github.com
+#   Ctrl-Y   copy the repo URL to the clipboard
+#
+# `--limit 4000` lists *all* your repos (plain `gh repo list` stops at 30). The
+# clone+cd happens in the enclosing function (not an fzf `become`/`execute`
+# child) because only the interactive shell can cd the caller. Set GHREPO_ROOT
+# to clone into a fixed repo root instead of the current dir (see docs/tools/gh-cli.md).
+ghrepo() {
+  command -v gh  >/dev/null 2>&1 || { printf '%s\n' "ghrepo: gh not found"  >&2; return 1; }
+  command -v fzf >/dev/null 2>&1 || { printf '%s\n' "ghrepo: fzf not found" >&2; return 1; }
+
+  local sel repo dest
+  sel=$(
+    gh repo list "$@" --limit 4000 --no-archived \
+       --json nameWithOwner,description,primaryLanguage,visibility \
+       --jq '.[] | [.nameWithOwner, (.description // ""), (.primaryLanguage.name // ""), .visibility] | @tsv' \
+    | fzf --ansi --delimiter='\t' --with-nth=1,2,3,4 \
+          --preview 'gh repo view {1}' --preview-window='right,60%,wrap' \
+          --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url' \
+          --bind 'alt-o:execute-silent(gh repo view {1} --web)' \
+          --bind 'ctrl-y:execute-silent(gh browse -R {1} -n | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))' \
+    | cut -f1
+  )
+
+  [ -n "$sel" ] || return 0
+  repo="${sel##*/}"
+  dest="${GHREPO_ROOT:-$PWD}"
+  gh repo clone "$sel" "$dest/$repo" && cd "$dest/$repo"
+}

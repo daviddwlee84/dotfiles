@@ -485,9 +485,11 @@
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
-| `ghget` | function | `dot_config/zsh/tools/41_github.zsh` | 從 GitHub tree URL 下載一個子目錄 |
-| `glcreate` | function | `dot_config/zsh/tools/42_gitlab.zsh` | 在某 group 下建立私有 GitLab repo、設定 origin 並 push |
-| `glcreate-ai` | function | `dot_config/zsh/tools/42_gitlab.zsh` | 同 `glcreate`，但使用 AI agent 自動產生描述 |
+| `ghget` | function | `dot_config/shell/41_github.sh` | 從 GitHub tree URL 下載一個子目錄 |
+| `ghrepo` | function | `dot_config/shell/41_github.sh` | 模糊搜尋你的 GitHub repos（fzf）→ 預覽 README，然後 clone 後 cd／開啟／複製 URL。`Enter` clone 到 `${GHREPO_ROOT:-$PWD}`。孿生：`tv github-repos` |
+| `glcreate` | function | `dot_config/shell/42_gitlab.sh` | 在某 group 下建立私有 GitLab repo、設定 origin 並 push |
+| `glcreate-ai` | function | `dot_config/shell/42_gitlab.sh` | 同 `glcreate`，但使用 AI agent 自動產生描述 |
+| `glrepo` | function | `dot_config/shell/42_gitlab.sh` | 模糊搜尋你的 GitLab repos（fzf）→ 預覽，然後 clone 後 cd／開啟／複製 URL。孿生：`tv gitlab-repos`。自架：`GITLAB_HOST=…` |
 
 ---
 

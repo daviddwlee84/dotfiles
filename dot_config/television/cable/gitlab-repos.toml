@@ -1,0 +1,64 @@
+# GitLab repos cable channel for television (tv) — browse twin of the `glrepo`
+# shell function (dot_config/shell/42_gitlab.sh).
+#
+# Fuzzy-find your GitLab repos, preview the README, then open in browser, copy
+# the URL, or clone. Needs glab (authenticated) + jq; auto-skipped where either
+# is absent. gitlab.com by default; export GITLAB_HOST=git.example.com to target
+# a self-hosted instance (glab honors it natively).
+#
+# Usage:
+#   tv gitlab-repos                 (Enter prints path; Alt+O opens; Ctrl+Y copies URL; Alt+C clones)
+#
+# Keybindings:
+#   Enter      Print path_with_namespace to stdout       (TV default confirm_selection)
+#   Alt+O      Open the project in the browser           (fork)
+#   Ctrl+Y     Copy the project URL to clipboard         (overrides TV's full-line copy)
+#   Alt+C      Clone into tv's launch cwd                (execute)
+#
+# NB: a tv action cannot cd your shell after cloning — use `glrepo` for clone+cd.
+#
+# Source format (TSV columns):
+#   0. path_with_namespace   (raw; printed / previewed / cloned / opened)
+#   1. description
+#   2. visibility
+#   3. web_url               (copied by Ctrl+Y)
+
+[metadata]
+name = "gitlab-repos"
+description = "Fuzzy-find your GitLab repos: preview README, open, copy URL, clone"
+requirements = ["glab", "jq"]
+
+[source]
+command = "glab repo list --mine --per-page 100 -F json | jq -r '.[] | [.path_with_namespace, (.description // \"\"), .visibility, .web_url] | @tsv'"
+display = "{split:\\t:0}  {split:\\t:2}  │  {split:\\t:1}"
+output = "{split:\\t:0}"
+
+[ui]
+layout = "portrait"
+
+[ui.preview_panel]
+size = 60
+
+[preview]
+command = "glab repo view '{split:\\t:0}'"
+header = "{split:\\t:0}"
+
+[keybindings]
+alt-o = "actions:open"
+ctrl-y = "actions:copy-url"
+alt-c = "actions:clone"
+
+[actions.open]
+description = "Open project in browser"
+command = "glab repo view '{split:\\t:0}' --web"
+mode = "fork"
+
+[actions.copy-url]
+description = "Copy project URL to clipboard"
+command = """_clip() { local d; d=$(cat); [ -z "$d" ] && return; if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy; elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy; elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard; else printf '%b' "\\033]52;c;$(printf '%s' "$d" | base64)\\007" > /dev/tty; fi; }; printf '%s' '{split:\\t:3}' | _clip"""
+mode = "fork"
+
+[actions.clone]
+description = "Clone project into the current directory"
+command = """repo='{split:\\t:0}'; printf '\\nCloning %s ...\\n' "$repo"; glab repo clone "$repo"; printf '\\n[Press Enter to close]'; read -r _"""
+mode = "execute"

@@ -110,3 +110,43 @@ glcreate-ai() {
     *)              echo "Unknown agent: ${agent}"; return 1 ;;
   esac
 }
+
+# ==============================================================================
+# Method 3: Fuzzy-find + clone your GitLab repos (twin of ghrepo / tv gitlab-repos)
+# ==============================================================================
+
+# Fuzzy-find your GitLab repos (path + description), preview the README, then
+# clone+cd / open in browser / copy the URL. Needs: glab (authed) + fzf + jq.
+# gitlab.com by default; export GITLAB_HOST=git.example.com for a self-hosted host.
+#
+# Usage: glrepo [extra `glab repo list` flags]
+#   glrepo                 # your repos (glab repo list --mine)
+#   glrepo --group foo     # a group's repos
+#   glrepo --all           # follow pagination past --per-page 100
+#
+# Keys inside the picker:
+#   Enter    clone into ${GLREPO_ROOT:-$PWD}/<repo>, then cd into it
+#   Alt-O    open the project in the browser
+#   Ctrl-Y   copy the project URL to the clipboard
+glrepo() {
+  command -v glab >/dev/null 2>&1 || { printf '%s\n' "glrepo: glab not found" >&2; return 1; }
+  command -v fzf  >/dev/null 2>&1 || { printf '%s\n' "glrepo: fzf not found"  >&2; return 1; }
+  command -v jq   >/dev/null 2>&1 || { printf '%s\n' "glrepo: jq not found"   >&2; return 1; }
+
+  local sel repo dest
+  sel=$(
+    glab repo list --mine --per-page 100 "$@" -F json \
+    | jq -r '.[] | [.path_with_namespace, (.description // ""), .visibility, .web_url] | @tsv' \
+    | fzf --ansi --delimiter='\t' --with-nth=1,2,3 \
+          --preview 'glab repo view {1}' --preview-window='right,60%,wrap' \
+          --header 'enter=clone+cd  alt-o=open  ctrl-y=copy-url' \
+          --bind 'alt-o:execute-silent(glab repo view {1} --web)' \
+          --bind 'ctrl-y:execute-silent(printf %s {4} | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null))' \
+    | cut -f1
+  )
+
+  [ -n "$sel" ] || return 0
+  repo="${sel##*/}"
+  dest="${GLREPO_ROOT:-$PWD}"
+  glab repo clone "$sel" "$dest/$repo" && cd "$dest/$repo"
+}

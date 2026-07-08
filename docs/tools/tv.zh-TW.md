@@ -280,6 +280,21 @@ tv update-channels
 
 ---
 
+### `github-repos` / `gitlab-repos` 頻道
+
+依名稱 + 描述模糊搜尋**你自己的 repos**，在面板中預覽 README，然後於瀏覽器開啟、複製 URL 或 clone。`github-repos` 底層為 `gh repo list --limit 4000`（列出*全部* repos — 純 `gh repo list` 只到 30 筆）；`gitlab-repos` 為 `glab repo list --mine`。兩者都以 `requirements` 對其 CLI（`gh`/`glab`）+ `jq` 做 gate，因此缺少對應工具的主機不會出現該頻道。定義檔：[`github-repos.toml`](../../dot_config/television/cable/github-repos.toml)、[`gitlab-repos.toml`](../../dot_config/television/cable/gitlab-repos.toml)。
+
+| 鍵位 | 動作 |
+|-----|--------|
+| `Enter` | 印出 `owner/repo`（GitHub）/ `group/project`（GitLab）到 stdout — 例如 `sel=$(tv github-repos)` |
+| `Alt+O` | 在瀏覽器開啟 repo/project（`gh`/`glab repo view --web`） |
+| `Ctrl+Y` | 複製 repo URL 到剪貼簿（覆寫 TV 預設的整行複製） |
+| `Alt+C` | clone 到 tv 啟動時的 cwd（顯示進度） |
+
+> tv 動作在子行程中執行，clone 後**無法 `cd` 你的 shell**。若要 find → clone → **cd 進去** 的流程，請用 `ghrepo` / `glrepo` shell 函式（picker 孿生）— 見 [aliases.md](../shells/aliases.md#github--gitlab)。自架 GitLab：`export GITLAB_HOST=git.example.com`。
+
+---
+
 ### `pueue` 頻道
 
 [pueue](https://github.com/Nukesor/pueue) 的互動式工作管理器 — 模糊搜尋工作、預覽 log、不離開選擇器即可 pause/resume/kill/restart。在執行期解析 `pueue status --json`。需要 `pueue` 與 `jq`。

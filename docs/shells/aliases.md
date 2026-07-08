@@ -512,8 +512,10 @@ Quick reference for custom aliases and shell functions defined in this dotfiles 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|
 | `ghget` | function | `dot_config/shell/41_github.sh` | Download a subdirectory from a GitHub tree URL |
+| `ghrepo` | function | `dot_config/shell/41_github.sh` | Fuzzy-find your GitHub repos (fzf) → preview README, then clone+cd / open / copy URL. `Enter` clones into `${GHREPO_ROOT:-$PWD}`. Twin: `tv github-repos` |
 | `glcreate` | function | `dot_config/shell/42_gitlab.sh` | Create a private GitLab repo under a group, set origin, and push |
 | `glcreate-ai` | function | `dot_config/shell/42_gitlab.sh` | Same as `glcreate` but uses an AI agent to auto-generate the description |
+| `glrepo` | function | `dot_config/shell/42_gitlab.sh` | Fuzzy-find your GitLab repos (fzf) → preview, then clone+cd / open / copy URL. Twin: `tv gitlab-repos`. Self-hosted: `GITLAB_HOST=…` |
 
 ---
 

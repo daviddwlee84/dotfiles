@@ -121,6 +121,19 @@ If you need to preserve another section type (e.g. `[includeIf "gitdir:~/work/"]
 
 - Expected to be empty. If it isn't, the awk filter probably doesn't recognise the section header gh wrote (older or newer `gh` versions might use a different scope URL). Open the live file and the rendered output side by side: `chezmoi cat ~/.gitconfig | diff - ~/.gitconfig`. If the diff is in a `[credential "<URL>"]` block, the script has a bug — file an issue.
 
+## Finding & cloning your repos
+
+`gh repo list` is non-interactive and stops at 30 rows. To fuzzy-browse **all** your repos by name + description — preview the README, then clone / open / copy — this repo ships a picker in two twinned surfaces:
+
+- **`ghrepo`** (shell function, `dot_config/shell/41_github.sh`) — fzf over `gh repo list --limit 4000` with a `gh repo view` README preview:
+  - `Enter` → clone into `${GHREPO_ROOT:-$PWD}/<repo>` and **`cd` into it**
+  - `Alt-O` → open on github.com · `Ctrl-Y` → copy the repo URL
+- **`tv github-repos`** (Television channel) — same browse / open / copy. A tv action can't `cd` your shell (subprocess), so `Alt+C` clones into the launch cwd without cd; use `ghrepo` for the clone-and-work flow.
+
+GitLab has the exact twins — **`glrepo`** + **`tv gitlab-repos`** (via `glab repo list --mine`). Self-hosted GitLab: `export GITLAB_HOST=git.example.com`.
+
+Set `GHREPO_ROOT` / `GLREPO_ROOT` to clone into a fixed repo root instead of the current dir — handy for pairing with [try-cli](https://github.com/tobi/try)'s graduate flow (`TRY_PROJECTS`). See also [tv.md → github-repos / gitlab-repos channels](tv.md#github-repos--gitlab-repos-channels).
+
 ## Related
 
 - [chezmoi prefixes](chezmoi-prefixes.md) — `modify_` / `create_` / `_remove` semantics in this repo
