@@ -71,6 +71,83 @@ _copilot_base() { printf 'http://localhost:%s' "$(_copilot_port)"; }
 _copilot_logfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).log"; }
 _copilot_pidfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).pid"; }
 
+# --- throttle shim (optional, in front of the fork) -----------------------------
+# A tiny Bun reverse proxy that caps concurrent in-flight upstream requests and
+# transparently retries 403/429 (GitHub enterprise abuse throttling) BEFORE any
+# body streams — so downstream agents never see "Please run /login". Toggle with
+# `copilot-proxy shim on|off`; tune via COPILOT_SHIM_{PORT,MAX,RETRIES,BACKOFF_MS}.
+_copilot_shim_port()    { printf '%s' "${COPILOT_SHIM_PORT:-4142}"; }
+_copilot_shim_base()    { printf 'http://localhost:%s' "$(_copilot_shim_port)"; }
+_copilot_shim_script()  { printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/shell/copilot-throttle-shim.js"; }
+_copilot_shim_logfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-shim-$(_copilot_shim_port).log"; }
+_copilot_shim_pidfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-shim-$(_copilot_shim_port).pid"; }
+_copilot_shim_state()   { printf '%s' "${XDG_STATE_HOME:-$HOME/.local/state}/copilot-proxy/shim"; }
+
+# Enabled? env COPILOT_PROXY_SHIM overrides a persisted on/off state file.
+_copilot_shim_enabled() {
+  case "${COPILOT_PROXY_SHIM:-}" in
+    1|on|true|yes)  return 0 ;;
+    0|off|false|no) return 1 ;;
+  esac
+  local sf; sf="$(_copilot_shim_state)"
+  [ -f "$sf" ] && [ "$(command head -n1 "$sf" 2>/dev/null)" = "on" ]
+}
+
+# Is the shim port answering at all? (curl w/o -f: any HTTP reply = exit 0, so a
+# 502 from a fork-down passthrough still counts as "shim process is up".)
+_copilot_shim_alive() {
+  command curl -s -o /dev/null --max-time 2 "$(_copilot_shim_base)/v1/models" >/dev/null 2>&1
+}
+
+# Base URL Claude Code should talk to: the shim when it's enabled AND actually
+# up, otherwise the fork directly (never break just because the shim is down).
+_copilot_client_base() {
+  if _copilot_shim_enabled && _copilot_shim_alive; then _copilot_shim_base; else _copilot_base; fi
+}
+
+# Base URL for PERSISTENT pins (copilot-here settings.local.json): the shim when
+# it's enabled (it's auto-started with the proxy, so it'll be up when in use),
+# else the fork. Not gated on currently-alive since the file outlives this shell.
+_copilot_pinned_base() {
+  if _copilot_shim_enabled; then _copilot_shim_base; else _copilot_base; fi
+}
+
+# Start the shim (idempotent). Points it at the fork; inherits COPILOT_SHIM_*.
+_copilot_shim_start() {
+  if _copilot_shim_alive; then return 0; fi
+  if ! command -v bun >/dev/null 2>&1; then
+    printf '%s\n' "copilot-proxy: shim needs 'bun' (via mise) — skipping." >&2
+    return 1
+  fi
+  local script; script="$(_copilot_shim_script)"
+  if [ ! -f "$script" ]; then
+    printf '%s\n' "copilot-proxy: shim script not found at $script" >&2
+    return 1
+  fi
+  COPILOT_SHIM_PORT="$(_copilot_shim_port)" COPILOT_SHIM_UPSTREAM="$(_copilot_base)" \
+    nohup bun "$script" >"$(_copilot_shim_logfile)" 2>&1 &
+  printf '%s\n' "$!" >"$(_copilot_shim_pidfile)"
+  local i=0
+  while [ "$i" -lt 10 ]; do
+    _copilot_shim_alive && return 0
+    sleep 1; i=$((i + 1))
+  done
+  printf '%s\n' "copilot-proxy: shim did not come up — check $(_copilot_shim_logfile)" >&2
+  return 1
+}
+
+# Stop the shim.
+_copilot_shim_stop() {
+  local pidf; pidf="$(_copilot_shim_pidfile)"
+  if [ -f "$pidf" ]; then
+    local pid; pid="$(command cat "$pidf" 2>/dev/null)"
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null
+    command rm -f -- "$pidf"
+  fi
+  command pkill -f "copilot-throttle-shim.js" 2>/dev/null
+  return 0
+}
+
 # Global default-model state file (used by copilot-run/claude-copilot when the
 # project has no copilot-here pin). Written by `copilot-model`.
 _copilot_model_state() {
@@ -138,6 +215,15 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: not authenticated yet — run 'copilot-proxy auth' first." >&2
         return 1
       fi
+      # Rotate the previous session's log (keep last 3) so a restart doesn't wipe
+      # it — the start commands below truncate ($logf) via `>`. logf.1 = previous
+      # session, logf.2/.3 = older. Debugging a transient (e.g. 403) survives.
+      if [ -f "$logf" ]; then
+        command rm -f "$logf.3" 2>/dev/null
+        [ -f "$logf.2" ] && command mv -f "$logf.2" "$logf.3"
+        [ -f "$logf.1" ] && command mv -f "$logf.1" "$logf.2"
+        command mv -f "$logf" "$logf.1"
+      fi
       # Flag sets differ per package: only the original has --rate-limit/--wait
       # (the fork ships no rate limiter — mitigate with COPILOT_PROXY_QUIET=1).
       if [ "$(_copilot_pkg_flavor)" = "original" ]; then
@@ -159,7 +245,10 @@ copilot-proxy() {
       local i=0
       while [ "$i" -lt 20 ]; do
         if _copilot_alive; then
-          printf '%s\n' "copilot-proxy: up → $(_copilot_base)  (logs: copilot-proxy logs)"
+          if _copilot_shim_enabled; then
+            _copilot_shim_start && printf '%s\n' "copilot-proxy: throttle shim up → $(_copilot_shim_base) (→ $(_copilot_base))"
+          fi
+          printf '%s\n' "copilot-proxy: up → $(_copilot_client_base)  (logs: copilot-proxy logs)"
           return 0
         fi
         sleep 1
@@ -169,6 +258,8 @@ copilot-proxy() {
       return 1
       ;;
     stop)
+      # Tear down the shim first (harmless if not running).
+      _copilot_shim_stop
       # Prefer the tracked pid; fall back to a broad match.
       if [ -f "$pidf" ]; then
         local pid; pid="$(cat "$pidf" 2>/dev/null)"
@@ -192,14 +283,26 @@ copilot-proxy() {
         printf '%s\n' "copilot-proxy: RUNNING on $(_copilot_base)"
         printf '%s\n' "  models: $(command curl -fsS --max-time 3 "$(_copilot_base)/v1/models" 2>/dev/null \
           | command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command grep -i claude | command tr '\n' ' ')"
+        if _copilot_shim_enabled; then
+          if _copilot_shim_alive; then
+            printf '%s\n' "  shim:   ON, up on $(_copilot_shim_base)  → clients use this"
+          else
+            printf '%s\n' "  shim:   ON but DOWN (clients fall back to $(_copilot_base); try 'copilot-proxy shim on')"
+          fi
+        else
+          printf '%s\n' "  shim:   off  (enable: copilot-proxy shim on)"
+        fi
       else
         printf '%s\n' "copilot-proxy: not running on port $port  (start: copilot-proxy start)"
         return 1
       fi
       ;;
     logs)
-      if [ -f "$logf" ]; then command tail -n "${2:-40}" "$logf"; else
-        printf '%s\n' "copilot-proxy: no log file at $logf" >&2; return 1; fi
+      # logs [N] [gen] — gen 1..3 tails a rotated previous session ($logf.gen).
+      local _gen="${3:-}" _lf="$logf"
+      case "$_gen" in 1|2|3) _lf="$logf.$_gen" ;; esac
+      if [ -f "$_lf" ]; then command tail -n "${2:-40}" "$_lf"; else
+        printf '%s\n' "copilot-proxy: no log file at $_lf" >&2; return 1; fi
       ;;
     auth)
       # One-time device login → stores a ghu_ token copilot-api can exchange.
@@ -236,8 +339,36 @@ copilot-proxy() {
         bunx "$pkg" debug
       fi
       ;;
+    shim)
+      # shim [on|off|status] — persist the toggle, and start/stop it live if the
+      # fork is already running.
+      local sf; sf="$(_copilot_shim_state)"
+      case "${2:-status}" in
+        on)
+          command mkdir -p "$(command dirname "$sf")"; printf 'on\n' >"$sf"
+          if _copilot_alive; then
+            _copilot_shim_start && printf '%s\n' "copilot-proxy: shim ON → $(_copilot_shim_base) (→ $(_copilot_base))"
+          else
+            printf '%s\n' "copilot-proxy: shim enabled; will start with the proxy ('copilot-proxy start')."
+          fi
+          printf '%s\n' "  NOTE: restart Claude Code so it picks up ANTHROPIC_BASE_URL=$(_copilot_shim_base)"
+          ;;
+        off)
+          printf 'off\n' >"$sf"; _copilot_shim_stop
+          printf '%s\n' "copilot-proxy: shim OFF (clients use $(_copilot_base) directly)"
+          printf '%s\n' "  NOTE: restart Claude Code to point back at $(_copilot_base)"
+          ;;
+        status|*)
+          if _copilot_shim_enabled; then
+            printf '%s\n' "copilot-proxy: shim ON ($(_copilot_shim_alive && echo up || echo down)) on $(_copilot_shim_base)"
+          else
+            printf '%s\n' "copilot-proxy: shim off"
+          fi
+          ;;
+      esac
+      ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [N [gen]]|shim [on|off|status]|whoami|auth]"
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2
@@ -264,6 +395,9 @@ copilot-run() {
   if ! _copilot_alive; then
     copilot-proxy start || return 1
   fi
+  # If the shim is enabled but not up (e.g. toggled on after the proxy started),
+  # bring it up now so ANTHROPIC_BASE_URL below resolves to it.
+  if _copilot_shim_enabled && ! _copilot_shim_alive; then _copilot_shim_start; fi
   local model; model="$(_copilot_default_model)"
   # Opt-in quota savers (COPILOT_PROXY_QUIET=1): prepended as NAME=VALUE args
   # to `env`. Off by default — they degrade the Claude Code UX a little.
@@ -278,7 +412,7 @@ copilot-run() {
   # `command env` (not bare var-prefix) so the vars are strictly per-process:
   # POSIX var-prefix on a *function* call would leak into the current shell.
   command env \
-    ANTHROPIC_BASE_URL="$(_copilot_base)" \
+    ANTHROPIC_BASE_URL="$(_copilot_client_base)" \
     ANTHROPIC_AUTH_TOKEN="dummy" \
     ANTHROPIC_MODEL="$model" \
     ANTHROPIC_DEFAULT_OPUS_MODEL="$model" \
@@ -352,7 +486,7 @@ copilot-here() {
       local quiet="${COPILOT_PROXY_QUIET:-0}"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
       if printf '%s' "$base" | jq \
-          --arg base_url "$(_copilot_base)" --arg model "$model" --arg quiet "$quiet" '
+          --arg base_url "$(_copilot_pinned_base)" --arg model "$model" --arg quiet "$quiet" '
           .env = ((.env // {}) + {
             ANTHROPIC_BASE_URL: $base_url,
             ANTHROPIC_AUTH_TOKEN: "dummy",
