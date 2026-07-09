@@ -30,6 +30,8 @@
 # llm_tools defaults: {{ include "dot_ansible/roles/llm_tools/defaults/main.yml" | sha256sum }}
 # rust_cargo_tools tasks: {{ include "dot_ansible/roles/rust_cargo_tools/tasks/main.yml" | sha256sum }}
 # rust_cargo_tools defaults: {{ include "dot_ansible/roles/rust_cargo_tools/defaults/main.yml" | sha256sum }}
+# go_tools tasks: {{ include "dot_ansible/roles/go_tools/tasks/main.yml" | sha256sum }}
+# go_tools defaults: {{ include "dot_ansible/roles/go_tools/defaults/main.yml" | sha256sum }}
 # ruby_gem_tools tasks: {{ include "dot_ansible/roles/ruby_gem_tools/tasks/main.yml" | sha256sum }}
 # ruby_gem_tools defaults: {{ include "dot_ansible/roles/ruby_gem_tools/defaults/main.yml" | sha256sum }}
 # starship: {{ include "dot_ansible/roles/starship/tasks/main.yml" | sha256sum }}
@@ -190,23 +192,23 @@ fi
 #   Desktop: devtools, docker, nerdfonts
 #   Server:  devtools, docker (no nerdfonts - no GUI)
 #   macOS:   homebrew
-#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, ruby_gem_tools
+#   Optional: coding_agents, bitwarden, python_uv_tools, llm_tools, rust_cargo_tools, go_tools, ruby_gem_tools
 
 {{ if eq .chezmoi.os "darwin" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/macos.yml"
 # macOS: full desktop experience
-TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="homebrew,base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else if eq .profile "ubuntu_desktop" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Desktop: full desktop experience (no homebrew).
 # gui_apps bundles alacritty + AppImageLauncher + VSCode + Cursor (see
 # dot_ansible/roles/gui_apps_linux/tasks/main.yml); libfuse2 comes with it
 # so AppImage-based editors work out of the box on Ubuntu 22.04+.
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,ruby_gem_tools,gui_apps"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,nerdfonts,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools,gui_apps"
 {{ else if eq .profile "ubuntu_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # Ubuntu Server: no GUI stuff (no nerdfonts)
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else if eq .profile "centos_server" -}}
 PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # CentOS Server: same playbook + tag set as Ubuntu Server. Ansible roles
@@ -215,7 +217,7 @@ PLAYBOOK="$ANSIBLE_DIR/playbooks/linux.yml"
 # actually runs are the user-level GitHub-release / cargo / mise
 # fallbacks — see pitfalls/centos7-noroot.md for the gate-broadening
 # fix that lets those fire on RedHat too.
-TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,ruby_gem_tools"
+TAGS="base,zsh,bash,starship,neovim,lazyvim_deps,devtools,docker,security_tools,rust_cargo_tools,go_tools,ruby_gem_tools"
 {{ else -}}
 warn "Unknown profile: {{ .profile }}"
 exit 0
@@ -223,10 +225,11 @@ exit 0
 
 {{ $installExtraRuntimes := true }}{{ if hasKey . "installExtraRuntimes" }}{{ $installExtraRuntimes = .installExtraRuntimes }}{{ end -}}
 {{ if not $installExtraRuntimes -}}
-# installExtraRuntimes=false: mise skips rust/bun/ruby (see
+# installExtraRuntimes=false: mise skips rust/bun/ruby/go (see
 # dot_config/mise/config.toml.tmpl), so the roles that need those toolchains
 # would only fail — drop them from the base tag set.
 TAGS="${TAGS//,rust_cargo_tools/}"
+TAGS="${TAGS//,go_tools/}"
 TAGS="${TAGS//,ruby_gem_tools/}"
 {{ end -}}
 

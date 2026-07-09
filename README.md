@@ -37,6 +37,7 @@ flowchart TB
         DEVTOOLS[devtools]
         UVTOOLS[python_uv_tools]
         CARGO[rust_cargo_tools]
+        GOTOOLS[go_tools]
         LLMTOOLS[llm_tools]
     end
 
@@ -49,6 +50,7 @@ flowchart TB
     Chezmoi -.-> BrewBundle
     MISE -.->|Node.js, Rust| NVIM
     MISE -.->|Rust| CARGO
+    MISE -.->|Go| GOTOOLS
     UV -.->|Python tools| UVTOOLS
     UV -.->|LiteLLM| LLMTOOLS
     BREW -.->|casks| CASKS
@@ -161,7 +163,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installMediaTools` | false | Media/AV CLI tools ([ffmpeg](docs/tools/ffmpeg.md), [ImageMagick](docs/tools/imagemagick.md), [exiftool](docs/tools/exiftool.md), [libvips](docs/tools/libvips.md)). Also satisfies vhs's runtime ffmpeg dep. |
 | `installMediaControl` | false | System media-control CLIs for the `sys*` shell helpers ([media-control](docs/tools/media-control.md)): `nowplaying-cli` + `switchaudio-osx` (macOS), `playerctl` (Linux). Unlocks full `sysplay`/`sysnow`; built-in `sysvol`/`sysmute` work without it. |
 | `installDotnetTools` | false | .NET SDK via mise + dotnet global tools ([azure-cost-cli](docs/tools/dotnet-tools.md) for Azure cost analysis) |
-| `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby; ~1.8GB) + their cargo/gem tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
+| `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby, go; ~1.8GB) + their cargo/gem/go tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
 | `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
 | `installHomelabTools` | false | Homelab hardware-monitoring CLIs (lm-sensors, smartmontools, ipmitool, nvme-cli, storcli) + `hw-*` shell helpers, each gated on detected hardware. Linux only; no-op in VMs. See [docs/sysadmin/hardware.md](docs/sysadmin/hardware.md). |
 | `useChineseMirror` | false | Switch Homebrew / pip / npm / cargo / etc. to China (GFW) mirrors |
@@ -351,7 +353,7 @@ every tool on your machine. For explicit upgrades, use the dedicated entry
 points (see [`docs/this_repo/upgrades.md`](docs/this_repo/upgrades.md) for the full matrix):
 
 ```bash
-just upgrade-all          # externals + brew + mise + uv + npm + cargo + dotnet + gem + agents + plugins
+just upgrade-all          # externals + brew + mise + uv + npm + cargo + go + dotnet + gem + agents + plugins
 just upgrade-dry-run      # preview without executing
 
 # Per category (compose as you like):
@@ -360,6 +362,7 @@ just upgrade-mise         # mise self-update + `mise upgrade`
 just upgrade-uv           # uv itself (auto-dispatches: brew vs self update) + `uv tool upgrade --all` (apprise, mlflow, sqlit-tui, ...)
 just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
 just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
+just upgrade-go           # go install <pkg>@latest per go_tools entry (translate, ...)
 just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
 just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
 just upgrade-agents       # re-runs install.sh for Claude Code / OpenCode / Cursor CLI / Ollama / llmfit / RTK

@@ -62,6 +62,9 @@
     - role: rust_cargo_tools
       tags: [rust_cargo_tools]
 
+    - role: go_tools
+      tags: [go_tools]
+
     - role: llm_tools
       tags: [llm_tools]
 

@@ -418,7 +418,7 @@ info:
 completions-refresh:
     ./scripts/generate_completions.sh --force
 
-# Upgrade everything: externals, brew, mise, uv, npm, cargo, dotnet, gem, flatpak, warp, agents, plugins
+# Upgrade everything: externals, brew, mise, uv, npm, cargo, go, dotnet, gem, flatpak, warp, agents, plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
 
@@ -441,6 +441,10 @@ upgrade-npm:
 # cargo install-update -a (bootstraps cargo-update crate if missing)
 upgrade-cargo:
     ./scripts/upgrade_tools.sh cargo
+
+# `go install <pkg>@latest` per tool in go_tools defaults (installs to ~/.local/bin)
+upgrade-go:
+    ./scripts/upgrade_tools.sh go
 
 # `dotnet tool update --global <name>` per tool in dotnet_tools defaults
 upgrade-dotnet:

@@ -1,0 +1,44 @@
+---
+# Go CLI tools installation via `go install`.
+# The Go toolchain is installed via mise (gated on installExtraRuntimes; see
+# dot_config/mise/config.toml.tmpl). This role no-ops cleanly when Go is absent.
+
+# =============================================================================
+# Resolve the mise-managed Go bin dir (no-op the whole role if Go is absent)
+# =============================================================================
+# `mise which go` prints the absolute path to the managed go binary
+# (~/.local/share/mise/installs/go/<ver>/bin/go); its dirname is the bin dir we
+# prepend to PATH so `go install` runs. Empty/failed → Go isn't installed
+# (installExtraRuntimes=false, or mise missing) and the install task below is
+# skipped. Mirrors the herdr-plus build idiom in dot_ansible/roles/devtools.
+- name: Resolve mise Go bin dir
+  ansible.builtin.shell: |
+    set -o pipefail
+    gobin="$(mise which go 2>/dev/null)" || exit 0
+    [ -n "$gobin" ] && dirname "$gobin"
+  args:
+    executable: /bin/bash
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/opt/homebrew/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+  register: go_bindir
+  changed_when: false
+  failed_when: false
+
+# =============================================================================
+# Install Go CLI tools (all platforms)
+# =============================================================================
+# GOBIN forces binaries into ~/.local/bin (the blessed dir already on PATH),
+# not ~/go/bin (GOPATH/bin) or the version-pinned mise toolchain dir. The
+# `creates:` guard makes this install-only + idempotent — version bumps go
+# through `just upgrade-go` (scripts/upgrade_tools.sh cat_go), never a re-apply.
+- name: Install Go CLI tools via go install
+  when: (go_bindir.stdout | default('') | trim) != ""
+  ansible.builtin.command: "go install {{ item.name }}"
+  args:
+    creates: "{{ ansible_facts['env']['HOME'] }}/.local/bin/{{ item.binary }}"
+  loop: "{{ go_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  environment:
+    GOBIN: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    PATH: "{{ (go_bindir.stdout | trim) }}:{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"

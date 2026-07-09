@@ -126,6 +126,7 @@ regen delta "--generate-completion zsh" "--generate-completion bash"
 regen zellij "setup --generate-completion zsh" "setup --generate-completion bash"
 regen pueue "completions zsh" "completions bash"
 regen opencode "completion zsh" "completion bash"
+regen translate "completion zsh" "completion bash"
 
 if [ "$n_z_regen" -gt 0 ] || [ "$n_b_regen" -gt 0 ] || [ "$quiet" = 0 ]; then
   printf 'completions: regenerated %d zsh + %d bash | skipped %d zsh + %d bash | %d not installed\n' \

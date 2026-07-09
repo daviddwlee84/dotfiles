@@ -30,11 +30,12 @@ If you want to know:
 | **Bootstrap** (`run_once_before_*.sh.tmpl`) | Homebrew itself, uv, mise, ansible-core, apt prereqs | `run_once_before_00_bootstrap.sh.tmpl` | n/a (one-shot, idempotent) |
 | **Homebrew formulae** | General macOS GUI helpers (`mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
 | **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
-| **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release) |
+| **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / go / gem / dotnet / curl-installer / github-release) |
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
+| **go** (`go install`) | Go CLI tools: `translate` | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -349,13 +350,13 @@ consumers regex-parse the same file (see AGENTS.md cross-file rule).
 Adding a new agent here means: install in this role + add to the SSOT
 + four Python `AGENT_CONFIG` dicts.
 
-#### 3.5 Language toolchains (`python_uv_tools`, `ruby_gem_tools`, `rust_cargo_tools`, `dotnet_tools`, `js_cli_tools`)
+#### 3.5 Language toolchains (`python_uv_tools`, `ruby_gem_tools`, `rust_cargo_tools`, `go_tools`, `dotnet_tools`, `js_cli_tools`)
 
 Wrappers around language-specific package managers. All consume a
 `defaults/main.yml` list so the role's `tasks/main.yml` is a loop. See
 [§ uv](#5-uv-python-cli-tools), [§ npm](#6-npm-global-node-clis),
-[§ cargo](#7-cargo-rust-crates), [§ dotnet](#8-dotnet-global-net-tools),
-[§ gem](#9-gem-ruby-gems) for the tool lists.
+[§ cargo](#7-cargo-rust-crates), [§ go](#8-go-go-cli-tools),
+[§ dotnet](#9-dotnet-global-net-tools), [§ gem](#10-gem-ruby-gems) for the tool lists.
 
 | Role | Underlying manager | Tools (count) | Gate |
 |---|---|---|---|
@@ -576,7 +577,33 @@ YAML (covered by `cargo install-update -a`); hard-code in `tasks/main.yml`
 only when the install needs extra build deps or a non-crates.io source
 (see `recon`, `pueue`).
 
-### 8. dotnet (global .NET tools)
+### 8. go (Go CLI tools)
+
+**Config**: `dot_ansible/roles/go_tools/defaults/main.yml`
+
+**Go install**: the Go toolchain ships via mise (`go = "latest"`, gated on
+`installExtraRuntimes`). The role resolves the mise Go bin dir via
+`mise which go` and no-ops cleanly when Go is absent (so lean/CI hosts skip
+it). Binaries install into `~/.local/bin` via `GOBIN` (already on PATH via
+`dot_config/shell/00_exports.sh.tmpl`) — not `~/go/bin` (`GOPATH/bin`) or the
+version-pinned mise toolchain dir. A `creates:` guard makes the install
+idempotent.
+
+**Inventory**:
+
+| Package | Binary |
+|---|---|
+| `github.com/daviddwlee84/translate@v0.1.0` | `translate` |
+
+**Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
+the pinned version). Install pins a known-good version for reproducible fresh
+boxes; upgrades move it forward — the same install-vs-upgrade split as cargo.
+
+**Adding a go tool**: append to `go_tools/defaults/main.yml` with `name`
+(`<module-path>@<version>`) and `binary` (the resulting command name, used for
+the `creates:` guard).
+
+### 9. dotnet (global .NET tools)
 
 **Config**: `dot_ansible/roles/dotnet_tools/defaults/main.yml`
 
@@ -597,7 +624,7 @@ per tool.
 **Adding a dotnet tool**: append to `dotnet_tools/defaults/main.yml`
 with `name` (NuGet package id) and `binary` (the actual command name).
 
-### 9. gem (Ruby gems)
+### 10. gem (Ruby gems)
 
 **Config**: `dot_ansible/roles/ruby_gem_tools/defaults/main.yml`
 
@@ -612,7 +639,7 @@ Build deps installed first: `libffi-dev`, `libyaml-dev` (Debian) /
 | `try-cli` | `try` |
 | `tmuxinator` | `tmuxinator` |
 
-Plus `toolkami.rb` fetched as a chezmoi external (see § 12 — runs
+Plus `toolkami.rb` fetched as a chezmoi external (see § 13 — runs
 standalone, not via `gem install`).
 
 **Upgrade**: `just upgrade-gem` → `gem update`.
@@ -620,7 +647,7 @@ standalone, not via `gem install`).
 **Adding a gem**: append to `ruby_gem_tools/defaults/main.yml` (will
 auto-skip on noRoot Linux since ruby isn't installed there).
 
-### 10. curl-installer (self-managed CLIs)
+### 11. curl-installer (self-managed CLIs)
 
 Tools that ship via vendor `install.sh` instead of any package manager.
 Mostly the AI coding agents (each vendor maintains their own installer
@@ -675,7 +702,7 @@ in-binary self-update works without sudo.
    `~/.opencode/bin/opencode`), add an existence-gated PATH prepend
    to `dot_config/shell/00_exports.sh.tmpl`
 
-### 11. GitHub-release downloads (user-level fallback)
+### 12. GitHub-release downloads (user-level fallback)
 
 When apt/yum can't satisfy a version requirement (e.g. Apple Silicon
 brew bottle missing, RHEL/CentOS package too old, noRoot host with no
@@ -731,7 +758,7 @@ similar arch matrix), substitute owner/repo/asset-name. Always wrap in
 `block:` / `rescue:` (vendor-side outages happen) and use
 `retries: 3, delay: 5, timeout: 120` on the download.
 
-### 12. chezmoi externals (refresh-periodic git/file fetches)
+### 13. chezmoi externals (refresh-periodic git/file fetches)
 
 **Config**: `.chezmoiexternal.toml.tmpl`
 
@@ -770,7 +797,7 @@ the external's commit changes.
 
 - ble.sh local-changes-overwritten ([`pitfalls/chezmoi-update-blesh-local-changes-overwritten.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/chezmoi-update-blesh-local-changes-overwritten.md)) — source clone moved out of the chezmoi external path to decouple from `make install`
 
-### 13. apt / yum (system packages)
+### 14. apt / yum (system packages)
 
 **The pragmatic Linux backbone**. Roles use apt/yum for tools that
 are well-packaged by the distro (i.e. recent enough, available, no
@@ -889,7 +916,7 @@ manually removed and re-installed.
 
 | Class | Why no upgrade | How to refresh |
 |---|---|---|
-| **GitHub-release user-level fallbacks** (~30 tools — see [§ 11](#11-github-release-downloads-user-level-fallback)) | `creates:` guard means ansible never re-downloads | `rm ~/.local/bin/<tool>` then `chezmoi apply` |
+| **GitHub-release user-level fallbacks** (~30 tools — see [§ 12](#12-github-release-downloads-user-level-fallback)) | `creates:` guard means ansible never re-downloads | `rm ~/.local/bin/<tool>` then `chezmoi apply` |
 | **Vendor apt-repo packages** on Debian (terraform, azure-cli, vscode, opentofu, ngrok, lazygit-from-PPA) | Rely on `sudo apt upgrade` outside this repo | `sudo apt update && sudo apt upgrade` (not chezmoi's job) |
 | **Docker convenience-script install** | No upgrade target | re-run `curl get.docker.com \| sh` |
 | **OrbStack** | Macos brew cask | Covered by `cat_brew --cask --greedy` |
@@ -1105,6 +1132,7 @@ list.
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
+| **translate** | go install (`go_tools`) | go install (`go_tools`) | go_tools |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
 | **trippy** (`trip`) | brew | apt/release | networking_tools |
@@ -1131,7 +1159,7 @@ list.
 > Tools not listed: `oh-my-zsh`, `oh-my-bash`, `zsh-autosuggestions`,
 > `zsh-syntax-highlighting`, `zsh-completions`, `zsh-vi-mode`,
 > `ble.sh`, `TPM`, `toolkami.rb` — these live as **chezmoi externals**
-> ([§ 12](#12-chezmoi-externals-refresh-periodic-gitfile-fetches)),
+> ([§ 13](#13-chezmoi-externals-refresh-periodic-gitfile-fetches)),
 > not as "binaries on PATH".
 
 ---
@@ -1171,6 +1199,12 @@ Is it a Ruby gem?
 
 Is it a .NET global tool?
 ├── Yes → dotnet tool (dotnet_tools/defaults/main.yml)
+└── No → continue
+
+Is it a Go CLI tool (installable via `go install`)?
+├── Yes → go (append to go_tools/defaults/main.yml: name=<module>@<ver>, binary=<cmd>)
+│         · Installs to ~/.local/bin via GOBIN; gated on installExtraRuntimes
+│         · Upgrade handled by cat_go in scripts/upgrade_tools.sh (just upgrade-go)
 └── No → continue
 
 Is the tool a coding agent CLI (vendor-distributed, ships its own installer)?

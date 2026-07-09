@@ -1,0 +1,20 @@
+---
+# Go CLI tools installed via `go install`.
+#
+# The Go toolchain comes from mise and is gated on installExtraRuntimes
+# (see dot_config/mise/config.toml.tmpl — `go = "latest"`). Binaries are
+# installed into ~/.local/bin (via GOBIN), the blessed auto-install dir that
+# is already on PATH (dot_config/shell/00_exports.sh.tmpl), matching where
+# cargo/uv/npm/dotnet tools land.
+#
+# Add tools here. Pin the version so a fresh box installs a known-good build;
+# `binary` is the resulting executable name, used for the `creates:`
+# idempotency guard. Version bumps are handled by the upgrade path
+# (`just upgrade-go` → scripts/upgrade_tools.sh cat_go), NOT by editing the pin
+# — same install-vs-upgrade split as cargo. Example:
+#   - name: github.com/owner/tool@v1.2.3
+#     binary: tool
+
+go_tools:
+  - name: github.com/daviddwlee84/translate@v0.1.0
+    binary: translate

@@ -22,7 +22,7 @@ Two side-effects worth knowing about:
 ## Entry points
 
 ```bash
-just upgrade-all          # externals → brew → mise → uv → npm → cargo → dotnet → gem → flatpak → warp → agents → plugins
+just upgrade-all          # externals → brew → mise → uv → npm → cargo → go → dotnet → gem → flatpak → warp → agents → plugins
 just upgrade-dry-run      # same, but commands are printed, not executed
 just upgrade-<category>   # run one category in isolation
 ```
@@ -50,6 +50,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `uv` | Detects install style by binary path (Homebrew vs curl-installer) and dispatches to the right channel: `brew upgrade uv` for Homebrew/Linuxbrew installs, `uv self update` for the standalone curl installer. Then `uv tool upgrade --all`. Covers every tool listed in [`python_uv_tools/defaults/main.yml`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml) and [`llm_tools/defaults/main.yml`](../../dot_ansible/roles/llm_tools/defaults/main.yml). The `python_uv_tools` ansible role does the same dispatch automatically when uv is below `min_uv_version` — see [`docs/this_repo/uv-bootstrap.md`](uv-bootstrap.md). |
 | `npm` | `npm -g update`, falling back to `mise exec -- npm -g update` when `npm` is not directly on PATH (same detection as [`js_cli_tools`](../../dot_ansible/roles/js_cli_tools/tasks/main.yml) / [`bitwarden`](../../dot_ansible/roles/bitwarden/tasks/main.yml)). |
 | `cargo` | If absent, bootstraps the `cargo-update` crate, then `cargo install-update -a`. Covers pueue (Linux) plus any future entries in [`rust_cargo_tools/defaults/main.yml`](../../dot_ansible/roles/rust_cargo_tools/defaults/main.yml). |
+| `go` | Parses tool names from [`go_tools/defaults/main.yml`](../../dot_ansible/roles/go_tools/defaults/main.yml) and runs `go install <pkg>@latest` per entry (strips the pinned version), installing into `~/.local/bin` via `GOBIN`. Resolves go via the mise shim; `SKIPPED` when Go is absent (`installExtraRuntimes=false`). |
 | `dotnet` | Parses tool names from [`dotnet_tools/defaults/main.yml`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml) and runs `dotnet tool update --global <name>` per tool (via the mise dotnet shim). Falls back to `dotnet tool list --global` if parsing finds nothing. |
 | `gem` | `gem update --system` + `gem update` via the mise ruby shim. |
 | `flatpak` | `flatpak update --user --noninteractive --assumeyes` for user-scope Flathub apps (Discord et al. when `discordChannel=flatpak` — see [`docs/playbooks/linux-gui-apps.md`](../playbooks/linux-gui-apps.md)). Skipped when `flatpak` is absent OR when no user-scope apps are installed. System-scope (`flatpak update --system`) is intentionally NOT covered — it requires `sudo` and is rare in this repo's flow; run manually if needed. |
@@ -67,7 +68,8 @@ flowchart LR
     mise["mise<br/>(self-update + runtimes)"] --> uv
     uv["uv<br/>(self update + tools)"] --> npm
     npm["npm<br/>(-g update)"] --> cargo
-    cargo["cargo<br/>(install-update -a)"] --> dotnet
+    cargo["cargo<br/>(install-update -a)"] --> go
+    go["go<br/>(install @latest)"] --> dotnet
     dotnet["dotnet<br/>(tool update --global)"] --> gem
     gem["gem<br/>(gem update)"] --> flatpak
     flatpak["flatpak<br/>(--user update)"] --> warp
@@ -77,7 +79,7 @@ flowchart LR
     plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
 ```
 
-Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
+Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`go`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.
 
 `claude-hud` stays out of [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl): it uses a versioned cache path and rewrites `~/.claude/plugins/installed_plugins.json`, so it fits the explicit `plugins` upgrade path better than chezmoi externals. Upstream `v0.0.12+` also switched usage rendering to Claude Code's official stdin `rate_limits`, which means the old credential-derived `Max` badge may disappear after upgrade.
 
@@ -147,7 +149,7 @@ Overall process exit code is `1` iff at least one category is in FAILED. `--dry-
 
 Three ways to add a new tool to the upgrade flow:
 
-1. **Tool already managed by an existing category (brew / uv / npm / cargo / dotnet / gem / mise).** Nothing to do — the generic `upgrade-<category>` picks it up because it uses the package manager's own bulk command.
+1. **Tool already managed by an existing category (brew / uv / npm / cargo / go / dotnet / gem / mise).** Nothing to do — the generic `upgrade-<category>` picks it up because it uses the package manager's own bulk command.
 2. **New `curl | bash` installer.** Add a guarded block inside `cat_agents()` in [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh). Gate on the binary being present so the upgrade path never bootstraps on machines that don't have the tool.
 
    ```bash
@@ -173,4 +175,4 @@ Keep the return-value contract: `0` = success, `77` = skipped (prerequisite miss
 - [`scripts/upgrade_tools.sh`](../../scripts/upgrade_tools.sh) — the implementation.
 - [`scripts/lib/sudo_shared.sh`](../../scripts/lib/sudo_shared.sh) — the sudo-session helper reused for macOS cask installers.
 - [`.chezmoiexternal.toml.tmpl`](../../.chezmoiexternal.toml.tmpl) — the `refreshPeriod` entries that `upgrade-externals` force-refreshes.
-- Ansible role defaults consumed for enumeration: [`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml), [`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml), [`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml), [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml).
+- Ansible role defaults consumed for enumeration: [`dotnet_tools`](../../dot_ansible/roles/dotnet_tools/defaults/main.yml), [`go_tools`](../../dot_ansible/roles/go_tools/defaults/main.yml), [`python_uv_tools`](../../dot_ansible/roles/python_uv_tools/defaults/main.yml), [`llm_tools`](../../dot_ansible/roles/llm_tools/defaults/main.yml), [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml).

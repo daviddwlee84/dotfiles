@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo dotnet gem flatpak warp atuin agents plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin agents plugins)
 
 usage() {
   cat <<EOF
@@ -493,6 +493,61 @@ cat_cargo() {
     warn "cargo-update not available; skipping bulk upgrade"
     any_fail=1
   fi
+  return "$any_fail"
+}
+
+# ============================================================================
+# Category: go — `go install <pkg>@latest` for each tool in
+# dot_ansible/roles/go_tools/defaults/main.yml
+# ============================================================================
+cat_go() {
+  # Resolve go via mise shim first, then system PATH.
+  local go_cmd=""
+  if [[ -x "$HOME/.local/share/mise/shims/go" ]]; then
+    go_cmd="$HOME/.local/share/mise/shims/go"
+  elif command -v go >/dev/null 2>&1; then
+    go_cmd="go"
+  else
+    warn "go not found (Go not installed via mise?) — skipping"
+    return $SKIP_RC
+  fi
+
+  # Parse the tools list from defaults YAML — lines `  - name: <pkg>@<ver>`.
+  # Same hand-rolled awk parser as cat_dotnet.
+  local defaults_file="$_REPO_ROOT/dot_ansible/roles/go_tools/defaults/main.yml"
+  local tools=()
+  if [[ -f "$defaults_file" ]]; then
+    while IFS= read -r line; do
+      tools+=("$line")
+    done < <(awk '
+            /^go_tools:/ { in_list=1; next }
+            in_list && /^[^ ]/ { in_list=0 }
+            in_list && /^[[:space:]]*-[[:space:]]*name:/ {
+                sub(/^[[:space:]]*-[[:space:]]*name:[[:space:]]*/, "")
+                gsub(/["'"'"']/, "")
+                print
+            }
+        ' "$defaults_file")
+  fi
+
+  if [[ ${#tools[@]} -eq 0 ]]; then
+    warn "no go tools to upgrade — skipping"
+    return $SKIP_RC
+  fi
+
+  # Install into ~/.local/bin (the blessed dir), not ~/go/bin or the mise
+  # toolchain dir. Upgrade = re-install at @latest regardless of the version
+  # pinned in defaults (install-vs-upgrade split — defaults pin for fresh
+  # installs, this moves them forward). See docs/this_repo/tool-managers.md.
+  export GOBIN="$HOME/.local/bin"
+
+  local any_fail=0
+  for t in "${tools[@]}"; do
+    # Strip any @version pin (module paths never contain '@') and go to @latest.
+    local pkg="${t%@*}"
+    info "Upgrading go tool: $pkg@latest"
+    _run "$go_cmd" install "$pkg@latest" || any_fail=1
+  done
   return "$any_fail"
 }
 
@@ -905,6 +960,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         uv) run_category uv cat_uv ;;
         npm) run_category npm cat_npm ;;
         cargo) run_category cargo cat_cargo ;;
+        go) run_category go cat_go ;;
         dotnet) run_category dotnet cat_dotnet ;;
         gem) run_category gem cat_gem ;;
         flatpak) run_category flatpak cat_flatpak ;;
