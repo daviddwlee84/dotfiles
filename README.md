@@ -256,7 +256,7 @@ See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".
 - `~/.config/zellij/config.kdl` - Zellij config (locked default mode for coding agent compatibility, kitty keyboard protocol)
 - `~/.config/zellij/layouts/claude-sidecar.kdl` - Zellij layout for Claude + Sidecar
 - `~/.config/herdr/config.toml` - Herdr config (Rust terminal multiplexer + AI-agent orchestrator; **trial tool that coexists with tmux**, not a replacement). Catppuccin theme, tmux-like keybindings, `tv`/lazygit command-panes, herdr-plus Projects layouts, and native agent-state indicators. Managed via a `modify_` tomlkit overlay (enforces our tables every apply, preserves herdr's runtime writeback). Behavior model (two cwd fields, OSC7 tracking, nesting inside tmux) + feasibility matrix + documented gaps (seamless nvim nav, OSC133 copy-mode) in [docs/tools/herdr.md](docs/tools/herdr.md)
-- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
+- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI helper formulas (e.g., `mas` for App Store installs)
 
 SSH files are managed as create-only templates: if `~/.ssh/config` already exists, it is not overwritten. In that case, add `Include ~/.ssh/config.d/*` to your existing config manually to load the managed snippets.
 
@@ -296,7 +296,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **.NET tools** (optional): .NET SDK via mise + `azure-cost-cli` (Azure cost analysis); see [docs/tools/dotnet-tools.md](docs/tools/dotnet-tools.md)
 - **Docker**: OrbStack (macOS) or Docker Engine (Linux)
 - **Cargo tools**: pueue (process queue manager), [`recon`](https://github.com/gavraz/recon) (Claude Code tmux dashboard — see [agent pane discovery](docs/tools/agent-panes-discovery.md))
-- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale Desktop via Homebrew Cask; Tailscale CLI via `brew "tailscale"` in shared Brewfile when `installBrewApps=true`.
+- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale (desktop app **and** `tailscale` CLI) via Homebrew Cask `tailscale-app` — the cask's pkg also installs a `/usr/local/bin/tailscale` wrapper into the app, so there is no separate `tailscale` formula on macOS.
 
 ### Bootstrap (installed before ansible)
 

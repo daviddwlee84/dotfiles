@@ -21,5 +21,12 @@ tap "nikitabobko/tap"  # aerospace (macOS window manager)
 {{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
 # Mac App Store CLI (needed for mas entries in Brewfile.darwin)
 brew "mas"
-brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+# NOTE: deliberately no `brew "tailscale"` here. On macOS the Tailscale CLI is
+# already provided by `cask "tailscale-app"` (Brewfile.darwin) as
+# /usr/local/bin/tailscale — a shell wrapper into the app bundle. The standalone
+# `tailscale` formula is redundant AND harmful: it fights the cask over that same
+# path on every upgrade (ollama-style link conflict) and ships a `tailscaled` the
+# app's system extension already runs. Do NOT re-add it for macOS, and never
+# `brew services start tailscale`. See
+# pitfalls/tailscale-another-copy-app-store-leftover.md
 {{ end -}}
