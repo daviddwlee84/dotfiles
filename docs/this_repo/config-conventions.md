@@ -270,9 +270,9 @@ TL;DR:
 | --------------------- | ---------- | ---------------- |
 | `~/.dotfiles/bin/`    | This repo  | chezmoi-managed user scripts (source: `dot_dotfiles/bin/executable_*`) — fleet, sms, mi-router, sesh-preview, x |
 | `~/bin/`              | Old POSIX  | Legacy / user-placed binaries (transitional; PATH entry will be removed once every host has cleaned up the old `~/bin/*` chezmoi-deployed copies) |
-| `~/.local/bin/`       | XDG-ish    | Auto-installed CLIs (uv, mise, chezmoi, just, fd, eza, …) |
+| `~/.local/bin/`       | XDG-ish    | Auto-installed CLIs (uv, mise, chezmoi, just, fd, eza, `go install`, …) |
 | `~/.cargo/bin/`       | Rust       | cargo-installed binaries |
-| `~/go/bin/`           | Go         | `go install` targets |
+| `~/.local/share/go/`  | Go (XDG)   | `GOPATH` — module cache (`pkg/mod`); **not** on PATH. `go install` targets go to `~/.local/bin` (GOBIN), so `~/go` is never created |
 | `~/.bun/bin/`         | Bun        | bun runtime + globally-installed JS CLIs |
 | `~/Library/pnpm/`     | macOS pnpm | pnpm global store |
 | `/opt/homebrew/bin/`  | macOS brew | Apple Silicon brew |

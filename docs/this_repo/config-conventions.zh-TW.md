@@ -241,9 +241,9 @@ Per-machine 的 API keys、tokens、proxy URLs——絕不追蹤。由受管 rc 
 | 目錄                  | 慣例       | 內容 |
 | --------------------- | ---------- | ---- |
 | `~/bin/`              | 老式 POSIX | 使用者撰寫的 shell 腳本（`dot_bin/` 中有幾個） |
-| `~/.local/bin/`       | XDG-ish    | 自動安裝的 CLI（uv、mise、chezmoi、just、fd、eza、…） |
+| `~/.local/bin/`       | XDG-ish    | 自動安裝的 CLI（uv、mise、chezmoi、just、fd、eza、`go install`、…） |
 | `~/.cargo/bin/`       | Rust       | cargo 安裝的 binary |
-| `~/go/bin/`           | Go         | `go install` 的 target |
+| `~/.local/share/go/`  | Go (XDG)   | `GOPATH` — module cache（`pkg/mod`）；**不**在 PATH 上。`go install` 的 target 落在 `~/.local/bin`（GOBIN），因此不會產生 `~/go` |
 | `~/.bun/bin/`         | Bun        | bun runtime + 全域安裝的 JS CLI |
 | `~/Library/pnpm/`     | macOS pnpm | pnpm 全域 store |
 | `/opt/homebrew/bin/`  | macOS brew | Apple Silicon brew |

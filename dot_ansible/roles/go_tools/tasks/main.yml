@@ -28,7 +28,10 @@
 # Install Go CLI tools (all platforms)
 # =============================================================================
 # GOBIN forces binaries into ~/.local/bin (the blessed dir already on PATH),
-# not ~/go/bin (GOPATH/bin) or the version-pinned mise toolchain dir. The
+# not ~/go/bin (GOPATH/bin) or the version-pinned mise toolchain dir. GOPATH is
+# pinned to ~/.local/share/go (XDG data) so the build-time module cache lands
+# there instead of recreating ~/go — matches the interactive shell
+# (dot_config/shell/02_legacy_tools.sh) and scripts/upgrade_tools.sh cat_go. The
 # `creates:` guard makes this install-only + idempotent — version bumps go
 # through `just upgrade-go` (scripts/upgrade_tools.sh cat_go), never a re-apply.
 - name: Install Go CLI tools via go install
@@ -41,4 +44,5 @@
     label: "{{ item.name }}"
   environment:
     GOBIN: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+    GOPATH: "{{ ansible_facts['env']['HOME'] }}/.local/share/go"
     PATH: "{{ (go_bindir.stdout | trim) }}:{{ ansible_facts['env']['HOME'] }}/.local/bin:{{ ansible_facts['env']['PATH'] }}"

@@ -4,10 +4,13 @@
 # kept for backwards compatibility with existing installations.
 
 # =============================================================================
-# Go (Golang)
+# Go (Golang) — keep HOME tidy: no ~/go. GOPATH → XDG data, go install → ~/.local/bin.
+# XDG_DATA_HOME is exported by the rc files before this module (defensive fallback
+# kept per repo convention). ~/.local/bin is already on PATH via 00_exports.sh.tmpl,
+# so GOBIN targets need no extra PATH entry. GOCACHE stays macOS-native (~/Library).
 # =============================================================================
-export GOPATH="${GOPATH:-$HOME/go}"
-[[ -d "$GOPATH/bin" ]] && export PATH="$GOPATH/bin:$PATH"
+export GOPATH="${GOPATH:-${XDG_DATA_HOME:-$HOME/.local/share}/go}"
+export GOBIN="${GOBIN:-$HOME/.local/bin}"
 
 # Homebrew Go (Apple Silicon, then Intel), falling back to a manual /usr/local/go
 # install only when neither brew Go exists. Order matters: the Intel brew path

@@ -539,7 +539,11 @@ cat_go() {
   # toolchain dir. Upgrade = re-install at @latest regardless of the version
   # pinned in defaults (install-vs-upgrade split — defaults pin for fresh
   # installs, this moves them forward). See docs/this_repo/tool-managers.md.
+  # GOPATH pinned to ~/.local/share/go (XDG data) so the build-time module cache
+  # doesn't repopulate ~/go — mirrors dot_config/shell/02_legacy_tools.sh and the
+  # go_tools ansible role.
   export GOBIN="$HOME/.local/bin"
+  export GOPATH="$HOME/.local/share/go"
 
   local any_fail=0
   for t in "${tools[@]}"; do

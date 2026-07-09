@@ -35,6 +35,18 @@
 # ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
 ruby.compile = false
 
+[env]
+# mise's Go backend force-sets GOBIN=<mise install>/bin with NO off-switch
+# (settings expose go_set_gopath / go_set_goroot but NOT go_set_gobin) and
+# re-asserts it on every `cd` via hook-env, clobbering any shell export. So the
+# ONLY reliable way to send `go install` into the blessed ~/.local/bin (instead
+# of the version-pinned toolchain dir, which is wiped on every `go` upgrade) is
+# to override GOBIN here in mise's own [env]. GOPATH is left to the shell
+# (dot_config/shell/02_legacy_tools.sh) because mise ships go_set_gopath=false
+# and never touches it. Non-mise shells fall back to that same module; the
+# go_tools ansible role + scripts/upgrade_tools.sh cat_go pin both explicitly.
+GOBIN = "{{ .chezmoi.homeDir }}/.local/bin"
+
 [tools]
 {{ if $oldEL -}}
 # CentOS/RHEL 7 detected (glibc 2.17). Modern toolchain prebuilds refuse to
