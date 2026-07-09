@@ -10,7 +10,14 @@
 # needs no re-auth. Full guide + risks: docs/tools/copilot-claude-proxy.md.
 #
 # Public surface:
-#   copilot-proxy [start|stop|status|restart|logs|whoami|auth]   - manage the proxy
+#   copilot-proxy [start|stop|status|restart|doctor|logs|whoami|auth]  - manage the proxy
+#   copilot-proxy doctor [--live]  - diagnose prereqs/auth/proxy/model-entitlement/
+#                                upstream; --live sends one real request. The
+#                                model-entitlement check catches the common
+#                                "400 model_not_supported" case, where a Copilot
+#                                plan serves no Anthropic models at all — that
+#                                looks like a network fault in the logs but is an
+#                                account-policy fact.
 #   copilot-run <cmd...>       - run any command with the proxy env injected
 #                                (auto-starts the proxy first)
 #   claude-copilot [args...]   - one-off Claude Code session on the proxy
@@ -180,6 +187,111 @@ _copilot_alive() {
   command curl -fsS --max-time 2 "$(_copilot_base)/v1/models" >/dev/null 2>&1
 }
 
+# --- doctor helpers -------------------------------------------------------------
+
+# Every model id the proxy will accept: the raw `.id` PLUS the `.claude_model_id`
+# alias (which is the one carrying the "[1m]" suffix Claude Code sends). Checking
+# only `.id` — as _copilot_model_list does — would reject a valid "...[1m]" pin.
+_copilot_served_models() {
+  local json
+  json="$(command curl -fsS --max-time 5 "$(_copilot_base)/v1/models" 2>/dev/null)" || return 1
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "$json" | jq -r '.data[] | .id, (.claude_model_id // empty)' 2>/dev/null | command sort -u
+  else
+    printf '%s\n' "$json" \
+      | command grep -oE '"(id|claude_model_id)":"[^"]*"' \
+      | command sed 's/.*":"//;s/"//' | command sort -u
+  fi
+}
+
+# The model Claude Code would actually send from THIS directory, and where it
+# came from. Mirrors copilot-model's precedence: project pin > $COPILOT_CLAUDE_MODEL
+# > state file > built-in default. Echoes "<model>|<source>" ('|' never occurs in
+# a model id or a path we emit here).
+_copilot_effective_model() {
+  local settings=".claude/settings.local.json" m
+  if [ -f "$settings" ] && command -v jq >/dev/null 2>&1 \
+     && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" != "" ]; then
+    m="$(jq -r '.env.ANTHROPIC_MODEL // empty' "$settings" 2>/dev/null)"
+    if [ -n "$m" ]; then printf '%s|%s' "$m" "project pin: $settings"; return 0; fi
+  fi
+  if [ -n "${COPILOT_CLAUDE_MODEL:-}" ]; then
+    printf '%s|%s' "$COPILOT_CLAUDE_MODEL" '$COPILOT_CLAUDE_MODEL'
+  elif [ -f "$(_copilot_model_state)" ]; then
+    printf '%s|%s' "$(command head -n 1 "$(_copilot_model_state)")" "state file: $(_copilot_model_state)"
+  else
+    printf '%s|%s' "$(_copilot_default_model)" "built-in default"
+  fi
+}
+
+# HTTP reachability probe. Any HTTP status means the host answered — an
+# unauthenticated 400/401 from the Copilot API is a SUCCESSFUL reach. Only a
+# connect/read failure is a fault. Echoes "<code>|<seconds>", empty on failure.
+# $2, when non-empty, routes through that proxy (e.g. http://127.0.0.1:7891).
+_copilot_probe() {
+  local url="$1" via="${2:-}" out
+  if [ -n "$via" ]; then
+    out="$(command curl -o /dev/null -s -w '%{http_code}|%{time_total}' --max-time 12 -x "$via" "$url" 2>/dev/null)" || return 1
+  else
+    out="$(command curl -o /dev/null -s -w '%{http_code}|%{time_total}' --max-time 12 --noproxy '*' "$url" 2>/dev/null)" || return 1
+  fi
+  case "$out" in 000*) return 1 ;; esac
+  printf '%s' "$out"
+}
+
+# Model ids GitHub serves for this account RIGHT NOW, bypassing the proxy.
+#
+# Why this exists: copilot-api fetches /models ONCE at startup and caches it for
+# the whole process lifetime. A degraded startup fetch (flaky VPN/Clash node,
+# transient GitHub response) leaves the proxy serving a truncated list forever,
+# and every request for a missing model returns a 400 "model_not_supported" that
+# looks exactly like an entitlement problem. Comparing live-upstream against
+# proxy-cached is the only way to tell those two apart. Verified 2026-07.
+#
+# Secrets: the ghu_/bearer tokens are passed via `curl -K -` (stdin config), NOT
+# argv — argv is world-readable via `ps`. Never echo either token.
+_copilot_upstream_models() {
+  local tokfile="$HOME/.local/share/copilot-api/github_token"
+  [ -f "$tokfile" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  local ghu ex api ctok up
+  ghu="$(command head -n 1 "$tokfile" 2>/dev/null)"
+  [ -n "$ghu" ] || return 1
+
+  ex="$(printf 'header = "Authorization: token %s"\n' "$ghu" \
+        | command curl -fsS --max-time 10 -K - \
+            -H 'user-agent: GitHubCopilotChat/0.26.7' \
+            https://api.github.com/copilot_internal/v2/token 2>/dev/null)" || return 1
+
+  api="$(printf '%s' "$ex" | jq -r '.endpoints.api // "https://api.githubcopilot.com"' 2>/dev/null)"
+  ctok="$(printf '%s' "$ex" | jq -r '.token // empty' 2>/dev/null)"
+  [ -n "$ctok" ] || return 1
+
+  up="$(printf 'header = "Authorization: Bearer %s"\n' "$ctok" \
+        | command curl -fsS --max-time 12 -K - \
+            -H 'user-agent: GitHubCopilotChat/0.26.7' \
+            -H 'copilot-integration-id: vscode-chat' \
+            "$api/models" 2>/dev/null)" || return 1
+
+  printf '%s' "$up" | jq -r '.data[]?.id // empty' 2>/dev/null | command sort -u
+}
+
+# Normalise a model id for cross-source comparison: lowercase, dots -> dashes
+# (upstream says claude-opus-4.8, the proxy says claude-opus-4-8), drop the
+# Claude Code-only "[1m]" suffix. Reads ids on stdin, one per line.
+_copilot_norm_models() {
+  command tr 'A-Z' 'a-z' | command sed 's/\[1m\]$//; s/\./-/g' | command sort -u
+}
+
+# macOS system HTTP proxy as "host:port", empty when disabled/not macOS.
+_copilot_system_proxy() {
+  command -v scutil >/dev/null 2>&1 || return 0
+  command scutil --proxy 2>/dev/null | command awk '
+    /HTTPEnable/ { en=$3 } /HTTPProxy/ { h=$3 } /HTTPPort/ { p=$3 }
+    END { if (en == 1 && h != "" && p != "") printf "%s:%s", h, p }'
+}
+
 # --- proxy manager --------------------------------------------------------------
 
 # Manage the copilot-api proxy. Subcommands: start|stop|status|restart|logs|auth.
@@ -297,6 +409,209 @@ copilot-proxy() {
         return 1
       fi
       ;;
+    doctor|test)
+      # Diagnose the whole path: prereqs -> auth -> proxy -> model entitlement
+      # -> upstream reachability -> (optional) a real inference round-trip.
+      #
+      # The model-entitlement check is the one that matters most: a Copilot plan
+      # that serves no Anthropic models fails EVERY request with a 400
+      # "model_not_supported", which reads like a network fault in the logs but
+      # is an account-policy fact no amount of proxy tuning will fix.
+      local _live=0
+      case "${2:-}" in --live) _live=1 ;; esac
+
+      # Colour only when stdout is a terminal, so `copilot-proxy doctor | tee`
+      # and CI capture stay readable. printf (not $'..') keeps this sh-portable.
+      local _g='' _r_='' _y='' _z=''
+      if [ -t 1 ]; then
+        _g="$(printf '\033[32m')"; _r_="$(printf '\033[31m')"
+        _y="$(printf '\033[33m')"; _z="$(printf '\033[0m')"
+      fi
+
+      local _fail=0 _warn=0
+      _ok()   { printf '  %s✓%s %-16s %s\n' "$_g" "$_z" "$1" "$2"; }
+      _bad()  { printf '  %s✗%s %-16s %s\n' "$_r_" "$_z" "$1" "$2"; _fail=$((_fail+1)); }
+      _note() { printf '  %s!%s %-16s %s\n' "$_y" "$_z" "$1" "$2"; _warn=$((_warn+1)); }
+      _skip() { printf '  · %-16s %s\n' "$1" "$2"; }
+      _hint() { printf '    %-16s → %s\n' "" "$1"; }
+
+      printf '\ncopilot-proxy doctor   port %s   pkg %s\n\n' "$port" "$pkg"
+
+      printf '%s\n' "Prerequisites"
+      local _tool
+      for _tool in bunx curl jq; do
+        if command -v "$_tool" >/dev/null 2>&1; then _ok "$_tool" "$(command -v "$_tool")"
+        elif [ "$_tool" = jq ]; then _note "$_tool" "not found — some checks degrade to grep"
+        else _bad "$_tool" "not found"; fi
+      done
+
+      printf '\n%s\n' "Authentication"
+      local _tok="$HOME/.local/share/copilot-api/github_token"
+      if [ -f "$_tok" ]; then _ok "token file" "$_tok"
+      else _bad "token file" "absent"; _hint "copilot-proxy auth"; fi
+
+      printf '\n%s\n' "Proxy"
+      if _copilot_alive; then _ok "listening" "$(_copilot_base)"
+      else
+        _bad "listening" "nothing answering on port $port"
+        _hint "copilot-proxy start"
+      fi
+      if _copilot_shim_enabled; then
+        if _copilot_shim_alive; then _ok "throttle shim" "up on $(_copilot_shim_base) → clients use this"
+        else _bad "throttle shim" "enabled but DOWN"; _hint "copilot-proxy shim on"; fi
+      else
+        _skip "throttle shim" "off"
+      fi
+
+      printf '\n%s\n' "Models"
+      local _served _n _claude _model _src _pin
+      if _served="$(_copilot_served_models)" && [ -n "$_served" ]; then
+        _n="$(printf '%s\n' "$_served" | command grep -c .)"
+        _claude="$(printf '%s\n' "$_served" | command grep -ci '^claude' || true)"
+        _ok "served" "$_n model ids"
+        if [ "$_claude" -gt 0 ]; then
+          _ok "claude models" "$_claude ids available"
+        else
+          _bad "claude models" "0 of $_n — the proxy is serving no Anthropic models"
+        fi
+
+        # Live upstream vs proxy-cached. This distinguishes the two causes of a
+        # 400 model_not_supported that are otherwise indistinguishable:
+        #   stale cache  -> upstream HAS claude, proxy doesn't  -> restart
+        #   entitlement  -> upstream lacks claude too           -> org policy
+        local _up _up_claude _missing _served_norm _m
+        if _up="$(_copilot_upstream_models)" && [ -n "$_up" ]; then
+          _up_claude="$(printf '%s\n' "$_up" | command grep -ci '^claude' || true)"
+          _ok "upstream" "$(printf '%s\n' "$_up" | command grep -c .) ids from GitHub, $_up_claude claude"
+          # set-difference without process substitution (POSIX subset: this file
+          # is sourced by both bash and zsh, and `<(...)` is neither's contract).
+          _served_norm="$(printf '%s\n' "$_served" | _copilot_norm_models)"
+          _missing="$(printf '%s\n' "$_up" | _copilot_norm_models | command grep -i '^claude' \
+            | while IFS= read -r _m; do
+                [ -n "$_m" ] || continue
+                printf '%s\n' "$_served_norm" | command grep -qxF "$_m" || printf '%s\n' "$_m"
+              done)"
+          if [ -n "$_missing" ]; then
+            _bad "STALE CACHE" "upstream serves claude ids the proxy does not:"
+            printf '%s\n' "$_missing" | while IFS= read -r _m; do [ -n "$_m" ] && _hint "$_m"; done
+            _hint "copilot-api caches /models at STARTUP — a flaky fetch poisons the session"
+            _hint "copilot-proxy restart   # re-fetch the list"
+          elif [ "$_up_claude" -gt 0 ] && [ "$_claude" -eq 0 ]; then
+            _bad "STALE CACHE" "upstream has claude, the proxy does not"
+            _hint "copilot-proxy restart"
+          elif [ "$_up_claude" -eq 0 ]; then
+            _note "entitlement" "GitHub itself serves no claude models for this account"
+            _hint "org Copilot policy disables Anthropic — a restart will NOT help"
+          else
+            _ok "cache" "proxy list matches upstream (no claude ids missing)"
+          fi
+        else
+          _skip "upstream" "could not query GitHub directly (need token + jq) — cache check skipped"
+        fi
+
+        _pin="$(_copilot_effective_model)"
+        _model="${_pin%%|*}"; _src="${_pin##*|}"
+        if printf '%s\n' "$_served" | command grep -qxF "$_model"; then
+          _ok "pinned model" "$_model  ($_src)"
+        else
+          _bad "pinned model" "$_model  ($_src)"
+          _hint "not in the served list → every request returns 400 model_not_supported"
+          _hint "copilot-model -l   # list served ids"
+        fi
+      else
+        _bad "served" "could not fetch $(_copilot_base)/v1/models"
+      fi
+
+      printf '\n%s\n' "Upstream (GitHub Copilot API)"
+      local _sysproxy _r _code _t
+      _sysproxy="$(_copilot_system_proxy)"
+      for _h in api.enterprise.githubcopilot.com api.githubcopilot.com; do
+        if _r="$(_copilot_probe "https://$_h/models")"; then
+          _code="${_r%%|*}"; _t="${_r##*|}"
+          _ok "$_h" "direct HTTP $_code in ${_t}s"
+        else
+          _bad "$_h" "direct — no response within 12s"
+          _hint "connection blocked or upstream unreachable without a proxy"
+        fi
+        if [ -n "$_sysproxy" ]; then
+          if _r="$(_copilot_probe "https://$_h/models" "http://$_sysproxy")"; then
+            _code="${_r%%|*}"; _t="${_r##*|}"
+            _ok "$_h" "via $_sysproxy HTTP $_code in ${_t}s"
+          else
+            _bad "$_h" "via $_sysproxy — no response within 12s"
+            _hint "your system proxy cannot reach this host; bypass it or fix the rule"
+          fi
+        fi
+      done
+      _skip "" "HTTP 400/401 = reached (an unauthenticated probe is expected to be rejected)"
+
+      printf '\n%s\n' "Network / local proxy"
+      if [ -n "$_sysproxy" ]; then
+        _note "system proxy" "$_sysproxy (macOS HTTP+HTTPS)"
+        local _ph="${_sysproxy%%:*}" _pp="${_sysproxy##*:}"
+        if command nc -z -G 2 "$_ph" "$_pp" >/dev/null 2>&1; then
+          _ok "proxy port" "$_sysproxy is listening"
+        else
+          _bad "proxy port" "$_sysproxy is NOT listening — system proxy points at a dead port"
+          _hint "start Clash/mihomo, or turn the macOS system proxy off"
+        fi
+      else
+        _skip "system proxy" "disabled"
+      fi
+      if command pgrep -f -i 'clash|mihomo' >/dev/null 2>&1; then
+        _note "clash/mihomo" "running — long streaming POSTs can be dropped by a flaky node"
+        _hint "an ETIMEDOUT mid-request (not at connect) usually means the proxy node died"
+      else
+        _skip "clash/mihomo" "not running"
+      fi
+      if [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ]; then
+        _note "env proxy" "HTTPS_PROXY is set — bun/node honour this, the macOS setting alone they ignore"
+      else
+        _skip "env proxy" "HTTPS_PROXY unset (bun reaches upstream directly)"
+      fi
+
+      printf '\n%s\n' "Live probe"
+      if [ "$_live" -ne 1 ]; then
+        _skip "skipped" "pass --live to send one real request (consumes 1 quota unit)"
+      elif ! _copilot_alive; then
+        _skip "skipped" "proxy is not running"
+      elif [ -z "${_served:-}" ]; then
+        _skip "skipped" "no served model to probe with"
+      else
+        # Pick a chat model, never an embedding one, and never a "[1m]" alias:
+        # that suffix is Claude Code-only sugar and the proxy rejects it from a
+        # raw API client (see _copilot_default_model's notes).
+        local _probe_model _body
+        _probe_model="$(printf '%s\n' "$_served" \
+          | command grep -vi 'embedding' | command grep -v '\[1m\]' | command head -n 1)"
+        _body="$(printf '{"model":"%s","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' "$_probe_model")"
+        # Probe the base CLIENTS use (the shim when it's up), so the live check
+        # exercises the same chain Claude Code does.
+        if _r="$(command curl -o /dev/null -s -w '%{http_code}|%{time_total}' --max-time 60 \
+                   -X POST "$(_copilot_client_base)/v1/messages?beta=true" \
+                   -H 'content-type: application/json' -d "$_body" 2>/dev/null)"; then
+          _code="${_r%%|*}"; _t="${_r##*|}"
+          case "$_code" in
+            2*) _ok "round-trip" "$_probe_model → HTTP $_code in ${_t}s" ;;
+            000) _bad "round-trip" "$_probe_model → no response (timeout/reset)"
+                 _hint "this is the streaming-fault class; suspect the local proxy chain" ;;
+            *)  _bad "round-trip" "$_probe_model → HTTP $_code in ${_t}s"
+                _hint "copilot-proxy logs 40" ;;
+          esac
+        else
+          _bad "round-trip" "request failed outright"
+        fi
+      fi
+
+      printf '\n'
+      if [ "$_fail" -gt 0 ]; then
+        printf '%s\n\n' "$_fail failed, $_warn warning(s)"
+        unset -f _ok _bad _note _skip _hint 2>/dev/null
+        return 1
+      fi
+      printf '%s\n\n' "all checks passed ($_warn warning(s))"
+      unset -f _ok _bad _note _skip _hint 2>/dev/null
+      ;;
     logs)
       # logs [N] [gen]  — tail the fork log; gen 1..3 = a rotated prev session.
       # logs shim [N]    — tail the throttle shim's log instead.
@@ -374,7 +689,9 @@ copilot-proxy() {
       esac
       ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth]"
+      printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, model entitlement, upstream"
+      printf '%s\n' "                        reachability. --live adds one real request (costs 1 quota unit)."
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2

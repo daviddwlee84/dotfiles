@@ -77,7 +77,7 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]`
+### `copilot-proxy [start|stop|restart|status|doctor [--live]|logs [N]|whoami|auth]`
 
 在 `$COPILOT_PROXY_PORT`（預設 `4141`）管理背景代理。
 
@@ -93,6 +93,32 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 `copilot-proxy whoami` 是真正的登入檢查：它拿儲存的 token 對 GitHub 交換，並印出你的
 帳號 / plan / quota（token 缺失或過期時會明確報錯）。用它取代直接看 token 檔案 —— token
 是明文憑證 (plaintext credential)，不應在編輯器裡打開。
+
+### `copilot-proxy doctor [--live]`（別名：`test`）
+
+診斷整條路徑，任何一項失敗就以非零狀態結束。預設**唯讀**；加上 `--live` 會多送一個真實的
+`POST /v1/messages`（`max_tokens: 1`、挑一個非 `[1m]` 的 chat model），會消耗一個 quota
+單位，但那是唯一能驗證 streaming 的檢查。
+
+檢查順序：前置工具（`bunx`/`curl`/`jq`）→ token 檔案 → 代理與 throttle shim 是否存活 →
+**模型**→ 上游連線 → 本機代理 / VPN → live probe。
+
+其中「模型」這一段才是這個指令的價值所在。它把代理**目前提供的**模型清單，跟 GitHub
+**此刻真正提供的**清單相比對 —— 這是唯一能區分 `400 model_not_supported` 兩種成因的方法：
+
+| 代理有 claude？ | 上游有 claude？ | 判定 | 修法 |
+|---|---|---|---|
+| 沒有 | **有** | 快取過期 (stale cache) | `copilot-proxy restart` |
+| 沒有 | 沒有 | 組織政策停用 Anthropic | 重啟**沒有用** |
+
+它同時會拿**釘選的**模型（`copilot-model -c` 的實際生效值，會尊重 `copilot-here` 的專案
+釘選）去比對已提供的清單 —— 包含 `copilot-model -l` **不會**顯示的 `[1m]` 別名。釘選了一個
+沒被提供的 id，代表每一個請求都會 400。
+
+上游連線會同時探測 `api.enterprise.githubcopilot.com` 與 `api.githubcopilot.com`，直連
+**以及**（若有設定）走 macOS 系統代理，所以 Clash/mihomo 規則黑洞掉其中一個 host 時會立刻
+顯現。未帶認證的 `400`/`401` 算「連得到」—— 只有連線/讀取失敗才算故障。`doctor` 絕不會印出你的
+token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv 可被 `ps` 讀到。
 
 ### `claude-copilot [--no-specstory] [claude args...]` —— 一次性 session
 
@@ -171,6 +197,25 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 **不要** 把這段貼進會 commit 的 `.claude/settings.json` —— 改用 `copilot-here on`。
 
 ## 陷阱 (gotchas)（這些都花了實際 debug 時間）
+
+### 模型清單只在啟動時抓一次 —— 一次抓壞，整個 session 就毀了
+
+`copilot-api` 只在**行程啟動時**向 GitHub 抓一次 `/models`，然後快取整個生命週期，
+不會定期更新、也不會在 cache miss 時重抓。若那一次請求剛好碰上 VPN / Clash 節點不穩，
+代理就會帶著一份**被截斷的清單**啟動 —— 通常只剩非 Anthropic 的模型 —— 之後每個
+`claude-*` 請求都會回 `400 model_not_supported`，直到你重啟為止。
+
+線索在啟動 banner：
+
+```
+ℹ Models refresh: 13 new     ← 壞掉：底下的清單裡沒有任何 claude id
+ℹ Models refresh: 21 new     ← 正常
+```
+
+log 裡沒有任何其他線索能把這個情況跟「我的組織停用了 Claude」區分開 —— 兩者產生的
+GitHub 400 一模一樣。`copilot-proxy doctor` 會把代理的快取清單跟即時上游清單相比對，
+直接告訴你是哪一種。若是快取問題，修法就只是 `copilot-proxy restart`。完整說明：
+[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](../../pitfalls/copilot-api-caches-degraded-model-list-at-startup.md)。
 
 ### 不要使用 Claude Code 內建的 `/model` 選單
 

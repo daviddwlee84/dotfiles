@@ -98,7 +98,7 @@ So the proxy uses the two layers nobody else owns:
 
 ## Shell helpers
 
-### `copilot-proxy [start|stop|restart|status|logs [N]|whoami|auth]`
+### `copilot-proxy [start|stop|restart|status|doctor [--live]|logs [N]|whoami|auth]`
 
 Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 
@@ -121,6 +121,37 @@ running proxy's `/usage` endpoint (jq-summarized) and falls back to
 `bunx <pkg> debug` when the proxy is down; on the original it runs
 `check-usage`. Use it instead of eyeballing the token file — the token is a
 plaintext credential and should not be opened in an editor.
+
+### `copilot-proxy doctor [--live]` (alias: `test`)
+
+Diagnoses the whole path and exits non-zero on any failure. Read-only by default;
+`--live` adds one real `POST /v1/messages` (`max_tokens: 1`, a non-`[1m]` chat
+model) that costs one quota unit but is the only check that exercises streaming.
+
+Sections, in order: prerequisites (`bunx`/`curl`/`jq`) → token file → proxy and
+throttle-shim liveness → **models** → upstream reachability → local proxy/VPN →
+live probe.
+
+The models section is the one that earns the command. It compares what the proxy
+serves against what GitHub serves *right now*, which is the only way to separate
+the two indistinguishable causes of a `400 model_not_supported`:
+
+| Proxy has claude? | Upstream has claude? | Verdict | Fix |
+|---|---|---|---|
+| no | **yes** | stale cache | `copilot-proxy restart` |
+| no | no | org policy disables Anthropic | a restart will not help |
+
+It also validates the *pinned* model (`copilot-model -c`'s effective value, honoring
+a `copilot-here` project pin) against the served list — including the `[1m]`
+aliases, which `copilot-model -l` does not show. A pin that isn't served means
+every single request 400s.
+
+Upstream reachability probes both `api.enterprise.githubcopilot.com` and
+`api.githubcopilot.com`, directly *and* through the macOS system proxy when one is
+set, so a Clash/mihomo rule that black-holes one host shows up immediately. An
+unauthenticated `400`/`401` counts as reached — only a connect/read failure is a
+fault. `doctor` never prints your token: it passes credentials to `curl` via
+`-K -` (stdin), never argv, since argv is readable through `ps`.
 
 ### `claude-copilot [--no-specstory] [claude args...]` — one-off session
 
@@ -241,6 +272,27 @@ inject the fork-README quota savers:
 `COPILOT_PROXY_QUIET` value.
 
 ## Gotchas (these cost real debugging time)
+
+### The model list is fetched ONCE at startup — a flaky fetch poisons the session
+
+`copilot-api` fetches `/models` from GitHub when the process starts, caches the
+result for its whole lifetime, and never re-fetches. If that one request lands
+while a VPN/Clash node is degraded, the proxy comes up serving a **truncated
+list** — typically the non-Anthropic models only — and then every
+`claude-*` request returns `400 model_not_supported` until you restart it.
+
+The tell is in the startup banner:
+
+```
+ℹ Models refresh: 13 new     ← degraded: no claude ids in the list below
+ℹ Models refresh: 21 new     ← healthy
+```
+
+Nothing else in the logs distinguishes this from "my org disabled Claude" — both
+produce the identical GitHub 400. `copilot-proxy doctor` compares the proxy's
+cached list against a live upstream fetch and tells you which one you have. Fix
+for the cache case is just `copilot-proxy restart`. Full write-up:
+[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](../../pitfalls/copilot-api-caches-degraded-model-list-at-startup.md).
 
 ### `settings.local.json` env beats shell env (docs say otherwise)
 
