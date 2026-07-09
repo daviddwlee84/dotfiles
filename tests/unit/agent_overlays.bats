@@ -310,7 +310,7 @@ websocket_connect_timeout_ms = 5000
   # its entries but our notify.sh hook is missing.
   local live='{
     "model": "sonnet",
-    "permissions": {"defaultMode": "auto"},
+    "permissions": {"defaultMode": "acceptEdits"},
     "hooks": {
       "Notification": [
         {"matcher": "", "hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh", "timeout": 86400}]}
@@ -348,8 +348,8 @@ websocket_connect_timeout_ms = 5000
   echo "$output" | jq -e '.hooks.PreToolUse[0].hooks[0].command == "~/.codeisland/codeisland-hook.sh"' >/dev/null
   # Non-hook keys: live values preserved EXCEPT where overlay scalars override.
   echo "$output" | jq -e '.model == "sonnet"' >/dev/null
-  # `permissions.defaultMode` is enforced by overlay → live "auto" loses to overlay "bypassPermissions".
-  echo "$output" | jq -e '.permissions.defaultMode == "bypassPermissions"' >/dev/null
+  # `permissions.defaultMode` is enforced by overlay → live "acceptEdits" loses to overlay "auto".
+  echo "$output" | jq -e '.permissions.defaultMode == "auto"' >/dev/null
   echo "$output" | jq -e '.skipDangerousModePermissionPrompt == true' >/dev/null
   echo "$output" | jq -e '.enabledPlugins["claude-hud@claude-hud"] == true' >/dev/null
 }

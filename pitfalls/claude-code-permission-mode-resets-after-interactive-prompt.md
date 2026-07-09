@@ -47,9 +47,25 @@ This interacts especially badly with two of our usage patterns:
 
 ## Workaround
 
-Set the **default mode** to `bypassPermissions` in `~/.claude/settings.json`. After a reset, the "default" Claude falls back to is now bypass, so the visible behaviour is "mode never changes."
+Set `permissions.defaultMode` in `~/.claude/settings.json` to **whatever steady state you want the session to sit in**. The reset always lands on `defaultMode`, so pinning it to your intended mode makes the visible behaviour "mode never changes." Leaving it unset is what produces the reported symptom, because the unset default is `acceptEdits`.
 
-Managed in this repo via `dot_claude/modify_settings.json` (see [`docs/tools/agent-overlays.md`](../docs/tools/agent-overlays.md)):
+This repo pins `auto` — a safety classifier vets each action instead of prompting, so resets are invisible without granting a blanket bypass. Managed via `dot_claude/modify_settings.json` (see [`docs/tools/agent-overlays.md`](../docs/tools/agent-overlays.md)):
+
+```json
+{
+  "permissions": {
+    "defaultMode": "auto"
+  }
+}
+```
+
+The hook-aware merger merges this normally (`permissions` is not under `.hooks`, so it goes through the regular `base * overlay_no_hooks` deep-merge — verified additive with CodeIsland's runtime-installed hook entries).
+
+Note that the overlay scalar **wins over the live file**: editing `permissions.defaultMode` in `~/.claude/settings.json` by hand looks like it works until the next `chezmoi apply` silently reverts it. Change the overlay, not the target. (`tests/unit/agent_overlays.bats` asserts exactly this precedence.)
+
+### Alternative: `bypassPermissions` if the classifier is too conservative
+
+`auto` can still block or prompt on actions its classifier judges risky. `bypassPermissions` never asks — the repo used this from 2026-04 to 2026-07. It fixes the reset symptom equally well, at the cost of widening the trust boundary repo-wide:
 
 ```json
 {
@@ -59,11 +75,9 @@ Managed in this repo via `dot_claude/modify_settings.json` (see [`docs/tools/age
 }
 ```
 
-The hook-aware merger merges this normally (`permissions` is not under `.hooks`, so it goes through the regular `base * overlay_no_hooks` deep-merge — verified additive with CodeIsland's runtime-installed hook entries).
+### Alternative if both are too broad
 
-### Alternative if `bypassPermissions` is too broad
-
-If you don't want a global bypass, use `acceptEdits` (the existing default) but expand `permissions.allow` so the noisy commands stop prompting:
+Use `acceptEdits` (the unset default) but expand `permissions.allow` so the noisy commands stop prompting:
 
 ```json
 {
@@ -97,7 +111,7 @@ Concretely:
 
 ```
 Mode before ExitPlanMode: plan          (because Shift+Tab put you there)
-defaultMode in settings.json:           bypassPermissions
+defaultMode in settings.json:           auto
 Mode immediately after ExitPlanMode:    acceptEdits   ← surprising
 ```
 
@@ -107,8 +121,8 @@ Confirmed against `code.claude.com/docs` (consulted 2026-04-27): there is **no d
 
 ## Prevention
 
-- Use the `defaultMode` overlay above. Verified by `chezmoi apply` → inspect `~/.claude/settings.json` → confirm `permissions.defaultMode == "bypassPermissions"` AND `hooks.Notification` still contains both the CodeIsland entry and our `notify.sh` entry.
-- Be aware that `bypassPermissions` widens the trust boundary repo-wide. If you collaborate with less-trusted code (random clones, AI-generated PRs landing on your machine), consider the `acceptEdits + allowlist` variant instead.
+- Use the `defaultMode` overlay above. Verified by `chezmoi apply` → inspect `~/.claude/settings.json` → confirm `permissions.defaultMode == "auto"` AND `hooks.Notification` still contains both the CodeIsland entry and our `notify.sh` entry.
+- `auto` keeps the trust boundary narrow: a classifier vets each action rather than waving everything through. If you switch to `bypassPermissions`, be aware it widens that boundary repo-wide — bad news when you collaborate with less-trusted code (random clones, AI-generated PRs landing on your machine).
 
 ## Related
 

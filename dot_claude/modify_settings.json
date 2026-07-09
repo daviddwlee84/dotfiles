@@ -115,7 +115,7 @@ overlay=$(cat <<'JSON'
   },
   "skipDangerousModePermissionPrompt": true,
   "permissions": {
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "auto"
   },
   "statusLine": {
     "type": "command",

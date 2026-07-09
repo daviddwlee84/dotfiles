@@ -251,7 +251,7 @@ CodeIsland 的設定面板自稱為「Auto hook install」並標榜「auto-repai
 
 [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) 透過掛鉤感知合併器解決這個問題：
 
-1. **非掛鉤的 key**（`enabledPlugins`、`extraKnownMarketplaces`、`skipDangerousModePermissionPrompt`、`permissions.defaultMode`、`statusLine`……）以正常方式透過 `base * overlay_no_hooks` 深層合併。注意：`permissions.defaultMode = "bypassPermissions"` 是刻意設定的，用來繞過 `Claude Code` 在每次互動 prompt（`AskUserQuestion`、CodeIsland 彈窗、遠端控制注入）後重設目前權限模式的行為；見 [`pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md`](../../pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md)。深層合併會寫入 `defaultMode` 純量值，不會動到同層的 `permissions.allow` / `permissions.deny` 陣列——那些保持機器本地。
+1. **非掛鉤的 key**（`enabledPlugins`、`extraKnownMarketplaces`、`skipDangerousModePermissionPrompt`、`permissions.defaultMode`、`statusLine`……）以正常方式透過 `base * overlay_no_hooks` 深層合併。注意：`permissions.defaultMode = "auto"` 是刻意設定的，用來繞過 `Claude Code` 在每次互動 prompt（`AskUserQuestion`、CodeIsland 彈窗、遠端控制注入）後重設目前權限模式的行為——重設一律落回 `defaultMode`，因此把它釘住就能讓重設變得無感。`auto`（由安全分類器逐一審核動作）於 2026-07 取代了 `bypassPermissions`：它同樣能修正重設問題，卻不必授予整個 repo 範圍的全面放行。見 [`pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md`](../../pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md)。深層合併會寫入 `defaultMode` 純量值，不會動到同層的 `permissions.allow` / `permissions.deny` 陣列——那些保持機器本地。
 2. **`hooks.<event>` 陣列**以累加方式合併：對於覆寫中宣告的每個事件，附加那些 `.hooks[0].command` 在即時陣列中還沒出現的條目（字串相等比對）。即時條目會原樣保留，永遠不會移除任何條目。
 
 完整 jq filter：
