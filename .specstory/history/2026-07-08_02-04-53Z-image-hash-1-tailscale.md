@@ -304,3 +304,1286 @@ _**Agent (claude-opus-4-8 2026-07-08 02:07:49Z)**_
 > 反過來也行:如果你偏好「不用批准 kernel/system extension、App Store 自動更新」的省事路線,就留 App Store 版、移除 brew cask + formula。但你這台是重度 brew 管理,我傾向留 brew cask。
 
 要不要我幫你動手清?因為這會刪掉正在提供 VPN 的軟體、又牽涉 `sudo`,我想先跟你確認 **留哪一份** 再操作 —— 預設方案是「留 brew cask、砍 App Store 版 + CLI formula」,可以嗎?
+
+---
+
+_**User (2026-07-09 09:44:22Z)**_
+
+ok (這也要同步更新我們 chezmoi的setup到best practice)
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-09 09:44:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is approving the cleanup and wants me to sync the chezmoi setup to best practice — so I need to remove the conflicting Tailscale installations (App Store version and the brew formula) while keeping the brew cask version, then update the dotfiles repo to codify this as the proper setup and document why the other approaches cause problems. update chezmoi to ensure the brew cask is declared and the formula is removed from the Brewfile, then document the pitfall and update the tool-managers index. Before I make any destructive changes though, I should investigate the current chezmoi setup to see how brew packages are managed and whether there's already an entry for Tailscale — this will help me understand what "best practice" looks like for this repo and ensure I'm making the right changes.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:44:52Z)**_
+
+收到。分兩塊做:**(1) 實際清理系統**、**(2) 把「用 brew cask `tailscale-app`」這個最佳實踐固化進 chezmoi repo**。先摸清楚 repo 現在怎麼管 brew 套件,再動手。
+
+_**Agent (claude-opus-4-8 2026-07-09 09:44:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find brew management + existing tailscale references
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== 找 Brewfile / homebrew 相關 ==="; fd -HI -t f 'Brewfile' 2>/dev/null; echo "---roles---"; ls dot_ansible/roles/ 2>/dev/null | grep -Ei 'brew|homebrew|mac|darwin'
+echo; echo "=== repo 內任何 tailscale 提及 ==="; grep -rin "tailscale" --include="*.yml" --include="*.yaml" --include="*.rb" --include="Brewfile*" --include="*.md" . 2>/dev/null | grep -vi "gui_apps_linux/tasks/main.yml:720" | head -30
+```
+
+```text
+=== 找 Brewfile / homebrew 相關 ===
+dot_config/homebrew/Brewfile.darwin.tmpl
+dot_config/homebrew/Brewfile.linux.tmpl
+dot_config/homebrew/Brewfile.tmpl
+---roles---
+homebrew
+
+=== repo 內任何 tailscale 提及 ===
+mkdocs.yml:319:          - Tailscale: tools/Tailscale.md
+README.md:259:- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
+README.md:299:- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Steam via Brewfile when `installGamingApps=true`; Tailscale Desktop via Homebrew Cask; Tailscale CLI via `brew "tailscale"` in shared Brewfile when `installBrewApps=true`.
+.cursor/plans/wakatime-leak-fix_3a9d6942.plan.md:71:- **Tailscale auth key** (tskey-auth / tskey-client):
+.specstory/history/2026-05-10_03-37-49Z.md:1086:/Users/david/.local/share/chezmoi/docs/tools/Tailscale.md
+.specstory/history/2026-05-10_03-37-49Z.md:1851:/Users/david/.local/share/chezmoi/README.md:- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-05-10_03-37-49Z.md:1862:/Users/david/.local/share/chezmoi/.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:234	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-05-10_03-37-49Z.md:1863:/Users/david/.local/share/chezmoi/.specstory/history/2026-04-16_23-13-33Z-only-github-cli-gitlab.md:161	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-05-10_03-37-49Z.md:1869:/Users/david/.local/share/chezmoi/.specstory/history/2026-04-24_02-36-54Z-tmux-scrolling-x-coding.md:217	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:427:- macOS-only: `mas`, `tailscale`
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:2286:112	# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:2287:113	# but Tailscale was delisted from the Mac App Store (mas install now fails with
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:2289:115	cask "tailscale-app"
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:2322:148	# mas "Tailscale", id: 1475387142  # delisted from MAS — use cask "tailscale-app" above instead
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:2372:22	brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:4831:- macOS-only: `mas`, `tailscale`
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:7270:197	- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
+.specstory/history/2026-05-06_03-30-59Z-figlet-https-www-figlet.md:7307:234	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, `codeisland` notch HUD for coding-agent activity, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-04-21_09-30-45Z-virtualization-solutions-comparison.md:100:--  Tailscale.md
+.specstory/history/2026-04-16_23-13-33Z-only-github-cli-gitlab.md:794:140	- `~/.config/homebrew/` - Brewfiles for GUI apps (macOS casks + mas) plus selected CLI formulas (e.g., `tailscale`)
+.specstory/history/2026-04-16_23-13-33Z-only-github-cli-gitlab.md:815:161	- **GUI Apps** (macOS): general terminals, editors, browsers, network tools, and utilities via Brewfile when `installBrewApps=true`, including developer apps like `dbeaver-community` and `superset` (Apple Silicon only); AI desktop apps via Brewfile when `installAiDesktopApps=true` (`claude`, `chatgpt`, `opencode-desktop`, `antigravity`, `codex-app` on Apple Silicon only, and `ollama-app` only when `installLlmTools=true`); Tailscale Desktop via Mac App Store `mas`, avoids pkg sudo prompt; Tailscale CLI via `brew "tailscale"` in shared Brewfile
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:13:[Image #1] 我們系統上好像裝了兩份Tailscale？(是App Store + brew 還是原生的？)
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:20:Looking at the debug output, it seems there's a localized version of Tailscale at `/Applications/Tailscale.localized/Tailscale.app` that the system is flagging as a duplicate. I need to check whether this is actually a second installation or just a differently-named copy of the same app, and figure out which one is the legitimate version to keep.
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:25:畫面顯示 Tailscale 偵測到 Mac 上有「另一份」拷貝在 `/Applications/Tailscale.localized/Tailscale.app`。我來實際查一下系統上到底裝了幾份、各自來源是什麼。
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:31:Locate all Tailscale.app copies
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:33:`echo "=== /Applications 下的 Tailscale ==="; ls -la /Applications/ | grep -i tailscale; echo; echo "=== Tailscale.localized 內容 ==="; ls -la "/Applications/Tailscale.localized/" 2>/dev/null; echo; echo "=== mdfind 全系統搜尋 Tailscale.app ==="; mdfind -name "Tailscale.app" 2>/dev/null`
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:36:=== /Applications 下的 Tailscale ===
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:37:drwxr-xr-x@    - root       4 Apr 16:40 Tailscale.app
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:38:drwxr-xr-x     - root       7 Jul 04:16 Tailscale.localized
+.specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md:40:=== Tailscale.localized 內容 ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:45:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+Looking at the git history, the repo switched from the Mac App Store version to the cask version back in May 2026 because Tailscale got delisted from the App Store. The current setup has the desktop app via cask in the Darwin-specific file and the CLI via brew in the shared file, which seems to be the established approach.
+
+So the leftover App Store version on the machine is indeed a remnant from before that migration and no longer managed by the repo, making it safe to remove. But I need to reconsider whether removing the brew formula is the right call — the README explicitly documents it as part of the setup, and while the cask bundles its own CLI, the formula provides additional tools like `tailscaled` that might be intentional. Having both could create some redundancy on macOS, but that might be acceptable if the formula serves a purpose beyond just the CLI binary. The real work is documenting this pitfall and ensuring the docs reflect the current state — the Brewfiles are already correct with the cask and CLI formula intentionally declared. I should verify that `docs/tools/Tailscale.md` and the tool-managers index accurately describe the cask setup and note the App Store leftover cleanup, rather than removing the formula which the repo explicitly declares. The real issue is that the shared Brewfile pulls in the formula on macOS too, creating redundancy — the app already provides the CLI, so installing the formula gives you a second binary and an unused daemon that could conflict if services were ever started. Option (b) would be cleaner: move the formula to a Linux-only Brewfile so macOS relies on the app-provided CLI. Let me check the actual Brewfile structure and Tailscale documentation to see what makes sense here, then I can present a concrete plan.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:45:39Z)**_
+
+Repo history is illuminating: you already migrated `mas "Tailscale"` → `cask "tailscale-app"` back in May (Tailscale got delisted from the Mac App Store). So the App Store copy in `.localized/` is a **stale leftover from the pre-migration era** — not managed by the repo anymore. Let me read the current Brewfiles + docs to see exactly what "best practice" needs.
+
+_**Agent (claude-opus-4-8 2026-07-09 09:45:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Brewfile tailscale entries and docs
+
+```bash
+cd /Users/david/.local/share/chezmoi
+for f in dot_config/homebrew/Brewfile.tmpl dot_config/homebrew/Brewfile.darwin.tmpl dot_config/homebrew/Brewfile.linux.tmpl; do
+  echo "########## $f ##########"; grep -n -i "tailscale" "$f" 2>/dev/null || echo "  (no tailscale)"
+done
+echo; echo "=== docs/tools/Tailscale.md 是否存在 ==="; ls -la docs/tools/Tailscale.md 2>/dev/null
+echo; echo "=== tool-managers.md 內 tailscale 行 ==="; grep -n -i "tailscale" docs/this_repo/tool-managers.md 2>/dev/null
+```
+
+```text
+########## dot_config/homebrew/Brewfile.tmpl ##########
+24:brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+########## dot_config/homebrew/Brewfile.darwin.tmpl ##########
+119:# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+120:# but Tailscale was delisted from the Mac App Store (mas install now fails with
+122:cask "tailscale-app"
+155:# mas "Tailscale", id: 1475387142  # delisted from MAS — use cask "tailscale-app" above instead
+########## dot_config/homebrew/Brewfile.linux.tmpl ##########
+  (no tailscale)
+
+=== docs/tools/Tailscale.md 是否存在 ===
+.rw-r--r--@ 472 david 16 Feb 10:29 docs/tools/Tailscale.md
+
+=== tool-managers.md 內 tailscale 行 ===
+31:| **Homebrew formulae** | General macOS GUI helpers (`tailscale`, `mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
+162:| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formulae `mas`, `tailscale` |
+181:| `tailscale-app` | `installBrewApps` |
+1090:| **tailscale** (CLI) | brew (shared Brewfile, macOS) | (Linux: via system pkg outside repo) | Brewfile.tmpl |
+1091:| **tailscale-app** | brew cask | n/a | Brewfile.darwin |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:46:35Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm reviewing the actual files I need to modify: the two Brewfiles and the Tailscale documentation. I've spotted a stale comment on line 24 of Brewfile.tmpl that incorrectly references the desktop app being installed via mas, when it's actually handled through cask now.
+
+The core issue is that the shared Brewfile installs the standalone `tailscale` formula on macOS, which is redundant since the cask already provides the CLI, and it also brings in an unused `tailscaled` daemon that could conflict with the app's system extension. The cleanest approach would be moving `brew "tailscale"` out of the shared Brewfile and into Brewfile.linux.tmpl, since Linux headless systems actually need the formula and daemon while macOS gets everything from the cask. I need to verify whether the shared Brewfile is even processed on Linux systems before finalizing this strategy. brew "tailscale"` to the Linux-only Brewfile so the formula only applies where there's no GUI app. This resolves the conflict and version-skew risk, and I should present this as the recommended best-practice change to get explicit approval before applying it.
+
+Actually, I'm realizing I need to verify whether Linux even processes the shared Brewfile or if it has its own separate flow. The docs mention Linux gets tailscale via system apt outside the repo, so the formula might not even be taking effect there. Before I recommend removing it from the shared file, I should check how the homebrew role applies Brewfiles across platforms to make sure I'm not breaking Linux's setup.
+
+Given the cross-platform complexity and the strict documentation constraints, I'll start with the safe, low-risk cleanup now—removing the App Store leftover—and then carefully review the platform-specific Brewfile logic before proposing the tailscale formula change. I'm weighing whether to use `sudo rm -rf` directly or ask the user to run it interactively, since sudo might prompt for a password. Given that the user already approved removing the App Store version and there's no active system extension or login item from it running, I'll proceed with the removal but handle the sudo prompt if it comes up. Before I do that, I should also check whether there are any stale login items or launchd entries from the App Store version that need cleanup alongside the app bundle itself.
+
+I'm going to gather the necessary context first — reading the Brewfile template and Darwin-specific sections, the Tailscale documentation, the homebrew role configuration, and the brew run script — so I can make an informed decision about the formula and any repo changes needed. I'll also test whether sudo works non-interactively in this environment.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:46:35Z)**_
+
+Now I understand the shape. Let me read the exact files I'll touch and confirm how Brewfiles are applied per-platform (critical before changing the CLI formula), plus check sudo for the cleanup.
+
+_**Agent (claude-opus-4-8 2026-07-09 09:46:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect Brewfile header and homebrew role application
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== Brewfile.tmpl 頭部 (看是否分平台 guard) ==="; sed -n '1,30p' dot_config/homebrew/Brewfile.tmpl
+echo; echo "=== 如何套用 Brewfile? homebrew role ==="; fd -HI . dot_ansible/roles/homebrew -t f; echo "---"; grep -rn "Brewfile" dot_ansible/roles/homebrew/ 2>/dev/null | head
+```
+
+```text
+=== Brewfile.tmpl 頭部 (看是否分平台 guard) ===
+# Brewfile - Shared configuration (macOS & Linux)
+# Applied via: brew bundle --file=~/.config/homebrew/Brewfile
+#
+# This file is managed by chezmoi. Edit the source:
+#   chezmoi edit ~/.config/homebrew/Brewfile
+
+# =============================================================================
+# Taps (Third-party repositories)
+# =============================================================================
+{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+tap "nikitabobko/tap"  # aerospace (macOS window manager)
+{{ end -}}
+
+# =============================================================================
+# Formulas - CLI Tools (cross-platform)
+# =============================================================================
+# Note: Most CLI tools are managed by ansible for better cross-platform support
+# Only add formulas here that you want to manage via Brewfile
+
+# The following formulas support the general macOS GUI app bundle.
+{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+brew "mas"
+brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+{{ end -}}
+
+=== 如何套用 Brewfile? homebrew role ===
+dot_ansible/roles/homebrew/tasks/main.yml
+---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:46:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Tailscale doc and test sudo cache
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== docs/tools/Tailscale.md ==="; cat docs/tools/Tailscale.md
+echo; echo "=== sudo 是否已快取(不會 prompt)? ==="; sudo -n true 2>/dev/null && echo "YES: sudo 已快取,可直接跑" || echo "NO: sudo 需要密碼(我會請你用 ! 執行)"
+```
+
+```text
+=== docs/tools/Tailscale.md ===
+# Tailscale
+
+- [Download | Tailscale](https://tailscale.com/download/mac)
+  - [tailscale-app — Homebrew Formulae](https://formulae.brew.sh/cask/tailscale-app) - Desktop App (Standalone)
+    - [Tailscale Packages - stable track](https://pkgs.tailscale.com/stable/#macos)
+  - [tailscale — Homebrew Formulae](https://formulae.brew.sh/formula/tailscale) - CLI
+  - [Tailscale App - App Store](https://apps.apple.com/ca/app/tailscale/id1475387142)
+
+> Standalone > App Store
+
+=== sudo 是否已快取(不會 prompt)? ===
+NO: sudo 需要密碼(我會請你用 ! 執行)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm looking at a critical section in the Brewfile template where macOS-specific packages are conditionally installed, including the `mas` CLI tool and Tailscale, with a note that the desktop app version is handled separately through the Mac App Store.
+
+The comment is outdated — it references the App Store version (`mas`) but the current setup uses `cask "tailscale-app"` instead. The user's own documentation already states a preference for the standalone app over the App Store version, so removing the App Store remnant aligns perfectly with their documented intent.
+
+For the `tailscale` CLI formula on macOS, I'm working through how it's actually accessed: the standalone app bundles the CLI, but it's not automatically symlinked to the PATH like a typical brew formula would be. On the App Store version, you'd need to alias it to the sandboxed app location, and on the standalone version, the CLI lives inside the app bundle at a specific path.
+
+The current setup of keeping both the cask app and the formula makes sense as a deliberate pattern — the GUI app handles the daemon and system extension, while the formula provides a clean `tailscale` CLI on PATH. The trade-off is that the formula also installs an unused `tailscaled` daemon and there's potential for version skew between the app and CLI.
+
+I'm weighing two main options: keep both and just fix the stale comment, or drop the formula and use a shell alias to the app's bundled CLI instead. The alias approach eliminates version skew and removes the unused daemon, but it only works in interactive shells, not scripts. The version mismatch between CLI and app is a real concern that could cause subtle bugs, but the formula's main value is getting `tailscale` on PATH for scripts — and the repo already depends on it. The actual foot-gun (running `brew services start tailscale`) hasn't been triggered. Since the user's core pain point is the duplicate `.app` bundles causing warnings, the minimal best-practice fix is removing the App Store leftover and updating stale documentation, while the formula question is secondary. I should probably present this as a decision point rather than unilaterally changing the Brewfile, since it affects CLI provisioning across all their machines.
+
+For cleanup, I need to handle the App Store app removal carefully — `sudo rm -rf /Applications/Tailscale.localized` is direct but moving to Trash is safer, though that requires Finder for root-owned files. I'll provide the `rm` command but note the trade-off.
+
+Before removing it, I should verify nothing else depends on that path — there might be a stale login item pointing there, but that's harmless after deletion and won't affect the running system extension. Once the duplicate is gone, the "Another Tailscale copy" warning should clear, and the DNS issue may resolve too, though I can't guarantee it since that could stem from other causes like MagicDNS conflicts.
+
+Now I'll structure my response: lay out the findings clearly (App Store copy is a stale leftover from the pre-May `mas` era, repo already migrated to cask), give the cleanup command, ask the one genuine decision about keeping the formula CLI, and list the repo edits I'll make regardless.
+
+The real question is whether to keep the formula at all — Tailscale's own guidance says if you're using the GUI app, the bundled CLI is sufficient and installing both creates version skew. But there's a practical trade-off: the app's CLI path is awkward and an alias won't work for non-interactive scripts, so many people keep the formula for a clean PATH binary. Given this repo's philosophy around declarative, brew-managed setup and potential automation that might call `tailscale` CLI, it's worth asking the user directly. I'll frame this as a focused user decision since it genuinely affects their workflow and muscle memory. I'm going to ask whether to keep the Homebrew formula (aligned with the app version and properly documented) or drop it in favor of using the app's built-in CLI directly—then pair that with the cleanup command for the App Store remnant.
+
+For the removal, I need to use sudo since the directory is root-owned, so I'll present the command clearly: `sudo rm -rf /Applications/Tailscale.localized`. I've verified this only removes the stale App Store version and won't touch the active `/Applications/Tailscale.app` or any user config, so it's safe. After they answer the formula question, I'll outline the specific repo edits I'll make based on their choice.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:12Z)**_
+
+Now I have the decisive facts. Key finding: in `Brewfile.tmpl:20-25`, the `brew "tailscale"` CLI formula is **guarded to `darwin` only** — Linux never installs Tailscale via brew (it uses the system package). And the comment there is **stale** ("installed via mas" — it's `cask` now). Your own `docs/tools/Tailscale.md` already declares the preference: **"Standalone > App Store"**.
+
+So everything points one way — the App Store copy is a pre-May leftover the repo already stopped managing. Let me set up the work and settle the one real fork.
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:14Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Delete /Applications/Tailscale.localized/ (io.tailscale.ipn.macos, v1.98.8 App Store build) — stale leftover from pre-May mas→cask migration. Requires sudo (root-owned); user runs via ! prefix. Active app is the macsys cask at /Applications/Tailscale.app.
+
+```text
+Task #1 created successfully: Remove stale App Store Tailscale leftover
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:15Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Decide whether to keep brew formula `tailscale` on macOS (clean PATH binary, redundant with cask) or drop it in favor of the app's bundled CLI. Governs the Brewfile.tmpl edit.
+
+```text
+Task #2 created successfully: Settle macOS tailscale CLI provisioning (keep vs drop formula)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:19Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Comment on Brewfile.tmpl:24 says "installed via mas" but it's cask now. Fix it. Apply the keep/drop-formula decision from the CLI question.
+
+```text
+Task #3 created successfully: Fix stale Brewfile.tmpl tailscale comment + apply CLI decision
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:19Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskCreate"><details>
+<summary>Tool use: **TaskCreate**</summary>
+Add pitfalls/ entry: symptom "Another Tailscale copy was found" + dns-forward-failing; root cause = App Store .app leftover in /Applications/Tailscale.localized after mas→cask migration; detection (mdfind, bundle id macsys vs macos, codesign authority) and fix (rm the leftover). Add MEMORY pointer + tool-managers/README/Tailscale.md mirrors per CLAUDE.md.
+
+```text
+Task #4 created successfully: Document Tailscale duplicate-copy pitfall
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to present the cleanup command to the user and ask about the formula approach—these are the two blocking items. I'll use AskUserQuestion to pose the decision point.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 09:48:36Z)**_
+
+**Machine cleanup** — the stale App Store copy is root-owned, so sudo isn't cached. Run this yourself (recoverable only by App-Store reinstall, but you don't want it):
+
+```
+! sudo rm -rf /Applications/Tailscale.localized
+```
+
+That removes only the idle App Store build (`io.tailscale.ipn.macos`, v1.98.8); the active cask build at `/Applications/Tailscale.app` (`io.tailscale.ipn.macsys`, running + system-extension) is untouched. The "Another Tailscale copy" warning should clear after.
+
+Now the one real "best practice" fork before I edit the repo — how macOS should provide the `tailscale` **CLI**:
+
+_**Agent (claude-opus-4-8 2026-07-09 10:45:31Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**macOS 上 Tailscale CLI 要怎麼提供?(cask GUI app 本身就內建一份 CLI,目前 repo 又額外裝了 brew formula `tailscale`,兩者版本已經對不上:CLI 1.94.1 vs app 1.96.5)**
+
+Options:
+- **保留 formula(建議)** - 續用 brew formula `tailscale` 提供乾淨的 /usr/local/bin/tailscale,scripts/fleet 可直接呼叫。我會:對齊版本(brew upgrade tailscale + cask)、修掉過期註解、並在 Brewfile 明確註明 macOS 上絕不可 `brew services start tailscale`(daemon 由 app 的 system-extension 提供)。改動最小、風險最低。
+- **移除 formula,改用 app 內建 CLI** - 從共享 Brewfile 移除 `brew "tailscale"`,單一來源、零版本落差、無多餘 tailscaled。代價:要在 shell config 加 alias 指到 /Applications/Tailscale.app/Contents/MacOS/Tailscale,非互動情境(scripts / 其他工具呼叫 tailscale)可能吃不到 PATH。並需在這台機器 `brew uninstall tailscale`。
+
+
+**Answer:** 保留 formula(建議)
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user went with keeping the formula and aligning versions, fixing the stale comment, and documenting that macOS requires never using `brew services start tailscale`. I'm executing the plan now—first checking if the App Store cleanup command ran, then proceeding with the repository edits.
+
+I won't block on the user running the sudo command since I already provided it. For version alignment, I'll run `brew upgrade tailscale` and `brew upgrade --cask tailscale-app` interactively (using `HOMEBREW_NO_AUTO_UPDATE=1` to avoid the aliyun hang), then update the Brewfile to fix the stale comment and add the macOS service warning.
+
+Updating Brewfile comments...
+
+I'm deciding whether to add a pointer to the pitfall in the project's MEMORY.md file. The pitfall itself belongs in the repo's `pitfalls/` directory as the canonical location, and since CLAUDE.md already directs agents there, duplicating it into the ~/.claude memory system seems unnecessary. I'll document the pitfall in the repo and rely on the existing knowledge-harness structure rather than creating a separate memory entry.
+
+Now I'm checking the existing pitfalls directory to match the format of other pitfalls before writing, and reviewing the doc mirrors — the tool-managers.md rows for tailscale are already accurate, README.md is correct, and I'm considering whether to expand the Tailscale.md documentation.
+
+The actual edits I need to make are: fix the Brewfile.tmpl comment, possibly add a cross-reference in Brewfile.darwin.tmpl, create the new pitfall file, update the pitfalls README index, add a cleanup note to docs/tools/Tailscale.md, and then verify the changes on a live machine by running brew upgrade and confirming the App Store leftover is removed. I'm also thinking through whether adding a link to the pitfall in Tailscale.md (which is already in the mkdocs nav) will trigger any strict build issues, since the pitfall file itself sits outside the mkdocs navigation structure.
+
+The key insight is that pitfalls are referenced via absolute GitHub URLs per the guidelines, so if I link to the pitfall from Tailscale.md, I need to use the full GitHub blob URL to avoid mkdocs link-check failures. I'll grab the git remote to construct the correct URL, then execute the file reads and brew upgrade in parallel while I work through the edits.
+
+For the brew upgrades, I need to be strategic: the formula upgrade for tailscale (the CLI) is safe to run without sudo, but the cask upgrade for tailscale-app requires sudo and kernel extension approval, which could hang in a non-interactive shell. Since the app has auto_updates enabled anyway, I'll just upgrade the formula and let the user handle the cask manually if needed. The user chose to align versions, so I need to upgrade the formula now and provide them with the cask upgrade command (which requires sudo). Let me mark task 2 as completed, move task 3 to in-progress, then batch together the background formula upgrade, reading the relevant config files, and fetching the git remote.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:39Z)**_
+
+Decision noted — keeping the formula, aligning versions, fixing the stale comment, and documenting the "never `brew services start tailscale` on macOS" rule. Let me update task state and start the version-alignment upgrade (formula, no sudo) while I read the files I'll edit.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:39Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #2 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:39Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #3 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check leftover status, git remote, current versions
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== App Store leftover 還在嗎? ==="; ls -d /Applications/Tailscale.localized 2>/dev/null && echo "  → 還在(等你跑 sudo rm)" || echo "  → 已移除 ✅"
+echo; echo "=== git remote (for GitHub pitfall URLs) ==="; git remote get-url origin 2>/dev/null
+echo; echo "=== 現在 formula/cask 版本 ==="; /usr/local/bin/tailscale version 2>/dev/null | head -1; /usr/bin/defaults read /Applications/Tailscale.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null
+```
+
+```text
+=== App Store leftover 還在嗎? ===
+/Applications/Tailscale.localized
+  → 還在(等你跑 sudo rm)
+
+=== git remote (for GitHub pitfall URLs) ===
+git@github.com:daviddwlee84/dotfiles.git
+
+=== 現在 formula/cask 版本 ===
+1.94.1
+1.96.5
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read Brewfile.darwin context and pitfalls README
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "########## Brewfile.darwin.tmpl 110-160 ##########"; sed -n '110,160p' dot_config/homebrew/Brewfile.darwin.tmpl
+echo; echo "########## pitfalls/README.md ##########"; cat pitfalls/README.md 2>/dev/null | head -60
+```
+
+```text
+########## Brewfile.darwin.tmpl 110-160 ##########
+# =============================================================================
+# Casks - Finance & Trading
+# =============================================================================
+# cask "binance"
+# cask "tradingview"
+
+# =============================================================================
+# Casks - Network & VPN
+# =============================================================================
+# Tailscale desktop app (cask). Was previously `mas "Tailscale", id: 1475387142`,
+# but Tailscale was delisted from the Mac App Store (mas install now fails with
+# "No apps found in the App Store for ADAM ID 1475387142").
+cask "tailscale-app"
+# cask "openvpn-connect"
+# cask "vibetunnel"
+# cask "clash-verge-rev"  # Clash proxy GUI (replacement for Clash for Windows)
+
+# =============================================================================
+# Casks - Virtualization & Remote
+# =============================================================================
+# cask "virtualbox"
+# cask "windows-app"      # Microsoft Remote Desktop
+# cask "teamviewer-host"
+# cask "sharemouse"       # KVM software
+
+# =============================================================================
+# Casks - Developer Tools
+# =============================================================================
+# Note: docker/orbstack is managed by ansible docker role
+cask "dbeaver-community"
+{{ if eq .chezmoi.arch "arm64" -}}
+cask "superset"
+{{ end -}}
+
+# =============================================================================
+# Casks - Cloud Storage (Chinese apps)
+# =============================================================================
+# {{ if .useChineseMirror -}}
+# cask "baidunetdisk"  # Baidu Netdisk (百度网盘)
+# {{- end }}
+
+# =============================================================================
+# Mac App Store Apps (via mas)
+# Requires: mas signin (or sign in via App Store.app)
+# =============================================================================
+# mas "Tailscale", id: 1475387142  # delisted from MAS — use cask "tailscale-app" above instead
+# mas "LINE", id: 539883307
+# mas "Keynote", id: 409183694
+# mas "Numbers", id: 409203825
+# mas "Pages", id: 409201541
+# mas "Magnet", id: 441258766  # Paid app - or use free 'rectangle' cask instead
+
+########## pitfalls/README.md ##########
+# Pitfalls
+
+Past traps we've stepped on. Symptoms-first knowledge base — the goal is that
+when a problem recurs (on a new machine, after an upgrade, with a new tool
+combo), grepping the symptom here lands you on the root cause and workaround
+in seconds, instead of re-debugging from scratch.
+
+This folder is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `pitfalls/**`); it
+is repo metadata for maintainers, not user-facing config to deploy.
+
+## Pitfalls vs the rest
+
+This repo has four sibling surfaces with overlapping shapes; pick the right one:
+
+| Surface | Time direction | Question it answers | Access pattern |
+|---|---|---|---|
+| `docs/tools/<tool>.md` | Present | "How does this tool work / how do I configure it?" | Read top to bottom |
+| `docs/this_repo/<topic>.md` | Present | "Why did we architect it this way?" | Read top to bottom |
+| `pitfalls/<slug>.md` | **Past** | **"I see error X — has this happened before?"** | **Grep symptoms** |
+| `backlog/<slug>.md` | Future | "We thought about doing Y — what was the analysis?" | Index in `TODO.md` |
+| `AGENTS.md` Hard invariants | Present | "What rules MUST agents follow?" | Read top to bottom |
+
+A pitfall **graduates** to a Hard invariant in `AGENTS.md` when the trap is
+serious enough that you can't rely on memory or grep — typically when (a) it
+recurs across machines, (b) it silently corrupts state, or (c) the workaround
+is non-obvious and easy to undo by accident. When graduating, leave a
+`pitfalls/<slug>.md` as historical record and link to it from the invariant.
+
+## When to add a pitfall doc
+
+Add a `pitfalls/<slug>.md` when you've spent more than ~15 minutes on something
+where the answer wasn't googleable, AND any of:
+
+- The symptom is non-obvious from the root cause (`SSH_CONNECTION` cleared
+  silently → hostname module disappears, no error)
+- The fix is "do nothing different but in a specific order" (sentinel writes
+  must come after `wait $pid` for fleet-apply, etc.)
+- The same trap could be hit by a new agent / new machine / new contributor
+- An upstream bug exists with no ETA — workaround needs to outlive memory
+- A specific tool version is required (or forbidden) and the failure mode at
+  the wrong version is silent / confusing (e.g. tmux 3.2a popup off-screen)
+
+## When NOT to add a pitfall doc
+
+- Trivially googleable error (the next person will solve in 30 seconds anyway)
+- Already covered in `docs/tools/<tool>.md` as part of the tool's normal
+  configuration — cross-link from this README's "Cross-referenced pitfalls"
+  table below instead of duplicating
+- Already a `AGENTS.md` Hard invariant — those have higher priority enforcement
+  (cross-link only)
+- One-off transient (network glitch, machine-specific config rot) — fix and
+  move on
+
+## File template
+
+See [`assets/pitfall-doc.md.template`](#) in the
+[`project-knowledge-harness` skill](https://github.com/daviddwlee84/agent-skills/tree/main/skills/local/project-knowledge-harness),
+or copy the structure of an existing entry below.
+
+Key sections (different from `backlog/` template — symptom-first, not
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:54Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking the rest of the README to understand the cross-referenced pitfalls table format and the file template structure, then comparing it against an existing pitfall to match the style.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:54Z)**_
+
+Let me see the rest of the pitfalls README (index table format) and a representative existing pitfall to match the house style.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:46:55Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read pitfalls index table and list existing entries
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "########## pitfalls/README.md 60- ##########"; sed -n '60,140p' pitfalls/README.md
+echo; echo "########## 現有 pitfall 範例 (挑一個中等長度) ##########"; ls pitfalls/*.md | grep -v README | head -20
+```
+
+```text
+########## pitfalls/README.md 60- ##########
+Key sections (different from `backlog/` template — symptom-first, not
+context-first):
+
+```markdown
+# <Title describing the SYMPTOM, not the root cause>
+
+**Symptoms** (grep this section): <verbatim error messages, observable behaviour>
+**First seen**: YYYY-MM
+**Affects**: <tool/version/OS combo>
+**Status**: workaround documented / fixed upstream in vX.Y / WONTFIX
+
+## Symptom
+
+Full error messages (verbatim, not paraphrased — preserves grep-ability).
+Reproduction steps if applicable.
+
+## Root cause
+
+Why this happens. Reference source, docs, or upstream issue.
+
+## Workaround
+
+Immediate workaround (commands, config diff). Should be copy-pasteable.
+
+## Prevention
+
+How to avoid stepping on this again. If serious enough, link to the
+corresponding `AGENTS.md` Hard invariant.
+
+## Related
+
+Links to `docs/`, sibling pitfalls, `TODO.md` entries (if a real fix is
+queued), upstream issues/PRs.
+```
+
+## Index
+
+Pitfalls owned by this folder. Keep alphabetical.
+
+| Slug | Symptom keywords | Status |
+|---|---|---|
+| [`agent-warmup-scheduled-run-hangs-or-blank-under-daemon`](agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md) | launchd/pueue `agent-warmup run` wedges for hours (`state = running`, no log) or finishes with an EMPTY `/usage` panel / blank `capture-pane`; `sample` shows `dyld mapFileReadOnly`; stuck PID is `uv` or `python3 .../agent-warmup`; identical `agent-warmup verify` works by hand | fixed (4 stacked fixes: direct python · lazy plistlib · main-volume python · inject into the existing GUI-session tmux server) |
+| [`ansible-js-cli-tools-old-system-node`](ansible-js-cli-tools-old-system-node.md) | `Tag 'js_cli_tools' had failures` / `Tag 'coding_agents' had failures`; `npm WARN EBADENGINE` + `EACCES /usr/local/lib/node_modules`; system node v12.22.9 on Ubuntu jammy | fix paths documented (no in-repo fix yet) |
+| [`ansible-missing-sudo-tag`](ansible-missing-sudo-tag.md) | `chezmoi apply` in noRoot mode aborts at one ansible task with `sudo: a password is required` / `Premature end of stream waiting for become success`; works fine on rooted hosts | workaround documented (add `tags: [sudo]`); convention = every `become: true` in `dot_ansible/` must pair with `tags: [sudo]` |
+| [`apt-update-fails-base-role-empty-error`](apt-update-fails-base-role-empty-error.md) | `Failed to update apt cache after 5 retries: ''` (empty reason) at base role; `Failed to update cache after 5 retries due to , retrying`; `chezmoi init` exit 1 on Debian/Ubuntu; GFW host with unreachable third-party repo / dead lazygit PPA leftover | fixed (best-effort cache update + CLI diagnostics; lazygit PPA removed + purged; deb822 migration with policy-probe rollback) |
+| [`bitwarden-ssh-agent-confirm-blocks-remote-git-push`](bitwarden-ssh-agent-confirm-blocks-remote-git-push.md) | `git push` / ssh fails `Connection closed by … port 443` + `Could not read from remote repository` when `$SSH_AUTH_SOCK` is Bitwarden's agent and you're on a remote/headless session; intermittent (first push OK, later fail); `ssh-add -l` still lists the key | by design — disable per-use confirm, approve at the physical screen, `ssh -A` forward, or use HTTPS+PAT |
+| [`blesh-set-v-leaks-gexec-wrapper`](blesh-set-v-leaks-gexec-wrapper.md) | `{ _ble_edit_exec_gexec__save_lastarg "$@"; } 4>&1 5>&2 &>/dev/null` printed after every prompt under bash + ble.sh; typed command echoed twice; goes away in fresh terminal; no `+` prefix (so not `set -x`) | workaround = `set +v` in-session; `set -v` is architecturally incompatible with ble.sh's eval-based gexec |
+| [`bootstrap-curl-bash-hangs-after-reattaching-tty`](bootstrap-curl-bash-hangs-after-reattaching-tty.md) | `curl … \| bash` of `bootstrap.sh` hangs forever right after `[bootstrap …] stdin is a pipe — reattaching to /dev/tty for interactive prompts`; no `fetching + running …` log; no `uv`/`chezmoi` child process; only happens on certain fresh users / hosts | fixed (`exec </dev/tty` removed mid-script; `/dev/tty` redirected only on the final `exec uv run`) |
+| [`bootstrap-no-tty-sudo-prompt-skipped`](bootstrap-no-tty-sudo-prompt-skipped.md) | `[WARN] Could not establish a sudo session (no TTY and sudo needs a password)` then Linuxbrew installer aborts with `Insufficient permissions to install Homebrew to "/home/linuxbrew/.linuxbrew"`; `mkdir: cannot create directory '/run/user/<UID>': Permission denied`; user verifiably has interactive sudo; CentOS 7 + high-UID AD/LDAP user | workaround documented (`CHEZMOI_SUDO_PASSWORD_FILE` / `just apply-with-sudo` / `NOPASSWD: ALL` sudoers drop-in) |
+| [`brew-bundle-redownloads-manually-installed-cask`](brew-bundle-redownloads-manually-installed-cask.md) | `brew bundle` re-downloads cask for `.app` already in `/Applications/`; chains into `process has already locked .incomplete` parallel-fetch errors; `[WARN] Some packages in macOS packages from Brewfile.darwin still failed after 2 attempts` | partial: stale-lock cleanup permanent; `--adopt` pre-flight opt-in via `CHEZMOI_BREW_ADOPT_PREFLIGHT=1` (version-strict + password-storm trade-offs documented) |
+| [`brew-cask-slow-github-release-assets`](brew-cask-slow-github-release-assets.md) | `brew upgrade --cask <x>` download creeps at ~25 KB/s from `release-assets.githubusercontent.com`; TUNA/ghproxy/Clash don't help | no workaround (network-path issue) |
+| [`btop-themes-permission-denied-core-dumped`](btop-themes-permission-denied-core-dumped.md) | `btop` aborts on launch: `IOT instruction (core dumped)` + `terminate called ... std::filesystem::filesystem_error` / `directory iterator cannot open directory: Permission denied [~/.config/btop/themes]`; dir perms are fine (775 user-owned); `command -v btop` = `/snap/bin/btop` (publisher `kz6fittycent`) | not a repo bug; snap `home` interface can't read hidden dirs; workaround = `sudo snap remove btop` (or `brew install btop`) so apt/GitHub/brew btop wins on PATH |
+| [`centos7-neovim-apt-register-defined`](centos7-neovim-apt-register-defined.md) | `just ansible-tags neovim` / `chezmoi apply` on **sudo-having** CentOS 7 box completes `ok=8 changed=0 skipped=23 failed=0` but `command -v nvim` is empty; user-level fallback gated `apt_neovim is not defined` but `register:` on a `when:`-skipped task IS defined (as a skip dict); plus mainline nvim ≥0.10 binaries require glibc 2.28+ which EL7 lacks | fixed (gate adds `or apt_neovim is skipped`; oldEL branch downloads from upstream's `neovim/neovim-releases` older-glibc repo) |
+| [`centos7-systemd-user-instance-missing`](centos7-systemd-user-instance-missing.md) | `rust_cargo_tools : Enable and start pueued service` fails with `Failed to get D-Bus connection: No such file or directory`, ansible `...ignoring`; PLAY RECAP `failed=0` but daemon never starts; `sudo loginctl enable-linger $USER` does NOT help; `sudo systemctl start user@$(id -u).service` returns `Unit not found`; `find /usr/lib/systemd -name 'user@.service'` is empty | WONTFIX upstream (RHEL 7 EOL); workaround = run pueued under tmux/nohup or as system service; ansible role's `ignore_errors: true` is correct |
+| [`chezmoi-reinit-promptonce-keeps-stale-value`](chezmoi-reinit-promptonce-keeps-stale-value.md) | re-running `chezmoi init` / `dotfiles_init.py` doesn't change a setting; `--promptBool "...=false"` ignored, `installX` flag stays `true`; `chezmoi data` shows stale value after re-apply; no error | fixed (`init` re-init branch + `reconfigure` both pass `--prompt`) |
+| [`chezmoi-update-blesh-local-changes-overwritten`](chezmoi-update-blesh-local-changes-overwritten.md) | `chezmoi update` / `--refresh-externals` aborts on `.local/share/blesh`: `Your local changes to the following files would be overwritten by merge` (`lib/core-syntax.sh` …); diff = added license header + stripped comments; nobody edited ble.sh source | fixed (source clone moved to `~/.local/src/blesh`, decoupled from `make install` target) |
+| [`chezmoiignore-negation-noop-under-recursive-glob`](chezmoiignore-negation-noop-under-recursive-glob.md) | a new managed file under a `**`-ignored dir shows `chezmoi: …: not managed`; `chezmoi managed \| grep` empty; `!path` re-include in `.chezmoiignore` silently does nothing; `chezmoi apply` exits 0 with no error | workaround documented (use single-`*` globs `dir/*` + `dir/*/**` so the parent stays un-excluded, then `!dir/keep`) |
+| [`claude-code-permission-mode-resets-after-interactive-prompt`](claude-code-permission-mode-resets-after-interactive-prompt.md) | Claude Code drops from `bypassPermissions` / `plan` back to `acceptEdits` after answering any `AskUserQuestion` / CodeIsland popup / remote-control inject; `Bash(...)` then re-prompts for permission | workaround documented (`permissions.defaultMode = "bypassPermissions"` in overlay); WONTFIX upstream |
+| [`claude-hud-usage-statusline-stale`](claude-hud-usage-statusline-stale.md) | `agent-wakeup status` says `WAIT_QUOTA` while Claude is active; tmux capture contains stale `Context ... | Usage ... Limit reached`; HUD usage line misread as quota-blocked pane | fixed in `agent-wakeup` (ignore Claude HUD usage statusLine; use explicit quota/menu markers only) |
+| [`claude-plans-here-misses-global-plans-jsonl-schema`](claude-plans-here-misses-global-plans-jsonl-schema.md) | `claude-plans-here` prints only `Wrote .../.claude/settings.json`; project `.claude/plans/` stays empty; matching plan still under `~/.claude/plans/*.md`; JSONL uses `toolUseResult.filePath` / `ExitPlanMode.planFilePath` | fixed (find + jq parser; Bats fixture coverage) |
+| [`codeisland-auto-approves-permissionrequest`](codeisland-auto-approves-permissionrequest.md) | Claude Code shows `⎿ Allowed by PermissionRequest hook` / `⏺ Plan approved.` instantly with no notch popup, no native confirm dialog; `~/.claude/settings.json` contains a `PermissionRequest` hook pointing at `~/.codeisland/codeisland-hook.sh` with `timeout: 86400` | workaround documented (toggle off auto-approve in the CodeIsland HUD app); repo-enforced subtractive removal designed but deliberately NOT wired up |
+| [`editor-overlay-flattens-empty-settings`](editor-overlay-flattens-empty-settings.md) | Cursor/VSCode/Antigravity loses `workbench.colorTheme` + `workbench.iconTheme` after `chezmoi apply`; `settings.json` collapses to ~286 bytes = only the 6 overlay keys; reverts to `Dark Modern` + no file icons; user blames the Brewfile cask reinstall (it's not); sibling editors untouched | by design (`jq '. * $overlay'` on an *empty* base yields overlay-only); recovery + optional guard documented |
+| [`git-delta-empty-stdin-huge-allocation`](git-delta-empty-stdin-huge-allocation.md) | `delta` / `printf '' \| delta` crashes with `memory allocation of 1970324836974592 bytes failed`; `delta --version` still works; `something is very wrong if the default theme is missing` | fixed (clear incompatible bat cache + delta stdin health check) |
+| [`git-lfs-global-hook-breaks-brew-tap`](git-lfs-global-hook-breaks-brew-tap.md) | `brew tap` / `brew bundle` fails: `This repository is configured for Git LFS but 'git-lfs' was not found on your path`, `git clone ... exited with 2`, `Tapping <tap> has failed!`, then `Cask '<name>' is unavailable: No Cask with this name exists`; git-lfs IS installed; stock git-lfs hook in the global `core.hooksPath` `exit 2`s under Homebrew's stripped superenv PATH | fixed (chezmoi-managed git-lfs hooks made PATH-robust + non-fatal) |
+| [`headless-claude-p-does-not-move-5h-window`](headless-claude-p-does-not-move-5h-window.md) | scheduled `claude -p 'Reply: hi'` warmup runs clean (exit 0) but the Claude Pro/Max 5-hour window never starts; `/usage` shows no active window at warmup time; metered Agent SDK credit consumed instead of subscription; `--bare` forces `ANTHROPIC_API_KEY` | by design (2026-06-15 billing split) — `agent-warmup` drives an interactive tmux session instead |
+| [`homebrew-6-refuses-untrusted-tap-formula`](homebrew-6-refuses-untrusted-tap-formula.md) | `chezmoi apply` dies at `devtools : Install developer CLI tools (macOS)` with `Error: Refusing to load formula raine/workmux/workmux from untrusted tap`; `Run \`brew trust raine/workmux\``; `brew tap-info <tap>` shows `Untrusted`; both `raine/workmux` and `dlvhdr/formulae` affected; worked days earlier | fixed (devtools role auto-`brew trust`s third-party taps; Homebrew 6.0 formula-trust gate) |
+| [`homebrew-aliyun-brew-git-hang-core-clone-bloat`](homebrew-aliyun-brew-git-hang-core-clone-bloat.md) | any auto-updating `brew` cmd hangs 60s+ after `HOMEBREW_BREW_GIT_REMOTE set: using https://mirrors.aliyun.com/homebrew/brew.git`; `unset HOMEBREW_BREW_GIT_REMOTE` "fixes" it; `git ls-remote` fast but `git fetch` stalls; SEPARATELY `du -sh "$(brew --repo homebrew/core)/.git"` = ~1 GB after being ~8 KB | fixed (baseline Aliyun→BFSU across 3 layers + `brew-mirror`; `HOMEBREW_CORE_GIT_REMOTE` dropped — brew 4.x API mode) |
+| [`macos-tcc-tmux-volumes-permission-denied`](macos-tcc-tmux-volumes-permission-denied.md) | `ls /Volumes/Data/...` in Alacritty or an attached old tmux session prints `Permission denied: . - code: 13` / `Skipped 1 directories due to permission denied: .`, while Cursor can read the same path and Unix perms are normal | workaround documented (Full Disk Access belongs to the app that started the tmux server; kill old server and restart tmux from the authorized app) |
+| [`macfuse-too-old-unsupported-macos-version-rclone-mount`](macfuse-too-old-unsupported-macos-version-rclone-mount.md) | macFUSE dialog `Unsupported macOS Version — The installed version of macFUSE is too old for the operating system` on boot / `rclone mount`; `rclone mount --help` works fine (binary not the cause); `brew info --cask macfuse` reports 5.x but Caskroom has 4.x; `brew upgrade` doesn't fix (cask is `auto_updates`) | by design (kext version-locked to macOS major); manual `brew reinstall --cask macfuse` + reboot + GUI approval; not repo-managed |
+| [`mkdocs-copy-to-llm-custom-css-no-trailing-newline`](mkdocs-copy-to-llm-custom-css-no-trailing-newline.md) | `git status` always shows `docs/assets/copy-to-llm/copy-to-llm-custom.css` modified after `mkdocs build` / `mkdocs serve`; diff is just `-}` / `+}` `\ No newline at end of file`; `end-of-file-fixer` adds `\n` back, next build strips it; ping-pong forever | workaround documented (gitignore + `git rm --cached`); upstream PR not yet sent |
+| [`modify-script-jq-bootstrap-cycle`](modify-script-jq-bootstrap-cycle.md) | `jq: command not found` / `chezmoi: .agents/.skill-lock.json: exit status 127` immediately after `[SUCCESS] Bootstrap complete!` on a fresh box; subsequent applies stuck in same loop because ansible never reached | fixed (`command -v` guards added to all 7 `modify_*` scripts that needed them) |
+| [`tmux-continuum-restores-on-intentional-quit`](tmux-continuum-restores-on-intentional-quit.md) | closed tmux on purpose (`kill-server` / "Kill all sessions" / `prefix + M-x` on last session) and the just-killed sessions come back on next `tmux` start; `@continuum-restore 'on'` can't tell intent from crash; `~/.local/share/tmux/resurrect/last` symlink still points at the pre-kill snapshot | workaround documented (clean-quit wrappers `kill-server-clean.sh` / `kill-session-exit.sh` rm the `last` symlink before server dies; crash recovery preserved via untouched history) |
+| [`tmux-copy-mode-double-free-3.6a`](tmux-copy-mode-double-free-3.6a.md) | `[server exited unexpectedly]` after long-running session when entering copy-mode; `.ips` shows `___BUG_IN_CLIENT_OF_LIBMALLOC_POINTER_BEING_FREED_WAS_NOT_ALLOCATED` with stack `cmd_copy_mode_exec → window_copy_clone_screen → screen_reinit → grid_clear_lines → grid_free_line`; homebrew bottle `slice_uuid: 1b2d8e7b-bb77-3465-8bab-73f5bbaffe49`; terminal-agnostic | fixed upstream ([`035a2f3`](https://github.com/tmux/tmux/commit/035a2f35d40628dcfe235179220fc0ede848a195) closing [#4777](https://github.com/tmux/tmux/issues/4777)) but not in any tagged release; workaround = `brew install --HEAD tmux` until 3.7 ships |
+| [`mrun-autoname-collides-zsh-random-subshell`](mrun-autoname-collides-zsh-random-subshell.md) | back-to-back `mrun` / `tmrun` / `zjrun` without `-n NAME` produce the same `run-<dir>-<hex>` suffix; second call errors `tmux session 'run-X-NNNN' already exists`; `zsh -c 'echo $(echo $RANDOM) $(echo $RANDOM)'` returns identical numbers | fixed in `dot_config/zsh/tools/23_mrun.zsh` (read `$RANDOM` into a parent-shell local before the `$(…)` boundary) |
+| [`niri-spawn-cargo-bin-not-on-session-path`](niri-spawn-cargo-bin-not-on-session-path.md) | niri `Mod+T` / any `spawn "<tool>"` opens nothing, no error; binary is in `~/.cargo/bin` (works in your shell) but not on the systemd/Wayland session PATH; the `ln -s … /usr/local/bin` "fix" breaks multi-user | fixed (per-user `environment { PATH … }` in `config.kdl.tmpl`, not a system symlink) |
+| [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
+| [`sudo-shared-setsid-macos`](sudo-shared-setsid-macos.md) | `[bootstrap]` / `[ansible]` / `[brew]` sudo prompts fire 3× in one `chezmoi apply` on macOS despite "entered once, reused" wording; `keepalive.pid` points to a dead PID; `which setsid` → not found | fixed (`_sudo_spawn_watchdog` falls back to `nohup` when `setsid` is absent) |
+| [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
+| [`ollama-brew-link-fails-cask-shadows-formula`](ollama-brew-link-fails-cask-shadows-formula.md) | `chezmoi apply` aborts at `llm_tools : Install Ollama via Homebrew formula` with `Error: The \`brew link\` step did not complete successfully` / `Could not symlink bin/ollama` / `Target /usr/local/bin/ollama already exists`; `ollama` formula installed-but-unlinked, `shadowed by /usr/local/bin/ollama`; the target is a symlink into `Ollama.app` (cask `ollama-app`); roles after `llm_tools` silently skipped | fixed (`which ollama` pre-check gates the formula install in `dot_ansible/roles/llm_tools`) |
+| [`opencode-concurrent-launch-wal-pragma-fails`](opencode-concurrent-launch-wal-pragma-fails.md) | `Failed to run the query 'PRAGMA journal_mode = WAL'`; one of N simultaneously-launched `opencode` TUIs exits on startup (`svibe N opencode`); log shows several `opencode.db opening database` within ms | upstream concurrency limit; mitigation = stagger launches (`SVIBE_LAUNCH_STAGGER`) |
+| [`opencode-docker-opentui-glibc-loader-missing`](opencode-docker-opentui-glibc-loader-missing.md) | `docker run ... ghcr.io/anomalyco/opencode` exits with `Failed to initialize OpenTUI render library: Failed to open library "/tmp/.<hex>-00000001.so": Error loading shared library ld-linux-x86-64.so.2: No such file or directory`; image is Alpine/musl, OpenTUI native lib needs glibc | workaround = `--entrypoint sh ... -c 'apk add --no-cache gcompat && exec opencode "$@"'`; upstream image bug as of 1.15.11 |
+
+########## 現有 pitfall 範例 (挑一個中等長度) ##########
+pitfalls/agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md
+pitfalls/ansible-js-cli-tools-old-system-node.md
+pitfalls/ansible-missing-sudo-tag.md
+pitfalls/ansible-when-regex-replace-backslash-strip.md
+pitfalls/apt-update-fails-base-role-empty-error.md
+pitfalls/bitwarden-ssh-agent-confirm-blocks-remote-git-push.md
+pitfalls/blesh-set-v-leaks-gexec-wrapper.md
+pitfalls/bootstrap-curl-bash-hangs-after-reattaching-tty.md
+pitfalls/bootstrap-no-tty-sudo-prompt-skipped.md
+pitfalls/brew-bundle-redownloads-manually-installed-cask.md
+pitfalls/brew-cask-slow-github-release-assets.md
+pitfalls/btop-themes-permission-denied-core-dumped.md
+pitfalls/centos7-ansible-yum-dnf-backend.md
+pitfalls/centos7-idc-slow-broken-installs.md
+pitfalls/centos7-neovim-apt-register-defined.md
+pitfalls/centos7-noroot.md
+pitfalls/centos7-numpy-pandas-source-build.md
+pitfalls/centos7-systemd-user-instance-missing.md
+pitfalls/centos7-zsh-too-old.md
+pitfalls/chezmoi-init-prompt-flag-mismatch.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:26Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm working through the pitfall documentation template with the house style in mind. The slug needs to be symptom-focused and alphabetically ordered, so I'm settling on `tailscale-another-copy-found-app-store-leftover` to capture the key symptom: "Another Tailscale copy was found on this Mac."
+
+I'll start a background brew upgrade with `HOMEBREW_NO_AUTO_UPDATE=1` to avoid any auto-update hangs, since upgrading the formula is safe—tailscaled isn't running and the CLI is only used interactively. Then I'll tackle the edits: updating the Brewfile template region, writing the pitfall doc, adding an alphabetical entry to the pitfalls index, and linking to it from the Tailscale tools doc.
+
+I'm also noting that `mas` is currently unused (no active entries, only commented ones), but leaving it in place is harmless since the user might add mas apps later—not worth scope-creeping into that cleanup.
+
+Updating Brewfile.tmpl... I need to read those files using the Read tool first before I can edit them, since the Edit tool requires a prior Read in the conversation. I've only examined them with bash commands so far. Let me batch the reads together and kick off the brew upgrade in the background at the same time.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:26Z)**_
+
+I have the house style. Let me kick off the formula version-alignment upgrade in the background (with `HOMEBREW_NO_AUTO_UPDATE=1` per the known aliyun-hang trap) and read the files I'll edit with the Edit tool.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Upgrade tailscale formula to align version
+
+```bash
+cd /Users/david/.local/share/chezmoi
+HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade tailscale 2>&1 | tail -15; echo "EXIT=$?"; echo "--- new CLI version ---"; /usr/local/bin/tailscale version 2>/dev/null | head -1
+```
+
+```text
+Command running in background with ID: b1hwbsgnh. Output is being written to: /private/tmp/claude-502/-Users-david--local-share-chezmoi/cd3611ce-c7eb-4287-b3a6-7a59e91fb7d8/tasks/b1hwbsgnh.output. You will be notified when it completes. To check interim output, use Read on that file path.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/homebrew/Brewfile.tmpl`
+
+```text
+1	# Brewfile - Shared configuration (macOS & Linux)
+2	# Applied via: brew bundle --file=~/.config/homebrew/Brewfile
+3	#
+4	# This file is managed by chezmoi. Edit the source:
+5	#   chezmoi edit ~/.config/homebrew/Brewfile
+6	
+7	# =============================================================================
+8	# Taps (Third-party repositories)
+9	# =============================================================================
+10	{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+11	tap "nikitabobko/tap"  # aerospace (macOS window manager)
+12	{{ end -}}
+13	
+14	# =============================================================================
+15	# Formulas - CLI Tools (cross-platform)
+16	# =============================================================================
+17	# Note: Most CLI tools are managed by ansible for better cross-platform support
+18	# Only add formulas here that you want to manage via Brewfile
+19	
+20	# The following formulas support the general macOS GUI app bundle.
+21	{{ if and (eq .chezmoi.os "darwin") .installBrewApps -}}
+22	# Mac App Store CLI (needed for mas entries in Brewfile.darwin)
+23	brew "mas"
+24	brew "tailscale"  # Tailscale CLI (desktop app is installed via mas in Brewfile.darwin)
+25	{{ end -}}
+26
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:28Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/Tailscale.md`
+
+```text
+1	# Tailscale
+2	
+3	- [Download | Tailscale](https://tailscale.com/download/mac)
+4	  - [tailscale-app — Homebrew Formulae](https://formulae.brew.sh/cask/tailscale-app) - Desktop App (Standalone)
+5	    - [Tailscale Packages - stable track](https://pkgs.tailscale.com/stable/#macos)
+6	  - [tailscale — Homebrew Formulae](https://formulae.brew.sh/formula/tailscale) - CLI
+7	  - [Tailscale App - App Store](https://apps.apple.com/ca/app/tailscale/id1475387142)
+8	
+9	> Standalone > App Store
+10
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm starting with the Brewfile template to fix the comment.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:33Z)**_
+
+Now the edits. First, fix the stale `Brewfile.tmpl` comment and encode the "never start the service" rule:
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/homebrew/Brewfile.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm working on the pitfall documentation file now, setting up the GitHub link to the Tailscale pitfall entry in the dotfiles repo so it can be referenced from the mkdocs navigation.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:52Z)**_
+
+Task 3 edit done. Now write the pitfall doc, index it, and add a cleanup note to the Tailscale doc.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:52Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #3 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:52Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #4 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:57Z)**_
+
+<think><details><summary>Thought Process</summary>
+The formula upgrade finished successfully, so I'll verify the new version is in place and then move on to working on the pitfall documentation.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:57Z)**_
+
+The formula upgrade finished (exit 0). Let me confirm the new CLI version, then write the pitfall doc.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:47:57Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `/private/tmp/claude-502/-Users-david--local-share-chezmoi/cd3611ce-c7eb-4287-b3a6-7a59e91fb7d8/tasks/b1hwbsgnh.output`
+
+```text
+1	To start tailscale now and restart at login:
+2	  brew services start tailscale
+3	Or, if you don't want/need a background service you can just run:
+4	  /usr/local/opt/tailscale/bin/tailscaled
+5	==> Summary
+6	🍺  /usr/local/Cellar/tailscale/1.98.8: 13 files, 40.2MB
+7	==> Running `brew cleanup tailscale`...
+8	Disable this behaviour by setting `HOMEBREW_NO_INSTALL_CLEANUP=1`.
+9	Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+10	Removing: /usr/local/Cellar/tailscale/1.94.1... (14 files, 38.8MB)
+11	==> Caveats
+12	zsh completions have been installed to:
+13	  /usr/local/share/zsh/site-functions
+14	==> Upgraded 1 outdated package
+15	tailscale 1.94.1 -> 1.98.8
+16	EXIT=0
+17	--- new CLI version ---
+18	1.98.8
+19
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+The CLI version is now aligned with the target at 1.98.8, though the daemon is still running 1.96.5 until the cask self-updates, which is fine for compatibility. I noticed brew's own caveats mention the exact foot-gun I'm documenting, so that's a good validation. Now I'm going to write out the pitfall documentation.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:37Z)**_
+
+CLI now at **1.98.8** (was 1.94.1) — aligned with the cask target. Note brew's own caveat literally suggests `brew services start tailscale` — exactly the foot-gun I'm now documenting. Writing the pitfall:
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# "Another Tailscale copy was found on this Mac" + DNS unavailable
+
+**Symptoms** (grep this section):
+- Tailscale debug → System Configuration Inspector: `System Configuration Issue Found` / `A software conflict and/or installation error on your Mac has been detected` / `Another Tailscale copy was found on this Mac.` / `Another copy of Tailscale was found at this path: /Applications/Tailscale.localized/Tailscale.app` / `onlyOneCopyExplainer`
+- `Current Issues` → `DNS Unavailable` / `Tailscale can't reach the configured DNS servers` / `Code: dns-forward-failing`
+- `mdfind -name "Tailscale.app"` returns **two** paths: `/Applications/Tailscale.app` **and** `/Applications/Tailscale.localized/Tailscale.app`
+- macsys menu-bar app keeps flagging the conflict even after quitting/reopening
+
+**First seen**: 2026-07
+**Affects**: macOS, any host that installed Tailscale from the Mac App Store **before** this repo migrated `mas "Tailscale"` → `cask "tailscale-app"` (May 2026). The App Store `.app` is left behind; the cask (macsys standalone) then owns `/Applications/Tailscale.app` and detects the leftover.
+**Status**: workaround documented (delete the leftover; repo already migrated to cask)
+
+## Symptom
+
+Two independent Tailscale `.app` bundles coexist. The **running** one is the
+macsys standalone build (installed by `cask "tailscale-app"`); the **idle** one
+is the old sandboxed App Store build, sitting in a `.localized` wrapper folder:
+
+\```
+$ mdfind -name "Tailscale.app"
+/Applications/Tailscale.localized/Tailscale.app
+/Applications/Tailscale.app
+
+$ for p in /Applications/Tailscale.app /Applications/Tailscale.localized/Tailscale.app; do
+    echo "$p → $(defaults read "$p/Contents/Info.plist" CFBundleIdentifier)  $(defaults read "$p/Contents/Info.plist" CFBundleShortVersionString)"
+  done
+/Applications/Tailscale.app                       → io.tailscale.ipn.macsys  1.96.5   # cask, RUNNING, system extension
+/Applications/Tailscale.localized/Tailscale.app   → io.tailscale.ipn.macos   1.98.8   # App Store leftover, idle
+\```
+
+The `dns-forward-failing` / DNS Unavailable banner tends to ride along with the
+conflict (two IPN clients confusing the network-extension / DNS proxy state).
+
+## Root cause
+
+Two things collided:
+
+1. **Two Tailscale variants** exist for macOS, with *different bundle IDs and
+   signing chains* — macOS treats them as separate apps:
+   - `io.tailscale.ipn.**macsys**` — standalone build, Developer ID-signed
+     (`Developer ID Application: Tailscale Inc. (W5364U7YZB)`), runs a **system
+     extension** as the daemon. This is what `cask "tailscale-app"` installs.
+   - `io.tailscale.ipn.**macos**` — sandboxed **Mac App Store** build, re-signed
+     by Apple (`Apple Mac OS Application Signing`). Installed into a
+     `/Applications/Tailscale.localized/` wrapper folder.
+2. **This repo migrated `mas` → `cask`** in May 2026 (Tailscale was delisted
+   from the Mac App Store — `mas` install now fails with `No apps found in the
+   App Store for ADAM ID 1475387142`; see `dot_config/homebrew/Brewfile.darwin.tmpl`).
+   `chezmoi apply` is **install-only** and does not uninstall the previously
+   `mas`-installed App Store copy, so it lingers. The macsys installer then takes
+   `/Applications/Tailscale.app` and shoves the old copy aside into
+   `.localized/`, producing the "Another copy" warning.
+
+(`_MASReceipt` exists in **both** bundles, so it is *not* a reliable
+discriminator — use `CFBundleIdentifier` `macsys` vs `macos`, or the `codesign
+-dv --verbose=4` Authority line, to tell them apart.)
+
+## Workaround
+
+Delete the idle App Store leftover (root-owned → needs `sudo`). The running
+macsys cask app and your tailnet login are untouched:
+
+\```bash
+sudo rm -rf /Applications/Tailscale.localized
+\```
+
+The "Another Tailscale copy" warning clears once the second `.app` is gone.
+Optionally purge the stale sandbox container:
+
+\```bash
+rm -rf ~/Library/Containers/io.tailscale.ipn.macos ~/Library/Group\ Containers/*.io.tailscale.ipn.macos 2>/dev/null || true
+\```
+
+Keep the cask (and its CLI formula) current so CLI↔daemon versions don't skew:
+
+\```bash
+HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade tailscale            # CLI formula (no sudo)
+HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade --cask tailscale-app # GUI app (sudo + may re-approve system extension)
+\```
+
+## Prevention
+
+- **The repo already prefers Standalone (cask) over App Store** — see
+  `docs/tools/Tailscale.md` ("Standalone > App Store") and
+  `dot_config/homebrew/Brewfile.darwin.tmpl` (`cask "tailscale-app"`, with the
+  `mas` line commented out and annotated as delisted). Do **not** re-add a
+  `mas "Tailscale"` entry.
+- **macOS keeps two Tailscale packages by design**: `cask "tailscale-app"`
+  (GUI + daemon via system extension) *and* `brew "tailscale"` (CLI on PATH,
+  shared `Brewfile.tmpl`, darwin-guarded). That is intentional, **not** a
+  duplicate — the formula only provides the `tailscale` CLI binary.
+- **NEVER `brew services start tailscale` on macOS.** Homebrew's own post-install
+  caveat suggests it, but on a GUI-app host the app's system extension already
+  **is** the daemon; a second `tailscaled` would conflict. The daemon belongs to
+  the app; the formula is CLI-only.
+- Fresh installs don't hit this (no App Store copy ever existed). This only bites
+  hosts that predate the `mas → cask` migration.
+
+## Related
+
+- `docs/tools/Tailscale.md` — install preference (Standalone > App Store)
+- `dot_config/homebrew/Brewfile.darwin.tmpl` — `cask "tailscale-app"` + delisted-`mas` note
+- `dot_config/homebrew/Brewfile.tmpl` — darwin-guarded `brew "tailscale"` CLI (with the "never start the service" warning inline)
+- `docs/this_repo/tool-managers.md` — A–Z rows for `tailscale` (CLI) and `tailscale-app`
+- Sibling install-vs-upgrade split trap: [`brew-bundle-redownloads-manually-installed-cask`](brew-bundle-redownloads-manually-installed-cask.md), [`macfuse-too-old-unsupported-macos-version-rclone-mount`](macfuse-too-old-unsupported-macos-version-rclone-mount.md) (another `auto_updates` cask that `brew upgrade` won't move)
+
+```
+
+```text
+File created successfully at: /Users/david/.local/share/chezmoi/pitfalls/tailscale-another-copy-app-store-leftover.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to add the new entry to the alphabetical index in pitfalls/README.md, and I'm figuring out where `tailscale-another-copy-app-store-leftover` fits alphabetically among the existing entries like `sudo-shared-setsid-macos`, `nvim-fs-find-enoent-stale-cwd`, and `ollama-brew-link-fails-cask-shadows-formula`. I'll just read the README file directly to see the exact index structure and find the right spot to insert the tailscale entry alphabetically.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:52Z)**_
+
+Now index the pitfall. Let me Read the README's index table to place the row correctly (alphabetically, before the `tmux-*` rows):
+
+_**Agent (claude-opus-4-8 2026-07-09 10:48:52Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./pitfalls/README.md`
+
+```text
+96	
+97	Pitfalls owned by this folder. Keep alphabetical.
+98	
+99	| Slug | Symptom keywords | Status |
+100	|---|---|---|
+101	| [`agent-warmup-scheduled-run-hangs-or-blank-under-daemon`](agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md) | launchd/pueue `agent-warmup run` wedges for hours (`state = running`, no log) or finishes with an EMPTY `/usage` panel / blank `capture-pane`; `sample` shows `dyld mapFileReadOnly`; stuck PID is `uv` or `python3 .../agent-warmup`; identical `agent-warmup verify` works by hand | fixed (4 stacked fixes: direct python · lazy plistlib · main-volume python · inject into the existing GUI-session tmux server) |
+102	| [`ansible-js-cli-tools-old-system-node`](ansible-js-cli-tools-old-system-node.md) | `Tag 'js_cli_tools' had failures` / `Tag 'coding_agents' had failures`; `npm WARN EBADENGINE` + `EACCES /usr/local/lib/node_modules`; system node v12.22.9 on Ubuntu jammy | fix paths documented (no in-repo fix yet) |
+103	| [`ansible-missing-sudo-tag`](ansible-missing-sudo-tag.md) | `chezmoi apply` in noRoot mode aborts at one ansible task with `sudo: a password is required` / `Premature end of stream waiting for become success`; works fine on rooted hosts | workaround documented (add `tags: [sudo]`); convention = every `become: true` in `dot_ansible/` must pair with `tags: [sudo]` |
+104	| [`apt-update-fails-base-role-empty-error`](apt-update-fails-base-role-empty-error.md) | `Failed to update apt cache after 5 retries: ''` (empty reason) at base role; `Failed to update cache after 5 retries due to , retrying`; `chezmoi init` exit 1 on Debian/Ubuntu; GFW host with unreachable third-party repo / dead lazygit PPA leftover | fixed (best-effort cache update + CLI diagnostics; lazygit PPA removed + purged; deb822 migration with policy-probe rollback) |
+105	| [`bitwarden-ssh-agent-confirm-blocks-remote-git-push`](bitwarden-ssh-agent-confirm-blocks-remote-git-push.md) | `git push` / ssh fails `Connection closed by … port 443` + `Could not read from remote repository` when `$SSH_AUTH_SOCK` is Bitwarden's agent and you're on a remote/headless session; intermittent (first push OK, later fail); `ssh-add -l` still lists the key | by design — disable per-use confirm, approve at the physical screen, `ssh -A` forward, or use HTTPS+PAT |
+106	| [`blesh-set-v-leaks-gexec-wrapper`](blesh-set-v-leaks-gexec-wrapper.md) | `{ _ble_edit_exec_gexec__save_lastarg "$@"; } 4>&1 5>&2 &>/dev/null` printed after every prompt under bash + ble.sh; typed command echoed twice; goes away in fresh terminal; no `+` prefix (so not `set -x`) | workaround = `set +v` in-session; `set -v` is architecturally incompatible with ble.sh's eval-based gexec |
+107	| [`bootstrap-curl-bash-hangs-after-reattaching-tty`](bootstrap-curl-bash-hangs-after-reattaching-tty.md) | `curl … \| bash` of `bootstrap.sh` hangs forever right after `[bootstrap …] stdin is a pipe — reattaching to /dev/tty for interactive prompts`; no `fetching + running …` log; no `uv`/`chezmoi` child process; only happens on certain fresh users / hosts | fixed (`exec </dev/tty` removed mid-script; `/dev/tty` redirected only on the final `exec uv run`) |
+108	| [`bootstrap-no-tty-sudo-prompt-skipped`](bootstrap-no-tty-sudo-prompt-skipped.md) | `[WARN] Could not establish a sudo session (no TTY and sudo needs a password)` then Linuxbrew installer aborts with `Insufficient permissions to install Homebrew to "/home/linuxbrew/.linuxbrew"`; `mkdir: cannot create directory '/run/user/<UID>': Permission denied`; user verifiably has interactive sudo; CentOS 7 + high-UID AD/LDAP user | workaround documented (`CHEZMOI_SUDO_PASSWORD_FILE` / `just apply-with-sudo` / `NOPASSWD: ALL` sudoers drop-in) |
+109	| [`brew-bundle-redownloads-manually-installed-cask`](brew-bundle-redownloads-manually-installed-cask.md) | `brew bundle` re-downloads cask for `.app` already in `/Applications/`; chains into `process has already locked .incomplete` parallel-fetch errors; `[WARN] Some packages in macOS packages from Brewfile.darwin still failed after 2 attempts` | partial: stale-lock cleanup permanent; `--adopt` pre-flight opt-in via `CHEZMOI_BREW_ADOPT_PREFLIGHT=1` (version-strict + password-storm trade-offs documented) |
+110	| [`brew-cask-slow-github-release-assets`](brew-cask-slow-github-release-assets.md) | `brew upgrade --cask <x>` download creeps at ~25 KB/s from `release-assets.githubusercontent.com`; TUNA/ghproxy/Clash don't help | no workaround (network-path issue) |
+111	| [`btop-themes-permission-denied-core-dumped`](btop-themes-permission-denied-core-dumped.md) | `btop` aborts on launch: `IOT instruction (core dumped)` + `terminate called ... std::filesystem::filesystem_error` / `directory iterator cannot open directory: Permission denied [~/.config/btop/themes]`; dir perms are fine (775 user-owned); `command -v btop` = `/snap/bin/btop` (publisher `kz6fittycent`) | not a repo bug; snap `home` interface can't read hidden dirs; workaround = `sudo snap remove btop` (or `brew install btop`) so apt/GitHub/brew btop wins on PATH |
+112	| [`centos7-neovim-apt-register-defined`](centos7-neovim-apt-register-defined.md) | `just ansible-tags neovim` / `chezmoi apply` on **sudo-having** CentOS 7 box completes `ok=8 changed=0 skipped=23 failed=0` but `command -v nvim` is empty; user-level fallback gated `apt_neovim is not defined` but `register:` on a `when:`-skipped task IS defined (as a skip dict); plus mainline nvim ≥0.10 binaries require glibc 2.28+ which EL7 lacks | fixed (gate adds `or apt_neovim is skipped`; oldEL branch downloads from upstream's `neovim/neovim-releases` older-glibc repo) |
+113	| [`centos7-systemd-user-instance-missing`](centos7-systemd-user-instance-missing.md) | `rust_cargo_tools : Enable and start pueued service` fails with `Failed to get D-Bus connection: No such file or directory`, ansible `...ignoring`; PLAY RECAP `failed=0` but daemon never starts; `sudo loginctl enable-linger $USER` does NOT help; `sudo systemctl start user@$(id -u).service` returns `Unit not found`; `find /usr/lib/systemd -name 'user@.service'` is empty | WONTFIX upstream (RHEL 7 EOL); workaround = run pueued under tmux/nohup or as system service; ansible role's `ignore_errors: true` is correct |
+114	| [`chezmoi-reinit-promptonce-keeps-stale-value`](chezmoi-reinit-promptonce-keeps-stale-value.md) | re-running `chezmoi init` / `dotfiles_init.py` doesn't change a setting; `--promptBool "...=false"` ignored, `installX` flag stays `true`; `chezmoi data` shows stale value after re-apply; no error | fixed (`init` re-init branch + `reconfigure` both pass `--prompt`) |
+115	| [`chezmoi-update-blesh-local-changes-overwritten`](chezmoi-update-blesh-local-changes-overwritten.md) | `chezmoi update` / `--refresh-externals` aborts on `.local/share/blesh`: `Your local changes to the following files would be overwritten by merge` (`lib/core-syntax.sh` …); diff = added license header + stripped comments; nobody edited ble.sh source | fixed (source clone moved to `~/.local/src/blesh`, decoupled from `make install` target) |
+116	| [`chezmoiignore-negation-noop-under-recursive-glob`](chezmoiignore-negation-noop-under-recursive-glob.md) | a new managed file under a `**`-ignored dir shows `chezmoi: …: not managed`; `chezmoi managed \| grep` empty; `!path` re-include in `.chezmoiignore` silently does nothing; `chezmoi apply` exits 0 with no error | workaround documented (use single-`*` globs `dir/*` + `dir/*/**` so the parent stays un-excluded, then `!dir/keep`) |
+117	| [`claude-code-permission-mode-resets-after-interactive-prompt`](claude-code-permission-mode-resets-after-interactive-prompt.md) | Claude Code drops from `bypassPermissions` / `plan` back to `acceptEdits` after answering any `AskUserQuestion` / CodeIsland popup / remote-control inject; `Bash(...)` then re-prompts for permission | workaround documented (`permissions.defaultMode = "bypassPermissions"` in overlay); WONTFIX upstream |
+118	| [`claude-hud-usage-statusline-stale`](claude-hud-usage-statusline-stale.md) | `agent-wakeup status` says `WAIT_QUOTA` while Claude is active; tmux capture contains stale `Context ... | Usage ... Limit reached`; HUD usage line misread as quota-blocked pane | fixed in `agent-wakeup` (ignore Claude HUD usage statusLine; use explicit quota/menu markers only) |
+119	| [`claude-plans-here-misses-global-plans-jsonl-schema`](claude-plans-here-misses-global-plans-jsonl-schema.md) | `claude-plans-here` prints only `Wrote .../.claude/settings.json`; project `.claude/plans/` stays empty; matching plan still under `~/.claude/plans/*.md`; JSONL uses `toolUseResult.filePath` / `ExitPlanMode.planFilePath` | fixed (find + jq parser; Bats fixture coverage) |
+120	| [`codeisland-auto-approves-permissionrequest`](codeisland-auto-approves-permissionrequest.md) | Claude Code shows `⎿ Allowed by PermissionRequest hook` / `⏺ Plan approved.` instantly with no notch popup, no native confirm dialog; `~/.claude/settings.json` contains a `PermissionRequest` hook pointing at `~/.codeisland/codeisland-hook.sh` with `timeout: 86400` | workaround documented (toggle off auto-approve in the CodeIsland HUD app); repo-enforced subtractive removal designed but deliberately NOT wired up |
+121	| [`editor-overlay-flattens-empty-settings`](editor-overlay-flattens-empty-settings.md) | Cursor/VSCode/Antigravity loses `workbench.colorTheme` + `workbench.iconTheme` after `chezmoi apply`; `settings.json` collapses to ~286 bytes = only the 6 overlay keys; reverts to `Dark Modern` + no file icons; user blames the Brewfile cask reinstall (it's not); sibling editors untouched | by design (`jq '. * $overlay'` on an *empty* base yields overlay-only); recovery + optional guard documented |
+122	| [`git-delta-empty-stdin-huge-allocation`](git-delta-empty-stdin-huge-allocation.md) | `delta` / `printf '' \| delta` crashes with `memory allocation of 1970324836974592 bytes failed`; `delta --version` still works; `something is very wrong if the default theme is missing` | fixed (clear incompatible bat cache + delta stdin health check) |
+123	| [`git-lfs-global-hook-breaks-brew-tap`](git-lfs-global-hook-breaks-brew-tap.md) | `brew tap` / `brew bundle` fails: `This repository is configured for Git LFS but 'git-lfs' was not found on your path`, `git clone ... exited with 2`, `Tapping <tap> has failed!`, then `Cask '<name>' is unavailable: No Cask with this name exists`; git-lfs IS installed; stock git-lfs hook in the global `core.hooksPath` `exit 2`s under Homebrew's stripped superenv PATH | fixed (chezmoi-managed git-lfs hooks made PATH-robust + non-fatal) |
+124	| [`headless-claude-p-does-not-move-5h-window`](headless-claude-p-does-not-move-5h-window.md) | scheduled `claude -p 'Reply: hi'` warmup runs clean (exit 0) but the Claude Pro/Max 5-hour window never starts; `/usage` shows no active window at warmup time; metered Agent SDK credit consumed instead of subscription; `--bare` forces `ANTHROPIC_API_KEY` | by design (2026-06-15 billing split) — `agent-warmup` drives an interactive tmux session instead |
+125	| [`homebrew-6-refuses-untrusted-tap-formula`](homebrew-6-refuses-untrusted-tap-formula.md) | `chezmoi apply` dies at `devtools : Install developer CLI tools (macOS)` with `Error: Refusing to load formula raine/workmux/workmux from untrusted tap`; `Run \`brew trust raine/workmux\``; `brew tap-info <tap>` shows `Untrusted`; both `raine/workmux` and `dlvhdr/formulae` affected; worked days earlier | fixed (devtools role auto-`brew trust`s third-party taps; Homebrew 6.0 formula-trust gate) |
+126	| [`homebrew-aliyun-brew-git-hang-core-clone-bloat`](homebrew-aliyun-brew-git-hang-core-clone-bloat.md) | any auto-updating `brew` cmd hangs 60s+ after `HOMEBREW_BREW_GIT_REMOTE set: using https://mirrors.aliyun.com/homebrew/brew.git`; `unset HOMEBREW_BREW_GIT_REMOTE` "fixes" it; `git ls-remote` fast but `git fetch` stalls; SEPARATELY `du -sh "$(brew --repo homebrew/core)/.git"` = ~1 GB after being ~8 KB | fixed (baseline Aliyun→BFSU across 3 layers + `brew-mirror`; `HOMEBREW_CORE_GIT_REMOTE` dropped — brew 4.x API mode) |
+127	| [`macos-tcc-tmux-volumes-permission-denied`](macos-tcc-tmux-volumes-permission-denied.md) | `ls /Volumes/Data/...` in Alacritty or an attached old tmux session prints `Permission denied: . - code: 13` / `Skipped 1 directories due to permission denied: .`, while Cursor can read the same path and Unix perms are normal | workaround documented (Full Disk Access belongs to the app that started the tmux server; kill old server and restart tmux from the authorized app) |
+128	| [`macfuse-too-old-unsupported-macos-version-rclone-mount`](macfuse-too-old-unsupported-macos-version-rclone-mount.md) | macFUSE dialog `Unsupported macOS Version — The installed version of macFUSE is too old for the operating system` on boot / `rclone mount`; `rclone mount --help` works fine (binary not the cause); `brew info --cask macfuse` reports 5.x but Caskroom has 4.x; `brew upgrade` doesn't fix (cask is `auto_updates`) | by design (kext version-locked to macOS major); manual `brew reinstall --cask macfuse` + reboot + GUI approval; not repo-managed |
+129	| [`mkdocs-copy-to-llm-custom-css-no-trailing-newline`](mkdocs-copy-to-llm-custom-css-no-trailing-newline.md) | `git status` always shows `docs/assets/copy-to-llm/copy-to-llm-custom.css` modified after `mkdocs build` / `mkdocs serve`; diff is just `-}` / `+}` `\ No newline at end of file`; `end-of-file-fixer` adds `\n` back, next build strips it; ping-pong forever | workaround documented (gitignore + `git rm --cached`); upstream PR not yet sent |
+130	| [`modify-script-jq-bootstrap-cycle`](modify-script-jq-bootstrap-cycle.md) | `jq: command not found` / `chezmoi: .agents/.skill-lock.json: exit status 127` immediately after `[SUCCESS] Bootstrap complete!` on a fresh box; subsequent applies stuck in same loop because ansible never reached | fixed (`command -v` guards added to all 7 `modify_*` scripts that needed them) |
+131	| [`tmux-continuum-restores-on-intentional-quit`](tmux-continuum-restores-on-intentional-quit.md) | closed tmux on purpose (`kill-server` / "Kill all sessions" / `prefix + M-x` on last session) and the just-killed sessions come back on next `tmux` start; `@continuum-restore 'on'` can't tell intent from crash; `~/.local/share/tmux/resurrect/last` symlink still points at the pre-kill snapshot | workaround documented (clean-quit wrappers `kill-server-clean.sh` / `kill-session-exit.sh` rm the `last` symlink before server dies; crash recovery preserved via untouched history) |
+132	| [`tmux-copy-mode-double-free-3.6a`](tmux-copy-mode-double-free-3.6a.md) | `[server exited unexpectedly]` after long-running session when entering copy-mode; `.ips` shows `___BUG_IN_CLIENT_OF_LIBMALLOC_POINTER_BEING_FREED_WAS_NOT_ALLOCATED` with stack `cmd_copy_mode_exec → window_copy_clone_screen → screen_reinit → grid_clear_lines → grid_free_line`; homebrew bottle `slice_uuid: 1b2d8e7b-bb77-3465-8bab-73f5bbaffe49`; terminal-agnostic | fixed upstream ([`035a2f3`](https://github.com/tmux/tmux/commit/035a2f35d40628dcfe235179220fc0ede848a195) closing [#4777](https://github.com/tmux/tmux/issues/4777)) but not in any tagged release; workaround = `brew install --HEAD tmux` until 3.7 ships |
+133	| [`mrun-autoname-collides-zsh-random-subshell`](mrun-autoname-collides-zsh-random-subshell.md) | back-to-back `mrun` / `tmrun` / `zjrun` without `-n NAME` produce the same `run-<dir>-<hex>` suffix; second call errors `tmux session 'run-X-NNNN' already exists`; `zsh -c 'echo $(echo $RANDOM) $(echo $RANDOM)'` returns identical numbers | fixed in `dot_config/zsh/tools/23_mrun.zsh` (read `$RANDOM` into a parent-shell local before the `$(…)` boundary) |
+134	| [`niri-spawn-cargo-bin-not-on-session-path`](niri-spawn-cargo-bin-not-on-session-path.md) | niri `Mod+T` / any `spawn "<tool>"` opens nothing, no error; binary is in `~/.cargo/bin` (works in your shell) but not on the systemd/Wayland session PATH; the `ln -s … /usr/local/bin` "fix" breaks multi-user | fixed (per-user `environment { PATH … }` in `config.kdl.tmpl`, not a system symlink) |
+135	| [`npm-postinstall-github-releases-hang`](npm-postinstall-github-releases-hang.md) | `npm install -g` hangs after "Downloading https://github.com/.../releases/..." | workaround documented |
+136	| [`sudo-shared-setsid-macos`](sudo-shared-setsid-macos.md) | `[bootstrap]` / `[ansible]` / `[brew]` sudo prompts fire 3× in one `chezmoi apply` on macOS despite "entered once, reused" wording; `keepalive.pid` points to a dead PID; `which setsid` → not found | fixed (`_sudo_spawn_watchdog` falls back to `nohup` when `setsid` is absent) |
+137	| [`nvim-fs-find-enoent-stale-cwd`](nvim-fs-find-enoent-stale-cwd.md) | nvim 0.12 startup `vim/fs.lua:0: ENOENT` from avante / lualine / lazy checker; `[C]: in function 'assert'` | workaround documented (`cd` to a real dir before launching) |
+138	| [`ollama-brew-link-fails-cask-shadows-formula`](ollama-brew-link-fails-cask-shadows-formula.md) | `chezmoi apply` aborts at `llm_tools : Install Ollama via Homebrew formula` with `Error: The \`brew link\` step did not complete successfully` / `Could not symlink bin/ollama` / `Target /usr/local/bin/ollama already exists`; `ollama` formula installed-but-unlinked, `shadowed by /usr/local/bin/ollama`; the target is a symlink into `Ollama.app` (cask `ollama-app`); roles after `llm_tools` silently skipped | fixed (`which ollama` pre-check gates the formula install in `dot_ansible/roles/llm_tools`) |
+139	| [`opencode-concurrent-launch-wal-pragma-fails`](opencode-concurrent-launch-wal-pragma-fails.md) | `Failed to run the query 'PRAGMA journal_mode = WAL'`; one of N simultaneously-launched `opencode` TUIs exits on startup (`svibe N opencode`); log shows several `opencode.db opening database` within ms | upstream concurrency limit; mitigation = stagger launches (`SVIBE_LAUNCH_STAGGER`) |
+140	| [`opencode-docker-opentui-glibc-loader-missing`](opencode-docker-opentui-glibc-loader-missing.md) | `docker run ... ghcr.io/anomalyco/opencode` exits with `Failed to initialize OpenTUI render library: Failed to open library "/tmp/.<hex>-00000001.so": Error loading shared library ld-linux-x86-64.so.2: No such file or directory`; image is Alpine/musl, OpenTUI native lib needs glibc | workaround = `--entrypoint sh ... -c 'apk add --no-cache gcompat && exec opencode "$@"'`; upstream image bug as of 1.15.11 |
+141	| [`opencode-tool-execution-aborted-on-long-write`](opencode-tool-execution-aborted-on-long-write.md) | OpenCode TUI repeats `~ Preparing write...` / `Tool execution aborted` (sometimes followed by `{"type":"api_error","message":"JSON error injected into SSE stream"}` and `Build · Claude Opus 4.x · interrupted`) when the agent tries to `write` a long file via `github-copilot` Claude; Claude Code does not reproduce | upstream root cause located 2026-05: post-write side-effects (`Effect.orDie` on LSP/format/BOM-sync) — PR #26347 ready for review, file may already be on disk despite abort message (verify before retrying); related orphan-tool prefill-400 cascade fixed in v1.15.11 |
+142	| [`pueue-macos-launchd-not-autostarted-no-socket`](pueue-macos-launchd-not-autostarted-no-socket.md) | macOS `pueue` / `pueue status` fails `Couldn't find a configuration file. Did you start the daemon yet?`, then after `brew services start pueue` (reports `Successfully started`) fails one step later `I/O error at path ".../Library/Application Support/pueue/pueue_<you>.socket" while connecting to daemon`; `ps` shows no `pueued`; `launchctl list homebrew.mxcl.pueue` = `"OnDemand" = true` + `"LastExitStatus" = 0` with NO `"PID"`; `~/.config/pueue/` doesn't exist (red herring — macOS uses `~/Library/Application Support/pueue/`); daemon runs fine by hand (`pueued -d`) | not a bug — Homebrew formula ships `keep_alive false` + RunAtLoad-only, launchd doesn't execute pueued after a `brew services` toggle that coincides with an upgrade/relink; workaround = `launchctl kickstart -k gui/$(id -u)/homebrew.mxcl.pueue` |
+143	| [`raycast-clipboard-sqlcipher-key-not-recoverable`](raycast-clipboard-sqlcipher-key-not-recoverable.md) | Want to read Raycast clipboard history programmatically; `~/Library/Application Support/com.raycast.macos/raycast-enc.sqlite` is SQLCipher (binary contains `cipher_*` PRAGMAs); `security find-generic-password -s Raycast -a database_key -w` returns 64-hex; that key fails `Parse error: file is not a database (26)` for every `cipher_compatibility` / page_size / raw-vs-KDF combo on every `*-enc.sqlite` file; older plaintext `Clipboard.sqlite` schema (`ZCLIPBOARDHISTORYITEM`) no longer exists | UNSOLVED without RE'ing AppDelegate; workaround = switch to Maccy (open SQLite at `~/Library/Containers/org.p0deje.Maccy/`) |
+144	| [`tmux-display-menu-silent-fail`](tmux-display-menu-silent-fail.md) | `prefix + Space` / `prefix + e` doesn't open the popup menu, no error | workaround documented (script + height tiers) |
+145	| [`tmux-pane-bottom-blank-alacritty-macos-tabs`](tmux-pane-bottom-blank-alacritty-macos-tabs.md) | inside Alacritty + macOS native tabs **when window is maximised (green-button zoom)**, tmux status bar + a few rows of output paint at the top, then the entire bottom of the window stays empty; `tmux display -p '#{pane_height}'` reports the full height (e.g. 45); **un-maximise / drag corner** un-sticks instantly, **re-maximise reliably repros**; `tmux refresh-client` does NOT help (redraws using stale cached size); `$TERM = tmux-256color` (correct, not the cause) | confirmed 2026-05-10 (PTY size desync, maximise-state-specific); workaround = drop Alacritty native tabs / switch to Ghostty |
+146	| [`tmux-submenu-flash-and-bottom-right`](tmux-submenu-flash-and-bottom-right.md) | nested `display-menu` via `run-shell` from right-click parent: flash, bottom-right placement, or selection silently does nothing on 2nd open | workaround documented (inline submenu items into parent) |
+147	| [`tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper`](tmux-pane-vanishes-on-ctrl-c-despite-shell-wrapper.md) | tmux pane built with `cmd; exec $SHELL` wrapper closes on Ctrl+C inside btop/htop/less even though clean quit (`q`/`:q`) lands in shell as designed | fixed in `dot_config/zsh/tools/22_sesh.zsh` (`trap '' INT;` prefix in `_sesh_on_exit_wrap`) |
+148	| [`tmux-resurrect-agents`](tmux-resurrect-agents.md) | tmux-resurrect doesn't restore coding-agent / TUI sessions after `kill-server` | known limitation |
+149	| [`tmux-scrollback-tui-repaint-ghosting`](tmux-scrollback-tui-repaint-ghosting.md) | ghost / duplicated lines in tmux scrollback while Claude Code / OpenCode / live progress streams; flipbook frames visible in copy-mode | mitigated (`scroll-on-clear off` + `prefix + [` freeze workflow); fundamental limit |
+150	| [`tmux2k-bandwidth-uint64-underflow`](tmux2k-bandwidth-uint64-underflow.md) | `18446744073709551615K` in tmux status bar | workaround documented |
+151	| [`tmuxp-append-ignores-session-start-directory`](tmuxp-append-ignores-session-start-directory.md) | `sesh connect` opens repo session but `nvim`/`lazygit`/shell all start at `$HOME`; `#{session_path}` is correct, `#{pane_current_path}` is HOME; yaml `start_directory` silently dead | workaround documented (`cd <path> &&` prefix in `sesh.toml` startup_command) |
+152	| [`tree-sitter-cli-empty-native-binary`](tree-sitter-cli-empty-native-binary.md) | `:TSInstall <lang>` fails with `spawn …/tree-sitter-cli/tree-sitter EACCES` on every parser; `tree-sitter --version` still prints a version; native binary is 0 bytes mode `0600` | workaround documented (stronger ansible check + `rm`+reinstall recovery) |
+153	| [`tv-channel-bare-braces-break-substitution`](tv-channel-bare-braces-break-substitution.md) | TV channel preview shows literal `{split:\t:N}` instead of substituted values, no error | workaround documented (avoid bare `{...}` in heredocs; prefer external `executable_*.sh/py` helpers) |
+154	| [`visidata-feather-stringdtype-numpy-dtype`](visidata-feather-stringdtype-numpy-dtype.md) | `visidata foo.feather` exits with `ValueError: Could not convert ... Name: <col>, dtype: string to a NumPy dtype (via .dtype value <StringDtype(na_value=<NA>)>)` (pandas 3) / `Cannot interpret 'string[python]' as a data type` (pandas 2); `pd.read_feather` itself works; status shows `raw() returned ERR`; only files whose pandas-metadata says `numpy_type: string` repro | workaround documented (`dot_visidatarc` reroutes `.feather` → `ArrowSheet`; `vd-arrow` alias as escape hatch); downgrade does NOT help (dtype identity is in the file's schema metadata) |
+155	| [`yazi-tmux-popup-crash`](yazi-tmux-popup-crash.md) | Yazi inside `display-popup` crashes tmux server, "Terminal response timeout" | workaround documented |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+The index table isn't strictly alphabetical, so I need to find the right spot for the `tailscale-*` entry. Since `tailscale` comes before `tmux` alphabetically, I should place it just before the cluster of `tmux-*` rows around line 144.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:04Z)**_
+
+The index has drifted from strict alphabetical, but there's a clean `t*` cluster starting at line 144. I'll insert the `tailscale` row just before `tmux-display-menu-silent-fail`:
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/pitfalls/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update the Tailscale documentation with a cleanup note that references the pitfall about the App Store leftover, using an absolute GitHub URL since the pitfall file isn't in the mkdocs navigation structure.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:22Z)**_
+
+Now the Tailscale doc. Since it's in the mkdocs nav and `pitfalls/` is out of nav, I'll link the pitfall via absolute GitHub URL (avoids the `mkdocs --strict` link-check failing):
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:23Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/Tailscale.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking whether my edits to the existing Tailscale.md file will pass mkdocs strict mode. Since I added external GitHub URLs as links rather than internal documentation links, there shouldn't be any broken link issues to worry about. I'm going to skip the full mkdocs build since it's slow and will fail on baseline warnings anyway — the real risk I need to catch is a broken internal link, and I used only absolute GitHub URLs so there's nothing to break. For the H2 and H3 headings I added, mkdocs handles those fine without anchor collisions. So I'm confident enough to move forward without validation.
+
+For the remaining work: the pitfall doc is essentially complete, Task 1 still needs the user to run the sudo command since I can't do that, and the cross-file maintenance like tool-managers.md and README don't need changes since I didn't add or remove any tools.
+
+Now I need to validate the Brewfile template — I added comment lines inside the `{{ if }}` block and want to make sure the template renders correctly and the `{{ end -}}` block is still intact. Let me run `chezmoi cat` on the rendered Brewfile to confirm the templating works, then do a quick `git diff --stat` to review the full scope of changes before marking Task 4 complete.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:55Z)**_
+
+Pitfall written, indexed, and cross-linked. Let me mark task 4 done and validate the rendered Brewfile (the "validate configs with the app" invariant) plus review the full diff.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:49:55Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #4 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:50:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate rendered Brewfile template and review diff
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== chezmoi 渲染 Brewfile (驗證模板) — tailscale/mas 區塊 ==="
+chezmoi cat ~/.config/homebrew/Brewfile 2>&1 | grep -n -A0 -B0 -E 'mas|tailscale|Tailscale|NEVER|CLI' | head -20
+echo; echo "EXIT of chezmoi cat: check below"
+chezmoi cat ~/.config/homebrew/Brewfile >/dev/null 2>/tmp/cz_err.txt && echo "  ✅ 模板渲染成功" || { echo "  ❌ 渲染失敗:"; cat /tmp/cz_err.txt; }
+echo; echo "=== 變更檔案總覽 ==="; git status --short
+```
+
+```text
+=== chezmoi 渲染 Brewfile (驗證模板) — tailscale/mas 區塊 ===
+11:# Formulas - CLI Tools (cross-platform)
+13:# Note: Most CLI tools are managed by ansible for better cross-platform support
+
+EXIT of chezmoi cat: check below
+  ✅ 模板渲染成功
+
+=== 變更檔案總覽 ===
+ M .specstory/history/2026-07-08_02-04-53Z-image-hash-1-tailscale.md
+ M CLAUDE.md
+ M TODO.md
+ M backlog/README.md
+ M docs/shells/aliases.md
+ M docs/this_repo/tool-managers.md
+ M docs/this_repo/tool-managers.zh-TW.md
+ M docs/tools/Tailscale.md
+ M docs/zsh/zsh-completions.md
+ M dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl
+ M dot_ansible/roles/python_uv_tools/defaults/main.yml
+ M dot_config/homebrew/Brewfile.tmpl
+ M mkdocs.yml
+ M pitfalls/README.md
+?? .claude/plans/yt-dlp-twinkling-sunset.md
+?? .specstory/history/2026-07-09_05-22-31Z-image-hash-1-lazygit.md
+?? .specstory/history/2026-07-09_07-01-06Z-gh-select-tui-youtube.md
+?? backlog/yth-semantic-search.md
+?? docs/tools/yth.md
+?? docs/tools/yth.zh-TW.md
+?? dot_config/bash/53_yth_completion.bash
+?? dot_config/television/cable/yth.toml
+?? dot_config/zsh/tools/53_yth_completion.zsh
+?? dot_dotfiles/bin/executable_yth
+?? pitfalls/tailscale-another-copy-app-store-leftover.md
+?? scripts/yth/
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:50:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing a mismatch between what the grep output showed and what actually rendered — the `mas` and `tailscale` brew lines should be there since we're on darwin with installBrewApps enabled, but they're not appearing in the grep results for those package names.
+
+This suggests `installBrewApps` might be false on this particular host, which would explain why the darwin+installBrewApps block rendered empty and those packages didn't show up. That's interesting because the machine actually has tailscale installed (both the app and formula), so either it was installed manually or `installBrewApps` was true at some point in the past.
+
+But for validating the template itself, what matters is that my edit renders without errors — whether `installBrewApps` is true or false on this specific host doesn't affect whether the template syntax is correct.
+
+I'm also noticing the git status shows a lot of unrelated modified files beyond what was there at the start of this conversation — CLAUDE.md, various docs, ansible configs, plus untracked yth tool files and yt-dlp plans. These aren't my changes; they look like pre-existing uncommitted work in the repo, possibly from concurrent development on the yth tool.
+
+Since the user hasn't asked me to commit, I'll leave everything as-is. But if they do ask, I need to be careful to commit only my Tailscale-related files (the Brewfile template, Tailscale docs, pitfalls README, and the new tailscale-another-copy-app-store-leftover file) and avoid sweeping up the yth tool work and other unrelated modifications.
+
+Now I should verify that my Brewfile edit renders correctly by forcing the template execution with installBrewApps enabled, and double-check the flag value.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:50:37Z)**_
+
+Good — template renders cleanly (✅). But note the `mas`/`tailscale` lines didn't appear in the render, which means `installBrewApps` is likely off on *this* host (the block is darwin+`installBrewApps`-gated). Let me confirm the flag and force-render the block to verify my comment is intact. (Also: the git status shows lots of unrelated `yth`-tool WIP — that's not mine; I'll keep my changes scoped to Tailscale.)
+
+_**Agent (claude-opus-4-8 2026-07-09 10:50:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify installBrewApps flag and force-render the tailscale block
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== installBrewApps 值 ==="; chezmoi data 2>/dev/null | grep -i installBrewApps
+echo; echo "=== 強制 installBrewApps=true 渲染我的區塊 ==="
+chezmoi execute-template --init --promptBool installBrewApps=true < dot_config/homebrew/Brewfile.tmpl 2>/tmp/et_err.txt | sed -n '18,32p' || cat /tmp/et_err.txt
+```
+
+```text
+=== installBrewApps 值 ===
+        "installBrewApps": false,
+  "installBrewApps": false,
+
+=== 強制 installBrewApps=true 渲染我的區塊 ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:51:13Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `chezmoi execute-template --init` command didn't produce the expected output—likely because `--init` requires the full configuration prompts rather than just a single `--promptBool` value, or other prompts may have blocked execution. The sed range I used (lines 18-32) might not capture the rendered content if the header offsets shifted. I'm realizing that `installBrewApps` is disabled on this machine, so the Brewfile doesn't actually manage tailscale here, which means the tailscale form isn't being generated in the first place.
+
+Since the template already rendered successfully via `chezmoi cat` with no errors, the syntax is valid—the `{{ if ... }}` block just evaluated to false and produced empty output, which proves the template structure is sound. My edit only added comment lines inside an existing valid block without touching the delimiters, so the template remains valid. To fully confirm the comment text renders when the condition is true, I need a cleaner way to force the evaluation with `installBrewApps` set to true, but `chezmoi execute-template` doesn't easily accept inline variable overrides.
+
+I'm confident enough in the validation already done. The `chezmoi cat` exit code confirms template validity at the application level, which is what matters. I should note in my report that on this host `installBrewApps` is false, so the Brewfile block is inactive anyway—the installed tailscale likely came from a manual installation or from when the setting was previously enabled—but the edit itself is correct for hosts where it's true.
+
+Now I need to wrap up: verify whether the user has already run the sudo command to remove the App Store leftover, do a final check on the current state, and provide a clear summary with any remaining actions.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:51:13Z)**_
+
+`installBrewApps` is **false** on this host — so the Brewfile block is inactive here (your installed tailscale + tailscale-app were added out-of-band / before the flag flipped). That doesn't affect correctness: the edit is right for hosts where it's on, and the template renders clean (exit 0 proves syntax validity; my change is comment-only inside the already-valid `{{ if }}` block).
+
+Let me do a final check — whether you've run the cleanup yet, and confirm end state.
+
+_**Agent (claude-opus-4-8 2026-07-09 10:51:13Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Final state check: leftover, versions, my changed files
+
+```bash
+echo "=== App Store leftover 狀態 ==="; ls -d /Applications/Tailscale.localized 2>/dev/null && echo "  → 還在(尚未 sudo rm)" || echo "  → 已移除 ✅"
+echo; echo "=== 現況版本 ==="; echo "CLI (formula):  $(/usr/local/bin/tailscale version 2>/dev/null | head -1)"; echo "App (cask):     $(/usr/bin/defaults read /Applications/Tailscale.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null)"
+echo; echo "=== 我的變更(僅 Tailscale 相關)==="; git status --short -- dot_config/homebrew/Brewfile.tmpl docs/tools/Tailscale.md pitfalls/README.md pitfalls/tailscale-another-copy-app-store-leftover.md
+```
+
+```text
+=== App Store leftover 狀態 ===
+/Applications/Tailscale.localized
+  → 還在(尚未 sudo rm)
+
+=== 現況版本 ===
+CLI (formula):  1.98.8
+App (cask):     1.96.5
+
+=== 我的變更(僅 Tailscale 相關)===
+ M docs/tools/Tailscale.md
+ M dot_config/homebrew/Brewfile.tmpl
+ M pitfalls/README.md
+?? pitfalls/tailscale-another-copy-app-store-leftover.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:51:34Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to wrap up with a final summary of what's been completed and what's still pending. The main blocker is that the user hasn't run the sudo command yet to remove the leftover files. I'll recap what I found and fixed in the repository and formula, then clearly flag what action remains for them to complete, and note that the CLI and app versions will sync up once everything is done.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-09 10:51:37Z)**_
+
+Done. Here's the wrap-up.
+
+## What was going on
+You had **three** official Tailscale installs, from two eras:
+
+| Item | Source | Status |
+|---|---|---|
+| `/Applications/Tailscale.app` (`io.tailscale.ipn.**macsys**`) | brew cask `tailscale-app` (standalone, Developer ID, system extension) | ✅ active — the one you use |
+| `/Applications/Tailscale.localized/Tailscale.app` (`io.tailscale.ipn.**macos**`) | **Mac App Store** — leftover from before the repo's May `mas → cask` migration | ⚠️ idle duplicate → the "Another copy" + `dns-forward-failing` warning |
+| `/usr/local/bin/tailscale` CLI | brew formula `tailscale` | kept (intentional PATH CLI) |
+
+The App Store copy is a **stale leftover** — the repo already stopped managing it (Tailscale got delisted from the App Store; your `Brewfile.darwin` moved to `cask "tailscale-app"`, and `docs/tools/Tailscale.md` already says "Standalone > App Store"). So removing it is fully aligned with repo intent.
+
+## What I did
+- **Aligned the CLI version**: `brew upgrade tailscale` → `1.94.1` → **1.98.8** (no sudo). ✅
+- **Fixed the stale `Brewfile.tmpl` comment** (said "installed via mas" → now describes the cask + CLI split, and encodes the rule **never `brew services start tailscale` on macOS** — the app's system extension *is* the daemon).
+- **Documented the pitfall**: `pitfalls/tailscale-another-copy-app-store-leftover.md` (symptom-first, detection via `mdfind`/bundle-id/codesign, fix) + indexed it in `pitfalls/README.md`.
+- **Updated `docs/tools/Tailscale.md`** with a "How this repo installs it" section + the cleanup note (pitfall linked via absolute GitHub URL, so `mkdocs --strict` link-check is unaffected — no new nav entry, external links only).
+- Validated the rendered Brewfile with `chezmoi cat` (exit 0). Cross-file mirrors (`tool-managers.md` A–Z rows, README) were already accurate — no tool added/removed, so nothing to change there.
+
+## One thing left for you (needs sudo — not cached)
+```
+sudo rm -rf /Applications/Tailscale.localized
+```
+That deletes **only** the idle App Store copy; the running macsys app + your tailnet login are untouched. The "Another Tailscale copy" warning clears afterward. To also close the CLI↔app version gap (app still `1.96.5`):
+```
+HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade --cask tailscale-app   # sudo + may re-approve the system extension
+```
+
+Note: `installBrewApps` is **false** on this host, so the Brewfile doesn't actually drive Tailscale here — your installs are out-of-band. The repo edits are still correct for hosts where it's on. I left the unrelated `yth`-tool WIP in your working tree untouched. If you want, I can commit just the four Tailscale files.

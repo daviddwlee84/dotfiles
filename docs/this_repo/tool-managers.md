@@ -481,6 +481,7 @@ installs, `uv self update` for the curl-installer. Mirror logic in
 | `marimo[recommended,mcp]` | `httpx[socks]` | ✓ |
 | `jupyterlab` (`jupyter-lab`) | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets`; `with_executables_from: notebook, jupyter-core`; `extra_binaries: jupyter, jupyter-notebook` | ✓ |
 | `xonsh` | `xontrib-jedi`, `xontrib-zoxide`, `xontrib-pipeliner`, `xontrib-fzf-widgets` | — |
+| `yt-dlp` | — | — |
 
 From `llm_tools/defaults/main.yml`:
 
@@ -1120,6 +1121,7 @@ list.
 | **xonsh** | uv tool (with xontribs) | uv tool | python_uv_tools |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
+| **yt-dlp** | uv tool | uv tool | python_uv_tools |
 | **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl official installer | devtools |

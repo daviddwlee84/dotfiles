@@ -96,3 +96,10 @@ python_uv_tools:
       - xontrib-zoxide        # z / zi directory jumping (uses zoxide binary on PATH)
       - xontrib-pipeliner     # pipe shell output through Python expressions (xonsh selling point)
       - xontrib-fzf-widgets   # Ctrl+R / Ctrl+T fzf widgets (uses fzf binary on PATH)
+  # yt-dlp: powers the in-house `yth` CLI (YouTube watch-history search). Also
+  # declared in executable_yth's PEP723 block so `yth` self-bootstraps even
+  # before ansible runs; this entry additionally exposes the standalone
+  # `yt-dlp` binary on PATH (same dual pattern as `mlflow` ↔ `mlf`). Pure
+  # Python, single entry point — no needs_modern_gcc / extras.
+  - name: yt-dlp
+    binary: yt-dlp

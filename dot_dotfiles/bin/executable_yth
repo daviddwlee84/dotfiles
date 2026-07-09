@@ -1,0 +1,190 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "yt-dlp>=2025.1",
+#   "tyro>=0.9",
+#   "rich>=13.9",
+#   "platformdirs>=4",
+# ]
+# ///
+"""yth — search your own YouTube watch history from the terminal.
+
+Bare `yth` (no args) launches the `tv yth` fuzzy picker over your history.
+Subcommands below bypass it for scripted / one-shot use.
+
+Subcommands:
+  import-takeout <file>          Backfill history from a Google Takeout
+                                 watch-history.json (primary, cookie-free).
+  sync                           Incremental sync of recent history via
+                                 yt-dlp :ythistory (needs login cookies).
+  enrich [--limit N | --all]     Fill missing description/duration/upload_date
+                                 for videos (yt-dlp; cookie-free for public).
+  fetch-subs <id>… | --recent N  Download + index subtitle text (auto+manual).
+             | --all
+  search <query> [--subs]        FTS5 search over title/channel/description
+         [--json] [--limit N]    (add --subs to also match caption text).
+  list [--tsv] [--limit N]       All history, newest first (--tsv feeds tv).
+  show <id> [--json]             Detail for one video (DB-only, no network).
+  open <id> | copy <id>          Open in browser / copy URL to clipboard.
+  play <id>                      mpv if configured+installed, else browser.
+
+Data lives in a local sqlite DB (platformdirs user_data_dir/yth/history.db).
+Cookie source + subtitle langs are configured in user_config_dir/yth/config.toml.
+
+Mirrors the structure of `mlf` (see dot_dotfiles/bin/executable_mlf) and pairs
+with the `tv yth` channel (dot_config/television/cable/yth.toml).
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+USAGE = """\
+Usage: yth [<subcommand>] [args...]
+
+Bare `yth` opens the `tv yth` fuzzy picker. Subcommands bypass it.
+
+  import-takeout <file>              Import a Google Takeout watch-history.json.
+  sync                               Incremental :ythistory sync (needs cookies).
+  enrich [--limit N | --all]         Fetch per-video metadata (public: no cookies).
+  fetch-subs <id>... | --recent N    Download + index subtitle text.
+             | --all
+  search <query> [--subs] [--json]   FTS5 search (title/channel/description;
+         [--limit N] [--raw]         --subs also matches captions).
+  list [--tsv] [--limit N]           List history, newest first (--tsv for tv).
+  show <id> [--json]                 One-video detail (DB-only).
+  open <id> | copy <id> | play <id>  Open / copy URL / play.
+
+Examples:
+  yth import-takeout ~/Downloads/watch-history.json
+  yth search "rust async" --subs
+  yth enrich --limit 200
+  yth fetch-subs --recent 50
+  yth show dQw4w9WgXcQ
+"""
+
+
+def _source_path() -> Path:
+    """Locate the chezmoi source dir so we can import scripts.yth.*.
+
+    Identical strategy to executable_mlf:_source_path / executable_fleet.
+    Trust `chezmoi source-path`; fall back to ~/.local/share/chezmoi.
+    """
+    chezmoi = shutil.which("chezmoi")
+    if chezmoi:
+        try:
+            out = subprocess.run(
+                [chezmoi, "source-path"],
+                capture_output=True, text=True, check=False, timeout=5,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return Path(out.stdout.strip())
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+    fallback = Path.home() / ".local" / "share" / "chezmoi"
+    if (fallback / "scripts" / "yth" / "__init__.py").is_file():
+        return fallback
+    print(
+        "yth: cannot locate chezmoi source dir.\n"
+        "  Tried: `chezmoi source-path` and ~/.local/share/chezmoi.\n"
+        "  Install chezmoi or ensure the source dir exists.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
+def _dispatch_tv(args: list[str]) -> int:
+    """Exec `tv yth` (the picker). Replaces this process so Ctrl+C reaches tv."""
+    tv = shutil.which("tv")
+    if not tv:
+        print(
+            "yth: `tv` (television) not in PATH — run a subcommand instead,\n"
+            "  e.g. `yth search <query>` or `yth list`.  `yth -h` for help.",
+            file=sys.stderr,
+        )
+        return 2
+    os.execvp(tv, [tv, "yth", *args])
+
+
+def _leaf(module: str, prog: str, args: list[str]) -> int:
+    """Rewrite argv and hand off to a leaf module's tyro-based main()."""
+    sys.argv = [prog, *args]
+    mod = __import__(f"scripts.yth.{module}", fromlist=["main"])
+    return mod.main()
+
+
+def _dispatch_open(args: list[str]) -> int:
+    if not args or not args[0].strip():
+        print("yth open: missing <id> argument", file=sys.stderr)
+        return 2
+    from scripts.yth import open_id
+
+    return open_id(args[0])
+
+
+def _dispatch_copy(args: list[str]) -> int:
+    if not args or not args[0].strip():
+        print("yth copy: missing <id> argument", file=sys.stderr)
+        return 2
+    from scripts.yth import copy_id
+
+    return copy_id(args[0])
+
+
+def _dispatch_play(args: list[str]) -> int:
+    if not args or not args[0].strip():
+        print("yth play: missing <id> argument", file=sys.stderr)
+        return 2
+    from scripts.yth import play_id
+
+    return play_id(args[0])
+
+
+def main() -> int:
+    # Help paths print USAGE and exit BEFORE any heavy import, so
+    # `yth -h | grep ...` stays fast + scriptable and never loads yt_dlp.
+    if len(sys.argv) >= 2 and sys.argv[1] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+
+    src = _source_path()
+    if str(src) not in sys.path:
+        sys.path.insert(0, str(src))
+
+    # Bare `yth` → tv picker.
+    if len(sys.argv) < 2:
+        return _dispatch_tv([])
+
+    sub = sys.argv[1]
+    rest = sys.argv[2:]
+
+    # Leaf modules own their own tyro parsing. Subcommand `-` → module `_`.
+    leaves = {
+        "import-takeout": ("import_takeout", "yth import-takeout"),
+        "sync": ("sync", "yth sync"),
+        "enrich": ("enrich", "yth enrich"),
+        "fetch-subs": ("fetch_subs", "yth fetch-subs"),
+        "search": ("search", "yth search"),
+        "list": ("list", "yth list"),
+        "show": ("show", "yth show"),
+    }
+    if sub in leaves:
+        module, prog = leaves[sub]
+        return _leaf(module, prog, rest)
+
+    shims = {"open": _dispatch_open, "copy": _dispatch_copy, "play": _dispatch_play}
+    if sub in shims:
+        return shims[sub](rest)
+    if sub == "tv":
+        return _dispatch_tv(rest)
+
+    print(f"yth: unknown subcommand '{sub}'\n\n{USAGE}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

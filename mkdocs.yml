@@ -147,6 +147,7 @@ plugins:
             SMS (Huawei router): 簡訊 (Huawei 路由器)
             reyee (Ruijie router): reyee (Ruijie 路由器)
             ping-monitor (latency spikes): ping-monitor (延遲尖刺)
+            yth (YouTube history): yth (YouTube 觀看歷史)
             chezmoi prefixes: chezmoi prefixes
             chezmoi templating: chezmoi templating
             Mirrors (Chinese CDN): 鏡像 (中國 CDN)
@@ -332,6 +333,7 @@ nav:
           - "Pueue (pqsum + fleet pueue)": tools/pueue.md
           - "fleet exec": tools/fleet-exec.md
           - "fleet hosts": tools/fleet-hosts.md
+          - "yth (YouTube history)": tools/yth.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
       - chezmoi conventions:

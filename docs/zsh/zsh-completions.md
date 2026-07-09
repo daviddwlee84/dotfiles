@@ -150,6 +150,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `x` | `dot_dotfiles/bin/executable_x` | bash hand-rolled | B | `dot_config/zsh/tools/49_x_completion.zsh` + `dot_config/bash/49_x_completion.bash` |
 | `dotcfg` | `dot_dotfiles/bin/executable_dotcfg` (thin shell → `scripts/init/dotfiles_init.py reconfigure`) | bash wrapper | B | `dot_config/zsh/tools/51_dotcfg_completion.zsh` + `dot_config/bash/51_dotcfg_completion.bash` (keys mirror PROMPTS) |
 | `agent-warmup` | `dot_dotfiles/bin/executable_agent-warmup` | argparse (subcommands) | B | `dot_config/zsh/tools/52_agent_warmup_completion.zsh` + `dot_config/bash/52_agent_warmup_completion.bash` |
+| `yth` | `dot_dotfiles/bin/executable_yth` + `scripts/yth/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/53_yth_completion.zsh` + `dot_config/bash/53_yth_completion.bash` |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**
@@ -157,6 +158,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - `fleet` host names — `_fleet_hosts_one` / `_fleet_hosts_csv` shell out to `fleet hosts --list`. Used for the positional `fleet hosts NAME`, `fleet chezmoi diff HOST`, `fleet chezmoi tail HOST`, and the `--hosts=foo,bar,baz` CSV flag everywhere.
 - `pqsum -g <GROUP>` — `_pqsum` shells out to `pueue status --json | jq '.groups | keys[]'`.
 - `mlf` ids (run-id, experiment-id, model-name) — **not** auto-completed (would round-trip MLflow tracking server, possibly auth-required). Use `tv mlflow` for fuzzy id picking instead.
+- `yth` video ids — **not** auto-completed (opaque 11-char ids; enumerating the whole history on every TAB is wasteful). Use `tv yth` or `yth search <query>` instead.
 
 **Adding a new in-house CLI** (decision flow):
 

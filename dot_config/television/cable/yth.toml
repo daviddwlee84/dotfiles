@@ -1,0 +1,90 @@
+# YouTube watch-history channel for television (tv).
+#
+# Fast fuzzy picker over your own watch history (`yth list --tsv` is the
+# source; tv fuzzy-filters the title/channel display string client-side).
+# Deep caption search is NOT here — television's source is single-shot and
+# never sees the live query, so it can only match the metadata display line.
+# Use `yth search --subs <query>` for caption/description search.
+#
+# Usage:
+#   tv yth
+#   yth            # bare `yth` execs `tv yth`
+#
+# Prerequisites:
+#   - `yth` on PATH (dot_dotfiles/bin/executable_yth; needs `uv`).
+#   - History populated:  yth import-takeout <watch-history.json>  (and/or
+#     `yth sync`, `yth enrich`, `yth fetch-subs`).
+#   - `bat` for the preview pane.
+#
+# TSV columns emitted by `yth list --tsv` (col 0 is the id tv hands to
+# preview + actions):
+#   0 video_id   1 marker(▶/×N)   2 channel   3 title   4 last_watched   5 dur
+#
+# Keybindings mirror the b/y/p/s/j single-letter mnemonics a future `yth tui`
+# would use (CLAUDE.md cross-file rule). Alt+ is used for new actions because
+# this repo's tmux prefix is Ctrl+b — a `ctrl-b` binding would never reach tv.
+
+[metadata]
+name = "yth"
+description = "YouTube watch history: fuzzy-pick by title/channel, preview metadata + captions"
+requirements = ["yth"]
+
+[source]
+command = "yth list --tsv"
+# Show title + channel (both fuzzy-matchable) with date/duration/marker context.
+display = "{split:\\t:3}  ·  {split:\\t:2}  ({split:\\t:4}, {split:\\t:5}) {split:\\t:1}"
+output = "{split:\\t:0}"
+no_sort = true  # `yth list` already orders by last_watched DESC
+
+[preview]
+# DB-only (`yth show` never touches the network) so the pane stays instant.
+command = "yth show '{split:\\t:0}' | bat --color=always --plain --paging=never --language=markdown"
+header = "{split:\\t:2}  ·  {split:\\t:4}"
+
+[ui]
+input_header = "YouTube history"
+
+[ui.preview_panel]
+size = 55
+
+[keybindings]
+enter = "actions:open"
+# Override tv's default ctrl-y (copies the whole display row) with URL-only copy.
+ctrl-y = "actions:copy-url"
+ctrl-o = "actions:open-browser"
+# Alt+B is the "b for browser" mnemonic — Ctrl+B is the tmux prefix, so it
+# would be swallowed before tv ever saw it.
+alt-b = "actions:open-browser"
+alt-p = "actions:play"
+alt-s = "actions:subs"
+alt-j = "actions:json"
+
+[actions.open]
+description = "Open the selected video in the browser"
+command = "yth open '{split:\\t:0}'"
+mode = "fork"
+
+[actions.open-browser]
+description = "Open in browser (mnemonic alias of Enter)"
+command = "yth open '{split:\\t:0}'"
+mode = "fork"
+
+[actions.copy-url]
+description = "Copy the video URL to the clipboard"
+command = "yth copy '{split:\\t:0}'"
+mode = "fork"
+
+[actions.play]
+description = "Play in mpv if configured+installed, else browser"
+command = "yth play '{split:\\t:0}'"
+mode = "fork"
+
+[actions.subs]
+description = "Fetch captions for this video, then show detail"
+command = "yth fetch-subs '{split:\\t:0}'; echo; yth show '{split:\\t:0}' | bat --color=always --plain --paging=never --language=markdown | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.json]
+description = "Dump the video's detail as JSON, paged"
+command = "yth show '{split:\\t:0}' --json | bat --color=always --plain --paging=never --language=json | less -R; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"

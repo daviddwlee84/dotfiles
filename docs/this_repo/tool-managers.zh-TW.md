@@ -465,6 +465,7 @@ Homebrew 安裝走 `brew upgrade uv`、curl-installer 安裝走
 | `marimo[recommended,mcp]` | `httpx[socks]` | ✓ |
 | `jupyterlab`(`jupyter-lab`) | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets`;`with_executables_from: notebook, jupyter-core`;`extra_binaries: jupyter, jupyter-notebook` | ✓ |
 | `xonsh` | `xontrib-jedi`, `xontrib-zoxide`, `xontrib-pipeliner`, `xontrib-fzf-widgets` | — |
+| `yt-dlp` | — | — |
 
 來自 `llm_tools/defaults/main.yml`:
 
@@ -1075,6 +1076,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **xonsh** | uv tool(配 xontribs) | uv tool | python_uv_tools |
 | **yazi** | brew | Linuxbrew/GitHub release | devtools |
 | **yq** | brew | release | devtools |
+| **yt-dlp** | uv tool | uv tool | python_uv_tools |
 | **Zen Browser** | n/a | GitHub release AppImage → `~/Applications/zen.AppImage` | gui_apps_linux |
 | **zellij** | brew | GitHub release | devtools |
 | **zoxide** | brew | curl 官方 installer | devtools |
