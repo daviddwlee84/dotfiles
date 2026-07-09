@@ -11,8 +11,8 @@
 cask "alacritty"
 cask "ghostty"
 # cask "iterm2"
-cask "warp"
-cask "cmux"
+# cask "warp"   # exploration converged on Alacritty + herdr; keep off by default
+# cask "cmux"   # exploration converged on Alacritty + herdr; keep off by default
 cask "cursor"
 cask "visual-studio-code"
 {{ end -}}
@@ -134,7 +134,7 @@ cask "tailscale-app"
 # Note: docker/orbstack is managed by ansible docker role
 cask "dbeaver-community"
 {{ if eq .chezmoi.arch "arm64" -}}
-cask "superset"
+# cask "superset"   # exploration converged on Alacritty + herdr; keep off by default
 {{ end -}}
 
 # =============================================================================
