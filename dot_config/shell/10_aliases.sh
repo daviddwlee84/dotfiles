@@ -226,6 +226,31 @@ function thefuck-update-completion {
 	fi
 }
 
+# --- mi-dhcp-bind (tyro) completion regen ----------------------------------
+# Force-regenerate the lazy-autoload completion file used by 46_mi_dhcp_bind.sh
+# (sister to mi-router-update-completion below; mi-dhcp-bind is the WRITE tool).
+function mi-dhcp-bind-update-completion {
+	command -v mi-dhcp-bind >/dev/null 2>&1 || {
+		echo "mi-dhcp-bind-update-completion: mi-dhcp-bind not installed" >&2
+		return 1
+	}
+	if [ -n "$ZSH_VERSION" ]; then
+		local _tmp
+		_tmp=$(mktemp)
+		if mi-dhcp-bind --tyro-write-completion zsh "$_tmp" >/dev/null 2>&1; then
+			mkdir -p "${HOME}/.zfunc"
+			{ echo "#compdef mi-dhcp-bind"; tail -n +2 "$_tmp"; } >"${HOME}/.zfunc/_mi-dhcp-bind" &&
+				echo "mi-dhcp-bind completion cache updated (zsh: ~/.zfunc/_mi-dhcp-bind)"
+		fi
+		rm -f "$_tmp"
+	elif [ -n "$BASH_VERSION" ]; then
+		local _bashdir="${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion/completions"
+		mkdir -p "$_bashdir" &&
+			mi-dhcp-bind --tyro-write-completion bash "$_bashdir/mi-dhcp-bind" >/dev/null 2>&1 &&
+			echo "mi-dhcp-bind completion cache updated (bash: $_bashdir/mi-dhcp-bind)"
+	fi
+}
+
 # --- mi-router (tyro) completion regen -------------------------------------
 # Force-regenerate the lazy-autoload completion file used by 47_mi_router.sh.
 # Useful after a tyro upgrade where mi-router's binary mtime didn't change

@@ -329,6 +329,7 @@ nav:
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md
           - mi-router (Xiaomi router): tools/mi-router.md
+          - mi-dhcp-bind (Xiaomi static DHCP): tools/mi-dhcp-bind.md
           - reyee (Ruijie router): tools/reyee.md
           - ping-monitor (latency spikes): tools/ping-monitor.md
           - "Pueue (pqsum + fleet pueue)": tools/pueue.md

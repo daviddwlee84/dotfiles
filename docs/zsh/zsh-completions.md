@@ -142,6 +142,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | CLI | Source | Framework | Strategy | Files |
 |---|---|---|---|---|
 | `mi-router` | `dot_dotfiles/bin/executable_mi-router` | tyro | A (lazy autoload) | `dot_config/shell/47_mi_router.sh` (gen + mtime check); refresh helper `mi-router-update-completion` |
+| `mi-dhcp-bind` | `dot_dotfiles/bin/executable_mi-dhcp-bind` | tyro | A (lazy autoload) | `dot_config/shell/46_mi_dhcp_bind.sh` (gen + mtime check); refresh helper `mi-dhcp-bind-update-completion` |
 | `reyee` | `dot_dotfiles/bin/executable_reyee` | tyro | A (lazy autoload) | `dot_config/shell/48_reyee.sh` (gen + mtime check); refresh helper `reyee-update-completion` |
 | `ping-monitor` | `dot_dotfiles/bin/executable_ping-monitor` | bash hand-rolled | B | `dot_config/zsh/tools/50_ping_monitor_completion.zsh` + `dot_config/bash/50_ping_monitor_completion.bash` |
 | `fleet` | `dot_dotfiles/bin/executable_fleet` + `scripts/fleet/*.py` | hand-rolled umbrella + tyro/argparse subs | B (eager hand-written) | `dot_config/zsh/tools/45_fleet_completion.zsh` + `dot_config/bash/45_fleet_completion.bash` |

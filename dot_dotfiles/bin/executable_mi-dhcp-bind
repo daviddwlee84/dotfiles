@@ -1,0 +1,363 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "tyro>=0.8",
+#   "httpx>=0.27",
+#   "rich>=13",
+#   "platformdirs>=4",
+# ]
+# ///
+"""Write helper for MiWiFi static DHCP reservations (MAC<->IP bindings).
+
+Companion to the read-only `mi-router` CLI. Kept SEPARATE on purpose so that
+`mi-router` keeps its read-only-by-design guarantee; this is the opt-in writer.
+
+Shares mi-router's credentials (in order): --flags, ~/.config/mi-router/config.toml,
+env MI_ROUTER_HOST/USER/PASS, then interactive prompt (TTY only).
+
+API (verified on AX9000 / firmware 1.0.168):
+  POST xqnetwork/mac_bind    body: data=[{"mac","ip","name"}]  (JSON array, url-encoded)
+  POST xqnetwork/mac_unbind  body: mac=<MAC>
+  GET  xqnetwork/macbind_info                                   -> reservations in `list`
+
+Examples:
+  mi-dhcp-bind list
+  mi-dhcp-bind bind                       # interactive: pick "this machine" or a device
+  mi-dhcp-bind bind --self --yes          # bind THIS host (autodetected MAC + LAN IP)
+  mi-dhcp-bind bind CC:28:AA:89:1B:9A 192.168.31.67 --name David-Ubuntu --yes
+  mi-dhcp-bind unbind CC:28:AA:89:1B:9A --yes
+"""
+from __future__ import annotations
+
+import getpass
+import hashlib
+import json
+import os
+import random
+import re
+import socket
+import subprocess
+import sys
+import time
+import tomllib
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Annotated, Any, Union
+
+import httpx
+import tyro
+from platformdirs import user_config_dir
+from rich.console import Console
+from rich.table import Table
+
+APP = "mi-router"  # deliberately share mi-router's config + creds
+DEFAULT_HOST = "192.168.31.1"
+DEFAULT_USER = "admin"
+
+CONFIG_FILE = Path(user_config_dir(APP)) / "config.toml"
+KEY_RE = re.compile(r"key\s*[:=]\s*['\"]([0-9a-f]{32})['\"]")
+MAC_RE = re.compile(r"mac\s*[:=]\s*['\"]([0-9a-fA-F:]{17})['\"]")
+MAC_FMT = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
+
+console = Console()
+err = Console(stderr=True, style="red")
+
+
+def die(msg: str, code: int = 1) -> None:
+    err.print(f"mi-dhcp-bind: {msg}")
+    sys.exit(code)
+
+
+# ----------------------------------------------------------------- config / creds
+
+
+def load_config() -> dict[str, Any]:
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return tomllib.loads(CONFIG_FILE.read_text())
+    except Exception as e:
+        die(f"bad config {CONFIG_FILE}: {e}", 2)
+
+
+def resolve_creds(cli_host, cli_user, cli_pw) -> dict[str, str]:
+    cfg = load_config()
+    host = cli_host or cfg.get("host") or os.environ.get("MI_ROUTER_HOST") or DEFAULT_HOST
+    user = cli_user or cfg.get("user") or os.environ.get("MI_ROUTER_USER") or DEFAULT_USER
+    pw = cli_pw or cfg.get("password") or os.environ.get("MI_ROUTER_PASS") or ""
+    if not pw:
+        if not sys.stdin.isatty():
+            die(f"no password; set MI_ROUTER_PASS or populate {CONFIG_FILE}", 2)
+        pw = getpass.getpass(f"Router password for {user}@{host}: ")
+    if not pw:
+        die("empty password", 2)
+    return {"host": host, "user": user, "password": pw}
+
+
+# ----------------------------------------------------------------- local autodetect
+
+
+def detect_local(router_ip: str) -> tuple[str | None, str, str]:
+    """Return (iface, local_ip, mac) for the NIC this host uses to reach the router."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect((router_ip, 80))  # no packet sent for UDP; just picks the route
+        ip = s.getsockname()[0]
+    except OSError:
+        ip = ""
+    finally:
+        s.close()
+
+    dev = None
+    try:
+        out = subprocess.run(
+            ["ip", "route", "get", router_ip], capture_output=True, text=True, timeout=3
+        ).stdout
+        m = re.search(r" dev (\S+)", out)
+        dev = m.group(1) if m else None
+    except Exception:
+        pass
+
+    mac = ""
+    if dev:
+        p = Path(f"/sys/class/net/{dev}/address")
+        if p.exists():
+            mac = p.read_text().strip()
+    if not mac:  # cross-platform fallback (picks primary NIC)
+        n = uuid.getnode()
+        mac = ":".join(f"{(n >> e) & 0xFF:02x}" for e in range(40, -1, -8))
+    return dev, ip, mac
+
+
+# ----------------------------------------------------------------- HTTP client
+
+
+class MiRouter:
+    """Minimal MiWiFi client — same SHA1 challenge login as mi-router, plus POST."""
+
+    def __init__(self, host, username, password, timeout=5.0):
+        self.host = host
+        self.base = f"http://{host}"
+        self.username = username
+        self.password = password
+        # ignore ambient proxy env (Clash etc.) — this is LAN traffic
+        self.client = httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False)
+        self.stok: str | None = None
+
+    def _login_once(self) -> None:
+        r = self.client.get(f"{self.base}/cgi-bin/luci/web")
+        r.raise_for_status()
+        m_key = KEY_RE.search(r.text)
+        m_mac = MAC_RE.search(r.text)
+        if not m_key or not m_mac:
+            raise RuntimeError("could not parse login key/mac from router page")
+        key, mac = m_key.group(1), m_mac.group(1)
+        nonce = f"0_{mac}_{int(time.time())}_{random.randint(1000, 10000)}"
+        pwd_key = hashlib.sha1((self.password + key).encode()).hexdigest()
+        pwd_hash = hashlib.sha1((nonce + pwd_key).encode()).hexdigest()
+        r = self.client.post(
+            f"{self.base}/cgi-bin/luci/api/xqsystem/login",
+            data={"username": self.username, "password": pwd_hash, "logtype": "2", "nonce": nonce},
+        )
+        r.raise_for_status()
+        body = r.json()
+        if body.get("code") != 0 or not body.get("token"):
+            raise RuntimeError(f"login failed: {body}")
+        self.stok = body["token"]
+
+    def login(self, attempts: int = 4) -> None:
+        # MiWiFi intermittently rejects rapid re-logins with "Invalid nonce" (1582);
+        # the nonce is second-resolution, so a short sleep + retry clears it.
+        for i in range(attempts):
+            try:
+                self._login_once()
+                return
+            except RuntimeError as e:
+                if i < attempts - 1 and ("nonce" in str(e).lower() or "1582" in str(e)):
+                    time.sleep(1.2)
+                    continue
+                raise
+
+    def _url(self, endpoint: str) -> str:
+        return f"{self.base}/cgi-bin/luci/;stok={self.stok}/api/{endpoint.lstrip('/')}"
+
+    def get(self, endpoint: str) -> Any:
+        if self.stok is None:
+            self.login()
+        r = self.client.get(self._url(endpoint))
+        r.raise_for_status()
+        return r.json()
+
+    def post(self, endpoint: str, data: dict) -> Any:
+        if self.stok is None:
+            self.login()
+        r = self.client.post(self._url(endpoint), data=data)
+        r.raise_for_status()
+        return r.json()
+
+
+def norm_mac(mac: str) -> str:
+    mac = mac.strip()
+    if not MAC_FMT.match(mac):
+        die(f"invalid MAC {mac!r} (want AA:BB:CC:DD:EE:FF)", 2)
+    return mac.upper()
+
+
+def show_bindings(r: MiRouter) -> None:
+    d = r.get("xqnetwork/macbind_info")
+    lst = d.get("list", []) or []
+    t = Table(title=f"Static DHCP reservations ({len(lst)})")
+    t.add_column("mac", style="bold cyan")
+    t.add_column("ip")
+    t.add_column("name")
+    for b in lst:
+        ip = b.get("ip")
+        ip = ip[0].get("ip") if isinstance(ip, list) and ip else ip
+        t.add_row(b.get("mac", "?"), str(ip or "?"), b.get("name") or b.get("origin_name") or "")
+    console.print(t)
+    if not lst:
+        console.print("[dim](no static reservations yet)[/dim]")
+
+
+def interactive_pick(r: MiRouter) -> tuple[str, str, str]:
+    """Offer 'this machine' (autodetected) or a router client; return (mac, ip, name)."""
+    hostname = socket.gethostname()
+    dev, ip, mac = detect_local(r.host)
+    console.print("[bold]Bind which device?[/bold]")
+    console.print(f"  [bold cyan]s[/bold cyan]) this machine — {hostname}   ip={ip}   mac={mac}   (dev {dev})")
+    devices: list[tuple[str, str, str]] = []
+    try:
+        for d in r.get("misystem/devicelist").get("list", []):
+            if not d.get("online"):
+                continue
+            dip = (d.get("ip") or [{}])[0].get("ip", "?")
+            devices.append((d.get("name", "?"), dip, d.get("mac", "?")))
+    except Exception as e:
+        err.print(f"(couldn't list router devices: {e})")
+    for i, (n, dip, dmac) in enumerate(devices):
+        console.print(f"  [bold cyan]{i}[/bold cyan]) {n}   ip={dip}   mac={dmac}")
+    choice = input("Choice [s / number / m=manual] (default s): ").strip().lower()
+    if choice in ("", "s"):
+        if not mac or not ip:
+            die("could not autodetect this machine; use manual entry", 2)
+        return mac, ip, hostname
+    if choice == "m":
+        return input("MAC: ").strip(), input("IP: ").strip(), (input("name: ").strip() or "device")
+    if choice.isdigit() and int(choice) < len(devices):
+        n, dip, dmac = devices[int(choice)]
+        return dmac, dip, n
+    die("invalid choice", 1)
+
+
+# ------------------------------------------------------------------- commands
+
+
+@dataclass
+class ListCmd:
+    """List current static MAC<->IP reservations."""
+
+
+@dataclass
+class Bind:
+    """Create/replace a static DHCP reservation. No args => interactive picker."""
+
+    mac: tyro.conf.Positional[str | None] = None
+    ip: tyro.conf.Positional[str | None] = None
+    self_: Annotated[bool, tyro.conf.arg(name="self")] = False
+    """Autodetect and bind THIS machine (its LAN NIC's MAC + current IP)."""
+    name: str | None = None
+    """Label for the reservation (defaults to hostname / device name)."""
+    yes: bool = False
+    """Skip the confirmation prompt (required in non-interactive shells)."""
+    dry_run: bool = False
+    """Print the request that would be sent, then exit without writing."""
+
+
+@dataclass
+class Unbind:
+    """Remove a static DHCP reservation by MAC."""
+
+    mac: tyro.conf.Positional[str]
+    yes: bool = False
+    dry_run: bool = False
+
+
+Cmd = Union[
+    Annotated[ListCmd, tyro.conf.subcommand(name="list")],
+    Annotated[Bind, tyro.conf.subcommand(name="bind")],
+    Annotated[Unbind, tyro.conf.subcommand(name="unbind")],
+]
+
+
+@dataclass
+class Args:
+    """MiWiFi static-DHCP writer (opt-in companion to read-only mi-router)."""
+
+    cmd: Cmd
+    host: str | None = None
+    username: str | None = None
+    password: str | None = None
+    timeout: float = 5.0
+
+
+def confirm(prompt: str) -> bool:
+    if not sys.stdin.isatty():
+        die("refusing to write without --yes in a non-interactive shell", 2)
+    return input(f"{prompt} [y/N] ").strip().lower() in ("y", "yes")
+
+
+def do_write(r: MiRouter, endpoint: str, payload: dict, action: str, yes: bool, dry_run: bool) -> None:
+    err.print(f"[cyan]POST[/cyan] /api/{endpoint}   {payload}")
+    if dry_run:
+        err.print("[yellow]dry-run:[/yellow] request NOT sent")
+        return
+    if not yes and not confirm(f"{action} on the router?"):
+        die("aborted", 1)
+    resp = r.post(endpoint, payload)
+    if not isinstance(resp, dict) or resp.get("code") != 0:
+        die(f"router rejected the write: {resp}")
+    console.print(f"[green]ok:[/green] {action}")
+    show_bindings(r)
+
+
+def main() -> None:
+    args = tyro.cli(Args, config=(tyro.conf.OmitSubcommandPrefixes,))
+    cmd = args.cmd
+    creds = resolve_creds(args.host, args.username, args.password)
+    r = MiRouter(creds["host"], creds["user"], creds["password"], timeout=args.timeout)
+    try:
+        r.login()
+    except Exception as e:
+        die(f"login failed: {e}")
+
+    if isinstance(cmd, ListCmd):
+        show_bindings(r)
+        return
+
+    if isinstance(cmd, Bind):
+        if cmd.self_:
+            dev, ip_d, mac_d = detect_local(r.host)
+            mac, ip = mac_d, (cmd.ip or ip_d)
+            name = cmd.name or socket.gethostname()
+            if not mac or not ip:
+                die("could not autodetect MAC/IP for --self", 2)
+        elif cmd.mac and cmd.ip:
+            mac, ip, name = cmd.mac, cmd.ip, (cmd.name or cmd.mac)
+        else:
+            if not sys.stdin.isatty():
+                die("provide MAC and IP, or --self, or run in a terminal for the picker", 2)
+            mac, ip, name = interactive_pick(r)
+        mac = norm_mac(mac)
+        payload = {"data": json.dumps([{"mac": mac, "ip": ip.strip(), "name": name}], ensure_ascii=False)}
+        do_write(r, "xqnetwork/mac_bind", payload, f"bind {mac} -> {ip} ({name})", cmd.yes, cmd.dry_run)
+        return
+
+    if isinstance(cmd, Unbind):
+        mac = norm_mac(cmd.mac)
+        do_write(r, "xqnetwork/mac_unbind", {"mac": mac}, f"unbind {mac}", cmd.yes, cmd.dry_run)
+
+
+if __name__ == "__main__":
+    main()
