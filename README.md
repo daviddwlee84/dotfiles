@@ -5,6 +5,10 @@ Cross-platform development environment setup using **chezmoi** + **ansible**.
 - **chezmoi**: manages config files (dotfiles)
 - **ansible**: installs system dependencies and tools
 
+> **Native Windows?** This repo covers macOS, Linux, and WSL. For a native
+> Windows + PowerShell 7 setup (scoop + winget, starship, `copilot-proxy`), use
+> **[dotfiles-windows](https://github.com/daviddwlee84/dotfiles-windows)**.
+
 ## Prerequisites
 
 - [chezmoi](https://www.chezmoi.io/install/)
