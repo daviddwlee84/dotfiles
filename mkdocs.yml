@@ -131,6 +131,7 @@ plugins:
             Language servers (LSP): 語言伺服器 (LSP)
             SpecStory internals: SpecStory 內部運作
             git diff workflow: git diff 工作流程
+            lazygit (history-surgery recipes): lazygit（歷史手術速查表）
             GitHub CLI (gh) auth: GitHub CLI (gh) 認證
             actionlint (GitHub Actions linter): actionlint（GitHub Actions 檢查器）
             Infrastructure-as-Code: Infrastructure-as-Code

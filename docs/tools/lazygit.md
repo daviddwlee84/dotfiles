@@ -28,6 +28,22 @@ The word *fixup* shows up in two unrelated lazygit operations — confusing them
 
 So `A` = "put my edits into that old commit"; `f` = "glue these two commits together". Reaching for `f` to add a file will mash neighbouring commits instead.
 
+## Recipe: see which commits changed a file (file history)
+
+Read-only lookup — no history rewrite, safe even on pushed commits.
+
+**lazygit**
+1. **`<ctrl+s>`** (global) → *View options for filtering the commit log* → enter the **path**. The **Commits** panel now lists only commits that touched it; **`<enter>`** on any commit drills into that file's diff. **`<ctrl+s>`** again to clear the filter.
+
+lazygit's filter doesn't follow renames and makes you open commits one at a time — for real file-history browsing a dedicated tool is nicer:
+
+**CLI**
+```bash
+tig path/to/file                             # best: log scoped to the file, <enter> opens each commit's diff, follows renames
+git log --follow -p        -- path/to/file   # follow renames + full diff each time (piped through delta here)
+git log --follow --oneline -- path/to/file   # quick "which commits touched it"
+```
+
 ## Recipe: add an uncommitted file into an OLDER commit
 
 **lazygit**
@@ -61,6 +77,23 @@ git reset HEAD^ -- path/to/file       # un-commit just that file -> working-tree
 git commit --amend --no-edit          # re-make the commit without it
 git rebase --continue
 ```
+
+## Recipe: fork working-tree changes into a new file, restore the original
+
+You edited a file but want to keep those edits as a *separate* new file while resetting the original back to `HEAD` (e.g. spin an experiment off into a copy). No single keybinding, but two quick steps: the copy captures the modified content, then discard restores the original.
+
+**lazygit**
+1. **`:`** (*Execute shell command*) → `cp path/to/file path/to/file.new` — the copy grabs the **current, modified** content. The `:` shell runs at the repo root.
+2. **Files** panel: select the original → **`d`** → *discard* → restored to `HEAD`.
+3. Edit `path/to/file.new` from there.
+
+**CLI**
+```bash
+cp path/to/file path/to/file.new   # modified content -> new file
+git restore path/to/file           # original back to HEAD  (git checkout -- <file> on older git)
+```
+
+> Want to *re-apply* the change later rather than fork it? `git stash` saves the edit and restores the original in one step — but it lands in the stash list, not a new file.
 
 ## Recipe: recover from a botched rebase
 
