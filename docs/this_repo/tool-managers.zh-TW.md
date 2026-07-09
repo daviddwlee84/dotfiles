@@ -30,7 +30,7 @@
 | Manager | 擁有什麼 | 列在哪 | 升級類別 |
 |---|---|---|---|
 | **Bootstrap** (`run_once_before_*.sh.tmpl`) | Homebrew 本身、uv、mise、ansible-core、apt 前置條件 | `run_once_before_00_bootstrap.sh.tmpl` | n/a (一次性、冪等) |
-| **Homebrew formulae** | macOS 共用 CLI (`tailscale`, `mas`) + role 驅動的（在 `base`, `devtools`, `coding_agents` 等之中） | `dot_config/homebrew/Brewfile.tmpl` + 散布在各處的 `community.general.homebrew:` task | `brew` |
+| **Homebrew formulae** | macOS 共用 CLI (`mas`) + role 驅動的（在 `base`, `devtools`, `coding_agents` 等之中） | `dot_config/homebrew/Brewfile.tmpl` + 散布在各處的 `community.general.homebrew:` task | `brew` |
 | **Homebrew casks** | macOS GUI 應用程式（~25 個；AI 類由 `installAiDesktopApps` 控管） | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
 | **Ansible roles** | 主要部分——26 個 role，涵蓋 shells、devtools、agents、語言工具鏈、網路、安全 | `dot_ansible/roles/*/tasks/main.yml` | 間接（每個 role 呼叫 brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release 之一） |
 | **mise** | Runtime 版本：`node`、`bun`、`rust`、`go`、`dotnet`、`ruby`（oldEL：只有 ruby） | `dot_config/mise/config.toml.tmpl` | `mise` |
@@ -155,7 +155,7 @@ Linux Brewfile 是空的,Linuxbrew 的使用是 role-by-role。
 
 | 檔案 | 擁有什麼 |
 |---|---|
-| `Brewfile.tmpl`(共用) | Taps: `nikitabobko/tap`。Formulae(僅 macOS,透過內層 `{{ if eq .chezmoi.os "darwin" }}`): `mas`、`tailscale` |
+| `Brewfile.tmpl`(共用) | Taps: `nikitabobko/tap`。Formula(僅 macOS,透過內層 `{{ if eq .chezmoi.os "darwin" }}`): `mas` |
 | `Brewfile.darwin.tmpl` | 全部 GUI casks — 見下表 |
 | `Brewfile.linux.tmpl` | 空白(只有被註解掉的佔位) |
 
@@ -1043,8 +1043,8 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **super-productivity** | brew cask | n/a | Brewfile.darwin |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask(arm64) | n/a | Brewfile.darwin |
-| **tailscale**(CLI) | brew(共用 Brewfile,macOS) | (Linux:透過 repo 外的系統 pkg) | Brewfile.tmpl |
-| **tailscale-app** | brew cask | n/a | Brewfile.darwin |
+| **tailscale**(CLI) | 由 `tailscale-app` cask 的 wrapper 提供(`/usr/local/bin/tailscale` → app;無 formula) | (Linux:repo 外的系統 pkg) | Brewfile.darwin |
+| **tailscale-app** | brew cask(pkg 同時安裝 `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
 | **tailspin**(`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |

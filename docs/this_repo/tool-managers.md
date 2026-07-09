@@ -28,7 +28,7 @@ If you want to know:
 | Manager | Owns | Where listed | Upgrade category |
 |---|---|---|---|
 | **Bootstrap** (`run_once_before_*.sh.tmpl`) | Homebrew itself, uv, mise, ansible-core, apt prereqs | `run_once_before_00_bootstrap.sh.tmpl` | n/a (one-shot, idempotent) |
-| **Homebrew formulae** | General macOS GUI helpers (`tailscale`, `mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
+| **Homebrew formulae** | General macOS GUI helpers (`mas`) + role-driven formulae (in `base`, `devtools`, `coding_agents`, …) | `dot_config/homebrew/Brewfile.tmpl` + scattered `community.general.homebrew:` tasks | `brew` |
 | **Homebrew casks** | macOS GUI apps, gated by `installBrewApps`, `installAiDesktopApps`, or `installGamingApps` | `Brewfile.darwin.tmpl` | `brew` (`--cask --greedy`) |
 | **Ansible roles** | The majority — 26 roles spanning shells, devtools, agents, language toolchains, networking, security | `dot_ansible/roles/*/tasks/main.yml` | indirect (each role calls one of: brew / apt / mise / uv / npm / cargo / gem / dotnet / curl-installer / github-release) |
 | **mise** | Runtime versions: `node`, `bun`, `rust`, `go`, `dotnet`, `ruby` (oldEL: ruby only) | `dot_config/mise/config.toml.tmpl` | `mise` |
@@ -159,7 +159,7 @@ empty, Linuxbrew use happens role-by-role.
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formulae `mas`, `tailscale` |
+| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas` |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -1088,8 +1088,8 @@ list.
 | **switchaudio-osx** (`SwitchAudioSource`) | brew (gated `installMediaControl`) | n/a | media_control |
 | **superfile** | brew | installer/release | devtools |
 | **superset** | brew cask (arm64) | n/a | Brewfile.darwin |
-| **tailscale** (CLI) | brew (shared Brewfile, macOS) | (Linux: via system pkg outside repo) | Brewfile.tmpl |
-| **tailscale-app** | brew cask | n/a | Brewfile.darwin |
+| **tailscale** (CLI) | via the `tailscale-app` cask wrapper (`/usr/local/bin/tailscale` → app; no formula) | (Linux: system pkg outside repo) | Brewfile.darwin |
+| **tailscale-app** | brew cask (pkg also installs the `/usr/local/bin/tailscale` CLI wrapper) | n/a | Brewfile.darwin |
 | **tailspin** (`tspin`) | brew | release | devtools |
 | **taplo** | brew | apt+release | devtools |
 | **td** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
