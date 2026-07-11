@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -85,6 +85,10 @@
       - htop
       - duckdb
       - rclone
+      # mosh — mobile shell; roaming UDP-based SSH replacement that survives
+      # IP changes / sleep / high latency. mosh-server listens on UDP
+      # 60000-61000, which cloud hosts must open inbound.
+      - mosh
       - coreutils
       - taplo
       - television
@@ -2079,6 +2083,18 @@
 # --- thefuck ---
 # NOTE: thefuck is now installed via uv tool (python_uv_tools role)
 # This avoids conda/virtualenv Python path conflicts
+
+# --- mosh ---
+# mosh (mobile shell) — roaming UDP-based SSH replacement; survives IP
+# changes / sleep / high latency. In Debian/Ubuntu apt (universe). Note:
+# mosh-server listens on UDP 60000-61000, which cloud hosts must open inbound.
+- name: Install mosh (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: mosh
+    state: present
 
 # --- shellcheck + shfmt ---
 # Shell linting / formatting. macOS gets both via brew (block above).
