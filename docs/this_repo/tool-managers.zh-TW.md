@@ -184,7 +184,7 @@ Linux Brewfile 是空的,Linuxbrew 的使用是 role-by-role。
 大多數 CLI formulae 透過 ansible role 而非 Brewfile 安裝。例:
 
 - `base/tasks/main.yml`:`git`、`git-lfs`、`curl`、`wget`、`ripgrep`、`fd`、`jq`、`tree`、`just`
-- `devtools/tasks/main.yml`:大量集合——`bat`、`gh`、`glab`、`diffnav`、`git-delta`、`eza`、`tlrc`、`glow`、`gum`、`vhs`、`freeze`、`thefuck`、`zoxide`、`direnv`、`yazi`、`superfile`、`tmux`、`sesh`、`worktrunk`、`workmux`、`zellij`、`btop`、`htop`、`duckdb`、`rclone`、`coreutils`、`taplo`、`television`、`pandoc`、`tailspin`、`lnav`、`grc`、`dasel`、`yq`、`jnv`、`witr`、`figlet`、`toilet`、`lolcat`、`fastfetch`、`shellcheck`、`shfmt`、`bats-core`、`git-graph`
+- `devtools/tasks/main.yml`:大量集合——`bat`、`gh`、`glab`、`diffnav`、`git-delta`、`eza`、`tlrc`、`glow`、`gum`、`vhs`、`freeze`、`thefuck`、`zoxide`、`direnv`、`yazi`、`superfile`、`tmux`、`sesh`、`worktrunk`、`workmux`、`zellij`、`btop`、`htop`、`duckdb`、`rclone`、`coreutils`、`taplo`、`television`、`pandoc`、`tailspin`、`lnav`、`grc`、`dasel`、`yq`、`jnv`、`witr`、`figlet`、`toilet`、`lolcat`、`fastfetch`、`shellcheck`、`shfmt`、`bats-core`、`git-graph`、`mosh`
 - `coding_agents/tasks/main.yml`:`claude-code`(cask)、`codex`(cask)、`gemini-cli`(formula)、`rtk`(formula)、`specstory`、`codexbar`、`td`、`sidecar`(都有 tap 設定)
 - `networking_tools/`:`nmap`、`arp-scan`、`mtr`、`iperf3`、`doggo`、`httpie`、`gping`、`trippy`、`bandwhich`、`rustscan`、`speedtest`(tap `teamookla/speedtest`)、`ngrok`、`cloudflared`
 - `media_tools/`:`ffmpeg`、`imagemagick`、`exiftool`、`vips`
@@ -1004,6 +1004,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **mise** | curl `mise.run` | curl `mise.run` → 直接 binary → musl 變體 | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
 | **models** | brew formula | Linuxbrew → cargo `modelsdev` | llm_tools |
+| **mosh** | brew | apt | devtools |
 | **mtr** | brew | apt/yum | networking_tools |
 | **nmap** | brew | apt/yum | networking_tools |
 | **neovim** | brew(`state: latest`) | apt → GitHub release → 使用者 → oldEL 分支 | neovim |
