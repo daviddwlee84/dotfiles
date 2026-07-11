@@ -37,9 +37,14 @@
         mode: '0755'
 
     - name: Add Resilio Sync GPG key (dearmored)
+      # Resilio's official docs use http://, but that endpoint is unreachable on
+      # some networks (IPv6 Meta/Fastly CDN, port 80 blocked) — https:// serves
+      # the same key. curl --max-time/--retry avoids the multi-minute hang a bare
+      # `wget` produces when an endpoint is dead.
       ansible.builtin.shell: |
-        set -eu
-        wget -qO- http://linux-packages.resilio.com/resilio-sync/key.asc \
+        set -eo pipefail
+        curl -fsSL --retry 3 --retry-delay 2 --max-time 60 \
+          https://linux-packages.resilio.com/resilio-sync/key.asc \
           | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
       args:
         creates: /etc/apt/keyrings/resilio-sync.gpg
@@ -57,7 +62,7 @@
       ansible.builtin.deb822_repository:
         name: resilio-sync
         types: deb
-        uris: http://linux-packages.resilio.com/resilio-sync/deb
+        uris: https://linux-packages.resilio.com/resilio-sync/deb
         suites: resilio-sync
         components: non-free
         signed_by: /etc/apt/keyrings/resilio-sync.gpg
@@ -84,12 +89,31 @@
 # ---------------------------------------------------------------------------
 # Run as a per-user service (mirrors Docker rootless). The package ships
 # /usr/lib/systemd/user/resilio-sync.service, so no hand-written unit needed.
+# Gated on the package actually being installed — if the apt install failed
+# (network/GPG), the service unit does not exist and we must NOT pretend to
+# enable it (that reported a misleading "ok" against a non-existent unit).
 # ---------------------------------------------------------------------------
+
+- name: Re-check whether resilio-sync installed successfully (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command: dpkg-query -W -f='${Status}' resilio-sync
+  register: resilio_pkg_post
+  changed_when: false
+  failed_when: false
+
+- name: Warn that the per-user service is skipped (package not installed)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - resilio_sync_enable_service | bool
+    - "'install ok installed' not in resilio_pkg_post.stdout"
+  ansible.builtin.debug:
+    msg: "resilio-sync package is not installed — skipping service enable. Fix the install (rerun --tags resilio_sync) first."
 
 - name: Disable and stop the rootful resilio-sync system unit (Debian/Ubuntu)
   when:
     - ansible_facts['os_family'] == 'Debian'
     - resilio_sync_enable_service | bool
+    - "'install ok installed' in resilio_pkg_post.stdout"
   become: true
   tags: [sudo]
   ansible.builtin.systemd_service:
@@ -102,6 +126,7 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
     - resilio_sync_enable_service | bool
+    - "'install ok installed' in resilio_pkg_post.stdout"
   become: true
   tags: [sudo]
   ansible.builtin.command: "loginctl enable-linger {{ ansible_facts['env']['USER'] }}"
@@ -112,6 +137,7 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
     - resilio_sync_enable_service | bool
+    - "'install ok installed' in resilio_pkg_post.stdout"
   ansible.builtin.systemd_service:
     name: resilio-sync
     scope: user
@@ -125,6 +151,7 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
     - resilio_sync_enable_service | bool
+    - "'install ok installed' in resilio_pkg_post.stdout"
   ansible.builtin.debug:
     msg: |
       Resilio Sync is running as a per-user service. Configure it via the WebUI:

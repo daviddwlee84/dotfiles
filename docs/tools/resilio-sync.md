@@ -82,6 +82,7 @@ Key types: a **read-write** key lets a peer change files both ways; a **read-onl
 - **Permission denied on synced files** — the per-user service runs as *you*, so sync folders must be readable/writable by your user. (If you ever switch back to the rootful unit, files are owned by the `rslsync` user instead.)
 - **Peers don't discover each other on the LAN** — allow Resilio's ports through the firewall (it uses a listening port shown in WebUI → Preferences; LAN discovery is UDP multicast). Over the internet it falls back to Resilio relay/tracker.
 - **Service didn't start after `chezmoi apply`** — on containers/hosts without a user systemd session the enable step is best-effort; start it manually once a session exists.
+- **Install failed at the GPG-key / apt step (`gpg: no valid OpenPGP data found`, or a multi-minute hang)** — Resilio's CDN resolves to an IPv6 Meta/Fastly endpoint where **port 80 (`http://`) is blocked on some networks** while `https://` works. The role fetches the key and repo over `https://` for exactly this reason; if you still see it, test `curl -I --max-time 10 https://linux-packages.resilio.com/resilio-sync/key.asc` (expect `200`).
 
 ## Related
 
