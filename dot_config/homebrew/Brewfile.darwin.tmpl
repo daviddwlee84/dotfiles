@@ -161,6 +161,14 @@ cask "superset"
 {{ end -}}
 
 # =============================================================================
+# Casks - File Sync (gated by installResilioSync, independent of installBrewApps)
+# =============================================================================
+{{ if .installResilioSync -}}
+cask "resilio-sync"   # P2P file sync (AirDrop-style transfer, phone→NAS photo backup) — see docs/tools/resilio-sync.md
+{{ end -}}
+
+
+# =============================================================================
 # Apps NOT available via Homebrew (manual install required):
 # - 东方财富, 同花顺 (Chinese finance apps)
 # - FileZilla (removed from Homebrew)

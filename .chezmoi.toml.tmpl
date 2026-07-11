@@ -65,6 +65,11 @@ installHomelabTools = {{ promptBoolOnce . "installHomelabTools" "Install homelab
 {{ else -}}
 installHomelabTools = false
 {{ end -}}
+# 是否安裝 Resilio Sync（P2P 檔案同步，類似 AirDrop 的跨機傳輸、手機照片備份到
+# NAS）。macOS 走 Homebrew cask 的 GUI app；Linux（桌機與 server 皆同）沒有 GUI，
+# 以 per-user systemd service 跑成背景 daemon，透過 127.0.0.1:8888 的 WebUI 設定
+# （headless server 用 SSH tunnel）。詳見 docs/tools/resilio-sync.md。
+installResilioSync = {{ promptBoolOnce . "installResilioSync" "Install Resilio Sync (P2P file sync — GUI cask on macOS, headless WebUI daemon on Linux/servers)" false }}
 # 是否安裝 Infrastructure-as-Code 工具 (Azure CLI, Terraform, OpenTofu)
 installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)" false }}
 # 是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)

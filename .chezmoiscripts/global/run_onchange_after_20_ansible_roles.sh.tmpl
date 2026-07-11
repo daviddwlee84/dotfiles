@@ -47,6 +47,8 @@
 # gui_apps_linux defaults: {{ include "dot_ansible/roles/gui_apps_linux/defaults/main.yml" | sha256sum }}
 # homelab_tools tasks: {{ include "dot_ansible/roles/homelab_tools/tasks/main.yml" | sha256sum }}
 # homelab_tools defaults: {{ include "dot_ansible/roles/homelab_tools/defaults/main.yml" | sha256sum }}
+# resilio_sync tasks: {{ include "dot_ansible/roles/resilio_sync/tasks/main.yml" | sha256sum }}
+# resilio_sync defaults: {{ include "dot_ansible/roles/resilio_sync/defaults/main.yml" | sha256sum }}
 
 set -e
 export PATH="$HOME/.local/bin:$PATH"
@@ -287,6 +289,10 @@ TAGS="${TAGS},auditd"
 {{ $installHomelabTools := false }}{{ if hasKey . "installHomelabTools" }}{{ $installHomelabTools = .installHomelabTools }}{{ end -}}
 {{ if and $installHomelabTools (eq .chezmoi.os "linux") -}}
 TAGS="${TAGS},homelab_tools"
+{{ end -}}
+{{ $installResilioSync := false }}{{ if hasKey . "installResilioSync" }}{{ $installResilioSync = .installResilioSync }}{{ end -}}
+{{ if and $installResilioSync (eq .chezmoi.os "linux") -}}
+TAGS="${TAGS},resilio_sync"
 {{ end -}}
 {{ $installNiri := false }}{{ if hasKey . "installNiri" }}{{ $installNiri = .installNiri }}{{ end -}}
 {{ if and $installNiri (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}

@@ -273,6 +273,15 @@ PROMPTS: tuple[Prompt, ...] = (
                     "MegaRAID 控制器就不裝 storcli、沒有 NVMe 就不裝 nvme-cli…），避免裝一堆\n"
                     "用不到的東西。Linux only — macOS 與 VM 內自動跳過。\n"
                     "詳見 docs/sysadmin/hardware.md。")),
+    Prompt("installResilioSync", "bool", "System & apps",
+           "Resilio Sync (P2P file sync)",
+           "Installs Resilio Sync for AirDrop-style cross-system transfer and phone→NAS photo backup. macOS: GUI app via Homebrew cask. Linux (desktop + server): headless daemon (no GUI) run as a per-user systemd service, configured via WebUI at 127.0.0.1:8888. See docs/tools/resilio-sync.md.",
+           default=False,
+           prompt_text="Install Resilio Sync (P2P file sync — GUI cask on macOS, headless WebUI daemon on Linux/servers)",
+           comment=("是否安裝 Resilio Sync（P2P 檔案同步，類似 AirDrop 的跨機傳輸、手機照片備份到\n"
+                    "NAS）。macOS 走 Homebrew cask 的 GUI app；Linux（桌機與 server 皆同）沒有 GUI，\n"
+                    "以 per-user systemd service 跑成背景 daemon，透過 127.0.0.1:8888 的 WebUI 設定\n"
+                    "（headless server 用 SSH tunnel）。詳見 docs/tools/resilio-sync.md。")),
     Prompt("installIacTools", "bool", "Dev tooling",
            "Infrastructure-as-Code tools",
            "Azure CLI, Terraform, OpenTofu.",

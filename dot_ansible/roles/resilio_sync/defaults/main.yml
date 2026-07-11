@@ -1,0 +1,7 @@
+---
+# resilio_sync role defaults
+
+# Run the daemon as a per-user systemd service (systemctl --user + enable-linger)
+# right after install. Set to false for install-only (you enable/start it
+# yourself later). See docs/tools/resilio-sync.md.
+resilio_sync_enable_service: true

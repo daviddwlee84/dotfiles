@@ -132,3 +132,6 @@
 
     - role: homelab_tools
       tags: [homelab_tools]
+
+    - role: resilio_sync
+      tags: [resilio_sync]

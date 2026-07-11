@@ -833,6 +833,7 @@ notable upstream-vs-downstream skew).
 | `pkgs.gierens.de` | eza |
 | `ngrok-agent.s3.amazonaws.com` | ngrok |
 | `apt.releases.opentofu.org` | opentofu (Cloudsmith) |
+| `linux-packages.resilio.com` | resilio-sync |
 | PPA `ppa:lazygit-team/release` | lazygit |
 | PPA `ppa:appimagelauncher-team/stable` | AppImageLauncher |
 
@@ -1095,6 +1096,7 @@ list.
 | **rclone** | brew | official installer or GitHub | devtools — macOS `rclone mount` also needs **macFUSE** (5.x on macOS 26+), manual & **not** repo-managed (reboot + GUI approval); brew rclone ≥1.73 already ships `mount` so the binary isn't the blocker ([pitfall](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/macfuse-too-old-unsupported-macos-version-rclone-mount.md)) |
 | **readability-cli** (`readable`) | npm global | `mise exec -- npm install -g` | js_cli_tools |
 | **recon** | cargo install (git source) | same | rust_cargo_tools |
+| **resilio-sync** | brew cask (GUI app) | Resilio apt repo → headless daemon + WebUI (per-user systemd service) | resilio_sync |
 | **ripgrep** | brew | apt/yum → GitHub release | base |
 | **ruby** | mise | mise (skipped in noRoot) | mise |
 | **rust** | mise | mise → rustup-init → `static.rust-lang.org` fallback | mise + rust_cargo_tools |

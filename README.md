@@ -166,6 +166,7 @@ is coverage-checked against that list by `dotfiles_init.py gen --check`.
 | `installExtraRuntimes` | true | Extra mise runtimes (rust, bun, ruby, go; ~1.8GB) + their cargo/gem/go tool roles. Node is always installed regardless. Set false for lean cloud VMs / CI. |
 | `installAuditd` | false | Linux audit framework (auditd) + baseline rules (identity / sudoers / sshd_config / privileged-exec). Linux only. See [docs/sysadmin/auditd.md](docs/sysadmin/auditd.md). |
 | `installHomelabTools` | false | Homelab hardware-monitoring CLIs (lm-sensors, smartmontools, ipmitool, nvme-cli, storcli) + `hw-*` shell helpers, each gated on detected hardware. Linux only; no-op in VMs. See [docs/sysadmin/hardware.md](docs/sysadmin/hardware.md). |
+| `installResilioSync` | false | [Resilio Sync](https://www.resilio.com/sync/) P2P file sync (AirDrop-style transfer, phone→NAS photo backup). macOS: GUI app via Homebrew cask. Linux (desktop + server): headless daemon (no GUI) as a per-user systemd service, WebUI at `127.0.0.1:8888`. See [docs/tools/resilio-sync.md](docs/tools/resilio-sync.md). |
 | `useChineseMirror` | false | Switch Homebrew / pip / npm / cargo / etc. to China (GFW) mirrors |
 | `gitleaksAllRepos` | false | Run gitleaks on ALL git repos, not just those with `.pre-commit-config.yaml` |
 | `backupMode` | `smart` | Back up existing dotfiles before apply: `smart` (only files chezmoi overwrites), `full` (fixed allowlist), `off` (skip) |
@@ -289,6 +290,7 @@ See [docs/tools/chezmoi-prefixes.md](docs/tools/chezmoi-prefixes.md#companion-fi
 - **DuckDB CLI**: `duckdb` (Homebrew on macOS, official downloads on Linux)
 - **rclone**: cloud storage sync CLI (Homebrew on macOS, official downloads on Linux)
 - **Ruby gem tools**: `try-cli` for ephemeral workspaces with graduate-to-project defaults, `tmuxinator` for declarative tmux session layouts (native sesh integration), plus `toolkami`
+- **File sync** (optional, `installResilioSync=true`): [Resilio Sync](docs/tools/resilio-sync.md) for AirDrop-style cross-system transfer + phone→NAS photo backup. macOS GUI cask; Linux (desktop + server) headless daemon (no GUI) as a per-user systemd service, configured via WebUI at `127.0.0.1:8888` (SSH-tunnel on a server).
 - **Coding Agents** (optional): Claude Code, `claude-hud` statusline plugin, Codex CLI, CodexBar, OpenCode, Cursor CLI, Copilot CLI, Gemini CLI, RTK, SpecStory, OpenChamber, td, sidecar, specify-cli
 - **Agent pane discovery**: `tv agent-panes` channel + tmux `prefix + a` popup — find which Claude/Codex/OpenCode/Cursor sessions are running in any tmux pane and jump straight to them; companion `recon` (Claude-only fast popup) installed via cargo. See [docs/tools/agent-panes-discovery.md](docs/tools/agent-panes-discovery.md)
 - **Bitwarden** (optional): Bitwarden CLI (`bw`) via npm, Desktop app (snap/deb on Linux, cask on macOS) on desktop profiles, with zsh completion and SSH agent auto-detection

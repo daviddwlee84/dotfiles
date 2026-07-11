@@ -140,6 +140,7 @@ plugins:
             Networking: 網路
             Services: 服務
             "Tunnels (ngrok / cloudflared)": Tunnels（ngrok / cloudflared）
+            Resilio Sync (P2P file sync): Resilio Sync（P2P 檔案同步）
             dotnet tools: dotnet 工具
             td / sidecar: td / sidecar
             Web reader: 網頁讀取器
@@ -320,6 +321,7 @@ nav:
           - Services: tools/services.md
           - Tailscale: tools/Tailscale.md
           - Tunnels (ngrok / cloudflared): tools/tunnels.md
+          - Resilio Sync (P2P file sync): tools/resilio-sync.md
           - dotnet tools: tools/dotnet-tools.md
       - Productivity:
           - td / sidecar: tools/td_sidecar.md

@@ -1,0 +1,134 @@
+---
+# resilio_sync role
+#
+# Resilio Sync — P2P file sync (AirDrop-style cross-system transfer, phone→NAS
+# photo backup). On Linux the `resilio-sync` package has NO GUI: it runs as a
+# daemon (binary `rslsync`) configured via a WebUI on 127.0.0.1:8888. The same
+# package serves ubuntu_desktop and ubuntu_server (headless — SSH-tunnel the
+# WebUI). See docs/tools/resilio-sync.md.
+#
+# We run it as a PER-USER service (systemctl --user + enable-linger) rather than
+# the package's default `rslsync` system user, so the daemon can read/write the
+# user's own $HOME files directly — best for photo/NAS sync. This mirrors the
+# Docker-rootless pattern in roles/docker/tasks/main.yml.
+#
+# Install-only for the package; enabling the service is gated on
+# resilio_sync_enable_service (default true) — the whole point is a running
+# backup daemon, but flip it off for a pure install.
+
+- name: Check whether resilio-sync is already installed (Debian/Ubuntu)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command: dpkg-query -W -f='${Status}' resilio-sync
+  register: resilio_pkg_check
+  changed_when: false
+  failed_when: false
+
+- name: Install resilio-sync via Resilio apt repo (Debian/Ubuntu)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - "'install ok installed' not in resilio_pkg_check.stdout"
+  become: true
+  tags: [sudo]
+  block:
+    - name: Ensure /etc/apt/keyrings exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Resilio Sync GPG key (dearmored)
+      ansible.builtin.shell: |
+        set -eu
+        wget -qO- http://linux-packages.resilio.com/resilio-sync/key.asc \
+          | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
+      args:
+        creates: /etc/apt/keyrings/resilio-sync.gpg
+
+    # apt_repository is deprecated (removed in ansible-core 2.25); deb822 doesn't
+    # run `apt update` itself, so refresh explicitly. A cache-update failure lands
+    # in the rescue below, which rolls the .sources file back so it can't break
+    # the base role's cache update on later runs. Requires python3-debian (base).
+    - name: Remove legacy one-line Resilio source (pre-deb822 format)
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/resilio-sync.list
+        state: absent
+
+    - name: Add Resilio Sync apt repository (deb822)
+      ansible.builtin.deb822_repository:
+        name: resilio-sync
+        types: deb
+        uris: http://linux-packages.resilio.com/resilio-sync/deb
+        suites: resilio-sync
+        components: non-free
+        signed_by: /etc/apt/keyrings/resilio-sync.gpg
+
+    - name: Refresh apt cache (Resilio repo)
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install resilio-sync package
+      ansible.builtin.apt:
+        name: resilio-sync
+        state: present
+  rescue:
+    - name: Remove Resilio apt repository (install failed; avoid leaving a broken source)
+      ansible.builtin.deb822_repository:
+        name: resilio-sync
+        state: absent
+      ignore_errors: true
+
+    - name: Warn Resilio Sync install failed
+      ansible.builtin.debug:
+        msg: "resilio-sync install failed — rerun with --tags resilio_sync after fixing network/GPG/apt issues."
+
+# ---------------------------------------------------------------------------
+# Run as a per-user service (mirrors Docker rootless). The package ships
+# /usr/lib/systemd/user/resilio-sync.service, so no hand-written unit needed.
+# ---------------------------------------------------------------------------
+
+- name: Disable and stop the rootful resilio-sync system unit (Debian/Ubuntu)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - resilio_sync_enable_service | bool
+  become: true
+  tags: [sudo]
+  ansible.builtin.systemd_service:
+    name: resilio-sync
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Enable user linger so the sync daemon survives logout (Debian/Ubuntu)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - resilio_sync_enable_service | bool
+  become: true
+  tags: [sudo]
+  ansible.builtin.command: "loginctl enable-linger {{ ansible_facts['env']['USER'] }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ ansible_facts['env']['USER'] }}"
+
+- name: Enable and start resilio-sync per-user service (Debian/Ubuntu)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - resilio_sync_enable_service | bool
+  ansible.builtin.systemd_service:
+    name: resilio-sync
+    scope: user
+    enabled: true
+    state: started
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+  failed_when: false
+
+- name: Remind how to reach the Resilio WebUI (Debian/Ubuntu)
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - resilio_sync_enable_service | bool
+  ansible.builtin.debug:
+    msg: |
+      Resilio Sync is running as a per-user service. Configure it via the WebUI:
+        http://127.0.0.1:8888
+      On a headless server, tunnel it first:
+        ssh -L 8888:127.0.0.1:8888 {{ ansible_facts['env']['USER'] }}@<this-host>
+      Config lives in ~/.config/resilio-sync/. See docs/tools/resilio-sync.md.
