@@ -10666,3 +10666,619 @@ _**Agent (claude-opus-4-8 2026-07-11 07:34:47Z)**_
 The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/resilio-sync.md has been updated successfully. (file state is current in your context — no need to Read it back)
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:35:00Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm staging the modified Ansible role tasks file and the Resilio Sync documentation, along with the updated specstory transcript, then committing these changes together.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:35:00Z)**_
+
+Now commit the fix (staging only the Resilio files + its transcript, not the unrelated mi-router artifacts):
+
+_**Agent (claude-opus-4-8 2026-07-11 07:35:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the resilio-sync install fix
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git add dot_ansible/roles/resilio_sync/tasks/main.yml docs/tools/resilio-sync.md
+git add .specstory/history/2026-07-08_02-37-48Z-setup-resilio-sync-https.md 2>/dev/null
+git commit -m "$(cat <<'EOF'
+fix(resilio-sync): fetch key/repo over https + fail fast + gate service on install
+
+The apt install hung 29 min then failed with `gpg: no valid OpenPGP data
+found`. Root cause: Resilio's CDN resolves to an IPv6 Meta/Fastly endpoint
+where port 80 (http://) is blocked on some networks; the bare `wget` (no
+timeout) hung on the dead HTTP endpoint and returned empty to gpg. https://
+serves the same key/repo and responds in ~1s.
+
+- Fetch the GPG key and apt repo over https:// (was http:// per Resilio docs).
+- Replace `wget -qO-` with `curl -fsSL --retry 3 --max-time 60` so a dead
+  endpoint fails in seconds, not 30 minutes.
+- Gate the per-user service tasks (disable-system-unit / enable-linger /
+  enable-start / WebUI reminder) on `dpkg-query` confirming the package is
+  actually installed. Previously they ran and reported a misleading "ok"
+  against a systemd unit that never existed when the install failed.
+
+Verified on David-Ubuntu: https key fetch + gpg --dearmor yields the valid
+"Resilio, Inc." keyring; http:// times out at 20s.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -20
+```
+
+```text
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1783755301-2270344.
+Auto-redact secrets in agent artifacts.......................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...................................................................Passed
+check toml...............................................(no files to check)Skipped
+check json...............................................(no files to check)Skipped
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+Lint GitHub Actions workflow files.......................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1783755301-2270344.
+[main e20b846] fix(resilio-sync): fetch key/repo over https + fail fast + gate service on install
+ 3 files changed, 1120 insertions(+), 3 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:35:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+The changes are committed, so the user needs to run `chezmoi apply` again to actually install everything. It'll be much faster now without that 29-minute hang—probably 2-3 minutes total. I could offer to run just the resilio_sync role, but it requires sudo and I don't have the password file to do it non-interactively, so the best approach is to have them re-run the full command themselves. I'm weighing whether to recommend the targeted ansible command for speed or suggest chezmoi apply which retries the OpenTofu failure — both work, but the ansible approach with `-K` for interactive sudo is faster since it only runs the resilio_sync role and its pre_tasks (which are tagged `[always]`), while the role's become tasks are properly gated by the `[sudo]` tag.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:35:34Z)**_
+
+Fixed and committed (`e20b846`). Here's what happened and what to do:
+
+## What went wrong
+The install didn't fail on logic — it failed on **network**. Resilio's CDN resolves to an IPv6 Meta/Fastly endpoint where **port 80 (`http://`) is blocked on your network**, but `https://` works fine (I verified: HTTP times out at 20s, HTTPS returns the valid key in ~1s). My role used the `http://` URL from Resilio's official docs, and the bare `wget` had no timeout — so it hung **29 minutes** then handed empty data to `gpg` → `no valid OpenPGP data found`.
+
+## What I fixed (committed)
+1. **`https://` for both the key and the apt repo** — verified it fetches the valid *"Resilio, Inc."* keyring.
+2. **`curl --retry 3 --max-time 60`** instead of `wget` — a dead endpoint now fails in seconds, never a 30-min hang.
+3. **Gated the service tasks on `dpkg-query`** confirming the package installed — previously they reported a misleading "ok" against a systemd unit that never existed (which is why `systemctl --user status` said "not found" even though tasks 306–309 said ok).
+
+## To actually install it now
+The failing step is fixed, but the apt install needs your sudo password, so run it yourself. Fastest is the targeted role (≈1–2 min vs. a full re-apply):
+
+```
+! cd ~/.local/share/chezmoi/dot_ansible && ansible-playbook playbooks/linux.yml --tags resilio_sync -K
+```
+
+(`-K` prompts for sudo once.) Then verify:
+
+```
+! systemctl --user status resilio-sync   # should be active
+! curl -sS http://127.0.0.1:8888 | head  # WebUI
+```
+
+Or just run `chezmoi apply` — it re-triggers the role (now without the hang) **and** retries OpenTofu, which failed separately in the same run (`curl: (35) Recv failure: Connection reset by peer` — transient network flakiness on that CDN, unrelated to my change; its own rescue already skipped it cleanly).
+
+Want me to also log this as a `pitfalls/` entry (HTTP-blocked Resilio CDN → use HTTPS), given the repo's pitfall convention?
+
+---
+
+_**User (2026-07-11 07:47:19Z)**_
+
+```
+─────────────────────── resilio_sync ───────────────────────
+[300] TASK · [resilio_sync : Check whether resilio-sync is already installed (Debian/Ubuntu)]
+ok: [localhost] (0.2s)
+[301] TASK · [resilio_sync : Ensure /etc/apt/keyrings exists]
+ok: [localhost] (0.2s)
+[302] TASK · [resilio_sync : Add Resilio Sync GPG key (dearmored)]
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/daviddwlee84/.ansible/roles/resilio_sync/tasks/main.yml:39:7
+
+37         mode: '0755'
+38
+39     - name: Add Resilio Sync GPG key (dearmored)
+         ^ column 7
+
+✘ fatal: [localhost]: FAILED! (0.2s) =>
+    changed: true
+    cmd: |-
+        set -eo pipefail
+        curl -fsSL --retry 3 --retry-delay 2 --max-time 60  https://linux-packages.resilio.com/resilio-sync/key.asc  | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
+    delta: '0:00:00.002407'
+    end: '2026-07-11 15:45:01.394341'
+    msg: non-zero return code
+    rc: 2
+    start: '2026-07-11 15:45:01.391934'
+    stderr: '/bin/sh: 1: set: Illegal option -o pipefail'
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+[303] TASK · [resilio_sync : Remove Resilio apt repository (install failed; avoid leaving a broken source)]
+ok: [localhost] (0.2s)
+[304] TASK · [resilio_sync : Warn Resilio Sync install failed]
+ok: [localhost] (0.0s) =>
+    msg: resilio-sync install failed — rerun with --tags resilio_sync after fixing network/GPG/apt
+        issues.
+[305] TASK · [resilio_sync : Re-check whether resilio-sync installed successfully (Debian/Ubuntu)]
+ok: [localhost] (0.2s)
+[306] TASK · [resilio_sync : Warn that the per-user service is skipped (package not installed)]
+ok: [localhost] (0.0s) =>
+    msg: resilio-sync package is not installed — skipping service enable. Fix the install
+        (rerun --tags resilio_sync) first.
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (2m7s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=304  changed=5    unreachable=0    failed=0    skipped=771  rescued=2    ignored=0
+
+Changed tasks (5):
+  ✦ base : Update apt cache (Debian/Ubuntu, best-effort) (9.2s)
+  ✦ lazyvim_deps : Install mise global tools (Debian/Ubuntu) (0.1s)
+  ✦ js_cli_tools : Install missing js_cli_tools via mise npm (1.6s)
+  ✦ iac_tools : Update apt cache for Azure CLI (3.0s)
+  ✦ iac_tools : Update apt cache for HashiCorp (2.7s)
+
+Slow tasks (>5s):
+  ⏱ base : Update apt cache (Debian/Ubuntu, best-effort) (9.2s)
+  ⏱ iac_tools : Install OpenTofu repo and package (6.0s)
+
+[SUCCESS] Ansible roles updated!
+
+daviddwlee84 in 🌐 David-Ubuntu in chezmoi on  main [$!⇡1] via  v3.12.3 took 2m12s
+❯ systemctl --user status resilio-sync
+Unit resilio-sync.service could not be found.
+
+
+❯ cd ~/.local/share/chezmoi/dot_ansible && ansible-playbook playbooks/linux.yml --tags resilio_sync -K
+BECOME password:
+
+────────────────────────────────────────────────────────────
+PLAY [Linux setup]
+────────────────────────────────────────────────────────────
+┌─ System Info
+│  OS:      Ubuntu 24.04
+│  Arch:    x86_64
+│  Python:  3.12.3
+│  Kernel:  6.17.0-35-generic
+│  Locale:  en_US.UTF-8
+│  Tags:    resilio_sync
+└─
+[1] TASK · [Gathering Facts]
+ok: [localhost] (0.8s)
+[2] TASK · [Detect userland architecture via dpkg]
+ok: [localhost] (0.2s)
+[3] TASK · [Set target_architecture from dpkg]
+ok: [localhost] (0.0s)
+[4] TASK · [Detect CentOS/RHEL 7 baseline (oldEL)]
+ok: [localhost] (0.0s)
+─────────────────────── resilio_sync ───────────────────────
+[5] TASK · [resilio_sync : Check whether resilio-sync is already installed (Debian/Ubuntu)]
+ok: [localhost] (0.2s)
+[6] TASK · [resilio_sync : Ensure /etc/apt/keyrings exists]
+ok: [localhost] (0.2s)
+[7] TASK · [resilio_sync : Add Resilio Sync GPG key (dearmored)]
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/resilio_sync/tasks/main.yml:39:7
+
+37         mode: '0755'
+38
+39     - name: Add Resilio Sync GPG key (dearmored)
+         ^ column 7
+
+✘ fatal: [localhost]: FAILED! (0.1s) =>
+    changed: true
+    cmd: |-
+        set -eo pipefail
+        curl -fsSL --retry 3 --retry-delay 2 --max-time 60  https://linux-packages.resilio.com/resilio-sync/key.asc  | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
+    delta: '0:00:00.002018'
+    end: '2026-07-11 15:46:51.452519'
+    msg: non-zero return code
+    rc: 2
+    start: '2026-07-11 15:46:51.450501'
+    stderr: '/bin/sh: 1: set: Illegal option -o pipefail'
+    stderr_lines: <omitted>
+    stdout: ''
+    stdout_lines: <omitted>
+[8] TASK · [resilio_sync : Remove Resilio apt repository (install failed; avoid leaving a broken source)]
+ok: [localhost] (0.3s)
+[9] TASK · [resilio_sync : Warn Resilio Sync install failed]
+ok: [localhost] (0.0s) =>
+    msg: resilio-sync install failed — rerun with --tags resilio_sync after fixing network/GPG/apt
+        issues.
+[10] TASK · [resilio_sync : Re-check whether resilio-sync installed successfully (Debian/Ubuntu)]
+ok: [localhost] (0.2s)
+[11] TASK · [resilio_sync : Warn that the per-user service is skipped (package not installed)]
+ok: [localhost] (0.0s) =>
+    msg: resilio-sync package is not installed — skipping service enable. Fix the install
+        (rerun --tags resilio_sync) first.
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (2.3s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=10   changed=0    unreachable=0    failed=0    skipped=5    rescued=1    ignored=0
+```
+
+still failed (can log as a pitfalls) please fix
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-11 07:47:35Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm hitting a dash shell compatibility issue—`set -o pipefail` isn't supported in `/bin/sh`, which is what the Ansible shell module uses by default. I can either specify `/bin/bash` as the executable to enable pipefail, or remove that option entirely and handle errors differently.
+
+Looking at how other roles in the repo handle this, the iac_tools role also uses `set -eo pipefail` in its shell tasks, so it must be setting the bash executable somewhere. Let me check if that's configured in the task args or if there's a default I'm missing.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:47:35Z)**_
+
+The new error is `/bin/sh: 1: set: Illegal option -o pipefail` — `ansible.builtin.shell` runs under **dash** (`/bin/sh`) on Ubuntu, which doesn't support `pipefail`. Let me check how the repo's other shell tasks (e.g. iac_tools, which also uses `set -eo pipefail`) handle this, then match it.
+
+_**Agent (claude-opus-4-8 2026-07-11 07:47:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find how repo shell tasks enable pipefail
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== iac_tools OpenTofu shell task (uses pipefail successfully) ==="
+grep -n "pipefail\|executable\|ansible.builtin.shell\|args:" dot_ansible/roles/iac_tools/tasks/main.yml | head -30
+```
+
+```text
+=== iac_tools OpenTofu shell task (uses pipefail successfully) ===
+118:      ansible.builtin.shell: |
+121:      args:
+122:        executable: /bin/bash
+126:      ansible.builtin.shell: |
+129:      args:
+130:        executable: /bin/bash
+168:      ansible.builtin.shell: |
+170:      args:
+171:        executable: /bin/bash
+175:      ansible.builtin.shell: |
+177:      args:
+178:        executable: /bin/bash
+231:      ansible.builtin.shell: |
+232:        set -eo pipefail
+242:      args:
+243:        executable: /bin/bash
+273:  ansible.builtin.shell: command -v az
+285:      ansible.builtin.shell: command -v uv
+310:  ansible.builtin.shell: command -v terraform
+372:  ansible.builtin.shell: command -v tofu
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:47:42Z)**_
+
+The repo pattern is `args.executable: /bin/bash`. Let me apply it to my key-fetch task (the `creates:` stays in the same `args`):
+
+_**Agent (claude-opus-4-8 2026-07-11 07:47:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/resilio_sync/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+The key insight is that the previous failed run cleaned up the apt source, and since `set -o pipefail` errored immediately before curl could execute, the GPG key file was never created in the first place — so we're starting from a clean state. The `creates:` guard will properly skip if the key already exists, but it doesn't, which is exactly what we want.
+
+Now I'm realizing the path discrepancy: the first run referenced `~/.ansible/roles/` but the source is in `dot_ansible/roles/`. That's because chezmoi's `dot_` prefix converts to a leading dot on apply — so `dot_ansible/` deploys to `~/.ansible/`, meaning the playbook and roles end up in the deployed location when `chezmoi apply` runs the ansible wrapper.
+
+The key insight is that my edits to the source file need to be deployed via `chezmoi apply` to reach `~/.ansible/roles/resilio_sync/tasks/main.yml`, but the user's direct `ansible-playbook` command from the source directory picks up changes immediately since it reads from the source tree directly.
+
+I should verify the bash executable fix works by testing the shell task command directly, check the syntax, and then commit the change so the user can re-run the direct ansible command to pick up the fix right away.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:10Z)**_
+
+The `dot_ansible/` source deploys to `~/.ansible/`, but running `ansible-playbook` directly from the source tree (as you did) reads these files live — so the fix applies on your next run. Let me verify it resolves the dash/pipefail issue and syntax-check before committing:
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify bash executable fixes pipefail
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== reproduce the failure under dash (/bin/sh) ==="
+/bin/sh -c 'set -eo pipefail; echo would-run' 2>&1 || echo "  ^ dash rejects pipefail (the bug)"
+echo "=== same under /bin/bash (the fix) ==="
+/bin/bash -c 'set -eo pipefail; echo OK-bash-accepts-pipefail' 2>&1
+echo "=== full fixed command under bash (non-root temp) ==="
+/bin/bash -c 'set -eo pipefail; curl -fsSL --retry 3 --retry-delay 2 --max-time 60 https://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor -o /tmp/rsl-fix-test.gpg' && echo "  OK: key fetched + dearmored" && gpg --show-keys /tmp/rsl-fix-test.gpg 2>/dev/null | sed -n 2p
+rm -f /tmp/rsl-fix-test.gpg
+echo "=== syntax-check ==="
+ANSIBLE_ROLES_PATH=dot_ansible/roles ansible-playbook dot_ansible/playbooks/linux.yml --syntax-check 2>&1 | tail -2
+```
+
+```text
+=== reproduce the failure under dash (/bin/sh) ===
+/bin/sh: 1: set: Illegal option -o pipefail
+  ^ dash rejects pipefail (the bug)
+=== same under /bin/bash (the fix) ===
+OK-bash-accepts-pipefail
+=== full fixed command under bash (non-root temp) ===
+  OK: key fetched + dearmored
+      E1B42102EBECA969E30D2CA4BE66CC4C3F171DE2
+=== syntax-check ===
+
+playbook: dot_ansible/playbooks/linux.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:25Z)**_
+
+<think><details><summary>Thought Process</summary>
+The fix checks out across different shells—dash rejects the pipefail option and reproduces the issue, while bash accepts it and successfully fetches and dearmors the Resilio key with the correct fingerprint. The syntax validation passes as well. Now I'm adding a pitfalls entry following the repo's naming convention, using the symptom and exact error message as the title.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:25Z)**_
+
+Verified: bash accepts `pipefail`, the full command fetches the valid Resilio key (fingerprint `…BE66CC4C3F171DE2`), syntax-check passes. Now let me log the pitfall as you asked — let me match the repo's pitfall format first.
+
+_**Agent (claude-opus-4-8 2026-07-11 07:48:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect pitfalls format convention
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+echo "=== pitfalls README (format rules) ==="; sed -n '1,40p' pitfalls/README.md 2>/dev/null
+echo "=== a representative existing pitfall (head) ==="; f=$(ls pitfalls/*.md | grep -v README | head -1); echo "-- $f"; sed -n '1,25p' "$f"
+```
+
+```text
+=== pitfalls README (format rules) ===
+# Pitfalls
+
+Past traps we've stepped on. Symptoms-first knowledge base — the goal is that
+when a problem recurs (on a new machine, after an upgrade, with a new tool
+combo), grepping the symptom here lands you on the root cause and workaround
+in seconds, instead of re-debugging from scratch.
+
+This folder is `chezmoi`-ignored (see `.chezmoiignore.tmpl` → `pitfalls/**`); it
+is repo metadata for maintainers, not user-facing config to deploy.
+
+## Pitfalls vs the rest
+
+This repo has four sibling surfaces with overlapping shapes; pick the right one:
+
+| Surface | Time direction | Question it answers | Access pattern |
+|---|---|---|---|
+| `docs/tools/<tool>.md` | Present | "How does this tool work / how do I configure it?" | Read top to bottom |
+| `docs/this_repo/<topic>.md` | Present | "Why did we architect it this way?" | Read top to bottom |
+| `pitfalls/<slug>.md` | **Past** | **"I see error X — has this happened before?"** | **Grep symptoms** |
+| `backlog/<slug>.md` | Future | "We thought about doing Y — what was the analysis?" | Index in `TODO.md` |
+| `AGENTS.md` Hard invariants | Present | "What rules MUST agents follow?" | Read top to bottom |
+
+A pitfall **graduates** to a Hard invariant in `AGENTS.md` when the trap is
+serious enough that you can't rely on memory or grep — typically when (a) it
+recurs across machines, (b) it silently corrupts state, or (c) the workaround
+is non-obvious and easy to undo by accident. When graduating, leave a
+`pitfalls/<slug>.md` as historical record and link to it from the invariant.
+
+## When to add a pitfall doc
+
+Add a `pitfalls/<slug>.md` when you've spent more than ~15 minutes on something
+where the answer wasn't googleable, AND any of:
+
+- The symptom is non-obvious from the root cause (`SSH_CONNECTION` cleared
+  silently → hostname module disappears, no error)
+- The fix is "do nothing different but in a specific order" (sentinel writes
+  must come after `wait $pid` for fleet-apply, etc.)
+- The same trap could be hit by a new agent / new machine / new contributor
+- An upstream bug exists with no ETA — workaround needs to outlive memory
+- A specific tool version is required (or forbidden) and the failure mode at
+=== a representative existing pitfall (head) ===
+-- pitfalls/agent-warmup-scheduled-run-hangs-or-blank-under-daemon.md
+# agent-warmup scheduled run hangs, exits early, or leaves a blank pane under launchd/pueue
+
+**Symptoms** (grep this section): a launchd / pueue / systemd-scheduled `agent-warmup run`
+wedges for hours with `state = running` / `last exit code = (never exited)` and
+no run log; OR completes (exit 0) but the run log's `## /usage panel` and
+`## final pane capture` are EMPTY; OR `pueue status` shows the task stuck on
+`Running`; `sample <pid>` shows the process pinned in
+`dyld4::SyscallDelegate::mapFileReadOnly` / `withReadOnlyMappedFile`; the stuck
+process is `uv` (no Python child) or `python3 .../agent-warmup run`; the warmup's
+tmux session exists but `tmux capture-pane` returns only blank lines; the exact
+same `agent-warmup verify` works perfectly when run by hand in a terminal.
+**First seen**: 2026-06-20 (bringing up `agent-warmup` on a Mac mini)
+**Affects**: macOS background launch contexts (launchd `gui/uid` agents, `pueued`
+daemon) spawning an interactive `claude` TUI. Likely any tool launching a fresh
+GUI-bound TUI from a daemon bootstrap.
+**Status**: fixed in `agent-warmup` (four stacked fixes below)
+
+## Four stacked traps, each masking the next
+
+Debugging found FOUR separate failures, only visible one at a time:
+
+1. **`uv run` shebang hangs under launchd.** The first scheduled run wedged in
+   the `uv` launcher itself (the stuck PID was `uv`, no Python child, stuck in
+   dyld) before Python started — no session, no log, no exit.
+   → Fix: invoke a Python interpreter directly on the script for scheduled runs
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm organizing a pitfall documentation by symptom with exact error messages. There are two main issues to capture: the GPG timeout problem caused by HTTP CDN blocking that needs HTTPS and curl configuration, and the shell option error from Ansible using dash instead of bash. I'll structure this with a slug for the first pitfall.
+
+Now I'm deciding whether to add an index entry to the README or just create the file itself. Since the pitfalls are designed to be grep-searchable by symptom, the file itself is the primary artifact—I'll create it and trust the grep-ability approach rather than maintaining a separate index.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:03Z)**_
+
+Now let me write the pitfall doc (symptom-titled, verbatim errors) and commit everything together:
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# resilio_sync install: `gpg: no valid OpenPGP data found`, a ~30-min hang, then `set: Illegal option -o pipefail`
+
+**Symptoms** (grep this section): `chezmoi apply` / `ansible-playbook --tags resilio_sync` fails in the
+`resilio_sync` role at task **"Add Resilio Sync GPG key (dearmored)"**. Two distinct failure modes, seen back-to-back:
+
+1. The task **hangs for ~29 minutes** (`Slow tasks (>5s): resilio_sync : Add Resilio Sync GPG key (dearmored) (29m32s)`) then fails:
+   \```
+   stderr: 'gpg: no valid OpenPGP data found.'
+   cmd: wget -qO- http://linux-packages.resilio.com/resilio-sync/key.asc | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
+   \```
+2. After switching to `curl ... | gpg`, it fails **instantly** (~2 ms):
+   \```
+   stderr: '/bin/sh: 1: set: Illegal option -o pipefail'
+   cmd: |-
+       set -eo pipefail
+       curl -fsSL --retry 3 --retry-delay 2 --max-time 60  https://linux-packages.resilio.com/resilio-sync/key.asc  | gpg --dearmor -o ...
+   \```
+The role's `rescue:` then removes the apt source and the service tasks skip (correctly gated on `dpkg-query`), so `systemctl --user status resilio-sync` reports **`Unit resilio-sync.service could not be found`**.
+
+**First seen**: 2026-07-11 (bringing up the new `resilio_sync` role on David-Ubuntu, ubuntu_desktop).
+**Affects**: `dot_ansible/roles/resilio_sync/tasks/main.yml`. Trap 2 (pipefail) affects *any* `ansible.builtin.shell` task in this repo that uses `set -o pipefail`.
+**Status**: fixed — key + repo fetched over `https://` with `curl --max-time`, and the shell task pinned to `executable: /bin/bash`.
+
+## Two independent traps, one masking the next
+
+### Trap 1 — Resilio's CDN blocks port 80 on some networks; use HTTPS
+
+`linux-packages.resilio.com` resolves to an **IPv6 Meta/Fastly endpoint** (`2a03:2880:...:face:b00c:...`). On this network **port 80 (`http://`) times out** while **443 (`https://`) works in ~1 s**:
+
+\```
+$ curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{time_total}s\n' http://linux-packages.resilio.com/resilio-sync/key.asc
+000 20.002s          # curl: (28) Operation timed out
+$ curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{time_total}s\n' https://linux-packages.resilio.com/resilio-sync/key.asc
+200 1.171s           # valid 957-byte key, uid "Resilio, Inc. <support@getsync.com>"
+\```
+
+Resilio's official docs give the `http://` URL. A bare **`wget` has no total timeout** and retries ~20× → the task hangs for tens of minutes on the dead endpoint, then hands empty stdin to `gpg` → `no valid OpenPGP data found`. The empty output is a *symptom of the network hang*, not a bad key.
+
+→ Fix: use `https://` for both the key **and** the deb822 `uris:`; fetch with `curl -fsSL --retry 3 --max-time 60` so a dead endpoint fails in seconds, never minutes.
+
+### Trap 2 — `ansible.builtin.shell` runs under dash, which has no `pipefail`
+
+`ansible.builtin.shell` executes via the remote's `/bin/sh`. On Ubuntu that's **dash**, and `set -o pipefail` is a bashism → `set: Illegal option -o pipefail`, rc 2, instantly. (The whole point of `pipefail` here is so a failed `curl` fails the task instead of silently piping empty data to `gpg` — i.e. it would have made Trap 1 fail fast too.)
+
+→ Fix: add `args.executable: /bin/bash` to the shell task. This is the established repo pattern — see `dot_ansible/roles/iac_tools/tasks/main.yml` (every `set -eo pipefail` shell task there sets `executable: /bin/bash`).
+
+## The fix (both traps)
+
+\```yaml
+- name: Add Resilio Sync GPG key (dearmored)
+  ansible.builtin.shell: |
+    set -eo pipefail
+    curl -fsSL --retry 3 --retry-delay 2 --max-time 60 \
+      https://linux-packages.resilio.com/resilio-sync/key.asc \
+      | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
+  args:
+    executable: /bin/bash          # dash has no pipefail
+    creates: /etc/apt/keyrings/resilio-sync.gpg
+# ... and deb822_repository uris: https://linux-packages.resilio.com/resilio-sync/deb
+\```
+
+## Related design note (not a bug, but why the failure was clean)
+
+The per-user service tasks are gated on `dpkg-query -W ... resilio-sync` reporting `install ok installed`.
+Before that gate they ran unconditionally and reported a misleading `ok` while *enabling a systemd unit that
+never existed*. If you see the service tasks "succeed" but `systemctl --user status resilio-sync` says
+"could not be found", check that gate is present. See `docs/tools/resilio-sync.md`.
+
+```
+
+```text
+File created successfully at: /home/daviddwlee84/.local/share/chezmoi/pitfalls/resilio-sync-http-cdn-blocked-and-shell-pipefail-dash.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm staging the role tasks file, the new pitfall documentation, and the specstory transcript update, then committing everything. Since the user runs Ansible directly from source, the pipefail fix is already live and they can re-run immediately without waiting for the commit to complete.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:15Z)**_
+
+Now commit the pipefail fix + pitfall:
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit pipefail fix and pitfall
+
+```bash
+cd /home/daviddwlee84/.local/share/chezmoi
+git add dot_ansible/roles/resilio_sync/tasks/main.yml pitfalls/resilio-sync-http-cdn-blocked-and-shell-pipefail-dash.md
+git add .specstory/history/2026-07-08_02-37-48Z-setup-resilio-sync-https.md 2>/dev/null
+git commit -m "$(cat <<'EOF'
+fix(resilio-sync): run key-fetch shell under bash (dash lacks pipefail) + log pitfall
+
+`ansible.builtin.shell` executes via /bin/sh = dash on Ubuntu, which rejects
+`set -o pipefail` → `set: Illegal option -o pipefail`, rc 2, instant fail.
+Pin the task to `executable: /bin/bash` (the repo's iac_tools pattern).
+
+Also add pitfalls/resilio-sync-http-cdn-blocked-and-shell-pipefail-dash.md
+documenting both traps (http:// CDN blocked → https; dash pipefail → bash).
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+EOF
+)" 2>&1 | tail -6
+```
+
+```text
+shfmt....................................................(no files to check)Skipped
+Lint GitHub Actions workflow files.......................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1783756156-2332051.
+[main dc846d2] fix(resilio-sync): run key-fetch shell under bash (dash lacks pipefail) + log pitfall
+ 3 files changed, 615 insertions(+)
+ create mode 100644 pitfalls/resilio-sync-http-cdn-blocked-and-shell-pipefail-dash.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-11 07:49:27Z)**_
+
+Fixed and committed (`dc846d2`). The bug was a second, separate trap the first fix uncovered:
+
+**`ansible.builtin.shell` runs under `/bin/sh` = dash on Ubuntu, and `set -o pipefail` is a bashism** → `set: Illegal option -o pipefail`. Pinned the task to `executable: /bin/bash` (the repo's own `iac_tools` pattern). Verified: dash rejects it, bash accepts it, and the full command fetches the valid Resilio key.
+
+I also logged the pitfall as you asked: `pitfalls/resilio-sync-http-cdn-blocked-and-shell-pipefail-dash.md` — symptom-titled, both traps documented (HTTP CDN blocked→HTTPS, dash→bash).
+
+## Re-run now
+Your direct command reads the source tree live, so the fix is already active — just run it again:
+
+```
+! cd ~/.local/share/chezmoi/dot_ansible && ansible-playbook playbooks/linux.yml --tags resilio_sync -K
+```
+
+This time expect: key added → repo added → `apt install resilio-sync` → the three service tasks actually run (no longer skipped). Then verify:
+
+```
+! systemctl --user status resilio-sync        # should be active (running)
+! curl -sS http://127.0.0.1:8888 | head -c 200 # WebUI responds
+```
+
+If it succeeds, you're done — open `http://127.0.0.1:8888` to configure folders. Paste the output if anything still trips and I'll take it from there.

@@ -47,6 +47,7 @@
           https://linux-packages.resilio.com/resilio-sync/key.asc \
           | gpg --dearmor -o /etc/apt/keyrings/resilio-sync.gpg
       args:
+        executable: /bin/bash
         creates: /etc/apt/keyrings/resilio-sync.gpg
 
     # apt_repository is deprecated (removed in ansible-core 2.25); deb822 doesn't
