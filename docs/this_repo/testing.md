@@ -304,6 +304,25 @@ Rule of thumb for deciding whether a test is worth adding: **would a silent regr
 
 ---
 
+## Testing TUIs and interactive programs
+
+The frameworks above are for **shell** code driven as a CLI. They don't fit **full-screen TUIs** — Bats can black-box a line-oriented command (run it, check exit code + stdout), but it can't render the terminal screen grid, follow cursor moves, or drive an alternate-screen app reliably.
+
+This repo has exactly **one** genuine full-screen TUI: **`mlf`** (`scripts/mlf/tui.py`, a Python [Textual](https://textual.textualize.io/) app). Everything else billed as "interactive" is a line CLI, a `questionary` / `getpass` prompt wizard (`dotcfg`, the router CLIs), a `y/N` loop (`pqsum --clean`), or delegates its picker to Television (`fleet hosts`, `yth` → `tv …`).
+
+**Decision (2026-07) — chosen direction, not yet built:**
+
+| Target | Tool | Why |
+|---|---|---|
+| The `mlf` Textual app (ours) | Textual [`Pilot`](https://textual.textualize.io/guide/testing/) + [`pytest-textual-snapshot`](https://github.com/Textualize/pytest-textual-snapshot) | First-party, headless / in-process (no PTY, no daemon), deterministic; `async with app.run_test() as pilot` + `snap_compare()` SVG regression |
+| Arbitrary third-party TUI binaries | [`pexpect`](https://pexpect.readthedocs.io/) + [`pyte`](https://github.com/selectel/pyte) | Boring-stable PTY driver + screen-grid renderer; every newer "terminal Playwright" wraps this same stack |
+
+Rejected: [`shell-use`](https://github.com/microsoft/shell-use) (Microsoft's "Playwright for the terminal") — genuinely capable (keyboard/mouse, per-cell color, snapshot expect, SVG), but pre-1.0 beta with a self-declared unstable CLI/install and a background daemon, which conflicts with this repo's low-churn mandate. Prior art already in-repo: `agent-warmup` drives the interactive `claude` TUI via a detached tmux `send-keys` session.
+
+Status: **greenfield** — there's no repo-wide `pytest` / dev-deps group or test CI job yet (the only pytest suite lives in the `agent-history-hygiene` skill), so this is deferred. Full evaluation, options table, and implementation sketch: [`backlog/tui-testing-harness.md`](../../backlog/tui-testing-harness.md).
+
+---
+
 ## References
 
 - [bats-core docs](https://bats-core.readthedocs.io/) · [bats-assert](https://github.com/bats-core/bats-assert) · [bats-file](https://github.com/bats-core/bats-file) · [bats-support](https://github.com/bats-core/bats-support)

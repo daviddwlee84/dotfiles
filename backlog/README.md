@@ -114,6 +114,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
 | [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
+| [`tui-testing-harness`](tui-testing-harness.md) | P3 direction decided, deferred | "TUI E2E testing harness — Textual Pilot for `mlf` (+ pexpect/pyte)" |
 | [`tv-agent-sessions-richer-preview`](tv-agent-sessions-richer-preview.md) | Done (batch 1) / P? deferred (Cursor) | "tv agent-sessions richer preview + SpecStory linkage" |
 | [`mise-runtime-gating`](mise-runtime-gating.md) | P2 ready | "Gate mise runtimes (rust/dotnet/bun/ruby) + fix .NET-SDK contract bug" |
 | [`lean-bundle-init-ux`](lean-bundle-init-ux.md) | P? needs design | "Lean no-brainer bundles + init-CLI UX + decision-tree SSOT" |

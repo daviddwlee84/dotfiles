@@ -297,6 +297,25 @@ shfmt -i 2 -ci -bn -w scripts/*.sh
 
 ---
 
+## 測試 TUI 與互動式程式
+
+上面的框架是給以 CLI 方式驅動的 **shell** 程式碼用的。它們不適合**全螢幕 TUI** — Bats 可以黑箱 (black-box) 一個行導向 (line-oriented) 命令（執行它、檢查退出碼 + stdout），但無法渲染終端機的畫面格點 (screen grid)、跟隨游標移動、或可靠地驅動 alternate-screen 應用程式。
+
+這個 repo 只有**一個**真正的全螢幕 TUI：**`mlf`**（`scripts/mlf/tui.py`，一個 Python [Textual](https://textual.textualize.io/) 應用程式）。其他號稱「互動式」的都是行 CLI、`questionary` / `getpass` 提示精靈 (prompt wizard)（`dotcfg`、router CLI）、`y/N` 迴圈 (`pqsum --clean`)，或把選單委派給 Television (`fleet hosts`、`yth` → `tv …`)。
+
+**決策 (2026-07) — 已定方向，尚未實作：**
+
+| 對象 | 工具 | 原因 |
+|---|---|---|
+| `mlf` Textual 應用程式（我們自己的） | Textual [`Pilot`](https://textual.textualize.io/guide/testing/) + [`pytest-textual-snapshot`](https://github.com/Textualize/pytest-textual-snapshot) | 官方第一方、headless / in-process（無 PTY、無 daemon）、可決定性 (deterministic)；`async with app.run_test() as pilot` + `snap_compare()` SVG 迴歸 (regression) |
+| 任意第三方 TUI 二進位檔 | [`pexpect`](https://pexpect.readthedocs.io/) + [`pyte`](https://github.com/selectel/pyte) | 無聊但穩定的 PTY 驅動器 + 畫面格點渲染器；每個較新的「terminal Playwright」都是包這同一套 |
+
+已否決：[`shell-use`](https://github.com/microsoft/shell-use)（Microsoft 的「Playwright for the terminal」）— 功能確實強（鍵鼠、per-cell 顏色、snapshot expect、SVG），但仍是 pre-1.0 beta、README 自承 CLI/安裝不穩定、且跑背景 daemon，與本 repo 的低變動 (low-churn) 原則衝突。repo 內已有先例：`agent-warmup` 透過 detached tmux `send-keys` session 驅動互動式 `claude` TUI。
+
+狀態：**greenfield** — 目前還沒有 repo 範圍的 `pytest` / dev-deps 群組或測試 CI job（唯一的 pytest 套件在 `agent-history-hygiene` skill 裡），因此延後。完整評估、選項表與實作草圖：[`backlog/tui-testing-harness.md`](../../backlog/tui-testing-harness.md)。
+
+---
+
 ## 參考資料
 
 - [bats-core docs](https://bats-core.readthedocs.io/) · [bats-assert](https://github.com/bats-core/bats-assert) · [bats-file](https://github.com/bats-core/bats-file) · [bats-support](https://github.com/bats-core/bats-support)
