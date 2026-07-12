@@ -1,0 +1,563 @@
+#!/usr/bin/env python3
+#
+# crash-blackbox — flight recorder for machines that hard-power-off with no logs.
+#
+# When a box loses power outright (PSU trip, VRM fault, AGESA reset) the kernel
+# never gets to run, so journald's write buffer dies with it and the last ~30s
+# of evidence is simply gone. This samples the sensors every second and fsyncs
+# each row, so the CSV survives the cut and `report` can show you the seconds
+# leading up to it.
+#
+# Usage:
+#   crash-blackbox run [--interval S]   # the sampling loop (what the service runs)
+#   crash-blackbox install              # install + enable the systemd service (sudo)
+#   crash-blackbox uninstall            # stop + remove it (sudo)
+#   crash-blackbox status               # service state + current readings
+#   crash-blackbox report [--seconds N] # what the sensors said before each power cut
+#
+# The payoff is `report`: it splits the log on boot markers, cross-checks each
+# segment against `journalctl --list-boots`, and for every boot that ended
+# without a clean shutdown it prints the final N samples. A pump dropping to
+# 0 RPM, a thermal runaway, or a GPU power spike shows up there. *Nothing*
+# showing up is itself the finding — it points at the power path, not the load.
+#
+# Diagnostic ladder this belongs to: docs/playbooks/random-hard-poweroff.md
+
+import argparse
+import csv
+import glob
+import os
+import shutil
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+STATE_DIR = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+    "crash-blackbox",
+)
+CSV_PATH = os.path.join(STATE_DIR, "blackbox.csv")
+SERVICE_NAME = "crash-blackbox.service"
+SYSTEM_UNIT = f"/etc/systemd/system/{SERVICE_NAME}"
+USER_UNIT = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "systemd", "user", SERVICE_NAME,
+)
+# ~350 bytes/row at 1 Hz is ~29 MB/day. Rotating at 64 MB keeps roughly two days
+# per file and caps total disk use at 128 MB (current + .1). Reading only ever
+# needs the tail, so there is no reason to hoard more; `report` reads .1 as well
+# so a cut landing just after a rotation still has its run-up.
+ROTATE_BYTES = 64 * 1024 * 1024
+BOOT_MARKER = "=== BOOT ==="
+
+# Only these hwmon chips carry signal for a power-loss investigation; skipping
+# the rest keeps the row width sane.
+CHIPS = ("k10temp", "coretemp", "nvme", "nct6799", "nct6798", "nct6797", "amdgpu")
+
+
+def die(msg):
+    print(f"crash-blackbox: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+# --------------------------------------------------------------------------
+# sampling
+# --------------------------------------------------------------------------
+
+def hwmon_fields():
+    """[(column_name, input_path, divisor)] — rescanned each start; hwmonN renumbers across boots."""
+    fields = []
+    for path in sorted(glob.glob("/sys/class/hwmon/hwmon*")):
+        try:
+            with open(os.path.join(path, "name")) as fh:
+                chip = fh.read().strip()
+        except OSError:
+            continue
+        if chip not in CHIPS:
+            continue
+        for inp in sorted(glob.glob(os.path.join(path, "*_input"))):
+            base = inp[: -len("_input")]
+            kind = os.path.basename(base)
+            try:
+                with open(base + "_label") as fh:
+                    label = fh.read().strip()
+            except OSError:
+                label = kind
+            # temps and voltages are millidegrees / millivolts; fans are plain RPM
+            divisor = 1000.0 if kind.startswith(("temp", "in")) else 1.0
+            fields.append((f"{chip}.{label}", inp, divisor))
+    return fields
+
+
+def read_int(path):
+    try:
+        with open(path) as fh:
+            return int(fh.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def cpu_times():
+    with open("/proc/stat") as fh:
+        parts = [float(x) for x in fh.readline().split()[1:]]
+    return sum(parts), parts[3] + parts[4]
+
+
+def gpu_stats(have_nvidia):
+    if not have_nvidia:
+        return ["", "", "", ""]
+    try:
+        out = subprocess.run(
+            ["nvidia-smi",
+             "--query-gpu=temperature.gpu,power.draw,utilization.gpu,clocks.sm",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=3, check=True,
+        ).stdout.strip().splitlines()[0]
+        return [v.strip() for v in out.split(",")]
+    except Exception:
+        return ["", "", "", ""]
+
+
+def top_process():
+    try:
+        rows = subprocess.run(
+            ["ps", "-eo", "pcpu,comm", "--sort=-pcpu", "--no-headers"],
+            capture_output=True, text=True, timeout=3, check=True,
+        ).stdout.strip().splitlines()
+        if rows:
+            pcpu, comm = rows[0].split(None, 1)
+            return f"{comm.strip()}:{pcpu}"
+    except Exception:
+        pass
+    return ""
+
+
+def cmd_run(args):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    fields = hwmon_fields()
+    have_nvidia = shutil.which("nvidia-smi") is not None
+
+    header = (["time", "uptime_s", "cpu_pct", "load1", "mem_used_gb", "mem_avail_gb"]
+              + [name for name, _, _ in fields]
+              + ["gpu_temp", "gpu_power_w", "gpu_util", "gpu_clk", "top_proc"])
+
+    fresh = not os.path.exists(CSV_PATH) or os.path.getsize(CSV_PATH) == 0
+    fh = open(CSV_PATH, "a", buffering=1)
+    writer = csv.writer(fh)
+    if fresh:
+        writer.writerow(header)
+
+    # The marker is what `report` splits on: everything after the last one and
+    # before an abrupt EOF is the run-up to a power cut.
+    writer.writerow([datetime.now().isoformat(timespec="seconds"), BOOT_MARKER])
+    fh.flush()
+    os.fsync(fh.fileno())
+
+    prev_total, prev_idle = cpu_times()
+    time.sleep(args.interval)
+
+    while True:
+        try:
+            total, idle = cpu_times()
+            d_total, d_idle = total - prev_total, idle - prev_idle
+            cpu_pct = round(100.0 * (1 - d_idle / d_total), 1) if d_total > 0 else 0.0
+            prev_total, prev_idle = total, idle
+
+            with open("/proc/loadavg") as f:
+                load1 = f.read().split()[0]
+            with open("/proc/uptime") as f:
+                uptime = round(float(f.read().split()[0]))
+
+            mem = {}
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    key, val = line.split(":", 1)
+                    mem[key] = int(val.split()[0])
+
+            row = [
+                datetime.now().isoformat(timespec="seconds"),
+                uptime, cpu_pct, load1,
+                round((mem["MemTotal"] - mem["MemAvailable"]) / 1048576, 2),
+                round(mem["MemAvailable"] / 1048576, 2),
+            ]
+            for _, inp, divisor in fields:
+                raw = read_int(inp)
+                row.append(round(raw / divisor, 3) if raw is not None else "")
+            row += gpu_stats(have_nvidia)
+            row.append(top_process())
+
+            writer.writerow(row)
+            fh.flush()
+            os.fsync(fh.fileno())  # load-bearing: without this the cut eats the tail
+
+            if fh.tell() > ROTATE_BYTES:
+                fh.close()
+                os.replace(CSV_PATH, CSV_PATH + ".1")
+                fh = open(CSV_PATH, "a", buffering=1)
+                writer = csv.writer(fh)
+                writer.writerow(header)
+        except Exception as exc:  # a flaky sensor must never kill the recorder
+            print(f"sample failed: {exc}", file=sys.stderr, flush=True)
+
+        time.sleep(args.interval)
+
+
+# --------------------------------------------------------------------------
+# service management
+# --------------------------------------------------------------------------
+
+_COMMON = """\
+[Unit]
+Description=crash-blackbox — per-second sensor flight recorder for hard power-offs
+Documentation=https://daviddwlee84.github.io/dotfiles/playbooks/random-hard-poweroff/
+After={after}
+
+[Service]
+Type=simple
+{ident}ExecStart={exe} run
+Restart=always
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy={wanted_by}
+"""
+
+# System scope: User= and XDG_STATE_HOME are load-bearing. A system service runs
+# as root by default, and STATE_DIR would then resolve against /root — the
+# recorder would sit there reporting "active" while writing somewhere you never
+# look. Sampling only reads /sys and /proc, so it has no business being root.
+# User scope: neither is needed; the unit already runs as you, with your $HOME.
+
+def render_unit(user_scope):
+    exe = os.path.realpath(__file__)
+    if user_scope:
+        return _COMMON.format(exe=exe, after="default.target",
+                              wanted_by="default.target", ident="")
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    ident = f"User={user}\nEnvironment=XDG_STATE_HOME={os.path.dirname(STATE_DIR)}\n"
+    return _COMMON.format(exe=exe, after="multi-user.target",
+                          wanted_by="multi-user.target", ident=ident)
+
+
+def systemctl(user_scope):
+    """Command prefix for the chosen scope. User scope needs no privileges at all."""
+    return ["systemctl", "--user"] if user_scope else ["sudo", "systemctl"]
+
+
+def unit_path(user_scope):
+    return USER_UNIT if user_scope else SYSTEM_UNIT
+
+
+def linger_enabled():
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    return os.path.exists(f"/var/lib/systemd/linger/{user}")
+
+
+def warn_if_no_linger():
+    """A user service without linger does not start until you log in.
+
+    That leaves boot-to-login unrecorded — precisely the window a machine that
+    resets on its own may die in. Say so loudly rather than letting the gap be
+    discovered from a report that mysteriously starts late.
+    """
+    if linger_enabled():
+        return
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    print()
+    print("  WARNING: linger is off, so this user service only runs once you log in.")
+    print("  Boot-to-login will NOT be recorded — a cut in that window is invisible.")
+    print("  To record from boot (needs sudo once):")
+    print(f"    sudo loginctl enable-linger {user}")
+
+
+def require_sudo():
+    """Fail with an actionable message, not a traceback, when sudo can't authenticate.
+
+    `sudo` needs a TTY to prompt. Run from a non-interactive context (a hook, a
+    pipe, an agent shelling out) it exits 1 and every subsequent call cascades —
+    which surfaced as a raw CalledProcessError stack instead of a usable hint.
+    """
+    if os.geteuid() == 0:
+        return
+    if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
+        return  # credentials already cached
+    if not sys.stdin.isatty():
+        die("needs sudo, but there is no terminal to prompt on.\n"
+            "  Run this from an interactive shell, or warm the cache first:\n"
+            "    sudo -v && crash-blackbox " + (sys.argv[1] if len(sys.argv) > 1 else "install"))
+    if subprocess.run(["sudo", "-v"]).returncode != 0:
+        die("sudo authentication failed")
+
+
+def sudo_run(cmd, **kw):
+    return subprocess.run(["sudo", *cmd], **kw)
+
+
+def cmd_install(args):
+    if not shutil.which("systemctl"):
+        die("no systemctl — this subcommand is Linux/systemd only")
+    path = unit_path(args.user)
+    unit = render_unit(args.user)
+
+    if args.user:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as fh:
+            fh.write(unit)
+    else:
+        require_sudo()
+        proc = sudo_run(["tee", path], input=unit, text=True, capture_output=True)
+        if proc.returncode != 0:
+            die(f"could not write {path}: {proc.stderr.strip()}")
+
+    sc = systemctl(args.user)
+    for step in (["daemon-reload"], ["enable", "--now", SERVICE_NAME]):
+        proc = subprocess.run(sc + step, capture_output=True, text=True)
+        if proc.returncode != 0:
+            die(f"{' '.join(sc + step)} failed: {proc.stderr.strip()}")
+
+    scope = "user" if args.user else "system"
+    print(f"installed {path}  ({scope} scope)")
+    print(f"logging to {CSV_PATH}")
+    if args.user:
+        warn_if_no_linger()
+    print("\nafter the next power cut: crash-blackbox report")
+
+
+def cmd_uninstall(args):
+    if not shutil.which("systemctl"):
+        die("no systemctl — this subcommand is Linux/systemd only")
+
+    # Remove whichever scope is actually present, so `uninstall` does the right
+    # thing without the user having to remember how they installed it.
+    removed = []
+    for user_scope in (True, False):
+        path = unit_path(user_scope)
+        if not os.path.exists(path):
+            continue
+        sc = systemctl(user_scope)
+        if not user_scope:
+            require_sudo()
+        subprocess.run(sc + ["disable", "--now", SERVICE_NAME], capture_output=True)
+        if user_scope:
+            os.remove(path)
+        else:
+            sudo_run(["rm", "-f", path], capture_output=True)
+        subprocess.run(sc + ["daemon-reload"], capture_output=True)
+        removed.append(path)
+
+    if not removed:
+        print("not installed in either scope; nothing to do")
+        return
+    for path in removed:
+        print(f"removed {path}")
+    print(f"log kept at {CSV_PATH}")
+
+
+def cmd_status(args):
+    # Auto-detect the scope rather than making the user remember which they chose.
+    scope, state = "not installed", ""
+    for user_scope in (True, False):
+        if not os.path.exists(unit_path(user_scope)):
+            continue
+        # is-active needs no privileges in either scope, so no sudo prefix here.
+        probe = ["systemctl", "--user"] if user_scope else ["systemctl"]
+        state = subprocess.run(probe + ["is-active", SERVICE_NAME],
+                               capture_output=True, text=True).stdout.strip()
+        scope = "user" if user_scope else "system"
+        break
+
+    print(f"service : {state or 'unknown'} ({scope} scope)")
+    if scope == "user" and not linger_enabled():
+        print("          linger OFF — not recording between boot and login")
+    if not os.path.exists(CSV_PATH):
+        print(f"log     : {CSV_PATH} (not created yet)")
+        return
+    _, rows = read_rows()
+    boots = sum(1 for r in rows if len(r) > 1 and r[1] == BOOT_MARKER)
+    on_disk = sum(os.path.getsize(p) for p in (CSV_PATH, CSV_PATH + ".1")
+                  if os.path.exists(p))
+    print(f"log     : {CSV_PATH}")
+    print(f"samples : {len(rows) - boots} across {boots} boot(s)")
+    print(f"on disk : {on_disk / 1048576:.1f} MB (capped at "
+          f"{2 * ROTATE_BYTES / 1048576:.0f} MB)")
+    for row in reversed(rows):
+        if len(row) > 1 and row[1] != BOOT_MARKER:
+            print(f"latest  : {row[0]}  cpu={row[2]}%  load={row[3]}")
+            break
+
+
+# --------------------------------------------------------------------------
+# report — the actual payoff
+# --------------------------------------------------------------------------
+
+def read_rows():
+    """Rows from the rotated file then the current one, headers dropped.
+
+    Reading .1 too matters: a power cut landing shortly after a rotation would
+    otherwise show a run-up only as long as the new file, hiding the very seconds
+    the tool exists to capture.
+    """
+    rows, header = [], None
+    for path in (CSV_PATH + ".1", CSV_PATH):
+        if not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            for row in csv.reader(fh):
+                if not row:
+                    continue
+                if row[0] == "time":
+                    header = header or row
+                    continue
+                rows.append(row)
+    return header, rows
+
+
+def unclean_boot_count():
+    """How many boots the kernel itself says ended badly — an independent cross-check."""
+    try:
+        out = subprocess.run(["nvme", "list"], capture_output=True, text=True, timeout=5)
+        if out.returncode != 0:
+            return None
+    except Exception:
+        return None
+    for dev in glob.glob("/dev/nvme?n1"):
+        try:
+            log = subprocess.run(["sudo", "-n", "nvme", "smart-log", dev],
+                                 capture_output=True, text=True, timeout=5).stdout
+            for line in log.splitlines():
+                if "unsafe_shutdowns" in line:
+                    return int(line.split(":")[1].strip())
+        except Exception:
+            continue
+    return None
+
+
+def cmd_report(args):
+    if not os.path.exists(CSV_PATH):
+        die(f"no log at {CSV_PATH} — is the service running? (crash-blackbox status)")
+
+    header, rows = read_rows()
+    if not header:
+        die("log is empty")
+
+    # Split into per-boot segments on the marker.
+    segments, current = [], []
+    for row in rows:
+        if len(row) > 1 and row[1] == BOOT_MARKER:
+            if current:
+                segments.append(current)
+            current = []
+        else:
+            current.append(row)
+    if current:
+        segments.append(current)
+
+    if not segments:
+        die("no samples recorded yet")
+
+    unsafe = unclean_boot_count()
+    if unsafe is not None:
+        print(f"NVMe unsafe_shutdowns (lifetime): {unsafe}\n")
+
+    # Every segment except the last one ended without the recorder being stopped
+    # cleanly — i.e. the machine went down under it.
+    cut_segments = segments[:-1]
+    if not cut_segments:
+        print("No power cut recorded yet since logging began.")
+        print(f"Currently recording: {len(segments[-1])} samples this boot.")
+        return
+
+    print(f"{len(cut_segments)} boot(s) ended while the recorder was running.\n")
+
+    for i, seg in enumerate(cut_segments, 1):
+        tail = seg[-args.seconds:]
+        if not tail:
+            continue
+        print(f"{'=' * 72}\nPower cut #{i} — last {len(tail)}s before the machine died")
+        print(f"{'=' * 72}")
+
+        # Only print columns that actually vary or matter; a 40-column dump is unreadable.
+        keep = [0, 2, 3, 4]  # time, cpu, load, mem_used
+        for idx, name in enumerate(header):
+            if any(k in name.lower() for k in ("tctl", "fan", "composite", "gpu_temp", "gpu_power")):
+                keep.append(idx)
+        keep = sorted(set(k for k in keep if k < len(header)))
+
+        print("  ".join(f"{header[k][:14]:>14}" for k in keep))
+        for row in tail:
+            print("  ".join(f"{(row[k] if k < len(row) else ''):>14}" for k in keep))
+        print()
+
+        flag_anomalies(header, tail)
+
+
+def flag_anomalies(header, tail):
+    """Point at the obvious killers. Silence here is itself a finding."""
+    def col(pred):
+        return [i for i, name in enumerate(header) if pred(name.lower())]
+
+    found = False
+    for i in col(lambda n: "fan" in n):
+        vals = [float(r[i]) for r in tail if i < len(r) and r[i] not in ("", None)]
+        # A pump/fan that was spinning and then stopped is a direct kill path.
+        if vals and vals[0] > 500 and vals[-1] == 0:
+            print(f"  !! {header[i]} dropped {vals[0]:.0f} -> 0 RPM before the cut")
+            found = True
+
+    for i in col(lambda n: "tctl" in n or "composite" in n or n == "gpu_temp"):
+        vals = [float(r[i]) for r in tail if i < len(r) and r[i] not in ("", None)]
+        if vals and max(vals) >= 90:
+            print(f"  !! {header[i]} peaked at {max(vals):.0f}°C")
+            found = True
+
+    for i in col(lambda n: n == "gpu_power_w"):
+        vals = [float(r[i]) for r in tail if i < len(r) and r[i] not in ("", None)]
+        if vals and max(vals) >= 300:
+            print(f"  !! {header[i]} peaked at {max(vals):.0f}W right before the cut")
+            found = True
+
+    if not found:
+        print("  No thermal / fan / GPU-power anomaly in the run-up.")
+        print("  Sensors clean right up to the cut => suspect the power path itself")
+        print("  (PSU, cabling, VRM, or an AGESA/BIOS reset), not load or cooling.")
+        print("  Next rungs: docs/playbooks/random-hard-poweroff.md")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="crash-blackbox",
+        description="Per-second sensor flight recorder for machines that hard-power-off.",
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_run = sub.add_parser("run", help="sampling loop (what the systemd service runs)")
+    p_run.add_argument("--interval", type=float, default=1.0, metavar="S")
+    p_run.set_defaults(func=cmd_run)
+
+    p_inst = sub.add_parser("install", help="install + enable the systemd service")
+    p_inst.add_argument(
+        "--user", action="store_true",
+        help="install as a systemd *user* service (no sudo). Note: without "
+             "`loginctl enable-linger` it only runs once you log in, so the "
+             "boot-to-login window goes unrecorded. System scope (the default) "
+             "records from boot.",
+    )
+    p_inst.set_defaults(func=cmd_install)
+
+    sub.add_parser("uninstall", help="stop + remove the service (either scope)").set_defaults(func=cmd_uninstall)
+    sub.add_parser("status", help="service state + sample count").set_defaults(func=cmd_status)
+
+    p_rep = sub.add_parser("report", help="what the sensors said before each power cut")
+    p_rep.add_argument("--seconds", type=int, default=30, metavar="N",
+                       help="how many seconds of run-up to show (default 30)")
+    p_rep.set_defaults(func=cmd_report)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

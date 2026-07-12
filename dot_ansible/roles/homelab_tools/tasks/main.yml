@@ -82,6 +82,22 @@
     file_type: any
   register: homelab_ipmi_dev
 
+# liquidctl only pays for itself when there is a USB-controlled cooler or a
+# telemetry-capable PSU to talk to. Match the vendor IDs that actually ship such
+# devices (NZXT / Corsair / Asetek / EVGA), plus ASUS ROG AIOs by name — the ASUS
+# vendor ID alone would false-positive on the board's own audio + Aura devices.
+- name: Probe USB for a liquid cooler / telemetry-capable PSU
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    lsusb 2>/dev/null
+    | grep -iE '\b(1e71|1b1c|2433|3842):|ryujin|ryuo|kraken|commander|hydro' || true
+  args:
+    executable: /bin/bash
+  register: homelab_liquid_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
 - name: Probe DMI for an IPMI device (type 38) when no /dev/ipmi* present
   when: homelab_ipmi_dev.matched | default(0) | int == 0
   become: true
@@ -103,12 +119,14 @@
     homelab_has_bmc: >-
       {{ (homelab_ipmi_dev.matched | default(0) | int > 0)
          or ((homelab_ipmi_dmi.stdout | default('') | trim) | length > 0) }}
+    homelab_has_liquid: "{{ (homelab_liquid_probe.stdout | default('') | trim) | length > 0 }}"
 
 - name: Show detected hardware
   ansible.builtin.debug:
     msg: >-
       homelab_tools detection — RAID controller: {{ homelab_has_raid }},
-      NVMe: {{ homelab_has_nvme }}, BMC/IPMI: {{ homelab_has_bmc }}
+      NVMe: {{ homelab_has_nvme }}, BMC/IPMI: {{ homelab_has_bmc }},
+      USB cooler/PSU: {{ homelab_has_liquid }}
 
 # -----------------------------------------------------------------------------
 # Always-useful installs on physical Linux (sensors + SMART work everywhere)
@@ -121,7 +139,8 @@
             if homelab_install_lm_sensors else [])
           + (['smartmontools'] if homelab_install_smartmontools else [])
           + (['ipmitool'] if (homelab_install_ipmitool and homelab_has_bmc) else [])
-          + (['nvme-cli'] if (homelab_install_nvme_cli and homelab_has_nvme) else [])) }}
+          + (['nvme-cli'] if (homelab_install_nvme_cli and homelab_has_nvme) else [])
+          + (['liquidctl'] if (homelab_install_liquidctl and homelab_has_liquid) else [])) }}
 
 - name: Install homelab hardware tools (Debian / Ubuntu)
   when:
@@ -248,3 +267,8 @@
 # Note: smartd / ipmievd services are intentionally NOT enabled. This repo is
 # install-only (see CLAUDE.md "Install vs upgrade is split on purpose"); a
 # monitoring/alerting timer would be a separate opt-in feature.
+#
+# `crash-blackbox` (dot_dotfiles/bin/) follows the same rule: the CLI ships on
+# every machine, but its always-on recorder is a systemd service you enable by
+# hand on the box you are debugging (`crash-blackbox install`). Nothing here
+# starts a daemon for you. See docs/playbooks/random-hard-poweroff.md.

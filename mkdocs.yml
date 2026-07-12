@@ -148,6 +148,8 @@ plugins:
             SMS (Huawei router): 簡訊 (Huawei 路由器)
             reyee (Ruijie router): reyee (Ruijie 路由器)
             ping-monitor (latency spikes): ping-monitor (延遲尖刺)
+            crash-blackbox (hard power-offs): crash-blackbox (硬斷電)
+            Random hard power-offs: 隨機硬斷電
             yth (YouTube history): yth (YouTube 觀看歷史)
             chezmoi prefixes: chezmoi prefixes
             chezmoi templating: chezmoi templating
@@ -257,6 +259,7 @@ nav:
       - auditd role (opt-in): playbooks/auditd.md
       - mDNS / Bonjour diagnostics: playbooks/mdns-diagnostics.md
       - Wi-Fi latency spikes: playbooks/wifi-latency-spikes.md
+      - Random hard power-offs: playbooks/random-hard-poweroff.md
   - Tools:
       - tools/aicapture.md
       - AI agent benchmark (Haiku/OpenRouter/Ollama): tools/ai-agents-benchmark.md
@@ -334,6 +337,7 @@ nav:
           - mi-dhcp-bind (Xiaomi static DHCP): tools/mi-dhcp-bind.md
           - reyee (Ruijie router): tools/reyee.md
           - ping-monitor (latency spikes): tools/ping-monitor.md
+          - crash-blackbox (hard power-offs): tools/crash-blackbox.md
           - "Pueue (pqsum + fleet pueue)": tools/pueue.md
           - "fleet exec": tools/fleet-exec.md
           - "fleet hosts": tools/fleet-hosts.md

@@ -14,6 +14,7 @@ homelab_install_smartmontools: true   # smartctl/smartd — disk SMART health
 homelab_install_ipmitool: true        # BMC sensors + SEL (gated on /dev/ipmi0 or DMI type 38)
 homelab_install_nvme_cli: true        # nvme-cli (gated on an NVMe controller being present)
 homelab_install_storcli: true         # LSI/MegaRAID mgmt (gated on a RAID controller being present)
+homelab_install_liquidctl: true       # USB AIO cooler / PSU telemetry (gated on such a device being present)
 
 # storcli is NOT in distro repos (Broadcom ships it as a zip behind a portal).
 # Leave this empty to SKIP the download and instead emit a clear hint when a

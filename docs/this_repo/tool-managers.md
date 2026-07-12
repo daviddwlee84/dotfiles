@@ -1060,6 +1060,7 @@ list.
 | **lazygit** | brew (via `lazyvim_deps`) | PPA → GitHub release | lazyvim_deps |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
+| **liquidctl** | n/a | apt/yum (gated on a USB cooler / telemetry PSU detected) | homelab_tools |
 | **litellm[proxy]** (`litellm`) | uv tool (python 3.13) | uv tool | llm_tools |
 | **llmfit** | brew formula | curl `llmfit.axjns.dev/install.sh` | llm_tools |
 | **lm-sensors** (`sensors`) | n/a | apt/yum (`lm-sensors`/`lm_sensors`) | homelab_tools |

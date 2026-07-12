@@ -58,9 +58,35 @@ unused packages:
 | ipmitool | `ipmitool` | `/dev/ipmi*` exists **or** DMI type 38 (IPMI Device) present |
 | nvme-cli | `nvme-cli` | an NVMe controller appears in `lspci` |
 | storcli | (vendor download) | a RAID controller appears in `lspci` |
+| liquidctl | `liquidctl` | a USB cooler / telemetry PSU appears in `lsusb` |
 
-Detection runs read-only `lspci` / `dmidecode` probes; results are printed by
-the role's `debug` task so you can see what it decided.
+Detection runs read-only `lspci` / `dmidecode` / `lsusb` probes; results are
+printed by the role's `debug` task so you can see what it decided.
+
+## liquidctl — USB coolers and PSU telemetry
+
+`liquidctl` talks to AIO coolers and PSUs that expose a **USB** interface:
+
+```bash
+liquidctl list          # what it can actually see
+sudo liquidctl status   # pump RPM, coolant temp, fan RPM, (some) PSU rails
+```
+
+Two caveats that cost real debugging time:
+
+- **Coverage is per-model, not per-vendor.** Being an NZXT/ASUS/Corsair device is
+  not enough — `liquidctl` may enumerate the board's Aura controller and still not
+  support the cooler sitting next to it (ASUS Ryujin III is a current example). Run
+  `liquidctl list` before you conclude the pump is dead.
+- **Most PSUs have no telemetry at all.** Only a few Corsair/NZXT units report over
+  USB (also exposed as the `corsair-psu` hwmon driver). Every be quiet! / Seasonic /
+  most others report **nothing** — there is no software path to their rails, and no
+  package will give you one.
+
+When the pump is invisible to `liquidctl`, fall back to the Super-I/O tachometers in
+`sensors`: the **pump is the channel holding a steady RPM regardless of temperature**,
+while radiator/case fans track it. See
+[Random hard power-offs](../playbooks/random-hard-poweroff.md).
 
 ## Installing storcli
 
