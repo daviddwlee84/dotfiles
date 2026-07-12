@@ -51,9 +51,15 @@ USER_UNIT = os.path.join(
 ROTATE_BYTES = 64 * 1024 * 1024
 BOOT_MARKER = "=== BOOT ==="
 
-# Only these hwmon chips carry signal for a power-loss investigation; skipping
-# the rest keeps the row width sane.
-CHIPS = ("k10temp", "coretemp", "nvme", "nct6799", "nct6798", "nct6797", "amdgpu")
+# Chips that carry signal for a power-loss investigation; skipping the rest keeps
+# the row width sane. Matched as prefixes — Super-I/O chips are named per model
+# (nct6799 / nct6796 / it8686 / …) and pinning exact numbers silently loses the fan
+# channels on the next board.
+CHIP_PREFIXES = ("k10temp", "coretemp", "nvme", "amdgpu", "nct6", "it87", "it86")
+
+
+def chip_wanted(name):
+    return name.startswith(CHIP_PREFIXES)
 
 
 def die(msg):
@@ -74,7 +80,7 @@ def hwmon_fields():
                 chip = fh.read().strip()
         except OSError:
             continue
-        if chip not in CHIPS:
+        if not chip_wanted(chip):
             continue
         for inp in sorted(glob.glob(os.path.join(path, "*_input"))):
             base = inp[: -len("_input")]
@@ -96,6 +102,37 @@ def read_int(path):
             return int(fh.read().strip())
     except (OSError, ValueError):
         return None
+
+
+def warn_if_blind():
+    """Say so when there are no fan channels — the recorder would be useless silently.
+
+    We read /sys/class/hwmon directly, so the `sensors` binary is not needed. The
+    Super-I/O *kernel module* (nct6775 and friends) very much is: without it the
+    chip never appears in hwmon and we lose every fan and voltage channel. That
+    includes the pump RPM, which is the first thing `report` looks for. A distro
+    does not load that module on its own — `sensors-detect` writes the
+    modules-load.d entry that does.
+
+    Losing this quietly is the exact failure a black box must not have, so check
+    at install time rather than letting it surface as an empty column months later.
+    """
+    # Classify on the sysfs path, not the label: a channel's *name* need not
+    # contain "temp" (nvme's is "Composite"), and miscounting here would
+    # undercut the very warning we are trying to make trustworthy.
+    fields = hwmon_fields()
+    fans = sum(1 for _, path, _ in fields if "/fan" in path)
+    temps = sum(1 for _, path, _ in fields if "/temp" in path)
+    if fans:
+        return
+    print()
+    print("  WARNING: no fan/pump channels visible in /sys/class/hwmon.")
+    print(f"  ({temps} temperature channel(s) found, but 0 fan channels.)")
+    print("  The Super-I/O kernel module (nct6775 / it87 / …) is probably not loaded,")
+    print("  so a dying pump or fan — the first thing `report` checks — is invisible.")
+    print("  Fix once, then reinstall:")
+    print("    sudo sensors-detect      # answer YES to the safe probes")
+    print("    sudo systemctl restart crash-blackbox")
 
 
 def cpu_times():
@@ -321,6 +358,7 @@ def cmd_install(args):
     scope = "user" if args.user else "system"
     print(f"installed {path}  ({scope} scope)")
     print(f"logging to {CSV_PATH}")
+    warn_if_blind()
     if args.user:
         warn_if_no_linger()
     print("\nafter the next power cut: crash-blackbox report")
@@ -372,6 +410,12 @@ def cmd_status(args):
     print(f"service : {state or 'unknown'} ({scope} scope)")
     if scope == "user" and not linger_enabled():
         print("          linger OFF — not recording between boot and login")
+
+    fields = hwmon_fields()
+    fans = sum(1 for _, p, _ in fields if "/fan" in p)
+    temps = sum(1 for _, p, _ in fields if "/temp" in p)
+    note = "" if fans else "  <- Super-I/O module not loaded; run sudo sensors-detect"
+    print(f"sensors : {temps} temp, {fans} fan channel(s){note}")
     if not os.path.exists(CSV_PATH):
         print(f"log     : {CSV_PATH} (not created yet)")
         return

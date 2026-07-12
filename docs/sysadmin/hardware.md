@@ -63,6 +63,19 @@ unused packages:
 Detection runs read-only `lspci` / `dmidecode` / `lsusb` probes; results are
 printed by the role's `debug` task so you can see what it decided.
 
+The role also persists the **Super-I/O kernel module** into
+`/etc/modules-load.d/board-sensors.conf`, resolving which module actually backs the
+fan channels (`nct6775` on Nuvoton boards, `it87` on ITE) rather than assuming.
+Installing `lm-sensors` alone does **not** make the board's fan tachometers appear —
+no distro loads that module on its own, and until it is loaded `/sys/class/hwmon`
+shows CPU and NVMe temperatures but **zero fan channels**. Nothing looks broken; you
+have just lost pump RPM, which is what [`crash-blackbox`](../tools/crash-blackbox.md)
+checks first when a machine hard-powers-off.
+
+The role does not run `sensors-detect` for you — it probes I2C/SMBus buses and is
+not something to fire unattended. If no fan channels exist yet, the role says so and
+points at the one-time manual step.
+
 ## liquidctl — USB coolers and PSU telemetry
 
 `liquidctl` talks to AIO coolers and PSUs that expose a **USB** interface:

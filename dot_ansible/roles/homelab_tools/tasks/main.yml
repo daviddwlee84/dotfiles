@@ -264,6 +264,64 @@
       or install manually — see docs/sysadmin/hardware.md "Installing storcli".
 
 # -----------------------------------------------------------------------------
+# Super-I/O module — the difference between "sensors installed" and "fans visible"
+#
+# Installing lm-sensors does NOT make the board's Super-I/O chip appear: that needs
+# the nct6775 / it87 kernel module, and no distro loads it on its own. Until it is
+# loaded, /sys/class/hwmon has CPU and NVMe temperatures but *zero fan channels* —
+# which silently costs you pump RPM, the first thing `crash-blackbox report` looks
+# for when a machine hard-powers-off. Detecting that months later, from an empty
+# column, is exactly the failure a black box must not have.
+#
+# We do not run `sensors-detect` here — it probes I2C/SMBus buses and is not
+# something to fire unattended. Instead: detect the chip that is already known to
+# the kernel via modalias, and if a Super-I/O driver matches, persist it. If none
+# matches, say so and point at the one-time manual step.
+# -----------------------------------------------------------------------------
+
+# Resolve the module that actually backs the fan channels rather than assuming
+# nct6775 — ITE-based boards use it87, and writing the wrong name would leave a
+# modules-load.d entry that fails silently at boot.
+- name: Find the kernel module currently providing fan channels
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    for f in /sys/class/hwmon/hwmon*/fan*_input; do
+      [ -e "$f" ] || continue;
+      d=$(dirname "$f");
+      m=$(readlink -f "$d/device/driver/module" 2>/dev/null);
+      [ -n "$m" ] && basename "$m" && break;
+    done || true
+  args:
+    executable: /bin/bash
+  register: homelab_siochip
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Persist the Super-I/O module so fan channels survive a reboot
+  when:
+    - homelab_install_lm_sensors
+    - (homelab_siochip.stdout | default('') | trim) | length > 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/board-sensors.conf
+    content: |
+      # Managed by dotfiles (homelab_tools). Super-I/O chip driver — without this
+      # the board's fan/pump tachometers are absent from /sys/class/hwmon, and a
+      # dying pump becomes invisible to crash-blackbox.
+      {{ homelab_siochip.stdout | trim }}
+    mode: "0644"
+
+- name: Hint when no fan channels are visible at all
+  when: (homelab_siochip.stdout | default('') | trim) | length == 0
+  ansible.builtin.debug:
+    msg: >-
+      No fan channels in /sys/class/hwmon — the Super-I/O module is not loaded, so
+      pump/fan RPM is invisible (crash-blackbox cannot detect a dying pump). Run
+      `sudo sensors-detect` once, answer YES to the safe probes, then re-run.
+
+# -----------------------------------------------------------------------------
 # Note: smartd / ipmievd services are intentionally NOT enabled. This repo is
 # install-only (see CLAUDE.md "Install vs upgrade is split on purpose"); a
 # monitoring/alerting timer would be a separate opt-in feature.

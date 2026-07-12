@@ -105,6 +105,32 @@ an empty section.
 smart-log`) as an independent cross-check — the SSD firmware counts every power
 loss regardless of what the OS managed to record.
 
+## Dependencies
+
+Nothing you have to install by hand — but one of them is easy to lose silently:
+
+| Needs | Comes from | Missing ⇒ |
+|---|---|---|
+| `python3`, `ps`, `systemctl` | base system | n/a |
+| `nvme` | `homelab_tools` (gated on an NVMe being present) | loses only the `unsafe_shutdowns` cross-check; degrades cleanly |
+| `nvidia-smi` | the NVIDIA driver, **not** `homelab_tools` | loses the GPU columns; degrades cleanly |
+| **Super-I/O kernel module** (`nct6775` / `it87`) | `homelab_tools` persists it into `/etc/modules-load.d/` | **loses every fan channel — including pump RPM** |
+
+That last row is the trap. We read `/sys/class/hwmon` directly, so the `sensors`
+binary is not needed — but the Super-I/O **kernel module** is, and no distro loads
+it on its own. Without it, hwmon still shows CPU and NVMe temperatures, so nothing
+looks broken; you have simply lost the pump tachometer, which is the *first* thing
+`report` checks. `install` and `status` therefore both report the channel count and
+warn loudly when zero fans are visible:
+
+```
+sensors : 20 temp, 7 fan channel(s)
+```
+
+If it says `0 fan channel(s)`, run `sudo sensors-detect` once (answer YES to the
+safe probes) and restart the service. `liquidctl` is **not** a dependency — it is
+installed alongside for manual AIO inspection, but `crash-blackbox` never calls it.
+
 ## Limits
 
 - Linux + systemd only (`install` / `status` shell out to `systemctl`).
