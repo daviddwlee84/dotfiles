@@ -36,26 +36,26 @@ herdr tracks cwd differently from tmux, which trips up two common expectations (
 
 - **Every pane has two cwds.** `cwd` = the shell's *startup* directory (fixed at spawn); `foreground_cwd` = the *live* cwd, tracked via **OSC 7** shell integration. A `cd` in the shell updates `foreground_cwd`; the startup `cwd` never changes.
 - **`cd` inside a child process / subshell doesn't propagate.** Because tracking is OSC 7-based, a `cd` in a subshell that doesn't re-emit OSC 7 — e.g. `chezmoi cd`, which spawns a *new* shell in the source dir — is invisible to herdr. `foreground_cwd` stays put, so the space's git-repo detection and the `prefix+G` lazygit location don't follow the subshell. This is inherent to OSC 7, **not** a herdr bug — expected behavior.
-- **New tabs spawn at the workspace root, not the focused pane's cwd.** With `new_cwd = "follow"` (below), a *split* inherits the focused pane's cwd, but a *new tab* falls back to the workspace's cwd (often `$HOME`). Confirmed: every non-first tab's root pane has `cwd = $HOME`.
+- **New tabs follow the focused pane's live cwd (herdr ≥0.7.x).** With `new_cwd = "follow"` (below), a *new tab* inherits the focused pane's live cwd — same as a *split*. herdr [issue #912](https://github.com/ogulcancelik/herdr/issues/912) changed `follow` so tabs behave like splits; the older "new tab opens at the workspace root (often `$HOME`)" was treated as a bug and removed. There is **no `new_cwd` value** (and no workspace-level cwd — `herdr workspace get` exposes none) that opens a new tab at the workspace root; for that use **`prefix+C`** (below).
 - **The workspace ("space") label auto-follows the root/primary pane's live cwd basename** (e.g. → `chezmoi`, `trading-journal`). `cd` in **tab 1** renames the space; `cd` in other tabs does not. No config knob controls this.
 
 **`new_cwd` values** (`[terminal]`) — the CWD policy for new panes/tabs/workspaces when no explicit `--cwd` is given:
 
 | value | meaning |
 |---|---|
-| `follow` (default) | inherit the **source** pane/workspace (split → focused pane's live cwd; new tab → workspace root) |
+| `follow` (default) | inherit the **source** pane — for both a split *and* a new tab, the focused pane's live cwd (herdr ≥0.7.x) |
 | `home` | `$HOME` |
 | `current` | herdr's **own process** directory (NOT the focused pane) |
 | `"~/path"` | a fixed path |
 
-**No `new_cwd` value opens a new tab in the focused pane's live cwd** — only an explicit `herdr tab create --cwd …` does (verified: `tab create --cwd PATH` spawns the new tab's shell in `PATH`). For a "new tab here" key, bind a command pane to `herdr tab create --cwd "$HERDR_ACTIVE_PANE_CWD" --focus` (e.g. on `prefix+C`; native `prefix+c` stays = workspace root):
+**No `new_cwd` value opens a new tab at the workspace ("space") root** — `follow` now tracks the focused pane, and herdr exposes no workspace-level cwd field. This repo ships that behavior as a keybind: **`prefix+C`** → `~/.config/herdr/new-tab-at-space-root.sh` (`dot_config/herdr/executable_new-tab-at-space-root.sh`), which derives the space root — the lowest-numbered tab's pane live cwd, i.e. what herdr uses for the space label — and runs `herdr tab create --workspace <wid> --cwd <root> --focus`. Native `prefix+c` **and the mouse "+" button** keep the follow-focused-pane behavior; a keybind cannot intercept the mouse button.
 
 ```toml
 [[keys.command]]
 key = "prefix+C"
 type = "pane"
-command = "herdr tab create --cwd \"$HERDR_ACTIVE_PANE_CWD\" --focus"
-description = "new tab in the current pane's cwd"
+command = "~/.config/herdr/new-tab-at-space-root.sh \"$HERDR_ACTIVE_PANE_ID\""
+description = "new tab at the workspace (space) root dir"
 ```
 
 ## Feasibility matrix (current tmux experience → herdr)
@@ -84,6 +84,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | Key | Action | Type |
 |---|---|---|
 | `prefix + c` / `prefix + 1..9` | new tab / switch tab | built-in default |
+| `prefix + C` | new tab at the workspace (**space**) root dir — `prefix+c` + mouse "+" stay follow-focused-pane | command pane |
 | `prefix + h/j/k/l` | focus pane | built-in default |
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | split side-by-side / stacked (tmux muscle memory — both the intuitive key and the tmux default) | rebound (arrays) |
 | `prefix + z` / `prefix + x` | zoom / close pane | built-in default |

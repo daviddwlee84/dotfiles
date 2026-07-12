@@ -41,10 +41,12 @@ shell_mode = "auto"           # login/non-login auto-detect; follows $SHELL
 # CWD policy for new panes/tabs/workspaces (no explicit --cwd). Values:
 #   "follow"  = inherit the SOURCE pane/workspace (default)
 #   "home"    = $HOME · "current" = herdr's own process dir · or a fixed path
-# NOTE: a split's source is the focused pane (→ inherits its live cwd), but a
-# NEW TAB's source is the WORKSPACE root, so new tabs open at the workspace cwd
-# (often $HOME), NOT the focused pane's live cwd. No new_cwd value changes that;
-# for "new tab here" use `herdr tab create --cwd …`. See docs/tools/herdr.md.
+# NOTE (herdr >=0.7.x): with "follow", a NEW TAB inherits the FOCUSED pane's live
+# cwd — same as a split. herdr issue #912 changed `follow` so tabs behave like
+# splits; the older "new tab opens at the workspace root" was treated as a bug and
+# removed. NO new_cwd value opens a new tab at the WORKSPACE ("space") dir — for
+# that use the prefix+C command below (derives the space root → tab create --cwd).
+# See docs/tools/herdr.md.
 new_cwd = "follow"
 
 # --- Built-in action rebinds (tmux muscle memory) ---
@@ -94,6 +96,20 @@ key = "prefix+`"
 type = "pane"
 command = "$SHELL"
 description = "scratch shell (popup pane)"
+
+# --- New tab at the workspace ("space") root dir (prefix+C) ---
+# herdr's native new-tab (prefix+c) and the mouse "+" button follow new_cwd,
+# which on herdr >=0.7.x means the FOCUSED pane's live cwd (issue #912 made
+# `follow` treat new tabs like splits). This binding instead opens a new tab at
+# the workspace ROOT dir — the lowest-numbered tab's pane cwd, i.e. what herdr
+# uses for the space label. No new_cwd value does this; the helper derives it
+# (herdr workspace get has no cwd field). prefix+c stays = follow-focused-pane.
+# Only affects THIS key; the mouse "+" button can't be intercepted.
+[[keys.command]]
+key = "prefix+C"
+type = "pane"
+command = "~/.config/herdr/new-tab-at-space-root.sh \"$HERDR_ACTIVE_PANE_ID\""
+description = "new tab at the workspace (space) root dir"
 
 [[keys.command]]
 key = "prefix+U"

@@ -41,26 +41,26 @@ herdr 追蹤 cwd 的方式跟 tmux 不同,會顛覆兩個常見預期（皆用 `
 
 - **每個 pane 有兩個 cwd。** `cwd` = shell 的*啟動*目錄（spawn 時固定）;`foreground_cwd` = *即時* cwd,透過 **OSC 7** shell 整合追蹤。shell 裡 `cd` 會更新 `foreground_cwd`;啟動 `cwd` 永不變。
 - **子行程 / 子 shell 裡的 `cd` 不會傳上來。** 因為追蹤是 OSC 7-based,一個沒有再送 OSC 7 的子 shell 裡的 `cd`——例如 `chezmoi cd`,它會在 source 目錄 spawn 一個*新*shell——對 herdr 是隱形的。`foreground_cwd` 不動,所以 space 的 git-repo 偵測與 `prefix+G` lazygit 位置都不跟著子 shell 走。這是 OSC 7 的固有特性,**不是** herdr bug——預期行為。
-- **新 tab 開在 workspace 根目錄,不是聚焦 pane 的 cwd。** 用 `new_cwd = "follow"`（見下）時,*split* 繼承聚焦 pane 的 cwd,但*新 tab* 退回 workspace 的 cwd（通常是 `$HOME`）。已驗證:每個非首 tab 的 root pane `cwd = $HOME`。
+- **新 tab 跟隨聚焦 pane 的即時 cwd（herdr ≥0.7.x）。** 用 `new_cwd = "follow"`（見下）時,*新 tab* 繼承聚焦 pane 的即時 cwd——跟 *split* 一樣。herdr [issue #912](https://github.com/ogulcancelik/herdr/issues/912) 改了 `follow`,讓 tab 跟 split 行為一致;舊的「新 tab 開在 workspace 根（通常 `$HOME`）」被當成 bug 移除了。**沒有任何 `new_cwd` 值**（也沒有 workspace 層級的 cwd——`herdr workspace get` 完全沒有 cwd 欄位）能讓新 tab 開在 workspace 根;要那樣請用下方的 **`prefix+C`**。
 - **workspace（space）label 自動跟隨 root/primary pane 的即時 cwd basename**（例如 → `chezmoi`、`trading-journal`）。在 **tab 1** 裡 `cd` 會改 space 名;在其他 tab 裡 `cd` 不會。沒有 config 旋鈕控制這個。
 
 **`new_cwd` 值**（`[terminal]`）—— 沒給明確 `--cwd` 時,新 pane/tab/workspace 的 CWD 政策:
 
 | 值 | 意義 |
 |---|---|
-| `follow`（預設） | 繼承**來源** pane/workspace（split → 聚焦 pane 的即時 cwd;新 tab → workspace 根） |
+| `follow`（預設） | 繼承**來源** pane——split 與新 tab 都取聚焦 pane 的即時 cwd（herdr ≥0.7.x） |
 | `home` | `$HOME` |
 | `current` | herdr **自身行程**的目錄（**不是**聚焦 pane） |
 | `"~/path"` | 固定路徑 |
 
-**沒有任何 `new_cwd` 值能讓新 tab 開在聚焦 pane 的即時 cwd**——只有明確的 `herdr tab create --cwd …` 可以（已驗證:`tab create --cwd PATH` 會把新 tab 的 shell spawn 在 `PATH`）。要一個「在此開新 tab」的鍵,綁一個 command pane 到 `herdr tab create --cwd "$HERDR_ACTIVE_PANE_CWD" --focus`（例如綁 `prefix+C`;原生 `prefix+c` 保留 = workspace 根）:
+**沒有任何 `new_cwd` 值能讓新 tab 開在 workspace（space）根**——`follow` 現在跟隨聚焦 pane,而 herdr 沒有 workspace 層級的 cwd 欄位。本 repo 把這個行為做成 keybind:**`prefix+C`** → `~/.config/herdr/new-tab-at-space-root.sh`（`dot_config/herdr/executable_new-tab-at-space-root.sh`）,它推導出 space 根——編號最小 tab 的 pane 即時 cwd,也就是 herdr 用來當 space label 的那個——然後執行 `herdr tab create --workspace <wid> --cwd <root> --focus`。原生 `prefix+c` **與滑鼠「+」按鈕**維持跟隨聚焦 pane;keybind 無法攔截滑鼠按鈕。
 
 ```toml
 [[keys.command]]
 key = "prefix+C"
 type = "pane"
-command = "herdr tab create --cwd \"$HERDR_ACTIVE_PANE_CWD\" --focus"
-description = "在目前 pane 的 cwd 開新 tab"
+command = "~/.config/herdr/new-tab-at-space-root.sh \"$HERDR_ACTIVE_PANE_ID\""
+description = "new tab at the workspace (space) root dir"
 ```
 
 ## 可行性對照表 (Feasibility matrix)（現有 tmux 體驗 → herdr）
@@ -89,6 +89,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | Key | Action | 類型 |
 |---|---|---|
 | `prefix + c` / `prefix + 1..9` | 新 tab / 切 tab | built-in default |
+| `prefix + C` | 在 workspace（**space**）根目錄開新 tab——`prefix+c` 與滑鼠「+」維持跟隨聚焦 pane | command pane |
 | `prefix + h/j/k/l` | 聚焦 pane | built-in default |
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | 左右分割 / 上下分割（tmux 肌肉記憶——直覺鍵與 tmux 預設鍵都綁） | rebound（陣列 arrays） |
 | `prefix + z` / `prefix + x` | zoom / 關 pane | built-in default |
