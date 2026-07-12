@@ -3,7 +3,7 @@
 **Symptoms** (grep this section): `copilot-proxy: did not come up in time — check 'copilot-proxy logs'.`; `copilot-proxy logs` shows only `nohup: ignoring input` + `Resolving dependencies` and nothing else; `copilot-proxy status` says `not running on port 4141`; `ps` shows one or more wedged `bun add @jeffreycao/copilot-api@1.13.14 --no-summary`; every retry adds ANOTHER stuck pair and none ever binds the port; `curl` to the npm registry works fine so it does not look like a network fault
 **First seen**: 2026-07
 **Affects**: bun 1.3.x (`bunx`) + `@jeffreycao/copilot-api` (any pinned version) on a host with a socks proxy exported as `ALL_PROXY` (Clash/mihomo, `socks://127.0.0.1:7890`)
-**Status**: workaround documented; `copilot-proxy doctor` detects it; permanent fix in `copilot-proxy start` not yet wired up
+**Status**: **fixed** 2026-07 — the runner no longer resolves at launch (pinned package installed once into `~/.local/share/copilot-api/pkg`, binary exec'd directly); install is timeout-bounded + killed, and `start` now reaps the server it spawned. `copilot-proxy doctor` still detects the condition as a safety net. The manual workaround below remains valid for any *other* `bunx`-based tool on a proxied host.
 
 ## Symptom
 
@@ -117,15 +117,27 @@ Proxy
                      → re-hangs? bun is stalling on the socks proxy — env -u ALL_PROXY -u HTTPS_PROXY -u HTTP_PROXY copilot-proxy start
 ```
 
-**Clearing the lock alone is not durable** — the stall recurs on the next cold
-resolve, which is why the doctor's second hint (strip the proxy env) is the one that
-actually sticks. The permanent fix is to stop `bunx` from resolving through the
-socks proxy at all: either pre-install the package once and invoke the binary
-directly, or have `copilot-proxy start` run a proxy-stripped warm-up `bun add`
-before launching the server with the full env. Not wired up yet.
+**Clearing the lock alone was not durable** — the stall recurs on the next cold
+resolve (it did, twice). That's why the fix removes the per-launch resolve entirely
+rather than making it more likely to succeed:
+
+- `_copilot_ensure_pkg` installs the pinned spec **once** into
+  `~/.local/share/copilot-api/pkg`, stamped with the spec so a version bump
+  re-installs. `start` then execs `node_modules/.bin/copilot-api` directly — a warm
+  start does **zero network** before it binds the port.
+- `_copilot_pkg_install_try` bounds each attempt and **kills it on timeout**, so a
+  stalled `bun add` can never again keep bun's global cache lock. Attempt 1 honours
+  the ambient env (a host may only reach the registry *through* the proxy); attempt
+  2 strips it. `COPILOT_INSTALL_NOPROXY=1` skips straight to attempt 2.
+- `start` now **reaps the server it spawned** on timeout. The old code returned and
+  left it running, which is the whole reason retries stacked orphans.
 
 Do not "fix" this by raising `start`'s 20s timeout — the installer is wedged, not
 slow; a longer wait just wedges for longer.
+
+The same trap applies to **any** `bunx`-based tool on this host: bunx re-resolves
+per launch, so a socks `ALL_PROXY` can hang it the same way. If you add one, either
+pin+install it or expect this failure mode.
 
 ## Related
 

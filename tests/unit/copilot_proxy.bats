@@ -119,6 +119,63 @@ JSON
   [[ "$output" == "claude-opus-4-6[1m]|project pin: .claude/settings.local.json" ]]
 }
 
+# --- _copilot_pkg_name / _copilot_pkg_ready -------------------------------------
+#
+# pkg_name feeds the pkill pattern that reaps a stalled `bun add`. The naive
+# "${spec%@*}" returns EMPTY for a scoped spec with no version, which would turn
+# the reap into `pkill -f 'bun add.*'` — a pattern that matches every bun install
+# on the box. Hence the scope-stripped test inside the helper, and these cases.
+
+@test "pkg_name: strips the version but keeps the @scope" {
+  run bash -c "COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14' \
+    bash -c \"source '$SHELL_LIB'; _copilot_pkg_name\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "@jeffreycao/copilot-api" ]
+}
+
+@test "pkg_name: a scoped spec with NO version survives intact (not emptied)" {
+  run bash -c "COPILOT_API_PKG='@jeffreycao/copilot-api' \
+    bash -c \"source '$SHELL_LIB'; _copilot_pkg_name\""
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  [ "$output" = "@jeffreycao/copilot-api" ]
+}
+
+@test "pkg_name: unscoped spec, with and without a version" {
+  run bash -c "COPILOT_API_PKG='copilot-api@0.7.0' \
+    bash -c \"source '$SHELL_LIB'; _copilot_pkg_name\""
+  [ "$output" = "copilot-api" ]
+  run bash -c "COPILOT_API_PKG='copilot-api' \
+    bash -c \"source '$SHELL_LIB'; _copilot_pkg_name\""
+  [ "$output" = "copilot-api" ]
+}
+
+@test "pkg_ready: false when the stamp names a DIFFERENT spec than the pin" {
+  # A version bump must re-install, not silently run the old binary.
+  local prefix="$TMP/data/copilot-api/pkg"
+  mkdir -p "$prefix/node_modules/.bin"
+  printf '#!/bin/sh\n' > "$prefix/node_modules/.bin/copilot-api"
+  chmod +x "$prefix/node_modules/.bin/copilot-api"
+  printf '@jeffreycao/copilot-api@1.13.14\n' > "$prefix/.installed-spec"
+
+  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@9.9.9'
+    source '$SHELL_LIB'; _copilot_pkg_ready"
+  [ "$status" -ne 0 ]
+
+  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14'
+    source '$SHELL_LIB'; _copilot_pkg_ready"
+  [ "$status" -eq 0 ]
+}
+
+@test "pkg_ready: false when the stamp exists but the binary does not" {
+  local prefix="$TMP/data/copilot-api/pkg"
+  mkdir -p "$prefix"
+  printf '@jeffreycao/copilot-api@1.13.14\n' > "$prefix/.installed-spec"
+  run bash -c "export XDG_DATA_HOME='$TMP/data' COPILOT_API_PKG='@jeffreycao/copilot-api@1.13.14'
+    source '$SHELL_LIB'; _copilot_pkg_ready"
+  [ "$status" -ne 0 ]
+}
+
 @test "effective_model: a settings.local.json WITHOUT our base_url is not a pin" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
   mkdir -p "$TMP/proj/.claude" "$TMP/state/copilot-proxy"

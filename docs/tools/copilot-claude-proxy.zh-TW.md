@@ -11,8 +11,13 @@
 [`ericc-ch/copilot-api`](https://github.com/ericc-ch/copilot-api)。
 
 - **Shell helpers**：`~/.config/shell/43_copilot_proxy.sh`（`copilot-proxy`、`claude-copilot`、`copilot-run`、`copilot-here`、`copilot-model`）
-- **執行器 (runner)**：`bunx copilot-api`（已釘選 pinned；沿用 `07_bunx_cli.sh` 的 `bunx` 慣例）
-- **不由 ansible 安裝** —— 透過 `bunx` 隨用隨拉，因此不進佈建 (provisioning) 流程。
+- **執行器 (runner)**：`@jeffreycao/copilot-api`（已釘選 pinned），**只安裝一次**到
+  `~/.local/share/copilot-api/pkg`，之後直接執行該處的 binary。刻意**不**在啟動時用
+  `bunx`：bunx 每次啟動都會重新解析套件，而 bun 透過 socks `ALL_PROXY` 解析相依會永遠卡住
+  —— 詳見[陷阱](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy)。
+  熱啟動 (warm start) 在綁定 port 之前完全不碰網路。
+- **不由 ansible 安裝** —— 在第一次 `copilot-proxy start` 時安裝，因此不進佈建
+  (provisioning) 流程。要強制重裝：`copilot-proxy reinstall`（改版號會自動重裝）。
 
 !!! warning "這違反 GitHub Copilot 的服務條款 (Terms of Service)"
     用 Copilot 訂閱去驅動非 GitHub 的 agent 是不被允許的，且 copilot-api 是逆向工程/非官方
@@ -85,10 +90,18 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` 秒數（節流；請溫和） |
-| `COPILOT_API_PKG` | `copilot-api@0.7.0` | `bunx` 套件規格（釘選/升級） |
+| `COPILOT_API_PKG` | `copilot-api@0.7.0` | 要安裝的套件規格（釘選/升級）。改了會自動重裝。 |
+| `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
 
 這些設在 `~/.shellrc.adhoc`（或 per-shell secrets 檔案）。在 `copilot-proxy auth`
 儲存 token 之前，`start` 會拒絕執行；啟動後最多等 ~20 秒直到代理能回應才返回。
+
+**第一次** `start` 會把釘選的套件安裝到 `~/.local/share/copilot-api/pkg`（並寫下 spec
+戳記），之後每次啟動只是直接執行那個 binary —— 不打 registry、不做啟動時解析。安裝時會
+先用你當下的環境變數（在「registry 只能透過 proxy 連到」的機器上必要），卡住就改用拿掉
+proxy 的重試；兩種嘗試都有 timeout 並會被殺掉，所以卡死的安裝再也不可能占住 bun 的全域
+快取鎖而拖垮下一次。`start` 逾時的時候現在也會**把自己啟動的 server 殺掉**，不會像以前
+那樣每重試一次就留下一個孤兒程序。
 
 `copilot-proxy whoami` 是真正的登入檢查：它拿儲存的 token 對 GitHub 交換，並印出你的
 帳號 / plan / quota（token 缺失或過期時會明確報錯）。用它取代直接看 token 檔案 —— token
@@ -100,17 +113,18 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 `POST /v1/messages`（`max_tokens: 1`、挑一個非 `[1m]` 的 chat model），會消耗一個 quota
 單位，但那是唯一能驗證 streaming 的檢查。
 
-檢查順序：前置工具（`bunx`/`curl`/`jq`）→ token 檔案 → 代理與 throttle shim 是否存活 →
-安裝殘留（stale installer）→ **模型**→ 上游連線 → 本機代理 / VPN → live probe。
+檢查順序：前置工具（`bun`/`curl`/`jq`）→ **套件 (package)** → token 檔案 → 代理與
+throttle shim 是否存活 → 安裝殘留（stale installer）→ **模型**→ 上游連線 →
+本機代理 / VPN → live probe。
 
-**安裝殘留（stale installer）** 這一段專門抓最令人困惑的啟動失敗：`start` 只印出
-*「did not come up in time」*，log 裡卻只有一行 *「Resolving dependencies」*。這代表
-`bunx` 還卡在 `bun add` 那個釘選的 `copilot-api`，而相依解析卡死了 —— 通常是 bun 透過
-socks `ALL_PROXY` 連 npm registry 卡住（即使 `curl` 連同一個 registry 正常）。這個卡死的
-安裝程序會占住 bun 的全域快取鎖，所以每次重試都同樣卡死、還會疊出更多殭屍程序。doctor
-會標出任何存活中的 `bun add … copilot-api`，並印出「清掉再重啟」的一行指令
-（`pkill -f 'bun add.*copilot-api'; rm -rf "$HOME/.bun/install/cache/.tmp"/*`）；若仍卡住，
-就把 `ALL_PROXY`/`HTTPS_PROXY` 拿掉再重試。
+**套件 (package)** 這一段報告釘選的 spec 是否已安裝在 prefix 裡、binary 在哪。顯示
+「未安裝」不算失敗 —— 下一次 `start` 會自動裝一次。
+
+**安裝殘留（stale installer）** 是[陷阱](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy)
+那個坑的保險絲：平常若還有存活的 `bun add … copilot-api`，就代表某次安裝卡死了（bun 透過
+socks proxy 解析相依會卡住），而且正占著 bun 的全域快取鎖。現在安裝流程自己會設 timeout
+並殺掉卡死的程序，所以這一項應該永遠是空的；萬一真的觸發，doctor 會印出「清掉再重啟」的
+一行指令。
 
 其中「模型」這一段才是這個指令的價值所在。它把代理**目前提供的**模型清單，跟 GitHub
 **此刻真正提供的**清單相比對 —— 這是唯一能區分 `400 model_not_supported` 兩種成因的方法：
@@ -206,6 +220,37 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 **不要** 把這段貼進會 commit 的 `.claude/settings.json` —— 改用 `copilot-here on`。
 
 ## 陷阱 (gotchas)（這些都花了實際 debug 時間）
+
+### `start` used to hang at "Resolving dependencies" behind a socks proxy
+
+（`start` 曾經卡在「Resolving dependencies」—— socks proxy 造成）
+
+**已修正**（runner 啟動時不再解析套件），但仍值得理解，因為它的失敗樣態極具誤導性 ——
+而且在有 proxy 的機器上，任何其他用 `bunx` 的工具都會踩到同一個坑。
+
+`start` 以前跑的是 `bunx <pkg> start`，而 bunx **每次啟動都會重新解析套件**。
+**bun 透過 socks `ALL_PROXY` 解析相依會無限期卡住** —— 但 `curl` 走同一個 proxy 連
+registry 卻不到 0.5 秒就回來。所以每一項明顯的檢查都會過，沒有任何線索指向安裝程序。
+你只會看到：
+
+```
+copilot-proxy: did not come up in time — check 'copilot-proxy logs'.
+$ copilot-proxy logs
+nohup: ignoring input
+Resolving dependencies
+```
+
+有兩件事把「一次卡住」變成「永久卡死」：卡死的 `bun add` 會占住 bun 的**全域安裝快取鎖**，
+所以下一次 `start` 也卡在那把鎖上；而 `start` 逾時後直接 return、沒有殺掉自己啟動的程序，
+於是每重試一次就多留一個孤兒（實際上疊了 5 個），而且沒有任何一個綁上 port。
+
+現在 runner 會把釘選的套件**只安裝一次**到 `~/.local/share/copilot-api/pkg` 並直接執行該
+binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時會被殺掉，並會退回「拿掉 proxy」
+的重試。注意這裡的 registry 是 npmmirror（國內鏡像，為了 GFW 速度設在 `~/.bunfig.toml`）
+—— 把它繞進 proxy 一點好處也沒有，而那正是弄壞 bun 的原因。
+
+完整事後檢討與可 grep 的原始症狀：
+[`pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md)。
 
 ### 模型清單只在啟動時抓一次 —— 一次抓壞，整個 session 就毀了
 

@@ -12,9 +12,15 @@ Both packages share the same token file
 (`~/.local/share/copilot-api/github_token`), so switching needs **no re-auth**.
 
 - **Shell helpers**: `~/.config/shell/43_copilot_proxy.sh` (`copilot-proxy`, `claude-copilot`, `claude-copilot-once`, `copilot-run`, `copilot-here`, `copilot-model`)
-- **Runner**: `bunx @jeffreycao/copilot-api` (pinned; matches the `bunx` convention in `07_bunx_cli.sh`)
-- **Not installed by ansible** — pulled on demand via `bunx`, so it stays off the
-  provisioning path.
+- **Runner**: `@jeffreycao/copilot-api` (pinned), installed **once** into
+  `~/.local/share/copilot-api/pkg` and executed directly from there. Deliberately
+  **not** `bunx` at launch: bunx re-resolves the package on every start, and bun
+  stalls forever resolving through a socks `ALL_PROXY` — see
+  [Gotchas](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy).
+  A warm start does zero network before it binds the port.
+- **Not installed by ansible** — installed on first `copilot-proxy start`, so it
+  stays off the provisioning path. Force a clean re-install with
+  `copilot-proxy reinstall` (a version bump re-installs on its own).
 
 !!! warning "This violates GitHub Copilot's Terms of Service"
     Using a Copilot subscription to power a non-GitHub agent is not permitted, and
@@ -105,9 +111,10 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 | Env var | Default | Meaning |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
-| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@1.13.14` | `bunx` package spec (pin / upgrade; `copilot-api@0.7.0` = old original) |
+| `COPILOT_API_PKG` | `@jeffreycao/copilot-api@1.13.14` | package spec to install (pin / upgrade; `copilot-api@0.7.0` = old original). Changing it re-installs. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
+| `COPILOT_INSTALL_NOPROXY` | `0` | `1` = install the package with the proxy env stripped, skipping the 45s stall on a host where bun cannot resolve through the proxy |
 
 Set these in `~/.shellrc.adhoc` (or the per-shell secrets files). `start` refuses
 to run until `copilot-proxy auth` has stored a token, and waits up to ~20s for the
@@ -115,10 +122,19 @@ proxy to answer before returning. `start` detects the package flavor from
 `COPILOT_API_PKG`: only the exact original `copilot-api` gets
 `--rate-limit`/`--wait` (the fork's `start` doesn't have those flags).
 
+The **first** `start` installs the pinned package into
+`~/.local/share/copilot-api/pkg` (stamped with the spec) and every later start
+just execs the resulting binary — no registry round-trip, no per-launch resolve.
+The install tries your ambient env first (needed where the registry is only
+reachable *through* the proxy) and retries with the proxy stripped if that stalls;
+either attempt is killed on a timeout, so a stalled install can never keep bun's
+global cache lock and wedge the next one. If `start` times out it now also **kills
+the server it spawned**, instead of leaving an orphan behind for every retry.
+
 `copilot-proxy whoami` is the real login check: it prints your plan / quota
 (fails loudly if the token is missing or expired). On the fork it queries the
-running proxy's `/usage` endpoint (jq-summarized) and falls back to
-`bunx <pkg> debug` when the proxy is down; on the original it runs
+running proxy's `/usage` endpoint (jq-summarized) and falls back to the installed
+binary's `debug` when the proxy is down; on the original it runs
 `check-usage`. Use it instead of eyeballing the token file — the token is a
 plaintext credential and should not be opened in an editor.
 
@@ -128,20 +144,20 @@ Diagnoses the whole path and exits non-zero on any failure. Read-only by default
 `--live` adds one real `POST /v1/messages` (`max_tokens: 1`, a non-`[1m]` chat
 model) that costs one quota unit but is the only check that exercises streaming.
 
-Sections, in order: prerequisites (`bunx`/`curl`/`jq`) → token file → proxy and
-throttle-shim liveness → stale installer → **models** → upstream reachability →
-local proxy/VPN → live probe.
+Sections, in order: prerequisites (`bun`/`curl`/`jq`) → **package** → token file →
+proxy and throttle-shim liveness → stale installer → **models** → upstream
+reachability → local proxy/VPN → live probe.
 
-The **stale-installer** check catches the most confusing startup failure: `start`
-prints only *"did not come up in time"* and the log shows a lone *"Resolving
-dependencies"*. That means `bunx` is still trying to `bun add` the pinned
-`copilot-api` and the resolve has hung — usually bun stalling against the npm
-registry through the socks `ALL_PROXY`, even when `curl` to the same registry
-works. The wedged installer holds bun's global cache lock, so every retry hangs
-the same way and stacks up more zombies. Doctor flags any live
-`bun add … copilot-api` and prints the clear-and-restart one-liner
-(`pkill -f 'bun add.*copilot-api'; rm -rf "$HOME/.bun/install/cache/.tmp"/*`);
-if it re-hangs, retry with `ALL_PROXY`/`HTTPS_PROXY` unset.
+The **package** check reports whether the pinned spec is installed in the prefix
+and where its binary is. "Not installed" is a note, not a failure — the next
+`start` installs it once.
+
+The **stale-installer** check is a safety net for the trap described in
+[Gotchas](#start-used-to-hang-at-resolving-dependencies-behind-a-socks-proxy): any
+live `bun add … copilot-api` at rest means an install has stalled (bun hangs
+resolving through a socks proxy) and is holding bun's global cache lock. The
+installer now bounds and kills its own attempts, so this should stay empty; if it
+ever fires, doctor prints the clear-and-restart one-liner.
 
 The models section is the one that earns the command. It compares what the proxy
 serves against what GitHub serves *right now*, which is the only way to separate
@@ -283,6 +299,39 @@ inject the fork-README quota savers:
 `COPILOT_PROXY_QUIET` value.
 
 ## Gotchas (these cost real debugging time)
+
+### `start` used to hang at "Resolving dependencies" behind a socks proxy
+
+**Fixed** (the runner no longer resolves at launch), but worth understanding
+because the failure mode is so misleading — and because it will bite any *other*
+`bunx`-based tool on a proxied host.
+
+`start` used to run `bunx <pkg> start`, and bunx re-resolves the package on every
+launch. **bun hangs indefinitely resolving through a socks `ALL_PROXY`** — while
+`curl` through that same proxy reaches the registry in under half a second. So
+every obvious check passes and nothing points at the installer. All you get is:
+
+```
+copilot-proxy: did not come up in time — check 'copilot-proxy logs'.
+$ copilot-proxy logs
+nohup: ignoring input
+Resolving dependencies
+```
+
+Two things turned one stall into a permanent wedge: the stalled `bun add` kept
+bun's **global install-cache lock**, so the next `start` hung on the lock too; and
+`start`'s timeout returned without killing what it spawned, so each retry left
+another orphan (five, in the wild) and none ever bound the port.
+
+The runner now installs the pinned package **once** into
+`~/.local/share/copilot-api/pkg` and execs that binary, so a warm start does no
+network at all. The install itself is bounded and killed on timeout, and falls back
+to a proxy-stripped retry. Note the registry here is npmmirror (a domestic mirror,
+set in `~/.bunfig.toml` for GFW speed) — routing it through the proxy buys nothing
+and is exactly what breaks bun.
+
+Full post-mortem, with the verbatim symptoms to grep:
+[`pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md).
 
 ### The model list is fetched ONCE at startup — a flaky fetch poisons the session
 

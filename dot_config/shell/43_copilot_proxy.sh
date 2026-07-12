@@ -43,15 +43,22 @@
 #     `copilot-here on` points elsewhere (run `copilot-here off` first).
 #
 # Portability notes (POSIX subset, both shells source this file):
-#   - runs the proxy via `bunx` (matches 07_bunx_cli.sh); pinned version avoids a
-#     per-launch @latest registry round-trip. Override with COPILOT_API_PKG.
+#   - the pinned package is INSTALLED ONCE into _copilot_pkg_prefix and the proxy
+#     runs that binary directly. It deliberately does NOT use `bunx` at launch:
+#     bunx re-resolves the package on every start, and bun stalls forever
+#     resolving through a socks ALL_PROXY — which wedged `start` at "Resolving
+#     dependencies" AND kept bun's global cache lock, so every retry hung too.
+#     See pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md.
+#     Override the spec with COPILOT_API_PKG; force a re-install with
+#     `copilot-proxy reinstall`.
 #   - no ZLE/compdef/setopt/glob-qualifiers here (bash would error on source).
 #
 # Env (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}):
 #   COPILOT_PROXY_PORT   default: 4141        - port the proxy listens on
 #   COPILOT_API_PKG      default: @jeffreycao/copilot-api@1.13.14
-#                                             - bunx package spec (pin/upgrade;
-#                                               copilot-api@0.7.0 = old original)
+#                                             - package spec to install (pin/
+#                                               upgrade; copilot-api@0.7.0 = old
+#                                               original). Changing it re-installs.
 #   COPILOT_PROXY_RATE   default: 15          - --rate-limit seconds; ONLY used
 #                                               by the original package (the fork
 #                                               has no rate limiter)
@@ -77,6 +84,125 @@ _copilot_pkg_flavor() {
 _copilot_base() { printf 'http://localhost:%s' "$(_copilot_port)"; }
 _copilot_logfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).log"; }
 _copilot_pidfile() { printf '%s' "${TMPDIR:-/tmp}/copilot-api-$(_copilot_port).pid"; }
+
+# --- pinned package install (run the binary, never `bunx` at launch) -------------
+#
+# Why an install prefix instead of `bunx <pkg> start`: bunx re-resolves the
+# package on EVERY launch, and bun hangs indefinitely resolving through a socks
+# ALL_PROXY (curl through the same proxy is fine, which is what makes it so
+# confusing). The wedged installer then keeps bun's global cache lock, so every
+# retry hangs identically and stacks another zombie. Installing once and exec'ing
+# the resulting binary removes the per-start resolve entirely — a warm start does
+# zero network before it binds the port. Full story:
+# pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md
+
+# Package NAME without the trailing @version, keeping any @scope/ prefix.
+# The naive "${spec%@*}" eats the whole string on a scoped spec with no version
+# (@jeffreycao/copilot-api -> ""), so test on the scope-stripped copy.
+_copilot_pkg_name() {
+  local spec base
+  spec="$(_copilot_pkg)"
+  base="${spec#@}"
+  case "$base" in
+    *@*) printf '%s' "${spec%@*}" ;;
+    *)   printf '%s' "$spec" ;;
+  esac
+}
+
+_copilot_pkg_prefix() { printf '%s' "${XDG_DATA_HOME:-$HOME/.local/share}/copilot-api/pkg"; }
+_copilot_pkg_bin()    { printf '%s' "$(_copilot_pkg_prefix)/node_modules/.bin/copilot-api"; }
+# Records the spec the prefix currently holds, so bumping COPILOT_API_PKG (or the
+# pinned default) re-installs instead of silently running the old version.
+_copilot_pkg_stamp()  { printf '%s' "$(_copilot_pkg_prefix)/.installed-spec"; }
+
+# Is the CURRENTLY pinned spec installed and runnable?
+_copilot_pkg_ready() {
+  local bin stamp
+  bin="$(_copilot_pkg_bin)"; stamp="$(_copilot_pkg_stamp)"
+  [ -x "$bin" ] || return 1
+  [ -f "$stamp" ] || return 1
+  [ "$(command head -n 1 "$stamp" 2>/dev/null)" = "$(_copilot_pkg)" ]
+}
+
+# One `bun add` attempt in $1. $2 = "noproxy" strips the proxy env, anything else
+# honours it. $3 = seconds budget, enforced by polling — `timeout(1)` is not in
+# macOS base, and this file is sourced by both shells. Returns 124 on expiry.
+#
+# The kill on expiry is the load-bearing part: a stalled `bun add` left running
+# keeps bun's global install-cache lock, and THAT is what made every subsequent
+# start hang too. Never let one escape.
+_copilot_pkg_install_try() {
+  local dir="$1" mode="$2" budget="$3" pkg pid i=0
+  pkg="$(_copilot_pkg)"
+  if [ "$mode" = "noproxy" ]; then
+    ( cd "$dir" 2>/dev/null && command env \
+        -u ALL_PROXY -u all_proxy -u HTTP_PROXY -u http_proxy \
+        -u HTTPS_PROXY -u https_proxy \
+        bun add "$pkg" --no-summary >/dev/null 2>&1 ) &
+  else
+    ( cd "$dir" 2>/dev/null && command bun add "$pkg" --no-summary >/dev/null 2>&1 ) &
+  fi
+  pid=$!
+  while [ "$i" -lt "$budget" ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid" 2>/dev/null
+      return $?
+    fi
+    sleep 1
+    i=$((i + 1))
+  done
+  # Braces + 2>/dev/null swallow the shell's own async "Killed" job notification:
+  # we report the timeout ourselves, and a raw job-control message here reads like
+  # a crash. Kill the whole process group's `bun add` too — the subshell's child
+  # is the one actually holding the cache lock.
+  { kill -9 "$pid" 2>/dev/null
+    command pkill -9 -f "bun add.*$(_copilot_pkg_name)" 2>/dev/null
+    wait "$pid" 2>/dev/null
+  } 2>/dev/null
+  return 124
+}
+
+# Ensure the pinned spec is installed. No-op (and no network) once it is.
+_copilot_ensure_pkg() {
+  local spec prefix bin
+  spec="$(_copilot_pkg)"; prefix="$(_copilot_pkg_prefix)"; bin="$(_copilot_pkg_bin)"
+
+  _copilot_pkg_ready && return 0
+
+  if ! command -v bun >/dev/null 2>&1; then
+    printf '%s\n' "copilot-proxy: bun not found (needs bun via mise)." >&2
+    return 1
+  fi
+  command mkdir -p "$prefix" || return 1
+  # A private package.json keeps `bun add` from walking up and polluting $HOME.
+  [ -f "$prefix/package.json" ] || printf '%s\n' \
+    '{"name":"copilot-api-runner","private":true,"version":"0.0.0"}' >"$prefix/package.json"
+
+  printf '%s\n' "copilot-proxy: installing $spec (one-time — later starts skip this) ..."
+  # Attempt 1 honours the ambient env: on a host where the npm registry is only
+  # reachable THROUGH the proxy, stripping it would break the install. Attempt 2
+  # strips it, which is what rescues the socks stall. COPILOT_INSTALL_NOPROXY=1
+  # skips straight to attempt 2 (saves the 45s stall on a known-bad host).
+  if [ "${COPILOT_INSTALL_NOPROXY:-0}" = "1" ] \
+     || ! _copilot_pkg_install_try "$prefix" env 45; then
+    if [ "${COPILOT_INSTALL_NOPROXY:-0}" != "1" ]; then
+      printf '%s\n' "copilot-proxy: install stalled with the proxy env — retrying without it ..." >&2
+      # Drop bun's cache lock dir before retrying; the killed attempt may have
+      # left it behind, and a stale lock hangs the retry for the same reason.
+      command rm -rf -- "${BUN_INSTALL:-$HOME/.bun}/install/cache/.tmp" 2>/dev/null
+    fi
+    if ! _copilot_pkg_install_try "$prefix" noproxy 90; then
+      printf '%s\n' "copilot-proxy: could not install $spec — run 'copilot-proxy doctor'." >&2
+      return 1
+    fi
+  fi
+
+  if [ ! -x "$bin" ]; then
+    printf '%s\n' "copilot-proxy: install finished but $bin is missing." >&2
+    return 1
+  fi
+  printf '%s\n' "$spec" >"$(_copilot_pkg_stamp)"
+}
 
 # --- throttle shim (optional, in front of the fork) -----------------------------
 # A tiny Bun reverse proxy that caps concurrent in-flight upstream requests and
@@ -293,16 +419,15 @@ _copilot_system_proxy() {
 }
 
 # PIDs of bun package-installer processes still resolving copilot-api, one per
-# line (empty when none). bunx must `bun add` the pinned package into a temp dir
-# before `start` can bind the port; when that resolve hangs — typically bun
-# stalling against the npm registry through a socks ALL_PROXY, even when curl to
-# the same registry is fine — `copilot-proxy start` blocks at "Resolving
-# dependencies", times out after ~20s, and leaves the installer wedged. Worse,
-# it keeps bun's global install-cache lock, so the NEXT start hangs the same way
-# and retries just pile up more zombies. A live `bun add … copilot-api` is never
-# normal once install is done (it's a one-shot), so a match is a clean
-# stale-installer signal. Pattern matches both flavors' package names. Verified
-# 2026-07: three stacked zombies from three retries, none ever bound the port.
+# line (empty when none). bun stalls indefinitely resolving through a socks
+# ALL_PROXY (even when curl to the same registry is fine), and a stalled
+# `bun add` keeps bun's global install-cache lock — which wedges every later
+# install too. _copilot_pkg_install_try now bounds and kills its own attempts, so
+# this should stay empty; it remains as a safety net for a stall we didn't spawn
+# (a hand-run `bunx @jeffreycao/copilot-api`, or a zombie left by the pre-install
+# design that resolved on every launch). A live `bun add … copilot-api` is never
+# normal at rest — install is a one-shot — so a match is a clean signal.
+# Verified 2026-07: five stacked zombies from five retries, none ever bound the port.
 _copilot_stale_installers() {
   command pgrep -f 'bun add.*copilot-api' 2>/dev/null
 }
@@ -321,8 +446,8 @@ copilot-proxy() {
     set -o pipefail
   fi
 
-  if ! command -v bunx >/dev/null 2>&1; then
-    printf '%s\n' "copilot-proxy: bunx not found (needs bun via mise)." >&2
+  if ! command -v bun >/dev/null 2>&1; then
+    printf '%s\n' "copilot-proxy: bun not found (needs bun via mise)." >&2
     return 1
   fi
 
@@ -351,23 +476,31 @@ copilot-proxy() {
         [ -f "$logf.1" ] && command mv -f "$logf.1" "$logf.2"
         command mv -f "$logf" "$logf.1"
       fi
+      # Install the pinned package BEFORE backgrounding anything. Resolving it at
+      # launch (the old `bunx <pkg> start`) is what used to hang forever behind a
+      # socks proxy, with nothing but "Resolving dependencies" in the log.
+      _copilot_ensure_pkg || return 1
+      local bin srv_pid
+      bin="$(_copilot_pkg_bin)"
+
       # Flag sets differ per package: only the original has --rate-limit/--wait
       # (the fork ships no rate limiter — mitigate with COPILOT_PROXY_QUIET=1).
       if [ "$(_copilot_pkg_flavor)" = "original" ]; then
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port (rate-limit ${COPILOT_PROXY_RATE:-15}s) ..."
         # nohup + background; detach so it survives the shell. Log to a file.
-        nohup bunx "$pkg" start \
+        nohup "$bin" start \
           --port "$port" \
           --rate-limit "${COPILOT_PROXY_RATE:-15}" \
           --wait \
           >"$logf" 2>&1 &
       else
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port ..."
-        nohup bunx "$pkg" start \
+        nohup "$bin" start \
           --port "$port" \
           >"$logf" 2>&1 &
       fi
-      printf '%s\n' "$!" >"$pidf"
+      srv_pid=$!
+      printf '%s\n' "$srv_pid" >"$pidf"
       # Wait up to ~20s for it to answer.
       local i=0
       while [ "$i" -lt 20 ]; do
@@ -378,9 +511,21 @@ copilot-proxy() {
           printf '%s\n' "copilot-proxy: up → $(_copilot_client_base)  (logs: copilot-proxy logs)"
           return 0
         fi
+        # Crashed on its own (bad flag, port taken, auth) — don't sit out the
+        # remaining seconds pretending we're still waiting.
+        if ! kill -0 "$srv_pid" 2>/dev/null; then
+          command rm -f -- "$pidf"
+          printf '%s\n' "copilot-proxy: server exited during startup — check 'copilot-proxy logs'." >&2
+          return 1
+        fi
         sleep 1
         i=$((i + 1))
       done
+      # Timed out. REAP what we spawned: the old code returned and left it running,
+      # so each retry stacked another orphan (5 of them, in the wild) and none ever
+      # bound the port.
+      kill "$srv_pid" 2>/dev/null
+      command rm -f -- "$pidf"
       printf '%s\n' "copilot-proxy: did not come up in time — check 'copilot-proxy logs'." >&2
       return 1
       ;;
@@ -454,11 +599,23 @@ copilot-proxy() {
 
       printf '%s\n' "Prerequisites"
       local _tool
-      for _tool in bunx curl jq; do
+      for _tool in bun curl jq; do
         if command -v "$_tool" >/dev/null 2>&1; then _ok "$_tool" "$(command -v "$_tool")"
         elif [ "$_tool" = jq ]; then _note "$_tool" "not found — some checks degrade to grep"
         else _bad "$_tool" "not found"; fi
       done
+
+      printf '\n%s\n' "Package"
+      # The proxy runs an INSTALLED binary, not `bunx <pkg>` — so a warm start does
+      # no network at all. An un-installed prefix is not a fault: the next start
+      # installs it once.
+      if _copilot_pkg_ready; then
+        _ok "installed" "$pkg"
+        _skip "bin" "$(_copilot_pkg_bin)"
+      else
+        _note "not installed" "$pkg — the next 'copilot-proxy start' installs it (one-time)"
+        _hint "copilot-proxy reinstall   # or force it now"
+      fi
 
       printf '\n%s\n' "Authentication"
       local _tok="$HOME/.local/share/copilot-api/github_token"
@@ -662,8 +819,17 @@ copilot-proxy() {
       ;;
     auth)
       # One-time device login → stores a ghu_ token copilot-api can exchange.
+      _copilot_ensure_pkg || return 1
       printf '%s\n' "copilot-proxy: launching copilot-api device login ..."
-      bunx "$pkg" auth
+      "$(_copilot_pkg_bin)" auth
+      ;;
+    reinstall)
+      # Force a clean re-install of the pinned spec (normally only needed if the
+      # prefix got corrupted — a version bump re-installs on its own via the stamp).
+      printf '%s\n' "copilot-proxy: removing $(_copilot_pkg_prefix) ..."
+      command rm -rf -- "$(_copilot_pkg_prefix)"
+      _copilot_ensure_pkg || return 1
+      printf '%s\n' "copilot-proxy: installed $(_copilot_pkg) → $(_copilot_pkg_bin)"
       ;;
     whoami|usage)
       # Real login check: exchanges the stored token against GitHub and prints
@@ -673,7 +839,8 @@ copilot-proxy() {
         return 1
       fi
       if [ "$(_copilot_pkg_flavor)" = "original" ]; then
-        bunx "$pkg" check-usage
+        _copilot_ensure_pkg || return 1
+        "$(_copilot_pkg_bin)" check-usage
       elif _copilot_alive; then
         # Fork has no check-usage subcommand; its /usage endpoint serves the
         # GitHub quota payload (same data as the bundled /usage-viewer).
@@ -692,7 +859,8 @@ copilot-proxy() {
       else
         # Proxy down → the fork's `debug` still validates auth state / paths.
         printf '%s\n' "copilot-proxy: not running — showing auth/debug info instead of quota." >&2
-        bunx "$pkg" debug
+        _copilot_ensure_pkg || return 1
+        "$(_copilot_pkg_bin)" debug
       fi
       ;;
     shim)
@@ -724,9 +892,11 @@ copilot-proxy() {
       esac
       ;;
     -h|--help|help)
-      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth]"
+      printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth|reinstall]"
       printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, model entitlement, upstream"
       printf '%s\n' "                        reachability. --live adds one real request (costs 1 quota unit)."
+      printf '%s\n' "  reinstall             wipe + re-install the pinned package (a version bump"
+      printf '%s\n' "                        re-installs on its own; this is for a corrupted prefix)."
       ;;
     *)
       printf '%s\n' "copilot-proxy: unknown action '$action' (try --help)" >&2
