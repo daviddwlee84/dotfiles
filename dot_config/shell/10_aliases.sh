@@ -90,6 +90,15 @@ run-for() {
 	"$to" --signal="${RUN_FOR_SIGNAL:-INT}" --kill-after="${RUN_FOR_KILL_AFTER:-5s}" "$dur" "$@"
 }
 
+# --- timeout → gtimeout (macOS) --------------------------------------------
+# macOS ships no `timeout(1)`; GNU coreutils installs it prefixed as `gtimeout`
+# (coreutils, devtools ansible role). Alias the bare name so scripts and
+# one-liners that call `timeout` Just Work — https://stackoverflow.com/q/3504945.
+# Self-gating: only defined where `gtimeout` exists (macOS + coreutils), so Linux
+# keeps its native `timeout`. `command -v` in `run-for` bypasses aliases, so this
+# doesn't affect that helper.
+command -v gtimeout >/dev/null 2>&1 && alias timeout='gtimeout'
+
 # --- Reload shell config (source-rc / reload) ------------------------------
 # Re-source the CURRENT shell's rc entry point in place, so a running session
 # picks up new aliases/functions after `chezmoi apply` — without exec'ing a
