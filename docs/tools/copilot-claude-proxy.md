@@ -129,8 +129,19 @@ Diagnoses the whole path and exits non-zero on any failure. Read-only by default
 model) that costs one quota unit but is the only check that exercises streaming.
 
 Sections, in order: prerequisites (`bunx`/`curl`/`jq`) → token file → proxy and
-throttle-shim liveness → **models** → upstream reachability → local proxy/VPN →
-live probe.
+throttle-shim liveness → stale installer → **models** → upstream reachability →
+local proxy/VPN → live probe.
+
+The **stale-installer** check catches the most confusing startup failure: `start`
+prints only *"did not come up in time"* and the log shows a lone *"Resolving
+dependencies"*. That means `bunx` is still trying to `bun add` the pinned
+`copilot-api` and the resolve has hung — usually bun stalling against the npm
+registry through the socks `ALL_PROXY`, even when `curl` to the same registry
+works. The wedged installer holds bun's global cache lock, so every retry hangs
+the same way and stacks up more zombies. Doctor flags any live
+`bun add … copilot-api` and prints the clear-and-restart one-liner
+(`pkill -f 'bun add.*copilot-api'; rm -rf "$HOME/.bun/install/cache/.tmp"/*`);
+if it re-hangs, retry with `ALL_PROXY`/`HTTPS_PROXY` unset.
 
 The models section is the one that earns the command. It compares what the proxy
 serves against what GitHub serves *right now*, which is the only way to separate

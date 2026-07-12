@@ -101,7 +101,16 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 單位，但那是唯一能驗證 streaming 的檢查。
 
 檢查順序：前置工具（`bunx`/`curl`/`jq`）→ token 檔案 → 代理與 throttle shim 是否存活 →
-**模型**→ 上游連線 → 本機代理 / VPN → live probe。
+安裝殘留（stale installer）→ **模型**→ 上游連線 → 本機代理 / VPN → live probe。
+
+**安裝殘留（stale installer）** 這一段專門抓最令人困惑的啟動失敗：`start` 只印出
+*「did not come up in time」*，log 裡卻只有一行 *「Resolving dependencies」*。這代表
+`bunx` 還卡在 `bun add` 那個釘選的 `copilot-api`，而相依解析卡死了 —— 通常是 bun 透過
+socks `ALL_PROXY` 連 npm registry 卡住（即使 `curl` 連同一個 registry 正常）。這個卡死的
+安裝程序會占住 bun 的全域快取鎖，所以每次重試都同樣卡死、還會疊出更多殭屍程序。doctor
+會標出任何存活中的 `bun add … copilot-api`，並印出「清掉再重啟」的一行指令
+（`pkill -f 'bun add.*copilot-api'; rm -rf "$HOME/.bun/install/cache/.tmp"/*`）；若仍卡住，
+就把 `ALL_PROXY`/`HTTPS_PROXY` 拿掉再重試。
 
 其中「模型」這一段才是這個指令的價值所在。它把代理**目前提供的**模型清單，跟 GitHub
 **此刻真正提供的**清單相比對 —— 這是唯一能區分 `400 model_not_supported` 兩種成因的方法：

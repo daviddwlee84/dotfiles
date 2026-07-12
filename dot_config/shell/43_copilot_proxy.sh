@@ -292,6 +292,21 @@ _copilot_system_proxy() {
     END { if (en == 1 && h != "" && p != "") printf "%s:%s", h, p }'
 }
 
+# PIDs of bun package-installer processes still resolving copilot-api, one per
+# line (empty when none). bunx must `bun add` the pinned package into a temp dir
+# before `start` can bind the port; when that resolve hangs — typically bun
+# stalling against the npm registry through a socks ALL_PROXY, even when curl to
+# the same registry is fine — `copilot-proxy start` blocks at "Resolving
+# dependencies", times out after ~20s, and leaves the installer wedged. Worse,
+# it keeps bun's global install-cache lock, so the NEXT start hangs the same way
+# and retries just pile up more zombies. A live `bun add … copilot-api` is never
+# normal once install is done (it's a one-shot), so a match is a clean
+# stale-installer signal. Pattern matches both flavors' package names. Verified
+# 2026-07: three stacked zombies from three retries, none ever bound the port.
+_copilot_stale_installers() {
+  command pgrep -f 'bun add.*copilot-api' 2>/dev/null
+}
+
 # --- proxy manager --------------------------------------------------------------
 
 # Manage the copilot-api proxy. Subcommands: start|stop|status|restart|logs|auth.
@@ -455,6 +470,26 @@ copilot-proxy() {
       else
         _bad "listening" "nothing answering on port $port"
         _hint "copilot-proxy start"
+      fi
+      # A wedged package installer is the non-obvious reason a proxy never binds
+      # the port (see _copilot_stale_installers): 'copilot-proxy start' just says
+      # "did not come up in time" and the log shows only "Resolving dependencies".
+      # Flag it hard when nothing is listening (this IS the fault), softer when
+      # the proxy is up (a leftover, but still worth clearing — it holds bun's
+      # cache lock and will hang the next restart).
+      local _stale _stale_n
+      _stale="$(_copilot_stale_installers)"
+      if [ -n "$_stale" ]; then
+        _stale_n="$(printf '%s\n' "$_stale" | command grep -c .)"
+        if _copilot_alive; then
+          _note "stale installer" "$_stale_n leftover 'bun add … copilot-api' proc(s) — harmless now, but they hold bun's cache lock (a restart will hang)"
+        else
+          _bad "stale installer" "$_stale_n wedged 'bun add … copilot-api' proc(s) — start is blocked at \"Resolving dependencies\", never binds port $port"
+        fi
+        _hint "pkill -f 'bun add.*copilot-api'; rm -rf \"\$HOME/.bun/install/cache/.tmp\"/*; copilot-proxy start"
+        _hint "re-hangs? bun is stalling on the socks proxy — env -u ALL_PROXY -u HTTPS_PROXY -u HTTP_PROXY copilot-proxy start"
+      else
+        _skip "installer" "no wedged 'bun add' process"
       fi
       if _copilot_shim_enabled; then
         if _copilot_shim_alive; then _ok "throttle shim" "up on $(_copilot_shim_base) → clients use this"
