@@ -11,6 +11,10 @@
     "showTodos": true,
     "showDuration": true,
     "showConfigCounts": true,
-    "showSessionName": true
+    "showSessionName": true,
+    "showSpeed": true,
+    "showClaudeCodeVersion": true,
+    "showMemoryUsage": true,
+    "contextValue": "both"
   }
 }
