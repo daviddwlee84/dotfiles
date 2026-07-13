@@ -114,6 +114,7 @@ Add new entries here as you create them. Keep alphabetical.
 | [`starship-context-modules`](starship-context-modules.md) | P1 ready | "Starship status-aware modules" |
 | [`tmux2k-tuning`](tmux2k-tuning.md) | P1 ready | "tmux2k bandwidth bug" + "tmux2k theme alignment" |
 | [`tmux-window-status-indicators`](tmux-window-status-indicators.md) | P? deferred | "tmux window status indicators (running / idle / error)" |
+| [`try-bash-port`](try-bash-port.md) | P2 deferred 2026-07 | "Migrate B-class zsh tools to shared shell layer" (`32_try.zsh` sub-item) |
 | [`tui-testing-harness`](tui-testing-harness.md) | P3 direction decided, deferred | "TUI E2E testing harness — Textual Pilot for `mlf` (+ pexpect/pyte)" |
 | [`tv-agent-sessions-richer-preview`](tv-agent-sessions-richer-preview.md) | Done (batch 1) / P? deferred (Cursor) | "tv agent-sessions richer preview + SpecStory linkage" |
 | [`mise-runtime-gating`](mise-runtime-gating.md) | P2 ready | "Gate mise runtimes (rust/dotnet/bun/ruby) + fix .NET-SDK contract bug" |
