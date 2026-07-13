@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+#
+# wake — Wake-on-LAN sender. Powers on a box by broadcasting a magic packet.
+#
+# The passive side (arming the target NIC + persisting it across reboots) is the
+# `wake_on_lan` ansible role (chezmoi prompt `installWakeOnLan`). Wake-from-full-
+# shutdown (S5) also needs a one-time BIOS change (Power On By PCI-E on, ErP off).
+# Full setup + troubleshooting: docs/sysadmin/wake-on-lan.md
+#
+# Usage:
+#   wake <host|MAC> [<host|MAC> ...]   # send magic packet(s)
+#   wake --list                        # show configured hosts
+#   wake <host> -b 192.168.1.255       # override the broadcast address
+#
+# Hosts live in ~/.config/wake/hosts.toml (seeded once by chezmoi):
+#   [hosts.david-ubuntu]
+#   mac       = "cc:28:aa:89:1b:9a"
+#   broadcast = "192.168.31.255"   # optional; subnet-directed broadcast
+#   # port    = 9                  # optional (default 9)
+#
+# Pure stdlib (socket + tomllib) — no external dependency, so it works on a
+# fresh box before the `wakeonlan` apt/brew twin is installed.
+
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import socket
+import sys
+
+try:
+    import tomllib  # stdlib, py3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    tomllib = None
+
+CONFIG = os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "wake", "hosts.toml",
+)
+DEFAULT_PORT = 9
+# aa:bb:cc:dd:ee:ff / aa-bb-.. / aabbccddeeff (separator must be consistent).
+MAC_RE = re.compile(r"^[0-9a-fA-F]{2}([:-]?)(?:[0-9a-fA-F]{2}\1){4}[0-9a-fA-F]{2}$")
+
+
+def err(msg):
+    print(f"wake: {msg}", file=sys.stderr)
+
+
+def die(msg, code=1):
+    err(msg)
+    sys.exit(code)
+
+
+def load_config():
+    if not os.path.exists(CONFIG):
+        return {}
+    if tomllib is None:
+        die("python 3.11+ (tomllib) required to read the hosts file")
+    try:
+        with open(CONFIG, "rb") as fh:
+            return tomllib.load(fh)
+    except Exception as e:  # noqa: BLE001
+        die(f"bad config {CONFIG}: {e}", 2)
+
+
+def normalize_mac(mac):
+    """Return 12 lowercase hex chars, or None if the string is not a MAC."""
+    mac = mac.strip()
+    if not MAC_RE.match(mac):
+        return None
+    return re.sub(r"[:-]", "", mac).lower()
+
+
+def magic_packet(mac_hex):
+    return b"\xff" * 6 + bytes.fromhex(mac_hex) * 16
+
+
+def send(mac_hex, broadcasts, port, count, quiet):
+    pkt = magic_packet(mac_hex)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    try:
+        for _ in range(count):
+            for dest in broadcasts:
+                sock.sendto(pkt, (dest, port))
+    finally:
+        sock.close()
+    if not quiet:
+        pretty = ":".join(mac_hex[i:i + 2] for i in range(0, 12, 2))
+        print(f"wake: sent {count}x magic packet to {pretty} "
+              f"via {', '.join(broadcasts)}:{port}")
+
+
+def resolve(target, hosts):
+    """(mac_hex, host_broadcast, host_port) for a config name or a raw MAC."""
+    if target in hosts:
+        entry = hosts[target]
+        mac = normalize_mac(str(entry.get("mac", "")))
+        if not mac:
+            die(f"host '{target}' has no valid mac= in {CONFIG}")
+        return mac, entry.get("broadcast"), int(entry.get("port", DEFAULT_PORT))
+    mac = normalize_mac(target)
+    if mac:
+        return mac, None, DEFAULT_PORT
+    die(f"unknown host '{target}' (not in {CONFIG}) and not a MAC. "
+        "Try `wake --list`.")
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog="wake",
+        description="Wake-on-LAN sender — power on a box by magic packet.",
+    )
+    ap.add_argument("targets", nargs="*",
+                    help="host name(s) from the config, or raw MAC(s)")
+    ap.add_argument("-l", "--list", action="store_true",
+                    help="list configured hosts and exit")
+    ap.add_argument("--list-names", action="store_true",
+                    help="print bare host names (for shell completion)")
+    ap.add_argument("-b", "--broadcast",
+                    help="broadcast address (default: 255.255.255.255 + host's)")
+    ap.add_argument("-p", "--port", type=int, default=DEFAULT_PORT,
+                    help=f"UDP port (default {DEFAULT_PORT})")
+    ap.add_argument("-c", "--count", type=int, default=3,
+                    help="packets per target (default 3)")
+    ap.add_argument("-q", "--quiet", action="store_true",
+                    help="suppress per-packet output")
+    args = ap.parse_args()
+
+    cfg = load_config()
+    hosts = cfg.get("hosts", {}) if isinstance(cfg, dict) else {}
+    default_bcast = cfg.get("broadcast") if isinstance(cfg, dict) else None
+
+    if args.list_names:
+        print("\n".join(sorted(hosts)))
+        return
+    if args.list:
+        if not hosts:
+            print(f"(no hosts configured in {CONFIG})")
+            return
+        width = max(len(n) for n in hosts)
+        for name in sorted(hosts):
+            entry = hosts[name]
+            bcast = entry.get("broadcast", default_bcast or "255.255.255.255")
+            print(f"{name:<{width}}  {entry.get('mac', '?'):<17}  {bcast}")
+        return
+
+    if not args.targets:
+        ap.error("no target given (a host name or MAC). "
+                 "`wake --list` shows configured hosts.")
+
+    for target in args.targets:
+        mac, host_bcast, host_port = resolve(target, hosts)
+        port = args.port if args.port != DEFAULT_PORT else host_port
+        # Always hit the global broadcast; add the host/CLI subnet-directed one
+        # too — some networks drop 255.255.255.255, some drop directed; send both.
+        bcasts = ["255.255.255.255"]
+        for extra in (args.broadcast, host_bcast, default_bcast):
+            if extra and extra not in bcasts:
+                bcasts.append(extra)
+        send(mac, bcasts, port, args.count, args.quiet)
+
+
+if __name__ == "__main__":
+    main()

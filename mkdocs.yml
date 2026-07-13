@@ -359,6 +359,7 @@ nav:
       - Scheduled jobs (cron / timers / launchd): sysadmin/scheduled-jobs.md
       - Disk / filesystem monitoring: sysadmin/disk.md
       - Hardware monitoring (homelab): sysadmin/hardware.md
+      - Wake-on-LAN (remote power-on): sysadmin/wake-on-lan.md
       - Service health: sysadmin/services-health.md
       - Atuin vs audit: sysadmin/atuin-vs-audit.md
       - Cookbook (scenario recipes): sysadmin/cookbook.md

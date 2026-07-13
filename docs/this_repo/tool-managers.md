@@ -1012,6 +1012,7 @@ list.
 | **dotenv** (python-dotenv[cli]) | uv tool | uv tool | python_uv_tools |
 | **dotnet** | mise | mise | mise |
 | **duckdb** | brew | GitHub release | devtools |
+| **ethtool** | n/a | apt / yum (`ethtool`) | wake_on_lan |
 | **exiftool** | brew | apt (`libimage-exiftool-perl`) | media_tools |
 | **eza** | brew | gierens.de apt repo → GitHub musl → brew aarch64 | devtools |
 | **fastfetch** | brew | (Linux release if added) | devtools |
@@ -1146,6 +1147,7 @@ list.
 | **vips** | brew | apt (`libvips-tools`) | media_tools |
 | **visual-studio-code** | brew cask | Microsoft apt repo | Brewfile.darwin / gui_apps_linux |
 | **warp** | brew cask | n/a | Brewfile.darwin |
+| **wakeonlan** | brew | apt (`wakeonlan`) | networking_tools |
 | **wget** | brew | apt/yum | base |
 | **witr** | brew | (release) | devtools |
 | **workmux** | brew (tap `raine/workmux`) | GitHub release `.tar.gz` | devtools |

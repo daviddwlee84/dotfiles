@@ -70,6 +70,16 @@ installHomelabTools = false
 # 以 per-user systemd service 跑成背景 daemon，透過 127.0.0.1:8888 的 WebUI 設定
 # （headless server 用 SSH tunnel）。詳見 docs/tools/resilio-sync.md。
 installResilioSync = {{ promptBoolOnce . "installResilioSync" "Install Resilio Sync (P2P file sync — GUI cask on macOS, headless WebUI daemon on Linux/servers)" false }}
+# 是否啟用 Wake-on-LAN（被動端）：把有線網卡 arm 成可被 magic packet 喚醒，
+# 並用 wol@<iface> 的 systemd unit 讓設定在重開機後自動套用（會裝 ethtool）。
+# Linux only — macOS 與 VM 內自動跳過。從「完全關機 (S5)」喚醒還需要 BIOS
+# 開 'Power On By PCI-E'、關 'ErP Ready'（韌體設定 Ansible 無法代勞）。
+# 主動端（發封包）用 `wake` CLI 或 wakeonlan。詳見 docs/sysadmin/wake-on-lan.md。
+{{ if eq .chezmoi.os "linux" -}}
+installWakeOnLan = {{ promptBoolOnce . "installWakeOnLan" "Arm Wake-on-LAN on wired NIC(s) so this box can be powered on remotely by a magic packet (persisted via a systemd unit)" false }}
+{{ else -}}
+installWakeOnLan = false
+{{ end -}}
 # 是否安裝 Infrastructure-as-Code 工具 (Azure CLI, Terraform, OpenTofu)
 installIacTools = {{ promptBoolOnce . "installIacTools" "Install Infrastructure-as-Code tools (Azure CLI, Terraform, OpenTofu)" false }}
 # 是否安裝影音/媒體 CLI 工具 (ffmpeg, ImageMagick, exiftool, libvips)

@@ -282,6 +282,17 @@ PROMPTS: tuple[Prompt, ...] = (
                     "NAS）。macOS 走 Homebrew cask 的 GUI app；Linux（桌機與 server 皆同）沒有 GUI，\n"
                     "以 per-user systemd service 跑成背景 daemon，透過 127.0.0.1:8888 的 WebUI 設定\n"
                     "（headless server 用 SSH tunnel）。詳見 docs/tools/resilio-sync.md。")),
+    Prompt("installWakeOnLan", "bool", "System & apps",
+           "Wake-on-LAN (power this box on remotely)",
+           "Arms this machine's wired NIC(s) to wake from a magic packet and persists it across reboots via a wol@<iface> systemd unit (installs ethtool). Linux only; no-op on macOS and inside VMs. Wake-from-full-shutdown (S5) also needs BIOS 'Power On By PCI-E' on + 'ErP Ready' off. The sender side is the `wake` CLI / wakeonlan. See docs/sysadmin/wake-on-lan.md.",
+           default=False,
+           condition=When(os=frozenset({"linux"})), else_value=False,
+           prompt_text="Arm Wake-on-LAN on wired NIC(s) so this box can be powered on remotely by a magic packet (persisted via a systemd unit)",
+           comment=("是否啟用 Wake-on-LAN（被動端）：把有線網卡 arm 成可被 magic packet 喚醒，\n"
+                    "並用 wol@<iface> 的 systemd unit 讓設定在重開機後自動套用（會裝 ethtool）。\n"
+                    "Linux only — macOS 與 VM 內自動跳過。從「完全關機 (S5)」喚醒還需要 BIOS\n"
+                    "開 'Power On By PCI-E'、關 'ErP Ready'（韌體設定 Ansible 無法代勞）。\n"
+                    "主動端（發封包）用 `wake` CLI 或 wakeonlan。詳見 docs/sysadmin/wake-on-lan.md。")),
     Prompt("installIacTools", "bool", "Dev tooling",
            "Infrastructure-as-Code tools",
            "Azure CLI, Terraform, OpenTofu.",
@@ -490,6 +501,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNetworkingTools": True,
         "installAuditd": True,
         "installHomelabTools": True,
+        "installWakeOnLan": True,
         "installGamingApps": False,
         "backupMode": "smart",
         # GUI / desktop flags stay off; noRoot stays false (needs sudo to apt-get).
@@ -514,6 +526,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installGamingApps": False,
         "installAuditd": False,
         "installHomelabTools": False,
+        "installWakeOnLan": False,
         "backupMode": "off",  # fresh VM — nothing worth backing up
     },
     "minimal": {
@@ -538,6 +551,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installMediaTools": False,
         "installAuditd": False,
         "installHomelabTools": False,
+        "installWakeOnLan": False,
         "useChineseMirror": False,
         "gitleaksAllRepos": False,
         "backupMode": "off",

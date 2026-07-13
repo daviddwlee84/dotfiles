@@ -1,0 +1,19 @@
+---
+# wake_on_lan role defaults
+#
+# Passive side of Wake-on-LAN: make THIS Linux box wakeable by a magic packet.
+# The active side (sending the packet) is the `wake` CLI + `wakeonlan` package
+# (see docs/sysadmin/wake-on-lan.md). Firmware settings — BIOS "Power On By
+# PCI-E" ON, "ErP Ready"/"Deep Sleep" OFF — are required for wake-from-S5 and
+# cannot be set from Ansible; the doc carries that checklist.
+
+# ethtool wol flag the wol@<iface> unit writes. "g" = wake on magic packet (the
+# only mode `wake`/`wakeonlan` send). Others exist (p=phy, u=unicast, m=multicast,
+# b=broadcast, a=ARP) but are rarely wanted and wake the box on ordinary traffic.
+wake_on_lan_mode: "g"
+
+# Interfaces to arm. Empty = auto-detect every wired NIC whose driver advertises
+# magic-packet support (`ethtool <if>` → "Supports Wake-on: …g…"). Wi-Fi is
+# always skipped (WoL over Wi-Fi needs WoWLAN + AP cooperation, out of scope).
+# Pin specific NICs with an explicit list, e.g. ["eno1"].
+wake_on_lan_interfaces: []

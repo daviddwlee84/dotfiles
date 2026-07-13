@@ -1,0 +1,137 @@
+---
+# wake_on_lan role — passive side: make this Linux box wakeable by a magic packet.
+#
+# Installs ethtool, drops a templated systemd unit wol@<iface>.service, detects
+# the wired NIC(s) that actually support magic-packet WoL, and enables the unit
+# for each so `ethtool -s <iface> wol g` is re-applied on every boot — the arming
+# does NOT survive a reboot on its own.
+#
+# Linux only. Gated by the chezmoi `installWakeOnLan` prompt (see
+# .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl).
+#
+# Wake-from-S5 (full shutdown) ALSO needs firmware: BIOS "Power On By PCI-E"
+# enabled + "ErP Ready"/"Deep Sleep" disabled (ErP cuts NIC standby power in
+# S4/S5, which silently breaks WoL from off). Ansible can't set firmware — the
+# checklist + troubleshooting live in docs/sysadmin/wake-on-lan.md.
+
+- name: Skip wake_on_lan role on non-Linux
+  when: ansible_facts["os_family"] not in ["Debian", "RedHat"]
+  ansible.builtin.meta: end_play
+
+- name: Skip wake_on_lan role inside a virtual machine
+  # A VM has no physical NIC to wake and no firmware WoL path; arming a virtio
+  # NIC is meaningless (cloud "start instance" is an API call, not a magic packet).
+  when: ansible_facts["virtualization_role"] | default("") == "guest"
+  ansible.builtin.meta: end_play
+
+- name: Install ethtool (Debian / Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+    # Main-archive package covered by base's best-effort cache refresh; don't
+    # re-run apt-get update here (a broken/flaky source would abort the play).
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
+
+- name: Install ethtool (RHEL / CentOS / Rocky / Alma)
+  when: ansible_facts["os_family"] == "RedHat"
+  become: true
+  tags: [sudo]
+  ansible.builtin.yum:
+    name: ethtool
+    state: present
+
+- name: Install wol@.service systemd template unit
+  become: true
+  tags: [sudo]
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/wol@.service
+    mode: "0644"
+    content: |
+      # Managed by dotfiles (wake_on_lan role). Re-arms Wake-on-LAN on the NIC
+      # named by the instance (%i) at every boot — `ethtool -s <if> wol g` does
+      # NOT persist across reboots on its own. Enabled per NIC: wol@eno1.service.
+      [Unit]
+      Description=Enable Wake-on-LAN (magic packet) on %i
+      Documentation=https://wiki.archlinux.org/title/Wake-on-LAN
+      Requires=sys-subsystem-net-devices-%i.device
+      After=sys-subsystem-net-devices-%i.device
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/ethtool -s %i wol {{ wake_on_lan_mode }}
+
+      [Install]
+      WantedBy=sys-subsystem-net-devices-%i.device
+  register: wol_unit
+
+- name: Reload systemd after unit change
+  when: wol_unit is changed
+  become: true
+  tags: [sudo]
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# --- pick the interfaces to arm ----------------------------------------------
+# Auto-detect wired NICs that advertise magic-packet support. Skips loopback,
+# virtual (docker/veth/bridge/tailscale/wireguard/tun) and Wi-Fi interfaces, and
+# any NIC whose "Supports Wake-on" string lacks 'g' (can't do magic-packet WoL).
+- name: Auto-detect wired NICs that support magic-packet WoL
+  when: wake_on_lan_interfaces | length == 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    for d in /sys/class/net/*; do
+      n=$(basename "$d");
+      [ -e "$d/device" ] || continue;
+      [ -d "$d/wireless" ] && continue;
+      [ -L "$d/phy80211" ] && continue;
+      case "$n" in lo|docker*|veth*|br-*|virbr*|tailscale*|utun*|wg*|tap*|bond*) continue;; esac;
+      supp=$(ethtool "$n" 2>/dev/null | sed -n 's/.*Supports Wake-on: //p' | head -1);
+      case "$supp" in *g*) echo "$n";; esac;
+    done || true
+  args:
+    executable: /bin/bash
+  register: wol_detect
+  changed_when: false
+  failed_when: false
+  check_mode: false   # read-only probe; must run even during --check
+
+- name: Resolve target interface list
+  ansible.builtin.set_fact:
+    wake_on_lan_target_interfaces: >-
+      {{ wake_on_lan_interfaces
+         if (wake_on_lan_interfaces | length > 0)
+         else (wol_detect.stdout_lines | default([])) }}
+
+- name: Warn when no magic-packet-capable wired NIC was found
+  when: wake_on_lan_target_interfaces | length == 0
+  ansible.builtin.debug:
+    msg: >-
+      wake_on_lan: no wired NIC advertising magic-packet support (…g…) found —
+      nothing to arm. Wi-Fi can't do WoL. Check `ethtool <iface>` "Supports
+      Wake-on"; without a 'g' the NIC/driver can't do magic-packet WoL.
+
+- name: Enable + start wol@<iface> for each target interface
+  when: wake_on_lan_target_interfaces | length > 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.systemd_service:
+    name: "wol@{{ item }}.service"
+    enabled: true
+    state: started
+  loop: "{{ wake_on_lan_target_interfaces }}"
+
+- name: Show which interfaces were armed for Wake-on-LAN
+  when: wake_on_lan_target_interfaces | length > 0
+  ansible.builtin.debug:
+    msg: >-
+      wake_on_lan: armed {{ wake_on_lan_target_interfaces | join(', ') }} with
+      `wol {{ wake_on_lan_mode }}` (persisted via wol@<iface>.service). For
+      wake-from-full-shutdown also enable BIOS "Power On By PCI-E" and disable
+      "ErP Ready" — see docs/sysadmin/wake-on-lan.md.

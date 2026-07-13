@@ -135,3 +135,6 @@
 
     - role: resilio_sync
       tags: [resilio_sync]
+
+    - role: wake_on_lan
+      tags: [wake_on_lan]

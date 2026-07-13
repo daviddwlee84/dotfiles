@@ -1,0 +1,25 @@
+# ~/.config/wake/hosts.toml — host → MAC map for the `wake` CLI (Wake-on-LAN).
+#
+# Seeded ONCE by chezmoi (create_ prefix) so your edits are never overwritten;
+# mode 0600 (private_ prefix). To reset to this template:
+#   rm ~/.config/wake/hosts.toml && chezmoi apply
+#
+# Real MACs / hostnames are personal inventory — they live HERE (your private
+# copy), never in the dotfiles repo, which ships only this commented template.
+#
+# The passive side (arming the target NIC, persisting it across reboots) is the
+# `wake_on_lan` ansible role (chezmoi prompt installWakeOnLan). Wake-from-full-
+# shutdown also needs a one-time BIOS change. Full guide:
+#   docs/sysadmin/wake-on-lan.md
+#
+# Usage:  wake <name>     # e.g. wake david-ubuntu
+#         wake <MAC>      # a raw MAC works without an entry here
+#         wake --list     # show configured hosts
+
+# Optional default subnet-directed broadcast, used when a host omits its own.
+# broadcast = "192.168.31.255"
+
+# [hosts.david-ubuntu]
+# mac       = "de:ad:be:ef:12:34"   # target NIC MAC: `ip link` / `ethtool -P <if>`
+# broadcast = "192.168.31.255"      # optional; your LAN's directed broadcast
+# port      = 9                     # optional (default 9)

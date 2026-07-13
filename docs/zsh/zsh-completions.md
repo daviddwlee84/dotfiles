@@ -152,6 +152,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `dotcfg` | `dot_dotfiles/bin/executable_dotcfg` (thin shell → `scripts/init/dotfiles_init.py reconfigure`) | bash wrapper | B | `dot_config/zsh/tools/51_dotcfg_completion.zsh` + `dot_config/bash/51_dotcfg_completion.bash` (keys mirror PROMPTS) |
 | `agent-warmup` | `dot_dotfiles/bin/executable_agent-warmup` | argparse (subcommands) | B | `dot_config/zsh/tools/52_agent_warmup_completion.zsh` + `dot_config/bash/52_agent_warmup_completion.bash` |
 | `yth` | `dot_dotfiles/bin/executable_yth` + `scripts/yth/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/53_yth_completion.zsh` + `dot_config/bash/53_yth_completion.bash` |
+| `wake` | `dot_dotfiles/bin/executable_wake` | argparse | B | `dot_config/zsh/tools/54_wake_completion.zsh` + `dot_config/bash/54_wake_completion.bash` |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**
@@ -160,6 +161,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - `pqsum -g <GROUP>` — `_pqsum` shells out to `pueue status --json | jq '.groups | keys[]'`.
 - `mlf` ids (run-id, experiment-id, model-name) — **not** auto-completed (would round-trip MLflow tracking server, possibly auth-required). Use `tv mlflow` for fuzzy id picking instead.
 - `yth` video ids — **not** auto-completed (opaque 11-char ids; enumerating the whole history on every TAB is wasteful). Use `tv yth` or `yth search <query>` instead.
+- `wake` host names — `_wake` shells out to `wake --list-names` (reads `~/.config/wake/hosts.toml`), same pattern as `_fleet_hosts_one`.
 
 **Adding a new in-house CLI** (decision flow):
 
@@ -223,7 +225,7 @@ Edit the `regen <tool> "<zsh-args>" "<bash-args>"` block in `scripts/generate_co
 - **`sesh` / `tv` / `worktrunk`**: shell-startup mtime check (each tool has its own `dot_config/zsh/tools/<NN>_<tool>.zsh` file that runs the version check on every shell start — these tools are typically `cargo install`-ed outside chezmoi, so they need the per-startup probe to catch user upgrades).
 - **`bw` / `marimo` / `thefuck` / `try-cli`**: cached eval at startup (their completion script has side effects beyond `compdef`, so the file is `source`'d into the running shell rather than autoloaded).
 - **`mi-router`**: tyro self-gen, lives in `dot_config/shell/47_mi_router.sh` (not the bulk script — has its own `#compdef` rewrite for tyro's full-path output quirk).
-- **`fleet` / `mlf` / `pqsum` / `x` / `dotcfg` / `agent-warmup`**: hand-written completion in `dot_config/{zsh/tools,bash}/45-52_*_completion.*` (in-house CLIs without a built-in completion generator). `dotcfg`'s `--set` key list mirrors the PROMPTS table in `scripts/init/dotfiles_init.py`.
+- **`fleet` / `mlf` / `pqsum` / `x` / `dotcfg` / `agent-warmup`**: hand-written completion in `dot_config/{zsh/tools,bash}/45-54_*_completion.*` (in-house CLIs without a built-in completion generator). `dotcfg`'s `--set` key list mirrors the PROMPTS table in `scripts/init/dotfiles_init.py`.
 
 ## Priority / Override Order
 

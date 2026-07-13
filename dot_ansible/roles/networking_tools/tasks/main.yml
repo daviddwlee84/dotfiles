@@ -20,6 +20,7 @@
       - trippy
       - bandwhich
       - rustscan
+      - wakeonlan
     state: present
 
 - name: Install Ookla Speedtest CLI (macOS)
@@ -67,6 +68,7 @@
       - iperf3
       - httpie
       - tcpdump
+      - wakeonlan
     state: present
 
 # --- system-level packages (yum/CentOS 7+) ---
