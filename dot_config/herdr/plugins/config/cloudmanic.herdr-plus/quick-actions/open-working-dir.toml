@@ -1,0 +1,8 @@
+# herdr-plus Quick Action — the plugin's "Reveal Working Dir" starter example.
+# Managed by chezmoi. {{.WorkDir}} = the directory you launched the picker from.
+# macOS Finder `open` → cross-platform `x open` (opens the dir in your file
+# manager). See docs/tools/herdr.md.
+name = "Reveal Working Dir"
+description = "Open the launch directory in your file manager"
+type = "command"
+command = "x open {{.WorkDir}}"

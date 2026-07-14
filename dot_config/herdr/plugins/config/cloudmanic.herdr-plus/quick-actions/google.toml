@@ -1,0 +1,6 @@
+# herdr-plus Quick Action — the plugin's "Google" starter example.
+# Managed by chezmoi. macOS `open` → cross-platform `x open`. See docs/tools/herdr.md.
+name = "Google"
+description = "Open https://google.com"
+type = "command"
+command = "x open https://google.com"

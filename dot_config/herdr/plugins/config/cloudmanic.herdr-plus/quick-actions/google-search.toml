@@ -1,0 +1,12 @@
+# herdr-plus Quick Action — the plugin's "Search Google" form starter example.
+# Managed by chezmoi. Choosing it shows a text field; what you type becomes
+# {{.Value}} (urlquery-escaped). macOS `open` → cross-platform `x open`.
+# See docs/tools/herdr.md.
+name = "Search Google"
+description = "Type a query and open the results"
+type = "form"
+command = "x open 'https://www.google.com/search?q={{.Value | urlquery}}'"
+
+[form]
+prompt = "Search Google for"
+placeholder = "e.g. herdr terminal multiplexer"

@@ -159,7 +159,7 @@ herdr plugin install cloudmanic/herdr-plus   # 手動 fallback / role 實際跑�
 
 Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → `~/.config/` 下的同一路徑。內建的 `chezmoi.toml` 對應本 repo 的 tmuxinator `chezmoi` session（editor/git/shell tab）。把 `prefix+O` 綁到 Projects、`prefix+y` 綁到 Quick Actions（設定裡已備好）。
 
-**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨四個 **copy-pane** action（見 [複製聚焦 pane 的資訊](#複製聚焦-pane-的資訊到剪貼簿prefixpdvs)）。因為這個受管目錄非空,herdr-plus **不會** seed 它內建的範例 action（`github` / `google` / `open-repo` / …）;那些留在 plugin 自己的 `examples/quick-actions/`。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
+**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨四個 **copy-pane** action（見 [複製聚焦 pane 的資訊](#複製聚焦-pane-的資訊到剪貼簿prefixpdvs)）,外加 plugin 的五個**起手式**範例（GitHub / Google / Search Google / Open Repo / Reveal Working Dir）,已為 Linux 調整——macOS `open` → 本 repo 的跨平台 [`x open`](../shells/aliases.md),repo 選單指向 `daviddwlee84/*`。因為這個受管目錄非空,herdr-plus **不會** 自己 seed 那些範例（它只在*空*目錄時 seed）,所以在此 vendored;不要的 TOML 刪掉即可。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
 
 > **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
 

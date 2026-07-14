@@ -1,0 +1,6 @@
+# herdr-plus Quick Action — the plugin's "GitHub" starter example.
+# Managed by chezmoi. Adapted for Linux: macOS `open` → the repo's cross-platform
+# `x open` (wslview / open / xdg-open). See docs/tools/herdr.md.
+name = "GitHub"
+description = "Open https://github.com"
+command = "x open https://github.com"
