@@ -105,12 +105,18 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + shift + r` | reload config（`prefix + r` 保留給 resize mode） | rebound |
 | `prefix + shift + b` | 新 git worktree（從 `prefix + shift + g` 移過來） | rebound |
 | `prefix + G` | lazygit | command pane |
+| `prefix + M` | btop 系統監控器 | command pane |
+| `prefix + N` | nvtop GPU 監控器 | command pane |
 | `prefix + U` | `tv tools`（CLI launcher） | command pane |
 | `prefix + T` | `tv herdr-sesh`（workspace/dir 切換） | command pane |
 | `prefix + a` | `tv herdr-agent-panes`（即時 agent panes） | command pane |
 | `prefix + f` | `tv fleet-hosts`（SSH picker） | command pane |
 | `prefix + m` | 切換目前 pane 的**待 review** 旗標（⭐） | command pane |
 | `prefix + i` | `tv herdr-review`——待 review **收件匣**（被標記的 pane） | command pane |
+| `prefix + P` | 複製聚焦 pane 的 **process 資訊** 到剪貼簿 | command pane |
+| `prefix + D` | 複製聚焦 pane 的 **座標**（session>space>tab>pane） | command pane |
+| `prefix + V` | 複製聚焦 pane 的 **內容**（可見畫面） | command pane |
+| `prefix + S` | 複製聚焦 pane 的 **內容**（完整 scrollback） | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -152,6 +158,10 @@ herdr plugin install cloudmanic/herdr-plus   # 手動 fallback / role 實際跑�
 `herdr plugin install` **在沒有 Go toolchain 時會下載預編譯 release binary**，所以有沒有 Go 都能用。唯一的陷阱：若 `PATH` 上有一個*過期*的 Go（例如舊的 `/usr/local/go` 遮蔽了較新的），herdr 會嘗試從原始碼建置並失敗（`invalid go version … must match format 1.23`），而不是 fallback。ansible task 透過在可用時把 mise 的 Go（`mise which go` → 它的 bin 目錄）前置到 PATH 來規避；手動修法：把現代 Go 放前面：`PATH="$(dirname "$(mise which go)"):$PATH" herdr plugin install cloudmanic/herdr-plus`。（Go 現在由 mise 管理，受 `installExtraRuntimes` gate。）
 
 Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → `~/.config/` 下的同一路徑。內建的 `chezmoi.toml` 對應本 repo 的 tmuxinator `chezmoi` session（editor/git/shell tab）。把 `prefix+O` 綁到 Projects、`prefix+y` 綁到 Quick Actions（設定裡已備好）。
+
+**Quick Actions** 同樣由 chezmoi 管理，位於 `…/cloudmanic.herdr-plus/quick-actions/`（每個 action 一個 TOML）。本 repo 出貨四個 **copy-pane** action（見 [複製聚焦 pane 的資訊](#複製聚焦-pane-的資訊到剪貼簿prefixpdvs)）。因為這個受管目錄非空,herdr-plus **不會** seed 它內建的範例 action（`github` / `google` / `open-repo` / …）;那些留在 plugin 自己的 `examples/quick-actions/`。要新增就往這裡丟一個 TOML,或在 `<repo>/.herdr-plus/quick-actions/` 出貨一組 repo 本地的。
+
+> **Quick Actions 是給一次性、非互動式指令用的**（內建範例全是 `open <url>`）。herdr-plus 用 `sh -c` 跑選中的 action,沒有 PTY、沒有互動 stdin,所以互動式 TUI 會出問題——btop 立刻退出、nvtop 收不到 F10。要跑 TUI 就用 lazygit 那種*浮動 command pane*（`[[keys.command]] type="pane"`）——這就是為何 **btop**（`prefix+M`）與 **nvtop**（`prefix+N`）是快捷鍵而非 Quick Action。
 
 ## Television 整合
 
@@ -270,6 +280,21 @@ herdr pane report-metadata <pane> --source review --clear-custom-status         
 | `tv herdr-review` / `prefix+i` | **收件匣**:只列出被標記的 pane。`Enter` focus 過去並**保留** ⭐（你可能還在 review 中）;`Alt+C` focus **並**清除（「mark read」） |
 
 **Caveat——`custom_status` 每 pane 單值。** 延後中的用量狀態 driver（下方）也會推 `--custom-status`;雖然用不同 `--source`,`herdr pane get` 只吐一個扁平的 `custom_status`,兩者會爭同一個可見標籤。目前無實際衝突（driver 未建、review 旗標短暫）,但見 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+
+## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
+
+四個一鍵「把這個 pane 抓到剪貼簿」的操作,全由同一支腳本驅動（`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)）。它把一個 herdr CLI 呼叫萃取成人類可讀的文字,再導入本 repo 自己的 [`x copy`](../shells/aliases.md)（自動選 pbcopy / wl-copy / xclip / xsel / OSC 52;`x` 以絕對路徑 fallback 解析,因為 command-pane 可能在沒有互動式 PATH 的情況下執行）。pane 預設為**目前聚焦的 pane**（`herdr pane current`）；keybind 傳入 `$HERDR_ACTIVE_PANE_ID`,Quick Actions 傳入 `$HERDR_PLUS_PANE_ID`,兩者為空時都會 fallback 到目前 pane 的查詢。
+
+| 操作 | 按鍵 | Quick Action | 進剪貼簿的內容 |
+|---|---|---|---|
+| `process` | `prefix+P` | *Copy pane: process info* | 前景 process——`cmdline` + `pid` + `cwd`（來自 `herdr pane process-info`） |
+| `coord` | `prefix+D` | *Copy pane: coordinate* | 可直接貼回 CLI 的 `session` / `workspace` / `tab` / `pane` id 區塊 + `socket` 路徑 + 一行 `# herdr pane get <pane>` |
+| `content`（可見） | `prefix+V` | *Copy pane: content (visible)* | pane 目前螢幕上的文字（`herdr pane read --source visible`） |
+| `content`（scrollback） | `prefix+S` | *Copy pane: content (scrollback)* | pane 完整保留的 scrollback（`--source recent`） |
+
+**座標**回答「這是哪個 `session > space > tab > pane`?」,並以可餵回 CLI 的形式呈現。herdr 在 `pane`/`tab`/`workspace` 子命令上**沒有 `--session` 旗標**——session 只能經由 `HERDR_SOCKET_PATH` 指定——所以區塊裡納入 `socket=` 那行作為 session 選擇器（session *名稱* 則是把該 socket 對 `herdr session list --json` 比對而得）。
+
+兩個介面共用同一支腳本:[`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 的 `[[keys.command]]` 綁定,以及 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` 下的四個 `copy-pane-*.toml` **Quick Actions**（用 `prefix+y` 模糊啟動）。`P/D/V/S` 是大寫（`prefix+shift+<letter>`）,刻意避開 herdr 保留的 `shift+H/J/K/L`（swap-pane）與本 repo 的 `shift+B`（new_worktree）/ `shift+R`（reload）——用 `herdr server reload-config`（`diagnostics` 為空）確認無衝突。
 
 ## AI 用量 / 額度狀態
 

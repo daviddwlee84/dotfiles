@@ -100,12 +100,18 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + shift + r` | reload config (`prefix + r` stays resize mode) | rebound |
 | `prefix + shift + b` | new git worktree (moved off `prefix + shift + g`) | rebound |
 | `prefix + G` | lazygit | command pane |
+| `prefix + M` | btop system monitor | command pane |
+| `prefix + N` | nvtop GPU monitor | command pane |
 | `prefix + U` | `tv tools` (CLI launcher) | command pane |
 | `prefix + T` | `tv herdr-sesh` (workspace/dir switcher) | command pane |
 | `prefix + a` | `tv herdr-agent-panes` (live agent panes) | command pane |
 | `prefix + f` | `tv fleet-hosts` (SSH picker) | command pane |
 | `prefix + m` | toggle **review-pending** flag (⭐) on the current pane | command pane |
 | `prefix + i` | `tv herdr-review` — review-pending **inbox** (flagged panes) | command pane |
+| `prefix + P` | copy focused pane's **process info** to the clipboard | command pane |
+| `prefix + D` | copy focused pane's **coordinate** (session>space>tab>pane) | command pane |
+| `prefix + V` | copy focused pane's **content** (visible screen) | command pane |
+| `prefix + S` | copy focused pane's **content** (full scrollback) | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -147,6 +153,10 @@ herdr plugin install cloudmanic/herdr-plus   # manual fallback / what the role r
 `herdr plugin install` **downloads a prebuilt release binary when no Go toolchain is present**, so it works with or without Go. The one trap: if a *stale* Go is on `PATH` (e.g. an old `/usr/local/go` shadowing a newer one) herdr tries to build from source and fails (`invalid go version … must match format 1.23`) instead of falling back. The ansible task sidesteps this by prepending mise's Go (`mise which go` → its bin dir) when available; to fix it by hand, put a modern Go first: `PATH="$(dirname "$(mise which go)"):$PATH" herdr plugin install cloudmanic/herdr-plus`. (Go is mise-managed now, gated on `installExtraRuntimes`.)
 
 Project templates are chezmoi-managed under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/projects/` → the same path under `~/.config/`. The shipped `chezmoi.toml` mirrors this repo's tmuxinator `chezmoi` session (editor/git/shell tabs). Bind `prefix+O` → Projects and `prefix+y` → Quick Actions (already in the config).
+
+**Quick Actions** are chezmoi-managed alongside them, under `…/cloudmanic.herdr-plus/quick-actions/` (one TOML per action). The repo ships the four **copy-pane** actions (see [Copy focused-pane facts](#copy-focused-pane-facts-to-the-clipboard-prefixpdvs)). Because this managed dir is non-empty, herdr-plus does **not** seed its bundled example actions (`github` / `google` / `open-repo` / …); those stay in the plugin's own `examples/quick-actions/`. Add your own by dropping a TOML here, or ship a repo-local set in `<repo>/.herdr-plus/quick-actions/`.
+
+> **Quick Actions are for one-off, non-interactive commands** (the shipped examples all `open <url>`). herdr-plus runs a chosen action via `sh -c` with no PTY and no interactive stdin, so an interactive TUI misbehaves — btop exits immediately, nvtop can't receive F10. For a TUI you want the lazygit-style *floating command pane* (`[[keys.command]] type="pane"`) instead — that's why **btop** (`prefix+M`) and **nvtop** (`prefix+N`) are keybinds, not Quick Actions.
 
 ## Television integration
 
@@ -265,6 +275,21 @@ Surfaces (all sharing one script, `~/.config/herdr/review-mark.sh` = `dot_config
 | `tv herdr-review` / `prefix+i` | the **inbox**: lists only flagged panes. `Enter` focuses & **keeps** the ⭐ (you may still be mid-review); `Alt+C` focuses **and** clears it ("mark read") |
 
 **Caveat — `custom_status` is a single value per pane.** The deferred usage-status driver (below) also pushes `--custom-status`; although it uses a different `--source`, `herdr pane get` exposes one flattened `custom_status`, so the two would contend for the visible label. No live conflict today (the usage driver isn't built and review flags are short-lived), but see [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+
+## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
+
+Four one-keypress "grab this pane onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
+
+| Op | Key | Quick Action | What lands on the clipboard |
+|---|---|---|---|
+| `process` | `prefix+P` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
+| `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
+| `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
+| `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's full retained scrollback (`--source recent`) |
+
+The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
+
+Both surfaces share the same helper: the `[[keys.command]]` binds in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) and the four `copy-pane-*.toml` **Quick Actions** under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` (fuzzy-launched via `prefix+y`). `P/D/V/S` are uppercase (`prefix+shift+<letter>`) chosen to dodge herdr's reserved `shift+H/J/K/L` (swap-pane) and this repo's `shift+B` (new_worktree) / `shift+R` (reload) — confirm no collision with `herdr server reload-config` (empty `diagnostics`).
 
 ## AI usage / quota status
 

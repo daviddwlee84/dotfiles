@@ -1,0 +1,7 @@
+# herdr-plus Quick Action — copy the focused pane's coordinate to the clipboard.
+# Managed by chezmoi. Emits a paste-ready Session > Workspace > Tab > Pane block
+# (ids the herdr CLI accepts, plus the socket path that selects the session).
+# Also bound to prefix+D. See docs/tools/herdr.md.
+name = "Copy pane: coordinate"
+description = "session > space > tab > pane ids (paste-ready for the herdr CLI)"
+command = "~/.config/herdr/pane-copy.sh coord \"$HERDR_PLUS_PANE_ID\""

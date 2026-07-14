@@ -91,6 +91,22 @@ type = "pane"
 command = "lazygit"
 description = "lazygit (popup pane)"
 
+# btop / nvtop monitors as floating command panes (same mechanism as lazygit —
+# a real PTY that closes when you quit the tool). Quick Actions can't host these:
+# herdr-plus runs an action via `sh -c` with no PTY/stdin, so an interactive TUI
+# either exits immediately (btop) or can't receive function keys like F10 (nvtop).
+[[keys.command]]
+key = "prefix+M"
+type = "pane"
+command = "btop"
+description = "btop system monitor (popup pane)"
+
+[[keys.command]]
+key = "prefix+N"
+type = "pane"
+command = "nvtop"
+description = "nvtop GPU monitor (popup pane)"
+
 [[keys.command]]
 key = "prefix+`"
 type = "pane"
@@ -152,6 +168,39 @@ key = "prefix+i"
 type = "pane"
 command = "tv herdr-review"
 description = "Review-pending inbox — flagged panes (herdr-aware tv channel)"
+
+# --- Copy focused-pane facts to the clipboard (prefix+P/D/V/S) ---
+# One helper (~/.config/herdr/pane-copy.sh) distills a pane's data and pipes it to
+# `x copy`. Bound to the KEYBIND-context $HERDR_ACTIVE_PANE_ID (the pane focused
+# when the key was pressed; the helper falls back to `herdr pane current` if empty).
+# The SAME four ops are also herdr-plus Quick Actions (dot_config/herdr/plugins/
+# config/cloudmanic.herdr-plus/quick-actions/). Uppercase letters resolve to
+# prefix+shift+<letter>; P/D/V/S avoid herdr's reserved shift builtins (shift+H/J/K/L
+# swap-pane) and this repo's own shift+B (new_worktree) / shift+R (reload). Confirm
+# clean with `herdr server reload-config` (empty diagnostics). See docs/tools/herdr.md.
+[[keys.command]]
+key = "prefix+P"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh process \"$HERDR_ACTIVE_PANE_ID\""
+description = "copy pane process info"
+
+[[keys.command]]
+key = "prefix+D"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh coord \"$HERDR_ACTIVE_PANE_ID\""
+description = "copy pane coordinate (session>space>tab>pane)"
+
+[[keys.command]]
+key = "prefix+V"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source visible"
+description = "copy pane content (visible screen)"
+
+[[keys.command]]
+key = "prefix+S"
+type = "pane"
+command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source recent"
+description = "copy pane content (full scrollback)"
 
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus

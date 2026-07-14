@@ -1,0 +1,5 @@
+# herdr-plus Quick Action — copy the focused pane's VISIBLE screen content.
+# Managed by chezmoi. Also bound to prefix+V. See docs/tools/herdr.md.
+name = "Copy pane: content (visible)"
+description = "The focused pane's on-screen terminal content"
+command = "~/.config/herdr/pane-copy.sh content \"$HERDR_PLUS_PANE_ID\" --source visible"
