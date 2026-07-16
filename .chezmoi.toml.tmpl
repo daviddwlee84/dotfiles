@@ -95,6 +95,11 @@ installBitwarden = {{ promptBoolOnce . "installBitwarden" "Install Bitwarden CLI
 # 的 sysvol/sysmute（音量/靜音）；裝了才有完整 sysplay/sysnow（播放控制/查正在播放）。
 # 詳見 docs/tools/media-control.md。
 installMediaControl = {{ promptBoolOnce . "installMediaControl" "Install system media-control CLIs (nowplaying-cli/switchaudio-osx on macOS, playerctl on Linux) for the sys* shell helpers" false }}
+# 是否安裝 calibre（電子書管理 + ebook-meta/ebook-convert CLI）。
+# yazi 透過 view-ebook 用 ebook-meta 預覽 Kindle .mobi/.azw/.azw3 的中繼資料
+# （書名/作者/簡介）。calibre 是較肥的 GUI app（數百 MB）；不裝也能用其他格式的
+# 預覽，且若你已手動裝過 calibre，預覽會自動生效。詳見 docs/tools/yazi-previews.md。
+installCalibre = {{ promptBoolOnce . "installCalibre" "Install calibre (e-book manager; enables .mobi/.azw/.azw3 metadata previews in yazi)" false }}
 # 是否安裝一般 GUI apps via Homebrew Brewfile (terminals, browsers, utilities, etc.; excludes AI desktop apps)
 # Desktop-class only（macos / ubuntu_desktop）；headless server 沒有 GUI，直接 false。
 {{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}

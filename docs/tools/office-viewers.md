@@ -10,7 +10,7 @@ There is no single tool that views everything well, so this repo wires a small *
 |---|---|---|
 | Word `.docx` | [`doxx`](https://github.com/bgreenwell/doxx) | `doxx --export ansi` |
 | Excel `.xlsx` | [`visidata`](https://www.visidata.org/) (`vd`) | `markitdown \| glow` |
-| PowerPoint `.pptx` | `markitdown \| glow` (pager) | `markitdown \| glow` |
+| PowerPoint `.pptx` | `markitdown \| glow` (pager) | `markitdown \| glow`; image-only decks → slide-1 thumbnail (chafa) |
 | Legacy `.doc/.xls/.ppt`, OpenDocument `.odt/.ods/.odp`, `.rtf` | LibreOffice → OOXML twin → above | same, converted first |
 
 ```console
@@ -57,6 +57,8 @@ Already in the repo (see [Data Viewers](../shells/aliases.md)). `vd file.xlsx` o
 [Microsoft MarkItDown](https://github.com/microsoft/markitdown) converts `.docx/.xlsx/.pptx` (and more) to Markdown, optimized for LLM/RAG pipelines. It is the universal preview engine for Excel and PowerPoint here, because **pandoc cannot read `.pptx` or `.xlsx`** (pandoc only *writes* pptx; it reads docx/odt/epub but not the spreadsheet/presentation formats). Installed as a uv tool (`python_uv_tools`).
 
 > **Gotcha:** the bare `markitdown` package ships **no format converters** — they live in optional extras. This repo installs `markitdown[docx,xlsx,pptx]`; without the extras every Office file raises `MissingDependencyException`. (Not `[all]` — that adds pdf/audio/youtube/azure bloat.)
+
+> **Image-only `.pptx`:** markitdown extracts *text*, so a deck whose slides are full-page images yields nothing but `![](imageN)` refs. For `--preview`, `view-office`'s `render_pptx` detects this by peeking at the slide XML with 7-Zip; if there's no text it extracts the first embedded slide image (`ppt/media/image1.*`) and renders it with [`chafa`](yazi-previews.md) — ~0.5 s, versus tens of seconds for a full LibreOffice slide render on image-heavy decks. Text decks still get the markitdown path.
 
 ### LibreOffice — legacy-format fallback
 

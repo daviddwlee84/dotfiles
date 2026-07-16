@@ -154,6 +154,20 @@
     name: libreoffice
     state: present
 
+# --- calibre (opt-in via installCalibre → install_calibre extra-var) ---
+# E-book toolkit; its `ebook-meta` CLI powers the Kindle .mobi/.azw/.azw3 metadata
+# previews in yazi (via the in-house `view-ebook`). Heavy GUI app (~hundreds of
+# MB), so gated behind the installCalibre prompt. The cask does NOT put calibre's
+# binaries on PATH — view-ebook resolves the .app bundle itself. See
+# docs/tools/yazi-previews.md.
+- name: Install calibre via Homebrew Cask (macOS, opt-in)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - install_calibre | default(false) | bool
+  community.general.homebrew_cask:
+    name: calibre
+    state: present
+
 # =============================================================================
 # Linux (Debian/Ubuntu)
 # =============================================================================
@@ -2434,6 +2448,20 @@
     - name: Warn resvg installation failed (non-fatal)
       ansible.builtin.debug:
         msg: "resvg install failed — SVG previews in yazi unavailable on this host (non-fatal)"
+
+# --- calibre (opt-in via installCalibre) ---
+# E-book toolkit for the Kindle .mobi/.azw/.azw3 metadata previews in yazi
+# (view-ebook → ebook-meta). Heavy, so gated behind the installCalibre prompt.
+- name: Install calibre (Debian/Ubuntu, opt-in)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - install_calibre | default(false) | bool
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: calibre
+    state: present
+    update_cache: false
 
 # --- superfile ---
 - name: Check if superfile (spf) is installed

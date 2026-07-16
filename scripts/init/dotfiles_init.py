@@ -326,6 +326,15 @@ PROMPTS: tuple[Prompt, ...] = (
                     "搭配 sys* shell helpers（sysvol/sysmute/sysplay/sysnow）。不裝也能用 built-in\n"
                     "的 sysvol/sysmute（音量/靜音）；裝了才有完整 sysplay/sysnow（播放控制/查正在播放）。\n"
                     "詳見 docs/tools/media-control.md。")),
+    Prompt("installCalibre", "bool", "System & apps",
+           "calibre (e-book toolkit)",
+           "calibre + its CLIs (ebook-meta/ebook-convert). Powers Kindle .mobi/.azw/.azw3 metadata previews in yazi via view-ebook. Heavy GUI app (~hundreds of MB); the preview is best-effort and also works if calibre is already installed by hand.",
+           default=False,
+           prompt_text="Install calibre (e-book manager; enables .mobi/.azw/.azw3 metadata previews in yazi)",
+           comment=("是否安裝 calibre（電子書管理 + ebook-meta/ebook-convert CLI）。\n"
+                    "yazi 透過 view-ebook 用 ebook-meta 預覽 Kindle .mobi/.azw/.azw3 的中繼資料\n"
+                    "（書名/作者/簡介）。calibre 是較肥的 GUI app（數百 MB）；不裝也能用其他格式的\n"
+                    "預覽，且若你已手動裝過 calibre，預覽會自動生效。詳見 docs/tools/yazi-previews.md。")),
     Prompt("installBrewApps", "bool", "System & apps",
            "Homebrew GUI apps",
            "Terminals, browsers, utilities via Brewfile (excl. AI desktop). Desktop-class profiles only (macos / ubuntu_desktop).",
@@ -549,6 +558,7 @@ BUNDLES: dict[str, dict[str, object]] = {
         "installNiri": False,
         "installNetworkingTools": False,
         "installMediaTools": False,
+        "installCalibre": False,
         "installAuditd": False,
         "installHomelabTools": False,
         "installWakeOnLan": False,

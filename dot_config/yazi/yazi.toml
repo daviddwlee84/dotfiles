@@ -196,8 +196,9 @@ marimo_py_sandbox = [
 #          (plain `.db` IS handled by the plugin: DuckDB auto-attaches SQLite).
 #   2. OFFICE DOCS → piper.yazi piping the in-house `view-office` dispatcher
 #      (doxx / markitdown / LibreOffice).
-#   3. CONTAINERS yazi's built-ins skip → piper: .epub (pandoc text) and .dmg
-#      (7-Zip listing) — their mimes aren't in the built-in archive set.
+#   3. CONTAINERS / e-books yazi's built-ins skip → piper: .epub (pandoc text),
+#      Kindle .mobi/.azw/.azw3/.fb2 (view-ebook → calibre metadata), and .dmg
+#      (7-Zip listing) — none of these mimes are in the built-in archive set.
 #
 # CONTRACTS / gotchas:
 #   - view-office entries must stay in sync with view-office's --preview/--width
@@ -247,6 +248,13 @@ prepend_previewers = [
   # 2>/dev/null is load-bearing (piper renders stderr as an error preview);
   # 7zz→macOS `sevenzip`, 7z→Linux `p7zip-full`. pandoc is a devtools-role tool.
   { url = "*.epub", run = 'piper -- pandoc -f epub -t plain "$1" 2>/dev/null | head -n 500' },
+  # Kindle / calibre e-books (pandoc can't read these) → view-ebook: calibre
+  # ebook-meta metadata (title/author/description). Best-effort — no preview if
+  # calibre is absent. See the installCalibre prompt + docs/tools/yazi-previews.md.
+  { url = "*.mobi", run = 'piper -- view-ebook --preview --width "$w" "$1"' },
+  { url = "*.azw", run = 'piper -- view-ebook --preview --width "$w" "$1"' },
+  { url = "*.azw3", run = 'piper -- view-ebook --preview --width "$w" "$1"' },
+  { url = "*.fb2", run = 'piper -- view-ebook --preview --width "$w" "$1"' },
   { url = "*.dmg", run = 'piper -- ( 7zz l "$1" 2>/dev/null || 7z l "$1" 2>/dev/null ) | head -n 200' },
 ]
 

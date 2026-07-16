@@ -1000,6 +1000,7 @@ list.
 | **btop** | brew | apt → GitHub release | devtools |
 | **build-essential** | n/a | apt | bootstrap (Linux) |
 | **bun** | mise | mise | mise |
+| **calibre** (`ebook-meta`) | brew cask — opt-in `installCalibre` | apt (`calibre`) — opt-in | devtools — backs Kindle .mobi/.azw/.azw3 metadata previews in yazi via `view-ebook`. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **cargo-update** | cargo install (bootstrap for `cat_cargo`) | same | rust_cargo_tools |
 | **chafa** | brew | apt (`chafa`) | devtools — yazi image-display fallback (unicode-art); backs all image/pdf/video/heic previews. Shadowed by a `--probe off` shim (`dot_dotfiles/bin/executable_chafa`) to stop the OSC-query→rename-popup leak. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **chatgpt** | brew cask (arm64) | n/a | Brewfile.darwin |

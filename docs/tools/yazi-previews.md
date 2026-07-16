@@ -8,8 +8,8 @@ The catch: yazi's **built-in** previewers (images / PDF / video / SVG / standard
 wired in `dot_config/yazi/yazi.toml` — yazi ships them internally and **shells out to external
 binaries at runtime**. If those binaries aren't installed, the hover pane shows an error
 (`failed to spawn chafa`) or bare file-type classification. So "expanding coverage" is mostly a
-**tool-install** job (a few ansible-managed binaries), plus two tiny config rules for the container
-formats yazi ignores by default.
+**tool-install** job (a few ansible-managed binaries), plus a handful of small config rules for the
+container / e-book formats yazi ignores by default.
 
 ## TL;DR — coverage matrix
 
@@ -21,10 +21,11 @@ formats yazi ignores by default.
 | archives: zip / tar / gz / 7z / rar (+ zip-based apk / jar / whl / xpi) | file listing | yazi built-in → **7-Zip** | baseline |
 | **dmg** | file listing | piper → **7-Zip** (`*.dmg` rule) | baseline |
 | **EPUB** | text | piper → **pandoc** (`*.epub` rule) | baseline |
+| **Kindle** .mobi / .azw / .azw3 / .fb2 | metadata (title/author/description) | piper → **view-ebook** → calibre `ebook-meta` | opt-in (installCalibre) |
 | video: mp4 / mkv / mov … | thumbnail | yazi built-in → **ffmpeg** + chafa | media (gated) |
 | HEIC / JPEG-XL / fonts | image / sample | yazi built-in → **ImageMagick ≥7.1.1** + chafa | media (gated) |
 | csv / tsv / parquet / xlsx / db / sqlite / feather | table | duckdb.yazi + fallbacks | plugin — see [data-viewers.md](data-viewers.md) |
-| docx / pptx / legacy / ODF | rendered text | view-office (doxx / markitdown / LibreOffice) | plugin — see [office-viewers.md](office-viewers.md) |
+| docx / **pptx** / legacy / ODF | text (image-only pptx → slide-1 thumbnail) | view-office (doxx / markitdown / chafa / LibreOffice) | plugin — see [office-viewers.md](office-viewers.md) |
 | txt / json / md / source | text (+ syntax) | yazi built-in / `bat` | always |
 
 - **Baseline** tools are installed unconditionally by the `devtools` role (next to yazi).
@@ -74,21 +75,35 @@ lever. `--probe off` merely disables color auto-detection (chafa falls back to `
 defaults; previews look the same), and the shim is **inert on graphics terminals** (yazi never calls
 chafa there). Caveat: launch yazi from a configured shell so `~/.dotfiles/bin` is on `PATH`.
 
-## The two config rules (EPUB + dmg)
+## Config-wired previewers (EPUB · Kindle · dmg)
 
-Everything above except EPUB and dmg is pure tool-install — yazi's built-ins handle the routing. Those
-two container mimes (`application/epub+zip`, `application/x-apple-diskimage`) are **not** in yazi's
-built-in archive set, so `dot_config/yazi/yazi.toml` adds them via [`piper.yazi`](office-viewers.md#the-ya-pkg-plugin-mechanism):
+Everything above except EPUB, Kindle e-books, and dmg is pure tool-install — yazi's built-ins handle
+the routing. Those mimes aren't in yazi's built-in sets, so `dot_config/yazi/yazi.toml` wires them via
+[`piper.yazi`](office-viewers.md#the-ya-pkg-plugin-mechanism):
 
 ```toml
 { url = "*.epub", run = 'piper -- pandoc -f epub -t plain "$1" 2>/dev/null | head -n 500' },
+{ url = "*.mobi", run = 'piper -- view-ebook --preview --width "$w" "$1"' },  # + *.azw *.azw3 *.fb2
 { url = "*.dmg",  run = 'piper -- ( 7zz l "$1" 2>/dev/null || 7z l "$1" 2>/dev/null ) | head -n 200' },
 ```
 
+- **EPUB → full text** via pandoc (pandoc reads EPUB but not the Kindle formats).
+- **Kindle `.mobi`/`.azw`/`.azw3`/`.fb2` → metadata** via [`view-ebook`](#kindle-e-books-calibre)
+  (calibre `ebook-meta`). There's no fast headless way to render mobi/azw *text*, so the preview is a
+  "book back-cover" (title / author / tags / description). Best-effort — nothing shows if calibre is absent.
+- **dmg → file listing** via 7-Zip (`7zz`/`7z`).
 - `2>/dev/null` is **load-bearing** — piper renders any stderr as an error preview.
-- `7zz || 7z` covers macOS `sevenzip` (`7zz`) vs Linux `p7zip-full` (`7z`).
 - **No rule needed** for `.zip` / `.tar.*` / `.7z` / `.rar` or zip-based `.apk` / `.jar` / `.whl` /
   `.xpi` — yazi's built-in archive previewer lists them for free once 7-Zip is installed.
+
+### Kindle e-books (calibre) {#kindle-e-books-calibre}
+
+`view-ebook` (`dot_dotfiles/bin/executable_view-ebook`) resolves calibre's `ebook-meta` — on PATH,
+else the macOS `/Applications/calibre.app` bundle, else the Linux prefix — and prints the book's
+metadata (HTML-stripped, wrapped to the pane width). calibre isn't repo-managed by default; enable the
+**`installCalibre`** init prompt to have the `devtools` role install it (brew cask on macOS, apt on
+Linux). Already have calibre installed by hand? The preview just works — the prompt only automates the
+install. (EPUB stays on pandoc's full-text path, not view-ebook.)
 
 ## Per-OS install
 
@@ -101,6 +116,7 @@ built-in archive set, so `dot_config/yazi/yazi.toml` adds them via [`piper.yazi`
 | ffmpeg | `ffmpeg` (`media_tools`, gated) | apt `ffmpeg` (gated) | video thumbnails |
 | ImageMagick | `imagemagick` (`media_tools`, gated) | apt `imagemagick` (gated) | HEIC / JPEG-XL / fonts |
 | pandoc | `pandoc` (already in `devtools`) | apt `pandoc` | EPUB text |
+| calibre (`ebook-meta`) | `calibre` cask — opt-in `installCalibre` | apt `calibre` — opt-in | Kindle .mobi/.azw/.azw3 metadata |
 
 ## Gotchas
 
@@ -114,8 +130,15 @@ built-in archive set, so `dot_config/yazi/yazi.toml` adds them via [`piper.yazi`
   hand). Everything else in the baseline works without it.
 - **resvg on Linux is best-effort.** No apt package → the role tries Linuxbrew then a one-time
   `cargo install resvg`. If neither is available, SVG simply previews as raw text — non-fatal.
-- **Lowercase globs.** The `*.epub` / `*.dmg` rules match lowercase extensions; `Book.EPUB` won't fire
-  (yazi's built-ins are mime-based and unaffected).
+- **Lowercase globs.** The `*.epub` / `*.dmg` / `*.mobi` rules match lowercase extensions; `Book.EPUB`
+  won't fire (yazi's built-ins are mime-based and unaffected).
+- **Kindle previews are metadata, not text.** `.mobi`/`.azw`/`.azw3` show the book's title / author /
+  description (via calibre `ebook-meta`), not the prose — there's no fast headless mobi/azw text
+  renderer. Needs calibre (the `installCalibre` prompt, or a manual install). EPUB gets full text (pandoc).
+- **Image-only pptx → slide thumbnail.** A deck whose slides are full-page images has no text for
+  markitdown to extract, so view-office renders the first embedded slide image with chafa instead of a
+  list of `![](imageN)`. It's detected cheaply by peeking at the slide XML with 7-Zip. See
+  [office-viewers.md](office-viewers.md).
 - **chafa is a fallback, not a downgrade to avoid.** ascii-art is the correct behavior in a
   non-graphics terminal — see [above](#unicode-art-vs-crisp-inline-images).
 
@@ -126,7 +149,10 @@ built-in archive set, so `dot_config/yazi/yazi.toml` adds them via [`piper.yazi`
 | Baseline tool install (chafa/poppler/7zip/resvg) | `dot_ansible/roles/devtools/tasks/main.yml` |
 | chafa `--probe off` shim (fixes the rename/shell popup) | `dot_dotfiles/bin/executable_chafa` |
 | Media tool install (ffmpeg/ImageMagick, gated) | `dot_ansible/roles/media_tools/tasks/main.yml` |
-| EPUB + dmg previewer rules | `dot_config/yazi/yazi.toml` `[plugin] prepend_previewers` |
+| calibre install (opt-in `installCalibre`) | `dot_ansible/roles/devtools/tasks/main.yml` |
+| EPUB / Kindle / dmg previewer rules | `dot_config/yazi/yazi.toml` `[plugin] prepend_previewers` |
+| Kindle metadata dispatcher | `dot_dotfiles/bin/executable_view-ebook` (+ 56_view_ebook_completion.*) |
+| pptx image-only thumbnail | `dot_dotfiles/bin/executable_view-office` (`render_pptx`) |
 | yazi install | `dot_ansible/roles/devtools/tasks/main.yml` (`# --- yazi ---`) |
 | tmux image passthrough | `dot_config/tmux/common.conf.tmpl` (`allow-passthrough on`) |
 

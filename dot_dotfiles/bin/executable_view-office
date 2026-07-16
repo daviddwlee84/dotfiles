@@ -2,6 +2,7 @@
 # view-office — open or preview Microsoft Office / OpenDocument files in the
 # terminal. Dispatches by extension to the right tool:
 #   .docx → doxx        .xlsx → visidata (vd)   .pptx → markitdown | glow
+#   (image-only .pptx → first embedded slide image via chafa; see render_pptx)
 #   legacy .doc/.xls/.ppt/.odt/.ods/.odp/.rtf → LibreOffice headless converts to
 #   the modern OOXML twin, then re-dispatches to the handler above.
 #
@@ -95,16 +96,63 @@ render_xlsx() {
     fi
 }
 
+# Render the first embedded slide image of a pptx (ppt/media/image*) with chafa.
+# Used only as an image-only-deck fallback: markitdown extracts no text from decks
+# whose slides are full-page pictures, so we show the actual first slide instead of
+# a list of `![](imageN)` refs. FAST (~0.5s: unzip one entry + chafa) — a full
+# LibreOffice slide render is tens of seconds on image-heavy decks (the exact case
+# we hit here). Best-effort: non-zero if 7-Zip/chafa are absent or no image is found.
+render_pptx_thumbnail() {
+    local f="$1" z img
+    have chafa || return 1
+    z="$(command -v 7zz || command -v 7z || true)"
+    [[ -n "$z" ]] || return 1
+    img="$("$z" l -slt "$f" 2>/dev/null | awk -F' = ' '/^Path = ppt\/media\/image/{print $2}' | sort -V | head -1)"
+    [[ -n "$img" ]] || return 1
+    "$z" e -so "$f" "$img" 2>/dev/null | chafa --format symbols --size "${WIDTH}x" - 2>/dev/null || return 1
+}
+
+# Cheaply classify a pptx as text vs image-only by peeking at the slide XML for a
+# non-empty text run (`<a:t>…`) with 7-Zip — far faster than a full markitdown
+# parse on a big image-heavy deck. Prints text | notext | unknown (no 7-Zip).
+_pptx_text_state() {
+    local f="$1" z
+    z="$(command -v 7zz || command -v 7z || true)"
+    [[ -n "$z" ]] || { printf 'unknown\n'; return; }
+    if "$z" e -so "$f" 'ppt/slides/slide*.xml' 2>/dev/null | grep -q '<a:t>[^<]'; then
+        printf 'text\n'
+    else
+        printf 'notext\n'
+    fi
+}
+
 render_pptx() {
     local f="$1"
     need markitdown "install via python_uv_tools (uv tool install markitdown)"
-    if ((PREVIEW)); then
-        markitdown "$f" | render_md
-    elif have glow; then
-        markitdown "$f" | glow -p -
-    else
-        markitdown "$f" | "${PAGER:-less}"
+    if ! ((PREVIEW)); then
+        if have glow; then markitdown "$f" | glow -p -; else markitdown "$f" | "${PAGER:-less}"; fi
+        return
     fi
+    # Preview: prefer extracted text; render the first embedded slide image only
+    # for image-only decks (markitdown would otherwise emit a list of ![](imageN)).
+    case "$(_pptx_text_state "$f")" in
+        text)
+            markitdown "$f" | render_md ;;
+        notext)
+            render_pptx_thumbnail "$f" || markitdown "$f" | render_md ;;
+        *)
+            # No 7-Zip to peek — fall back to a full markitdown parse, then judge:
+            # strip slide-number comments + image refs + whitespace; empty ⇒ thumbnail.
+            local md text
+            md="$(markitdown "$f" 2>/dev/null || true)"
+            text="$(printf '%s' "$md" | sed -E 's/<!--[^>]*-->//g; s/!\[[^]]*\]\([^)]*\)//g' | tr -d '[:space:]')"
+            if [[ -n "$text" ]]; then
+                printf '%s\n' "$md" | render_md
+            else
+                render_pptx_thumbnail "$f" || printf '%s\n' "$md" | render_md
+            fi
+            ;;
+    esac
 }
 
 # Legacy binary / OpenDocument formats: convert to the modern OOXML twin with

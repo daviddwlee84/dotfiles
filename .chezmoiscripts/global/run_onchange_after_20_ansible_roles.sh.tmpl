@@ -316,6 +316,12 @@ EXTRA_VARS="primary_shell={{ $primaryShell }}"
 # Install Bitwarden Desktop app (for SSH agent) on desktop profiles
 EXTRA_VARS="$EXTRA_VARS bitwarden_install_desktop=true"
 {{ end -}}
+{{ $installCalibre := false }}{{ if hasKey . "installCalibre" }}{{ $installCalibre = .installCalibre }}{{ end -}}
+{{ if $installCalibre -}}
+# calibre e-book toolkit (opt-in) — devtools installs it (cask/apt); its
+# ebook-meta CLI backs the yazi Kindle-format metadata previews (view-ebook).
+EXTRA_VARS="$EXTRA_VARS install_calibre=true"
+{{ end -}}
 {{ if $installLlmTools -}}
 if [[ -z "$EXTRA_VARS" ]]; then
     EXTRA_VARS="llm_tools_install_brew_apps={{ .installBrewApps }}"

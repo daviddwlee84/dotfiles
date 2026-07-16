@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# view-ebook — preview / open e-book formats that pandoc can't read: Kindle
+# `.mobi` / `.azw` / `.azw3` (and `.fb2` / `.lit` / `.pdb` / `.prc`). EPUB is
+# handled elsewhere (pandoc → full text); this covers the DRM-free formats
+# calibre understands.
+#
+# Two modes (mirrors view-office):
+#   view-ebook FILE              open in calibre's ebook-viewer (GUI) if present
+#   view-ebook --preview FILE    metadata (title/author/description) to stdout
+#
+# There is no fast headless way to render mobi/azw *text*, so --preview shows
+# rich metadata via calibre's `ebook-meta` (title, author, tags, description) —
+# a "book back-cover" glance, the same philosophy as the SQLite table-listing
+# preview. calibre's CLIs aren't on PATH from its macOS .app, so resolve the
+# bundled binary the way view-office resolves LibreOffice's `soffice`.
+#
+# The yazi previewer contract (dot_config/yazi/yazi.toml) is:
+#   run = 'piper -- view-ebook --preview --width "$w" "$1"'
+# See docs/tools/yazi-previews.md.
+set -euo pipefail
+
+PREVIEW=0
+WIDTH="${COLUMNS:-100}"
+
+usage() {
+    printf '%s\n' \
+        "Usage: view-ebook [--preview] [--width N] FILE" \
+        "" \
+        "Preview or open an e-book (.mobi/.azw/.azw3/.fb2/.lit/.pdb/.prc)." \
+        "" \
+        "Options:" \
+        "  -p, --preview    Print metadata (title/author/description) to stdout." \
+        "  -w, --width N    Wrap width for --preview (default: \$COLUMNS or 100)." \
+        "  -h, --help       Show this help." \
+        "" \
+        "Needs calibre (ebook-meta / ebook-viewer). EPUB is handled by pandoc, not here."
+}
+
+err() { printf 'view-ebook: %s\n' "$*" >&2; }
+
+# Resolve a calibre CLI ($1 = ebook-meta / ebook-viewer): PATH first, else the
+# macOS .app bundle (the cask does not put calibre's binaries on PATH), else the
+# common Linux install prefix.
+calibre_bin() {
+    local t="$1" b
+    if command -v "$t" >/dev/null 2>&1; then command -v "$t"; return 0; fi
+    for b in "/Applications/calibre.app/Contents/MacOS/$t" \
+             "/opt/calibre/$t" "/usr/bin/$t"; do
+        [[ -x "$b" ]] && { printf '%s\n' "$b"; return 0; }
+    done
+    return 1
+}
+
+CALIBRE_HINT="install calibre — macOS: brew install --cask calibre (or enable the installCalibre prompt); Linux: apt install calibre"
+
+render_preview() {
+    local f="$1" em
+    em="$(calibre_bin ebook-meta)" || { err "ebook-meta not found — $CALIBRE_HINT"; exit 2; }
+    # ebook-meta prints an aligned "Field : value" block; the Comments/description
+    # field carries HTML → strip tags, wrap the long description to the pane width,
+    # and cap the length.
+    "$em" "$f" 2>/dev/null | sed -E 's/<[^>]+>//g' | fold -s -w "$WIDTH" | head -n 200
+}
+
+open_interactive() {
+    local f="$1" ev
+    if ev="$(calibre_bin ebook-viewer)"; then
+        exec "$ev" "$f"
+    fi
+    # No GUI viewer — fall back to metadata through a pager.
+    err "calibre ebook-viewer not found; showing metadata instead ($CALIBRE_HINT)"
+    render_preview "$f" | "${PAGER:-less}"
+}
+
+main() {
+    local file=""
+    while (($#)); do
+        case "$1" in
+            -p|--preview) PREVIEW=1; shift ;;
+            -w|--width)
+                [[ $# -ge 2 ]] || { err "--width requires a value"; exit 2; }
+                WIDTH="$2"; shift 2 ;;
+            --width=*) WIDTH="${1#*=}"; shift ;;
+            -h|--help) usage; exit 0 ;;
+            --) shift; while (($#)); do file="$1"; shift; done; break ;;
+            -*) err "unknown option: $1"; usage >&2; exit 2 ;;
+            *)
+                if [[ -z "$file" ]]; then file="$1"; else err "too many files: $1"; exit 2; fi
+                shift ;;
+        esac
+    done
+
+    [[ -n "$file" ]] || { err "expected a FILE"; usage >&2; exit 2; }
+    [[ -r "$file" ]] || { err "file not readable: $file"; exit 1; }
+
+    if ((PREVIEW)); then
+        render_preview "$file"
+    else
+        open_interactive "$file"
+    fi
+}
+
+main "$@"
