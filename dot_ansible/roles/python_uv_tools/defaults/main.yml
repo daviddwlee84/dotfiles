@@ -103,3 +103,14 @@ python_uv_tools:
   # Python, single entry point — no needs_modern_gcc / extras.
   - name: yt-dlp
     binary: yt-dlp
+  # markitdown: Microsoft's Office/PDF → Markdown converter. Powers the `.xlsx`
+  # and `.pptx` paths of the in-house `view-office` CLI (pandoc canNOT read
+  # pptx/xlsx, so markitdown is the universal Office→markdown engine there) and
+  # the yazi Office previewer. The BARE `markitdown` package ships NO format
+  # converters — the docx/xlsx/pptx readers live in optional extras, so we pull
+  # [docx,xlsx,pptx] explicitly (without them it raises MissingDependencyException
+  # on every Office file). Not [all]: that adds pdf/audio/youtube/azure bloat we
+  # don't need. Pure Python, single entry point. See docs/tools/office-viewers.md.
+  - name: markitdown[docx,xlsx,pptx]
+    binary: markitdown
+    needs_modern_gcc: true  # [xlsx] pulls pandas 3.x → numpy 2.x (source build needs gcc >= 9 on CentOS 7)

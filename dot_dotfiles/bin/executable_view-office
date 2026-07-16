@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# view-office — open or preview Microsoft Office / OpenDocument files in the
+# terminal. Dispatches by extension to the right tool:
+#   .docx → doxx        .xlsx → visidata (vd)   .pptx → markitdown | glow
+#   legacy .doc/.xls/.ppt/.odt/.ods/.odp/.rtf → LibreOffice headless converts to
+#   the modern OOXML twin, then re-dispatches to the handler above.
+#
+# Two modes:
+#   view-office FILE              interactive TUI / pager (default)
+#   view-office --preview FILE    non-interactive ANSI/markdown to stdout
+#
+# Deliberately plain bash, NOT the `uv run --script` self-boot pattern used by
+# executable_pqsum / yth / mlf: this sits on yazi's preview hot-path (invoked on
+# every file hover via the piper.yazi previewer), where uv/Python startup
+# (~100-200ms) would make previews feel laggy. Pure dispatch/exec is ~5ms.
+#
+# The yazi previewer contract (dot_config/yazi/yazi.toml) is:
+#   run = 'piper -- view-office --preview --width "$w" "$1"'
+# Keep --preview/--width in sync with that. See docs/tools/office-viewers.md.
+set -euo pipefail
+
+PREVIEW=0
+WIDTH="${COLUMNS:-100}"
+
+usage() {
+    printf '%s\n' \
+        "Usage: view-office [--preview] [--width N] FILE" \
+        "" \
+        "Open or preview an Office / OpenDocument file in the terminal." \
+        "" \
+        "Options:" \
+        "  -p, --preview    Render to stdout (ANSI/markdown) instead of a TUI." \
+        "  -w, --width N    Wrap width for --preview (default: \$COLUMNS or 100)." \
+        "  -h, --help       Show this help." \
+        "" \
+        "Formats:" \
+        "  .docx  doxx (interactive) / doxx --export ansi (preview)" \
+        "  .xlsx  visidata vd (interactive) / markitdown | glow (preview)" \
+        "  .pptx  markitdown | glow pager (interactive) / markitdown | glow (preview)" \
+        "  .doc .xls .ppt .odt .ods .odp .rtf  LibreOffice → OOXML twin, then above"
+}
+
+err() { printf 'view-office: %s\n' "$*" >&2; }
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# need TOOL "install hint" — fail with an actionable message if TOOL is absent.
+need() {
+    have "$1" && return 0
+    err "$1 not found — $2"
+    exit 2
+}
+
+# Resolve the LibreOffice headless binary: `soffice` / `libreoffice` on PATH,
+# else the macOS .app bundle (the cask does not put soffice on PATH).
+soffice_bin() {
+    local b
+    for b in soffice libreoffice; do
+        if have "$b"; then printf '%s\n' "$b"; return 0; fi
+    done
+    if [[ -x /Applications/LibreOffice.app/Contents/MacOS/soffice ]]; then
+        printf '%s\n' /Applications/LibreOffice.app/Contents/MacOS/soffice
+        return 0
+    fi
+    return 1
+}
+
+# Render markdown from stdin: pretty ANSI via glow if present, else raw passthrough.
+render_md() {
+    if have glow; then
+        glow -w "$WIDTH" -
+    else
+        cat
+    fi
+}
+
+render_docx() {
+    local f="$1"
+    need doxx "install via the devtools ansible role (brew bgreenwell/tap/doxx)"
+    if ((PREVIEW)); then
+        doxx --export ansi -w "$WIDTH" "$f"
+    else
+        doxx "$f"
+    fi
+}
+
+render_xlsx() {
+    local f="$1"
+    if ((PREVIEW)); then
+        need markitdown "install via python_uv_tools (uv tool install markitdown)"
+        markitdown "$f" | render_md
+    else
+        need vd "install visidata via python_uv_tools (uv tool install visidata)"
+        vd "$f"
+    fi
+}
+
+render_pptx() {
+    local f="$1"
+    need markitdown "install via python_uv_tools (uv tool install markitdown)"
+    if ((PREVIEW)); then
+        markitdown "$f" | render_md
+    elif have glow; then
+        markitdown "$f" | glow -p -
+    else
+        markitdown "$f" | "${PAGER:-less}"
+    fi
+}
+
+# Legacy binary / OpenDocument formats: convert to the modern OOXML twin with
+# LibreOffice headless (isolated -env profile so a running GUI instance doesn't
+# lock us out), then re-dispatch. NOTE: we run the viewer as a child (no exec)
+# so the EXIT trap still fires and cleans the tmpdir after an interactive TUI.
+render_legacy() {
+    local f="$1" target="$2" so tmp stem twin
+    so="$(soffice_bin)" || {
+        err "LibreOffice (soffice) not found — install via the devtools role (brew --cask libreoffice / apt libreoffice)"
+        exit 2
+    }
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+    if ! "$so" --headless -env:UserInstallation="file://$tmp/profile" \
+            --convert-to "$target" --outdir "$tmp" "$f" >/dev/null 2>&1; then
+        err "LibreOffice failed to convert $f → $target"
+        exit 1
+    fi
+    stem="$(basename -- "$f")"; stem="${stem%.*}"
+    twin="$tmp/$stem.$target"
+    [[ -f "$twin" ]] || { err "converted file not found: $twin"; exit 1; }
+    render "$twin"
+}
+
+render() {
+    local f="$1" ext
+    ext="${f##*.}"
+    ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"  # bash 3.2-safe lowercasing
+    case "$ext" in
+        docx)        render_docx "$f" ;;
+        xlsx)        render_xlsx "$f" ;;
+        pptx)        render_pptx "$f" ;;
+        doc|odt|rtf) render_legacy "$f" docx ;;
+        xls|ods)     render_legacy "$f" xlsx ;;
+        ppt|odp)     render_legacy "$f" pptx ;;
+        *)
+            err "unsupported file type: .$ext"
+            err "supported: docx xlsx pptx doc xls ppt odt ods odp rtf"
+            exit 2
+            ;;
+    esac
+}
+
+main() {
+    local file=""
+    while (($#)); do
+        case "$1" in
+            -p|--preview) PREVIEW=1; shift ;;
+            -w|--width)
+                [[ $# -ge 2 ]] || { err "--width requires a value"; exit 2; }
+                WIDTH="$2"; shift 2 ;;
+            --width=*) WIDTH="${1#*=}"; shift ;;
+            -h|--help) usage; exit 0 ;;
+            --) shift; while (($#)); do file="$1"; shift; done; break ;;
+            -*) err "unknown option: $1"; usage >&2; exit 2 ;;
+            *)
+                if [[ -z "$file" ]]; then file="$1"; else err "too many files: $1"; exit 2; fi
+                shift ;;
+        esac
+    done
+
+    if [[ -z "$file" ]]; then
+        err "expected a FILE"
+        usage >&2
+        exit 2
+    fi
+    if [[ ! -r "$file" ]]; then
+        err "file not readable: $file"
+        exit 1
+    fi
+    render "$file"
+}
+
+main "$@"

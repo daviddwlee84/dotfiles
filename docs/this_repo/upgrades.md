@@ -58,6 +58,7 @@ The script runs categories in the canonical `ALL_CATEGORIES` order regardless of
 | `agents` | Re-runs the official `curl \| bash` installers for **tools already present** only — Claude Code, OpenCode, Cursor CLI, Ollama (Linux), llmfit (Linux), RTK. Bootstrap list mirrors [`coding_agents`](../../dot_ansible/roles/coding_agents/tasks/main.yml). |
 | `atuin` | macOS: `brew upgrade atuin` (no-op when atuin was installed via the upstream installer rather than brew). Linux: re-runs `curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh \| env ATUIN_NO_MODIFY_PATH=1 sh` so the upstream installer drops the new binary into `~/.atuin/bin/` while leaving PATH wiring to [`dot_config/shell/15_atuin.sh`](../../dot_config/shell/15_atuin.sh). Skipped with `SKIPPED` if `atuin` is not on PATH. The local SQLite history (`~/.local/share/atuin/`) and config (`~/.config/atuin/config.toml`) are untouched. |
 | `plugins` | `nvim --headless "+Lazy! sync" +qa` → `~/.tmux/plugins/tpm/bin/update_plugins all` → refresh installed `claude-hud` via [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) → `pre-commit autoupdate` (on the dotfiles repo root) → `tldr --update` → `gh extension upgrade --all`. Each step is guarded on the relevant binary being present. |
+| `yazi-plugins` | `ya pkg upgrade` — bumps Yazi plugins (`piper.yazi`, …) declared in [`dot_config/yazi/package.toml`](../../dot_config/yazi/package.toml) to their latest upstream revs. `SKIPPED` when `ya` or the lockfile is absent. Install-only `chezmoi apply` pins the committed revs via `ya pkg install`; after upgrading, copy the regenerated `~/.config/yazi/package.toml` back into the chezmoi source to persist the new revs. See [`docs/tools/office-viewers.md`](../tools/office-viewers.md). |
 
 ### Run order
 
@@ -76,7 +77,8 @@ flowchart LR
     warp["warp<br/>(Linux apt-only)"] --> atuin
     atuin["atuin<br/>(brew or setup.atuin.sh)"] --> agents
     agents["agents<br/>(curl \| bash installers)"] --> plugins
-    plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> summary((Summary))
+    plugins["plugins<br/>(Lazy, TPM, pre-commit, tldr, gh)"] --> yazi_plugins
+    yazi_plugins["yazi-plugins<br/>(ya pkg upgrade)"] --> summary((Summary))
 ```
 
 Rationale: package managers themselves go first (`externals` to maybe swap chezmoi; `brew` because mise/uv/npm/cargo/dotnet/gem may be Homebrew-installed; `mise` before the language-scoped ones because `mise upgrade` can swap the runtime `npm`/`cargo`/`go`/`dotnet`/`gem` belong to). `agents` + `plugins` last because they depend on everything above being current.

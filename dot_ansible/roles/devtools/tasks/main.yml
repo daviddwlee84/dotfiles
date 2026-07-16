@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, doxx, libreoffice, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -64,6 +64,12 @@
       - eza
       - tlrc
       - glow
+      # doxx — terminal-native .docx viewer (rich tables/formatting, LaTeX, and
+      # `--export ansi/markdown/text` for piping). Powers the .docx path of the
+      # in-house `view-office` CLI + the yazi Office previewer. In homebrew-core,
+      # so no tap needed (the README's `bgreenwell/tap/doxx` is stale — that tap
+      # ships xleak/lstr, not doxx). See docs/tools/office-viewers.md.
+      - doxx
       - gum
       - vhs
       - freeze
@@ -121,6 +127,19 @@
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
     # on `command -v ccze` so it becomes a no-op on macOS.
+
+# --- LibreOffice (macOS cask) ---
+# Heavy (~hundreds of MB) headless-conversion fallback used ONLY by the in-house
+# `view-office` CLI for legacy binary formats (.doc/.xls/.ppt) and OpenDocument
+# (.odt/.ods/.odp). The cask installs /Applications/LibreOffice.app; `soffice` is
+# NOT placed on PATH — view-office resolves the bundle path itself. Modern
+# .docx/.xlsx/.pptx never touch LibreOffice (doxx/visidata/markitdown handle
+# those). See docs/tools/office-viewers.md.
+- name: Install LibreOffice via Homebrew Cask (macOS)
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew_cask:
+    name: libreoffice
+    state: present
 
 # =============================================================================
 # Linux (Debian/Ubuntu)
@@ -2760,6 +2779,28 @@
     name: pandoc
     state: present
 
+# --- LibreOffice (headless conversion fallback) ---
+# Heavy (~hundreds of MB) dependency used ONLY by the in-house `view-office` CLI
+# to convert legacy binary formats (.doc/.xls/.ppt) and OpenDocument
+# (.odt/.ods/.odp) to the modern OOXML twin before viewing. install_recommends
+# is disabled to skip GUI extras; writer+calc+impress pull libreoffice-core
+# (which provides `soffice`) plus the import/export filters. no-root installs
+# skip this (become fails) and `view-office` prints an install hint for legacy
+# files — modern .docx/.xlsx/.pptx never need LibreOffice. failed_when:false so
+# this optional heavy dep never aborts the play. See docs/tools/office-viewers.md.
+- name: Install LibreOffice (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - libreoffice-writer
+      - libreoffice-calc
+      - libreoffice-impress
+    install_recommends: false
+    state: present
+  failed_when: false
+
 # --- btop ---
 - name: Install btop (Debian/Ubuntu)
   when: ansible_facts["os_family"] == "Debian"
@@ -3238,6 +3279,170 @@
       loop:
         - /tmp/worktrunk.tar.xz
         - /tmp/worktrunk
+
+# --- doxx (terminal-native .docx viewer) ---
+# cargo-dist release ships .tar.xz (like worktrunk → needs xz-utils). Asset
+# names are Rust target triples and the suffix varies by arch:
+#   x86_64  → doxx-x86_64-unknown-linux-musl.tar.xz  (static, most portable)
+#   aarch64 → doxx-aarch64-unknown-linux-gnu.tar.xz  (no musl build published)
+# The tarball contains doxx-<triple>/doxx. NOTE: the doxx README's
+# `doxx-$(uname -s)-$(uname -m).tar.gz` is stale — the real assets are the
+# target-triple .tar.xz files above. macOS uses brew (homebrew-core). See
+# docs/tools/office-viewers.md.
+- name: Check if doxx is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: doxx --version
+  register: doxx_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Ensure xz is available for doxx extraction (Debian/Ubuntu)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - doxx_check.rc != 0
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name: xz-utils
+    state: present
+  failed_when: false
+
+- name: Probe for xz binary (doxx extraction dependency)
+  # doxx releases only ship .tar.xz; the apt install above is skipped in
+  # noRoot mode. If xz isn't already on PATH the unarchive step cannot
+  # succeed — skip the download outright.
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - doxx_check.rc != 0
+  ansible.builtin.shell: command -v xz || true
+  args:
+    executable: /bin/bash
+  register: doxx_xz_probe
+  changed_when: false
+
+- name: Install doxx from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - doxx_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    - doxx_xz_probe.stdout | default('') | trim != ''
+  block:
+    - name: Ensure ~/.local/bin exists (doxx)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Get latest doxx release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/bgreenwell/doxx/releases/latest
+        return_content: true
+      register: doxx_release
+
+    - name: Set doxx asset name (arch-specific target triple)
+      ansible.builtin.set_fact:
+        doxx_asset: >-
+          {{
+            'doxx-x86_64-unknown-linux-musl.tar.xz' if target_architecture in ['x86_64', 'amd64']
+            else 'doxx-aarch64-unknown-linux-gnu.tar.xz' if target_architecture in ['aarch64', 'arm64']
+            else ''
+          }}
+
+    - name: Skip doxx on unsupported architecture
+      when: doxx_asset | trim == ''
+      ansible.builtin.debug:
+        msg: "doxx skipped: no release for {{ target_architecture }}"
+
+    - name: Set doxx download URL fact
+      ansible.builtin.set_fact:
+        doxx_download_url: >-
+          {{
+            (
+              doxx_release.json.assets
+              | selectattr('name', 'equalto', doxx_asset)
+              | map(attribute='browser_download_url')
+              | first
+            )
+            | default('', true)
+          }}
+
+    - name: Skip doxx if download URL could not be determined
+      when: doxx_download_url | trim == ''
+      ansible.builtin.debug:
+        msg: "doxx skipped: could not determine download URL for {{ doxx_asset }}"
+
+    - name: Download doxx tarball
+      when: doxx_download_url | trim != ''
+      ansible.builtin.get_url:
+        url: "{{ doxx_download_url }}"
+        dest: /tmp/doxx.tar.xz
+        mode: '0644'
+        timeout: 120
+      retries: 3
+      delay: 5
+
+    - name: Create doxx temp directory
+      when: doxx_download_url | trim != ''
+      ansible.builtin.file:
+        path: /tmp/doxx
+        state: directory
+        mode: '0755'
+
+    - name: Extract doxx
+      when: doxx_download_url | trim != ''
+      ansible.builtin.unarchive:
+        src: /tmp/doxx.tar.xz
+        dest: /tmp/doxx
+        remote_src: true
+
+    - name: Find doxx binary
+      when: doxx_download_url | trim != ''
+      ansible.builtin.find:
+        paths: /tmp/doxx
+        patterns: doxx
+        file_type: file
+        recurse: true
+      register: doxx_find
+
+    - name: Fail if doxx binary was not found in extracted archive
+      when:
+        - doxx_download_url | trim != ''
+        - doxx_find.matched | default(0) | int == 0
+      ansible.builtin.fail:
+        msg: "doxx binary not found under /tmp/doxx after extraction"
+
+    - name: Install doxx to ~/.local/bin
+      when:
+        - doxx_download_url | trim != ''
+        - doxx_find.matched | default(0) | int > 0
+      ansible.builtin.copy:
+        src: "{{ doxx_find.files[0].path }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/doxx"
+        mode: '0755'
+        remote_src: true
+
+    - name: Clean up doxx temp files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/doxx.tar.xz
+        - /tmp/doxx
+
+  rescue:
+    - name: Warn doxx installation failed
+      ansible.builtin.debug:
+        msg: "doxx installation failed (likely network timeout) - skipping"
+
+    - name: Clean up doxx temp files after failure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/doxx.tar.xz
+        - /tmp/doxx
 
 # --- workmux (tmux + git-worktree orchestrator with agent status icons) ---
 # Coexists with worktrunk (`wt`); see docs/tools/workmux.md.

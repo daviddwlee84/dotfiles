@@ -1,0 +1,24 @@
+# yazi plugin lockfile — managed by chezmoi (source: dot_config/yazi/package.toml).
+#
+# Materialized into ~/.config/yazi/plugins/ by `ya pkg install`, run automatically
+# on every `chezmoi apply` via
+# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl (hash-gated on
+# this file). `ya pkg install` READS but never rewrites this file, so there is no
+# chezmoi drift.
+#
+# Add a plugin:    `ya pkg add <owner>/<repo>:<plugin>` then copy the regenerated
+#                  ~/.config/yazi/package.toml back here (`chezmoi re-add` / cp).
+# Upgrade plugins: `ya pkg upgrade` (see scripts/upgrade_tools.sh /
+#                  `just upgrade-yazi-plugins`) then copy back — install-only by
+#                  design, apply never bumps revs.
+#
+# piper.yazi: generic "pipe any shell command as a previewer" plugin. Used by the
+# Office previewers in yazi.toml (`piper -- view-office --preview ...`).
+# See docs/tools/office-viewers.md.
+[[plugin.deps]]
+use = "yazi-rs/plugins:piper"
+rev = "8577ec8"
+hash = "e0d59bd47866a6a574c74574097e5070"
+
+[flavor]
+deps = []

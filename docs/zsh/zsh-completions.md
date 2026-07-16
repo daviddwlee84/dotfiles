@@ -153,6 +153,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `agent-warmup` | `dot_dotfiles/bin/executable_agent-warmup` | argparse (subcommands) | B | `dot_config/zsh/tools/52_agent_warmup_completion.zsh` + `dot_config/bash/52_agent_warmup_completion.bash` |
 | `yth` | `dot_dotfiles/bin/executable_yth` + `scripts/yth/*.py` | hand-rolled umbrella + tyro subs | B | `dot_config/zsh/tools/53_yth_completion.zsh` + `dot_config/bash/53_yth_completion.bash` |
 | `wake` | `dot_dotfiles/bin/executable_wake` | argparse | B | `dot_config/zsh/tools/54_wake_completion.zsh` + `dot_config/bash/54_wake_completion.bash` |
+| `view-office` | `dot_dotfiles/bin/executable_view-office` | bash hand-rolled | B | `dot_config/zsh/tools/55_view_office_completion.zsh` + `dot_config/bash/55_view_office_completion.bash` |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**

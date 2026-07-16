@@ -191,7 +191,7 @@ openvpn-connect, etc.) — uncomment to enable.
 Most CLI formulae land via ansible roles, not the Brewfile. Examples:
 
 - `base/tasks/main.yml`: `git`, `git-lfs`, `curl`, `wget`, `ripgrep`, `fd`, `jq`, `tree`, `just`
-- `devtools/tasks/main.yml`: large set — `bat`, `gh`, `glab`, `diffnav`, `git-delta`, `eza`, `tlrc`, `glow`, `gum`, `vhs`, `freeze`, `thefuck`, `zoxide`, `direnv`, `yazi`, `superfile`, `tmux`, `sesh`, `worktrunk`, `workmux`, `zellij`, `btop`, `htop`, `duckdb`, `rclone`, `coreutils`, `taplo`, `television`, `pandoc`, `tailspin`, `lnav`, `grc`, `dasel`, `yq`, `jnv`, `witr`, `figlet`, `toilet`, `lolcat`, `fastfetch`, `shellcheck`, `shfmt`, `bats-core`, `git-graph`, `mosh`
+- `devtools/tasks/main.yml`: large set — `bat`, `gh`, `glab`, `diffnav`, `git-delta`, `eza`, `tlrc`, `glow`, `gum`, `vhs`, `freeze`, `thefuck`, `zoxide`, `direnv`, `yazi`, `superfile`, `tmux`, `sesh`, `worktrunk`, `workmux`, `zellij`, `btop`, `htop`, `duckdb`, `rclone`, `coreutils`, `taplo`, `television`, `pandoc`, `tailspin`, `lnav`, `grc`, `dasel`, `yq`, `jnv`, `witr`, `figlet`, `toilet`, `lolcat`, `fastfetch`, `shellcheck`, `shfmt`, `bats-core`, `git-graph`, `mosh`, `doxx`, `libreoffice`
 - `coding_agents/tasks/main.yml`: `claude-code` (cask), `codex` (cask), `gemini-cli` (formula), `rtk` (formula), `specstory`, `codexbar`, `td`, `sidecar` (all with tap setup)
 - `networking_tools/`: `nmap`, `arp-scan`, `mtr`, `iperf3`, `doggo`, `httpie`, `gping`, `trippy`, `bandwhich`, `rustscan`, `speedtest` (tap `teamookla/speedtest`), `ngrok`, `cloudflared`
 - `media_tools/`: `ffmpeg`, `imagemagick`, `exiftool`, `vips`
@@ -288,7 +288,7 @@ considering whether to break this up.
 `workmux`, `zellij`, `btop`, `htop`, `duckdb`, `rclone`, `coreutils`,
 `taplo`, `television`, `pandoc`, `tailspin`, `lnav`, `grc`, `dasel`,
 `yq`, `jnv`, `witr`, `figlet`, `toilet`, `lolcat`, `fastfetch`,
-`shellcheck`, `shfmt`.
+`shellcheck`, `shfmt`, `doxx`.
 
 **Linux** — per-tool dispatch. The pattern is **apt/yum (system) →
 GitHub release tarball or installer (user)**:
@@ -483,6 +483,7 @@ installs, `uv self update` for the curl-installer. Mirror logic in
 | `jupyterlab` (`jupyter-lab`) | `marimo[sandbox]`, `marimo-jupyter-extension`, `ipykernel`, `ipywidgets`; `with_executables_from: notebook, jupyter-core`; `extra_binaries: jupyter, jupyter-notebook` | ✓ |
 | `xonsh` | `xontrib-jedi`, `xontrib-zoxide`, `xontrib-pipeliner`, `xontrib-fzf-widgets` | — |
 | `yt-dlp` | — | — |
+| `markitdown[docx,xlsx,pptx]` | — (extras in name; pulls pandas 3.x) | ✓ |
 
 From `llm_tools/defaults/main.yml`:
 
@@ -850,6 +851,18 @@ noRoot path if the tool is broadly useful.
 
 ---
 
+### 15. ya pkg (Yazi plugins)
+
+Yazi's built-in plugin manager. `ya` (the yazi CLI companion) clones a plugin, copies it into `~/.config/yazi/plugins/`, and pins its revision in `~/.config/yazi/package.toml`.
+
+In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by a hash-gated run-script, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever the lockfile changes. `ya pkg install` reads but never rewrites `package.toml`, so there's no chezmoi drift.
+
+| Plugin | Purpose |
+|---|---|
+| `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`). See [office-viewers.md](../tools/office-viewers.md). |
+
+**Add a plugin:** `ya pkg add <owner>/<repo>:<plugin>`, then copy `~/.config/yazi/package.toml` back into the source. **Upgrade:** `ya pkg upgrade` → `just upgrade-yazi-plugins` (install-only by design; apply never bumps revs). Requires a recent yazi (`ya pkg` replaced the older `ya pack`).
+
 ## Multi-mechanism tools + rationale
 
 Tools where the install path differs by OS / arch / role-feature-flag,
@@ -1011,6 +1024,7 @@ list.
 | **doggo** | brew | GitHub release | networking_tools |
 | **dotenv** (python-dotenv[cli]) | uv tool | uv tool | python_uv_tools |
 | **dotnet** | mise | mise | mise |
+| **doxx** | brew (homebrew-core) | GitHub release `.tar.xz` | devtools |
 | **duckdb** | brew | GitHub release | devtools |
 | **ethtool** | n/a | apt / yum (`ethtool`) | wake_on_lan |
 | **exiftool** | brew | apt (`libimage-exiftool-perl`) | media_tools |
@@ -1061,6 +1075,7 @@ list.
 | **lazygit** | brew (via `lazyvim_deps`) | PPA → GitHub release | lazyvim_deps |
 | **libnotify-bin** | n/a | apt (Debian) | coding_agents |
 | **libfuse2** | n/a | apt | gui_apps_linux |
+| **libreoffice** (`soffice`) | brew cask | apt (`libreoffice-writer/calc/impress`, no-recommends) | devtools |
 | **liquidctl** | n/a | apt/yum (gated on a USB cooler / telemetry PSU detected) | homelab_tools |
 | **litellm[proxy]** (`litellm`) | uv tool (python 3.13) | uv tool | llm_tools |
 | **llmfit** | brew formula | curl `llmfit.axjns.dev/install.sh` | llm_tools |
@@ -1069,6 +1084,7 @@ list.
 | **lolcat** | brew | (apt) | devtools |
 | **maccy** | brew cask | n/a | Brewfile.darwin |
 | **marimo** | uv tool (`[recommended,mcp]`) | uv tool | python_uv_tools |
+| **markitdown** (`[docx,xlsx,pptx]`) | uv tool | uv tool | python_uv_tools |
 | **mas** | brew (shared Brewfile, macOS only) | n/a | Brewfile.tmpl |
 | **mise** | curl `mise.run` | curl `mise.run` → direct binary → musl variant | bootstrap |
 | **mlflow** | uv tool | uv tool | python_uv_tools |
@@ -1089,6 +1105,7 @@ list.
 | **opentofu** (`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
+| **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
 | **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
 | **procps** | (system) | apt | bootstrap (Linux) |
@@ -1219,6 +1236,13 @@ Is the tool a coding agent CLI (vendor-distributed, ships its own installer)?
 │         · Add to cat_agents in scripts/upgrade_tools.sh
 │         · Update AICAP SSOT (dot_config/shell/04_ai_agents.sh) +
 │           four Python AGENT_CONFIG dicts (see AGENTS.md hard invariant)
+└── No → continue
+
+Is it a Yazi plugin?
+├── Yes → ya pkg (Yazi's plugin manager; § 15). Lockfile
+│         dot_config/yazi/package.toml (chezmoi-managed), materialized by
+│         run_onchange_after_45_yazi_plugins. `ya pkg add owner/repo:plugin`,
+│         copy package.toml back; upgrade via `ya pkg upgrade` (just upgrade-yazi-plugins)
 └── No → continue
 
 Is it macOS-shipped, GUI app?

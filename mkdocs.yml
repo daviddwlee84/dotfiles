@@ -144,6 +144,7 @@ plugins:
             dotnet tools: dotnet 工具
             td / sidecar: td / sidecar
             Web reader: 網頁讀取器
+            Office viewers (doxx / markitdown): Office 文件檢視 (doxx / markitdown)
             Log tools: Log 工具
             SMS (Huawei router): 簡訊 (Huawei 路由器)
             reyee (Ruijie router): reyee (Ruijie 路由器)
@@ -330,6 +331,7 @@ nav:
           - td / sidecar: tools/td_sidecar.md
           - Super Productivity: tools/super-productivity.md
           - Web reader: tools/web-reader.md
+          - Office viewers (doxx / markitdown): tools/office-viewers.md
           - Log tools: tools/log-tools.md
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md

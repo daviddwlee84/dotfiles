@@ -1,6 +1,6 @@
 # ~/.config/yazi/yazi.toml
 # Yazi configuration (tested with v0.3.3+, syntax updated for v25.12.29+)
-# Last updated: 2026-02-12
+# Last updated: 2026-07-13
 # Documentation: https://yazi-rs.github.io/docs/configuration/yazi/
 # Default preset: https://github.com/sxyazi/yazi/blob/shipped/yazi-config/preset/yazi.toml
 
@@ -175,4 +175,31 @@ exec marimo edit --watch .
 # --- marimo sandbox：只給 .py 用，避免對 dir 亂套
 marimo_py_sandbox = [
   { run = """sh -lc 'exec marimo edit --watch --sandbox "$1"' -- %s1 """, block = true, desc = "Marimo (watch + sandbox py)" },
+]
+
+# -----------------------
+# Previewers: Office / OpenDocument documents, via the piper.yazi plugin piping
+# through the in-house `view-office` dispatcher (doxx / visidata / markitdown /
+# LibreOffice). Requires `ya pkg install` — run automatically on chezmoi apply
+# (lockfile: dot_config/yazi/package.toml; installer:
+# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl).
+#
+# CONTRACT: the run command must stay in sync with view-office's --preview /
+# --width interface (dot_dotfiles/bin/executable_view-office). piper.yazi passes
+# $w = preview width, $1 = file path. See docs/tools/office-viewers.md.
+# -----------------------
+[plugin]
+prepend_previewers = [
+  # Modern OOXML
+  { url = "*.docx", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.xlsx", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.pptx", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  # Legacy binary + OpenDocument (LibreOffice converts → re-dispatches)
+  { url = "*.doc", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.xls", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.ppt", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.odt", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.ods", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.odp", run = 'piper -- view-office --preview --width "$w" "$1"' },
+  { url = "*.rtf", run = 'piper -- view-office --preview --width "$w" "$1"' },
 ]

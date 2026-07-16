@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin agents plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -137,7 +137,7 @@ while [[ $# -gt 0 ]]; do
       SELECTED=("${ALL_CATEGORIES[@]}")
       shift
       ;;
-    externals | brew | mise | uv | npm | cargo | dotnet | gem | flatpak | warp | atuin | agents | plugins)
+    externals | brew | mise | uv | npm | cargo | go | dotnet | gem | flatpak | warp | atuin | agents | plugins | yazi-plugins)
       SELECTED+=("$1")
       shift
       ;;
@@ -748,6 +748,32 @@ cat_atuin() {
 }
 
 # ============================================================================
+# Category: yazi-plugins — `ya pkg upgrade` for Yazi plugins (piper.yazi, …)
+# ============================================================================
+# `chezmoi apply` is install-only: it materializes plugins from the pinned
+# lockfile (dot_config/yazi/package.toml) via `ya pkg install`. This category
+# bumps them to the latest upstream revs. Remember to copy the regenerated
+# ~/.config/yazi/package.toml back into the chezmoi source afterward, else the
+# next apply pins the old rev again. See docs/tools/office-viewers.md.
+cat_yazi_plugins() {
+  if ! command -v ya >/dev/null 2>&1; then
+    warn "ya (yazi CLI) not installed — skipping"
+    return $SKIP_RC
+  fi
+  if [[ ! -f "$HOME/.config/yazi/package.toml" ]]; then
+    warn "no ~/.config/yazi/package.toml — no yazi plugins to upgrade, skipping"
+    return $SKIP_RC
+  fi
+  info "Upgrading Yazi plugins (ya pkg upgrade)"
+  if ! _run ya pkg upgrade; then
+    error "ya pkg upgrade failed"
+    return 1
+  fi
+  warn "Remember: copy ~/.config/yazi/package.toml into the chezmoi source to persist new revs"
+  return 0
+}
+
+# ============================================================================
 # Category: agents — re-run install.sh for curl-installed CLI tools
 # ============================================================================
 # Only re-runs when the binary is already present. The installers are (by
@@ -972,6 +998,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         atuin) run_category atuin cat_atuin ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
+        yazi-plugins) run_category yazi-plugins cat_yazi_plugins ;;
       esac
       break
     fi

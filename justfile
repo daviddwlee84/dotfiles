@@ -474,6 +474,11 @@ upgrade-agents:
 upgrade-plugins:
     ./scripts/upgrade_tools.sh plugins
 
+# Yazi plugins: ya pkg upgrade (piper.yazi, …). Copy ~/.config/yazi/package.toml
+# back into the chezmoi source afterward to persist the new revs.
+upgrade-yazi-plugins:
+    ./scripts/upgrade_tools.sh yazi-plugins
+
 # chezmoi upgrade + chezmoi apply --refresh-externals (oh-my-zsh, TPM, etc.)
 upgrade-externals:
     ./scripts/upgrade_tools.sh externals
