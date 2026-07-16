@@ -1,8 +1,10 @@
 #!/bin/bash
 # Install yazi plugins declared in the managed lockfile via `ya pkg install`.
-# Materializes ~/.config/yazi/plugins/ (piper.yazi, …) so the Office previewers
-# in yazi.toml work. `ya pkg install` reads but never rewrites package.toml, so
-# there is no chezmoi drift.
+# Materializes ~/.config/yazi/plugins/ (piper.yazi, duckdb.yazi, …) so the yazi
+# previewers in yazi.toml work. NOTE: `ya pkg install` REWRITES package.toml
+# (normalizes it and strips comments), so the managed source lockfile is kept
+# comment-free to match its canonical output — that is what avoids chezmoi drift.
+# Never add comments to dot_config/yazi/package.toml.
 #
 # Re-runs only when the lockfile changes:
 #   package.toml: {{ include "dot_config/yazi/package.toml" | sha256sum }}

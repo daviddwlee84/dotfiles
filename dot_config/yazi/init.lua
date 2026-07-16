@@ -1,0 +1,21 @@
+-- ~/.config/yazi/init.lua
+-- Yazi Lua init — runs once at startup. Managed by chezmoi
+-- (source: dot_config/yazi/init.lua). Edits to ~/.config/yazi/init.lua are
+-- reverted on next `chezmoi apply` — change the source instead.
+--
+-- Documentation: https://yazi-rs.github.io/docs/configuration/overview
+
+-- duckdb.yazi — DuckDB-powered table previewer for data files
+-- (csv/tsv/parquet/xlsx/db/duckdb). This setup() call is REQUIRED: it registers
+-- the plugin's previewer/preloader; without it the `run = "duckdb"` rules in
+-- yazi.toml never activate.
+--
+--   mode = "standard"   → hover shows actual data rows (press K at top-of-file
+--                         to toggle to DuckDB's SUMMARIZE view: min/max/counts).
+--                         The plugin default is "summarized"; we prefer showing
+--                         rows first for a quick "what's in this file" glance.
+--
+-- Other opts (see the plugin README / main.lua M:setup): cache_size (default 500),
+-- row_id (false), minmax_column_width (21), column_fit_factor (10).
+-- See docs/tools/data-viewers.md.
+require("duckdb"):setup({ mode = "standard" })

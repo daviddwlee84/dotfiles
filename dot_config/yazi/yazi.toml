@@ -178,21 +178,49 @@ marimo_py_sandbox = [
 ]
 
 # -----------------------
-# Previewers: Office / OpenDocument documents, via the piper.yazi plugin piping
-# through the in-house `view-office` dispatcher (doxx / visidata / markitdown /
-# LibreOffice). Requires `ya pkg install` — run automatically on chezmoi apply
-# (lockfile: dot_config/yazi/package.toml; installer:
-# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl).
+# Previewers — two families, both via yazi plugins auto-installed by `ya pkg
+# install` on chezmoi apply (lockfile: dot_config/yazi/package.toml; installer:
+# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl):
 #
-# CONTRACT: the run command must stay in sync with view-office's --preview /
-# --width interface (dot_dotfiles/bin/executable_view-office). piper.yazi passes
-# $w = preview width, $1 = file path. See docs/tools/office-viewers.md.
+#   1. DATA FILES → duckdb.yazi (run = "duckdb"): csv/tsv/parquet/xlsx/db/duckdb.
+#      Native DuckDB table view; K toggles SUMMARIZE, H/L scroll columns (see
+#      keymap.toml); init.lua runs the REQUIRED `require("duckdb"):setup{}`. Needs
+#      the `duckdb` CLI (devtools role). Two gaps filled via piper below:
+#        - .feather/.arrow  → DuckDB has no Arrow-IPC reader → visidata `fixed`.
+#        - .sqlite/.sqlite3 → not in the plugin's extension_map → duckdb table list
+#          (plain `.db` IS handled by the plugin: DuckDB auto-attaches SQLite).
+#   2. OFFICE DOCS → piper.yazi piping the in-house `view-office` dispatcher
+#      (doxx / markitdown / LibreOffice).
+#
+# CONTRACTS / gotchas:
+#   - view-office entries must stay in sync with view-office's --preview/--width
+#     interface (dot_dotfiles/bin/executable_view-office).
+#   - piper passes $w=width, $h=height, $1=file path and runs the string via
+#     `sh -c` (pipes/redirects work). piper renders any STDERR as an error, so the
+#     visidata/duckdb fallbacks MUST keep `2>/dev/null`.
+#   - .xlsx PREVIEW is owned by duckdb.yazi here (first xlsx preview per machine
+#     fetches DuckDB's `spatial` ext → needs network once). The `view-office` CLI
+#     still previews xlsx via markitdown; only yazi's previewer moved.
+# See docs/tools/data-viewers.md and docs/tools/office-viewers.md.
 # -----------------------
 [plugin]
 prepend_previewers = [
-  # Modern OOXML
+  # --- Data files → duckdb.yazi (native table view) ---
+  { url = "*.csv", run = "duckdb" },
+  { url = "*.tsv", run = "duckdb" },
+  { url = "*.parquet", run = "duckdb" },
+  { url = "*.xlsx", run = "duckdb" },
+  { url = "*.db", run = "duckdb" },
+  { url = "*.duckdb", run = "duckdb" },
+  # --- Feather / Arrow → visidata `fixed` table (no DuckDB Arrow-IPC reader) ---
+  { url = "*.feather", run = 'piper -- vd -b -f arrow "$1" -o - --save-filetype fixed 2>/dev/null | head -n 500' },
+  { url = "*.arrow", run = 'piper -- vd -b -f arrow "$1" -o - --save-filetype fixed 2>/dev/null | head -n 500' },
+  # --- SQLite by .sqlite/.sqlite3 name → duckdb table listing (plugin only maps .db) ---
+  { url = "*.sqlite", run = 'piper -- duckdb -readonly "$1" -box -c "SELECT table_name, column_count AS cols FROM duckdb_tables() ORDER BY table_name" 2>/dev/null' },
+  { url = "*.sqlite3", run = 'piper -- duckdb -readonly "$1" -box -c "SELECT table_name, column_count AS cols FROM duckdb_tables() ORDER BY table_name" 2>/dev/null' },
+
+  # --- Office / OpenDocument → view-office (piper). .xlsx handled by duckdb above. ---
   { url = "*.docx", run = 'piper -- view-office --preview --width "$w" "$1"' },
-  { url = "*.xlsx", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.pptx", run = 'piper -- view-office --preview --width "$w" "$1"' },
   # Legacy binary + OpenDocument (LibreOffice converts → re-dispatches)
   { url = "*.doc", run = 'piper -- view-office --preview --width "$w" "$1"' },
@@ -202,4 +230,14 @@ prepend_previewers = [
   { url = "*.ods", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.odp", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.rtf", run = 'piper -- view-office --preview --width "$w" "$1"' },
+]
+
+# duckdb.yazi builds parquet scroll-caches in a preload step — it needs matching
+# preloader rules for the tabular formats (NOT .db/.duckdb, which are not
+# pre-cached; NOT the piper fallbacks). See the plugin README.
+prepend_preloaders = [
+  { url = "*.csv", run = "duckdb", multi = false },
+  { url = "*.tsv", run = "duckdb", multi = false },
+  { url = "*.parquet", run = "duckdb", multi = false },
+  { url = "*.xlsx", run = "duckdb", multi = false },
 ]

@@ -145,6 +145,7 @@ plugins:
             td / sidecar: td / sidecar
             Web reader: 網頁讀取器
             Office viewers (doxx / markitdown): Office 文件檢視 (doxx / markitdown)
+            Data viewers (duckdb.yazi / VisiData): 資料檔檢視 (duckdb.yazi / VisiData)
             Log tools: Log 工具
             SMS (Huawei router): 簡訊 (Huawei 路由器)
             reyee (Ruijie router): reyee (Ruijie 路由器)
@@ -332,6 +333,7 @@ nav:
           - Super Productivity: tools/super-productivity.md
           - Web reader: tools/web-reader.md
           - Office viewers (doxx / markitdown): tools/office-viewers.md
+          - Data viewers (duckdb.yazi / VisiData): tools/data-viewers.md
           - Log tools: tools/log-tools.md
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md

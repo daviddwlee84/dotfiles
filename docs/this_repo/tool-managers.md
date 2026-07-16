@@ -855,11 +855,12 @@ noRoot path if the tool is broadly useful.
 
 Yazi's built-in plugin manager. `ya` (the yazi CLI companion) clones a plugin, copies it into `~/.config/yazi/plugins/`, and pins its revision in `~/.config/yazi/package.toml`.
 
-In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by a hash-gated run-script, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever the lockfile changes. `ya pkg install` reads but never rewrites `package.toml`, so there's no chezmoi drift.
+In this repo the **lockfile is chezmoi-managed** (`dot_config/yazi/package.toml`) and plugins are materialized by a hash-gated run-script, `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, which runs `ya pkg install` whenever the lockfile changes. `ya pkg install` **rewrites** `package.toml` (normalizes it and strips comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift (never add comments to it).
 
 | Plugin | Purpose |
 |---|---|
-| `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`). See [office-viewers.md](../tools/office-viewers.md). |
+| `yazi-rs/plugins:piper` (`piper.yazi`) | "pipe any shell command as a previewer" — backs the Office-document previewers in `dot_config/yazi/yazi.toml` (`piper -- view-office --preview …`) and the feather/sqlite preview fallbacks. See [office-viewers.md](../tools/office-viewers.md). |
+| `wylie102/duckdb` (`duckdb.yazi`) | DuckDB-powered table previewer for data files (csv/tsv/parquet/xlsx/db/duckdb) — `run = "duckdb"` in `dot_config/yazi/yazi.toml` + required `require("duckdb"):setup{}` in `dot_config/yazi/init.lua`. Uses the `duckdb` CLI. See [data-viewers.md](../tools/data-viewers.md). |
 
 **Add a plugin:** `ya pkg add <owner>/<repo>:<plugin>`, then copy `~/.config/yazi/package.toml` back into the source. **Upgrade:** `ya pkg upgrade` → `just upgrade-yazi-plugins` (install-only by design; apply never bumps revs). Requires a recent yazi (`ya pkg` replaced the older `ya pack`).
 
@@ -1026,6 +1027,7 @@ list.
 | **dotnet** | mise | mise | mise |
 | **doxx** | brew (homebrew-core) | GitHub release `.tar.xz` | devtools |
 | **duckdb** | brew | GitHub release | devtools |
+| **duckdb.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **ethtool** | n/a | apt / yum (`ethtool`) | wake_on_lan |
 | **exiftool** | brew | apt (`libimage-exiftool-perl`) | media_tools |
 | **eza** | brew | gierens.de apt repo → GitHub musl → brew aarch64 | devtools |

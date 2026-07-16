@@ -71,9 +71,15 @@ Hovering an Office file in [yazi](tmux/README.md) renders a preview in the right
 [plugin]
 prepend_previewers = [
   { url = "*.docx", run = 'piper -- view-office --preview --width "$w" "$1"' },
-  # … .xlsx .pptx .doc .xls .ppt .odt .ods .odp .rtf
+  # … .pptx .doc .xls .ppt .odt .ods .odp .rtf
 ]
 ```
+
+> **`.xlsx` preview is handled by [duckdb.yazi](data-viewers.md), not `view-office`.** Yazi routes
+> spreadsheet hovers to the DuckDB table previewer (a nicer aligned grid). The
+> `view-office --preview budget.xlsx` **CLI** path (markitdown → glow) is unchanged — only Yazi's
+> previewer wiring moved. Legacy `.xls` / OpenDocument `.ods` stay on the view-office (LibreOffice)
+> path here, since DuckDB can't read those.
 
 `piper.yazi` passes `$w` (preview width) and `$1` (file path); the command's stdout becomes the preview. The `run` string and `view-office`'s `--preview`/`--width` interface are a **contract** — change one, change the other.
 
@@ -89,7 +95,7 @@ In this repo the lockfile is **chezmoi-managed** (`dot_config/yazi/package.toml`
 | Installer | `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl` | runs `ya pkg install` when the lockfile changes |
 | Previewer wiring | `dot_config/yazi/yazi.toml` `[plugin]` | maps Office extensions → `piper -- view-office …` |
 
-`ya pkg install` **reads but never rewrites** `package.toml`, so there's no chezmoi drift. It is install-only by design (like the rest of the repo) — bump plugin versions with `ya pkg upgrade` (`just upgrade-yazi-plugins`), then copy the regenerated `~/.config/yazi/package.toml` back into the source.
+`ya pkg install` **rewrites** `package.toml` (normalizes it and drops comments), so the managed source lockfile is kept **comment-free** to match its canonical output — that's what avoids chezmoi drift. It is install-only by design (like the rest of the repo) — bump plugin versions with `ya pkg upgrade` (`just upgrade-yazi-plugins`), then copy the regenerated `~/.config/yazi/package.toml` back into the source.
 
 Add another yazi plugin:
 

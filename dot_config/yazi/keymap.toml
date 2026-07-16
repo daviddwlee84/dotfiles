@@ -1,10 +1,24 @@
 # ~/.config/yazi/keymap.toml
-# Yazi v0.3.3+ keybindings customization
+# Yazi keybindings customization. Managed by chezmoi
+# (source: dot_config/yazi/keymap.toml).
 # Default keybindings: https://github.com/sxyazi/yazi/blob/shipped/yazi-config/preset/keymap.toml
 # Documentation: https://yazi-rs.github.io/docs/configuration/keymap/
+#
+# NOTE: current Yazi uses the [mgr] table (the old [manager] name is deprecated).
 
-# Uncomment and modify to customize keybindings
-# [manager]
-# prepend_keymap = [
-#   { on = "<C-n>", run = "plugin your-plugin", desc = "Description" },
-# ]
+# --- duckdb.yazi previewer keybindings ---
+# Companion to the data-file previewers in yazi.toml [plugin] and the required
+# `require("duckdb"):setup{}` in init.lua. See docs/tools/data-viewers.md.
+#
+# ⚠ H / L OVERRIDE Yazi's default history back/forward (the capital-letter binds).
+#   Lowercase h / l (leave / enter directory) are UNAFFECTED. While previewing a
+#   data file, H / L scroll the visible columns; on other files they no-op.
+#   The SUMMARIZE ⇄ standard view toggle is `K` at top-of-file — built into the
+#   plugin, so it needs no keymap entry here.
+[mgr]
+prepend_keymap = [
+  { on = "H", run = "plugin duckdb -1", desc = "DuckDB preview: scroll one column left" },
+  { on = "L", run = "plugin duckdb +1", desc = "DuckDB preview: scroll one column right" },
+  { on = [ "g", "o" ], run = "plugin duckdb -open", desc = "Open file in the DuckDB CLI" },
+  { on = [ "g", "u" ], run = "plugin duckdb -ui", desc = "Open file in the DuckDB UI" },
+]
