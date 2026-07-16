@@ -178,9 +178,14 @@ marimo_py_sandbox = [
 ]
 
 # -----------------------
-# Previewers — two families, both via yazi plugins auto-installed by `ya pkg
-# install` on chezmoi apply (lockfile: dot_config/yazi/package.toml; installer:
-# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl):
+# Previewers — three families this repo wires explicitly, via yazi plugins
+# auto-installed by `ya pkg install` on chezmoi apply (lockfile:
+# dot_config/yazi/package.toml; installer:
+# .chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl).
+# NOTE: images / PDF / video / SVG / standard archives are handled by yazi's
+# BUILT-IN previewers (not wired here); those shell out to chafa/poppler/7zip/
+# resvg — plus ffmpeg/imagemagick when installMediaTools — installed by the
+# devtools/media_tools ansible roles. See docs/tools/yazi-previews.md.
 #
 #   1. DATA FILES → duckdb.yazi (run = "duckdb"): csv/tsv/parquet/xlsx/db/duckdb.
 #      Native DuckDB table view; K toggles SUMMARIZE, H/L scroll columns (see
@@ -191,17 +196,19 @@ marimo_py_sandbox = [
 #          (plain `.db` IS handled by the plugin: DuckDB auto-attaches SQLite).
 #   2. OFFICE DOCS → piper.yazi piping the in-house `view-office` dispatcher
 #      (doxx / markitdown / LibreOffice).
+#   3. CONTAINERS yazi's built-ins skip → piper: .epub (pandoc text) and .dmg
+#      (7-Zip listing) — their mimes aren't in the built-in archive set.
 #
 # CONTRACTS / gotchas:
 #   - view-office entries must stay in sync with view-office's --preview/--width
 #     interface (dot_dotfiles/bin/executable_view-office).
 #   - piper passes $w=width, $h=height, $1=file path and runs the string via
 #     `sh -c` (pipes/redirects work). piper renders any STDERR as an error, so the
-#     visidata/duckdb fallbacks MUST keep `2>/dev/null`.
+#     visidata/duckdb/pandoc/7z fallbacks MUST keep `2>/dev/null`.
 #   - .xlsx PREVIEW is owned by duckdb.yazi here (first xlsx preview per machine
 #     fetches DuckDB's `spatial` ext → needs network once). The `view-office` CLI
 #     still previews xlsx via markitdown; only yazi's previewer moved.
-# See docs/tools/data-viewers.md and docs/tools/office-viewers.md.
+# See docs/tools/data-viewers.md, docs/tools/office-viewers.md, docs/tools/yazi-previews.md.
 # -----------------------
 [plugin]
 prepend_previewers = [
@@ -230,6 +237,17 @@ prepend_previewers = [
   { url = "*.ods", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.odp", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.rtf", run = 'piper -- view-office --preview --width "$w" "$1"' },
+
+  # --- Containers yazi's built-in previewers skip → piper ---
+  # EPUB (application/epub+zip) → pandoc plain text; .dmg (application/x-apple-
+  # diskimage) → 7-Zip content listing. Both mimes are absent from yazi's built-in
+  # archive set, so without these they show only file-type classification.
+  # (.zip/.tar.*/.7z/.rar and zip-based .apk/.jar/.whl/.xpi ARE handled free by the
+  # built-in archive previewer once 7-Zip is installed — no rule needed.)
+  # 2>/dev/null is load-bearing (piper renders stderr as an error preview);
+  # 7zz→macOS `sevenzip`, 7z→Linux `p7zip-full`. pandoc is a devtools-role tool.
+  { url = "*.epub", run = 'piper -- pandoc -f epub -t plain "$1" 2>/dev/null | head -n 500' },
+  { url = "*.dmg", run = 'piper -- ( 7zz l "$1" 2>/dev/null || 7z l "$1" 2>/dev/null ) | head -n 200' },
 ]
 
 # duckdb.yazi builds parquet scroll-caches in a preload step — it needs matching

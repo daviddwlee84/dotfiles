@@ -146,6 +146,7 @@ plugins:
             Web reader: 網頁讀取器
             Office viewers (doxx / markitdown): Office 文件檢視 (doxx / markitdown)
             Data viewers (duckdb.yazi / VisiData): 資料檔檢視 (duckdb.yazi / VisiData)
+            Yazi preview coverage (images / PDF / video / archives): Yazi 預覽支援 (圖片 / PDF / 影片 / 壓縮檔)
             Log tools: Log 工具
             SMS (Huawei router): 簡訊 (Huawei 路由器)
             reyee (Ruijie router): reyee (Ruijie 路由器)
@@ -334,6 +335,7 @@ nav:
           - Web reader: tools/web-reader.md
           - Office viewers (doxx / markitdown): tools/office-viewers.md
           - Data viewers (duckdb.yazi / VisiData): tools/data-viewers.md
+          - Yazi preview coverage (images / PDF / video / archives): tools/yazi-previews.md
           - Log tools: tools/log-tools.md
           - Notebooks (Jupyter / Marimo / kernels): tools/notebooks.md
           - SMS (Huawei router): tools/sms.md

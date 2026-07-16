@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# chafa wrapper — force `--probe off`.
+#
+# WHY: yazi's fallback image adapter shells out to `chafa` for terminals with no
+# native graphics protocol (e.g. Alacritty) and there is no way to pass it flags.
+# chafa >=1.16 probes the terminal for its fg/bg colors via OSC 10/11 queries;
+# inside tmux/zellij chafa often exits before the multiplexer delivers the reply,
+# so the terminal's `rgb:…` response leaks into yazi's input buffer and pops a
+# spurious rename / shell prompt (yazi #3680 — closed "not planned": it's a mux
+# leak; chafa's `--probe off` is the source-side cure). `--probe off` only skips
+# color auto-detection (chafa falls back to sensible defaults from $TERM/
+# $COLORTERM), so ascii-art previews are unchanged.
+#
+# INERT on graphics terminals (Ghostty/Kitty/iTerm2/…): yazi uses the native
+# protocol there and never calls chafa, so this shim is a no-op cost. It lives on
+# ~/.dotfiles/bin, which precedes brew on PATH (dot_config/shell/00_exports.sh.tmpl).
+# See docs/tools/yazi-previews.md.
+set -e
+
+# Resolve the REAL chafa (this shim's dir is never in the list → no recursion).
+real=""
+for c in /opt/homebrew/bin/chafa /usr/local/bin/chafa \
+         /home/linuxbrew/.linuxbrew/bin/chafa "$HOME/.linuxbrew/bin/chafa" \
+         /usr/bin/chafa; do
+  [ -x "$c" ] && { real="$c"; break; }
+done
+if [ -z "$real" ]; then
+  # Fallback: first `chafa` on PATH outside this wrapper's own directory.
+  selfdir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  IFS=:
+  for d in $PATH; do
+    [ "$d" = "$selfdir" ] && continue
+    [ -x "$d/chafa" ] && { real="$d/chafa"; break; }
+  done
+  unset IFS
+fi
+[ -n "$real" ] || { echo "chafa (yazi shim): real chafa not found on PATH" >&2; exit 127; }
+
+# Drop any caller-supplied --probe (space- or =-form), then force it off.
+args=()
+skip=0
+for a in "$@"; do
+  [ "$skip" = 1 ] && { skip=0; continue; }
+  case "$a" in
+    --probe)   skip=1 ;;
+    --probe=*) ;;
+    *) args+=("$a") ;;
+  esac
+done
+exec "$real" "${args[@]}" --probe off

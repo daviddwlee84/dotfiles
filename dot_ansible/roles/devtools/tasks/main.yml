@@ -1,6 +1,6 @@
 ---
 # Developer CLI tools role
-# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, doxx, libreoffice, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh
+# Tools: bat, bats, gh, glab, diffnav, gh-dash, gh-notify, eza, git-delta, git-graph, tldr, glow, gum, vhs, freeze, thefuck, zoxide, direnv, yazi, superfile, tmux, sesh, worktrunk, workmux, zellij, herdr, btop, htop, duckdb, rclone, coreutils, taplo, television, pandoc, doxx, libreoffice, tailspin, lnav, grc, ccze (Linux only), dasel, yq, jnv, witr, figlet, toilet, lolcat, fastfetch, mosh, chafa, poppler, sevenzip (7zz), resvg (yazi preview deps)
 
 # =============================================================================
 # macOS - all via Homebrew
@@ -123,6 +123,19 @@
       # Also driven by the rhysd/actionlint pre-commit hook (actionlint-system,
       # which reuses this on-PATH binary). See docs/tools/actionlint.md.
       - actionlint
+      # --- yazi preview-dependency binaries ---
+      # yazi's built-in previewers shell out to these at runtime; without them
+      # hovers show "failed to spawn chafa" / "Do you have 7-zip installed?".
+      # chafa = image-display fallback (unicode-art when the terminal has no
+      # native graphics protocol, e.g. inside tmux) AND the shared display step
+      # for pdf/video/heic; poppler = PDF rasterize (pdftoppm); sevenzip =
+      # archive + dmg listing (7zz); resvg = SVG render. ffmpeg + imagemagick
+      # (video / HEIC / JPEG-XL / fonts) stay in the media_tools role, gated
+      # behind installMediaTools. See docs/tools/yazi-previews.md.
+      - chafa
+      - poppler
+      - sevenzip
+      - resvg
     state: present
     # Note: ccze is not available on Homebrew (removed from homebrew-core).
     # It is installed only on Linux via apt; the `lessl` zsh wrapper is guarded
@@ -2348,6 +2361,79 @@
         state: absent
       loop:
         - /tmp/yazi.zip
+
+# --- yazi preview deps ---
+# Runtime binaries yazi's built-in previewers shell out to (docs/tools/yazi-previews.md).
+# chafa = image-display fallback (unicode-art when the terminal has no native
+# graphics protocol) + the shared display step for pdf/video/heic; poppler-utils
+# = PDF rasterize (pdftoppm); p7zip-full = archive + dmg listing (provides `7z`;
+# yazi accepts `7zz` OR `7z`). ffmpeg + imagemagick (video / HEIC) live in the
+# media_tools role behind installMediaTools — deliberately not duplicated here.
+- name: Install yazi preview deps (Debian/Ubuntu)
+  when: ansible_facts["os_family"] == "Debian"
+  become: true
+  tags: [sudo]
+  ansible.builtin.apt:
+    name:
+      - chafa
+      - poppler-utils
+      - p7zip-full
+    state: present
+    # base role already refreshes the apt cache at play start; an inlined
+    # update here would let one transient source failure abort the play.
+    # See pitfalls/apt-update-fails-base-role-empty-error.md.
+    update_cache: false
+
+# resvg (SVG preview) has no apt package — best-effort Linuxbrew, then cargo.
+# Non-fatal: SVG preview is simply absent if neither is available. Gated on
+# `resvg not installed` so the (slow) cargo build runs at most once.
+- name: Check if resvg is installed (Debian/RedHat)
+  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+  ansible.builtin.shell: command -v resvg
+  register: resvg_check
+  changed_when: false
+  failed_when: false
+
+- name: Detect Linuxbrew for resvg (Debian/RedHat)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - resvg_check.rc != 0
+  ansible.builtin.shell: command -v brew || true
+  args:
+    executable: /bin/bash
+  register: resvg_brew_probe
+  changed_when: false
+
+- name: Install resvg via Linuxbrew when available (Debian/RedHat)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - resvg_check.rc != 0
+    - resvg_brew_probe.stdout | default('') | trim != ''
+  community.general.homebrew:
+    name: resvg
+    state: present
+
+- name: Install resvg via cargo when Linuxbrew absent (Debian/RedHat)
+  when:
+    - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    - resvg_check.rc != 0
+    - resvg_brew_probe.stdout | default('') | trim == ''
+  block:
+    - name: Probe cargo for resvg
+      ansible.builtin.shell: command -v cargo || true
+      args:
+        executable: /bin/bash
+      register: resvg_cargo_probe
+      changed_when: false
+
+    - name: cargo install resvg (compiles from source, one-time)
+      when: resvg_cargo_probe.stdout | default('') | trim != ''
+      ansible.builtin.command: cargo install resvg
+      changed_when: true
+  rescue:
+    - name: Warn resvg installation failed (non-fatal)
+      ansible.builtin.debug:
+        msg: "resvg install failed — SVG previews in yazi unavailable on this host (non-fatal)"
 
 # --- superfile ---
 - name: Check if superfile (spf) is installed

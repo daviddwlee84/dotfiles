@@ -1001,6 +1001,7 @@ list.
 | **build-essential** | n/a | apt | bootstrap (Linux) |
 | **bun** | mise | mise | mise |
 | **cargo-update** | cargo install (bootstrap for `cat_cargo`) | same | rust_cargo_tools |
+| **chafa** | brew | apt (`chafa`) | devtools — yazi image-display fallback (unicode-art); backs all image/pdf/video/heic previews. Shadowed by a `--probe off` shim (`dot_dotfiles/bin/executable_chafa`) to stop the OSC-query→rename-popup leak. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **chatgpt** | brew cask (arm64) | n/a | Brewfile.darwin |
 | **Claude Code** | brew cask `claude-code` | curl `claude.ai/install.sh` → `~/.claude/local/bin/claude` | coding_agents |
 | **claude-hud** | python helper run from role | same | coding_agents |
@@ -1109,6 +1110,7 @@ list.
 | **pandoc** | brew | apt | devtools |
 | **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
+| **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **pre-commit** | `uv tool install --python 3.13` | same | security_tools |
 | **procps** | (system) | apt | bootstrap (Linux) |
 | **pueue** | brew formula | `cargo install pueue --locked` + systemd user unit | rust_cargo_tools |
@@ -1118,12 +1120,14 @@ list.
 | **readability-cli** (`readable`) | npm global | `mise exec -- npm install -g` | js_cli_tools |
 | **recon** | cargo install (git source) | same | rust_cargo_tools |
 | **resilio-sync** | brew cask (GUI app) | Resilio apt repo → headless daemon + WebUI (per-user systemd service) | resilio_sync |
+| **resvg** | brew | Linuxbrew → `cargo install resvg` (no apt pkg; non-fatal if absent) | devtools — yazi SVG preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **ripgrep** | brew | apt/yum → GitHub release | base |
 | **ruby** | mise | mise (skipped in noRoot) | mise |
 | **rust** | mise | mise → rustup-init → `static.rust-lang.org` fallback | mise + rust_cargo_tools |
 | **rustscan** | brew | GitHub release | networking_tools |
 | **scroll-reverser** | brew cask | n/a | Brewfile.darwin |
 | **sesh** | brew | GitHub release | devtools |
+| **sevenzip** (7-Zip; `7zz` / `7z`) | brew (`sevenzip`) | apt (`p7zip-full`) | devtools — yazi archive + dmg listing. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **shellcheck / shfmt** | brew | apt or release | devtools |
 | **sidecar** | brew tap `marcus/tap` | Linuxbrew → GitHub release | coding_agents |
 | **smartmontools** (`smartctl`) | n/a | apt/yum | homelab_tools |
