@@ -160,20 +160,26 @@ render_pptx() {
 # lock us out), then re-dispatch. NOTE: we run the viewer as a child (no exec)
 # so the EXIT trap still fires and cleans the tmpdir after an interactive TUI.
 render_legacy() {
-    local f="$1" target="$2" so tmp stem twin
+    # The tmpdir var is intentionally NOT `local`: the EXIT trap below runs at
+    # shell exit (so it also cleans up after an interactive TUI child), by which
+    # point a function-local would be out of scope — `rm -rf "$tmp"` would then
+    # fail with "unbound variable" under `set -u`, LEAKING the dir and (because
+    # piper renders stderr as the preview) showing that error instead of a short
+    # legacy doc's content. Global + `${:-}` guard keeps cleanup working.
+    local f="$1" target="$2" so stem twin
     so="$(soffice_bin)" || {
         err "LibreOffice (soffice) not found — install via the devtools role (brew --cask libreoffice / apt libreoffice)"
         exit 2
     }
-    tmp="$(mktemp -d)"
-    trap 'rm -rf "$tmp"' EXIT
-    if ! "$so" --headless -env:UserInstallation="file://$tmp/profile" \
-            --convert-to "$target" --outdir "$tmp" "$f" >/dev/null 2>&1; then
+    _vo_legacy_tmp="$(mktemp -d)"
+    trap 'rm -rf "${_vo_legacy_tmp:-}"' EXIT
+    if ! "$so" --headless -env:UserInstallation="file://$_vo_legacy_tmp/profile" \
+            --convert-to "$target" --outdir "$_vo_legacy_tmp" "$f" >/dev/null 2>&1; then
         err "LibreOffice failed to convert $f → $target"
         exit 1
     fi
     stem="$(basename -- "$f")"; stem="${stem%.*}"
-    twin="$tmp/$stem.$target"
+    twin="$_vo_legacy_tmp/$stem.$target"
     [[ -f "$twin" ]] || { err "converted file not found: $twin"; exit 1; }
     render "$twin"
 }

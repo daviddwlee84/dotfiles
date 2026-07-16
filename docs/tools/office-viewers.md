@@ -123,7 +123,7 @@ cp ~/.config/yazi/package.toml "$(chezmoi source-path ~/.config/yazi/package.tom
 - **`markitdown` needs extras** — see the box above. `markitdown[docx,xlsx,pptx]`, not bare `markitdown`.
 - **pandoc ≠ Office reader** — it cannot read `.pptx`/`.xlsx`. Use `markitdown` for those. (pandoc still powers the [web reader](web-reader.md) for HTML.)
 - **Uppercase extensions** — the yazi `url` globs are lowercase (`*.docx`); a file named `Report.DOCX` won't trigger the previewer (running `view-office` directly still works — it lowercases internally).
-- **LibreOffice cold start** — the first legacy-format conversion spins up a headless soffice profile (~1–2 s); previews of `.doc/.xls/.ppt` are slower than modern formats.
+- **LibreOffice cold start** — legacy-format previews spin up a fresh isolated headless soffice profile **on every hover** (no caching — each invocation `mktemp`s its own profile), so `.doc/.xls/.ppt/ODF` previews take **~7 s each** (measured; more on large files). yazi runs previewers asynchronously so the UI stays responsive, but the pane is blank until it lands. Modern OOXML formats don't touch LibreOffice and are instant.
 - **PATH in yazi previews** — `piper` runs the command via `sh`; `view-office` must be on the `PATH` yazi inherited. Launch yazi from a configured shell so `~/.dotfiles/bin` is present.
 
 ## See also

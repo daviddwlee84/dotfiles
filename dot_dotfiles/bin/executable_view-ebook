@@ -67,7 +67,9 @@ open_interactive() {
     if ev="$(calibre_bin ebook-viewer)"; then
         exec "$ev" "$f"
     fi
-    # No GUI viewer — fall back to metadata through a pager.
+    # No GUI viewer. If metadata is also unavailable (calibre fully absent), bail
+    # with the hint rather than opening an empty pager on zero bytes.
+    calibre_bin ebook-meta >/dev/null 2>&1 || { err "calibre not found — $CALIBRE_HINT"; exit 2; }
     err "calibre ebook-viewer not found; showing metadata instead ($CALIBRE_HINT)"
     render_preview "$f" | "${PAGER:-less}"
 }

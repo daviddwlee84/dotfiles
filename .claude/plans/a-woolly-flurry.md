@@ -1,127 +1,122 @@
-# Route A — Add `duckdb.yazi` data-file previewer to yazi
+# Maximize Yazi Preview Coverage (images / PDF / video / archives / SVG / EPUB / dmg)
 
 ## Context
 
-Yazi currently previews only Office files (`.docx/.xlsx/.pptx` + legacy/OpenDocument) via the
-`piper.yazi` → `view-office` pipeline. Data files (`.csv/.tsv/.parquet/.feather/.db/.sqlite`) get no
-table preview — they show as raw text or binary/hex on hover.
+Yazi today only previews tabular/office files (duckdb.yazi + `view-office`). Everything else
+falls through to yazi's **built-in** previewers, which shell out to external binaries at
+runtime — and most of those binaries aren't installed by this repo, so on hover the user sees:
 
-We evaluated using **visidata** as the previewer and rejected it: visidata's non-interactive `-b`
-output is raw TSV (or a `TypeError`-broken `.md`), it can't preview SQLite data (only lists tables),
-can't open `.xlsx` (its venv lacks `openpyxl`), and is slow on the hot-path (~0.4s CSV, up to ~10s
-cold for parquet). visidata stays the **interactive** opener. For **previews**, `duckdb -box` is far
-better (native aligned table, ~0.12s, `LIMIT` for cheap first-N-rows), and a ready-made yazi plugin
-already wraps it: **`wylie102/duckdb.yazi`**. Both `duckdb` CLI (devtools role) and `visidata` +
-`piper.yazi` are already required in this repo, so this adds **zero new install burden**.
+- **`failed to spawn chafa`** on png/pdf/mp4/HEIC — yazi's built-ins rasterize each to an image,
+  then display it via the adapter it auto-selects. With no native graphics protocol available
+  (e.g. inside tmux, or a non-graphics terminal) that adapter is **chafa** (yazi's documented
+  "last fallback resort"), which isn't installed. One missing tool breaks *all* image-derived
+  previews at the shared display step.
+- **`failed to start either 7zz or 7z. Do you have 7-zip installed?`** — no 7-Zip → no archive
+  or dmg preview.
+- **EPUB / dmg → bare file-type classification** — their mimes (`application/epub+zip`,
+  `application/x-apple-diskimage`) aren't in yazi's built-in archive set.
 
-Verified on this host (duckdb 1.4.4, vd 3.3): duckdb renders csv/parquet cleanly and — importantly —
-**auto-attaches raw SQLite** `.db` files (`duckdb -readonly t.db` returns both table list and row
-data), so duckdb.yazi's `.db` handler covers SQLite despite the plugin source not loading
-`sqlite_scanner` explicitly. duckdb has **no feather/arrow reader** (confirmed: `read_parquet`
-rejects Arrow IPC, `nanoarrow` ext 404s), so feather is handled by a visidata fallback.
+**Root cause is tool-install, not config** — nothing in `dot_config/yazi/` names these tools
+(confirmed by full grep). Fix = install yazi's documented optional deps across macOS + Linux,
+plus two tiny `piper` rules for the two container formats yazi ignores by default.
 
-### Decisions (from user)
-- **xlsx → duckdb.yazi** (moves off the view-office/markitdown previewer path). First xlsx preview per
-  machine downloads DuckDB's `spatial` extension (one-time network) — accepted.
-- **Feather/arrow → visidata fallback** via `piper` running `vd -b … --save-filetype fixed` (the one
-  clean headless visidata mode; verified renders feather correctly).
-- **Keybindings → take the plugin's `H`/`L` + `g o`/`g u` as-is** (overrides yazi's default H/L
-  directory-history nav, by explicit choice).
+Coverage matrix (verified against yazi upstream docs + this host, Intel mac, yazi 26.1.22):
 
-## Changes (file by file)
+| Preview | Needs | Repo status |
+|---|---|---|
+| png/jpg/webp/gif  **+ the display step of every image-derived preview** | **chafa** | missing → baseline adds |
+| PDF | poppler (`pdftoppm`) + chafa | poppler unmanaged → baseline adds |
+| archives (zip/tar/7z/rar/gz…) **+ dmg** | **7-Zip** | missing → baseline adds |
+| SVG | resvg + chafa | missing → baseline adds |
+| video (`.mp4`) | ffmpeg + chafa | ffmpeg **gated** behind `installMediaTools` |
+| HEIC / JPEG-XL / fonts | ImageMagick ≥7.1.1 + chafa | **gated** behind `installMediaTools` |
+| json / text / std images | jq / built-in | already always-installed |
 
-### 1. `dot_config/yazi/package.toml` — pin the plugin (SSOT, drives install)
-Do **not** hand-write `rev`/`hash`. On a live box:
+**User decisions:** (1) keep ffmpeg + ImageMagick **gated** behind `installMediaTools`
+(default off; forced off on server/minimal) — just document the yazi tie-in. (2) **Add EPUB + dmg
+previewer rules** (pandoc is already installed everywhere; 7zip lands in the baseline → no new
+install cost).
+
+## Changes
+
+### 1. Baseline preview deps — `dot_ansible/roles/devtools/tasks/main.yml` (always-installed, next to yazi)
+
+- **macOS** — add to the single big brew `name:` list (~L57-125): `chafa`, `poppler`,
+  `sevenzip` (provides `7zz`), `resvg`. Update the `# Tools:` header comment (L3).
+- **Linux (Debian/Ubuntu)** — new `# --- yazi preview deps ---` block near the yazi section (~L2227):
+  - apt (`become: true`, `tags: [sudo]`): `chafa`, `poppler-utils`, `p7zip-full` (provides `7z`;
+    yazi accepts `7zz` **or** `7z`).
+  - `resvg` has no apt package → best-effort **linuxbrew** (`community.general.homebrew`) else
+    `cargo install resvg`, wrapped `block:`/`rescue:`→warn (matches the eza/git-delta aarch64
+    fallback idiom already in this file). SVG preview is simply absent if it can't install — non-fatal.
+
+  These are **not** gated on `primary_shell`/`installMediaTools` — small, universally useful, and
+  the direct fix for the reported errors on every machine.
+
+### 2. EPUB + dmg previewer rules — `dot_config/yazi/yazi.toml`
+
+Append to the existing `prepend_previewers` list. `piper` is already pinned → **no** new plugin,
+**no** `init.lua`/`package.toml`/run-script change:
+
+```toml
+{ url = "*.epub", run = 'piper -- pandoc -f epub -t plain "$1" 2>/dev/null | head -n 500' },
+{ url = "*.dmg",  run = 'piper -- ( 7zz l "$1" 2>/dev/null || 7z l "$1" 2>/dev/null ) | head -n 200' },
 ```
-ya pkg add wylie102/duckdb
-cp ~/.config/yazi/package.toml "$(chezmoi source-path ~/.config/yazi/package.toml)"
-```
-Adds a second `[[plugin.deps]]` (`use = "wylie102/duckdb"`, `rev`, `hash`) before `[flavor]`. The
-hash-gated installer `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl` re-runs
-`ya pkg install` automatically on the changed sha256 — **no edit to the run-script**. Upgrade path
-(`scripts/upgrade_tools.sh::cat_yazi_plugins` + `just upgrade-yazi-plugins`) is generic — **no edit**.
 
-### 2. `dot_config/yazi/init.lua` — **NEW FILE** (required; none exists today)
-```lua
--- Initialize the duckdb.yazi data-file previewer.
-require("duckdb"):setup({ mode = "standard" })  -- show data rows by default; press K for SUMMARIZE
-```
-Without this call the plugin never registers. `mode = "standard"` chosen so hover shows actual rows
-(plugin default is `summarized`); one-line change if we prefer summaries.
+- `2>/dev/null` is **load-bearing** — piper renders any stderr as an error preview (same rule as
+  the existing feather/sqlite fallbacks).
+- `7zz || 7z` covers macOS `sevenzip` (`7zz`) vs Linux `p7zip-full` (`7z`).
+- `.apk/.jar/.whl/.xpi/.zip/.tar.*` need **no** rule — yazi's built-in archive previewer handles
+  them free once 7-Zip is installed (document this, don't add rules).
 
-### 3. `dot_config/yazi/yazi.toml` — previewer + preloader wiring (lines ~191-205)
-- In the existing Office `prepend_previewers`, **remove the `*.xlsx` line** (xlsx now owned by duckdb).
-  Keep `*.xls`/`*.ods` on view-office (legacy binary/ODF → LibreOffice; duckdb can't read those).
-- **Add duckdb entries** (plugin previewer → `run = "duckdb"`, bare plugin name, not piper):
-  `*.csv *.tsv *.parquet *.xlsx *.db *.duckdb *.sqlite *.sqlite3`
-- **Add feather/arrow fallback** via piper → visidata `fixed`:
-  ```
-  { url = "*.feather", run = 'piper -- sh -c ''vd -b "$1" -o - --save-filetype fixed 2>/dev/null | head -n 500'' -- "$1"' },
-  { url = "*.arrow",   run = 'piper -- sh -c ''vd -b "$1" -o - --save-filetype fixed 2>/dev/null | head -n 500'' -- "$1"' },
-  ```
-  (Inline `sh -c` matches the file's existing `sh -lc` opener style; `-- "$1"` passes the path as the
-  inner shell's `$1`. `piper.yazi` already installed.)
-- **Add `prepend_preloaders`** (duckdb.yazi needs these to build its scroll caches):
-  `*.csv *.tsv *.parquet *.xlsx` each `{ … run = "duckdb", multi = false }`.
-- Deliberately **omit `*.json` and `*.txt`** from the duckdb map (plugin lists them, but routing all
-  JSON/text to a table view would hijack config/log previews).
-- **Key-name caveat to verify:** existing Office entries use `url = "*.ext"`; the duckdb.yazi README
-  uses `name = "*.ext"`. Mirror the repo's `url =` for consistency, then verify previews actually fire
-  (see Verification). If `url` turns out invalid for previewer rules in the installed yazi, that's a
-  pre-existing Office-previewer bug — switch the whole `[plugin]` block to `name =` in one pass.
+### 3. Docs (CLAUDE.md cross-file rules mandate same-commit updates)
 
-### 4. `dot_config/yazi/keymap.toml` — plugin keybindings (currently all-commented template)
-Add a `[manager] prepend_keymap` with the 4 documented binds verbatim:
-`H` → `plugin duckdb -1`, `L` → `plugin duckdb +1` (scroll columns), `g o` → `plugin duckdb -open`
-(open in duckdb CLI), `g u` → `plugin duckdb -ui`. Note in a comment that H/L override yazi's default
-directory-history nav (chosen deliberately). SUMMARIZE toggle is `K` at top-of-file — built into the
-plugin, no keymap entry needed.
-
-### 5. Docs (CLAUDE.md cross-file rules mandate same-commit updates)
-- **NEW `docs/tools/data-viewers.md`** — the duckdb.yazi previewer: formats, `K`/`H`/`L`/`g o`/`g u`,
-  the xlsx-spatial-first-run-network note, the feather→visidata fallback, SQLite-via-duckdb-auto-attach.
-  Cross-link ↔ `office-viewers.md` and `../shells/aliases.md` (visidata).
-- **`mkdocs.yml`** — nav entry next to `Office viewers … tools/office-viewers.md` (~line 334):
-  `- Data viewers (duckdb.yazi): tools/data-viewers.md`. Then `uv run mkdocs build --strict`.
-- **`docs/this_repo/tool-managers.md`** — § 15 (`ya pkg`) add a `duckdb.yazi` row under `piper.yazi`;
-  A–Z index add a `duckdb.yazi` plugin row (mechanism `ya pkg`, role `devtools (yazi)`). The `duckdb`
-  **CLI** row already exists — leave it.
-- **`docs/tools/office-viewers.md`** — one line noting `.xlsx` **preview** now routes to duckdb.yazi
-  (the `view-office --preview file.xlsx` CLI path via markitdown is unchanged; only yazi's previewer
-  moved). markitdown's `[docx,xlsx,pptx]` extras **stay** (CLI still uses them).
-- **`CLAUDE.md`** — add a "Data-file viewing" row to the cross-file table (sibling of "Office
-  viewing") listing: `package.toml` duckdb dep, `yazi.toml` duckdb entries, **`init.lua`** requirement,
-  `keymap.toml` binds, the **feather piper→`vd --save-filetype fixed` contract**, and the
-  "xlsx preview owned by duckdb.yazi (needs spatial ext, network-on-first-use)" note.
-- **`README.md`** — optional: extend the yazi/duckdb bullet to mention data-file table previews.
+- **NEW `docs/tools/yazi-previews.md`** — umbrella "yazi preview coverage" page: the
+  format→tool→tier matrix above; the chafa-fallback explanation + native-protocol/tmux note
+  (install a graphics terminal to auto-upgrade from ascii-art); the `installMediaTools` gating for
+  video/HEIC **and** the Ubuntu-ImageMagick-v6 HEIC caveat; the EPUB/dmg rules; per-OS install
+  (brew formulae vs apt packages vs resvg fallback). Cross-link ↔ `office-viewers.md`,
+  `data-viewers.md`. Pitfall/repo-root links use absolute GitHub URLs (repo convention).
+- **`mkdocs.yml`** — nav entry (en + zh-TW) next to Office/Data viewers; then
+  `uv run mkdocs build --strict`.
+- **`docs/this_repo/tool-managers.md`** — A–Z index rows: `chafa`, `poppler`, `sevenzip`/`7zip`,
+  `resvg` (mechanism: **devtools** — brew macOS / apt Linux); update the devtools Tools list.
+- **`CLAUDE.md`** — extend the existing yazi-preview contract row: add the `yazi-previews.md`
+  reference, the runtime-tool deps (chafa/poppler/7zip/resvg always; ffmpeg/ImageMagick gated), and
+  the two new epub/dmg piper rules.
+- **`README.md`** — extend the yazi/preview bullet: images, PDF, video, archives, ebooks.
 
 ## Critical files
-- Functional: `dot_config/yazi/package.toml`, `dot_config/yazi/init.lua` (new),
-  `dot_config/yazi/yazi.toml`, `dot_config/yazi/keymap.toml`
-- Reused as-is (no edit): `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`,
-  `scripts/upgrade_tools.sh`, `justfile`, `dot_ansible/roles/devtools/tasks/main.yml` (duckdb CLI),
-  `dot_visidatarc.tmpl` (feather ArrowSheet override already deployed)
-- Docs: `docs/tools/data-viewers.md` (new), `mkdocs.yml`, `docs/this_repo/tool-managers.md`,
-  `docs/tools/office-viewers.md`, `CLAUDE.md`, `README.md`
 
-## Verification (end-to-end)
-1. `ya pkg add wylie102/duckdb` on this host; copy `package.toml` back; `chezmoi diff` the yazi files.
-2. `chezmoi apply` (or `chezmoi apply ~/.config/yazi`) → confirm `ya pkg install` materializes
-   `~/.config/yazi/plugins/duckdb.yazi/`, and `init.lua`/`keymap.toml` deploy.
-3. Launch `yazi` and hover each test file (already generated in `/tmp`: `t.csv t.parquet t.feather
-   t.db`; make a `t.xlsx`): confirm each renders an aligned table. **This confirms the `url=` vs
-   `name=` key question** — if a `.csv` shows a table, the key is correct.
-   - Press `K` (summarized), `H`/`L` (column scroll), `g o` / `g u` (open in duckdb).
-   - `.db`/`.sqlite`: confirm table-listing + that SQLite files preview (duckdb auto-attach).
-   - `.feather`: confirm the visidata `fixed` table renders (fallback path).
-   - `.xlsx`: confirm duckdb table (first run may pause to fetch `spatial`).
-4. yazi starts with no config error (validates `yazi.toml`/`keymap.toml`/`init.lua` parse).
-5. `uv run mkdocs build --strict` passes (docs + nav).
-6. Sanity: a plain `.txt`/`.json`/config file still previews as text (we omitted those from the map).
+- **Functional:** `dot_ansible/roles/devtools/tasks/main.yml`, `dot_config/yazi/yazi.toml`
+- **Reused as-is (no edit):** `dot_config/yazi/{init.lua,package.toml,keymap.toml}`, `piper` plugin,
+  `.chezmoiscripts/global/run_onchange_after_45_yazi_plugins.sh.tmpl`, the `media_tools` role
+  (ffmpeg/ImageMagick stay gated — deliberate)
+- **Docs:** new `docs/tools/yazi-previews.md`, `mkdocs.yml`, `docs/this_repo/tool-managers.md`,
+  `CLAUDE.md`, `README.md`
 
-## Follow-ups / notes
-- If `.sqlite`/`.sqlite3` don't dispatch inside the plugin (its internal extension map may only know
-  `.db`/`.duckdb`), fall back to a piper→`duckdb -box -readonly "$1" -c "…"` previewer for those two,
-  or drop them. Verify in step 3.
-- Feather preview loads the whole file (visidata has no cheap first-N); fine for the rare fallback.
-  If it grows, promote feather/arrow into a proper `view-data` dispatcher (the deferred "Route B").
+## Verification
+
+1. **Confirm formula names + the fix on this mac:** `brew install chafa poppler sevenzip resvg`
+   then `command -v chafa 7zz pdftoppm resvg`. (This mac already has ffmpeg/magick, so pdf/mp4/heic
+   should render as soon as chafa is present.)
+2. **Parse gate:** `taplo check dot_config/yazi/yazi.toml` + `python3 -c 'import tomllib …'`.
+3. **Ansible:** `ansible-playbook --syntax-check` the devtools role; run the new tasks narrowly
+   (`--tags`/check-mode) where possible. If a host/cred is missing, say so explicitly.
+4. **Docs:** `uv run mkdocs build --strict`.
+5. **Piper-command sanity (headless-OK):** run each new rule body standalone —
+   `pandoc -f epub -t plain book.epub | head`, `7zz l some.dmg | head`.
+6. **Real-terminal smoke (can't run headless — sandbox yazi aborts with os error 6):** launch
+   `yazi` and hover a png / pdf / mp4 / .zip / .dmg / .epub / .svg / .heic. Expect
+   images/pdf/video as chafa ascii-art (or inline in a graphics terminal), archive + dmg listings,
+   epub text, svg render. Confirm a plain `.txt`/`.json` still previews normally.
+
+## Notes / follow-ups
+
+- **Native inline images vs chafa:** chafa gives universal ascii-art previews (works over
+  tmux/ssh/any terminal). For crisp inline images use a graphics-capable terminal
+  (Ghostty/Kitty/iTerm2/WezTerm) — yazi auto-upgrades the adapter; over tmux the terminal must
+  support Kitty-graphics passthrough (repo already sets `allow-passthrough on`). Documented, not coded.
+- **Ubuntu HEIC/font:** apt ImageMagick is v6 (no unified `magick`, weak HEIC) → those previews may
+  not work on Ubuntu even with `installMediaTools=true`. Documented as a known caveat; v7 needs a
+  PPA/build (out of scope).
