@@ -103,6 +103,13 @@ elif [[ -x "$HOME/.linuxbrew/bin/brew" ]]; then
 fi
 {{ end -}}
 
+# Install-only apply doesn't need Homebrew's periodic auto-update, whose `brew
+# update` (git fetch) can hang for many minutes on a constrained network/mirror
+# — it stalled the opt-in calibre cask install for ~34 min. Inherited by the
+# ansible community.general.homebrew{,_cask} subprocesses. Matches
+# run_onchange_after_30_brew_bundle.sh.tmpl.
+export HOMEBREW_NO_AUTO_UPDATE=1
+
 {{ if .useChineseMirror -}}
 # GFW mirrors (useChineseMirror=true) — exported so ansible subprocesses
 # (community.general.homebrew, mise, rustup, gem) inherit them. Without

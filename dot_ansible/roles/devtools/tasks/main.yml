@@ -160,13 +160,35 @@
 # MB), so gated behind the installCalibre prompt. The cask does NOT put calibre's
 # binaries on PATH — view-ebook resolves the .app bundle itself. See
 # docs/tools/yazi-previews.md.
-- name: Install calibre via Homebrew Cask (macOS, opt-in)
+#
+# Skip the cask if a calibre.app already exists (hand-installed): the Homebrew
+# cask refuses to install over an existing app, and `--adopt` refuses on a version
+# mismatch ("bundle short version 9.11.0 but is 8.2.100"). Any existing calibre
+# already powers the preview (view-ebook shells out to the bundle regardless of
+# version / brew management), so respect it rather than force-replacing it.
+- name: Check for an existing calibre.app (macOS)
   when:
     - ansible_facts["os_family"] == "Darwin"
     - install_calibre | default(false) | bool
-  community.general.homebrew_cask:
-    name: calibre
-    state: present
+  ansible.builtin.stat:
+    path: /Applications/calibre.app
+  register: calibre_app
+
+- name: Install calibre via Homebrew Cask (macOS, opt-in — only when not already present)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - install_calibre | default(false) | bool
+    - not (calibre_app.stat.exists | default(false))
+  block:
+    - name: Install calibre cask
+      community.general.homebrew_cask:
+        name: calibre
+        state: present
+  rescue:
+    # Non-fatal: calibre only backs an optional preview — never break the apply.
+    - name: Warn calibre install failed (non-fatal — opt-in preview tool)
+      ansible.builtin.debug:
+        msg: "calibre cask install failed — Kindle metadata previews unavailable via the repo install; install calibre by hand or ignore. Non-fatal."
 
 # =============================================================================
 # Linux (Debian/Ubuntu)

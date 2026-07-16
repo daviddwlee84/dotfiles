@@ -135,8 +135,10 @@ the routing. Those mimes aren't in yazi's built-in sets, so `dot_config/yazi/yaz
 else the macOS `/Applications/calibre.app` bundle, else the Linux prefix — and prints the book's
 metadata (HTML-stripped, wrapped to the pane width). calibre isn't repo-managed by default; enable the
 **`installCalibre`** init prompt to have the `devtools` role install it (brew cask on macOS, apt on
-Linux). Already have calibre installed by hand? The preview just works — the prompt only automates the
-install. (EPUB stays on pandoc's full-text path, not view-ebook.)
+Linux). Already have calibre installed by hand? The preview just works, and the macOS cask install is
+**skipped** when `/Applications/calibre.app` already exists (Homebrew won't install over an existing app,
+and `--adopt` refuses on a version mismatch) — so the prompt only installs calibre where it's absent,
+never touching a version you manage yourself. (EPUB stays on pandoc's full-text path, not view-ebook.)
 
 ## Per-OS install
 

@@ -32755,3 +32755,535 @@ But the audit caught a **genuine confirmed bug** (pre-existing, in the legacy `.
 - Minor: view-ebook no longer opens an empty pager when calibre is fully absent; corrected the LibreOffice cold-start doc (~1–2 s → the real ~7 s/hover).
 
 **Commits this session** (all on `main`, nothing pushed): `7d33eaa`, `b24695a`, `0171410`, `865d07a`.
+
+---
+
+_**User (2026-07-16 15:10:45Z)**_
+
+```
+───────────────────────── devtools ─────────────────────────
+[20] TASK · [devtools : Tap diffnav formula (macOS)]
+ok: [localhost] (0.9s)
+[21] TASK · [devtools : Tap raine/workmux formula (macOS)]
+ok: [localhost] (0.8s)
+[22] TASK · [devtools : Check trust state of third-party taps (macOS, Homebrew >= 6.0 formula-trust gate)]
+ok: [localhost] => (item=dlvhdr/formulae)
+ok: [localhost] => (item=raine/workmux)
+[23] TASK · [devtools : Install developer CLI tools (macOS)]
+ok: [localhost] (3.1s)
+[24] TASK · [devtools : Install LibreOffice via Homebrew Cask (macOS)]
+ok: [localhost] (2.8s)
+[25] TASK · [devtools : Install calibre via Homebrew Cask (macOS, opt-in)]
+[ERROR]: Task failed: Module failed: ==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+✔︎ Cask calibre (9.11.0)
+Error: It seems there is already an App at '/Applications/calibre.app'.
+Origin: /Users/david/.ansible/roles/devtools/tasks/main.yml:163:3
+
+161 # binaries on PATH — view-ebook resolves the .app bundle itself. See
+162 # docs/tools/yazi-previews.md.
+163 - name: Install calibre via Homebrew Cask (macOS, opt-in)
+      ^ column 3
+
+✘ fatal: [localhost]: FAILED! (33m52s) =>
+    changed: false
+    msg: |-
+        ==> Auto-updating Homebrew...
+        Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+        `$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+        ✔︎ Cask calibre (9.11.0)
+        Error: It seems there is already an App at '/Applications/calibre.app'.
+
+────────────────────────────────────────────────────────────
+PLAY RECAP  (34m36s)
+────────────────────────────────────────────────────────────
+localhost                  : ok=24   changed=0    unreachable=0    failed=1    skipped=118  rescued=0    ignored=0
+
+Slow tasks (>5s):
+  ⏱ devtools : Install calibre via Homebrew Cask (macOS, opt-in) (33m52s)
+  ⏱ devtools : Check trust state of third-party taps (macOS, Homebrew >= 6.0 formula-trust gate) (9.5s)
+
+chezmoi: .chezmoiscripts/global/20_ansible_roles.sh: exit status 2
+```
+calibre 似乎安裝失敗 (可能我之前裝過了 需要handle一下這種情況)
+
+---
+
+_**Agent (claude-opus-4-8 2026-07-16 15:12:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+The calibre installation is failing because the app already exists at /Applications/calibre.app from a manual install, and homebrew cask refuses to overwrite it without the `--force` or `--adopt` flag. I need to add `install_options` to the Ansible community.general module to handle this.
+
+The cleanest solution is using `--adopt`, which tells brew to take over management of the existing app without reinstalling it. This is idempotent — once adopted, subsequent runs will see it as already installed and skip it. I could also force a reinstall or add a conditional check to skip if the app exists, but `--adopt` is the best approach since it preserves the existing installation while bringing it under brew's control.
+
+I'm also noticing the task took over 33 minutes before failing, likely because Homebrew was auto-updating in the background.  The aliyun mirror seems to hang during these auto-updates, which is why the calibre install stalled while the LibreOffice task before it completed quickly. I should set `HOMEBREW_NO_AUTO_UPDATE=1` in the environment to prevent this from happening again. The actual failure is that brew downloaded calibre 9.11.0 successfully but then refused to install because the app already exists at /Applications/calibre.app. So I need to add the `adopt` install option to the calibre cask task so it adopts the existing app instead of erroring out. The 33-minute hang was just the auto-update and download process beforehand — the real problem to solve is the "already exists" installation failure. The `install_options: adopt` parameter should work with the homebrew_cask module to pass `--adopt` to the brew install command, which will adopt any existing calibre.app installation instead of failing. Let me verify the exact syntax the module expects for these options. I'm weighing whether `--adopt` is the most robust approach or if checking for the app's existence first is safer. The `--adopt` flag is designed for exactly this scenario—bringing an existing installation under brew management—so it should handle version mismatches gracefully. For the user's needs, either approach works, but `--adopt` keeps things cleaner by letting brew manage future upgrades rather than leaving the installation orphaned.
+
+I'm also realizing the 33-minute hang is a serious problem worth addressing. That delay came from brew's auto-update on the aliyun mirror, so I should set `HOMEBREW_NO_AUTO_UPDATE=1` when running the calibre task to prevent it from blocking. Setting `HOMEBREW_NO_AUTO_UPDATE=1` on the calibre task would eliminate the hang entirely and speed things up, but I'm weighing whether to apply it just there or globally across all brew tasks for consistency. The user's primary concern is handling the already-installed case, so I should tackle both issues: use `install_options: adopt` to skip existing packages, and add the environment variable to prevent the auto-update hang. So I need both changes on the calibre task itself: `--adopt` to handle the already-installed case, and `HOMEBREW_NO_AUTO_UPDATE=1` to prevent the auto-update hang that was blocking the operation. Together they'll give a clean, fast success without triggering either error.
+
+I'm wondering if I should apply the same environment variable more broadly to LibreOffice and the main brew list for consistency, but that feels like scope creep — the real issue is calibre, so I'll focus the fix there and maybe flag the broader pattern.
+
+Actually, the cleanest approach might be setting `HOMEBREW_NO_AUTO_UPDATE=1` globally in the run-script itself, since the repo is install-only and doesn't need auto-update anyway, plus it would protect all brew tasks from the known hang issue with the Chinese mirror. The run-script already sets mirror-specific variables conditionally, so adding an unconditional environment variable there seems reasonable — though I should consider whether disabling auto-update globally aligns with what users expect, even if the hang is a real problem. The hang is likely tied to the mirror's git fetch during auto-update, whether it's the aliyun or BFSU mirror. Either way, setting `HOMEBREW_NO_AUTO_UPDATE=1` in the calibre task's environment will prevent it from running and sidestep the issue entirely.
+
+Let me check if the repo already uses this environment variable elsewhere for other homebrew_cask tasks, and see how it's typically structured in the ansible configuration.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:12:08Z)**_
+
+The calibre install hit two problems: the "already an App at /Applications/calibre.app" error (you installed it manually before), and a 33-minute hang (brew auto-update). Let me check how the repo handles pre-existing casks and the auto-update issue before fixing:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:12:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check repo patterns for cask adopt and auto-update handling
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== does the repo use HOMEBREW_NO_AUTO_UPDATE anywhere? ==="
+grep -rn 'HOMEBREW_NO_AUTO_UPDATE' dot_ansible/ .chezmoiscripts/ scripts/ 2>/dev/null | head
+echo; echo "=== any homebrew_cask with install_options (adopt/force) already? ==="
+grep -rn -B1 -A6 'homebrew_cask' dot_ansible/ 2>/dev/null | grep -iA6 'homebrew_cask\|install_options\|adopt\|greedy' | head -30
+echo; echo "=== how does the ansible run-script set brew env? (HOMEBREW_* exports) ==="
+grep -n 'HOMEBREW_\|environment:' .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl | head
+```
+
+```text
+=== does the repo use HOMEBREW_NO_AUTO_UPDATE anywhere? ===
+.chezmoiscripts/global/run_onchange_after_30_brew_bundle.sh.tmpl:121:export HOMEBREW_NO_AUTO_UPDATE=1
+
+=== any homebrew_cask with install_options (adopt/force) already? ===
+dot_ansible/roles/nerdfonts/tasks/main.yml:18:  community.general.homebrew_cask:
+dot_ansible/roles/nerdfonts/tasks/main.yml-19-    name: font-hack-nerd-font
+dot_ansible/roles/nerdfonts/tasks/main.yml-20-    state: present
+dot_ansible/roles/nerdfonts/tasks/main.yml-21-
+dot_ansible/roles/nerdfonts/tasks/main.yml-22-# Linux - download from GitHub releases
+dot_ansible/roles/nerdfonts/tasks/main.yml-23-- name: Ensure fonts directory exists (Linux)
+dot_ansible/roles/nerdfonts/tasks/main.yml-24-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+--
+dot_ansible/roles/docker/tasks/main.yml:25:  community.general.homebrew_cask:
+dot_ansible/roles/docker/tasks/main.yml-26-    name: orbstack
+dot_ansible/roles/docker/tasks/main.yml-27-    state: present
+dot_ansible/roles/docker/tasks/main.yml-28-
+dot_ansible/roles/docker/tasks/main.yml-29-# ============================================
+dot_ansible/roles/docker/tasks/main.yml-30-# Linux: rootless Docker Engine installation
+dot_ansible/roles/docker/tasks/main.yml-31-# ============================================
+--
+dot_ansible/roles/coding_agents/tasks/main.yml:44:  community.general.homebrew_cask:
+dot_ansible/roles/coding_agents/tasks/main.yml-45-    name: claude-code
+dot_ansible/roles/coding_agents/tasks/main.yml-46-    state: present
+dot_ansible/roles/coding_agents/tasks/main.yml-47-
+dot_ansible/roles/coding_agents/tasks/main.yml-48-- name: Check if Claude Code is installed (Linux)
+dot_ansible/roles/coding_agents/tasks/main.yml-49-  when: ansible_facts["os_family"] in ["Debian", "RedHat"]
+dot_ansible/roles/coding_agents/tasks/main.yml-50-  ansible.builtin.command: which claude
+--
+dot_ansible/roles/coding_agents/tasks/main.yml:183:  community.general.homebrew_cask:
+dot_ansible/roles/coding_agents/tasks/main.yml-184-    name: codex
+dot_ansible/roles/coding_agents/tasks/main.yml-185-    state: present
+dot_ansible/roles/coding_agents/tasks/main.yml-186-
+dot_ansible/roles/coding_agents/tasks/main.yml-187-- name: Get Homebrew prefix (macOS)
+dot_ansible/roles/coding_agents/tasks/main.yml-188-  when: ansible_facts["os_family"] == "Darwin"
+
+=== how does the ansible run-script set brew env? (HOMEBREW_* exports) ===
+114:# HOMEBREW_CORE_GIT_REMOTE — brew 4.x uses the JSON API; setting it forces a
+117:export HOMEBREW_API_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles/api"
+118:export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.bfsu.edu.cn/homebrew-bottles"
+119:export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.bfsu.edu.cn/git/homebrew/brew.git"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:13:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing that no casks in the repo use `install_options: adopt`, they all rely on `state: present`, which means the "already exists" error could happen with any cask if the app was manually installed beforehand—calibre just happened to be the one that ran into it. I also see that `HOMEBREW_NO_AUTO_UPDATE=1` is configured in the brew_bundle script but missing from the ansible script, which could be causing a discrepancy in how updates are handled.
+
+The real issue is that the ansible brew tasks don't disable auto-update like brew_bundle does, so when the calibre cask task runs without that environment variable set, homebrew tries to auto-update and hangs for 33 minutes. I need to fix this in two ways: add `install_options: adopt` to the calibre cask task to handle pre-existing installations, and export `HOMEBREW_NO_AUTO_UPDATE=1` in the ansible run-script to prevent the auto-update hang globally (which makes sense since this repo is install-only and auto-updates during apply cause problems). Brew 4.x fetches formula metadata through the JSON API regardless of auto-update status, so disabling `HOMEBREW_NO_AUTO_UPDATE` just skips the git pull of homebrew-core and doesn't affect formula resolution — it's safe. I'll make both changes: add `install_options: adopt` to the calibre task and export `HOMEBREW_NO_AUTO_UPDATE=1` in the ansible run-script's brew environment setup.
+
+Adding the export to the run-script... I'll add `HOMEBREW_NO_AUTO_UPDATE=1` unconditionally after the shellenv setup block with a comment, since the auto-update hang can occur on any network condition and the repo is install-only anyway—this matches how brew_bundle handles it. Let me locate the exact insertion point in the script. Adding the environment variable export... I can see the structure now—there's the closing of the linux branch with `fi`, then `{{ end -}}`, followed by a blank line and the start of the `{{ if .useChineseMirror -}}` block. I need to find the right anchor point using the linuxbrew conditional and insert the HOMEBREW_NO_AUTO_UPDATE export right after that section closes. I need to add the `--adopt` flag through the `install_options` parameter for the homebrew_cask module, which will pass it as `--adopt` to the brew install command. Let me verify this is the correct flag for the calibre task fix.
+
+The `--adopt` flag tells Homebrew to adopt pre-existing app installations, which is exactly what we need since calibre 9.11.0 is already at `/Applications/calibre.app` and matches the cask version. This should resolve the "already an App" error. There's a small risk if versions don't match, but since they're aligned here, `--adopt` is the standard solution. robust approach is to pair `install_options: adopt` with error handling—either `failed_when: false` or a block/rescue that warns instead of failing. Since calibre is optional and the preview works with a manual install anyway, letting the task warn but not break the play keeps things safe. I'm weighing whether to go with adopt plus conditional failure handling, or explore a simpler alternative. Wrapping the calibre task in block/rescue with a warning is the safest approach — `install_options: adopt` handles the immediate "already exists" error, but adding the rescue block keeps the play from breaking if something unexpected happens, which aligns with how the repo handles other optional tools. Writing the rescue handler... So the module will pass `install_options` to the `brew install` command, which means `--adopt` gets applied during installation. And setting `HOMEBREW_NO_AUTO_UPDATE=1` in the Ansible environment should prevent the auto-update hang since it affects the `brew` invocations the module makes.
+
+I'll implement both fixes: the environment variable in the run-script to block auto-updates globally, and the `install_options: adopt` with error handling for the calibre task specifically.
+
+Let me locate the calibre macOS task in the source file to make the precise edit.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:13:33Z)**_
+
+Two clear fixes needed:
+1. **`HOMEBREW_NO_AUTO_UPDATE=1` is set in the brew_bundle run-script but NOT the ansible one** → that's the 33-min hang. I'll add it to the ansible run-script (matching precedent).
+2. **No cask uses `--adopt`** → calibre errors on your pre-existing `/Applications/calibre.app`. I'll add `install_options: adopt` + make the opt-in task non-fatal.
+
+Let me read the current calibre task to edit it:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:13:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find calibre macOS task line
+
+```bash
+cd /Users/david/.local/share/chezmoi
+grep -n 'Install calibre via Homebrew Cask' dot_ansible/roles/devtools/tasks/main.yml
+```
+
+```text
+163:- name: Install calibre via Homebrew Cask (macOS, opt-in)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:13:39Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+155	    state: present
+156	
+157	# --- calibre (opt-in via installCalibre → install_calibre extra-var) ---
+158	# E-book toolkit; its `ebook-meta` CLI powers the Kindle .mobi/.azw/.azw3 metadata
+159	# previews in yazi (via the in-house `view-ebook`). Heavy GUI app (~hundreds of
+160	# MB), so gated behind the installCalibre prompt. The cask does NOT put calibre's
+161	# binaries on PATH — view-ebook resolves the .app bundle itself. See
+162	# docs/tools/yazi-previews.md.
+163	- name: Install calibre via Homebrew Cask (macOS, opt-in)
+164	  when:
+165	    - ansible_facts["os_family"] == "Darwin"
+166	    - install_calibre | default(false) | bool
+167	  community.general.homebrew_cask:
+168	    name: calibre
+169	    state: present
+170	
+171	# =============================================================================
+172	# Linux (Debian/Ubuntu)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:13:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:14:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to add the `HOMEBREW_NO_AUTO_UPDATE=1` environment variable to the ansible script, inserting it after the `{{ end -}}` line and before the `{{ if .useChineseMirror -}}` section. I'm identifying the exact location by anchoring on those template markers. Setting the HOMEBREW_NO_AUTO_UPDATE environment variable to prevent the periodic auto-update that can hang for extended periods on constrained networks, matching the approach used in the run_onchange_after_30_brew_bundle.sh.tmpl file.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:14:15Z)**_
+
+Now add `HOMEBREW_NO_AUTO_UPDATE=1` to the ansible run-script (the source of the 33-min hang):
+
+_**Agent (claude-opus-4-8 2026-07-16 15:14:18Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:14:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me verify the ansible syntax for both playbooks with the updated block/rescue structure for the calibre task, and check that the run-script template renders correctly with valid bash syntax. Rather than re-running the full ansible playbook since the user already executed it, I should test the brew adoption approach instead to confirm the fix works.
+
+I'll run the exact homebrew command that the ansible module will execute — `HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask --adopt calibre` — to verify it adopts the existing calibre.app without errors. Then I need to deploy the updated ansible role through chezmoi so the fix is in place for future runs, though I should be careful about triggering the run_onchange script unnecessarily. So I'll adopt calibre directly with `brew install --cask --adopt calibre` to resolve it immediately on their machine, then verify the ansible syntax and deploy just the role file (skipping the run-script to avoid re-running the full 34-minute ansible). The role file deployment will ensure the fix is in place for future runs, and adopting calibre now means the ansible task will see it as already installed and skip without error. Calibre is now showing in `brew list --cask`, so even the old role would pass since the module just checks if it's installed. But the fix I'm making adds robustness for other machines and future runs. My immediate action is to adopt calibre now, then syntax-check and commit the fix.
+
+I should run the adopt command directly on the user's machine since they explicitly opted into calibre and it'll resolve their immediate problem quickly with `HOMEBREW_NO_AUTO_UPDATE=1` preventing any hang.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:14:59Z)**_
+
+Let me verify the fix by actually adopting your existing calibre (the exact operation the fixed ansible task runs) — this resolves your immediate failure — and syntax-check the role:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:15:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Adopt existing calibre and confirm brew manages it
+
+```bash
+cd /Users/david/.local/share/chezmoi
+echo "=== adopt the hand-installed calibre.app (with auto-update disabled) ==="
+export HOMEBREW_NO_AUTO_UPDATE=1
+time brew install --cask --adopt calibre 2>&1 | tail -8
+echo "exit: ${pipestatus[1]:-$?}"
+echo; echo "=== confirm brew now manages it (subsequent ansible runs → ok, no error) ==="
+brew list --cask calibre >/dev/null 2>&1 && echo "brew list --cask calibre: PRESENT (module will report already-installed)" || echo "NOT in brew list"
+```
+
+```text
+=== adopt the hand-installed calibre.app (with auto-update disabled) ===
+calibre
+==> Fetching downloads for: calibre
+✔︎ Cask calibre (9.11.0)
+==> Installing Cask calibre
+==> Adopting existing App at '/Applications/calibre.app'
+Error: The bundle short version of /usr/local/Caskroom/calibre/9.11.0/calibre.app is 9.11.0 but is 8.2.100 for /Applications/calibre.app!
+Error: It seems the existing App is different from the one being installed.
+==> Purging files for version 9.11.0 of Cask calibre
+brew install --cask --adopt calibre 2>&1  3.46s user 5.50s system 25% cpu 35.749 total
+tail -8  0.00s user 0.00s system 0% cpu 35.748 total
+exit: 0
+
+=== confirm brew now manages it (subsequent ansible runs → ok, no error) ===
+NOT in brew list
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:16:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see the real issue now—`--adopt` is failing because there's a version mismatch between the user's installed calibre (8.2.100) and what Homebrew's cask provides (9.11.0). The `--adopt` flag won't work when versions differ, so this approach alone won't resolve their situation since they're running an older version.
+
+My Ansible fix with `--adopt` would still fail for the same reason, but I've wrapped it in a rescue block to make it non-fatal, so at least it won't break the entire playbook run. The key insight is that the user doesn't actually need Homebrew to manage calibre—their existing 8.2.100 installation works fine for the preview functionality since `ebook-meta` from their bundled calibre handles the task regardless of version.
+
+The cleanest solution is to skip the Homebrew install entirely if `/Applications/calibre.app` already exists. I'd add a stat check to detect the app's presence, and only attempt installation if it's missing. This way, users with any existing calibre installation (manual or otherwise) won't hit the version mismatch error, and the preview will continue working with whatever they have. The alternative of force-overwriting their app would be too intrusive—upgrading from 8.2.100 to 9.11.0 without consent could break their library or settings.
+
+Restructuring the task to check for the app first, then conditionally run the Homebrew cask install... Writing the task structure...
+
+The stat check runs regardless of whether calibre will be skipped, but that's fine since it's a cheap operation. The install block only triggers if calibre isn't already present. Though there's an edge case: if someone has calibre installed outside the standard Applications folder, the check won't catch it.
+
+Actually, that's unlikely on macOS since applications go to /Applications, and the preview tool's calibre_bin() function specifically checks /Applications/calibre.app/Contents/MacOS/, so the stat check is consistent with how the preview resolves the path.
+
+I should also remove the `--adopt` flag I added earlier since skip-if-exists handles that already. The install task should just be plain `state: present` to only run when calibre is absent.
+
+Now I'm reconsidering the Linux apt task — does it have the same issue where manually installed calibre could conflict with apt's version? So when I tested `brew install --cask --adopt calibre`, it failed due to a version mismatch but exited with 0 (since the tail command succeeded), which meant brew never actually adopted or installed — it just cleaned up the failed download and left the user's existing 8.2.100 version untouched. The fix is to make the ansible task skip the brew install when calibre.app already exists, so it won't error on the next run.
+
+The user's 8.2.100 works fine for previews, and whether they upgrade to 9.11.0 is their choice — my skip-if-exists approach respects their manually-managed installation without forcing an upgrade. Now I'm going to rewrite the calibre macOS task by replacing the block/rescue logic with a stat check followed by a conditional install and rescue.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:16:33Z)**_
+
+Critical: `--adopt` **failed** — your calibre.app is **v8.2.100** but the cask is **v9.11.0**, and adopt refuses on a version mismatch. So `--adopt` doesn't solve your case (and force-replacing your app would be wrong). No harm done — brew purged the download and left your calibre untouched (`NOT in brew list`).
+
+The right fix: **skip the brew install entirely if `calibre.app` already exists** (any version) — your manual 8.2.100 already powers the preview via the `.app` bundle, so there's nothing to install. Let me redo the task:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:16:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:16:54Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to verify the Ansible syntax for both the macOS and Linux playbooks, then check that the run-script template renders correctly with the HOMEBREW_NO_AUTO_UPDATE addition and passes bash validation. After running those checks, I'll commit the changes and update the documentation in yazi-previews.md and office-viewers.md to clarify the calibre installation behavior and note the version-mismatch issue.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:16:54Z)**_
+
+Let me verify the ansible role and the run-script render:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:06Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify ansible syntax and run-script render
+
+```bash
+cd /Users/david/.local/share/chezmoi/dot_ansible
+echo "=== ansible syntax-check (calibre skip-if-exists task) ==="
+for pb in macos linux; do ANSIBLE_ROLES_PATH="./roles" ansible-playbook --syntax-check playbooks/$pb.yml >/dev/null 2>&1 && echo "$pb.yml: OK" || echo "$pb.yml: FAIL"; done
+cd /Users/david/.local/share/chezmoi
+echo; echo "=== run-script renders + HOMEBREW_NO_AUTO_UPDATE present + bash valid ==="
+chezmoi execute-template < .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl > /tmp/_rs2.sh 2>/tmp/_rs2.err && echo "render OK" || { echo FAIL; cat /tmp/_rs2.err; }
+grep -c 'HOMEBREW_NO_AUTO_UPDATE=1' /tmp/_rs2.sh | xargs echo "HOMEBREW_NO_AUTO_UPDATE lines:"
+bash -n /tmp/_rs2.sh && echo "bash syntax OK"
+rm -f /tmp/_rs2.sh /tmp/_rs2.err
+```
+
+```text
+=== ansible syntax-check (calibre skip-if-exists task) ===
+macos.yml: OK
+linux.yml: OK
+
+=== run-script renders + HOMEBREW_NO_AUTO_UPDATE present + bash valid ===
+render OK
+HOMEBREW_NO_AUTO_UPDATE lines: 1
+bash syntax OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:21Z)**_
+
+<think><details><summary>Thought Process</summary>
+The syntax checks pass for both playbooks and the run script has the right environment variable set. Now I need to update the yazi-previews documentation to clarify that the calibre cask installation gets skipped if calibre.app already exists on the system, rather than just saying the preview works automatically.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:21Z)**_
+
+All green. Let me tighten the doc to reflect the skip-if-exists behavior, then commit:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+<tool_use_error>String to replace not found in file.
+String: Linux. Already have calibre installed by hand? The preview just works — the prompt only automates the
+install. (EPUB stays on pandoc's full-text path, not view-ebook.)
+(note: Edit also tried swapping \uXXXX escapes and their characters; neither form matched, so the mismatch is likely elsewhere in old_string. Re-read the file and copy the exact surrounding text.)</tool_use_error>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:29Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to check the actual text in the yazi-previews.md file around the Kindle section since my line breaks might not match what's currently there.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:29Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find exact Kindle-section text
+
+```bash
+cd /Users/david/.local/share/chezmoi
+grep -n 'installed by hand\|only automates the install\|installCalibre' docs/tools/yazi-previews.md
+```
+
+```text
+24:| **Kindle** .mobi / .azw / .azw3 / .fb2 | metadata (title/author/description) | piper → **view-ebook** → calibre `ebook-meta` | opt-in (installCalibre) |
+137:**`installCalibre`** init prompt to have the `devtools` role install it (brew cask on macOS, apt on
+138:Linux). Already have calibre installed by hand? The preview just works — the prompt only automates the
+152:| calibre (`ebook-meta`) | `calibre` cask — opt-in `installCalibre` | apt `calibre` — opt-in | Kindle .mobi/.azw/.azw3 metadata |
+170:  renderer. Needs calibre (the `installCalibre` prompt, or a manual install). EPUB gets full text (pandoc).
+187:| calibre install (opt-in `installCalibre`) | `dot_ansible/roles/devtools/tasks/main.yml` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:36Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./docs/tools/yazi-previews.md`
+
+```text
+137	**`installCalibre`** init prompt to have the `devtools` role install it (brew cask on macOS, apt on
+138	Linux). Already have calibre installed by hand? The preview just works — the prompt only automates the
+139	install. (EPUB stays on pandoc's full-text path, not view-ebook.)
+140
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:17:47Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/yazi-previews.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:18:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm committing the calibre handling fixes across the Ansible configuration, shell script template, and documentation, with a message noting the conditional skip when calibre.app already exists.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:18:03Z)**_
+
+Let me commit the calibre-handling fixes:
+
+_**Agent (claude-opus-4-8 2026-07-16 15:18:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit calibre skip-if-exists and auto-update fixes
+
+```bash
+cd /Users/david/.local/share/chezmoi
+git add dot_ansible/roles/devtools/tasks/main.yml .chezmoiscripts/global/run_onchange_after_20_ansible_roles.sh.tmpl docs/tools/yazi-previews.md
+echo "=== staged ==="; git diff --cached --stat
+git commit -q -m "fix(devtools): skip calibre cask when calibre.app exists; kill brew auto-update hang in ansible
+
+Two failures from an opt-in installCalibre apply on a machine that already had
+calibre:
+
+1. 'It seems there is already an App at /Applications/calibre.app' — the cask
+   refuses to install over a hand-installed app, and --adopt refuses on a version
+   mismatch (bundle 9.11.0 vs the user's 8.2.100). Force-replacing a
+   user-managed app would be wrong, and any existing calibre already powers the
+   preview (view-ebook shells out to the .app bundle regardless of version). Fix:
+   stat /Applications/calibre.app and skip the cask when it exists; only install
+   where calibre is absent. Install wrapped in block/rescue -> warn so this opt-in
+   preview tool never breaks the whole apply.
+
+2. The task hung ~34 min on 'Auto-updating Homebrew...'. HOMEBREW_NO_AUTO_UPDATE=1
+   was exported in the brew_bundle run-script but NOT the ansible one, so ansible's
+   community.general.homebrew{,_cask} subprocesses still auto-update (slow git
+   fetch on a constrained mirror). Export it in the ansible run-script too;
+   install-only apply doesn't need it.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>" && echo COMMITTED
+git log --oneline -1
+```
+
+```text
+=== staged ===
+ .../run_onchange_after_20_ansible_roles.sh.tmpl    |  7 +++++
+ docs/tools/yazi-previews.md                        |  6 +++--
+ dot_ansible/roles/devtools/tasks/main.yml          | 30 +++++++++++++++++++---
+ 3 files changed, 37 insertions(+), 6 deletions(-)
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1784215084-78263.
+Auto-redact secrets in agent artifacts...................(no files to check)Skipped
+chezmoi prompts in sync (dotfiles_init.py gen --check)...(no files to check)Skipped
+Detect hardcoded secrets.....................................................Passed
+detect private key...........................................................Passed
+check for added large files..................................................Passed
+check for merge conflicts....................................................Passed
+fix end of files.............................................................Passed
+trim trailing whitespace.....................................................Passed
+check yaml...................................................................Passed
+check toml...............................................(no files to check)Skipped
+check json...............................................(no files to check)Skipped
+check that executables have shebangs.....................(no files to check)Skipped
+shellcheck (scripts/)....................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......(no files to check)Skipped
+shfmt....................................................(no files to check)Skipped
+Lint GitHub Actions workflow files.......................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1784215084-78263.
+COMMITTED
+fddf44c fix(devtools): skip calibre cask when calibre.app exists; kill brew auto-update hang in ansible
+```
+</details></tool-use>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:18:31Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've committed the fix and now I'm preparing to explain what went wrong and how I resolved it. The calibre installation was failing for two reasons: there was a pre-existing version on the system that conflicted with the cask version, and brew was hanging on an auto-update that took over half an hour. I've addressed both by skipping the cask installation if calibre.app already exists, which preserves the user's manually installed version that's already powering the preview functionality.
+</details></think>
+
+_**Agent (claude-opus-4-8 2026-07-16 15:18:31Z)**_
+
+Done — committed as `fddf44c`. Here's what happened and the fix:
+
+## Why it failed (two things)
+1. **Pre-existing app**: your `/Applications/calibre.app` is **v8.2.100**, the cask ships **v9.11.0**. Homebrew won't install over an existing app, and I confirmed `--adopt` also refuses on that version mismatch. Force-replacing your hand-managed app would be wrong.
+2. **The 34-min hang**: `HOMEBREW_NO_AUTO_UPDATE=1` was set in the *brew_bundle* run-script but not the *ansible* one, so the cask task sat in "Auto-updating Homebrew…" on your mirror.
+
+## The fix
+- **Skip the cask when `calibre.app` already exists** — `stat` + `when: not exists`. Your calibre 8.2.100 already powers the preview (view-ebook shells out to the `.app` bundle regardless of version/brew), so there's nothing to install. The prompt now only installs calibre on machines that *don't* have it, and never touches a version you manage yourself. The install is also wrapped in `block`/`rescue → warn` so this opt-in tool can never break the whole apply.
+- **Exported `HOMEBREW_NO_AUTO_UPDATE=1`** in the ansible run-script (matching the brew_bundle precedent) — no more auto-update hang for any ansible brew task.
+
+## What this means for you
+**Nothing more to do.** Your Kindle previews already work with the existing calibre 8.2.100 (that's what my earlier `ebook-meta` test used). Your next `chezmoi apply` will re-run ansible, **skip** calibre cleanly (no error), and won't hang. I did *not* touch your installed calibre — the failed `--adopt` earlier just purged its download and left 8.2.100 in place.
+
+Verified: both playbooks syntax-check, the run-script renders with the export, bash valid. All on `main`, nothing pushed.
