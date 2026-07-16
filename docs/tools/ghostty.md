@@ -82,6 +82,20 @@ Caveats:
 
 The `|`-separated long description in Ghostty's terminfo is interpreted as an extra alias by `tic` / ncurses prior to 6.3. The entry still installs correctly; the warning is cosmetic. The only real fix is upgrading ncurses on the remote.
 
+## Image preview (yazi)
+
+Ghostty and cmux speak the **Kitty graphics protocol**, so [yazi](yazi-previews.md) renders **crisp
+inline images** (not chafa ascii-art) for png / jpg / pdf / video previews — no config needed, yazi
+auto-detects the terminal.
+
+Gotcha: a very large image (a wide plot, a hi-DPI screenshot) can show **`Image size exceeds limit`**
+in the preview pane. That's yazi's image *decode* bound, **not** a Ghostty/cmux cap — this repo raises
+`[tasks] image_bound` in `dot_config/yazi/yazi.toml`; run `yazi --clear-cache` and restart yazi to pick
+it up. Detail + the terminal support matrix:
+[yazi-previews.md → Large images](yazi-previews.md#image-size-limit) /
+[which terminal gets crisp images](yazi-previews.md#which-terminal-gets-crisp-images-vs-ascii-art).
+Inside tmux, image passthrough needs `allow-passthrough on` (set in `dot_config/tmux/common.conf.tmpl`).
+
 ## See also
 
 - [tmux](tmux.md) — tmux config and keybindings (cmux runs on top of tmux).

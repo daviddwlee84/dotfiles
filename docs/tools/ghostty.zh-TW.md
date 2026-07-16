@@ -87,6 +87,18 @@ ghostty-ssh-terminfo localhost
 
 Ghostty terminfo 中以 `|` 分隔的長描述，在 6.3 版以前的 `tic` / ncurses 中會被解讀為額外的別名。條目仍會正確安裝；該警告只是外觀問題。唯一真正的修法是在遠端升級 ncurses。
 
+## 圖片預覽（yazi）
+
+Ghostty 與 cmux 支援 **Kitty graphics protocol**，因此 [yazi](yazi-previews.md) 對 png / jpg / pdf /
+影片會顯示**清晰的行內圖片**（而非 chafa 的字元藝術）——不需設定，yazi 會自動偵測終端機。
+
+小陷阱：非常大的圖片（很寬的圖表、高 DPI 截圖）可能在預覽窗格顯示 **`Image size exceeds limit`**。這是
+yazi 的圖片*解碼*上限，**不是** Ghostty/cmux 的限制——本 repo 已在 `dot_config/yazi/yazi.toml` 調高
+`[tasks] image_bound`；改完後執行 `yazi --clear-cache` 並重啟 yazi 才會生效。細節與終端機支援對照表：
+[yazi-previews.md → Large images](yazi-previews.md#image-size-limit) /
+[哪些終端機能顯示清晰圖片](yazi-previews.md#which-terminal-gets-crisp-images-vs-ascii-art)。
+在 tmux 內，圖片 passthrough 需要 `allow-passthrough on`（在 `dot_config/tmux/common.conf.tmpl` 設定）。
+
 ## 另見
 
 - [tmux](tmux.md) — tmux 設定與鍵位（cmux 在 tmux 之上運行）。

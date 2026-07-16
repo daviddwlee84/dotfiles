@@ -13,6 +13,19 @@ show_hidden = true           # Show hidden files
 show_symlink = true          # Show symlink targets
 
 # -----------------------
+# Image DECODE bound. yazi's built-in image previewer decodes an image with the
+# `image` crate's Limits capped at [tasks].image_bound (default [10000, 10000] px)
+# BEFORE downscaling to the small [preview] max_width/max_height (600x900) — so a
+# wide time-series/plot PNG or a huge screenshot (>10000 px on a side) is rejected
+# outright with "Image size exceeds limit" in the preview pane. Raise the bound so
+# large images preview; image_alloc (512 MB, kept from the preset via deep-merge)
+# stays the real memory guard. Run `yazi --clear-cache` after changing (cached
+# failed previews persist). See docs/tools/yazi-previews.md.
+# -----------------------
+[tasks]
+image_bound = [ 30000, 30000 ]
+
+# -----------------------
 # Open rules: 決定 Enter / o 的預設 opener，還有 O 的候選清單
 # -----------------------
 [open]

@@ -44,16 +44,49 @@ available (a non-graphics terminal, or inside tmux without passthrough) — **ch
 So a missing `chafa` breaks **all** of png/pdf/mp4/HEIC at once, even though poppler/ffmpeg/magick are
 present — they produce the image fine; nothing can display it. Installing `chafa` fixes the whole set.
 
-### Unicode-art vs crisp inline images
+### Which terminal gets crisp images vs ascii-art
 
-chafa gives **universal ASCII/ANSI-art** previews that work everywhere — over tmux, over SSH, in any
-terminal. For crisp *inline* images, run yazi in a graphics-capable terminal
-(**Ghostty / Kitty / iTerm2 / WezTerm / Konsole / foot / Ghostty**); yazi auto-upgrades the adapter,
-no config change. Over tmux the terminal must support Kitty-graphics passthrough — this repo already
-sets `allow-passthrough on` (`dot_config/tmux/common.conf.tmpl`), but the older `KgpOld` protocol
-variant doesn't work under tmux and Sixel needs a `--enable-sixel` tmux build. If you only ever get
-ascii-art, that's the terminal/tmux graphics story, **not** a missing tool — chafa is doing its job.
-See yazi's [image-preview docs](https://yazi-rs.github.io/docs/image-preview/).
+chafa gives **universal ASCII/ANSI-art** previews that work everywhere — over tmux, SSH, any terminal.
+For **crisp inline images**, run yazi in a terminal that speaks an image graphics protocol; yazi
+auto-detects it (from `$TERM` / `$TERM_PROGRAM` / `$XDG_SESSION_TYPE`) and upgrades the adapter, no
+config change. yazi's adapters, in priority order:
+
+| Adapter | Protocol | Terminals (non-exhaustive) |
+|---|---|---|
+| **Kgp** | Kitty graphics protocol | **kitty**, **Ghostty** / **cmux**, WezTerm, Konsole, wayst |
+| **Iip** | iTerm2 inline images | **iTerm2**, WezTerm, Warp, Rio, Tabby, VSCode (partial) |
+| **Sixel** | Sixel | foot, Contour, mlterm, WezTerm, Windows Terminal, Rio, xterm (`+sixel`) |
+| **X11 / Wayland** | Überzug++ overlay | any terminal on Linux X11/Wayland (needs Überzug++ installed) |
+| **Chafa** | Unicode / ANSI art | **everything else** — Alacritty, macOS Terminal.app, tmux-without-passthrough, plain SSH |
+
+- **No native protocol → chafa.** Notably **Alacritty** and **macOS Terminal.app** have *no* image
+  protocol, so yazi always falls back to chafa there (this repo's [`--probe off` shim](#chafa-probe-leak)
+  keeps that path clean). Ghostty / cmux / kitty / iTerm2 / WezTerm give real inline images.
+- **Inside a multiplexer** the *terminal* still has to support the protocol AND the mux has to pass it
+  through: tmux needs `allow-passthrough on` (set here in `dot_config/tmux/common.conf.tmpl`) — but the
+  legacy `KgpOld` variant doesn't work under tmux, and Sixel needs a `--enable-sixel` tmux build. zellij's
+  image support is limited and shares the same [OSC-query leak](#chafa-probe-leak) class as the chafa bug.
+- **See which adapter yazi picked**: `yazi --debug` → the `Adapter.matches` line.
+
+If you only ever get ascii-art, that's the terminal/tmux graphics story, **not** a missing tool — chafa
+is doing its job. See yazi's [image-preview docs](https://yazi-rs.github.io/docs/image-preview/).
+
+### Large images: "Image size exceeds limit" {#image-size-limit}
+
+A big screenshot or a wide time-series / plot PNG can show **`Image size exceeds limit`** instead of a
+preview. That's yazi's **decode** guard, not the terminal: yazi decodes the image with the `image`
+crate bounded by `[tasks] image_bound` (default **`[10000, 10000]`** px) *before* downscaling to the
+small `[preview] max_width`/`max_height` (600×900), so anything over 10000 px on a side is rejected up
+front (confirmed in `yazi-adapter`: `limits.max_image_width = Some(YAZI.tasks.image_bound[0])`). This
+repo raises the bound in `dot_config/yazi/yazi.toml`:
+
+```toml
+[tasks]
+image_bound = [ 30000, 30000 ]   # image_alloc (512 MB, kept from the preset) stays the memory guard
+```
+
+Then run **`yazi --clear-cache`** (a cached failed preview persists) and restart yazi (config is read at
+launch). cmux / Ghostty then display the downscaled image fine over Kitty graphics.
 
 ### The `chafa` probe leak — spurious rename / shell popup {#chafa-probe-leak}
 
@@ -140,7 +173,9 @@ install. (EPUB stays on pandoc's full-text path, not view-ebook.)
   list of `![](imageN)`. It's detected cheaply by peeking at the slide XML with 7-Zip. See
   [office-viewers.md](office-viewers.md).
 - **chafa is a fallback, not a downgrade to avoid.** ascii-art is the correct behavior in a
-  non-graphics terminal — see [above](#unicode-art-vs-crisp-inline-images).
+  non-graphics terminal — see [above](#which-terminal-gets-crisp-images-vs-ascii-art).
+- **Large image → `Image size exceeds limit`.** yazi's decode bound (`[tasks] image_bound`), not the
+  terminal; raised to `[30000, 30000]` here — see [above](#image-size-limit).
 
 ## Where things live
 
