@@ -133,6 +133,17 @@ type = "pane"
 command = "tv tools"
 description = "CLI tools launcher (tv tools)"
 
+# URL picker (tmux prefix+u analog — joshmedeski/tmux-fzf-url). Reads the focused
+# pane, fzf-picks a URL (same rewrites: http(s)/ftp/file, www., IP, git@ remote,
+# quoted owner/repo, npm import), opens it via the repo's cross-platform `x open`.
+# Visible screen by default; `url-pick.sh --source recent` scans full scrollback.
+# Kept beside prefix+U so the u/U pair sits together. Helper mirrors pane-copy.sh.
+[[keys.command]]
+key = "prefix+u"
+type = "pane"
+command = "~/.config/herdr/url-pick.sh \"$HERDR_ACTIVE_PANE_ID\""
+description = "URL picker — open a URL from the pane (fzf)"
+
 [[keys.command]]
 key = "prefix+T"
 type = "pane"

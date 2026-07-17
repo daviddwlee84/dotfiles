@@ -70,6 +70,7 @@ description = "new tab at the workspace (space) root dir"
 | `sesh` fuzzy switch + `tmuxp` layouts | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects templates |
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
 | lazygit / scratch popups | **Custom command panes** | Key bindings |
+| URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
 | Seamless `Ctrl-hjkl` nvim↔pane nav | **No herdr-aware smart-splits** | **Gap** — workaround below |
 | OSC133 copy-mode (`cpout`/`cpblock`) | tmux-specific | **Gap** — `cpcmd` (zsh history) still works |
 | Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
@@ -103,6 +104,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + M` | btop system monitor | command pane |
 | `prefix + N` | nvtop GPU monitor | command pane |
 | `prefix + U` | `tv tools` (CLI launcher) | command pane |
+| `` prefix + u `` | **URL picker** — fzf-pick a URL from the pane and open it (`x open`); tmux-fzf-url analog. `--source recent` = full scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh` (workspace/dir switcher) | command pane |
 | `prefix + a` | `tv herdr-agent-panes` (live agent panes) | command pane |
 | `prefix + f` | `tv fleet-hosts` (SSH picker) | command pane |
@@ -290,6 +292,21 @@ Four one-keypress "grab this pane onto the clipboard" ops, all driven by one hel
 The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
 
 Both surfaces share the same helper: the `[[keys.command]]` binds in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) and the four `copy-pane-*.toml` **Quick Actions** under `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` (fuzzy-launched via `prefix+y`). `P/D/V/S` are uppercase (`prefix+shift+<letter>`) chosen to dodge herdr's reserved `shift+H/J/K/L` (swap-pane) and this repo's `shift+B` (new_worktree) / `shift+R` (reload) — confirm no collision with `herdr server reload-config` (empty `diagnostics`).
+
+## Open a URL from the pane (`prefix+u`)
+
+The herdr analog of tmux's `prefix + u` ([`joshmedeski/tmux-fzf-url`](https://github.com/joshmedeski/tmux-fzf-url)). `prefix+u` opens an fzf popup listing every URL in the focused pane; pick one (or several — fzf multi-select) and each opens in the browser. Lowercase `u` is deliberately paired with uppercase `U` (`tv tools`), matching the tmux muscle memory.
+
+One helper drives it: `~/.config/herdr/url-pick.sh` = [`dot_config/herdr/executable_url-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_url-pick.sh). It reads the pane (`herdr pane read`), runs the **same extraction/rewrite passes as tmux-fzf-url**, and opens each choice with the repo's cross-platform [`x open`](../shells/aliases.md) (wslview / open / xdg-open). It mirrors `pane-copy.sh` exactly: pane defaults to `$HERDR_ACTIVE_PANE_ID` (the keybind var) with a `herdr pane current` fallback, and `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH.
+
+| Aspect | Behavior |
+|---|---|
+| Scope | **Visible screen by default** (matches tmux-fzf-url). `url-pick.sh <pane> --source recent` scans the full retained scrollback |
+| Patterns | `http(s)` / `ftp` / `file`, bare `www.` → `http://`, `IPv4[:port]` → `http://`, `git@…` SSH remotes → `https://…`, quoted `"owner/repo"` → `github.com/owner/repo`, `import "pkg"` → `npmjs.com/package/pkg` |
+| Open | `x open <url>` per selection; multi-select opens all |
+| No URLs | prints `no URLs found` and pauses ~1.5 s (a command pane closes the instant the script exits — tmux uses the status line instead) |
+
+Bound via a `[[keys.command]] type="pane"` in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) — no tv channel needed (fzf is the faithful port). Copy-mode URL opening (tmux's `tmux-open` `o`) has no herdr equivalent; use `prefix+u` for the picker.
 
 ## AI usage / quota status
 

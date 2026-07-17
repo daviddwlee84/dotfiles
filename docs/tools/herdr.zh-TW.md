@@ -75,6 +75,7 @@ description = "new tab at the workspace (space) root dir"
 | `sesh` 模糊切換 + `tmuxp` layout | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects 範本 |
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
 | lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
+| URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
 | 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --custom-status`（逐 pane、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
@@ -108,6 +109,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + M` | btop 系統監控器 | command pane |
 | `prefix + N` | nvtop GPU 監控器 | command pane |
 | `prefix + U` | `tv tools`（CLI launcher） | command pane |
+| `` prefix + u `` | **URL 選單** — 從 pane fzf 挑一個 URL 並開啟（`x open`）；tmux-fzf-url 對應物。`--source recent` = 完整 scrollback | command pane |
 | `prefix + T` | `tv herdr-sesh`（workspace/dir 切換） | command pane |
 | `prefix + a` | `tv herdr-agent-panes`（即時 agent panes） | command pane |
 | `prefix + f` | `tv fleet-hosts`（SSH picker） | command pane |
@@ -295,6 +297,21 @@ herdr pane report-metadata <pane> --source review --clear-custom-status         
 **座標**回答「這是哪個 `session > space > tab > pane`?」,並以可餵回 CLI 的形式呈現。herdr 在 `pane`/`tab`/`workspace` 子命令上**沒有 `--session` 旗標**——session 只能經由 `HERDR_SOCKET_PATH` 指定——所以區塊裡納入 `socket=` 那行作為 session 選擇器（session *名稱* 則是把該 socket 對 `herdr session list --json` 比對而得）。
 
 兩個介面共用同一支腳本:[`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 的 `[[keys.command]]` 綁定,以及 `dot_config/herdr/plugins/config/cloudmanic.herdr-plus/quick-actions/` 下的四個 `copy-pane-*.toml` **Quick Actions**（用 `prefix+y` 模糊啟動）。`P/D/V/S` 是大寫（`prefix+shift+<letter>`）,刻意避開 herdr 保留的 `shift+H/J/K/L`（swap-pane）與本 repo 的 `shift+B`（new_worktree）/ `shift+R`（reload）——用 `herdr server reload-config`（`diagnostics` 為空）確認無衝突。
+
+## 從 pane 開啟 URL（`prefix+u`）
+
+tmux `prefix + u`（[`joshmedeski/tmux-fzf-url`](https://github.com/joshmedeski/tmux-fzf-url)）的 herdr 對應物。`prefix+u` 開一個 fzf 彈窗,列出聚焦 pane 裡的每個 URL;挑一個(或多個——fzf 多選),每個都在瀏覽器開啟。小寫 `u` 刻意與大寫 `U`(`tv tools`)配對,延續 tmux 的肌肉記憶。
+
+由一支腳本驅動:`~/.config/herdr/url-pick.sh` = [`dot_config/herdr/executable_url-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_url-pick.sh)。它讀取 pane(`herdr pane read`),跑**與 tmux-fzf-url 相同的萃取/改寫規則**,再用本 repo 跨平台的 [`x open`](../shells/aliases.md)(wslview / open / xdg-open)開啟每個選項。它與 `pane-copy.sh` 完全同構:pane 預設為 `$HERDR_ACTIVE_PANE_ID`(keybind 變數),為空時 fallback 到 `herdr pane current`;`x` 以絕對路徑 fallback 解析,因為 command-pane 可能在沒有互動式 PATH 的情況下執行。
+
+| 面向 | 行為 |
+|---|---|
+| 範圍 | **預設可見螢幕**(與 tmux-fzf-url 一致)。`url-pick.sh <pane> --source recent` 掃描完整保留的 scrollback |
+| 樣式 | `http(s)` / `ftp` / `file`、裸 `www.` → `http://`、`IPv4[:port]` → `http://`、`git@…` SSH remote → `https://…`、引號 `"owner/repo"` → `github.com/owner/repo`、`import "pkg"` → `npmjs.com/package/pkg` |
+| 開啟 | 每個選項 `x open <url>`;多選則全部開啟 |
+| 無 URL | 印出 `no URLs found` 並暫停約 1.5 秒(command pane 在腳本退出的瞬間就關閉——tmux 是用狀態列) |
+
+以 [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 裡的 `[[keys.command]] type="pane"` 綁定——不需要 tv channel(fzf 才是忠實移植)。Copy-mode 的 URL 開啟(tmux `tmux-open` 的 `o`)沒有 herdr 對應物;請用 `prefix+u` 選單。
 
 ## AI 用量 / 額度狀態
 
