@@ -120,6 +120,7 @@ Prefix key：`Ctrl+B`
 | Binding | 動作 |
 |---------|--------|
 | `prefix + u` | fzf URL picker（tmux-fzf-url） |
+| `prefix + Tab` | extrakto：fzf 挑選路徑/URL/字詞（Enter=複製、Tab=插入）|
 | `prefix + g` | Sesh session picker（fzf popup） |
 | `prefix + T` | 透過 tv 的 Sesh picker（television popup） |
 | `prefix + O` | Sesh 內建 picker popup |

@@ -40,6 +40,14 @@ set -g @plugin 'joshmedeski/tmux-fzf-url'
 set -g @plugin 'tmux-plugins/tmux-open'
 set -g @open-S 'https://www.google.com/search?q='
 
+# extrakto: prefix + Tab opens an fzf popup that extracts file paths / URLs / words
+# from the pane. Enter = copy to clipboard, Tab = insert to the prompt, Ctrl-f =
+# cycle filter, Ctrl-t = cycle clipboard mode (incl. OSC 52 for SSH). PATH-first
+# filter order since the main use is grabbing file paths. Complements tmux-fzf-url
+# (prefix+u, URLs) and prefix+C-y (line yank); prefix+Tab is otherwise unbound.
+set -g @plugin 'laktak/extrakto'
+set -g @extrakto_filter_order 'path url word line'
+
 # tmux-fzf: replaces the ugly built-in `prefix + ?` (list-keys dump) with an
 # fzf popup over EVERY binding (incl. user-defined), plus session/window/pane/
 # command/process/clipboard pickers. The plugin's launch key defaults to `F`

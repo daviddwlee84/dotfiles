@@ -115,6 +115,7 @@ Prefix key: `Ctrl+B`
 | Binding | Action |
 |---------|--------|
 | `prefix + u` | fzf URL picker (tmux-fzf-url) |
+| `prefix + Tab` | extrakto: fzf-pick paths/URLs/words (Enter=copy, Tab=insert) |
 | `prefix + g` | Sesh session picker (fzf popup) |
 | `prefix + T` | Sesh picker via tv (television popup) |
 | `prefix + O` | Sesh built-in picker popup |

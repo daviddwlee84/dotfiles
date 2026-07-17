@@ -236,6 +236,7 @@ Typical workflow: `prefix + u` for quick URL browsing; `prefix + [` then select 
 | `prefix + y` | Copy visible pane content to system clipboard |
 | `prefix + Y` | Copy full scrollback to system clipboard |
 | `prefix + C-y` | Open scrollback in fzf, select lines to copy (Tab=multi) |
+| `prefix + Tab` | **extrakto** — fzf popup extracting file paths / URLs / words from the pane; Enter copies, Tab inserts to the prompt, `Ctrl-f` cycles filter (path/url/word), `Ctrl-t` cycles clipboard mode (incl. OSC 52 for SSH) |
 | `prefix + M-y` | Copy **last command's output** to clipboard (Warp-style, needs OSC 133 — see [OSC 133](./README.md#osc-133-command-boundary-navigation-warp-style)) |
 | `prefix + M-i` | Copy **last command's input line** (prompt + typed command) to clipboard (needs OSC 133) |
 

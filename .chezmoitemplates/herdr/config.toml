@@ -213,6 +213,17 @@ type = "pane"
 command = "~/.config/herdr/pane-copy.sh content \"$HERDR_ACTIVE_PANE_ID\" --source recent"
 description = "copy pane content (full scrollback)"
 
+# Copy a file PATH from the pane (extrakto-style, herdr side). Extracts path-like
+# tokens; two-tier: paths that EXIST under the pane cwd (copied as resolved
+# absolute) on top, unverified candidates below a separator. fzf-pick → `x copy`.
+# Lowercase p pairs with the uppercase copy family (P/D/V/S), same u/U convention.
+# Passes $HERDR_ACTIVE_PANE_CWD for the existence check. Helper mirrors pane-copy.sh.
+[[keys.command]]
+key = "prefix+p"
+type = "pane"
+command = "~/.config/herdr/path-pick.sh \"$HERDR_ACTIVE_PANE_ID\" --cwd \"$HERDR_ACTIVE_PANE_CWD\""
+description = "copy a file path from the pane (fzf, two-tier)"
+
 # --- herdr-plus plugin (sesh + tmuxp + popup-menu analog) ---
 # Requires: herdr plugin install cloudmanic/herdr-plus
 # Projects = declarative multi-pane workspace templates (see

@@ -200,6 +200,7 @@ tmux source-file ~/.tmux.conf
 | `tmux-floax` | 浮動暫存窗格（`prefix+F` 切換、`prefix+P` 選單）|
 | `tmux-fzf` | 模糊挑選 keybindings/sessions/windows/panes（`prefix+?`，從 list-keys 改綁）|
 | `tmux-fzf-url` | `prefix+u` 開啟 fzf 彈出視窗，列出窗格中所有 URL |
+| `extrakto` | `prefix+Tab` fzf 彈窗，萃取路徑/URL/字詞（Enter=複製、Tab=插入、Ctrl-f=切換 filter）|
 | `tmux-open` | 在複製模式中：`o` 打開選取項、`C-o` 在編輯器中打開、`S` 搜尋 |
 | `catppuccin/tmux` | 狀態列主題（mocha，頂部）— 預設 |
 | `tmux2k` | 狀態列主題（onedark，底部）— 替代方案 |

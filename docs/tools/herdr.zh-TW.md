@@ -76,6 +76,7 @@ description = "new tab at the workspace (space) root dir"
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
 | lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |
 | URL 選單（`prefix+u`,tmux-fzf-url） | **自訂 command pane + 輔助腳本** | `prefix+u` → `url-pick.sh`（fzf → `x open`）；`--source recent` 掃描 scrollback |
+| 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
 | 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --custom-status`（逐 pane、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
@@ -119,6 +120,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + D` | 複製聚焦 pane 的 **座標**（session>space>tab>pane） | command pane |
 | `prefix + V` | 複製聚焦 pane 的 **內容**（可見畫面） | command pane |
 | `prefix + S` | 複製聚焦 pane 的 **內容**（完整 scrollback） | command pane |
+| `` prefix + p `` | **複製檔案路徑** ——兩層 fzf（cwd 下存在的路徑在上），複製解析後的絕對路徑（`x copy`） | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -312,6 +314,22 @@ tmux `prefix + u`（[`joshmedeski/tmux-fzf-url`](https://github.com/joshmedeski/
 | 無 URL | 印出 `no URLs found` 並暫停約 1.5 秒(command pane 在腳本退出的瞬間就關閉——tmux 是用狀態列) |
 
 以 [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) 裡的 `[[keys.command]] type="pane"` 綁定——不需要 tv channel(fzf 才是忠實移植)。Copy-mode 的 URL 開啟(tmux `tmux-open` 的 `o`)沒有 herdr 對應物;請用 `prefix+u` 選單。
+
+## 從 pane 複製檔案路徑（`prefix+p`）
+
+URL 選單的複製路徑姊妹版。`prefix+p` 開一個 fzf 彈窗,列出聚焦 pane 裡的檔案路徑;挑一個(或多個),路徑就複製到剪貼簿。小寫 `p`(copy **p**ath)坐落在大寫複製家族(`prefix+P/D/V/S`)之下,與 `u`/`U` 同一慣例。tmux 上的對應物是 **extrakto** plugin(`prefix + Tab`)——見 [tmux 快捷鍵](tmux/keybindings.md)。
+
+輔助腳本:`~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_path-pick.sh),與 `url-pick.sh`/`pane-copy.sh` 完全同構(相同的 pane + `x` 解析 + `herdr pane read` 管線),用 [`x copy`](../shells/aliases.md) 複製。
+
+**noise 問題與處理方式。** 與 URL(用 `scheme://` 自我標識)不同,檔案路徑沒有標記,所以單靠 regex 會誤中日期(`2024/01/02`)、速率(`10k/s`)與分數(`1/2`)。兩道防線:
+
+| 防線 | 行為 |
+|---|---|
+| 萃取 | extrakto 的路徑啟發式——含斜線的 token(`/…`、`~/…`、`./`、`a/b/c`)+ 裸 `file.ext`;去掉尾端 `",):`;速率/分數 token 直接排除 |
+| 存在檢查（noise 殺手） | 每個候選對 pane cwd(`$HERDR_ACTIVE_PANE_CWD`,否則 `herdr pane get` 的 `foreground_cwd`,否則 process-info cwd)解析後 `test -e` |
+| **兩層清單** | **存在**的路徑排在最前(複製為解析後的**絕對**路徑);其餘——遠端 / 過期 / 假設的——放在 `── unverified ──` 分隔線下方(仍可選),所以真實但無法解析的路徑不會遺失 |
+
+`path:line:col` 後綴(grep `-n` / stack trace / 編譯器輸出)在存在檢查前先剝除,所以 `pkg.py:42:5` 會以 `pkg.py` 驗證。範圍預設為可見螢幕(`--source recent` 掃 scrollback);多選以換行接合複製;無結果時印出 `no file paths found` 並暫停約 1.5 秒。
 
 ## AI 用量 / 額度狀態
 

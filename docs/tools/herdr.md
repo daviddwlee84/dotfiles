@@ -71,6 +71,7 @@ description = "new tab at the workspace (space) root dir"
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
 | lazygit / scratch popups | **Custom command panes** | Key bindings |
 | URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` scans scrollback |
+| File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
 | Seamless `Ctrl-hjkl` nvim↔pane nav | **No herdr-aware smart-splits** | **Gap** — workaround below |
 | OSC133 copy-mode (`cpout`/`cpblock`) | tmux-specific | **Gap** — `cpcmd` (zsh history) still works |
 | Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
@@ -114,6 +115,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + D` | copy focused pane's **coordinate** (session>space>tab>pane) | command pane |
 | `prefix + V` | copy focused pane's **content** (visible screen) | command pane |
 | `prefix + S` | copy focused pane's **content** (full scrollback) | command pane |
+| `` prefix + p `` | **copy a file path** from the pane — two-tier fzf (paths that exist under the pane cwd on top), copies the resolved absolute path (`x copy`) | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
@@ -307,6 +309,22 @@ One helper drives it: `~/.config/herdr/url-pick.sh` = [`dot_config/herdr/executa
 | No URLs | prints `no URLs found` and pauses ~1.5 s (a command pane closes the instant the script exits — tmux uses the status line instead) |
 
 Bound via a `[[keys.command]] type="pane"` in [`.chezmoitemplates/herdr/config.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoitemplates/herdr/config.toml) — no tv channel needed (fzf is the faithful port). Copy-mode URL opening (tmux's `tmux-open` `o`) has no herdr equivalent; use `prefix+u` for the picker.
+
+## Copy a file path from the pane (`prefix+p`)
+
+The copy-path sibling of the URL picker. `prefix+p` opens an fzf popup of the file paths in the focused pane; pick one (or several) and the path is copied to the clipboard. Lowercase `p` ("copy **p**ath") sits under the uppercase copy family (`prefix+P/D/V/S`), the same `u`/`U` convention. On tmux the analog is the **extrakto** plugin (`prefix + Tab`) — see [tmux keybindings](tmux/keybindings.md).
+
+Helper: `~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_path-pick.sh), a direct sibling of `url-pick.sh`/`pane-copy.sh` (same pane + `x`-resolution + `herdr pane read` plumbing), copying via [`x copy`](../shells/aliases.md).
+
+**The noise problem, and how it's handled.** Unlike URLs (which self-identify with `scheme://`), file paths have no marker, so a regex alone matches dates (`2024/01/02`), rates (`10k/s`) and fractions (`1/2`). Two defenses:
+
+| Defense | Behavior |
+|---|---|
+| Extraction | extrakto's path heuristics — slash-bearing tokens (`/…`, `~/…`, `./`, `a/b/c`) + bare `file.ext`; trailing `",):` stripped; rate/fraction tokens excluded outright |
+| Existence check (the noise-killer) | Each candidate is resolved against the pane cwd (`$HERDR_ACTIVE_PANE_CWD`, else `herdr pane get` `foreground_cwd`, else process-info cwd) and `test -e`'d |
+| **Two-tier list** | Paths that **exist** show first (copied as their resolved **absolute** path); everything else — remote / stale / hypothetical — appears below a `── unverified ──` separator (still selectable), so real-but-unresolvable paths aren't lost |
+
+`path:line:col` suffixes (grep `-n` / stack traces / compiler output) are stripped before the existence test, so `pkg.py:42:5` validates as `pkg.py`. Scope is the visible screen by default (`--source recent` for scrollback); multi-select copies newline-joined; an empty result prints `no file paths found` and pauses ~1.5 s.
 
 ## AI usage / quota status
 

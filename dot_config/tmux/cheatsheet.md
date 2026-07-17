@@ -131,6 +131,7 @@ Other directions:
 | `prefix + y` | Visible pane → clipboard |
 | `prefix + Y` | Full scrollback → clipboard |
 | `prefix + C-y` | fzf-pick lines from scrollback → clipboard |
+| `prefix + Tab` | extrakto: fzf-pick paths/URLs/words (Enter=copy, Ctrl-f=filter) |
 | `prefix + C-p` | Copy pane path (`session:window.pane`) → clipboard |
 
 ## Help / Discovery

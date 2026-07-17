@@ -201,6 +201,7 @@ Default: `Ctrl + b`. Examples in the sibling docs assume `prefix = Ctrl + b`.
 | `tmux-floax` | Floating scratch pane (`prefix+F` toggle, `prefix+P` menu) |
 | `tmux-fzf` | Fuzzy picker for keybindings/sessions/windows/panes (`prefix+?` rebound from list-keys) |
 | `tmux-fzf-url` | `prefix+u` opens fzf popup with all URLs in pane |
+| `extrakto` | `prefix+Tab` fzf popup extracting paths/URLs/words (Enter=copy, Tab=insert, Ctrl-f=filter) |
 | `tmux-open` | In copy-mode: `o` opens selection, `C-o` in editor, `S` search |
 | `catppuccin/tmux` | Status bar theme (mocha, top bar) — default |
 | `tmux2k` | Status bar theme (onedark, bottom bar) — alternative |

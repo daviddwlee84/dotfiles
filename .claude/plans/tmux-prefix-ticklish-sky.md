@@ -1,190 +1,220 @@
-# Port tmux `prefix + u` URL picker to herdr
+# Copy-path picker: extrakto (tmux) + `path-pick.sh` (herdr)
 
 ## Context
 
-In tmux, `prefix + u` opens an fzf popup listing every URL in the current pane;
-selecting one opens it in the browser. It is the third-party TPM plugin
-[`joshmedeski/tmux-fzf-url`](https://github.com/joshmedeski/tmux-fzf-url)
-(declared at `dot_config/tmux/common.conf.tmpl:37`, all defaults): capture the
-visible pane → extract URLs with a stack of `grep -oE` passes → `fzf-tmux -m` →
-`xdg-open`/`open`.
+Follow-up to the just-shipped herdr URL picker (`prefix+u` → `url-pick.sh`, commit
+`068a085`). The user wants the same "grab something from the pane" ergonomics but
+for **file paths**, copied to the clipboard — on **both** tmux and herdr.
 
-**herdr** (the repo's trial Rust multiplexer, coexists with tmux) has no URL
-picker today. `prefix+u` (lowercase) is **free** — only `prefix+U` (`tv tools`)
-is bound. herdr already ships every building block this needs:
+The hard part is detection: URLs self-identify via `scheme://`, file paths don't,
+so naive regex is noisy (dates `2024/01/02`, flags `--x=a/b`, rates `10k/s`,
+fractions `1/2`). Two mitigations, per the user's answers:
 
-- **Keybind vehicle** — `[[keys.command]] type="pane"` (herdr's analog of
-  `tmux display-popup -E`): a real PTY that closes when the command exits, with
-  `$HERDR_ACTIVE_PANE_ID` in its env. Already used for `lazygit`/`btop`/`tv tools`.
-- **Pane text** — `herdr pane read <pane> --source visible|recent --format text`
-  (used in `dot_config/herdr/executable_pane-copy.sh:132`).
-- **Cross-platform open** — `x open <url>` (wslview / open / xdg-open), already
-  the opener in every herdr-plus URL Quick Action (e.g. `github.toml`).
-
-Outcome: `prefix + u` in herdr reproduces the tmux UX 1:1 — fzf-pick a URL from
-the pane and open it.
-
-> A prior session today (`.specstory/history/2026-07-17_07-30-59Z-…`) explored
-> the same task but committed nothing (git log + tree confirm no URL helper exists).
+- **tmux** → adopt the **`laktak/extrakto`** TPM plugin (`prefix + Tab`): a mature
+  fzf extractor for paths/URLs/words with copy/insert. `prefix+Tab` is **free** in
+  this repo (verified — no `Tab`/`C-i` binding anywhere in the tmux config).
+- **herdr** → a custom **two-tier, existence-validated** `path-pick.sh`, borrowing
+  extrakto's path heuristics but adding the noise-killer extrakto lacks: keep paths
+  that **exist under the pane cwd** on top, unverified candidates below a separator.
+  Copy via `x copy`. Bound to **`prefix+p`** (free; pairs with the uppercase copy
+  family `P/D/V/S` exactly like `u`/`U`).
 
 ## Decisions (confirmed with user)
 
-1. **Picker = fzf** (faithful port of tmux-fzf-url; one helper, no tv channel).
-2. **Scope = visible default + `--source recent` flag** (keybind uses visible,
-   matching tmux; scrollback available via the helper flag).
-3. **Extraction = full tmux-fzf-url parity** (http(s)/ftp/file, bare `www.`,
-   IPv4[:port], `git@` SSH remotes → https, quoted `owner/repo` → github.com,
-   `import "pkg"` → npmjs.com).
+1. Engine: **extrakto on tmux, custom helper on herdr** (borrow extrakto's patterns).
+2. Noise policy: **two-tier** — existence-validated (copied as resolved absolute
+   path) on top, unverified candidates (as-seen) below a separator.
 
-## Files to change
+## Part A — tmux: add the extrakto plugin
 
-| File | Change |
-|---|---|
-| `dot_config/herdr/executable_url-pick.sh` | **New** helper → `~/.config/herdr/url-pick.sh` |
-| `.chezmoitemplates/herdr/config.toml` | Add one `[[keys.command]]` for `prefix+u` |
-| `docs/tools/herdr.md` | Keybind-table row + feasibility-matrix row + a short section |
-| `docs/tools/herdr.zh-TW.md` | Mirror the same three doc edits |
+**File:** `dot_config/tmux/common.conf.tmpl` — insert after the `tmux-open` block
+(line 41), before `sainnhe/tmux-fzf` (line 43), matching the inline-comment +
+`@plugin` + options convention every other plugin uses:
 
-Not needed: tab-completion (helper lives under `dot_config/herdr/`, not a
-PATH-level `dot_dotfiles/bin/executable_*` CLI — same as `pane-copy.sh`);
-`mkdocs.yml` nav (herdr page already listed); the agent skill (lean/self-discovering,
-doesn't enumerate herdr keybinds); no `modify_config.toml.tmpl` change (we edit the
-**managed body**, the documented path).
+```tmux
+# extrakto: prefix + Tab → fzf popup that extracts file paths / URLs / words from
+# the pane. Enter = copy to clipboard, Tab = insert to prompt, Ctrl-f = cycle
+# filter, Ctrl-t = cycle clipboard mode (incl. OSC 52 for SSH). PATH-first order
+# (main use = grabbing file paths). Complements tmux-fzf-url (prefix+u, URLs) and
+# prefix+C-y (line yank). prefix+Tab is otherwise unbound in this config.
+set -g @plugin 'laktak/extrakto'
+set -g @extrakto_filter_order 'path url word line'
+```
 
-## New helper — `dot_config/herdr/executable_url-pick.sh`
+- **Deps** already present: fzf, Python 3.6+, tmux ≥3.3 (repo already upgrades tmux
+  for the popup menu). No new ansible/brew work.
+- **Install:** auto on fresh ansible runs (TPM sentinel absent, task at
+  `dot_ansible/roles/devtools/tasks/main.yml:4200`). On this already-provisioned
+  machine it needs a one-time `prefix + I` (or `rm ~/.tmux/plugins/.ansible-installed`
+  before apply). Verification step below.
+- **Clipboard:** default `auto`/`bg` uses the same backends as `x copy`
+  (pbcopy/xclip/wl-copy). Over SSH, toggle to OSC 52 in-popup with `Ctrl-t` (the
+  repo's terminals have `set-clipboard on`). Left as default to avoid silent
+  failures on non-OSC52 terminals — documented, not overridden.
 
-POSIX `sh` + `set -eu`, matching the conventions of the sibling `pane-copy.sh`
-(same `$HERDR_ACTIVE_PANE_ID`→`herdr pane current` fallback, same absolute-path
-`x`/opener resolution for the no-interactive-PATH `sh -c` command-pane case).
-Reference implementation:
+## Part B — herdr: new `dot_config/herdr/executable_path-pick.sh`
+
+POSIX `sh` + `set -eu`, a direct sibling of `executable_url-pick.sh` /
+`executable_pane-copy.sh` (same `$HERDR_ACTIVE_PANE_ID`→`herdr pane current`
+fallback, same absolute-path `x` resolution, same `herdr pane read`). Differences:
+extraction is path-shaped, output is **two-tier**, action is **`x copy`**.
+
+Reference implementation (refined + unit-tested at execution, like url-pick):
 
 ```sh
 #!/usr/bin/env sh
-# ~/.config/herdr/url-pick.sh
-# Source: dot_config/herdr/executable_url-pick.sh (managed by chezmoi)
+# ~/.config/herdr/path-pick.sh
+# Source: dot_config/herdr/executable_path-pick.sh (managed by chezmoi)
 #
-# herdr analog of tmux's `prefix + u` (joshmedeski/tmux-fzf-url). Reads a herdr
-# pane's text, extracts every URL-like token (same rewrite rules as tmux-fzf-url:
-# http(s)/ftp/file, bare www., IPv4[:port], git@ SSH remotes, quoted owner/repo,
-# npm imports), fuzzy-picks with fzf (multi-select), opens each choice via the
-# repo's cross-platform `x open` (wslview / open / xdg-open).
+# Copy-path sibling of url-pick.sh. Reads the focused pane, extracts path-like
+# tokens (extrakto path heuristics), TWO-TIER: paths that EXIST under the pane cwd
+# (copied as resolved ABSOLUTE path) on top, unverified candidates (as-seen) below
+# a separator. fzf-pick (multi) → `x copy`. Bound to prefix+p.
 #
-# Runs inside a herdr `[[keys.command]] type="pane"` (a PTY that closes when this
-# script exits), bound to prefix+u in .chezmoitemplates/herdr/config.toml.
-#
-# Usage: url-pick.sh [PANE_ID] [--source visible|recent]
-#   PANE defaults to $HERDR_ACTIVE_PANE_ID (the keybind var), else the current
-#   focused pane. --source defaults to visible (tmux-fzf-url's screen scope);
-#   --source recent scans the full retained scrollback.
+# Usage: path-pick.sh [PANE_ID] [--source visible|recent] [--cwd DIR]
+#   PANE  = $HERDR_ACTIVE_PANE_ID (keybind var) else current pane.
+#   --cwd = $HERDR_ACTIVE_PANE_CWD; else herdr pane get .foreground_cwd; else
+#           process-info cwd; else $PWD. Used only for existence checks.
 set -eu
 
-usage() { printf 'usage: %s [PANE_ID] [--source visible|recent]\n' "$0" >&2; exit 64; }
-command -v herdr >/dev/null 2>&1 || { echo "url-pick: herdr not found" >&2; exit 1; }
-command -v fzf   >/dev/null 2>&1 || { echo "url-pick: fzf is required"  >&2; exit 1; }
-
-# Resolve `x open` even without the interactive PATH (command panes run via sh -c).
-if   command -v x >/dev/null 2>&1;         then X_BIN=x
-elif [ -x "$HOME/.dotfiles/bin/x" ];       then X_BIN="$HOME/.dotfiles/bin/x"
-else echo "url-pick: opener 'x' not found" >&2; exit 1
+usage() { printf 'usage: %s [PANE_ID] [--source visible|recent] [--cwd DIR]\n' "$0" >&2; exit 64; }
+command -v herdr >/dev/null 2>&1 || { echo "path-pick: herdr not found" >&2; exit 1; }
+command -v fzf   >/dev/null 2>&1 || { echo "path-pick: fzf is required"  >&2; exit 1; }
+if   command -v x >/dev/null 2>&1;   then X_BIN=x
+elif [ -x "$HOME/.dotfiles/bin/x" ]; then X_BIN="$HOME/.dotfiles/bin/x"
+else echo "path-pick: clipboard tool 'x' not found" >&2; exit 1
 fi
 
-pane=""; source="visible"
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        --source) source="${2:-}"; shift 2 ;;
-        --source=*) source="${1#--source=}"; shift ;;
-        -h|--help) usage ;;
-        -*) usage ;;
-        *) if [ -z "$pane" ]; then pane="$1"; shift; else usage; fi ;;
-    esac
-done
-case "$source" in visible|recent|recent-unwrapped) ;; *) echo "url-pick: --source must be visible|recent" >&2; exit 64 ;; esac
+pane=""; source="visible"; cwd=""
+while [ "$#" -gt 0 ]; do case "$1" in
+  --source) source="${2:-}"; shift 2 ;;   --source=*) source="${1#--source=}"; shift ;;
+  --cwd) cwd="${2:-}"; shift 2 ;;          --cwd=*) cwd="${1#--cwd=}"; shift ;;
+  -h|--help) usage ;;   -*) usage ;;
+  *) if [ -z "$pane" ]; then pane="$1"; shift; else usage; fi ;;
+esac; done
+case "$source" in visible|recent|recent-unwrapped) ;; *) echo "path-pick: --source must be visible|recent" >&2; exit 64 ;; esac
 
-# Default to the current focused pane when the keybind var was empty.
 if [ -z "$pane" ]; then
-    command -v jq >/dev/null 2>&1 || { echo "url-pick: jq required to resolve current pane" >&2; exit 1; }
-    pane=$(herdr pane current 2>/dev/null | jq -r '.result.pane.pane_id // empty' 2>/dev/null || true)
+  command -v jq >/dev/null 2>&1 || { echo "path-pick: jq required to resolve current pane" >&2; exit 1; }
+  pane=$(herdr pane current 2>/dev/null | jq -r '.result.pane.pane_id // empty' 2>/dev/null || true)
 fi
-[ -n "$pane" ] || { echo "url-pick: could not determine a pane id" >&2; exit 1; }
+[ -n "$pane" ] || { echo "path-pick: could not determine a pane id" >&2; exit 1; }
+
+if [ -z "$cwd" ] && command -v jq >/dev/null 2>&1; then
+  cwd=$(herdr pane get "$pane" 2>/dev/null | jq -r '.result.pane.foreground_cwd // empty' 2>/dev/null || true)
+  [ -n "$cwd" ] || cwd=$(herdr pane process-info --pane "$pane" 2>/dev/null \
+      | jq -r '.result.process_info.foreground_processes[0].cwd // empty' 2>/dev/null || true)
+fi
+[ -n "$cwd" ] || cwd="$PWD"
 
 content=$(herdr pane read "$pane" --source "$source" --format text 2>/dev/null) \
-    || { echo "url-pick: failed to read pane $pane" >&2; exit 1; }
+  || { echo "path-pick: failed to read pane $pane" >&2; exit 1; }
 
-# Extraction — same passes/rewrites as tmux-fzf-url's fzf-url.sh, POSIX-ized
-# (plain vars instead of bash arrays; `|| true` so a no-match grep doesn't trip set -e).
-urls=$(printf '%s\n' "$content" | grep -oE '(https?|ftp|file):/?//[-A-Za-z0-9+&@#/%?=~_|!:,.;]*[-A-Za-z0-9+&@#/%=~_|]' || true)
-wwws=$(printf '%s\n' "$content" | grep -oE '(https?://)?www\.[a-zA-Z](-?[a-zA-Z0-9])+\.[a-zA-Z]{2,}(/\S+)*' | grep -vE '^https?://' | sed 's#^#http://#' || true)
-ips=$(printf  '%s\n' "$content" | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]{1,5})?(/\S+)*' | sed 's#^#http://#' || true)
-gits=$(printf '%s\n' "$content" | grep -oE '(ssh://)?git@\S*' | sed 's#:#/#g' | sed 's#^\(ssh///\)\{0,1\}git@\(.*\)$#https://\2#' || true)
-gh=$(printf   '%s\n' "$content" | grep -oE "['\"]([A-Za-z0-9_-]+/[.A-Za-z0-9_-]+)['\"]" | sed "s/['\"]//g" | sed 's#^#https://github.com/#' || true)
-npm=$(printf  '%s\n' "$content" | grep -oE "import[[:space:]]+[^\"';]*[\"']([^.][^\"';]*)[\"']" | sed "s/[^'\"]*['\"]\([^'\"]*\)['\"];*/\1/" | sed 's#^#https://npmjs.com/package/#' || true)
+# Path candidates (extrakto heuristics, POSIX-ized): slash-bearing tokens
+# (abs /…, home ~/…, rel ./ ../ a/b/c) + bare filename.ext. rstrip trailing
+# ",):; then drop rate/fraction noise (extrakto's exclude: 10k/s, 1/2). dedupe.
+cands=$(printf '%s\n' "$content" \
+  | grep -oE '(~|\.\.?)?/?[A-Za-z0-9._+~-]+(/[A-Za-z0-9._+~-]+)+|[A-Za-z0-9._+-]+\.[A-Za-z0-9]{1,8}' \
+  | sed -E 's/[",):;]+$//' \
+  | grep -vE '^[0-9]+/[0-9]+$|[kKmMgG]/s$' \
+  | grep -v '^$' | awk '!seen[$0]++' || true)
+[ -n "$cands" ] || { printf 'path-pick: no file paths found in pane %s (%s)\n' "$pane" "$source" >&2; sleep 1.5; exit 0; }
 
-items=$(printf '%s\n' "$urls" "$wwws" "$gh" "$npm" "$ips" "$gits" | grep -v '^$' | sort -u || true)
-if [ -z "$items" ]; then
-    printf 'url-pick: no URLs found in pane %s (%s)\n' "$pane" "$source" >&2
-    sleep 1.5   # command pane closes on exit — pause so the message is visible
-    exit 0
-fi
-
-# fzf multi-select; Esc / no-match (exit 130 / 1) → clean no-op.
-chosen=$(printf '%s\n' "$items" | fzf --multi --prompt='url> ' --height=100% --border --no-sort) || exit 0
-[ -n "$chosen" ] || exit 0
-printf '%s\n' "$chosen" | while IFS= read -r url; do
-    [ -n "$url" ] && "$X_BIN" open "$url" >/dev/null 2>&1 || true
+exist=""; maybe=""
+OLDIFS=$IFS; IFS='
+'
+for c in $cands; do
+  base=$(printf '%s' "$c" | sed -E 's/:[0-9]+(:[0-9]+)?$//')   # strip :line[:col] for the test
+  case "$base" in
+    /*)   abs="$base" ;;
+    \~/*) abs="$HOME/${base#\~/}" ;;
+    *)    abs="$cwd/$base" ;;
+  esac
+  if [ -e "$abs" ]; then
+    rp=$(CDPATH= cd -- "$(dirname -- "$abs")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename -- "$abs")") || rp="$abs"
+    exist="$exist$rp
+"
+  else
+    maybe="$maybe$c
+"
+  fi
 done
+IFS=$OLDIFS
+exist=$(printf '%s' "$exist" | grep -v '^$' | sort -u || true)
+maybe=$(printf '%s' "$maybe" | grep -v '^$' | sort -u || true)
+
+SEP='────────  unverified (not found under cwd)  ────────'
+list=$( [ -n "$exist" ] && printf '%s\n' "$exist"; [ -n "$maybe" ] && { printf '%s\n' "$SEP"; printf '%s\n' "$maybe"; } )
+
+chosen=$(printf '%s\n' "$list" | fzf --multi --no-sort --height=100% --border \
+  --prompt='path> ' --header="Enter=copy · Tab=multi · cwd=$cwd") || exit 0
+chosen=$(printf '%s\n' "$chosen" | grep -vFx "$SEP" | grep -v '^$' || true)   # drop separator if picked
+[ -n "$chosen" ] || exit 0
+printf '%s' "$chosen" | "$X_BIN" copy
+echo "copied $(printf '%s\n' "$chosen" | grep -c .) path(s)"
 ```
 
-Key edge cases handled: `set -eu` vs. no-match greps (`|| true`) and fzf-cancel
-(`|| exit 0`); empty `$HERDR_ACTIVE_PANE_ID` → current-pane fallback; the
-"no URLs" message pauses (`sleep 1.5`) because a command pane closes the instant
-the script exits (tmux uses the status line instead); multi-select opens each URL.
-
-## Keybind — `.chezmoitemplates/herdr/config.toml`
-
-Add next to the `prefix+U` (`tv tools`) block so the `u`/`U` pair sits together:
+**Keybind** in `.chezmoitemplates/herdr/config.toml`, placed in the copy family
+right after the `prefix+S` block (lines ~211):
 
 ```toml
-# URL picker (tmux prefix+u analog): read the focused pane, fzf-pick a URL, open
-# it with `x open`. Visible screen by default; url-pick.sh --source recent scans
-# the full scrollback. Helper: ~/.config/herdr/url-pick.sh.
+# Copy a file PATH from the pane (extrakto-style, herdr side). Extracts path-like
+# tokens; two-tier: paths that exist under the pane cwd (copied absolute) on top,
+# unverified below a separator. fzf-pick → `x copy`. Lowercase p pairs with the
+# uppercase copy family (P/D/V/S), same u/U convention. Helper mirrors pane-copy.sh.
 [[keys.command]]
-key = "prefix+u"
+key = "prefix+p"
 type = "pane"
-command = "~/.config/herdr/url-pick.sh \"$HERDR_ACTIVE_PANE_ID\""
-description = "URL picker — open a URL from the pane (fzf)"
+command = "~/.config/herdr/path-pick.sh \"$HERDR_ACTIVE_PANE_ID\" --cwd \"$HERDR_ACTIVE_PANE_CWD\""
+description = "copy a file path from the pane (fzf, two-tier)"
 ```
 
-## Docs — `docs/tools/herdr.md` (+ zh-TW mirror)
+## Docs & cross-file maintenance
 
-1. **Keybindings table** (near line 114, after the `prefix+S` content-copy row):
-   `| `` prefix + u `` | **URL picker** — fzf-pick a URL from the pane and open it (`x open`); tmux-fzf-url analog | command pane |`
-2. **Feasibility matrix** (line 61–75): add
-   `| URL picker (`prefix+u`, tmux-fzf-url) | **Custom command pane + helper** | `prefix+u` → `url-pick.sh` (fzf → `x open`); `--source recent` for scrollback |`
-3. **New short section** "Open a URL from the pane (`prefix+u`)" as a sibling of
-   "Copy focused-pane facts" (line 279): note the helper path, the visible/recent
-   scope, the full parity extraction set, and that it opens via `x open`.
+**herdr** (`docs/tools/herdr.md` + `docs/tools/herdr.zh-TW.md`): keybind-table row
+(`prefix + p`, in the copy family near `prefix+S`), a feasibility-matrix row
+(`Path/token extractor (extrakto prefix+Tab) → path-pick.sh (prefix+p)`), and a new
+section "Copy a file path from the pane (`prefix+p`)" — sibling of the `prefix+u`
+and Copy-focused-pane sections; document the two-tier model + cwd resolution.
 
-The zh-TW file has the same table/section anchors (`docs/tools/herdr.zh-TW.md`) —
-translate the three edits identically.
+**tmux** (add extrakto to these + their `.zh-TW` mirrors):
+- `docs/tools/tmux/README.md` plugin table (~line 203, after `tmux-open`).
+- `docs/tools/tmux/keybindings.md` — a `prefix + Tab` row in the Capture-Pane
+  section (~234–240) and/or a short "Extract (extrakto)" note.
+- `dot_config/tmux/cheatsheet.md` — Capture-pane table (~127–134). *(no zh-TW tmux cheatsheet)*
+- `docs/keyboard-shortcuts.md` (URL & Sessions table ~113–124) + zh-TW mirror.
 
-## Verification (execution phase)
+**No change needed:**
+- `docs/this_repo/tool-managers.md` — individual TPM plugins are **not** listed
+  (neither are `tmux-fzf-url`/`tmux-open`/`tmux-floax`); extrakto is covered by the
+  generic TPM entries (lines 779, 943). Adding a per-plugin row would break convention.
+- Ansible / Brewfile (auto via TPM), tab-completion (herdr helpers under
+  `dot_config/herdr/` get none — same as `pane-copy.sh`/`url-pick.sh`), the agent
+  skill (self-discovering), repo-root `README.md` (doesn't enumerate tmux plugins).
 
-1. **Syntax / lint**: `sh -n dot_config/herdr/executable_url-pick.sh`;
-   `shellcheck -s sh …` if available.
-2. **Apply**: `chezmoi apply` — first preview the overlay merge with
-   `chezmoi cat ~/.config/herdr/config.toml` to confirm the new `[[keys.command]]`
-   round-trips and no other table drifts.
-3. **herdr validates the config**: `herdr server reload-config` → expect
-   `"status":"applied"` and an **empty `diagnostics`** array (no `prefix+u`
-   collision). This is the repo's hard "validate with the app" rule.
-4. **Extraction unit check (headless-safe)** — do *not* launch the herdr TUI to
-   test (TUIs crash without a TTY, per the tv-channel validation lesson). Instead
-   pipe known text through the extraction block standalone, e.g.
-   `printf 'see https://github.com/foo/bar and git@github.com:o/r and "own/repo"\n' | <extraction pipeline>`
-   and confirm the rewrites (`git@…`→https, `"own/repo"`→github.com).
-5. **End-to-end in herdr** (interactive, on a host with herdr): open a pane,
-   `echo https://example.com https://github.com/foo/bar`, press `prefix + u` →
-   fzf lists both → select → opens via `x open`. Test the empty case (blank pane →
-   "no URLs found" flashes ~1.5s). Test scrollback: `~/.config/herdr/url-pick.sh <pane> --source recent`.
-6. **Docs build**: `uv run mkdocs build --strict` (expect only the known baseline
-   llmstxt/i18n warnings, not new ones from these edits).
+## Verification
+
+**herdr helper (headless-safe):**
+1. `sh -n dot_config/herdr/executable_path-pick.sh`; `shellcheck -s sh`.
+2. **Two-tier unit test**: `mktemp -d`, create `src/main.rs` etc. inside it, feed
+   sample text (real relative paths + `2024/01/02` + `10k/s` + `/no/such/file` +
+   `pkg.py:42:5`) through the extraction+tier logic with `--cwd $tmpdir`; assert the
+   real files land in the `exist` tier (absolute) and the noise is excluded / in `maybe`.
+3. `chezmoi apply ~/.config/herdr/config.toml ~/.config/herdr/path-pick.sh`; confirm
+   the helper is deployed executable and `prefix+p` survives the modify_ overlay
+   (`chezmoi cat`).
+4. **`herdr server reload-config`** → expect `status:applied`, **empty
+   `diagnostics`** (confirms `prefix+p` is truly free — the repo's app-validation rule).
+5. Read-only live check: `herdr pane read` + the cwd-resolution chain against an
+   existing pane.
+6. Interactive (manual): inside herdr, `ls`/`grep` something, `prefix+p`, confirm the
+   two tiers and that Enter copies the absolute path.
+
+**tmux extrakto:**
+7. `chezmoi apply`, then `tmux kill-server` won't be needed — install with `prefix + I`
+   (TPM), then `tmux source-file ~/.tmux.conf`. Press `prefix + Tab`: confirm the
+   popup opens, `path` filter is first, Enter copies a path, `Ctrl-f` cycles to `url`.
+   Confirm `prefix + Tab` didn't shadow anything (it was unbound).
+
+**Docs:** `uv run mkdocs build --strict` — expect only the known baseline
+llmstxt/i18n warnings; none referencing the edited files.

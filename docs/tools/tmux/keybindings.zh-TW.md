@@ -205,6 +205,7 @@ Swap-pane 會交換**內容**但保留**大小**。所以如果你有 75%/25% �
 | `prefix + y` | 將窗格可見內容複製到系統剪貼簿 |
 | `prefix + Y` | 將完整捲動歷史 (scrollback) 複製到系統剪貼簿 |
 | `prefix + C-y` | 在 fzf 中開啟捲動歷史，選取要複製的行（Tab=多選）|
+| `prefix + Tab` | **extrakto** — fzf 彈窗，從窗格萃取檔案路徑 / URL / 字詞；Enter 複製、Tab 插入到 prompt、`Ctrl-f` 切換 filter（path/url/word）、`Ctrl-t` 切換剪貼簿模式（含 SSH 用的 OSC 52）|
 | `prefix + M-y` | 將**最後一條命令的輸出**複製到剪貼簿（Warp 風格，需要 OSC 133 — 詳見 [OSC 133](./README.md#osc-133-command-boundary-navigation-warp-style)）|
 | `prefix + M-i` | 將**最後一條命令的輸入行**（prompt + 輸入的命令）複製到剪貼簿（需要 OSC 133）|
 
