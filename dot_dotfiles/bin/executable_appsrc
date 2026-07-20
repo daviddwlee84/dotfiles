@@ -212,6 +212,25 @@ def _du_bytes(path: str | Path, timeout: float = 20.0) -> int | None:
         return None
 
 
+def _du_many(paths: list[str], chunk: int = 400) -> dict[str, int]:
+    """Batch disk-usage: `du -sk <many paths>` prints one line per path, so a
+    few subprocess calls size thousands of items instead of one fork each
+    (~40s of per-item forks → a few seconds). Returns {path: bytes}."""
+    line_re = re.compile(r"^(\d+)\t(.*)$")           # macOS/GNU du: size<TAB>path
+    alt_re = re.compile(r"^(\d+)\s+(.+)$")           # fallback: size<whitespace>path
+    out: dict[str, int] = {}
+    for i in range(0, len(paths), chunk):
+        batch = [p for p in paths[i:i + chunk] if p]
+        if not batch:
+            continue
+        rc, so, _ = _run(["du", "-sk", *batch], timeout=120)
+        for line in so.splitlines():
+            m = line_re.match(line) or alt_re.match(line)
+            if m:
+                out[m.group(2)] = int(m.group(1)) * 1024
+    return out
+
+
 def _human(n: int | None) -> str:
     if n is None:
         return "?"
@@ -781,9 +800,11 @@ def do_scan(args: argparse.Namespace) -> int:
     kind = args.kind
     if getattr(args, "sort", "source") == "size":
         args.size = True  # can't sort by size without sizing
-    cache = {} if (args.refresh or args.no_cache) else _cache_load()
-    records: list[AppRecord] = []
-    fresh_items: dict[str, dict] = {}
+    loaded = _cache_load()                                  # always load, for cumulative merge
+    cache = {} if (args.refresh or args.no_cache) else loaded  # used for mtime matching
+
+    # (path_key, rec) pairs so we can size in parallel and rebuild the cache.
+    keyed: list[tuple[str, AppRecord]] = []
 
     def resolve(path_key: str, mt: float | None, compute) -> AppRecord:
         cached = cache.get(path_key)
@@ -791,29 +812,42 @@ def do_scan(args: argparse.Namespace) -> int:
             rec = AppRecord(**{k: v for k, v in cached.items() if k in AppRecord.__annotations__})
         else:
             rec = compute()
-        # --size rides the mtime cache: only (re)compute when missing.
-        if args.size and rec.size_bytes is None and rec.path:
-            rec.size_bytes = _du_bytes(rec.path)
-        fresh_items[path_key] = asdict(rec)
+        keyed.append((path_key, rec))
         return rec
 
     if kind in ("gui", "all"):
         if IS_MAC:
             for app in _mac_gui_apps():
-                records.append(resolve(str(app), _mtime(app),
-                                       lambda a=app: _mac_classify_app(a, mac_ctx, evidence=False)))
+                resolve(str(app), _mtime(app),
+                        lambda a=app: _mac_classify_app(a, mac_ctx, evidence=False))
         elif IS_LINUX:
             for name, path in _linux_desktop_apps():
-                records.append(resolve(f"gui::{name}", _mtime(path),
-                                       lambda n=name, p=path: _linux_classify_path(_realpath(p), n, lin_ctx, kind="gui")))
+                resolve(f"gui::{name}", _mtime(path),
+                        lambda n=name, p=path: _linux_classify_path(_realpath(p), n, lin_ctx, kind="gui"))
 
     if kind in ("cli", "all"):
         for name, rp in _path_binaries():
-            records.append(resolve(rp, _mtime(rp),
-                                   lambda n=name, r=rp: _classify_cli(n, r, mac_ctx, lin_ctx)))
+            resolve(rp, _mtime(rp),
+                    lambda n=name, r=rp: _classify_cli(n, r, mac_ctx, lin_ctx))
+
+    records = [rec for _, rec in keyed]
+
+    # --size rides the mtime cache; size only the still-unsized ones. Batch the
+    # `du` calls (one line per path) — a cold full scan drops from ~40s of
+    # per-item forks to a few seconds (this was the "stuck on sort" perf bug).
+    if args.size:
+        todo = [r for r in records if r.size_bytes is None and r.path]
+        if todo:
+            sizes = _du_many([r.path for r in todo])
+            for r in todo:
+                r.size_bytes = sizes.get(r.path)
 
     if not args.no_cache:
-        _cache_save(fresh_items)
+        # Cumulative cache: keep entries for kinds NOT scanned this run (a `gui`
+        # scan must not evict the `cli` sizes) so a full-inventory size stays warm.
+        merged = dict(loaded)
+        merged.update({k: asdict(rec) for k, rec in keyed})
+        _cache_save(merged)
 
     if args.source:
         f = args.source.lower()
@@ -1259,13 +1293,21 @@ def _tui_app(kind: str):
         #box { width: 90%; height: 80%; border: round $accent; padding: 1 2; background: $surface; }
         """
 
-        def __init__(self, text: str) -> None:
+        def __init__(self, title: str) -> None:
             super().__init__()
-            self._text = text
+            self._title = title
 
         def compose(self) -> ComposeResult:
             with Vertical(id="box"):
-                yield Static(self._text)
+                yield Static(f"{self._title}\n", id="content")
+
+        def on_mount(self) -> None:
+            self.query_one("#content", Static).loading = True   # spinner until filled
+
+        def set_text(self, text: str) -> None:
+            c = self.query_one("#content", Static)
+            c.loading = False
+            c.update(text)
 
         def action_close(self) -> None:
             self.dismiss()
@@ -1308,12 +1350,14 @@ def _tui_app(kind: str):
         def on_mount(self) -> None:
             t = self.query_one("#table", DataTable)
             t.add_columns("Name", "Source", "Kind", "Size", "Path")
+            self.query_one("#filter", Input).can_focus = False  # don't let it eat s/o/n/y/r keys
             t.loading = True   # animated spinner until the first scan lands
+            t.focus()
             self._scan()
 
         # ---- data (asyncio-native subprocess; NEVER blocking subprocess in a
         #      worker thread — that deadlocks under Textual's loop) ----
-        async def _run_json(self, args: list[str], timeout: float = 180.0):
+        async def _run_json(self, args: list[str], timeout: float = 300.0):
             try:
                 proc = await asyncio.create_subprocess_exec(
                     sys.executable, _SELF, *args, "--json",
@@ -1322,16 +1366,6 @@ def _tui_app(kind: str):
                 out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
                 return json.loads(out.decode() or "null")
             except (OSError, ValueError, asyncio.TimeoutError):
-                return None
-
-        async def _du(self, path: str, timeout: float = 20.0) -> int | None:
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    "du", "-sk", path, stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL, stdin=asyncio.subprocess.DEVNULL)
-                out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-                return int(out.split()[0]) * 1024
-            except (OSError, ValueError, IndexError, asyncio.TimeoutError):
                 return None
 
         @work(exclusive=True, group="scan")
@@ -1346,41 +1380,50 @@ def _tui_app(kind: str):
                 return
             self._records = [_rec_from_dict(d) for d in data]
             self._rebuild()
+            self.query_one("#table", DataTable).focus()
             self._set_status(
                 f"{len(self._records)} items — [s]ize  [o/n]sort  [/]filter  "
                 "[enter]detail  [y]copy  [r]eveal  [R]escan  [q]uit")
 
         @work(exclusive=True, group="size")
         async def _size_view(self) -> None:
-            table = self.query_one("#table", DataTable)
-            table.loading = True
-            targets = [r for r in self._view if r.size_bytes is None and r.path]
-            for i, r in enumerate(targets):
-                r.size_bytes = await self._du(r.path)
-                if i % 10 == 0:
-                    self._set_status(f"sizing… {i}/{len(targets)}")
-            self._sort = "size"
-            table.loading = False
-            self._rebuild()
-            self._set_status(f"{len(self._view)} shown — sorted by size")
+            # Sort by size. Sizes may already be present (shared cache warmed by a
+            # prior --size run); otherwise fetch them in ONE cached subprocess
+            # (batched `du` inside → a few seconds), keeping rows visible.
+            try:
+                if any(r.size_bytes is None and r.path for r in self._records):
+                    self._set_status("computing sizes… (first run may take a few seconds; cached after)")
+                    data = await self._run_json(["scan", "--kind", self._kind, "--size"])
+                    if isinstance(data, list):
+                        self._records = [_rec_from_dict(d) for d in data]
+                self._sort = "size"
+                self._rebuild()
+                self._set_status(f"{len(self._view)} shown — sorted by size (biggest first)")
+            except Exception as e:  # noqa: BLE001 — surface, don't hang
+                self._set_status(f"size failed: {e}")
 
         @work(exclusive=True, group="detail")
         async def _detail(self, rec: AppRecord) -> None:
+            screen = DetailScreen(rec.name)
+            await self.push_screen(screen)   # open immediately with a spinner
             self._set_status(f"sizing {rec.name}…")
             arg = ["size", "--path", rec.path] if rec.path else ["size", rec.name]
             data = await self._run_json(arg)
-            if not isinstance(data, dict):
-                self._set_status("size failed")
-                return
-            rep = SizeReport(
-                name=data.get("name", rec.name), source=data.get("source", rec.source),
-                kind=data.get("kind", rec.kind), path=data.get("path"),
-                bundle_bytes=data.get("bundle_bytes"), associated_bytes=data.get("associated_bytes", 0),
-                total_bytes=data.get("total_bytes", 0),
-                items=[StorageItem(category=it.get("category", ""), path=it.get("path", ""),
-                                   size_bytes=it.get("size_bytes"), confidence=it.get("confidence", "exact"),
-                                   note=it.get("note")) for it in data.get("items", [])])
-            self.push_screen(DetailScreen(_size_report_lines(rep)))
+            try:
+                if not isinstance(data, dict):
+                    screen.set_text("size failed")
+                else:
+                    rep = SizeReport(
+                        name=data.get("name", rec.name), source=data.get("source", rec.source),
+                        kind=data.get("kind", rec.kind), path=data.get("path"),
+                        bundle_bytes=data.get("bundle_bytes"), associated_bytes=data.get("associated_bytes", 0),
+                        total_bytes=data.get("total_bytes", 0),
+                        items=[StorageItem(category=it.get("category", ""), path=it.get("path", ""),
+                                           size_bytes=it.get("size_bytes"), confidence=it.get("confidence", "exact"),
+                                           note=it.get("note")) for it in data.get("items", [])])
+                    screen.set_text(_size_report_lines(rep))
+            except Exception:  # noqa: BLE001 — modal was closed before sizing finished
+                pass
             self._set_status(f"{len(self._view)} shown")
 
         # ---- view helpers ----
@@ -1417,6 +1460,7 @@ def _tui_app(kind: str):
         # ---- actions ----
         def action_filter(self) -> None:
             inp = self.query_one("#filter", Input)
+            inp.can_focus = True
             inp.add_class("on")
             inp.focus()
 
@@ -1424,6 +1468,7 @@ def _tui_app(kind: str):
             inp = self.query_one("#filter", Input)
             inp.value = ""
             inp.remove_class("on")
+            inp.can_focus = False
             self._filter = ""
             self._rebuild()
             self.query_one("#table", DataTable).focus()
