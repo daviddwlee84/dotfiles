@@ -370,7 +370,7 @@ just upgrade-mise         # mise self-update + `mise upgrade`
 just upgrade-uv           # uv itself (auto-dispatches: brew vs self update) + `uv tool upgrade --all` (apprise, mlflow, sqlit-tui, ...)
 just upgrade-npm          # global npm packages (Bitwarden CLI, readability-cli, ...)
 just upgrade-cargo        # cargo install-update -a (bootstraps cargo-update)
-just upgrade-go           # go install <pkg>@latest per go_tools entry (translate, ...)
+just upgrade-go           # go install <pkg>@latest per go_tools entry (Linux only; on macOS translate → brew)
 just upgrade-dotnet       # .NET global tools (azure-cost-cli, ...)
 just upgrade-gem          # Ruby gems (try-cli, tmuxinator, ...)
 just upgrade-agents       # re-runs install.sh for Claude Code / OpenCode / Cursor CLI / Ollama / llmfit / RTK

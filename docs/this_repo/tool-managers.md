@@ -35,7 +35,7 @@ If you want to know:
 | **uv** | Python CLI tools (~13 entries in `python_uv_tools` + 1 in `llm_tools` + `litellm`) | `dot_ansible/roles/python_uv_tools/defaults/main.yml`, `dot_ansible/roles/llm_tools/defaults/main.yml`, ad-hoc `uv tool install` in `coding_agents` (specify-cli) + `security_tools` (pre-commit) | `uv` (`uv tool upgrade --all`) |
 | **npm** (global) | JS CLIs (~5: copilot-cli, codex, gemini-cli, openchamber, bitwarden, readability-cli) + `tldr` + `tree-sitter-cli` | `js_cli_tools/defaults/main.yml`, scattered `community.general.npm:` + `mise exec -- npm install -g` | `npm` (`npm -g update`) |
 | **cargo** | Rust crates: `recon`, `pueue` (Linux), `tree-sitter-cli` (fallback), `alacritty` (Linux build), `modelsdev` (Linux fallback) | `rust_cargo_tools/defaults/main.yml` (currently `[]`) + hard-coded in tasks | `cargo` (`cargo install-update -a`) |
-| **go** (`go install`) | Go CLI tools: `translate` | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
+| **go** (`go install`) | Go CLI tools: `translate` (**Linux only** — macOS installs it via Homebrew `daviddwlee84/tap`) | `go_tools/defaults/main.yml` | `go` (`go install <pkg>@latest` per entry) |
 | **dotnet** (global tools) | `azure-cost-cli` (binary `azure-cost`) | `dotnet_tools/defaults/main.yml` | `dotnet` |
 | **gem** | `try-cli` (binary `try`), `tmuxinator` | `ruby_gem_tools/defaults/main.yml` | `gem` |
 | **curl-installer** (vendor `install.sh`) | Self-managed coding agents + a handful of system tools: claude, opencode, cursor-agent, agy, rtk, ollama, atuin, docker, zoxide, direnv, just, llmfit, starship | `dot_ansible/roles/coding_agents/`, `llm_tools/`, `devtools/`, `starship/`, `atuin/`, `docker/`, bootstrap | `agents` (subset of these has a known self-update subcommand) |
@@ -160,7 +160,7 @@ empty, Linuxbrew use happens role-by-role.
 
 | File | Owns |
 |---|---|
-| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas` |
+| `Brewfile.tmpl` (shared) | General macOS GUI support when `installBrewApps=true`: tap `nikitabobko/tap`, formula `mas`. Plus (macOS, **always** — not `installBrewApps`-gated): tap `daviddwlee84/tap` + formula `daviddwlee84/tap/translate` (terminal translator CLI/TUI; Linux uses `go install` via `go_tools`) |
 | `Brewfile.darwin.tmpl` | All GUI casks — see table below |
 | `Brewfile.linux.tmpl` | Empty (commented-out placeholders only) |
 
@@ -594,7 +594,7 @@ idempotent.
 
 | Package | Binary |
 |---|---|
-| `github.com/daviddwlee84/translate@v0.1.0` | `translate` |
+| `github.com/daviddwlee84/translate@v0.1.0` | `translate` (Linux only; macOS → Homebrew `daviddwlee84/tap/translate`) |
 
 **Upgrade**: `just upgrade-go` → `go install <pkg>@latest` per entry (strips
 the pinned version). Install pins a known-good version for reproducible fresh
@@ -1160,7 +1160,7 @@ list.
 | **tmuxinator** | gem | gem | ruby_gem_tools |
 | **tmuxp** | uv tool | uv tool | python_uv_tools |
 | **toilet** | brew | (apt) | devtools |
-| **translate** | go install (`go_tools`) | go install (`go_tools`) | go_tools |
+| **translate** | brew (`daviddwlee84/tap`) | go install (`go_tools`) | Brewfile + go_tools |
 | **tree** | brew | apt/yum | base |
 | **tree-sitter** / **tree-sitter-cli** | brew | mise-npm → cargo fallback | lazyvim_deps |
 | **trippy** (`trip`) | brew | apt/release | networking_tools |
