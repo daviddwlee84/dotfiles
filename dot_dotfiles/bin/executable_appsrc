@@ -1308,6 +1308,7 @@ def _tui_app(kind: str):
         def on_mount(self) -> None:
             t = self.query_one("#table", DataTable)
             t.add_columns("Name", "Source", "Kind", "Size", "Path")
+            t.loading = True   # animated spinner until the first scan lands
             self._scan()
 
         # ---- data (asyncio-native subprocess; NEVER blocking subprocess in a
@@ -1335,8 +1336,11 @@ def _tui_app(kind: str):
 
         @work(exclusive=True, group="scan")
         async def _scan(self) -> None:
+            table = self.query_one("#table", DataTable)
+            table.loading = True
             self._set_status("scanning…")
             data = await self._run_json(["scan", "--kind", self._kind])
+            table.loading = False
             if not isinstance(data, list):
                 self._set_status("scan failed — try `appsrc scan` in a shell")
                 return
@@ -1348,12 +1352,15 @@ def _tui_app(kind: str):
 
         @work(exclusive=True, group="size")
         async def _size_view(self) -> None:
+            table = self.query_one("#table", DataTable)
+            table.loading = True
             targets = [r for r in self._view if r.size_bytes is None and r.path]
             for i, r in enumerate(targets):
                 r.size_bytes = await self._du(r.path)
                 if i % 10 == 0:
                     self._set_status(f"sizing… {i}/{len(targets)}")
             self._sort = "size"
+            table.loading = False
             self._rebuild()
             self._set_status(f"{len(self._view)} shown — sorted by size")
 
