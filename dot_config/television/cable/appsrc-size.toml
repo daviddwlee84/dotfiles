@@ -1,0 +1,63 @@
+# appsrc-size channel — installed apps sorted by disk footprint (space hogs).
+#
+# Companion to the `appsrc` channel (which browses by install source). This one
+# is pre-sorted biggest-first by the CLI and shows a human size column, so the
+# top of the list is where your disk is going. All logic is in the `appsrc` CLI:
+#   appsrc scan --kind gui --size --sort size --tsv --human
+#     → name<TAB>source<TAB>path<TAB>kind<TAB>package<TAB>SIZE(human)
+#   appsrc size --path '<path>'   (preview / Enter — bundle + associated storage)
+#
+# GUI apps only: sizing every CLI binary too would make opening slow and is
+# rarely the space story. The source runs `scan --size` (~18s cold, ~4s warm —
+# the per-app mtime cache keeps re-opens fast). `no_sort = true` preserves the
+# CLI's size order (tv would otherwise fuzzy-rerank).
+#
+# Non-templated: `appsrc` adapts to macOS/Linux; actions use portable fallbacks.
+#
+# Usage:
+#   tv appsrc-size
+#
+# Keybindings (mirror `tv appsrc`; Alt+ namespace — tmux shadows Ctrl+):
+#   Enter / Alt+S   Size report (bundle + associated cache / data / containers)
+#   Alt+C           Copy the app path
+#   Alt+O           Reveal in Finder (macOS) / open (Linux)
+
+[metadata]
+name = "appsrc-size"
+description = "Installed apps by disk footprint — biggest first (bundle + caches/data/containers)"
+requirements = ["appsrc"]
+
+[source]
+command = "appsrc scan --kind gui --size --sort size --tsv --human"
+# name<TAB>source<TAB>path<TAB>kind<TAB>package<TAB>SIZE(human)
+display = "{split:\\t:5}  {split:\\t:0}  ({split:\\t:1})"
+output = "{split:\\t:0}"
+no_sort = true
+
+[preview]
+command = "appsrc size --path '{split:\\t:2}'"
+header = "{split:\\t:5}  {split:\\t:0}"
+
+[ui]
+input_header = "Space hogs"
+
+[keybindings]
+enter = "actions:size"
+alt-s = "actions:size"
+alt-c = "actions:copy-path"
+alt-o = "actions:reveal"
+
+[actions.size]
+description = "Footprint + associated storage (cache / data / containers)"
+command = "appsrc size --path '{split:\\t:2}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.copy-path]
+description = "Copy the app path to the clipboard"
+command = "printf '%s' '{split:\\t:2}' | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat >/dev/null)"
+mode = "fork"
+
+[actions.reveal]
+description = "Reveal in Finder (macOS) / open (Linux)"
+command = "open -R '{split:\\t:2}' 2>/dev/null || xdg-open '{split:\\t:2}' 2>/dev/null || true"
+mode = "fork"

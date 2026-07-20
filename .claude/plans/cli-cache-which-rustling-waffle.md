@@ -1,132 +1,104 @@
-# Plan: `appsrc size` — app footprint + associated storage (cache / data / containers)
+# Plan: navigate `appsrc` — full-inventory tv channels + `appsrc tui` (Textual)
 
 ## Context
 
-**Problem.** `appsrc` (shipped in `04df259`) tells you *how* an app was installed
-but not *how much space it costs*. The real cost is often hidden: empirically on
-this Mac, **Docker's bundle is 2.1 GB but it uses 23 GB in
-`~/Library/Containers/com.docker.docker`**. Users want "how big is this app, and
-what other space (caches, data, containers) does it use?" — the question
-AppCleaner-style uninstallers answer.
+**Problem.** `appsrc scan` now prints ~2264 rows (GUI + CLI, every source) — a
+flat wall of text. There's no way to *navigate* it: filter by source, find the
+space hogs (now that `appsrc size` exists), drill into detail. The existing `tv
+appsrc` channel only covers GUI apps.
 
-**Key lever (validated).** `appsrc which` already resolves an app's **bundle id**;
-that id is the reverse-lookup key into `~/Library/{Caches,HTTPStorages,Containers,
-Preferences,…}/<bundle-id>`. `du -s` on a bundle is fast even at multi-GB
-(Docker 2.1 GB in 0.05 s), so sizing is viable.
+**Decision (locked).** Build **both** (user chose): a fast tv-picker layer over
+the *full* inventory + a size-sorted "space hogs" picker, **and** a Textual
+`appsrc tui` dashboard (sortable-by-size, filterable) — mirroring the repo's
+`mlf` pattern ("tv = fast picker, TUI = dashboard", CLAUDE.md line 21).
 
-**Decisions (locked).** Add **both** a dedicated `appsrc size <name>` command and a
-`scan --size` bundle-size column. Associated-storage matching = **exact bundle-id
-paths + fuzzy name candidates**, every item tagged `exact`/`fuzzy` with its real
-path listed. **Never delete** — inspection only, no sudo.
+**Outcome.** `tv appsrc` (browse everything by source), `tv appsrc-size` (biggest
+consumers first), and `appsrc tui` (interactive: sort by size, filter, Enter→size
+detail).
 
-**Goal.**
-- `appsrc size <name>` (or `--path`) — live: app bundle size + each associated
-  storage location + totals, highlighting the bundle-vs-other split.
-- `appsrc scan --size` — adds a bundle-size column (bundle only; mtime-cached).
-- `--json` on both.
+## Design
 
-## Design (all in `dot_dotfiles/bin/executable_appsrc`)
+### 1. CLI additions (`dot_dotfiles/bin/executable_appsrc`)
+- **`scan --sort {source,name,size}`** (default `source`, current behaviour).
+  `--sort size` implies `--size`; sorts records by `size_bytes` desc. Applies to
+  table / `--tsv` / `--json`. ~10 lines in `do_scan` before rendering.
+- **`tui` subcommand** → `do_tui()`. Lazy `import textual` *inside* `do_tui` (so
+  `scan`/`which`/`size`/`-h` never load it); add `"textual>=5"` to the PEP723
+  block. `tui` refuses to run when `sys.stdout` isn't a TTY (copy mlf
+  `tui.py:main` guard). Add `tui` to `parse_args` subparsers + `main` dispatch.
 
-### Data model
-```python
-@dataclass
-class StorageItem:
-    category: str        # bundle|cache|data|container|prefs|state|logs|web|launch|xdg
-    path: str
-    size_bytes: int | None      # None = unreadable / du timed out
-    confidence: str             # "exact" | "fuzzy"
-    note: str | None = None
+### 2. Textual TUI — inline `AppsrcTUI(App)` in the same file
+Single-file (no `scripts/appsrc/` package needed) — the App **calls the existing
+module functions directly**: `_mac_gui_apps`/`_path_binaries`/`_classify_gui`/
+`_classify_cli`/`compute_size`/`_resolve_record`/`_human`/`_du_bytes`.
+- **Widget:** one `textual.widgets.DataTable` (`cursor_type="row"`), columns
+  `Name / Source / Kind / Size / Path`; docked `Input` filter (hidden until `/`),
+  docked `Static` status bar, `Header`/`Footer`. Copy mlf's CSS + `compose` +
+  `on_mount` column-setup + filter show/hide + `Input.Changed` rebuild verbatim
+  (`scripts/mlf/tui.py:424-561,1099-1250`).
+- **Load (fast):** `@work(thread=True, exclusive=True, group="scan")` runs the
+  inventory (no sizes) → `call_from_thread` fills rows; status `"scanning…"` →
+  `"N items"`. Exact worker skeleton from `tui.py:565-599`.
+- **Sizes on demand:** binding `s` = size the **currently-visible (filtered)**
+  rows in a worker (bounds `du` cost to what's on screen), fill the Size column,
+  then sort by size desc. Avoids du-ing all 2264 up front.
+- **Sort/filter:** `DataTable.sort(col)` bindings — `s` size, `o` source, `n`
+  name (net-new vs mlf, which sorts in Python; `DataTable.sort` is one call). `/`
+  filter box (substring over name+source), rebuild rows on `Input.Changed`.
+- **Drill-in / actions** (mirror the tv channel single-letter mnemonics):
+  `enter`→size detail (a `ModalScreen` rendering `compute_size` via
+  `_resolve_record(prefer_app=True)`, or a `Static`), `d`→which detail,
+  `o`… conflict → use `enter`=detail, `s`=size-sort, `y`=copy path, `r`=reveal,
+  `j`=json. Wire `@on(DataTable.RowHighlighted/RowSelected)` reading
+  `event.row_key` (the one net-new piece — mlf drives off a Tree, not the table).
+- Est. ~250-300 lines (mlf agent estimate for a single-table sortable TUI).
 
-@dataclass
-class SizeReport:
-    name: str; source: str; kind: str; path: str | None
-    bundle_bytes: int | None
-    associated_bytes: int       # sum of non-bundle items
-    total_bytes: int
-    items: list[StorageItem]
-```
-Add one optional field to the existing `AppRecord`: `size_bytes: int | None = None`
-(populated only by `scan --size`; rides the mtime-keyed cache, so it invalidates
-when the bundle updates). Additive → no cache-version bump needed; in `do_scan`,
-if `args.size` and a cache-hit record has `size_bytes is None`, compute it.
+### 3. tv channels (`dot_config/television/cable/`)
+- **`appsrc.toml`** (existing) — broaden source from `scan --kind gui --tsv` to
+  the **full inventory** `appsrc scan --tsv`; add source+kind to `display` so
+  fuzzy-typing `cask`/`manual`/`app-store` filters. Keep current
+  detail/size/copy/reveal/json actions.
+- **`appsrc-size.toml`** (new) — space hogs. `source = "appsrc scan --kind gui
+  --size --sort size --tsv"`, `no_sort = true` (preserve CLI order — the idiom in
+  `ansible.toml:41` etc.), display `"<size>  <name>  (<source>)"`; preview/Enter =
+  `appsrc size --path`. (GUI-only default so the source command stays ~warm-3.6s;
+  note the cold-scan cost in the header comment.)
+- Mirror `Alt+<letter>` actions with the TUI mnemonics per CLAUDE.md invariant.
 
-### Reuse / refactor
-- **Extract resolution** from `do_which` (`executable_appsrc:781-812`, the
-  `--path` / `shutil.which` / `_find_gui_app` / `_linux_desktop_apps` ladder) into
-  `_resolve_record(args, mac_ctx, lin_ctx) -> AppRecord | None`. Both `do_which`
-  and the new `do_size` call it (evidence=True so `bundle_id` is populated).
-- `_du_bytes(path, timeout=20)` — `_run(["du","-sk",path])` → KB×1024; `None` on
-  non-zero/timeout (guards a pathological cache dir). Reuses existing `_run`.
-- `_mac_bundle_id` exists (`:263`); add `_mac_bundle_name(app)` (reads
-  `CFBundleName` via `defaults read`) as an extra fuzzy candidate.
-- `_human(n)` for table display (existing repo tools inline this).
-
-### Sizing logic
-**macOS GUI app** (has `path`, `bundle_id`):
-- `bundle_bytes = _du_bytes(app)`.
-- **exact** (by `<bid>`): `~/Library/Caches/<bid>`, `HTTPStorages/<bid>`,
-  `Containers/<bid>`, `Group Containers/*<bid>*` (glob), `Application Scripts/<bid>`,
-  `Preferences/<bid>.plist` (+`ByHost/<bid>.*`), `Saved Application State/<bid>.savedState`,
-  `WebKit/<bid>`, `Cookies/<bid>.binarycookies`, `LaunchAgents/*<bid>*.plist`.
-- **fuzzy** (per candidate ∈ {app.stem, CFBundleName, bid last segment, `Vendor/Product`
-  split from `com.vendor.Product`}): `Application Support/<cand>`, `Caches/<cand>`,
-  `Logs/<cand>`. Dedup against exact hits. (Catches Chrome's `Application Support/
-  Google/Chrome`, VSCode's `Code`; may still miss deeply-nested vendor dirs — that's
-  why each is labeled `fuzzy` and its path shown.)
-- Readable **system** paths best-effort (no sudo): `/Library/Application Support/<cand>`,
-  `/Library/LaunchDaemons|LaunchAgents/*<bid>*` — unreadable → `note="needs root"`.
-
-**CLI (both OSes)**: `bundle_bytes` = `du` of the resolved binary, or the
-`Cellar/<pkg>/<ver>` dir when the realpath is under it (walk up). fuzzy XDG:
-`~/.config|.cache|.local/share|.local/state/<name>` (+ mac `~/Library/{Caches,
-Application Support}/<name>`).
-
-**Linux GUI/pkg** (designed, unverified — no Linux host this session): apt →
-`dpkg-query -f='${Installed-Size}' -W <pkg>` (KB); snap → `du /snap/<name>/current`
-+ `~/snap/<name>`,`/var/snap/<name>`; flatpak → `flatpak info` size + `~/.var/app/<id>`;
-appimage → `du` the `.AppImage`.
-
-### Output
-- `render_size(report)`: header `name (source) — total <human>`, a **bundle X /
-  other Y** split line (the reveal), then a table `Category | Size | ? | Path`
-  sorted by size desc; `fuzzy` rows dimmed. `--json` = `asdict(SizeReport)`.
-- `scan --size`: add a right-aligned "Size" column to `render_table` and a 6th TSV
-  field; `--json` already carries the new `size_bytes`.
-
-### CLI surface
-- New `size` subparser: positional `name`, `--json`, `--path`. `main()` dispatch:
-  `size` → `do_size`. Bare-word routing (`appsrc firefox`) still → `which`.
-- `scan` gains `--size` (argparse `store_true`).
-
-## Integration surfaces
+### 4. Integration
 | File | Change |
 |---|---|
-| `dot_dotfiles/bin/executable_appsrc` | all of the above |
-| `dot_config/zsh/tools/57_appsrc_completion.zsh` + `dot_config/bash/57_appsrc_completion.bash` | add `size` to subcommand list (+ its `--json`/`--path`, reuse `_appsrc_names`); add `--size` to scan flags |
-| `dot_config/television/cable/appsrc.toml` | add `Alt+S` action → `appsrc size --path '{split:\t:2}'` (execute + pause) |
-| `docs/tools/appsrc.md` | new "Space & associated storage" section (incl. the Docker 2.1 GB vs 23 GB example + fuzzy-match caveat) |
-| `docs/shells/aliases.md` + `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl` | mention `size` in the appsrc row/bullet |
-| `docs/zsh/zsh-completions.md` | extend the appsrc dynamic-candidate bullet to note `size <name>` |
+| `dot_dotfiles/bin/executable_appsrc` | `--sort`, `tui` subcommand + `AppsrcTUI`, `textual` dep |
+| `dot_config/television/cable/appsrc.toml` + new `appsrc-size.toml` | full-inventory + size-sorted channels |
+| `dot_config/{zsh/tools,bash}/57_appsrc_completion.*` | add `tui` subcommand + `--sort {source,name,size}` to scan |
+| `docs/tools/appsrc.md` | "Navigating (tv + tui)" section |
+| `docs/shells/aliases.md`, `dot_agents/skills/chezmoi-dotfiles/SKILL.md.tmpl` | mention `tui` + the two channels |
+| `docs/zsh/zsh-completions.md` | note `tui` in the dynamic bullet |
+| `CLAUDE.md` | new invariant row: `executable_appsrc` (tui BINDINGS) ↔ `appsrc*.toml` channel Alt-keys ↔ completions — mirror single-letter mnemonics in one commit (model on the `mlf` row, line 21). Keep ≤30k headroom. |
 
-No new deps (`rich`-only). No `python_uv_tools` / `tool-managers.md` change.
+No `docs/tools/` new page (extend appsrc.md). `textual` needs **no**
+`python_uv_tools` entry (library dep, PEP723-only — same as `rich`).
 
-## Verification (this Mac)
-1. `just appsrc size docker` → bundle ≈ 2.1 GB, a `container` row ≈ 23 GB for
-   `~/Library/Containers/com.docker.docker`, correct total; cross-check with
-   `du -sh` by hand. `--json` schema = `SizeReport` keys.
-2. `appsrc size "Google Chrome"` and `size "Visual Studio Code"` → confirm fuzzy
-   catches `Application Support/Google/Chrome` / `.../Code` (or is honestly absent
-   with only exact hits listed — no false "0 B").
-3. `appsrc size rg` (CLI) → binary/Cellar size + any XDG dirs.
-4. `du` timeout guard: point `--path` at a huge dir, confirm it degrades to
-   `size None` + note, never hangs.
-5. `appsrc scan --kind gui --size` → Size column populated; re-run fast (mtime
-   cache hit reuses sizes); `touch` an app → its size recomputes; `--json` has
-   `size_bytes`.
-6. Completions: `appsrc size <Tab>` offers app/command names; `appsrc scan --<Tab>`
-   lists `--size`. Both shells syntax-check (`zsh -n` / `bash -n`).
-7. `tv appsrc` → `Alt+S` runs the size report for the highlighted app (validate the
-   action command standalone per `memory/tv-channel-headless-validation.md`).
-8. `uv run mkdocs build --strict` adds no new warning beyond the 11 baseline.
-9. **Stated gap**: Linux sizing (snap/flatpak/apt/appimage) is unverified — needs a
-   Linux host via `fleet`.
+## Reuse
+- Launch/TTY guard + worker/`call_from_thread` + DataTable rebuild + filter Input:
+  `scripts/mlf/tui.py` (§ lines above); PEP723 `textual>=5` from `executable_mlf`.
+- All data/sizing logic already exists in `executable_appsrc` (§2) — the TUI is a
+  thin view over it; no logic duplication.
+- `no_sort`/pre-sorted channel idiom: `dot_config/television/cable/ansible.toml`.
+
+## Verification
+1. `appsrc scan --sort size --tsv | head` → Docker/Chrome/nvim on top (desc).
+2. `appsrc tui` in a real terminal: table paints fast; `/` filters; `s` sizes the
+   visible set and sorts (Docker 25 G top); `enter` shows the size detail;
+   `y`/`r` copy/reveal; `q` quits. (Headless caveat per
+   `memory/tv-channel-headless-validation.md`: TUI needs a TTY — smoke via a real
+   pane / tmux; validate the *data* functions standalone, don't assert by piping.)
+3. `tv appsrc` lists GUI+CLI, fuzzy `cask` filters; `tv appsrc-size` opens with
+   biggest first (validate the source/preview commands standalone, not the TUI).
+4. Completions: `appsrc <Tab>` offers `scan/which/size/tui`; `appsrc scan --sort
+   <Tab>` → `source name size`. `zsh -n` / `bash -n` clean.
+5. `uv run mkdocs build --strict` adds no new warning; `chezmoi execute-template`
+   renders SKILL.md.tmpl; `just gen-prompts --check` (CLAUDE.md edit is prose, no
+   prompt change) unaffected.
+6. Confirm `appsrc -h` / `scan` / `which` still fast (textual NOT imported on
+   non-tui paths — `python3 -X importtime` or just timing).

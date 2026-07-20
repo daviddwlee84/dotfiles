@@ -36,6 +36,10 @@ $ appsrc scan --refresh                 # ignore cache, recompute
 $ appsrc size docker                    # bundle + ~/Library/Containers/… + caches, totalled
 $ appsrc size "Google Chrome" --json
 $ appsrc scan --kind gui --size         # add a bundle-size column to the inventory
+
+# Navigate the whole inventory interactively:
+$ appsrc tui                            # sortable dashboard — `s` sorts by size, `/` filters
+$ appsrc scan --sort size               # biggest first (implies --size)
 ```
 
 `which` is always live and gathers full evidence (codesign signer, bundle id,
@@ -142,12 +146,18 @@ scan ~15 s cold, ~5 s warm (~2 200 items); `which` is instant.
 
 ## Integration
 
-- **`tv appsrc`** — browse GUI apps by install source. `Enter` = detail,
-  `Alt+S` = size report, `Alt+C` = copy path, `Alt+O` = reveal in Finder / open,
-  `Alt+J` = JSON. Sources `appsrc scan --kind gui --tsv`; preview is `appsrc which
-  --path`.
-- **Completions** shell out to `appsrc scan --list-names` for GUI app names and
-  add PATH commands, so `appsrc which <Tab>` completes either.
+- **`appsrc tui`** — interactive Textual dashboard over the full inventory. A
+  background worker scans (fast, no sizes); `/` filters by name/source, `s` sizes
+  the currently-visible rows and sorts biggest-first (bounding `du` cost to what's
+  on screen), `o`/`n` sort by source/name, `Enter` opens the size breakdown,
+  `y`/`r` copy path / reveal, `q` quits. Needs a real terminal.
+- **`tv appsrc`** — fuzzy-pick the full GUI+CLI inventory; type a source label
+  (`cask`, `manual`, `app-store`, `apt`…) to narrow. `Enter` = detail, `Alt+S` =
+  size, `Alt+C` = copy path, `Alt+O` = reveal, `Alt+J` = JSON.
+- **`tv appsrc-size`** — the same picker pre-sorted by footprint (biggest first,
+  human sizes shown) for hunting space hogs; preview/`Enter` = the size report.
+- **Completions** shell out to `appsrc scan --list-names` for GUI app names + PATH
+  commands, so `appsrc which/size <Tab>` completes either.
 
 `appsrc` is the *runtime* companion to
 [`docs/this_repo/tool-managers.md`](../this_repo/tool-managers.md), which records

@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "rich>=13.9",
+#   "textual>=5.0",
 # ]
 # ///
 """appsrc — detect how an installed app / CLI was installed & managed.
@@ -63,6 +64,11 @@ err = Console(stderr=True)
 IS_MAC = sys.platform == "darwin"
 IS_LINUX = sys.platform.startswith("linux")
 HOME = Path.home()
+
+# brew auto-update can hang on this repo's aliyun mirror (see the
+# homebrew-aliyun-autoupdate-hang pitfall) — deadly when a `brew` call runs
+# inside the TUI worker thread. Never let our read-only queries trigger it.
+os.environ.setdefault("HOMEBREW_NO_AUTO_UPDATE", "1")
 
 _CACHE_VERSION = "v3"
 
@@ -153,9 +159,14 @@ def _label(source: str) -> str:
 # Subprocess helper
 # ---------------------------------------------------------------------------
 def _run(cmd: list[str], timeout: float = 20.0) -> tuple[int, str, str]:
-    """Run cmd; never raise. Returns (rc, stdout, stderr). rc=127 if missing."""
+    """Run cmd; never raise. Returns (rc, stdout, stderr). rc=127 if missing.
+
+    stdin=DEVNULL is load-bearing: without it a subprocess spawned from the TUI's
+    worker thread inherits the raw-mode tty and can block forever (brew/mdls/…).
+    """
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                           check=False, stdin=subprocess.DEVNULL)
         return r.returncode, r.stdout, r.stderr
     except FileNotFoundError:
         return 127, "", ""
@@ -768,6 +779,8 @@ def do_scan(args: argparse.Namespace) -> int:
     lin_ctx = LinuxCtx() if IS_LINUX else None
 
     kind = args.kind
+    if getattr(args, "sort", "source") == "size":
+        args.size = True  # can't sort by size without sizing
     cache = {} if (args.refresh or args.no_cache) else _cache_load()
     records: list[AppRecord] = []
     fresh_items: dict[str, dict] = {}
@@ -806,15 +819,26 @@ def do_scan(args: argparse.Namespace) -> int:
         f = args.source.lower()
         records = [r for r in records if f in r.source.lower() or f in _label(r.source).lower()]
 
+    sort = getattr(args, "sort", "source")
+    if sort == "size":
+        records.sort(key=lambda r: -(r.size_bytes or 0))
+    elif sort == "name":
+        records.sort(key=lambda r: r.name.lower())
+    else:
+        records.sort(key=lambda r: (r.source, r.name.lower()))
+
     if args.json:
         print(json.dumps([asdict(r) for r in records], indent=2, default=str))
         return 0
 
     if args.tsv:
-        for r in sorted(records, key=lambda r: (r.source, r.name.lower())):
+        for r in records:
             row = [r.name, _label(r.source), r.path or "", r.kind, r.package or ""]
             if args.size:
-                row.append(str(r.size_bytes) if r.size_bytes is not None else "")
+                if getattr(args, "human", False):
+                    row.append(_human(r.size_bytes) if r.size_bytes is not None else "")
+                else:
+                    row.append(str(r.size_bytes) if r.size_bytes is not None else "")
             print("\t".join(row))
         return 0
 
@@ -1081,7 +1105,6 @@ def render_table(records: list[AppRecord], kind: str, show_size: bool = False) -
     if not records:
         err.print("[yellow]appsrc: nothing found.[/yellow]")
         return
-    records = sorted(records, key=lambda r: (r.source, r.name.lower()))
     t = Table(title=f"Installed {kind} — install source", header_style="bold", expand=False)
     t.add_column("Name", overflow="fold")
     t.add_column("Source")
@@ -1156,6 +1179,291 @@ def render_size(rep: SizeReport) -> None:
 
 
 # ---------------------------------------------------------------------------
+# TUI (Textual) — interactive dashboard; textual imported lazily in _run_tui
+# ---------------------------------------------------------------------------
+# The TUI shells out to `<self> scan/size --json` via asyncio-native subprocess
+# (NOT blocking subprocess in a worker thread — that intermittently deadlocks
+# under Textual's asyncio loop, since a scan spawns thousands of child procs).
+# The child does all the brew/mdls/du work synchronously in its own process.
+_SELF = os.path.abspath(__file__)
+
+
+def _rec_from_dict(d: dict) -> AppRecord:
+    return AppRecord(**{k: d.get(k) for k in AppRecord.__annotations__})
+
+
+def _copy_to_clipboard(text: str) -> bool:
+    for cmd in (["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"]):
+        if _has(cmd[0]):
+            try:
+                subprocess.run(cmd, input=text, text=True, timeout=5, check=False)
+                return True
+            except OSError:
+                pass
+    return False
+
+
+def _reveal_path(path: str) -> None:
+    if IS_MAC:
+        _run(["open", "-R", path], timeout=5)
+    elif _has("xdg-open"):
+        _run(["xdg-open", path], timeout=5)
+
+
+def _size_report_lines(rep: SizeReport) -> str:
+    lines = [
+        f"{rep.name}  ({_label(rep.source)})   total {_human(rep.total_bytes)}",
+        f"  bundle {_human(rep.bundle_bytes)}    other {_human(rep.associated_bytes)}",
+        "",
+    ]
+    for it in sorted(rep.items, key=lambda i: (i.category != "bundle", -(i.size_bytes or 0))):
+        tag = "" if it.confidence == "exact" else " ?"
+        note = f"  ({it.note})" if it.note else ""
+        lines.append(f"{_human(it.size_bytes):>8}  {it.category + tag:<12} {it.path}{note}")
+    if any(i.confidence != "exact" for i in rep.items):
+        lines += ["", "? = fuzzy (name-based) match — verify before acting"]
+    return "\n".join(lines)
+
+
+def do_tui(args: argparse.Namespace) -> int:
+    if not sys.stdout.isatty():
+        err.print("[red]appsrc tui: needs a terminal (TTY). Use `appsrc scan` for pipes.[/red]")
+        return 2
+    try:
+        return _run_tui(args.kind)
+    except ModuleNotFoundError as e:
+        err.print(f"[red]appsrc tui: {e}. Textual missing — reinstall the tool's deps.[/red]")
+        return 2
+
+
+def _run_tui(kind: str) -> int:
+    _tui_app(kind).run()
+    return 0
+
+
+def _tui_app(kind: str):
+    """Build (but don't run) the Textual app — factored out so run_test() pilots it."""
+    import asyncio
+
+    from textual import on, work
+    from textual.app import App, ComposeResult
+    from textual.binding import Binding
+    from textual.containers import Vertical
+    from textual.screen import ModalScreen
+    from textual.widgets import DataTable, Footer, Header, Input, Static
+
+    class DetailScreen(ModalScreen):
+        BINDINGS = [Binding("escape,q,enter", "close", "Close")]
+        CSS = """
+        DetailScreen { align: center middle; }
+        #box { width: 90%; height: 80%; border: round $accent; padding: 1 2; background: $surface; }
+        """
+
+        def __init__(self, text: str) -> None:
+            super().__init__()
+            self._text = text
+
+        def compose(self) -> ComposeResult:
+            with Vertical(id="box"):
+                yield Static(self._text)
+
+        def action_close(self) -> None:
+            self.dismiss()
+
+    class AppsrcTUI(App):
+        TITLE = "appsrc"
+        CSS = """
+        #filter { dock: top; display: none; }
+        #filter.on { display: block; }
+        #status { dock: bottom; height: 1; color: $text-muted; }
+        DataTable { height: 1fr; }
+        """
+        BINDINGS = [
+            Binding("q", "quit", "Quit"),
+            Binding("slash", "filter", "Filter"),
+            Binding("escape", "unfilter", "Esc", show=False),
+            Binding("s", "sort_size", "Size↓"),
+            Binding("o", "sort_source", "Source"),
+            Binding("n", "sort_name", "Name"),
+            Binding("y", "copy", "Copy"),
+            Binding("r", "reveal", "Reveal"),
+            Binding("R", "rescan", "Rescan"),
+        ]
+
+        def __init__(self, kind: str) -> None:
+            super().__init__()
+            self._kind = kind
+            self._records: list[AppRecord] = []
+            self._view: list[AppRecord] = []
+            self._sort = "source"
+            self._filter = ""
+
+        def compose(self) -> ComposeResult:
+            yield Header()
+            yield Input(placeholder="filter — name / source…", id="filter")
+            yield DataTable(id="table", cursor_type="row", zebra_stripes=True)
+            yield Static("scanning…", id="status")
+            yield Footer()
+
+        def on_mount(self) -> None:
+            t = self.query_one("#table", DataTable)
+            t.add_columns("Name", "Source", "Kind", "Size", "Path")
+            self._scan()
+
+        # ---- data (asyncio-native subprocess; NEVER blocking subprocess in a
+        #      worker thread — that deadlocks under Textual's loop) ----
+        async def _run_json(self, args: list[str], timeout: float = 180.0):
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, _SELF, *args, "--json",
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+                    stdin=asyncio.subprocess.DEVNULL)
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                return json.loads(out.decode() or "null")
+            except (OSError, ValueError, asyncio.TimeoutError):
+                return None
+
+        async def _du(self, path: str, timeout: float = 20.0) -> int | None:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "du", "-sk", path, stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL, stdin=asyncio.subprocess.DEVNULL)
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                return int(out.split()[0]) * 1024
+            except (OSError, ValueError, IndexError, asyncio.TimeoutError):
+                return None
+
+        @work(exclusive=True, group="scan")
+        async def _scan(self) -> None:
+            self._set_status("scanning…")
+            data = await self._run_json(["scan", "--kind", self._kind])
+            if not isinstance(data, list):
+                self._set_status("scan failed — try `appsrc scan` in a shell")
+                return
+            self._records = [_rec_from_dict(d) for d in data]
+            self._rebuild()
+            self._set_status(
+                f"{len(self._records)} items — [s]ize  [o/n]sort  [/]filter  "
+                "[enter]detail  [y]copy  [r]eveal  [R]escan  [q]uit")
+
+        @work(exclusive=True, group="size")
+        async def _size_view(self) -> None:
+            targets = [r for r in self._view if r.size_bytes is None and r.path]
+            for i, r in enumerate(targets):
+                r.size_bytes = await self._du(r.path)
+                if i % 10 == 0:
+                    self._set_status(f"sizing… {i}/{len(targets)}")
+            self._sort = "size"
+            self._rebuild()
+            self._set_status(f"{len(self._view)} shown — sorted by size")
+
+        @work(exclusive=True, group="detail")
+        async def _detail(self, rec: AppRecord) -> None:
+            self._set_status(f"sizing {rec.name}…")
+            arg = ["size", "--path", rec.path] if rec.path else ["size", rec.name]
+            data = await self._run_json(arg)
+            if not isinstance(data, dict):
+                self._set_status("size failed")
+                return
+            rep = SizeReport(
+                name=data.get("name", rec.name), source=data.get("source", rec.source),
+                kind=data.get("kind", rec.kind), path=data.get("path"),
+                bundle_bytes=data.get("bundle_bytes"), associated_bytes=data.get("associated_bytes", 0),
+                total_bytes=data.get("total_bytes", 0),
+                items=[StorageItem(category=it.get("category", ""), path=it.get("path", ""),
+                                   size_bytes=it.get("size_bytes"), confidence=it.get("confidence", "exact"),
+                                   note=it.get("note")) for it in data.get("items", [])])
+            self.push_screen(DetailScreen(_size_report_lines(rep)))
+            self._set_status(f"{len(self._view)} shown")
+
+        # ---- view helpers ----
+        def _apply(self) -> None:
+            f = self._filter.lower()
+            self._view = [
+                r for r in self._records
+                if not f or f in r.name.lower() or f in r.source.lower() or f in _label(r.source).lower()
+            ]
+            if self._sort == "size":
+                self._view.sort(key=lambda r: -(r.size_bytes or 0))
+            elif self._sort == "name":
+                self._view.sort(key=lambda r: r.name.lower())
+            else:
+                self._view.sort(key=lambda r: (r.source, r.name.lower()))
+
+        def _rebuild(self) -> None:
+            self._apply()
+            t = self.query_one("#table", DataTable)
+            t.clear()
+            for r in self._view:
+                t.add_row(r.name, _label(r.source), r.kind,
+                          _human(r.size_bytes) if r.size_bytes is not None else "—",
+                          r.path or "")
+
+        def _set_status(self, msg: str) -> None:
+            self.query_one("#status", Static).update(msg)
+
+        def _current(self) -> "AppRecord | None":
+            t = self.query_one("#table", DataTable)
+            row = t.cursor_row
+            return self._view[row] if 0 <= row < len(self._view) else None
+
+        # ---- actions ----
+        def action_filter(self) -> None:
+            inp = self.query_one("#filter", Input)
+            inp.add_class("on")
+            inp.focus()
+
+        def action_unfilter(self) -> None:
+            inp = self.query_one("#filter", Input)
+            inp.value = ""
+            inp.remove_class("on")
+            self._filter = ""
+            self._rebuild()
+            self.query_one("#table", DataTable).focus()
+
+        @on(Input.Changed, "#filter")
+        def _on_filter(self, e: Input.Changed) -> None:
+            self._filter = e.value
+            self._rebuild()
+
+        @on(Input.Submitted, "#filter")
+        def _on_submit(self, _e: Input.Submitted) -> None:
+            self.query_one("#table", DataTable).focus()
+
+        def action_sort_size(self) -> None:
+            self._size_view()   # sizes any unsized visible rows, then sorts by size
+
+        def action_sort_source(self) -> None:
+            self._sort = "source"
+            self._rebuild()
+
+        def action_sort_name(self) -> None:
+            self._sort = "name"
+            self._rebuild()
+
+        @on(DataTable.RowSelected, "#table")
+        def _row_selected(self, _e: "DataTable.RowSelected") -> None:
+            rec = self._current()
+            if rec:
+                self._detail(rec)
+
+        def action_copy(self) -> None:
+            rec = self._current()
+            if rec and rec.path:
+                self._set_status(f"copied {rec.path}" if _copy_to_clipboard(rec.path) else "no clipboard tool")
+
+        def action_reveal(self) -> None:
+            rec = self._current()
+            if rec and rec.path:
+                _reveal_path(rec.path)
+
+        def action_rescan(self) -> None:
+            self._scan()
+
+    return AppsrcTUI(kind)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -1169,10 +1477,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                     help="Emit TSV: name<TAB>source<TAB>path<TAB>kind<TAB>package (for tv / scripts).")
     ps.add_argument("--kind", choices=["gui", "cli", "all"], default="all", help="Restrict inventory.")
     ps.add_argument("--source", default="", help="Filter by source id/label substring.")
+    ps.add_argument("--sort", choices=["source", "name", "size"], default="source",
+                    help="Sort order (size => biggest first; implies --size).")
     ps.add_argument("-r", "--refresh", action="store_true", help="Recompute; ignore cache.")
     ps.add_argument("--no-cache", action="store_true", help="Don't read or write cache.")
     ps.add_argument("--size", action="store_true",
                     help="Also compute each item's bundle size (slower; mtime-cached).")
+    ps.add_argument("--human", action="store_true",
+                    help="With --tsv, emit human-readable sizes (e.g. 3.7G) instead of bytes.")
     ps.add_argument("--list-names", action="store_true", help=argparse.SUPPRESS)
 
     pw = sub.add_parser("which", help="Single lookup (live): command or GUI app name.")
@@ -1185,12 +1497,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     pz.add_argument("--json", action="store_true", help="Emit JSON.")
     pz.add_argument("--path", default="", help="Size PATH directly.")
 
+    pt = sub.add_parser("tui", help="Interactive dashboard: sort by size, filter, drill in.")
+    pt.add_argument("--kind", choices=["gui", "cli", "all"], default="all", help="Initial inventory.")
+
     # Default routing: bare `appsrc` / flags → scan; a bare word → `which WORD`.
     if not argv:
         argv = ["scan"]
     elif argv[0] in ("-h", "--help"):
         pass
-    elif argv[0] not in ("scan", "which", "size"):
+    elif argv[0] not in ("scan", "which", "size", "tui"):
         argv = (["scan", *argv] if argv[0].startswith("-") else ["which", *argv])
     return p.parse_args(argv)
 
@@ -1219,6 +1534,8 @@ def main() -> int:
             err.print("[red]appsrc size: need a NAME or --path.[/red]")
             return 2
         return do_size(args)
+    if args.cmd == "tui":
+        return do_tui(args)
     return do_scan(args)
 
 

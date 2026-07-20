@@ -19,9 +19,11 @@ _appsrc_scan() {
         '--tsv[emit TSV rows (name/source/path/kind/package[/size])]' \
         '--kind=[restrict inventory]:kind:(gui cli all)' \
         '--source=[filter by source id/label]:source:(homebrew-cask homebrew-formula mac-app-store direct-download-pkg direct-download-dmg manual macos-system apt snap flatpak appimage linuxbrew cargo npm pipx uv mise go gem)' \
+        '--sort=[sort order (size => biggest first, implies --size)]:sort:(source name size)' \
         '(-r --refresh)'{-r,--refresh}'[recompute; ignore cache]' \
         '--no-cache[do not read or write cache]' \
-        '--size[also compute each item bundle size (cached)]'
+        '--size[also compute each item bundle size (cached)]' \
+        '--human[human-readable sizes in --tsv]'
 }
 
 _appsrc_which() {
@@ -38,6 +40,10 @@ _appsrc_size() {
         '1:name:_appsrc_names'
 }
 
+_appsrc_tui() {
+    _arguments '--kind=[initial inventory]:kind:(gui cli all)'
+}
+
 _appsrc() {
     local context state state_descr line
     typeset -A opt_args
@@ -52,6 +58,7 @@ _appsrc() {
                 'scan:Batch-inventory installed apps + CLIs (cached)'
                 'which:Single lookup (live): command or GUI app name'
                 'size:Footprint + associated storage (cache/data/containers) for one app'
+                'tui:Interactive dashboard — sort by size, filter, drill in'
             )
             _describe -t subcommands 'appsrc subcommand' subs
             _appsrc_names   # bare word routes to `which`
@@ -60,6 +67,7 @@ _appsrc() {
             case "$line[1]" in
                 scan)  _appsrc_scan ;;
                 size)  _appsrc_size ;;
+                tui)   _appsrc_tui ;;
                 *)     _appsrc_which ;;   # `which` or a bare name
             esac
             ;;

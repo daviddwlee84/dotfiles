@@ -1,13 +1,14 @@
-# appsrc channel — browse installed GUI apps + how each was installed.
+# appsrc channel — browse the full installed inventory + how each was installed.
 #
 # Thin channel: all detection lives in the `appsrc` CLI
 # (dot_dotfiles/bin/executable_appsrc). This file just shells out:
-#   appsrc scan --kind gui --tsv      (source — name<TAB>source<TAB>path<TAB>kind<TAB>package)
+#   appsrc scan --tsv                 (source — name<TAB>source<TAB>path<TAB>kind<TAB>package)
 #   appsrc which --path '<path>'      (preview + Enter detail; --path is unambiguous)
 # so the picker tracks the CLI automatically (no parallel logic to keep in sync).
 #
-# GUI apps only by design — a pickable set (~dozens). The full GUI+CLI
-# inventory (thousands of rows) is `appsrc scan` in the terminal.
+# Full GUI+CLI inventory (~thousands) — fuzzy-type a source label (cask / manual
+# / app-store / apt / snap …) or a name to narrow. For the biggest space
+# consumers use `tv appsrc-size` instead.
 #
 # Non-templated: `appsrc` adapts to macOS/Linux internally, and the actions use
 # portable clipboard / open fallbacks, so one file works on both.
@@ -25,13 +26,13 @@
 
 [metadata]
 name = "appsrc"
-description = "Installed apps — how each was installed (cask / App Store / direct / apt / snap / …)"
+description = "Installed apps + CLIs — how each was installed (cask / App Store / direct / apt / snap / …)"
 requirements = ["appsrc"]
 
 [source]
-command = "appsrc scan --kind gui --tsv"
+command = "appsrc scan --tsv"
 # name<TAB>source-label<TAB>path<TAB>kind<TAB>package
-display = "{split:\\t:0}  ({split:\\t:1})"
+display = "{split:\\t:0}  ({split:\\t:1})  [{split:\\t:3}]"
 output = "{split:\\t:0}"
 
 [preview]
