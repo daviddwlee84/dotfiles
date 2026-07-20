@@ -1278,6 +1278,7 @@ def _run_tui(kind: str) -> int:
 def _tui_app(kind: str):
     """Build (but don't run) the Textual app — factored out so run_test() pilots it."""
     import asyncio
+    import shlex
 
     from textual import on, work
     from textual.app import App, ComposeResult
@@ -1327,6 +1328,8 @@ def _tui_app(kind: str):
             Binding("s", "sort_size", "Size↓"),
             Binding("o", "sort_source", "Source"),
             Binding("n", "sort_name", "Name"),
+            Binding("t", "tldr", "tldr"),
+            Binding("m", "man", "man"),
             Binding("y", "copy", "Copy"),
             Binding("r", "reveal", "Reveal"),
             Binding("R", "rescan", "Rescan"),
@@ -1382,8 +1385,8 @@ def _tui_app(kind: str):
             self._rebuild()
             self.query_one("#table", DataTable).focus()
             self._set_status(
-                f"{len(self._records)} items — [s]ize  [o/n]sort  [/]filter  "
-                "[enter]detail  [y]copy  [r]eveal  [R]escan  [q]uit")
+                f"{len(self._records)} items — [s]ize  [o/n]sort  [/]filter  [enter]detail  "
+                "[t]ldr  [m]an  [y]copy  [r]eveal  [R]escan  [q]uit")
 
         @work(exclusive=True, group="size")
         async def _size_view(self) -> None:
@@ -1492,6 +1495,34 @@ def _tui_app(kind: str):
         def action_sort_name(self) -> None:
             self._sort = "name"
             self._rebuild()
+
+        def _suspend_run(self, shell_cmd: str) -> None:
+            """Drop out of the TUI to run a pager (man/tldr) in the real terminal."""
+            with self.suspend():
+                try:
+                    subprocess.run(["sh", "-c", shell_cmd], check=False)
+                except OSError:
+                    pass
+            self.query_one("#table", DataTable).focus()
+
+        def action_tldr(self) -> None:
+            rec = self._current()
+            if not rec:
+                return
+            n = shlex.quote(rec.name)
+            # tldr exits non-zero on a missing page → show a hint + wait.
+            self._suspend_run(
+                f"tldr {n} 2>/dev/null | ${{PAGER:-less}} -R "
+                f"|| {{ printf '\\n  no tldr page for %s\\n  (press enter to return)… ' {n}; read -r _; }}")
+
+        def action_man(self) -> None:
+            rec = self._current()
+            if not rec:
+                return
+            n = shlex.quote(rec.name)
+            self._suspend_run(
+                f"man {n} 2>/dev/null "
+                f"|| {{ printf '\\n  no man page for %s\\n  (press enter to return)… ' {n}; read -r _; }}")
 
         @on(DataTable.RowSelected, "#table")
         def _row_selected(self, _e: "DataTable.RowSelected") -> None:

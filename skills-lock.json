@@ -5,13 +5,13 @@
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/agent-history-hygiene/SKILL.md",
-      "computedHash": "0084da93617f7eb3eb462fe2a4a02924a70de8cf92c33167fb860e53e2cc69d4"
+      "computedHash": "e964c0120e4845ed4989b32843f71da422e44d447e9b71abeeb87ea2f2c27df6"
     },
     "mkdocs-site-bootstrap": {
       "source": "daviddwlee84/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/local/mkdocs-site-bootstrap/SKILL.md",
-      "computedHash": "bc215d03fdb99b745190c3c1a3e3d3336cd9b1f67aedbb31101cfca97af58dfd"
+      "computedHash": "e8aab23a5cf942887954003617ec5e700ad52968cddc8f809e2534a9773af06b"
     },
     "project-knowledge-harness": {
       "source": "daviddwlee84/agent-skills",

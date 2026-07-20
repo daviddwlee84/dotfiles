@@ -19,6 +19,8 @@
 # Keybindings (Alt+ namespace — tmux root-table `bind -n C-*` shadows Ctrl+):
 #   Enter      Full detail (source + evidence: signer / bundle-id / origin URL)
 #   Alt+S      Size report (bundle + associated storage: cache / data / containers)
+#   Alt+T      tldr — quick usage (CLI tools)
+#   Alt+M      man page (CLI tools)
 #   Alt+C      Copy the app path to the clipboard
 #   Alt+O      Reveal the app in Finder (macOS) / open it (Linux)
 #   Alt+J      Detail as JSON (piped through a pager)
@@ -45,6 +47,8 @@ input_header = "Install source"
 [keybindings]
 enter = "actions:detail"
 alt-s = "actions:size"
+alt-t = "actions:tldr"
+alt-m = "actions:man"
 alt-c = "actions:copy-path"
 alt-o = "actions:reveal"
 alt-j = "actions:json"
@@ -57,6 +61,16 @@ mode = "execute"
 [actions.size]
 description = "Footprint + associated storage (cache / data / containers)"
 command = "appsrc size --path '{split:\\t:2}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.tldr]
+description = "tldr — quick usage (CLI tools)"
+command = "tldr '{split:\\t:0}' 2>/dev/null | ${PAGER:-less} -R || { printf 'no tldr page for %s\\n[Press Enter]' '{split:\\t:0}'; read -r _; }"
+mode = "execute"
+
+[actions.man]
+description = "man page (CLI tools)"
+command = "man '{split:\\t:0}' 2>/dev/null || { printf 'no man page for %s\\n[Press Enter]' '{split:\\t:0}'; read -r _; }"
 mode = "execute"
 
 [actions.copy-path]

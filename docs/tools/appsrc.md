@@ -150,10 +150,12 @@ scan ~15 s cold, ~5 s warm (~2 200 items); `which` is instant.
   background worker scans (fast, no sizes); `/` filters by name/source, `s` sizes
   the currently-visible rows and sorts biggest-first (bounding `du` cost to what's
   on screen), `o`/`n` sort by source/name, `Enter` opens the size breakdown,
-  `y`/`r` copy path / reveal, `q` quits. Needs a real terminal.
+  `t`/`m` show the selected tool's `tldr`/`man` page (suspends into the pager),
+  `y`/`r` copy path / reveal, `R` rescan, `q` quits. Needs a real terminal.
 - **`tv appsrc`** — fuzzy-pick the full GUI+CLI inventory; type a source label
   (`cask`, `manual`, `app-store`, `apt`…) to narrow. `Enter` = detail, `Alt+S` =
-  size, `Alt+C` = copy path, `Alt+O` = reveal, `Alt+J` = JSON.
+  size, `Alt+T`/`Alt+M` = tldr/man, `Alt+C` = copy path, `Alt+O` = reveal,
+  `Alt+J` = JSON.
 - **`tv appsrc-size`** — the same picker pre-sorted by footprint (biggest first,
   human sizes shown) for hunting space hogs; preview/`Enter` = the size report.
 - **Completions** shell out to `appsrc scan --list-names` for GUI app names + PATH
