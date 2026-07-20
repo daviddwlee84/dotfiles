@@ -1,0 +1,926 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "rich>=13.9",
+# ]
+# ///
+"""appsrc — detect how an installed app / CLI was installed & managed.
+
+There is no single OS command that tells you whether an app came from a
+Homebrew cask, the Mac App Store, a direct-download dmg/pkg, apt, snap,
+flatpak, an AppImage, or a language package manager. This tool combines
+several signals, ordered by specificity, and captures the evidence.
+
+Subcommands (positional, default `scan`):
+  scan            Batch-inventory installed GUI apps + CLI tools, attribute
+                  each to its manager. Cached (per-item mtime invalidation).
+  which <name>    which-style single lookup, always live (no cache). NAME may
+                  be a shell command (docker) OR a GUI app name ("Google
+                  Chrome") — auto-detected. Prints source + evidence.
+
+scan flags:
+  --json                     Emit JSON (list of records) instead of a table.
+  --kind {gui,cli,all}       Restrict inventory (default: all).
+  --source FILTER            Only rows whose source id/label matches FILTER.
+  -r, --refresh              Recompute everything, ignore cache.
+  --no-cache                 Don't read or write the cache.
+  --list-names               Print GUI app names only (used by completions).
+
+which flags:
+  --json                     Emit the single record as JSON.
+  --path PATH                Classify PATH directly (skip name resolution).
+
+Caveats baked in (see pitfalls/tailscale-another-copy-app-store-leftover.md):
+  `_MASReceipt` is NOT a reliable App Store discriminator (it exists in some
+  standalone bundles too) — this tool leans on codesign Authority /
+  CFBundleIdentifier / `mas list` / mdls receipt instead.
+
+Cache:
+  ${XDG_CACHE_HOME:-~/.cache}/appsrc/<hostname>.json
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
+
+out = Console()
+err = Console(stderr=True)
+
+IS_MAC = sys.platform == "darwin"
+IS_LINUX = sys.platform.startswith("linux")
+HOME = Path.home()
+
+_CACHE_VERSION = "v3"
+
+
+# ---------------------------------------------------------------------------
+# Record + labels
+# ---------------------------------------------------------------------------
+@dataclass
+class AppRecord:
+    name: str
+    kind: str                       # "gui" | "cli"
+    path: str | None
+    source: str                     # canonical id (see SOURCE_LABELS)
+    manager: str | None = None      # human label
+    package: str | None = None      # owning cask/formula/deb/snap/crate
+    confidence: str = "heuristic"   # "authoritative" | "heuristic"
+    bundle_id: str | None = None    # macOS CFBundleIdentifier
+    signer: str | None = None       # macOS codesign Authority leaf
+    origin_url: str | None = None   # macOS kMDItemWhereFroms
+    detail: str | None = None
+    mtime: float | None = None
+
+
+SOURCE_LABELS = {
+    "homebrew-cask": "Homebrew cask",
+    "homebrew-formula": "Homebrew formula",
+    "mac-app-store": "Mac App Store",
+    "direct-download-pkg": "Direct download (pkg)",
+    "direct-download-dmg": "Direct download (dmg/web)",
+    "manual": "Manual / drag-in",
+    "macos-system": "macOS system",
+    "apt": "apt / dpkg",
+    "snap": "snap",
+    "flatpak": "flatpak",
+    "appimage": "AppImage",
+    "linuxbrew": "Homebrew (Linuxbrew)",
+    "cargo": "cargo",
+    "npm": "npm (global)",
+    "pipx": "pipx",
+    "uv": "uv tool",
+    "mise": "mise",
+    "go": "go install",
+    "gem": "gem",
+    "system": "system",
+    "unknown": "unknown",
+}
+
+# Colour per source-family for the table.
+SOURCE_COLOR = {
+    "homebrew-cask": "cyan", "homebrew-formula": "cyan", "linuxbrew": "cyan",
+    "mac-app-store": "green", "apt": "blue", "snap": "magenta",
+    "flatpak": "magenta", "appimage": "yellow",
+    "direct-download-pkg": "yellow", "direct-download-dmg": "yellow",
+    "manual": "red", "unknown": "red",
+    "macos-system": "bright_black", "system": "bright_black",
+    "cargo": "bright_cyan", "npm": "bright_cyan", "pipx": "bright_cyan",
+    "uv": "bright_cyan", "mise": "bright_cyan", "go": "bright_cyan", "gem": "bright_cyan",
+}
+
+
+def _label(source: str) -> str:
+    return SOURCE_LABELS.get(source, source)
+
+
+# ---------------------------------------------------------------------------
+# Subprocess helper
+# ---------------------------------------------------------------------------
+def _run(cmd: list[str], timeout: float = 20.0) -> tuple[int, str, str]:
+    """Run cmd; never raise. Returns (rc, stdout, stderr). rc=127 if missing."""
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        return r.returncode, r.stdout, r.stderr
+    except FileNotFoundError:
+        return 127, "", ""
+    except (subprocess.TimeoutExpired, OSError):
+        return 1, "", ""
+
+
+def _has(cmd: str) -> bool:
+    return shutil.which(cmd) is not None
+
+
+def _realpath(p: str | Path) -> str:
+    try:
+        return os.path.realpath(p)
+    except OSError:
+        return str(p)
+
+
+def _mtime(p: str | Path) -> float | None:
+    try:
+        return Path(p).stat().st_mtime
+    except OSError:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Shared: language-package-manager attribution by resolved path prefix
+# ---------------------------------------------------------------------------
+def _lang_source_for_path(rp: str) -> tuple[str, str | None] | None:
+    """Attribute a resolved binary path to a language PM. (source, pkg) or None.
+
+    Only trusts *manager-specific* dirs. A shared user-bin (`~/.local/bin`,
+    `~/bin`) is deliberately NOT attributed here even if GOBIN points at it —
+    that trap is resolved by a `go version` content-check in the classifier.
+    """
+    home = str(HOME)
+    checks: list[tuple[str, str]] = [
+        (f"{home}/.cargo/", "cargo"),
+        (f"{home}/.local/share/uv/", "uv"),
+        (f"{home}/.local/share/pipx/", "pipx"),
+        (f"{home}/.local/pipx/", "pipx"),
+        (f"{home}/.local/share/mise/", "mise"),
+        (f"{home}/.local/share/rtx/", "mise"),
+        (f"{home}/.gem/", "gem"),
+    ]
+    for prefix, source in checks:
+        if rp.startswith(prefix):
+            return source, None
+    # go: conventional dirs only (~/go/bin, $GOPATH/bin) — never a shared GOBIN.
+    gopath = (os.environ.get("GOPATH") or f"{home}/go").rstrip("/")
+    if rp.startswith(f"{home}/go/bin/") or rp.startswith(f"{gopath}/bin/"):
+        return "go", None
+    if "/gems/" in rp and "/bin/" in rp:
+        return "gem", None
+    return None
+
+
+def _is_go_binary(rp: str) -> bool:
+    """True if rp is a compiled Go binary (`go version <file>` reports goX.Y)."""
+    if not _has("go"):
+        return False
+    rc, so, _ = _run(["go", "version", rp], timeout=8)
+    return rc == 0 and bool(re.search(r":\s*go\d", so))
+
+
+def _shared_user_bin(rp: str) -> bool:
+    return rp.startswith((f"{HOME}/.local/bin/", f"{HOME}/bin/"))
+
+
+def _classify_user_bin(rec: AppRecord, rp: str) -> AppRecord:
+    """Disambiguate a real binary in a shared user-bin: go-installed vs manual."""
+    if _is_go_binary(rp):
+        rec.source, rec.manager, rec.confidence = "go", _label("go"), "authoritative"
+    else:
+        rec.source, rec.manager = "manual", _label("manual")
+        rec.detail = rec.detail or "self-contained binary in a shared user-bin"
+    return rec
+
+
+# ===========================================================================
+# macOS
+# ===========================================================================
+class MacCtx:
+    """Lazily-built forward inventories for macOS (one subprocess each)."""
+
+    def __init__(self) -> None:
+        self._prefix: str | None = "?"
+        self._caskroom: str | None = "?"
+        self._app_to_cask: dict[str, str] | None = None
+        self._formula_bins: set[str] | None = None
+        self._mas: dict[str, str] | None = None
+
+    @property
+    def brew_prefix(self) -> str | None:
+        if self._prefix == "?":
+            self._prefix = None
+            if _has("brew"):
+                rc, so, _ = _run(["brew", "--prefix"], timeout=10)
+                if rc == 0 and so.strip():
+                    self._prefix = so.strip()
+            if not self._prefix:
+                for p in ("/opt/homebrew", "/usr/local"):
+                    if Path(p, "bin", "brew").exists():
+                        self._prefix = p
+                        break
+        return self._prefix
+
+    @property
+    def caskroom(self) -> str | None:
+        if self._caskroom == "?":
+            self._caskroom = None
+            for base in ("/opt/homebrew/Caskroom", "/usr/local/Caskroom"):
+                if Path(base).is_dir():
+                    self._caskroom = base
+                    break
+            if not self._caskroom and self.brew_prefix:
+                cand = Path(self.brew_prefix) / "Caskroom"
+                if cand.is_dir():
+                    self._caskroom = str(cand)
+        return self._caskroom
+
+    @property
+    def app_to_cask(self) -> dict[str, str]:
+        """Map lowercase '<app>.app' basename -> cask token."""
+        if self._app_to_cask is None:
+            self._app_to_cask = {}
+            if not _has("brew"):
+                return self._app_to_cask
+            rc, so, _ = _run(["brew", "list", "--cask"], timeout=20)
+            casks = so.split() if rc == 0 else []
+            if not casks:
+                return self._app_to_cask
+            rc, so, _ = _run(["brew", "info", "--cask", "--json=v2", *casks], timeout=60)
+            if rc != 0 or not so.strip():
+                return self._app_to_cask
+            try:
+                data = json.loads(so)
+            except json.JSONDecodeError:
+                return self._app_to_cask
+            for cask in data.get("casks", []):
+                token = cask.get("token") or ""
+                for artifact in cask.get("artifacts", []) or []:
+                    if not isinstance(artifact, dict):
+                        continue
+                    for app in artifact.get("app", []) or []:
+                        target = None
+                        if isinstance(app, str):
+                            target = app
+                        elif isinstance(app, dict):
+                            target = app.get("target") or app.get("source")
+                        if target:
+                            self._app_to_cask[Path(target).name.lower()] = token
+        return self._app_to_cask
+
+    @property
+    def mas(self) -> dict[str, str]:
+        """Map lowercase App Store app name -> 'id'."""
+        if self._mas is None:
+            self._mas = {}
+            if _has("mas"):
+                rc, so, _ = _run(["mas", "list"], timeout=20)
+                if rc == 0:
+                    for line in so.splitlines():
+                        # "<id>  <Name>  (<version>)"
+                        m = re.match(r"^\s*(\d+)\s+(.*?)\s+\([^()]*\)\s*$", line)
+                        if m:
+                            self._mas[m.group(2).strip().lower()] = m.group(1)
+        return self._mas
+
+
+def _mac_bundle_id(app: Path) -> str | None:
+    plist = app / "Contents" / "Info"
+    rc, so, _ = _run(["defaults", "read", str(plist), "CFBundleIdentifier"], timeout=8)
+    return so.strip() if rc == 0 and so.strip() else None
+
+
+def _mac_signer(app: Path) -> str | None:
+    # codesign writes to stderr; first Authority= line is the leaf certificate.
+    rc, _, se = _run(["codesign", "-dv", "--verbose=4", str(app)], timeout=12)
+    for line in se.splitlines():
+        if line.startswith("Authority="):
+            return line.split("=", 1)[1].strip()
+    return None
+
+
+def _mac_meta(app: Path) -> tuple[bool, str | None]:
+    """One mdls fork → (has_app_store_receipt, first_where_from_url)."""
+    rc, so, _ = _run(
+        ["mdls", "-name", "kMDItemAppStoreHasReceipt", "-name", "kMDItemWhereFroms", str(app)],
+        timeout=10,
+    )
+    if rc != 0:
+        return False, None
+    receipt = False
+    for line in so.splitlines():
+        if "kMDItemAppStoreHasReceipt" in line and line.rstrip().endswith("= 1"):
+            receipt = True
+            break
+    m = re.search(r'"([^"]+)"', so)
+    return receipt, (m.group(1) if m else None)
+
+
+def _mac_pkg_for(path: Path) -> str | None:
+    rc, so, _ = _run(["pkgutil", "--file-info", str(path)], timeout=10)
+    if rc != 0:
+        return None
+    for line in so.splitlines():
+        if line.strip().startswith("pkgid:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def _mac_classify_app(app: Path, ctx: MacCtx, *, evidence: bool) -> AppRecord:
+    name = app.stem
+    base_lc = app.name.lower()
+    rec = AppRecord(name=name, kind="gui", path=str(app), source="unknown", mtime=_mtime(app))
+
+    # 1. Homebrew cask (authoritative when Caskroom metadata is present).
+    cask = ctx.app_to_cask.get(base_lc)
+    if cask:
+        rec.source = "homebrew-cask"
+        rec.package = cask
+        rec.manager = _label("homebrew-cask")
+        if ctx.caskroom and Path(ctx.caskroom, cask).is_dir():
+            rec.confidence = "authoritative"
+        else:
+            rec.confidence = "heuristic"
+            rec.detail = "cask declares this app but no Caskroom entry (drag-installed / drift)"
+        if evidence:
+            rec.bundle_id = _mac_bundle_id(app)
+            rec.signer = _mac_signer(app)
+        return rec
+
+    # 2. Mac App Store — cheapest tell first (in-memory `mas list` membership).
+    if name.lower() in ctx.mas:
+        rec.source = "mac-app-store"
+        rec.manager = _label("mac-app-store")
+        rec.package = ctx.mas.get(name.lower())
+        rec.confidence = "authoritative"
+        if evidence:
+            rec.bundle_id = _mac_bundle_id(app)
+            rec.signer = _mac_signer(app)
+        return rec
+
+    # Evidence (codesign/bundle-id) only when asked (which); it's the slow fork.
+    if evidence:
+        rec.signer = _mac_signer(app)
+        rec.bundle_id = _mac_bundle_id(app)
+
+    # One mdls fork gets both the App Store receipt and the download provenance.
+    receipt, url = _mac_meta(app)
+
+    # 2b. App Store via receipt / Apple re-signing (delisted apps not in `mas list`).
+    #     Never rely on _MASReceipt alone — corroborated by receipt or signer.
+    if receipt or (rec.signer or "").startswith("Apple Mac OS Application Signing"):
+        rec.source = "mac-app-store"
+        rec.manager = _label("mac-app-store")
+        rec.confidence = "heuristic"
+        return rec
+
+    # 3. Direct download via .pkg installer (receipt on file).
+    pkg = _mac_pkg_for(app)
+    if pkg:
+        rec.source = "direct-download-pkg"
+        rec.manager = _label("direct-download-pkg")
+        rec.package = pkg
+        rec.confidence = "authoritative"
+        return rec
+
+    # 4. Direct download via dmg / browser (quarantine provenance URL).
+    if url:
+        rec.source = "direct-download-dmg"
+        rec.manager = _label("direct-download-dmg")
+        rec.origin_url = url
+        rec.confidence = "heuristic"
+        return rec
+
+    # 5. Manual placement (no manager, no provenance).
+    rec.source = "manual"
+    rec.manager = _label("manual")
+    rec.confidence = "heuristic"
+    return rec
+
+
+def _mac_classify_cli(rp: str, name: str, ctx: MacCtx) -> AppRecord:
+    rec = AppRecord(name=name, kind="cli", path=rp, source="unknown", mtime=_mtime(rp))
+    # CLI shim that points into a GUI .app bundle → attribute to that app.
+    if ".app/Contents/" in rp:
+        app = Path(rp[: rp.index(".app/Contents/") + 4])
+        sub = _mac_classify_app(app, ctx, evidence=False)
+        rec.source, rec.manager, rec.package = sub.source, sub.manager, sub.package
+        rec.confidence = sub.confidence
+        rec.detail = f"CLI shim into {app.name}"
+        return rec
+    if "/Caskroom/" in rp:
+        rec.source, rec.manager, rec.confidence = "homebrew-cask", _label("homebrew-cask"), "authoritative"
+        return rec
+    if "/Cellar/" in rp or (ctx.brew_prefix and rp.startswith(ctx.brew_prefix.rstrip("/") + "/")):
+        rec.source, rec.manager, rec.confidence = "homebrew-formula", _label("homebrew-formula"), "authoritative"
+        return rec
+    lang = _lang_source_for_path(rp)
+    if lang:
+        rec.source, rec.package = lang
+        rec.manager, rec.confidence = _label(lang[0]), "authoritative"
+        return rec
+    # System / SIP binaries.
+    if rp.startswith(("/usr/bin/", "/bin/", "/usr/sbin/", "/sbin/", "/System/")):
+        rec.source, rec.manager, rec.confidence = "macos-system", _label("macos-system"), "authoritative"
+        return rec
+    if _shared_user_bin(rp):
+        return _classify_user_bin(rec, rp)
+    if rp.startswith("/usr/local/") or rp.startswith(str(HOME)):
+        rec.source, rec.manager = "manual", _label("manual")
+        return rec
+    rec.manager = _label("unknown")
+    return rec
+
+
+# ===========================================================================
+# Linux
+# ===========================================================================
+_LINUX_DESKTOP_DIRS = [
+    "/usr/share/applications",
+    str(HOME / ".local/share/applications"),
+    "/var/lib/flatpak/exports/share/applications",
+    str(HOME / ".local/share/flatpak/exports/share/applications"),
+    "/var/lib/snapd/desktop/applications",
+]
+
+
+class LinuxCtx:
+    def __init__(self) -> None:
+        self._snaps: set[str] | None = None
+        self._flatpaks: set[str] | None = None
+        self._brew_prefix: str | None = "?"
+
+    @property
+    def snaps(self) -> set[str]:
+        if self._snaps is None:
+            self._snaps = set()
+            if _has("snap"):
+                rc, so, _ = _run(["snap", "list"], timeout=15)
+                if rc == 0:
+                    for line in so.splitlines()[1:]:
+                        parts = line.split()
+                        if parts:
+                            self._snaps.add(parts[0].lower())
+        return self._snaps
+
+    @property
+    def flatpaks(self) -> set[str]:
+        if self._flatpaks is None:
+            self._flatpaks = set()
+            if _has("flatpak"):
+                rc, so, _ = _run(["flatpak", "list", "--app", "--columns=application,name"], timeout=15)
+                if rc == 0:
+                    for line in so.splitlines():
+                        for field in line.split("\t"):
+                            if field.strip():
+                                self._flatpaks.add(field.strip().lower())
+        return self._flatpaks
+
+    @property
+    def brew_prefix(self) -> str | None:
+        if self._brew_prefix == "?":
+            self._brew_prefix = None
+            for p in (f"{HOME}/.linuxbrew", "/home/linuxbrew/.linuxbrew"):
+                if Path(p, "bin", "brew").exists():
+                    self._brew_prefix = p
+                    break
+        return self._brew_prefix
+
+
+def _dpkg_owner(rp: str) -> str | None:
+    if not _has("dpkg"):
+        return None
+    rc, so, _ = _run(["dpkg", "-S", rp], timeout=15)
+    if rc == 0 and ":" in so:
+        return so.split(":", 1)[0].strip()
+    return None
+
+
+def _rpm_owner(rp: str) -> str | None:
+    if not _has("rpm"):
+        return None
+    rc, so, _ = _run(["rpm", "-qf", rp], timeout=15)
+    if rc == 0 and so.strip() and "not owned" not in so:
+        return so.strip().splitlines()[0]
+    return None
+
+
+def _linux_classify_path(rp: str, name: str, ctx: LinuxCtx, *, kind: str) -> AppRecord:
+    rec = AppRecord(name=name, kind=kind, path=rp, source="unknown", mtime=_mtime(rp))
+    if rp.startswith("/snap/"):
+        parts = rp.split("/")
+        rec.source, rec.manager, rec.confidence = "snap", _label("snap"), "authoritative"
+        rec.package = parts[2] if len(parts) > 2 else None
+        return rec
+    if rp.startswith("/var/lib/flatpak/") or rp.startswith(str(HOME / ".local/share/flatpak")):
+        rec.source, rec.manager, rec.confidence = "flatpak", _label("flatpak"), "authoritative"
+        return rec
+    if rp.lower().endswith(".appimage"):
+        rec.source, rec.manager, rec.confidence = "appimage", _label("appimage"), "authoritative"
+        return rec
+    if ctx.brew_prefix and rp.startswith(ctx.brew_prefix.rstrip("/") + "/"):
+        rec.source, rec.manager, rec.confidence = "linuxbrew", _label("linuxbrew"), "authoritative"
+        return rec
+    lang = _lang_source_for_path(rp)
+    if lang:
+        rec.source, rec.package = lang
+        rec.manager, rec.confidence = _label(lang[0]), "authoritative"
+        return rec
+    if _shared_user_bin(rp):
+        return _classify_user_bin(rec, rp)
+    owner = _dpkg_owner(rp) or _rpm_owner(rp)
+    if owner:
+        rec.source, rec.manager, rec.package, rec.confidence = "apt", _label("apt"), owner, "authoritative"
+        return rec
+    if rp.startswith("/usr/local/") or rp.startswith(str(HOME)):
+        rec.source, rec.manager = "manual", _label("manual")
+        return rec
+    rec.manager = _label("unknown")
+    return rec
+
+
+def _linux_desktop_apps() -> list[tuple[str, str]]:
+    """Return (display_name, exec_path) for GUI apps from .desktop files.
+
+    Reuses the directory set + Name/Exec parsing idiom from
+    dot_config/shell/56_linux_apps.sh (the debugged version).
+    """
+    seen: dict[str, tuple[str, str]] = {}
+    for d in _LINUX_DESKTOP_DIRS:
+        dd = Path(d)
+        if not dd.is_dir():
+            continue
+        for f in sorted(dd.glob("*.desktop")):
+            name = exec_line = ""
+            nodisplay = False
+            try:
+                for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+                    if line.startswith("Name=") and not name:
+                        name = line[5:].strip()
+                    elif line.startswith("Exec=") and not exec_line:
+                        exec_line = line[5:].strip()
+                    elif line.startswith("NoDisplay=") and line[10:].strip().lower() == "true":
+                        nodisplay = True
+            except OSError:
+                continue
+            if nodisplay or not name or not exec_line:
+                continue
+            # Strip %f/%u field codes; take the argv[0] token.
+            cmd = re.sub(r"\s+%[a-zA-Z]", "", exec_line).split()
+            if not cmd:
+                continue
+            token = cmd[0]
+            path = token
+            if token in ("flatpak", "snap", "gio"):
+                path = exec_line  # keep whole line; classifier reads /var/lib markers
+            elif not token.startswith("/"):
+                resolved = shutil.which(token)
+                path = _realpath(resolved) if resolved else token
+            else:
+                path = _realpath(token)
+            seen.setdefault(name, (name, path))
+    return list(seen.values())
+
+
+# ===========================================================================
+# Enumeration + orchestration
+# ===========================================================================
+def _mac_gui_apps() -> list[Path]:
+    apps: list[Path] = []
+    for base in ("/Applications", str(HOME / "Applications")):
+        bd = Path(base)
+        if bd.is_dir():
+            apps.extend(sorted(bd.glob("*.app")))
+    return apps
+
+
+def _path_binaries() -> list[tuple[str, str]]:
+    """(command_name, resolved_path) for every executable on $PATH, deduped."""
+    seen_rp: set[str] = set()
+    result: list[tuple[str, str]] = []
+    seen_name: set[str] = set()
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        if not d:
+            continue
+        dd = Path(d)
+        try:
+            entries = sorted(dd.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            name = entry.name
+            if name in seen_name:
+                continue
+            try:
+                if not (entry.is_file() or entry.is_symlink()):
+                    continue
+                if not os.access(entry, os.X_OK):
+                    continue
+            except OSError:
+                continue
+            rp = _realpath(entry)
+            if rp in seen_rp:
+                seen_name.add(name)
+                continue
+            seen_rp.add(rp)
+            seen_name.add(name)
+            result.append((name, rp))
+    return result
+
+
+def _classify_gui(path: Path, mac_ctx, lin_ctx, *, evidence: bool) -> AppRecord:
+    if IS_MAC:
+        return _mac_classify_app(path, mac_ctx, evidence=evidence)
+    return _linux_classify_path(_realpath(path), path.name, lin_ctx, kind="gui")
+
+
+def _classify_cli(name: str, rp: str, mac_ctx, lin_ctx) -> AppRecord:
+    if IS_MAC:
+        return _mac_classify_cli(rp, name, mac_ctx)
+    return _linux_classify_path(rp, name, lin_ctx, kind="cli")
+
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
+def _cache_path() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    d = Path(base) / "appsrc"
+    d.mkdir(parents=True, exist_ok=True)
+    host = socket.gethostname().split(".")[0] or "host"
+    return d / f"{host}.json"
+
+
+def _cache_load() -> dict[str, dict]:
+    p = _cache_path()
+    if not p.is_file():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if data.get("version") != _CACHE_VERSION:
+        return {}
+    items = data.get("items")
+    return items if isinstance(items, dict) else {}
+
+
+def _cache_save(items: dict[str, dict]) -> None:
+    p = _cache_path()
+    tmp = p.with_suffix(".json.tmp")
+    payload = {
+        "version": _CACHE_VERSION,
+        "generated_at": time.time(),
+        "host": socket.gethostname().split(".")[0],
+        "items": items,
+    }
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        os.replace(tmp, p)
+    except OSError as e:
+        err.print(f"[yellow]appsrc: cache write failed: {e}[/yellow]")
+
+
+# ---------------------------------------------------------------------------
+# scan
+# ---------------------------------------------------------------------------
+def do_scan(args: argparse.Namespace) -> int:
+    mac_ctx = MacCtx() if IS_MAC else None
+    lin_ctx = LinuxCtx() if IS_LINUX else None
+
+    kind = args.kind
+    cache = {} if (args.refresh or args.no_cache) else _cache_load()
+    records: list[AppRecord] = []
+    fresh_items: dict[str, dict] = {}
+
+    def resolve(path_key: str, mt: float | None, compute) -> AppRecord:
+        cached = cache.get(path_key)
+        if cached and mt is not None and cached.get("mtime") == mt:
+            rec = AppRecord(**{k: v for k, v in cached.items() if k in AppRecord.__annotations__})
+        else:
+            rec = compute()
+        fresh_items[path_key] = asdict(rec)
+        return rec
+
+    if kind in ("gui", "all"):
+        if IS_MAC:
+            for app in _mac_gui_apps():
+                records.append(resolve(str(app), _mtime(app),
+                                       lambda a=app: _mac_classify_app(a, mac_ctx, evidence=False)))
+        elif IS_LINUX:
+            for name, path in _linux_desktop_apps():
+                records.append(resolve(f"gui::{name}", _mtime(path),
+                                       lambda n=name, p=path: _linux_classify_path(_realpath(p), n, lin_ctx, kind="gui")))
+
+    if kind in ("cli", "all"):
+        for name, rp in _path_binaries():
+            records.append(resolve(rp, _mtime(rp),
+                                   lambda n=name, r=rp: _classify_cli(n, r, mac_ctx, lin_ctx)))
+
+    if not args.no_cache:
+        _cache_save(fresh_items)
+
+    if args.source:
+        f = args.source.lower()
+        records = [r for r in records if f in r.source.lower() or f in _label(r.source).lower()]
+
+    if args.json:
+        print(json.dumps([asdict(r) for r in records], indent=2, default=str))
+        return 0
+
+    if args.tsv:
+        for r in sorted(records, key=lambda r: (r.source, r.name.lower())):
+            print("\t".join([r.name, _label(r.source), r.path or "", r.kind, r.package or ""]))
+        return 0
+
+    render_table(records, kind)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# which
+# ---------------------------------------------------------------------------
+def _find_gui_app(name: str) -> Path | None:
+    if name.lower().endswith(".app"):
+        cand = Path(name)
+        if cand.is_absolute() and cand.exists():
+            return cand
+    stem = name[:-4] if name.lower().endswith(".app") else name
+    for base in ("/Applications", str(HOME / "Applications")):
+        exact = Path(base, f"{stem}.app")
+        if exact.exists():
+            return exact
+        bd = Path(base)
+        if bd.is_dir():
+            for app in bd.glob("*.app"):
+                if app.stem.lower() == stem.lower():
+                    return app
+    return None
+
+
+def do_which(args: argparse.Namespace) -> int:
+    mac_ctx = MacCtx() if IS_MAC else None
+    lin_ctx = LinuxCtx() if IS_LINUX else None
+    name = args.name
+
+    if args.path:
+        p = Path(args.path)
+        if IS_MAC and p.suffix == ".app":
+            rec = _mac_classify_app(p, mac_ctx, evidence=True)
+        elif IS_MAC:
+            rec = _mac_classify_cli(_realpath(p), p.name, mac_ctx)
+        else:
+            rec = _linux_classify_path(_realpath(p), p.name, lin_ctx,
+                                       kind="gui" if p.suffix == ".desktop" else "cli")
+    else:
+        cmd = shutil.which(name)
+        if cmd:
+            rp = _realpath(cmd)
+            rec = _classify_cli(name, rp, mac_ctx, lin_ctx)
+        else:
+            app = _find_gui_app(name) if IS_MAC else None
+            if app:
+                rec = _mac_classify_app(app, mac_ctx, evidence=True)
+            elif IS_LINUX:
+                match = next((x for x in _linux_desktop_apps() if x[0].lower() == name.lower()), None)
+                if not match:
+                    err.print(f"[red]appsrc: '{name}' not found on PATH or as an app.[/red]")
+                    return 1
+                rec = _linux_classify_path(_realpath(match[1]), match[0], lin_ctx, kind="gui")
+            else:
+                err.print(f"[red]appsrc: '{name}' not found on PATH or in /Applications.[/red]")
+                return 1
+
+    if args.json:
+        print(json.dumps(asdict(rec), indent=2, default=str))
+        return 0
+
+    render_detail(rec)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Rendering
+# ---------------------------------------------------------------------------
+def render_table(records: list[AppRecord], kind: str) -> None:
+    if not records:
+        err.print("[yellow]appsrc: nothing found.[/yellow]")
+        return
+    records = sorted(records, key=lambda r: (r.source, r.name.lower()))
+    t = Table(title=f"Installed {kind} — install source", header_style="bold", expand=False)
+    t.add_column("Name", overflow="fold")
+    t.add_column("Source")
+    t.add_column("Package", overflow="fold")
+    t.add_column("Kind")
+    t.add_column("Path", overflow="fold", style="dim")
+    for r in records:
+        color = SOURCE_COLOR.get(r.source, "white")
+        src = Text(_label(r.source), style=color)
+        if r.confidence != "authoritative":
+            src.append(" ?", style="dim")
+        t.add_row(r.name, src, r.package or "", r.kind, r.path or "")
+    out.print(t)
+    # Source tally.
+    tally: dict[str, int] = {}
+    for r in records:
+        tally[r.source] = tally.get(r.source, 0) + 1
+    summary = "  ".join(f"[{SOURCE_COLOR.get(s,'white')}]{_label(s)}[/]: {n}"
+                        for s, n in sorted(tally.items(), key=lambda kv: -kv[1]))
+    out.print(f"\n{len(records)} total   {summary}")
+
+
+def render_detail(r: AppRecord) -> None:
+    color = SOURCE_COLOR.get(r.source, "white")
+    out.print(f"[bold]{r.name}[/bold]  ([{color}]{_label(r.source)}[/])"
+              + ("" if r.confidence == "authoritative" else "  [dim](heuristic)[/dim]"))
+    rows = [
+        ("kind", r.kind),
+        ("path", r.path),
+        ("package", r.package),
+        ("bundle id", r.bundle_id),
+        ("signer", r.signer),
+        ("origin", r.origin_url),
+        ("note", r.detail),
+    ]
+    for k, v in rows:
+        if v:
+            out.print(f"  [dim]{k:<10}[/dim] {v}")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    p = argparse.ArgumentParser(prog="appsrc",
+                                description="Detect how an installed app / CLI was installed & managed.")
+    sub = p.add_subparsers(dest="cmd")
+
+    ps = sub.add_parser("scan", help="Batch-inventory installed apps + CLIs (cached).")
+    ps.add_argument("--json", action="store_true", help="Emit JSON.")
+    ps.add_argument("--tsv", action="store_true",
+                    help="Emit TSV: name<TAB>source<TAB>path<TAB>kind<TAB>package (for tv / scripts).")
+    ps.add_argument("--kind", choices=["gui", "cli", "all"], default="all", help="Restrict inventory.")
+    ps.add_argument("--source", default="", help="Filter by source id/label substring.")
+    ps.add_argument("-r", "--refresh", action="store_true", help="Recompute; ignore cache.")
+    ps.add_argument("--no-cache", action="store_true", help="Don't read or write cache.")
+    ps.add_argument("--list-names", action="store_true", help=argparse.SUPPRESS)
+
+    pw = sub.add_parser("which", help="Single lookup (live): command or GUI app name.")
+    pw.add_argument("name", nargs="?", default="", help="Command or app name.")
+    pw.add_argument("--json", action="store_true", help="Emit JSON.")
+    pw.add_argument("--path", default="", help="Classify PATH directly.")
+
+    # Default routing: bare `appsrc` / flags → scan; a bare word → `which WORD`.
+    if not argv:
+        argv = ["scan"]
+    elif argv[0] in ("-h", "--help"):
+        pass
+    elif argv[0] not in ("scan", "which"):
+        argv = (["scan", *argv] if argv[0].startswith("-") else ["which", *argv])
+    return p.parse_args(argv)
+
+
+def _list_names() -> int:
+    if IS_MAC:
+        for app in _mac_gui_apps():
+            print(app.stem)
+    elif IS_LINUX:
+        for name, _ in _linux_desktop_apps():
+            print(name)
+    return 0
+
+
+def main() -> int:
+    args = parse_args(sys.argv[1:])
+    if getattr(args, "list_names", False):
+        return _list_names()
+    if args.cmd == "which":
+        if not args.name and not args.path:
+            err.print("[red]appsrc which: need a NAME or --path.[/red]")
+            return 2
+        return do_which(args)
+    return do_scan(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

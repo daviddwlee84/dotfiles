@@ -524,6 +524,12 @@ fleet *ARGS:
 mlf *ARGS:
     @uv run --script ./dot_dotfiles/bin/executable_mlf {{ARGS}}
 
+# appsrc — detect how an installed app / CLI was installed & managed.
+# `just appsrc which docker` / `just appsrc scan` / `just appsrc scan --json`.
+# Same binary chezmoi deploys to ~/.dotfiles/bin/appsrc; run from source here.
+appsrc *ARGS:
+    @uv run --script ./dot_dotfiles/bin/executable_appsrc {{ARGS}}
+
 # Apply chezmoi update to all configured hosts in parallel
 fleet-apply *ARGS:
     ./scripts/fleet/apply.py {{ARGS}}

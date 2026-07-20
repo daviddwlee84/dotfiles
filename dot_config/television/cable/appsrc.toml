@@ -1,0 +1,67 @@
+# appsrc channel — browse installed GUI apps + how each was installed.
+#
+# Thin channel: all detection lives in the `appsrc` CLI
+# (dot_dotfiles/bin/executable_appsrc). This file just shells out:
+#   appsrc scan --kind gui --tsv      (source — name<TAB>source<TAB>path<TAB>kind<TAB>package)
+#   appsrc which --path '<path>'      (preview + Enter detail; --path is unambiguous)
+# so the picker tracks the CLI automatically (no parallel logic to keep in sync).
+#
+# GUI apps only by design — a pickable set (~dozens). The full GUI+CLI
+# inventory (thousands of rows) is `appsrc scan` in the terminal.
+#
+# Non-templated: `appsrc` adapts to macOS/Linux internally, and the actions use
+# portable clipboard / open fallbacks, so one file works on both.
+#
+# Usage:
+#   tv appsrc
+#
+# Keybindings (Alt+ namespace — tmux root-table `bind -n C-*` shadows Ctrl+):
+#   Enter      Full detail (source + evidence: signer / bundle-id / origin URL)
+#   Alt+C      Copy the app path to the clipboard
+#   Alt+O      Reveal the app in Finder (macOS) / open it (Linux)
+#   Alt+J      Detail as JSON (piped through a pager)
+#   Ctrl+/     Toggle preview panel
+
+[metadata]
+name = "appsrc"
+description = "Installed apps — how each was installed (cask / App Store / direct / apt / snap / …)"
+requirements = ["appsrc"]
+
+[source]
+command = "appsrc scan --kind gui --tsv"
+# name<TAB>source-label<TAB>path<TAB>kind<TAB>package
+display = "{split:\\t:0}  ({split:\\t:1})"
+output = "{split:\\t:0}"
+
+[preview]
+command = "appsrc which --path '{split:\\t:2}'"
+header = "{split:\\t:0}  —  {split:\\t:1}"
+
+[ui]
+input_header = "Install source"
+
+[keybindings]
+enter = "actions:detail"
+alt-c = "actions:copy-path"
+alt-o = "actions:reveal"
+alt-j = "actions:json"
+
+[actions.detail]
+description = "Full source + evidence detail"
+command = "appsrc which --path '{split:\\t:2}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.copy-path]
+description = "Copy the app path to the clipboard"
+command = "printf '%s' '{split:\\t:2}' | (pbcopy 2>/dev/null || wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat >/dev/null)"
+mode = "fork"
+
+[actions.reveal]
+description = "Reveal in Finder (macOS) / open (Linux)"
+command = "open -R '{split:\\t:2}' 2>/dev/null || xdg-open '{split:\\t:2}' 2>/dev/null || true"
+mode = "fork"
+
+[actions.json]
+description = "Detail as JSON"
+command = "appsrc which --path '{split:\\t:2}' --json | ${PAGER:-less}; printf '\\n[Press Enter to exit]\\n'; read -r _"
+mode = "execute"

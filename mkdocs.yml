@@ -348,6 +348,7 @@ nav:
           - "fleet exec": tools/fleet-exec.md
           - "fleet hosts": tools/fleet-hosts.md
           - "yth (YouTube history)": tools/yth.md
+          - "appsrc (install-source detector)": tools/appsrc.md
           - direnv: tools/direnv.md
           - macOS swap & memory: tools/macos-swap.md
       - chezmoi conventions:

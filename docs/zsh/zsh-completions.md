@@ -155,6 +155,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 | `wake` | `dot_dotfiles/bin/executable_wake` | argparse | B | `dot_config/zsh/tools/54_wake_completion.zsh` + `dot_config/bash/54_wake_completion.bash` |
 | `view-office` | `dot_dotfiles/bin/executable_view-office` | bash hand-rolled | B | `dot_config/zsh/tools/55_view_office_completion.zsh` + `dot_config/bash/55_view_office_completion.bash` |
 | `view-ebook` | `dot_dotfiles/bin/executable_view-ebook` | bash hand-rolled | B | `dot_config/zsh/tools/56_view_ebook_completion.zsh` + `dot_config/bash/56_view_ebook_completion.bash` |
+| `appsrc` | `dot_dotfiles/bin/executable_appsrc` | argparse (subcommands) | B | `dot_config/zsh/tools/57_appsrc_completion.zsh` + `dot_config/bash/57_appsrc_completion.bash` |
 | `aiblock` | `scripts/aiblock.py` | questionary (interactive TUI) | — (no CLI args) | (not needed) |
 
 **Dynamic candidates wired up:**
@@ -164,6 +165,7 @@ Python CLI frameworks can generate completions. Pick by what your script uses:
 - `mlf` ids (run-id, experiment-id, model-name) — **not** auto-completed (would round-trip MLflow tracking server, possibly auth-required). Use `tv mlflow` for fuzzy id picking instead.
 - `yth` video ids — **not** auto-completed (opaque 11-char ids; enumerating the whole history on every TAB is wasteful). Use `tv yth` or `yth search <query>` instead.
 - `wake` host names — `_wake` shells out to `wake --list-names` (reads `~/.config/wake/hosts.toml`), same pattern as `_fleet_hosts_one`.
+- `appsrc which <name>` — `_appsrc_names` shells out to `appsrc scan --list-names` (installed GUI app names) and adds `_command_names -e` / `compgen -c` (PATH commands), so both a GUI app name and a shell command complete. Same shell-out pattern as `_wake` / `_fleet_hosts_one`.
 
 **Adding a new in-house CLI** (decision flow):
 
