@@ -17,6 +17,7 @@
 #
 # Keybindings (Alt+ namespace — tmux root-table `bind -n C-*` shadows Ctrl+):
 #   Enter      Full detail (source + evidence: signer / bundle-id / origin URL)
+#   Alt+S      Size report (bundle + associated storage: cache / data / containers)
 #   Alt+C      Copy the app path to the clipboard
 #   Alt+O      Reveal the app in Finder (macOS) / open it (Linux)
 #   Alt+J      Detail as JSON (piped through a pager)
@@ -42,6 +43,7 @@ input_header = "Install source"
 
 [keybindings]
 enter = "actions:detail"
+alt-s = "actions:size"
 alt-c = "actions:copy-path"
 alt-o = "actions:reveal"
 alt-j = "actions:json"
@@ -49,6 +51,11 @@ alt-j = "actions:json"
 [actions.detail]
 description = "Full source + evidence detail"
 command = "appsrc which --path '{split:\\t:2}'; echo; echo '[Press Enter to exit]'; read -r _"
+mode = "execute"
+
+[actions.size]
+description = "Footprint + associated storage (cache / data / containers)"
+command = "appsrc size --path '{split:\\t:2}'; echo; echo '[Press Enter to exit]'; read -r _"
 mode = "execute"
 
 [actions.copy-path]

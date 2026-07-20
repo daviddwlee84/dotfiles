@@ -121,7 +121,7 @@ Each works from any cwd. Run with `--help`, or read `docs/tools/<name>.md`. Full
 - **`ping-monitor`** — record ping over time, flag latency spikes. See `docs/tools/ping-monitor.md`.
 - **`wake`** — Wake-on-LAN sender: `wake <host>` powers a box on by magic packet (hosts in `~/.config/wake/hosts.toml`). Passive side = `installWakeOnLan` ansible role. See `docs/sysadmin/wake-on-lan.md`.
 - **`yth`** — search your YouTube watch history (title/channel/description + captions; Takeout import + optional cookie sync). Picker twin: `tv yth`. See `docs/tools/yth.md`.
-- **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`). Picker twin: `tv appsrc`. See `docs/tools/appsrc.md`.
+- **`appsrc`** — detect how an installed app / CLI was installed & managed (cask / App Store / direct-download / apt / snap / flatpak / AppImage / cargo/npm/pipx/uv/mise/go/gem / manual): `appsrc which <cmd-or-app>` (live), `appsrc size <app>` (footprint + associated cache/data/containers), bare `appsrc` / `appsrc scan` (cached inventory, `--json`/`--tsv`/`--size`). Picker twin: `tv appsrc`. See `docs/tools/appsrc.md`.
 - **`dotcfg`** — reconfigure dotfiles prompts (above).
 - **`sesh-preview`** — preview helper for the sesh picker.
 

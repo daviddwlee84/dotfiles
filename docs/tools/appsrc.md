@@ -31,6 +31,11 @@ $ appsrc scan --source cask             # filter by source id/label
 $ appsrc scan --json | jq '.[] | select(.source=="manual")'
 $ appsrc scan --tsv                     # name<TAB>source<TAB>path<TAB>kind<TAB>package
 $ appsrc scan --refresh                 # ignore cache, recompute
+
+# How much space does it cost (bundle + caches / data / containers)?
+$ appsrc size docker                    # bundle + ~/Library/Containers/… + caches, totalled
+$ appsrc size "Google Chrome" --json
+$ appsrc scan --kind gui --size         # add a bundle-size column to the inventory
 ```
 
 `which` is always live and gathers full evidence (codesign signer, bundle id,
@@ -85,6 +90,48 @@ CLI tools by resolved-path prefix (`~/.cargo/bin`, `~/.local/share/uv`, …).
   drag-installed `.app`, per [`pitfalls/brew-bundle-redownloads-manually-installed-cask.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/brew-bundle-redownloads-manually-installed-cask.md))
   is flagged `homebrew-cask` with `confidence: heuristic` and a drift note.
 
+## Space & associated storage (`appsrc size`)
+
+`appsrc size <name>` (or `--path`) reports an app's real disk cost: the bundle
+**plus** the storage it uses elsewhere — the caches, data, containers and prefs
+an uninstaller would hunt for. The reveal is often large:
+
+```console
+$ appsrc size docker
+Docker  (Homebrew cask)   total 25.3G
+  bundle 2.1G    other 23.3G
+  Size  Category   Path
+  2.1G  bundle     /Applications/Docker.app
+ 23.3G  container  ~/Library/Containers/com.docker.docker
+220.0K  cache      ~/Library/Caches/com.docker.docker
+  4.0K  prefs      ~/Library/Preferences/com.docker.docker.plist
+```
+
+`size` prefers the **GUI app** over a same-named CLI (a CLI shim living inside a
+`.app` is mapped back to the app), so `appsrc size docker` sizes Docker.app +
+its containers, not the `docker` shim. It's always live (no cache).
+
+**How associated storage is found:**
+- **exact** — keyed on the app's **bundle id**: `~/Library/{Caches,HTTPStorages,
+  Containers,WebKit}/<bid>`, `Preferences/<bid>.plist`, `Saved Application State`,
+  `Group Containers/*<bid>*`, matching `LaunchAgents`/`LaunchDaemons`.
+- **fuzzy** (`?` in the table) — name candidates (app name, `CFBundleName`,
+  bundle-id product, `Vendor/Product`) against `Application Support` / `Caches` /
+  `Logs`; for CLIs, the XDG dirs `~/.config|.cache|.local/share|.local/state/<name>`.
+
+**Caveats:** fuzzy matches are heuristic — they catch Chrome's `Application
+Support/Google/Chrome` and VSCode's `Code`, but a differently-named data dir can
+be missed, and a shared vendor dir can over-match. Every row shows its real path
+and is tagged `exact`/`fuzzy`; **nothing is ever deleted**. Overlapping
+parent/child paths are de-duplicated so space isn't double-counted. System
+(`/Library`) paths that need root are listed but marked `needs root` (no sudo).
+`du` is bounded by a 20 s per-path timeout (→ `?`), so a pathological cache dir
+can't hang the tool.
+
+`appsrc scan --size` adds a bundle-size column to the inventory (bundle only —
+associated storage is `size`-command territory); it's cached per-item by mtime,
+so re-scans are fast and a bundle size refreshes when the app updates.
+
 ## Cache
 
 `scan` caches to `${XDG_CACHE_HOME:-~/.cache}/appsrc/<hostname>.json`, keyed
@@ -96,8 +143,9 @@ scan ~15 s cold, ~5 s warm (~2 200 items); `which` is instant.
 ## Integration
 
 - **`tv appsrc`** — browse GUI apps by install source. `Enter` = detail,
-  `Alt+C` = copy path, `Alt+O` = reveal in Finder / open, `Alt+J` = JSON.
-  Sources `appsrc scan --kind gui --tsv`; preview is `appsrc which --path`.
+  `Alt+S` = size report, `Alt+C` = copy path, `Alt+O` = reveal in Finder / open,
+  `Alt+J` = JSON. Sources `appsrc scan --kind gui --tsv`; preview is `appsrc which
+  --path`.
 - **Completions** shell out to `appsrc scan --list-names` for GUI app names and
   add PATH commands, so `appsrc which <Tab>` completes either.
 

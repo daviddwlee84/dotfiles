@@ -16,16 +16,25 @@ _appsrc_names() {
 _appsrc_scan() {
     _arguments \
         '--json[emit JSON instead of a table]' \
+        '--tsv[emit TSV rows (name/source/path/kind/package[/size])]' \
         '--kind=[restrict inventory]:kind:(gui cli all)' \
         '--source=[filter by source id/label]:source:(homebrew-cask homebrew-formula mac-app-store direct-download-pkg direct-download-dmg manual macos-system apt snap flatpak appimage linuxbrew cargo npm pipx uv mise go gem)' \
         '(-r --refresh)'{-r,--refresh}'[recompute; ignore cache]' \
-        '--no-cache[do not read or write cache]'
+        '--no-cache[do not read or write cache]' \
+        '--size[also compute each item bundle size (cached)]'
 }
 
 _appsrc_which() {
     _arguments \
         '--json[emit JSON]' \
         '--path=[classify PATH directly]:path:_files' \
+        '1:name:_appsrc_names'
+}
+
+_appsrc_size() {
+    _arguments \
+        '--json[emit JSON]' \
+        '--path=[size PATH directly]:path:_files' \
         '1:name:_appsrc_names'
 }
 
@@ -42,6 +51,7 @@ _appsrc() {
             local -a subs=(
                 'scan:Batch-inventory installed apps + CLIs (cached)'
                 'which:Single lookup (live): command or GUI app name'
+                'size:Footprint + associated storage (cache/data/containers) for one app'
             )
             _describe -t subcommands 'appsrc subcommand' subs
             _appsrc_names   # bare word routes to `which`
@@ -49,6 +59,7 @@ _appsrc() {
         args)
             case "$line[1]" in
                 scan)  _appsrc_scan ;;
+                size)  _appsrc_size ;;
                 *)     _appsrc_which ;;   # `which` or a bare name
             esac
             ;;

@@ -19,7 +19,7 @@ _appsrc_completion() {
         # subcommands + app names (bare word routes to `which`)
         local apps
         apps=$(appsrc scan --list-names 2>/dev/null)
-        COMPREPLY=( $(compgen -W "scan which $apps" -- "$cur") )
+        COMPREPLY=( $(compgen -W "scan which size $apps" -- "$cur") )
         return
     fi
 
@@ -32,9 +32,9 @@ _appsrc_completion() {
                 --source)
                     COMPREPLY=( $(compgen -W "homebrew-cask homebrew-formula mac-app-store direct-download-pkg direct-download-dmg manual macos-system apt snap flatpak appimage linuxbrew cargo npm pipx uv mise go gem" -- "$cur") ); return ;;
             esac
-            COMPREPLY=( $(compgen -W "--json --kind --source -r --refresh --no-cache" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--json --tsv --kind --source -r --refresh --no-cache --size" -- "$cur") )
             ;;
-        which|*)
+        which|size|*)
             case "$prev" in
                 --path) _filedir; return ;;
             esac

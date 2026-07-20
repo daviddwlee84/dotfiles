@@ -84,6 +84,28 @@ class AppRecord:
     origin_url: str | None = None   # macOS kMDItemWhereFroms
     detail: str | None = None
     mtime: float | None = None
+    size_bytes: int | None = None   # bundle footprint; only filled by `scan --size`
+
+
+@dataclass
+class StorageItem:
+    category: str                   # bundle|cache|data|container|prefs|state|logs|web|launch|xdg
+    path: str
+    size_bytes: int | None          # None = unreadable / du timed out
+    confidence: str                 # "exact" | "fuzzy"
+    note: str | None = None
+
+
+@dataclass
+class SizeReport:
+    name: str
+    source: str
+    kind: str
+    path: str | None
+    bundle_bytes: int | None
+    associated_bytes: int           # sum of non-bundle items
+    total_bytes: int
+    items: list[StorageItem]
 
 
 SOURCE_LABELS = {
@@ -157,6 +179,37 @@ def _mtime(p: str | Path) -> float | None:
         return Path(p).stat().st_mtime
     except OSError:
         return None
+
+
+def _du_bytes(path: str | Path, timeout: float = 20.0) -> int | None:
+    """Disk usage of PATH in bytes via `du -sk`. None on error / timeout.
+
+    The subprocess timeout is the hard guard against a pathological cache dir
+    (millions of tiny files / a networked mount) hanging the tool.
+    """
+    p = str(path)
+    if not os.path.exists(p):
+        return None
+    rc, so, _ = _run(["du", "-sk", p], timeout=timeout)
+    # du may exit non-zero on permission-denied subdirs yet still print the
+    # total to stdout; a real timeout kills du → empty stdout → None.
+    if not so.strip():
+        return None
+    try:
+        return int(so.split()[0]) * 1024
+    except (ValueError, IndexError):
+        return None
+
+
+def _human(n: int | None) -> str:
+    if n is None:
+        return "?"
+    size = float(n)
+    for unit in ("B", "K", "M", "G", "T"):
+        if size < 1024 or unit == "T":
+            return f"{size:.0f}{unit}" if unit == "B" else f"{size:.1f}{unit}"
+        size /= 1024
+    return f"{size:.1f}T"
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +360,12 @@ class MacCtx:
 def _mac_bundle_id(app: Path) -> str | None:
     plist = app / "Contents" / "Info"
     rc, so, _ = _run(["defaults", "read", str(plist), "CFBundleIdentifier"], timeout=8)
+    return so.strip() if rc == 0 and so.strip() else None
+
+
+def _mac_bundle_name(app: Path) -> str | None:
+    plist = app / "Contents" / "Info"
+    rc, so, _ = _run(["defaults", "read", str(plist), "CFBundleName"], timeout=8)
     return so.strip() if rc == 0 and so.strip() else None
 
 
@@ -719,6 +778,9 @@ def do_scan(args: argparse.Namespace) -> int:
             rec = AppRecord(**{k: v for k, v in cached.items() if k in AppRecord.__annotations__})
         else:
             rec = compute()
+        # --size rides the mtime cache: only (re)compute when missing.
+        if args.size and rec.size_bytes is None and rec.path:
+            rec.size_bytes = _du_bytes(rec.path)
         fresh_items[path_key] = asdict(rec)
         return rec
 
@@ -750,10 +812,13 @@ def do_scan(args: argparse.Namespace) -> int:
 
     if args.tsv:
         for r in sorted(records, key=lambda r: (r.source, r.name.lower())):
-            print("\t".join([r.name, _label(r.source), r.path or "", r.kind, r.package or ""]))
+            row = [r.name, _label(r.source), r.path or "", r.kind, r.package or ""]
+            if args.size:
+                row.append(str(r.size_bytes) if r.size_bytes is not None else "")
+            print("\t".join(row))
         return 0
 
-    render_table(records, kind)
+    render_table(records, kind, show_size=args.size)
     return 0
 
 
@@ -765,64 +830,254 @@ def _find_gui_app(name: str) -> Path | None:
         cand = Path(name)
         if cand.is_absolute() and cand.exists():
             return cand
-    stem = name[:-4] if name.lower().endswith(".app") else name
+    stem_lc = (name[:-4] if name.lower().endswith(".app") else name).lower()
+    # Glob-scan (not an exact Path check) so we return the real on-disk casing —
+    # APFS is case-insensitive, so `/Applications/docker.app` "exists" but would
+    # mislabel the app "docker" instead of "Docker".
     for base in ("/Applications", str(HOME / "Applications")):
-        exact = Path(base, f"{stem}.app")
-        if exact.exists():
-            return exact
         bd = Path(base)
         if bd.is_dir():
             for app in bd.glob("*.app"):
-                if app.stem.lower() == stem.lower():
+                if app.stem.lower() == stem_lc:
                     return app
+    return None
+
+
+def _resolve_record(name: str, path: str, mac_ctx, lin_ctx, prefer_app: bool = False) -> AppRecord | None:
+    """Resolve a NAME (command or GUI app) or explicit --path to an AppRecord.
+
+    evidence=True so macOS bundle_id/signer are populated (needed for sizing).
+    prefer_app=True (used by `size`) resolves a GUI app ahead of a same-named
+    command, and maps a CLI shim living inside a .app back to that .app — so
+    `appsrc size docker` sizes Docker.app + its containers, not the CLI shim.
+    Returns None if nothing matches. Shared by `which` and `size`.
+    """
+    if path:
+        p = Path(path)
+        if IS_MAC and p.suffix == ".app":
+            return _mac_classify_app(p, mac_ctx, evidence=True)
+        if IS_MAC:
+            return _mac_classify_cli(_realpath(p), p.name, mac_ctx)
+        return _linux_classify_path(_realpath(p), p.name, lin_ctx,
+                                    kind="gui" if p.suffix == ".desktop" else "cli")
+    if prefer_app and IS_MAC and name:
+        app = _find_gui_app(name)
+        if app:
+            return _mac_classify_app(app, mac_ctx, evidence=True)
+    cmd = shutil.which(name)
+    if cmd:
+        rp = _realpath(cmd)
+        if prefer_app and IS_MAC and ".app/Contents/" in rp:
+            app = Path(rp[: rp.index(".app/Contents/") + 4])
+            return _mac_classify_app(app, mac_ctx, evidence=True)
+        return _classify_cli(name, rp, mac_ctx, lin_ctx)
+    if IS_MAC:
+        app = _find_gui_app(name)
+        return _mac_classify_app(app, mac_ctx, evidence=True) if app else None
+    if IS_LINUX:
+        match = next((x for x in _linux_desktop_apps() if x[0].lower() == name.lower()), None)
+        if match:
+            return _linux_classify_path(_realpath(match[1]), match[0], lin_ctx, kind="gui")
     return None
 
 
 def do_which(args: argparse.Namespace) -> int:
     mac_ctx = MacCtx() if IS_MAC else None
     lin_ctx = LinuxCtx() if IS_LINUX else None
-    name = args.name
-
-    if args.path:
-        p = Path(args.path)
-        if IS_MAC and p.suffix == ".app":
-            rec = _mac_classify_app(p, mac_ctx, evidence=True)
-        elif IS_MAC:
-            rec = _mac_classify_cli(_realpath(p), p.name, mac_ctx)
-        else:
-            rec = _linux_classify_path(_realpath(p), p.name, lin_ctx,
-                                       kind="gui" if p.suffix == ".desktop" else "cli")
-    else:
-        cmd = shutil.which(name)
-        if cmd:
-            rp = _realpath(cmd)
-            rec = _classify_cli(name, rp, mac_ctx, lin_ctx)
-        else:
-            app = _find_gui_app(name) if IS_MAC else None
-            if app:
-                rec = _mac_classify_app(app, mac_ctx, evidence=True)
-            elif IS_LINUX:
-                match = next((x for x in _linux_desktop_apps() if x[0].lower() == name.lower()), None)
-                if not match:
-                    err.print(f"[red]appsrc: '{name}' not found on PATH or as an app.[/red]")
-                    return 1
-                rec = _linux_classify_path(_realpath(match[1]), match[0], lin_ctx, kind="gui")
-            else:
-                err.print(f"[red]appsrc: '{name}' not found on PATH or in /Applications.[/red]")
-                return 1
-
+    rec = _resolve_record(args.name, args.path, mac_ctx, lin_ctx)
+    if rec is None:
+        err.print(f"[red]appsrc: '{args.name or args.path}' not found on PATH or as an app.[/red]")
+        return 1
     if args.json:
         print(json.dumps(asdict(rec), indent=2, default=str))
         return 0
-
     render_detail(rec)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# size — footprint + associated storage
+# ---------------------------------------------------------------------------
+def _name_candidates(rec: AppRecord, app: Path | None) -> list[str]:
+    """Name variants an app might use for its data/cache dirs (fuzzy matching)."""
+    cands: list[str] = []
+
+    def add(x: str | None) -> None:
+        if x and x not in cands:
+            cands.append(x)
+
+    add(rec.name)
+    if app is not None:
+        add(app.stem)
+        add(_mac_bundle_name(app))
+    if rec.bundle_id:
+        parts = rec.bundle_id.split(".")
+        add(parts[-1])                          # product
+        if len(parts) >= 3:
+            add(f"{parts[-2]}/{parts[-1]}")     # Vendor/Product nesting (Google/Chrome)
+    return cands
+
+
+def _dedup_nested(items: list[StorageItem]) -> list[StorageItem]:
+    """Drop any item whose path sits inside another kept item's path.
+
+    A vendor/app data dir already contains its cache subdir; counting both
+    would double-count. Keep the shortest (ancestor) path, drop descendants.
+    """
+    kept: list[StorageItem] = []
+    for it in sorted(items, key=lambda i: len(i.path)):
+        if any(it.path == k.path or it.path.startswith(k.path.rstrip("/") + "/") for k in kept):
+            continue
+        kept.append(it)
+    return kept
+
+
+def _sized_item(category: str, path: Path, confidence: str, note: str | None = None) -> StorageItem | None:
+    if not path.exists():
+        return None
+    readable = os.access(path, os.R_OK)
+    size = _du_bytes(path) if readable else None
+    if not readable and note is None:
+        note = "needs root"
+    return StorageItem(category=category, path=str(path), size_bytes=size,
+                       confidence=confidence, note=note)
+
+
+def _mac_associated(rec: AppRecord, app: Path) -> list[StorageItem]:
+    bid = rec.bundle_id
+    lib = HOME / "Library"
+    items: list[StorageItem] = []
+    seen: set[str] = set()
+
+    def push(it: StorageItem | None) -> None:
+        if it and it.path not in seen:
+            seen.add(it.path)
+            items.append(it)
+
+    if bid:
+        for cat, p in (
+            ("cache", lib / "Caches" / bid),
+            ("cache", lib / "HTTPStorages" / bid),
+            ("container", lib / "Containers" / bid),
+            ("data", lib / "Application Scripts" / bid),
+            ("prefs", lib / "Preferences" / f"{bid}.plist"),
+            ("state", lib / "Saved Application State" / f"{bid}.savedState"),
+            ("web", lib / "WebKit" / bid),
+            ("web", lib / "Cookies" / f"{bid}.binarycookies"),
+        ):
+            push(_sized_item(cat, p, "exact"))
+        for gc in (lib / "Group Containers").glob(f"*{bid}*"):
+            push(_sized_item("container", gc, "exact"))
+        for la in (lib / "LaunchAgents").glob(f"*{bid}*.plist"):
+            push(_sized_item("launch", la, "exact"))
+        for bh in (lib / "Preferences" / "ByHost").glob(f"{bid}.*"):
+            push(_sized_item("prefs", bh, "exact"))
+        for sysdir in (Path("/Library/LaunchDaemons"), Path("/Library/LaunchAgents")):
+            for la in sysdir.glob(f"*{bid}*"):
+                push(_sized_item("launch", la, "exact"))
+
+    for cand in _name_candidates(rec, app):
+        for base, cat in ((lib / "Application Support", "data"),
+                          (lib / "Caches", "cache"),
+                          (lib / "Logs", "logs"),
+                          (Path("/Library/Application Support"), "data")):
+            push(_sized_item(cat, base / cand, "fuzzy"))
+    return items
+
+
+def _cli_associated(rec: AppRecord) -> list[StorageItem]:
+    items: list[StorageItem] = []
+    seen: set[str] = set()
+
+    def push(it: StorageItem | None) -> None:
+        if it and it.path not in seen:
+            seen.add(it.path)
+            items.append(it)
+
+    for cand in _name_candidates(rec, None):
+        for base, cat in ((HOME / ".config", "data"), (HOME / ".cache", "cache"),
+                          (HOME / ".local/share", "data"), (HOME / ".local/state", "state")):
+            push(_sized_item(cat, base / cand, "fuzzy"))
+        if IS_MAC:
+            push(_sized_item("cache", HOME / "Library/Caches" / cand, "fuzzy"))
+            push(_sized_item("data", HOME / "Library/Application Support" / cand, "fuzzy"))
+    return items
+
+
+def _linux_associated(rec: AppRecord) -> list[StorageItem]:
+    items: list[StorageItem] = []
+    nm = rec.package or rec.name
+    if rec.source == "snap":
+        for p in (HOME / "snap" / nm, Path("/var/snap") / nm):
+            it = _sized_item("data", p, "exact")
+            if it:
+                items.append(it)
+    elif rec.source == "flatpak":
+        it = _sized_item("data", HOME / ".var/app" / nm, "fuzzy")
+        if it:
+            items.append(it)
+    return items + _cli_associated(rec)
+
+
+def _bundle_size(rec: AppRecord) -> tuple[int | None, str | None]:
+    """(bytes, path_used). Walks up to the Homebrew keg / uses pkg metadata where apt."""
+    if rec.source == "apt" and rec.package and _has("dpkg-query"):
+        rc, so, _ = _run(["dpkg-query", "-W", "-f=${Installed-Size}", rec.package], timeout=10)
+        if rc == 0 and so.strip().isdigit():
+            return int(so.strip()) * 1024, f"dpkg:{rec.package}"
+    if rec.source == "snap":
+        keg = f"/snap/{rec.package or rec.name}/current"
+        return _du_bytes(keg), keg
+    if not rec.path:
+        return None, None
+    p = rec.path
+    if rec.kind == "cli" and "/Cellar/" in p:
+        idx = p.index("/Cellar/") + len("/Cellar/")
+        rest = p[idx:].split("/")
+        if len(rest) >= 2:
+            keg = p[:idx] + "/".join(rest[:2])   # Cellar/<formula>/<version>
+            return _du_bytes(keg), keg
+    return _du_bytes(p), p
+
+
+def compute_size(rec: AppRecord) -> SizeReport:
+    bundle_bytes, bpath = _bundle_size(rec)
+    items: list[StorageItem] = []
+    if bpath:
+        items.append(StorageItem("bundle", bpath, bundle_bytes, "exact"))
+    if IS_MAC and rec.kind == "gui" and rec.path:
+        items += _mac_associated(rec, Path(rec.path))
+    elif IS_LINUX and rec.kind == "gui":
+        items += _linux_associated(rec)
+    else:
+        items += _cli_associated(rec)
+    items = _dedup_nested(items)
+    assoc = sum(i.size_bytes or 0 for i in items if i.category != "bundle")
+    total = (bundle_bytes or 0) + assoc
+    return SizeReport(name=rec.name, source=rec.source, kind=rec.kind, path=rec.path,
+                      bundle_bytes=bundle_bytes, associated_bytes=assoc,
+                      total_bytes=total, items=items)
+
+
+def do_size(args: argparse.Namespace) -> int:
+    mac_ctx = MacCtx() if IS_MAC else None
+    lin_ctx = LinuxCtx() if IS_LINUX else None
+    rec = _resolve_record(args.name, args.path, mac_ctx, lin_ctx, prefer_app=True)
+    if rec is None:
+        err.print(f"[red]appsrc: '{args.name or args.path}' not found on PATH or as an app.[/red]")
+        return 1
+    rep = compute_size(rec)
+    if args.json:
+        print(json.dumps(asdict(rep), indent=2, default=str))
+        return 0
+    render_size(rep)
     return 0
 
 
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
-def render_table(records: list[AppRecord], kind: str) -> None:
+def render_table(records: list[AppRecord], kind: str, show_size: bool = False) -> None:
     if not records:
         err.print("[yellow]appsrc: nothing found.[/yellow]")
         return
@@ -832,13 +1087,19 @@ def render_table(records: list[AppRecord], kind: str) -> None:
     t.add_column("Source")
     t.add_column("Package", overflow="fold")
     t.add_column("Kind")
+    if show_size:
+        t.add_column("Size", justify="right")
     t.add_column("Path", overflow="fold", style="dim")
     for r in records:
         color = SOURCE_COLOR.get(r.source, "white")
         src = Text(_label(r.source), style=color)
         if r.confidence != "authoritative":
             src.append(" ?", style="dim")
-        t.add_row(r.name, src, r.package or "", r.kind, r.path or "")
+        row = [r.name, src, r.package or "", r.kind]
+        if show_size:
+            row.append(_human(r.size_bytes))
+        row.append(r.path or "")
+        t.add_row(*row)
     out.print(t)
     # Source tally.
     tally: dict[str, int] = {}
@@ -846,7 +1107,11 @@ def render_table(records: list[AppRecord], kind: str) -> None:
         tally[r.source] = tally.get(r.source, 0) + 1
     summary = "  ".join(f"[{SOURCE_COLOR.get(s,'white')}]{_label(s)}[/]: {n}"
                         for s, n in sorted(tally.items(), key=lambda kv: -kv[1]))
-    out.print(f"\n{len(records)} total   {summary}")
+    extra = ""
+    if show_size:
+        tot = sum(r.size_bytes or 0 for r in records)
+        extra = f"   [bold]{_human(tot)}[/bold] sized"
+    out.print(f"\n{len(records)} total   {summary}{extra}")
 
 
 def render_detail(r: AppRecord) -> None:
@@ -867,6 +1132,29 @@ def render_detail(r: AppRecord) -> None:
             out.print(f"  [dim]{k:<10}[/dim] {v}")
 
 
+def render_size(rep: SizeReport) -> None:
+    color = SOURCE_COLOR.get(rep.source, "white")
+    out.print(f"[bold]{rep.name}[/bold]  ([{color}]{_label(rep.source)}[/])   "
+              f"total [bold]{_human(rep.total_bytes)}[/bold]")
+    out.print(f"  [dim]bundle[/dim] {_human(rep.bundle_bytes)}    "
+              f"[dim]other[/dim] {_human(rep.associated_bytes)}")
+    if len(rep.items) <= 1:
+        out.print("  [dim](no associated storage found)[/dim]")
+        return
+    rows = sorted(rep.items, key=lambda i: (i.category != "bundle", -(i.size_bytes or 0)))
+    t = Table(header_style="bold", expand=False, show_edge=False, pad_edge=False, box=None)
+    t.add_column("Size", justify="right")
+    t.add_column("Category")
+    t.add_column("Path", overflow="fold", style="dim")
+    for it in rows:
+        cat = it.category if it.confidence == "exact" else f"[dim]{it.category} ?[/dim]"
+        path_cell = it.path if not it.note else f"{it.path}  [yellow dim]({it.note})[/yellow dim]"
+        t.add_row(_human(it.size_bytes), cat, path_cell)
+    out.print(t)
+    if any(i.confidence == "fuzzy" for i in rep.items):
+        out.print("  [dim]? = fuzzy (name-based) match — verify before acting; never auto-deleted[/dim]")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -883,6 +1171,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ps.add_argument("--source", default="", help="Filter by source id/label substring.")
     ps.add_argument("-r", "--refresh", action="store_true", help="Recompute; ignore cache.")
     ps.add_argument("--no-cache", action="store_true", help="Don't read or write cache.")
+    ps.add_argument("--size", action="store_true",
+                    help="Also compute each item's bundle size (slower; mtime-cached).")
     ps.add_argument("--list-names", action="store_true", help=argparse.SUPPRESS)
 
     pw = sub.add_parser("which", help="Single lookup (live): command or GUI app name.")
@@ -890,12 +1180,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     pw.add_argument("--json", action="store_true", help="Emit JSON.")
     pw.add_argument("--path", default="", help="Classify PATH directly.")
 
+    pz = sub.add_parser("size", help="Footprint + associated storage (cache/data/containers) for one app.")
+    pz.add_argument("name", nargs="?", default="", help="Command or app name.")
+    pz.add_argument("--json", action="store_true", help="Emit JSON.")
+    pz.add_argument("--path", default="", help="Size PATH directly.")
+
     # Default routing: bare `appsrc` / flags → scan; a bare word → `which WORD`.
     if not argv:
         argv = ["scan"]
     elif argv[0] in ("-h", "--help"):
         pass
-    elif argv[0] not in ("scan", "which"):
+    elif argv[0] not in ("scan", "which", "size"):
         argv = (["scan", *argv] if argv[0].startswith("-") else ["which", *argv])
     return p.parse_args(argv)
 
@@ -919,6 +1214,11 @@ def main() -> int:
             err.print("[red]appsrc which: need a NAME or --path.[/red]")
             return 2
         return do_which(args)
+    if args.cmd == "size":
+        if not args.name and not args.path:
+            err.print("[red]appsrc size: need a NAME or --path.[/red]")
+            return 2
+        return do_size(args)
     return do_scan(args)
 
 
