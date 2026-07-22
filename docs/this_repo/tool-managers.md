@@ -1123,6 +1123,7 @@ list.
 | **resilio-sync** | brew cask (GUI app) | Resilio apt repo → headless daemon + WebUI (per-user systemd service) | resilio_sync |
 | **resvg** | brew | Linuxbrew → `cargo install resvg` (no apt pkg; non-fatal if absent) | devtools — yazi SVG preview. See [yazi-previews.md](../tools/yazi-previews.md) |
 | **ripgrep** | brew | apt/yum → GitHub release | base |
+| **rsync** | brew | apt / yum (usually preinstalled) | base — replaces macOS's built-in openrsync 2.6.9 (no `--info` etc.); brew rsync 3.x lands in brew's bin (`/opt/homebrew/bin` Apple Silicon, `/usr/local/bin` Intel) ahead of `/usr/bin` on PATH |
 | **ruby** | mise | mise (skipped in noRoot) | mise |
 | **rust** | mise | mise → rustup-init → `static.rust-lang.org` fallback | mise + rust_cargo_tools |
 | **rustscan** | brew | GitHub release | networking_tools |

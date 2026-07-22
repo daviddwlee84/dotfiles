@@ -11,6 +11,7 @@
       - wget
       - ripgrep
       - fd
+      - rsync
       - jq
       - tree
       - just
@@ -75,6 +76,7 @@
       - wget
       - ripgrep
       - fd-find
+      - rsync
       - jq
       - tree
       - build-essential
@@ -123,7 +125,7 @@
   ansible.builtin.shell: |
     set -e
     missing=()
-    for p in git git-lfs curl wget jq tree gcc gcc-c++ make; do
+    for p in git git-lfs curl wget jq tree gcc gcc-c++ make rsync; do
       rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
     done
     if [ -z "${missing[*]:-}" ]; then
