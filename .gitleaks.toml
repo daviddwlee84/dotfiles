@@ -132,6 +132,15 @@ useDefault = true
   regex       = '''\bsk-or-v1-[a-f0-9]{64}\b'''
   tags        = ["key", "openrouter", "auto"]
 
+[[rules]]
+  id          = "grafana-service-account-token"
+  description = "Grafana service-account token (glsa_<32 chars>_<8 hex crc>)"
+  # Pasted verbatim when wiring up the Grafana MCP (GRAFANA_SERVICE_ACCOUNT_TOKEN).
+  # Fixed `glsa_<32 alnum>_<8 hex crc>` shape; strict enough that the redaction
+  # sentinel `glsa_<REDACTED>` and doc placeholders (glsa_xxx) never match.
+  regex       = '''\bglsa_[A-Za-z0-9]{32}_[0-9a-f]{8}\b'''
+  tags        = ["key", "grafana", "auto"]
+
 # ---------------------------------------------------------------------------
 # Clash / V2Ray / mihomo proxy config leaks. Example sources:
 #   - Pasted Clash YAML in SpecStory transcripts / coding-agent plan files
