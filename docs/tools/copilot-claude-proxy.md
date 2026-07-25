@@ -375,7 +375,7 @@ Nothing else in the logs distinguishes this from "my org disabled Claude" — bo
 produce the identical GitHub 400. `copilot-proxy doctor` compares the proxy's
 cached list against a live upstream fetch and tells you which one you have. Fix
 for the cache case is just `copilot-proxy restart`. Full write-up:
-[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](../../pitfalls/copilot-api-caches-degraded-model-list-at-startup.md).
+[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md).
 
 ### `settings.local.json` env beats shell env (docs say otherwise)
 

@@ -32,6 +32,7 @@
 copilot-proxy auth      # 一次性：GitHub 裝置登入 (device login)（儲存 ghu_ token）
 
 claude-copilot          # 一次性 session 走代理（自動啟動代理；不寫任何檔案）
+claude-copilot-once     # 釘住「這個專案」跑一次 session，結束自動解除（代理需已啟動）
 
 copilot-here on         # 或者：釘選「這個專案」—— 之後直接跑 `claude` 就走代理
 copilot-here off        # 取消釘選 —— 回到真正的 Anthropic 後端
@@ -164,6 +165,28 @@ token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv
   `--no-specstory` 刻意不繼承（既然退出 specstory，就一併退出它的設定）。
 - 還原 = 不用還原；下次直接跑 `claude` 完全不受影響。
 
+### `claude-copilot-once [--no-specstory] [claude args...]` —— 一次性釘選 session
+
+第一層的用完即丟 + 第二層的可靠度：用 `copilot-here on` 釘住 **這個專案**，跑一個
+`claude-copilot` session，結束時 `copilot-here off` —— 連 Ctrl-C 也會還原。當純環境變數
+注入不夠力（因為 `settings.local.json` 位階高於 shell env，見陷阱章節）、但你又不想留下
+一個黏著的 pin 時就用它。
+
+- **前提條件：** 代理必須**已經**在跑 —— 跟 `claude-copilot` 不同，它**不會**自動啟動；
+  代理沒回應時它只印出 `copilot-proxy start` 提示並回傳非零。
+- **不動既有 pin：** 如果這個專案的 `copilot-here` 本來就是 `on`，結束時會原樣保留
+  （不會去解除你沒要求解除的 pin）。如果那個 pin **過期了** —— 跟現在 `copilot-here on`
+  會寫入的內容不一致，例如預設值已經移到 `claude-opus-5[1m]` 而 pin 還停在
+  `claude-opus-4-8[1m]`，或是 pin 建立時某個 key 還不存在 —— 它會印出差異，並詢問要
+  就地更新（`copilot-here on`）還是保留。預設答案是**保留**（stdin 非互動時自動保留）。
+  差異的計算方式是拿現檔去 diff `copilot-here on` 會合併的那份 env 區塊
+  （`_copilot_env_json`，兩邊共用的唯一來源），所以它精確等於「`on` 會改動的 key」——
+  不是一份會默默落後的手挑清單。檔案裡有、但不在那份區塊裡的 key **不算**差異：
+  `on` 只合併、從不移除（只有 `off` 會移除）。`copilot-here status` 會印出同一份差異報告。
+- session 本身就是 `claude-copilot "$@"`，所以 specstory 自動存檔、`--no-specstory`、
+  `-c`（繼續）的行為完全一致。
+- 結束時會提醒你代理還開著，以及怎麼 `copilot-proxy stop`。
+
 ### `copilot-run <cmd...>` —— 泛用環境變數注入器
 
 `claude-copilot` 底下的積木：自動啟動代理，然後帶著代理 env 執行 *任意* 指令。
@@ -196,11 +219,14 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
 - 目前專案的 `copilot-here` 是 ON → 編輯 `./.claude/settings.local.json`。
 - 否則 → 寫入全域狀態檔 `~/.local/state/copilot-proxy/model`，由
   `claude-copilot`、`copilot-run` 與下一次 `copilot-here on` 讀取。
-  （`$COPILOT_CLAUDE_MODEL` 可覆寫狀態檔；最終預設是 `claude-opus-4.8`。）
+  （`$COPILOT_CLAUDE_MODEL` 可覆寫狀態檔；最終預設是 `claude-opus-5[1m]`。）
 
 行為：
 
-- 模糊 id：`copilot-model opus-4.8` 會解析成 `claude-opus-4.8`。
+- 模糊 id：`copilot-model opus-4-8` 會解析成 `claude-opus-4-8`；點號寫法也會被
+  正規化（`opus-4.8` 一樣可用）。
+- `[1m]` 後綴（`copilot-model 'opus-4-8[1m]'`）驗證時會被剝掉、之後再接回去 ——
+  它是只給 Claude Code 看的 1M context 提示，詳見下方模型 id 章節。
 - 會對照即時的代理 `/v1/models` 驗證（代理未啟動時退回靜態 Claude 清單）；打錯字與不明確的
   前綴會被拒絕。
 - 無參數 → `fzf` 選單。`-c` 印出目前模型以及它來自哪一層。
@@ -214,11 +240,11 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4.5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4.5",
+    "ANTHROPIC_MODEL": "claude-opus-5[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
@@ -278,25 +304,60 @@ binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時�
 log 裡沒有任何其他線索能把這個情況跟「我的組織停用了 Claude」區分開 —— 兩者產生的
 GitHub 400 一模一樣。`copilot-proxy doctor` 會把代理的快取清單跟即時上游清單相比對，
 直接告訴你是哪一種。若是快取問題，修法就只是 `copilot-proxy restart`。完整說明：
-[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](../../pitfalls/copilot-api-caches-degraded-model-list-at-startup.md)。
+[`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md)。
+
+### `settings.local.json` 的 env 蓋過 shell env（官方文件說法相反）
+
+實測確認（2026-07）：目前版本的 Claude Code 會讓 `./.claude/settings.local.json` 的
+`env` 區塊 **蓋過繼承而來的 shell 環境變數** —— 跟官方 settings 文件暗示的順序相反。
+後果：
+
+- `claude-copilot` / `copilot-run` **無法**改寫一個已經 `copilot-here on` 的專案
+  （兩邊指向同一個代理時無害，指向不同時就會靜默地用錯設定）。
+- 想透過 wrapper 試另一個代理／port，必須先 `copilot-here off`。
+
+### fork 沒有速率限制器
+
+fork 的 `start` 拿掉了 `--rate-limit`/`--wait`。它 README 給的緩解方式是改成減少
+Claude Code 的背景雜訊 —— 那正是 `COPILOT_PROXY_QUIET=1` 注入的東西（這裡預設關閉；
+我們優先保 UX 而不是 Copilot quota）。真的需要請求節流的話，退回原始套件：
+`COPILOT_API_PKG=copilot-api@0.7.0`。
+
+### fork 的小毛病：`context_management` 可能 400
+
+較新的 Claude Code context-editing 可能會塞入 `context_management`，而 Copilot 原生的
+`/v1/messages` endpoint 會以 400 拒絕
+（[caozhiyuan#305](https://github.com/caozhiyuan/copilot-api/issues/305)，與版本有關）。
+實際測試中真實的 Claude Code 執行沒有觸發到，但如果你在長 session 看到無法解釋的 400，
+先去看那個 issue。
 
 ### 不要使用 Claude Code 內建的 `/model` 選單
 
-它送出的是 Anthropic 的 *官方* id（例如 `claude-opus-4-8-YYYYMMDD`），但 Copilot 後端只
-認得自己的 id（`claude-opus-4.8`）。從選單挑會產生：
+它送出的是 Anthropic 的 *官方* 帶日期 id（例如 `claude-opus-4-8-YYYYMMDD`），會被 Copilot
+後端拒絕：
 
 ```
 API Error: 400 {"error":{"message":"The requested model is not supported.",
 "code":"model_not_supported", ...}}
 ```
 
-改用 `copilot-model` 釘選模型。
+改用 `copilot-model` 釘選模型 —— 不帶日期的連字號 id（`claude-opus-4-8`）可以正常運作，
+只有選單送出的帶日期 id 會失敗。
 
-### 「Opus 4 retired」警告只是顯示問題 (cosmetic)
+### 點號 id 會造成「Opus 4 retired」警告與 >100% 的 context HUD
 
-Claude Code 顯示 `[Opus 4]` 並警告 *"Claude Opus 4 was retired"* —— 它無法把 Copilot id
-對應到內建的 Anthropic 表，於是退回最接近的（已退役）名稱。請求其實仍正確路由到
-`claude-opus-4.8`。沒有乾淨的方法移除此警告；忽略即可。
+歷史陷阱，已由連字號預設值修掉。使用 **點號** id（`claude-opus-4.8`，也就是舊版原始代理
+唯一接受的形狀）時，Claude Code 無法對應到它內建的模型表，於是：
+
+- 顯示 `[Opus 4]` 並警告 *"Claude Opus 4 was retired"*（退回最接近的、已退役的名稱），且
+- 假設 context window 是 **200k**，但 Copilot 實際上以 **1M** 提供 opus-5 / opus-4-8 /
+  sonnet-5（`/v1/models` 裡的 `max_context_window_tokens: 1000000`）—— 所以 HUD/statusline
+  的 context 可能顯示超過 100%，compaction 也會用錯誤的預算觸發。
+
+正確做法就是目前 helper 預設注入的 id 形狀：**`claude-opus-5[1m]`** —— 連字號讓 Claude Code
+認得這個 family（顯示名稱正確、沒有退役警告），`[1m]` 後綴讓它把 context 算成 1M。
+Claude Code 送出前會把 `[1m]` 剝掉，所以代理收到的是合法 id（在原生 API 呼叫裡放**字面上**
+的 `...[1m]` 會被拒絕 —— `copilot-model` 驗證時會自行處理剝除）。
 
 ### Token 陷阱：`gho_` vs `ghu_`
 
@@ -314,22 +375,27 @@ OpenCode 的 `gho_` token（OAuth App）只有在 *直接* 當 Bearer 打 `api.g
 
 ## 可用的 Claude 模型 id
 
-經 `/v1/models` 驗證（2026-07）：`claude-opus-4.5`、`claude-opus-4.6`、
-`claude-opus-4.7`、`claude-opus-4.8`、`claude-sonnet-4.5`、`claude-sonnet-4.6`、
-`claude-sonnet-5`、`claude-haiku-4.5`。非 Claude 模型（gpt-5.5、
-gemini-3.1-pro-preview…）也有提供 —— 見 `copilot-model -l` 或 `GET /v1/models`。
+經 `/v1/models` + `/v1/messages` 驗證（2026-07）：`claude-opus-4-5`、`claude-opus-4-6`、
+`claude-opus-4-7`、`claude-opus-4-8`、`claude-opus-5`、`claude-sonnet-4-5`、
+`claude-sonnet-4-6`、`claude-sonnet-5`、`claude-haiku-4-5`。fork 在請求時連字號與舊的點號
+形式（`claude-opus-4.8`）都收，但**在 Claude Code 裡請用連字號 id** —— 點號會破壞它的
+模型辨識（見陷阱章節）。`/v1/models` capabilities 回報的 context window：opus-5、opus-4-8
+與 sonnet-5 是 **1M**（`max_prompt_tokens: 936000`），haiku-4-5 是 200k —— 對 1M 的模型
+請補上 `[1m]` 後綴讓 Claude Code 知道。非 Claude 模型（gpt-5.5、gemini-3.1-pro-preview…）
+也有提供 —— 見 `copilot-model -l` 或 `GET /v1/models`。
 
 ## 實用指令
 
 ```sh
 claude-copilot                       # 一次性代理 session（specstory 包裝）
+claude-copilot-once                  # 透過 settings.local.json pin 跑一次 session（自動還原）
 copilot-here status                  # 這個專案有釘在代理上嗎？
 copilot-model -c                     # 目前模型 + 來自哪一層
 copilot-proxy status                 # 有沒有在跑？提供哪些 Claude 模型？
 copilot-proxy whoami                 # 驗證 token → 帳號 / plan / quota
 copilot-proxy logs 60                # tail 代理的 log
-# 用量儀表板 (dashboard)：
-#   https://ericc-ch.github.io/copilot-api?endpoint=http://localhost:4141/usage
+# 用量儀表板 (dashboard)（fork 已在本地內建）：
+#   http://localhost:4141/usage-viewer?endpoint=http://localhost:4141/usage
 ```
 
 ## 參見
