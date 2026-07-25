@@ -192,6 +192,16 @@ project-level settings files — but **not** an active `copilot-here` pin in
   auto-save — same convention as `scode`/`svibe`); opt out with
   `--no-specstory`. Extra args reach the claude CLI via specstory's
   `-c "custom command"` passthrough: `claude-copilot -c` → continue session.
+- **The passthrough preserves your `claude_cmd`.** specstory's `-c` *replaces*
+  the provider command rather than appending to it, so the args are appended to
+  the effective `claude_cmd` from your specstory config (project
+  `./.specstory/cli/config.toml` > user `~/.specstory/cli/config.toml` > bare
+  `claude`). That is what keeps `claude_cmd = "claude --dangerously-skip-permissions"`
+  in force for `claude-copilot --resume <id>` and not just for a bare
+  `claude-copilot` — the two used to disagree, see
+  [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md).
+  `--no-specstory` deliberately does *not* inherit it (opting out of specstory
+  opts out of its config too).
 - Revert = nothing to revert; plain `claude` next time is untouched.
 
 ### `claude-copilot-once [--no-specstory] [claude args...]` — one-shot pinned session

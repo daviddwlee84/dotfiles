@@ -951,11 +951,61 @@ copilot-run() {
     "$@"
 }
 
+# --- specstory `-c` passthrough (why the base command must come from config) ----
+#
+# specstory's `-c/--command` REPLACES the provider's configured command — it does
+# NOT append to it. The shipped config says as much: "Use of these is equivalent
+# to -c \"custom command\"" — same slot, last write wins. So a hardcoded
+# `-c "claude $*"` silently drops every flag in `claude_cmd` the moment
+# claude-copilot has args to pass through.
+#
+# Symptom that found this (verified 2026-07, specstory 2.5.0): with
+# `claude_cmd = "claude --dangerously-skip-permissions"` in the specstory config,
+# a bare `claude-copilot-once` took the no-`-c` branch and correctly ran in
+# bypass-permissions mode, but `claude-copilot-once --resume X` took the `-c`
+# branch and fell back to ~/.claude/settings.json's permissions.defaultMode
+# ("auto"). Same wrapper, opposite permission mode, no warning either way.
+#
+# Deriving the base command from the config keeps specstory the single source of
+# truth for BOTH branches: change `claude_cmd` there and both paths follow.
+# `--no-specstory` deliberately does NOT inherit it (opting out of specstory
+# means opting out of its config too).
+
+# Effective `claude_cmd`, honouring specstory's own precedence:
+#   project ./.specstory/cli/config.toml > user ~/.specstory/cli/config.toml
+#   > bare `claude`
+# Matches UNCOMMENTED assignments only — both shipped configs carry a commented
+# `# claude_cmd = "claude"` example, and matching that would re-introduce the very
+# bug this exists to fix. Handles TOML's double- and single-quoted strings.
+_copilot_specstory_claude_cmd() {
+  local f cmd=''
+  for f in ".specstory/cli/config.toml" "$HOME/.specstory/cli/config.toml"; do
+    [ -f "$f" ] || continue
+    cmd="$(command sed -n \
+      -e "s/^[[:space:]]*claude_cmd[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+      -e "s/^[[:space:]]*claude_cmd[[:space:]]*=[[:space:]]*'\([^']*\)'.*/\1/p" \
+      "$f" 2>/dev/null | command head -n 1)"
+    if [ -n "$cmd" ]; then break; fi
+  done
+  printf '%s' "${cmd:-claude}"
+}
+
+# Single-quote ONE argument for embedding in specstory's `-c` command STRING.
+# specstory shell-splits that string honouring quotes (verified: `-p 'a b'`
+# arrives as a single argv entry), so quoting is both possible and necessary —
+# the old `"claude $*"` flattened `claude-copilot -p "two words"` into two
+# separate arguments. POSIX escape for an embedded quote: close, \', reopen.
+_copilot_shquote() {
+  printf "'%s'" "$(printf '%s' "${1:-}" | command sed "s/'/'\\\\''/g")"
+}
+
 # One-off Claude Code session backed by the Copilot proxy. Nothing on disk
 # changes — revert is just running plain `claude` next time.
 # Wraps in `specstory run` when specstory is installed (markdown auto-save,
 # same convention as scode/svibe); opt out with --no-specstory. Extra args go
-# to the claude CLI (via specstory's -c "custom command" passthrough).
+# to the claude CLI via specstory's -c "custom command" passthrough, appended to
+# the configured `claude_cmd` (see the block above — `-c` REPLACES that command,
+# so we have to rebuild it or its flags are lost).
 # Example:
 #   claude-copilot                 # specstory run claude (proxy env)
 #   claude-copilot -c              # continue last session
@@ -973,7 +1023,14 @@ claude-copilot() {
   esac
   if [ "$ss" = "auto" ] && command -v specstory >/dev/null 2>&1; then
     if [ "$#" -gt 0 ]; then
-      copilot-run specstory run claude -c "claude $*"
+      # Rebuild what `-c` clobbers: the configured base command (ITS flags left
+      # unquoted so specstory splits them normally) + each of our args quoted.
+      local _cc_cmd _cc_arg
+      _cc_cmd="$(_copilot_specstory_claude_cmd)"
+      for _cc_arg in "$@"; do
+        _cc_cmd="$_cc_cmd $(_copilot_shquote "$_cc_arg")"
+      done
+      copilot-run specstory run claude -c "$_cc_cmd"
     else
       copilot-run specstory run claude
     fi

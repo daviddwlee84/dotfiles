@@ -153,6 +153,15 @@ token：憑證是透過 `curl -K -`（stdin）傳入，而非 argv，因為 argv
   跟 `scode`/`svibe` 同一套慣例）；用 `--no-specstory` 退出。額外參數透過
   specstory 的 `-c "custom command"` 傳給 claude CLI：`claude-copilot -c`
   → 繼續上一個 session。
+- **傳參數時會保留你設定的 `claude_cmd`。** specstory 的 `-c` 是「**取代**」
+  provider 指令而不是「附加」，所以這裡會先取出 specstory 設定檔中生效的
+  `claude_cmd`（專案 `./.specstory/cli/config.toml` > 使用者
+  `~/.specstory/cli/config.toml` > 裸 `claude`），再把參數接在後面。這正是讓
+  `claude_cmd = "claude --dangerously-skip-permissions"` 對
+  `claude-copilot --resume <id>` 也生效、而不是只對沒帶參數的 `claude-copilot`
+  生效的原因 —— 這兩者以前行為並不一致，詳見
+  [`pitfalls/specstory-custom-command-drops-configured-flags.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/specstory-custom-command-drops-configured-flags.md)。
+  `--no-specstory` 刻意不繼承（既然退出 specstory，就一併退出它的設定）。
 - 還原 = 不用還原；下次直接跑 `claude` 完全不受影響。
 
 ### `copilot-run <cmd...>` —— 泛用環境變數注入器
