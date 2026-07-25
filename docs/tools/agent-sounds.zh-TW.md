@@ -121,7 +121,7 @@ peon volume 0.4 && chezmoi diff # 必須是空的 —— 證明 config 沒被管
 要在既有機器上改：
 
 ```sh
-just reconfigure -- --set agentSounds=peon --yes
+just reconfigure --set agentSounds=peon --yes
 chezmoi apply
 ```
 

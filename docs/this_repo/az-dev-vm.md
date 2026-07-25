@@ -14,7 +14,7 @@ Implementation: [`scripts/azure/dev_vm.py`](../../scripts/azure/dev_vm.py)
 ## Prerequisites (controlling box)
 
 - `az` CLI on PATH — installed by the `iac_tools` ansible role
-  (`just reconfigure -- --set installIacTools=true --yes`) or the
+  (`just reconfigure --set installIacTools=true --yes`) or the
   [official installer](https://learn.microsoft.com/cli/azure/install-azure-cli).
 - A live `az login` session (the script checks `az account show` and exits
   with a hint otherwise).

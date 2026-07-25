@@ -184,7 +184,7 @@ To change options later, don't hand-edit `~/.config/chezmoi/chezmoi.toml` — ru
 
 ```bash
 just reconfigure                 # interactive (or: czcfg)
-just reconfigure -- --set installLlmTools=true --yes   # non-interactive single key
+just reconfigure --set installLlmTools=true --yes   # non-interactive single key
 ```
 
 See [`scripts/init/README.md`](scripts/init/README.md) → "Reconfigure".

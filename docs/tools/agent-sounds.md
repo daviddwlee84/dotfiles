@@ -135,7 +135,7 @@ tier prunes OUR entries…`).
 chezmoi config. To change it on an existing machine:
 
 ```sh
-just reconfigure -- --set agentSounds=peon --yes
+just reconfigure --set agentSounds=peon --yes
 chezmoi apply
 ```
 

@@ -141,7 +141,7 @@ chezmoi-reinit:
 #     just bootstrap-local                  # interactive
 #     just bootstrap-local -- doctor        # schema parity check (alias for gen --check)
 #     just bootstrap-local -- list-bundles  # show bundles
-#     just bootstrap-local -- --yes --bundle minimal  # non-interactive
+#     just bootstrap-local --yes --bundle minimal  # non-interactive
 bootstrap-local *ARGS:
     @echo "[bootstrap-local] running scripts/init/dotfiles_init.py from local source"
     uv run --script scripts/init/dotfiles_init.py {{ARGS}}
@@ -156,15 +156,15 @@ bootstrap-local-verbose *ARGS:
 # `chezmoi init --apply --prompt` so the new answers actually take effect
 # (the `--prompt` is what re-fires promptXOnce; without it the old values win).
 # Non-interactive single-key changes (space-separated, for scripts / fleet):
-#     just reconfigure -- --set installLlmTools=true motdStyle=figlet --yes
-#     just reconfigure -- --dry-run        # preview the chezmoi command
+#     just reconfigure --set installLlmTools=true motdStyle=figlet --yes
+#     just reconfigure --dry-run        # preview the chezmoi command
 reconfigure *ARGS:
     uv run --script scripts/init/dotfiles_init.py reconfigure {{ARGS}}
 
 # Regenerate the chezmoi prompt blocks (.chezmoi.toml.tmpl + Dockerfile) from
 # PROMPTS in scripts/init/dotfiles_init.py — the single source of truth. Run
 # after editing PROMPTS, then commit the regenerated files. The pre-commit
-# `dotfiles-init-gen-check` hook (or `just gen-prompts -- --check`) fails on drift.
+# `dotfiles-init-gen-check` hook (or `just gen-prompts --check`) fails on drift.
 gen-prompts *ARGS:
     uv run --script scripts/init/dotfiles_init.py gen --source . {{ARGS}}
 
