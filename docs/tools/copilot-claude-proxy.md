@@ -217,11 +217,17 @@ leave a sticky pin behind.
   returns non-zero if the proxy isn't answering.
 - **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
   left in place on exit (nothing is unpinned that you didn't ask for). If that
-  pin has gone **stale** — its model/base differs from the current defaults, e.g.
-  an older `claude-opus-4-8[1m]` after the default moved to `claude-opus-5[1m]` —
-  it prints the drift and asks whether to refresh it in place (`copilot-here on`)
-  or keep it. The answer defaults to **keep** (and keeps automatically on a
-  non-interactive stdin).
+  pin has gone **stale** — it differs from what `copilot-here on` would write
+  now, e.g. an older `claude-opus-4-8[1m]` after the default moved to
+  `claude-opus-5[1m]`, or a pin written before a key was added — it prints the
+  drift and asks whether to refresh it in place (`copilot-here on`) or keep it.
+  The answer defaults to **keep** (and keeps automatically on a non-interactive
+  stdin). Drift is computed by diffing the live file against the exact env block
+  `copilot-here on` would merge (`_copilot_env_json`, the single source of truth
+  for both), so it is precisely "the keys `on` would change" — no hand-picked
+  subset that can silently fall behind. Keys present in the file but not in that
+  block are *not* drift: `on` merges and never removes (only `off` removes).
+  `copilot-here status` prints the same drift report.
 - The session itself is just `claude-copilot "$@"`, so specstory auto-save,
   `--no-specstory`, and `-c` (continue) all work the same way.
 - On exit it reminds you the proxy is still up and how to `copilot-proxy stop`.

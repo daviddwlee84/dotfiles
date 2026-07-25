@@ -1046,6 +1046,39 @@ claude-copilot() {
 # regardless of the knob's value at `off` time).
 _copilot_here_keys='["ANTHROPIC_BASE_URL","ANTHROPIC_AUTH_TOKEN","ANTHROPIC_MODEL","ANTHROPIC_DEFAULT_OPUS_MODEL","ANTHROPIC_DEFAULT_SONNET_MODEL","ANTHROPIC_DEFAULT_HAIKU_MODEL","ANTHROPIC_SMALL_FAST_MODEL","CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC","CLAUDE_CODE_ATTRIBUTION_HEADER","CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION","CLAUDE_CODE_ENABLE_AWAY_SUMMARY","DISABLE_NON_ESSENTIAL_MODEL_CALLS"]'
 
+# The EXACT env object `copilot-here on` would write right now, as JSON.
+#
+# SINGLE SOURCE OF TRUTH for both `copilot-here on` (what it merges in) and
+# _copilot_here_drift (what it compares against). These were two hand-maintained
+# copies and they had already diverged: `on` wrote 8 keys while the drift check
+# compared only 4, so a pin written by an older `on` — current models but no
+# ANTHROPIC_DEFAULT_HAIKU_MODEL / ANTHROPIC_SMALL_FAST_MODEL /
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC — reported "no drift" while `on`
+# would still have changed it. Add a key here and BOTH sides follow.
+#
+# Needs jq; every caller already requires it.
+_copilot_env_json() {
+  jq -n \
+    --arg base_url "$(_copilot_pinned_base)" \
+    --arg model "$(_copilot_default_model)" \
+    --arg quiet "${COPILOT_PROXY_QUIET:-0}" '
+    {
+      ANTHROPIC_BASE_URL: $base_url,
+      ANTHROPIC_AUTH_TOKEN: "dummy",
+      ANTHROPIC_MODEL: $model,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: $model,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-5[1m]",
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4-5",
+      ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4-5",
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    } + (if $quiet == "1" then {
+      CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "false",
+      CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
+      DISABLE_NON_ESSENTIAL_MODEL_CALLS: "1"
+    } else {} end)'
+}
+
 # Pin THIS project to the Copilot proxy via ./.claude/settings.local.json —
 # the gitignored local layer that overrides the committed .claude/settings.json
 # (so claude-plans-here's plansDirectory stays untouched). Plain `claude` then
@@ -1068,25 +1101,9 @@ copilot-here() {
       [ -f "$settings" ] && base="$(command cat "$settings")"
       [ -n "$base" ] || base='{}'
       local model; model="$(_copilot_default_model)"
-      local quiet="${COPILOT_PROXY_QUIET:-0}"
       local tmp; tmp="$(command mktemp "${TMPDIR:-/tmp}/copilot-here.XXXXXX")" || return 1
-      if printf '%s' "$base" | jq \
-          --arg base_url "$(_copilot_pinned_base)" --arg model "$model" --arg quiet "$quiet" '
-          .env = ((.env // {}) + {
-            ANTHROPIC_BASE_URL: $base_url,
-            ANTHROPIC_AUTH_TOKEN: "dummy",
-            ANTHROPIC_MODEL: $model,
-            ANTHROPIC_DEFAULT_OPUS_MODEL: $model,
-            ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-5[1m]",
-            ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4-5",
-            ANTHROPIC_SMALL_FAST_MODEL: "claude-haiku-4-5",
-            CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-          } + (if $quiet == "1" then {
-            CLAUDE_CODE_ATTRIBUTION_HEADER: "0",
-            CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "false",
-            CLAUDE_CODE_ENABLE_AWAY_SUMMARY: "0",
-            DISABLE_NON_ESSENTIAL_MODEL_CALLS: "1"
-          } else {} end))' >"$tmp"; then
+      if printf '%s' "$base" | jq --argjson want "$(_copilot_env_json)" \
+          '.env = ((.env // {}) + $want)' >"$tmp"; then
         command mv -- "$tmp" "$settings"
       else
         command rm -f -- "$tmp"
@@ -1266,28 +1283,34 @@ _copilot_confirm() {
 }
 
 # Has THIS project's copilot-here pin drifted from what `copilot-here on` would
-# write now (default model bumped, proxy port/shim moved)? Prints one
-# "key: old -> new" line per drifted key to stdout; exit 0 = stale (drift
-# printed), 1 = up-to-date or not pinned. `copilot-here on` re-merges exactly
-# these keys, so refreshing a stale pin is just running it again.
+# write now (default model bumped, proxy port/shim moved, a key added since the
+# pin was written)? Prints one "KEY : old -> new" line per drifted key to stdout;
+# exit 0 = stale (drift printed), 1 = up-to-date or not pinned. `copilot-here on`
+# re-merges exactly these keys, so refreshing a stale pin is just running it again.
+#
+# Drift is defined as "the set of keys `copilot-here on` would actually CHANGE",
+# computed by diffing the live file against _copilot_env_json — not a hand-picked
+# subset (that is how three keys silently went unchecked). Note the asymmetry is
+# deliberate: keys present in the file but absent from the want-set are NOT drift,
+# because `on` merges and never removes them (only `off` does).
 _copilot_here_drift() {
   local settings=".claude/settings.local.json"
   [ -f "$settings" ] || return 1
   command -v jq >/dev/null 2>&1 || return 1
-  local want_base want_model cur found=1
-  want_base="$(_copilot_pinned_base)"
-  want_model="$(_copilot_default_model)"
   # ANTHROPIC_BASE_URL is only set while the pin is ON — absent → nothing to do.
-  cur="$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)"
-  [ -n "$cur" ] || return 1
-  [ "$cur" = "$want_base" ]  || { printf '  base_url : %s -> %s\n' "$cur" "$want_base";  found=0; }
-  cur="$(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings" 2>/dev/null)"
-  [ "$cur" = "$want_model" ] || { printf '  model    : %s -> %s\n' "$cur" "$want_model"; found=0; }
-  cur="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // "(unset)"' "$settings" 2>/dev/null)"
-  [ "$cur" = "$want_model" ] || { printf '  opus     : %s -> %s\n' "$cur" "$want_model"; found=0; }
-  cur="$(jq -r '.env.ANTHROPIC_DEFAULT_SONNET_MODEL // "(unset)"' "$settings" 2>/dev/null)"
-  [ "$cur" = "claude-sonnet-5[1m]" ] || { printf '  sonnet   : %s -> %s\n' "$cur" "claude-sonnet-5[1m]"; found=0; }
-  return $found
+  [ -n "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" ] || return 1
+  local want out
+  want="$(_copilot_env_json)" || return 1
+  out="$(jq -r --argjson want "$want" '
+    (.env // {}) as $cur
+    | [ $want
+        | to_entries[]
+        | select($cur[.key] != .value)
+        | "  \(.key) : \($cur[.key] // "(unset)") -> \(.value)" ]
+    | .[]' "$settings" 2>/dev/null)"
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
+  return 0
 }
 
 # --- model switcher -------------------------------------------------------------
