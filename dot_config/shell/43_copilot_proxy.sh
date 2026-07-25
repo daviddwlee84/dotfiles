@@ -1083,6 +1083,8 @@ copilot-here() {
     status)
       if [ -f "$settings" ] && [ "$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)" != "" ]; then
         printf '%s\n' "copilot-here: ON  (base: $(jq -r '.env.ANTHROPIC_BASE_URL' "$settings"), model: $(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings"))"
+        local _drift; _drift="$(_copilot_here_drift)"
+        [ -n "$_drift" ] && { printf '%s\n' "  ⚠ stale vs current defaults:"; printf '%s\n' "$_drift"; printf '%s\n' "  refresh in place: copilot-here on"; }
         _copilot_alive || printf '%s\n' "  ⚠ proxy not running — start it with: copilot-proxy start"
       else
         printf '%s\n' "copilot-here: off  (enable: copilot-here on; one-off: claude-copilot)"
@@ -1146,7 +1148,21 @@ claude-copilot-once() {
     # fire on the wrong event when bash sources this file.
     trap '_copilot_once_trap' INT TERM HUP
   else
-    printf '%s\n' "claude-copilot-once: copilot-here already ON here — leaving the pin in place on exit."
+    # Already pinned here. If the pin drifted from current defaults (model bump,
+    # proxy moved), offer to refresh it in place; otherwise leave it untouched.
+    # Either way it was already ON, so it stays ON on exit (no revert, no trap).
+    local _drift; _drift="$(_copilot_here_drift)"
+    if [ -n "$_drift" ]; then
+      printf '%s\n' "claude-copilot-once: this project's copilot-here pin looks stale:" >&2
+      printf '%s\n' "$_drift" >&2
+      if _copilot_confirm "  override with current defaults? (keep = default) [y/N]"; then
+        copilot-here on || return 1
+      else
+        printf '%s\n' "claude-copilot-once: kept the existing pin (stays ON on exit)." >&2
+      fi
+    else
+      printf '%s\n' "claude-copilot-once: copilot-here already ON here — leaving the pin in place on exit."
+    fi
   fi
 
   # 3. One session — specstory-wrapped + arg passthrough (reuses claude-copilot).
@@ -1173,6 +1189,48 @@ _copilot_once_trap() {
   trap - INT TERM HUP
   printf '\n%s\n' "claude-copilot-once: interrupted — unpinned (copilot-here off). Proxy still up." >&2
   kill -INT $$ 2>/dev/null
+}
+
+# --- pin staleness: detect drift + confirm-to-refresh ---------------------------
+
+# POSIX y/N prompt. Returns 0 only on an explicit yes; a non-interactive stdin
+# (no TTY) returns 1 — the safe default (keep, don't override). We only call this
+# right before launching an interactive Claude Code session, so reading stdin is
+# fine. NOT `read -q` (zsh-only) — this file is sourced by bash too.
+_copilot_confirm() {
+  local _ans
+  [ -t 0 ] || return 1
+  printf '%s ' "${1:-Proceed? [y/N]}" >&2
+  IFS= read -r _ans || return 1
+  case "$_ans" in
+    [yY]|[yY][eE][sS]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Has THIS project's copilot-here pin drifted from what `copilot-here on` would
+# write now (default model bumped, proxy port/shim moved)? Prints one
+# "key: old -> new" line per drifted key to stdout; exit 0 = stale (drift
+# printed), 1 = up-to-date or not pinned. `copilot-here on` re-merges exactly
+# these keys, so refreshing a stale pin is just running it again.
+_copilot_here_drift() {
+  local settings=".claude/settings.local.json"
+  [ -f "$settings" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  local want_base want_model cur found=1
+  want_base="$(_copilot_pinned_base)"
+  want_model="$(_copilot_default_model)"
+  # ANTHROPIC_BASE_URL is only set while the pin is ON — absent → nothing to do.
+  cur="$(jq -r '.env.ANTHROPIC_BASE_URL // empty' "$settings" 2>/dev/null)"
+  [ -n "$cur" ] || return 1
+  [ "$cur" = "$want_base" ]  || { printf '  base_url : %s -> %s\n' "$cur" "$want_base";  found=0; }
+  cur="$(jq -r '.env.ANTHROPIC_MODEL // "(unset)"' "$settings" 2>/dev/null)"
+  [ "$cur" = "$want_model" ] || { printf '  model    : %s -> %s\n' "$cur" "$want_model"; found=0; }
+  cur="$(jq -r '.env.ANTHROPIC_DEFAULT_OPUS_MODEL // "(unset)"' "$settings" 2>/dev/null)"
+  [ "$cur" = "$want_model" ] || { printf '  opus     : %s -> %s\n' "$cur" "$want_model"; found=0; }
+  cur="$(jq -r '.env.ANTHROPIC_DEFAULT_SONNET_MODEL // "(unset)"' "$settings" 2>/dev/null)"
+  [ "$cur" = "claude-sonnet-5[1m]" ] || { printf '  sonnet   : %s -> %s\n' "$cur" "claude-sonnet-5[1m]"; found=0; }
+  return $found
 }
 
 # --- model switcher -------------------------------------------------------------

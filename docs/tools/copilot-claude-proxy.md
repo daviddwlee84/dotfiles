@@ -206,7 +206,12 @@ leave a sticky pin behind.
   this does **not** auto-start it; it prints a `copilot-proxy start` hint and
   returns non-zero if the proxy isn't answering.
 - **Prior-pin safe:** if `copilot-here` is already `on` here, the existing pin is
-  left in place on exit (nothing is unpinned that you didn't ask for).
+  left in place on exit (nothing is unpinned that you didn't ask for). If that
+  pin has gone **stale** — its model/base differs from the current defaults, e.g.
+  an older `claude-opus-4-8[1m]` after the default moved to `claude-opus-5[1m]` —
+  it prints the drift and asks whether to refresh it in place (`copilot-here on`)
+  or keep it. The answer defaults to **keep** (and keeps automatically on a
+  non-interactive stdin).
 - The session itself is just `claude-copilot "$@"`, so specstory auto-save,
   `--no-specstory`, and `-c` (continue) all work the same way.
 - On exit it reminds you the proxy is still up and how to `copilot-proxy stop`.
@@ -234,7 +239,9 @@ so plain `claude` (and `scode`/`svibe` panes, which just run
   `.claude/settings.json` (`plansDirectory` etc.) is never touched.
 - `off` — removes exactly the env keys `on` added; other content you put in
   `settings.local.json` survives, and the file is deleted if it becomes empty.
-- `status` — pinned? which base URL / model? warns when the proxy isn't running.
+- `status` — pinned? which base URL / model? Flags a **stale** pin (model/base
+  drifted from the current defaults) with the exact diff and a `copilot-here on`
+  refresh hint, and warns when the proxy isn't running.
 
 ### `copilot-model [<id>|-l|-c]`
 
