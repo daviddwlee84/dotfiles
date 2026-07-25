@@ -246,7 +246,7 @@ committed `.claude/settings.json`:
 - otherwise → writes the global state file
   `~/.local/state/copilot-proxy/model`, which `claude-copilot`, `copilot-run`
   and the next `copilot-here on` pick up. (`$COPILOT_CLAUDE_MODEL` overrides
-  the state file; final fallback is `claude-opus-4-8[1m]`.)
+  the state file; final fallback is `claude-opus-5[1m]`.)
 
 Behavior:
 
@@ -270,8 +270,8 @@ Behavior:
   "env": {
     "ANTHROPIC_BASE_URL": "http://localhost:4141",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4-8[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8[1m]",
+    "ANTHROPIC_MODEL": "claude-opus-5[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5[1m]",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5",
     "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5",
@@ -403,13 +403,13 @@ fails to match its built-in model table, so it:
 
 - displays `[Opus 4]` and warns *"Claude Opus 4 was retired"* (falls back to
   the nearest known, retired name), and
-- assumes a **200k** context window, while Copilot actually serves opus-4-8 /
-  sonnet-5 with **1M** (`max_context_window_tokens: 1000000` in `/v1/models`)
+- assumes a **200k** context window, while Copilot actually serves opus-5 /
+  opus-4-8 / sonnet-5 with **1M** (`max_context_window_tokens: 1000000` in `/v1/models`)
   — so HUD/statusline context can read >100% and compaction triggers on the
   wrong budget.
 
 The fix is the id shape the helpers now inject by default:
-**`claude-opus-4-8[1m]`** — hyphenated so Claude Code recognizes the family
+**`claude-opus-5[1m]`** — hyphenated so Claude Code recognizes the family
 (correct display name, no retirement warning), plus the `[1m]` suffix so it
 sizes context to 1M. Claude Code strips `[1m]` before sending, so the proxy
 sees a valid id (a *literal* `...[1m]` in a raw API call is rejected —
@@ -432,12 +432,12 @@ reuse OpenCode's.** Token is stored at `~/.local/share/copilot-api/github_token`
 ## Available Claude model ids
 
 Verified via `/v1/models` + `/v1/messages` (2026-07): `claude-opus-4-5`,
-`claude-opus-4-6`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-sonnet-4-5`,
-`claude-sonnet-4-6`, `claude-sonnet-5`, `claude-haiku-4-5`. The fork accepts
+`claude-opus-4-6`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-opus-5`,
+`claude-sonnet-4-5`, `claude-sonnet-4-6`, `claude-sonnet-5`, `claude-haiku-4-5`. The fork accepts
 both hyphenated and legacy dotted (`claude-opus-4.8`) forms at request time,
 but **use hyphenated ids in Claude Code** — dotted ids break its model
 detection (see Gotchas). Context windows from `/v1/models` capabilities:
-opus-4-8 and sonnet-5 are **1M** (`max_prompt_tokens: 936000`), haiku-4-5 is
+opus-5, opus-4-8 and sonnet-5 are **1M** (`max_prompt_tokens: 936000`), haiku-4-5 is
 200k — append `[1m]` to the 1M models so Claude Code knows. Non-Claude models
 (gpt-5.5, gemini-3.1-pro-preview, …) are also served — see `copilot-model -l`
 or `GET /v1/models`.

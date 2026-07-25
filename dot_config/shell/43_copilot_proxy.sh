@@ -293,7 +293,7 @@ _copilot_model_state() {
 #   - HYPHENATED ids (claude-opus-4-8), not dotted (claude-opus-4.8): Claude
 #     Code only recognizes hyphenated family names — dotted ids fall back to
 #     a legacy "[Opus 4] retired" label AND a 200k context assumption.
-#   - "[1m]" suffix: Copilot serves opus-4-8 / sonnet-5 with a 1M context
+#   - "[1m]" suffix: Copilot serves opus-5 / opus-4-8 / sonnet-5 with a 1M context
 #     window; the suffix makes Claude Code strip it, send the context-1m
 #     beta header, and size HUD/compaction to 1M (otherwise it assumes 200k
 #     and shows >100% context). Claude Code-only: raw API clients must send
@@ -304,7 +304,7 @@ _copilot_default_model() {
   elif [ -f "$(_copilot_model_state)" ]; then
     command head -n 1 "$(_copilot_model_state)"
   else
-    printf '%s' "claude-opus-4-8[1m]"
+    printf '%s' "claude-opus-5[1m]"
   fi
 }
 
@@ -1188,8 +1188,8 @@ _copilot_once_trap() {
 #   - otherwise → global state file (~/.local/state/copilot-proxy/model), which
 #     claude-copilot / copilot-run / the next `copilot-here on` pick up.
 # Example:
-#   copilot-model opus-4-8         # fuzzy → claude-opus-4-8 (opus-4.8 works too)
-#   copilot-model 'opus-4-8[1m]'   # same + 1M-context hint for Claude Code
+#   copilot-model opus-5           # fuzzy → claude-opus-5 (the default; opus-4-8 etc. work too)
+#   copilot-model 'opus-5[1m]'     # same + 1M-context hint for Claude Code
 #   copilot-model -l               # list available (live from proxy)
 #   copilot-model -c               # print current (+ where it came from)
 copilot-model() {
@@ -1217,7 +1217,7 @@ copilot-model() {
       printf '%s\n' "$json" | command grep -o '"id":"[^"]*"' | command sed 's/"id":"//;s/"//' | command sort
     else
       printf '%s\n' \
-        claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
+        claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 claude-opus-4-5 \
         claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 claude-haiku-4-5
       printf '%s\n' "copilot-model: proxy not reachable — showing fallback list" >&2
     fi
