@@ -35,13 +35,47 @@
 # apply, jq isn't yet installed; this script falls back to passing the live
 # file through unchanged. See pitfalls/modify-script-jq-bootstrap-cycle.md.
 #
+# Completion feedback is gated on the `agentSounds` prompt (none|notify|peon|
+# both) — see docs/tools/agent-sounds.md. This file is a TEMPLATE for that
+# reason; the peon-ping hook entries below were lifted verbatim from a real
+# `peon-ping-setup` run against a throwaway CLAUDE_CONFIG_DIR (its README
+# documents a different, wrong command shape). We declare them ourselves and
+# NEVER run `peon-ping-setup` on a managed machine — same rule as workmux's
+# `wm setup`. The `[ -x … ]` guard makes the hook a silent no-op on a box
+# where the binary isn't installed yet (fresh box, Linux without ansible),
+# mirroring the mandatory `command -v workmux` guard.
+#
 # See: docs/tools/agent-overlays.md → "CodeIsland integration".
 set -eu
 
 overlay=$(cat <<'JSON'
 {
   "hooks": {
+{{- $peon := or (eq .agentSounds "peon") (eq .agentSounds "both") }}
+{{- $notify := or (eq .agentSounds "notify") (eq .agentSounds "both") }}
+{{- $peonCmd := "[ -x \"$HOME/.claude/hooks/peon-ping/peon.sh\" ] && \"$HOME/.claude/hooks/peon-ping/peon.sh\" || true" }}
+{{- if $peon }}
+    "SessionStart": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10 } ] }
+    ],
+    "SessionEnd": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
+    ],
+    "SubagentStart": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
+    ],
+    "PermissionRequest": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
+    ],
+    "PreCompact": [
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] }
+    ],
+{{- end }}
     "Notification": [
+{{- if $notify }}
       {
         "matcher": "",
         "hooks": [
@@ -51,6 +85,10 @@ overlay=$(cat <<'JSON'
           }
         ]
       },
+{{- end }}
+{{- if $peon }}
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] },
+{{- end }}
       {
         "matcher": "",
         "hooks": [
@@ -62,6 +100,9 @@ overlay=$(cat <<'JSON'
       }
     ],
     "UserPromptSubmit": [
+{{- if $peon }}
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] },
+{{- end }}
       {
         "matcher": "",
         "hooks": [
@@ -73,6 +114,7 @@ overlay=$(cat <<'JSON'
       }
     ],
     "Stop": [
+{{- if $notify }}
       {
         "hooks": [
           {
@@ -81,6 +123,10 @@ overlay=$(cat <<'JSON'
           }
         ]
       },
+{{- end }}
+{{- if $peon }}
+      { "matcher": "", "hooks": [ { "type": "command", "command": {{ $peonCmd | quote }}, "timeout": 10, "async": true } ] },
+{{- end }}
       {
         "hooks": [
           {
@@ -144,7 +190,23 @@ fi
 #      isn't already represented in the live event array (by exact-string
 #      command match on .hooks[0].command). Live entries are preserved
 #      verbatim, and new overlay entries are added at the end.
-printf '%s' "$base" | jq --argjson overlay "$overlay" '
+#   4. Prune OUR OWN entries that the current agentSounds tier disables.
+#
+# Step 4 is the one deliberate exception to "never subtract". Without it the
+# additive merge makes `agentSounds` a one-way ratchet: switching notify -> none
+# would leave the already-installed notify.sh hook wired forever, so `none`
+# would not actually silence a machine that previously had sound (verified
+# 2026-07 — this is exactly what happened on the first apply).
+#
+# The invariant that matters is preserved: we only ever prune commands WE
+# declare. $prune is built from our own fingerprints, never from a foreign
+# command, so CodeIsland / workmux / herdr entries can never be touched no
+# matter what the tier is. Empty event arrays are dropped so turning everything
+# off doesn't leave "SessionStart": [] litter behind.
+{{- $prune := list }}
+{{- if not $notify }}{{ $prune = append $prune "/.claude/hooks/notify.sh" }}{{ end }}
+{{- if not $peon }}{{ $prune = append $prune "/.claude/hooks/peon-ping/peon.sh" }}{{ end }}
+printf '%s' "$base" | jq --argjson overlay "$overlay" --argjson prune {{ $prune | toJson | quote }} '
   . as $base
   | ($overlay | del(.hooks)) as $non_hook_overlay
   | ($overlay.hooks // {}) as $overlay_hooks
@@ -166,5 +228,15 @@ printf '%s' "$base" | jq --argjson overlay "$overlay" '
               )
           )
         )
+    )
+  | .hooks = (
+      .hooks
+      | map_values(
+          map(select(
+            (.hooks[0].command? // "") as $cmd
+            | ($prune | any(. as $frag | $cmd | contains($frag))) | not
+          ))
+        )
+      | with_entries(select(.value | length > 0))
     )
 '

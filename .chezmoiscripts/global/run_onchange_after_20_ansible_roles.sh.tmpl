@@ -336,6 +336,18 @@ else
     EXTRA_VARS="$EXTRA_VARS llm_tools_install_brew_apps={{ .installBrewApps }}"
 fi
 {{ end -}}
+{{ if .installCodingAgents -}}
+# Agent completion feedback (coding_agents): none | notify | peon | both.
+# Only gates HOOK WIRING — the peon-ping binary installs on any desktop box
+# with coding agents so `peon preview` etc. are always available to try.
+# See docs/tools/agent-sounds.md.
+{{ $agentSounds := "notify" }}{{ if hasKey . "agentSounds" }}{{ $agentSounds = .agentSounds }}{{ end -}}
+if [[ -z "$EXTRA_VARS" ]]; then
+    EXTRA_VARS="coding_agents_sounds={{ $agentSounds }}"
+else
+    EXTRA_VARS="$EXTRA_VARS coding_agents_sounds={{ $agentSounds }}"
+fi
+{{ end -}}
 {{ if and (eq .chezmoi.os "linux") (eq .profile "ubuntu_desktop") -}}
 # Discord channel (gui_apps_linux): flatpak | deb | none. Default flatpak.
 {{ $discordChannel := "flatpak" }}{{ if hasKey . "discordChannel" }}{{ $discordChannel = .discordChannel }}{{ end -}}

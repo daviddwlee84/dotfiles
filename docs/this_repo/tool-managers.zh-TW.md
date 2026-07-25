@@ -1018,6 +1018,7 @@ plugins 的推進。但 ~30 個 GitHub-release-installed CLI(其中很多廣泛
 | **opentofu**(`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
+| **peon-ping** (`peon`) | brew tap `PeonPing/tap`（需 `brew trust`，Homebrew 6 gate） | `install.sh --openpeon --no-rc` | coding_agents —— agent 完成音效；**絕不要跑 `peon-ping-setup`**（hook 由 `dot_claude/modify_settings.json.tmpl` 宣告）。由 `agentSounds` prompt 控制。見 [agent-sounds.md](../tools/agent-sounds.md) |
 | **playerctl / wmctrl / xdotool** | n/a | apt | gui_apps_linux |
 | **pre-commit** | `uv tool install --python 3.13` | 同 | security_tools |
 | **procps** | (系統) | apt | bootstrap(Linux) |

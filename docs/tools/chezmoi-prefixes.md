@@ -176,7 +176,7 @@ Worked examples:
 
 - `private_executable_dot_ssh/private_readonly_id_ed25519` — directory is private, file is private+readonly. (In practice: don't check in private keys; shown for ordering only.)
 - `create_private_dot_ssh/create_private_config` — create-once SSH config that is 0600 on creation.
-- `modify_private_dot_claude/modify_settings.json` — the actual pattern used in this repo (see the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq)).
+- `modify_private_dot_claude/modify_settings.json.tmpl` — the actual pattern used in this repo (see the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq)).
 
 If you ever lose the stacking order, `chezmoi chattr` will normalize it for you:
 
@@ -211,7 +211,7 @@ Files that an app rewrites in-place after first launch, and where you only care 
 
 Files an app actively rewrites at runtime (adding keys, reordering, …), where you only want to enforce a subset of keys.
 
-- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`, a `jq` script that deep-merges a managed overlay. See the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq).
+- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json.tmpl`, a `jq` script that deep-merges a managed overlay. See the [case study below](#dot_claudemodify_settingsjson--partial-json-management-via-jq).
 - **`~/.docker/config.json`** → a modify-script that rewrites `proxies.default` while preserving `auths` / `credsStore`. See [docs/tools/containers.md](containers.md).
 - **`~/.config/herdr/config.toml`** → `dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`, a tomlkit overlay that enforces the `[theme]`/`[ui]`/`[terminal]`/`[keys]` tables and pulls through everything herdr writes back at runtime (`onboarding`, `[session]`, `[remote]`, …). Was `create_` (seed-once), but that never propagated repo edits to already-seeded hosts. See [docs/tools/herdr.md → Config management](herdr.md#config-management-why-modify_).
 - Rule of thumb: if an app owns the file and you only care about N keys, `modify_` beats a full managed template.
@@ -333,7 +333,7 @@ Keep in ansible:
 
 Three concrete walkthroughs of the `modify_` / `create_` patterns above, with the failure modes that bit us.
 
-### `dot_claude/modify_settings.json` — partial JSON management via jq
+### `dot_claude/modify_settings.json.tmpl` — partial JSON management via jq
 
 Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `skipAutoPermissionPrompt`, reorders keys). A static managed file would produce diff on every apply.
 
@@ -343,7 +343,7 @@ Claude Code rewrites `~/.claude/settings.json` at runtime (adds `permissions`, `
 - Any other keys Claude Code adds (model, permissions, `skipAutoPermissionPrompt`, etc.) are preserved verbatim.
 - Arrays in the overlay replace their counterparts wholesale, so `hooks.Notification` won't accumulate duplicates.
 
-To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
+To manage an additional key, add it to the `overlay` heredoc in `dot_claude/modify_settings.json.tmpl`. Requires `jq` (installed by the `base` ansible role). The source file must have exec bit set (git mode `100755`).
 
 **Failure mode**: if the live `~/.claude/settings.json` contains invalid JSON (e.g. Claude Code writes a stray trailing comma), `jq` aborts with a parse error and the script exits non-zero. chezmoi then logs `chezmoi: .claude/settings.json: exit status 5` and skips the file for that apply; the broken live file is left untouched for manual inspection. No partial / corrupt output is ever written. Fix or delete the live file and re-run `chezmoi apply`.
 

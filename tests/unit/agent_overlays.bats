@@ -3,6 +3,7 @@
 #   dot_cursor/modify_cli-config.json.tmpl
 #   dot_config/opencode/modify_opencode.json.tmpl
 #   dot_codex/modify_config.toml.tmpl
+#   dot_claude/modify_settings.json.tmpl
 #
 # Each script is a chezmoi `modify_` template: chezmoi pipes the live target
 # file into stdin and expects the new contents on stdout. The contract we
@@ -44,6 +45,18 @@ _render_with_data() {
 
 _have_chezmoi() {
   command -v chezmoi >/dev/null 2>&1
+}
+
+# Render dot_claude/modify_settings.json.tmpl at a given `agentSounds` tier and
+# echo the path to the runnable script. The tier is a real prompt value
+# (none|notify|peon|both) — see docs/tools/agent-sounds.md. Most tests use
+# `notify` because that's the default and the tier the pre-peon assertions were
+# written against.
+_claude_overlay() {
+  local tier="${1:-notify}" out="$RENDER_DIR/claude-$1.sh"
+  _render_with_data "$SOURCE_DIR/dot_claude/modify_settings.json.tmpl" \
+    "$out" "{\"agentSounds\":\"$tier\"}"
+  printf '%s' "$out"
 }
 
 @test "cursor modify_cli-config: overlay keys enforced, runtime keys preserved" {
@@ -305,6 +318,7 @@ websocket_connect_timeout_ms = 5000
 
 @test "claude modify_settings: notify.sh added to empty hooks, codeisland entries preserved" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
 
   # Live file mimics a fresh install where CodeIsland has already injected
   # its entries but our notify.sh hook is missing.
@@ -324,7 +338,7 @@ websocket_connect_timeout_ms = 5000
     }
   }'
 
-  run bash -c "printf '%s' \"\$1\" | sh '$SOURCE_DIR/dot_claude/modify_settings.json'" _ "$live"
+  run bash -c "printf '%s' \"\$1\" | sh '$(_claude_overlay notify)'" _ "$live"
   [ "$status" -eq 0 ]
 
   # Notification: CodeIsland entry preserved + notify.sh + workmux waiting appended.
@@ -356,6 +370,7 @@ websocket_connect_timeout_ms = 5000
 
 @test "claude modify_settings: idempotent when notify.sh already present" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
 
   local live='{
     "hooks": {
@@ -371,9 +386,10 @@ websocket_connect_timeout_ms = 5000
   }'
 
   # First pass.
-  pass1=$(printf '%s' "$live" | sh "$SOURCE_DIR/dot_claude/modify_settings.json")
+  local _ov; _ov="$(_claude_overlay notify)"
+  pass1=$(printf '%s' "$live" | sh "$_ov")
   # Second pass on the result of the first.
-  pass2=$(printf '%s' "$pass1" | sh "$SOURCE_DIR/dot_claude/modify_settings.json")
+  pass2=$(printf '%s' "$pass1" | sh "$_ov")
 
   # No duplicate notify.sh entry on first pass.
   printf '%s' "$pass1" | jq -e '[.hooks.Notification[] | select(.hooks[0].command == "~/.claude/hooks/notify.sh")] | length == 1' >/dev/null
@@ -385,8 +401,9 @@ websocket_connect_timeout_ms = 5000
 
 @test "claude modify_settings: empty live file produces overlay-only output" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
 
-  run bash -c "printf '' | sh '$SOURCE_DIR/dot_claude/modify_settings.json'"
+  run bash -c "printf '' | sh '$(_claude_overlay notify)'"
   [ "$status" -eq 0 ]
 
   echo "$output" | jq -e '.hooks.Notification[0].hooks[0].command == "~/.claude/hooks/notify.sh"' >/dev/null
@@ -396,6 +413,7 @@ websocket_connect_timeout_ms = 5000
 
 @test "claude modify_settings: non-hook deep-merge preserves siblings" {
   command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
 
   # User has manually added an extra plugin in enabledPlugins; our overlay
   # only declares two specific plugins. Deep merge means user's extra survives.
@@ -408,7 +426,7 @@ websocket_connect_timeout_ms = 5000
     }
   }'
 
-  run bash -c "printf '%s' \"\$1\" | sh '$SOURCE_DIR/dot_claude/modify_settings.json'" _ "$live"
+  run bash -c "printf '%s' \"\$1\" | sh '$(_claude_overlay notify)'" _ "$live"
   [ "$status" -eq 0 ]
 
   # Overlay keys enforced.
@@ -417,4 +435,93 @@ websocket_connect_timeout_ms = 5000
   # User's extras preserved (deep merge into objects).
   echo "$output" | jq -e '.enabledPlugins["user-custom@some-marketplace"] == true' >/dev/null
   echo "$output" | jq -e '.extraKnownMarketplaces["user-marketplace"].source.repo == "user/m"' >/dev/null
+}
+
+# -----------------------------------------------------------------------------
+# agentSounds tiers (none|notify|peon|both) — see docs/tools/agent-sounds.md.
+# The prompt gates ONLY hook wiring; workmux entries are unconditional. Guards
+# against the silent regression where a tier stops emitting (or starts leaking)
+# a feedback mechanism.
+# -----------------------------------------------------------------------------
+
+@test "claude modify_settings: agentSounds tiers gate notify.sh and peon-ping independently" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
+
+  local tier out n p w
+  # tier -> expected notify.sh / peon.sh / workmux command counts
+  for tier in "none 0 0 4" "notify 2 0 4" "peon 0 9 4" "both 2 9 4"; do
+    set -- $tier
+    out=$(printf '' | sh "$(_claude_overlay "$1")")
+    n=$(printf '%s' "$out" | jq '[.hooks[][].hooks[0].command | select(test("notify\\.sh"))] | length')
+    p=$(printf '%s' "$out" | jq '[.hooks[][].hooks[0].command | select(test("peon\\.sh"))] | length')
+    w=$(printf '%s' "$out" | jq '[.hooks[][].hooks[0].command | select(test("workmux"))] | length')
+    [ "$n" -eq "$2" ] || { echo "tier=$1 notify.sh: got $n want $2"; return 1; }
+    [ "$p" -eq "$3" ] || { echo "tier=$1 peon.sh: got $p want $3"; return 1; }
+    [ "$w" -eq "$4" ] || { echo "tier=$1 workmux: got $w want $4"; return 1; }
+  done
+}
+
+@test "claude modify_settings: peon tier keeps its hook guarded and preserves foreign entries" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
+
+  # herdr installs its own SessionStart hook at runtime; peon also wants
+  # SessionStart. Both must coexist.
+  local live='{
+    "hooks": {
+      "SessionStart": [
+        {"hooks": [{"type": "command", "command": "bash ~/.claude/hooks/herdr-agent-state.sh session"}]}
+      ]
+    }
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | sh '$(_claude_overlay peon)'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # herdr survived, peon appended alongside it.
+  echo "$output" | jq -e '.hooks.SessionStart | length == 2' >/dev/null
+  echo "$output" | jq -e '.hooks.SessionStart | map(.hooks[0].command) | any(. | test("herdr-agent-state"))' >/dev/null
+  echo "$output" | jq -e '.hooks.SessionStart | map(.hooks[0].command) | any(. | test("peon\\.sh"))' >/dev/null
+  # The guard is mandatory: the hook must no-op on a box without peon-ping
+  # installed, exactly like the `command -v workmux` guard.
+  echo "$output" | jq -e '.hooks.Stop | map(.hooks[0].command) | any(. | test("\\[ -x .* \\] &&.*peon\\.sh.*\\|\\| true"))' >/dev/null
+  # PostToolUseFailure is the one peon event with a non-empty matcher.
+  echo "$output" | jq -e '.hooks.PostToolUseFailure[0].matcher == "Bash"' >/dev/null
+}
+
+@test "claude modify_settings: lowering the tier prunes OUR entries but never foreign ones" {
+  command -v jq >/dev/null 2>&1 || skip "jq not installed"
+  _have_chezmoi || skip "chezmoi not installed"
+
+  # A machine that previously ran at `both`: notify.sh and peon are already
+  # wired, alongside foreign CodeIsland / herdr entries. Dropping to `none`
+  # must silence ours and leave theirs untouched — the additive merger alone
+  # would leave both of ours wired forever (one-way ratchet).
+  local live='{
+    "hooks": {
+      "Stop": [
+        {"hooks": [{"type": "command", "command": "~/.codeisland/codeisland-hook.sh"}]},
+        {"hooks": [{"type": "command", "command": "~/.claude/hooks/notify.sh"}]},
+        {"hooks": [{"type": "command", "command": "[ -x \"$HOME/.claude/hooks/peon-ping/peon.sh\" ] && \"$HOME/.claude/hooks/peon-ping/peon.sh\" || true"}]}
+      ],
+      "SessionStart": [
+        {"hooks": [{"type": "command", "command": "bash ~/.claude/hooks/herdr-agent-state.sh session"}]}
+      ]
+    }
+  }'
+
+  run bash -c "printf '%s' \"\$1\" | sh '$(_claude_overlay none)'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  # Ours: gone.
+  echo "$output" | jq -e '[.hooks[][].hooks[0].command | select(test("notify\\.sh"))] | length == 0' >/dev/null
+  echo "$output" | jq -e '[.hooks[][].hooks[0].command | select(test("peon\\.sh"))] | length == 0' >/dev/null
+  # Theirs: untouched.
+  echo "$output" | jq -e '[.hooks.Stop[].hooks[0].command | select(test("codeisland"))] | length == 1' >/dev/null
+  echo "$output" | jq -e '[.hooks.SessionStart[].hooks[0].command | select(test("herdr"))] | length == 1' >/dev/null
+  # workmux is unconditional and must still be enforced at `none`.
+  echo "$output" | jq -e '[.hooks[][].hooks[0].command | select(test("workmux"))] | length == 4' >/dev/null
+  # No empty event arrays left behind.
+  echo "$output" | jq -e '[.hooks[] | select(length == 0)] | length == 0' >/dev/null
 }

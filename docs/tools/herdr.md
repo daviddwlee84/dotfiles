@@ -188,7 +188,7 @@ herdr's first-run onboarding offers to **install optional agent integrations** (
 
 | Agent | What `herdr integration install` creates | Touches a repo-managed file? |
 |---|---|---|
-| claude | `~/.claude/hooks/herdr-agent-state.sh` **+ a hook entry in `~/.claude/settings.json`** | Yes — but the repo's hook-aware `modify_settings.json` merger **preserves** it (same as it does for CodeIsland). `chezmoi apply` is a no-op; it won't strip the herdr hook. |
+| claude | `~/.claude/hooks/herdr-agent-state.sh` **+ a hook entry in `~/.claude/settings.json`** | Yes — but the repo's hook-aware `modify_settings.json.tmpl` merger **preserves** it (same as it does for CodeIsland). `chezmoi apply` is a no-op; it won't strip the herdr hook. |
 | codex | `~/.codex/herdr-agent-state.sh` only | No — `~/.codex/config.toml` is untouched (identical to the chezmoi-computed target). |
 | opencode | `~/.config/opencode/plugins/herdr-agent-state.js` (separate plugin) | No — only `workmux-status.ts` is managed; herdr's plugin coexists. |
 | cursor | `~/.cursor/herdr-agent-state.sh` + hook | Script lives outside chezmoi; coexists. |

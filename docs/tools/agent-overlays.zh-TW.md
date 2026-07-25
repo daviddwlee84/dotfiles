@@ -16,7 +16,7 @@
 
 覆寫內容 (overlay payloads) 位於 [`.chezmoitemplates/agents/`](../../.chezmoitemplates/agents/) 之下，並透過 `{{ template ... }}` include 引入，讓合併邏輯可以獨立於覆寫內容進行測試。
 
-> **為什麼不用 Charm [`crush`](https://github.com/charmbracelet/crush)？** `crush` 是 Charm 自家的 agentic coding CLI。要加進來會多出第五份 overlay（binary + auth + 每專案信任 + marketplace 狀態），而每個 agent overlay 的維運成本不低 — 任何在執行期重寫自身設定檔的 CLI 都需要一個感知 hook 的合併器、TOML/JSON round-tripper 與 `.chezmoiignore.tmpl` 的存在性 gating。現有三組（Cursor / OpenCode / Codex，加上透過 `dot_claude/modify_settings.json` 管理的 Claude Code）已涵蓋實務上的 agent CLI 設計空間。如要評估 `crush`，加第五個 CLI 的模式是：在 `dot_ansible/roles/coding_agents/tasks/main.yml` 安裝、新增 `dot_crush/modify_<config>` 與 `.chezmoitemplates/agents/crush.overlay.<json|toml>`、選擇性接到 `04_ai_capture.zsh` 的 agent 偵測鏈。
+> **為什麼不用 Charm [`crush`](https://github.com/charmbracelet/crush)？** `crush` 是 Charm 自家的 agentic coding CLI。要加進來會多出第五份 overlay（binary + auth + 每專案信任 + marketplace 狀態），而每個 agent overlay 的維運成本不低 — 任何在執行期重寫自身設定檔的 CLI 都需要一個感知 hook 的合併器、TOML/JSON round-tripper 與 `.chezmoiignore.tmpl` 的存在性 gating。現有三組（Cursor / OpenCode / Codex，加上透過 `dot_claude/modify_settings.json.tmpl` 管理的 Claude Code）已涵蓋實務上的 agent CLI 設計空間。如要評估 `crush`，加第五個 CLI 的模式是：在 `dot_ansible/roles/coding_agents/tasks/main.yml` 安裝、新增 `dot_crush/modify_<config>` 與 `.chezmoitemplates/agents/crush.overlay.<json|toml>`、選擇性接到 `04_ai_capture.zsh` 的 agent 偵測鏈。
 
 ## 為什麼用 `modify_` 而非完整檔案管理
 
@@ -249,7 +249,7 @@ CodeIsland 的設定面板自稱為「Auto hook install」並標榜「auto-repai
 
 當穩定的使用者偏好與 CodeIsland 掛鉤共存於同一檔案時，需要更聰明的覆寫。目前唯一這類檔案是 **`~/.claude/settings.json`**——`Claude Code` 將模型選擇、外掛、statusLine 與 `permissions.defaultMode` 與 `hooks.<event>` 陣列存在同一個檔案。簡單的 `jq '. * $overlay'` 深層合併會整個替換陣列：在覆寫中宣告一個 `hooks.Notification` 條目，會在每次 `chezmoi apply` 時靜默砍掉所有 CodeIsland 條目，然後 CodeIsland 會在下次啟動時重裝——無限乒乓，產生 diff 雜訊與壞掉的整合。
 
-[`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) 透過掛鉤感知合併器解決這個問題：
+[`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 透過掛鉤感知合併器解決這個問題：
 
 1. **非掛鉤的 key**（`enabledPlugins`、`extraKnownMarketplaces`、`skipDangerousModePermissionPrompt`、`permissions.defaultMode`、`statusLine`……）以正常方式透過 `base * overlay_no_hooks` 深層合併。注意：`permissions.defaultMode = "auto"` 是刻意設定的，用來繞過 `Claude Code` 在每次互動 prompt（`AskUserQuestion`、CodeIsland 彈窗、遠端控制注入）後重設目前權限模式的行為——重設一律落回 `defaultMode`，因此把它釘住就能讓重設變得無感。`auto`（由安全分類器逐一審核動作）於 2026-07 取代了 `bypassPermissions`：它同樣能修正重設問題，卻不必授予整個 repo 範圍的全面放行。見 [`pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md`](../../pitfalls/claude-code-permission-mode-resets-after-interactive-prompt.md)。深層合併會寫入 `defaultMode` 純量值，不會動到同層的 `permissions.allow` / `permissions.deny` 陣列——那些保持機器本地。
 2. **`hooks.<event>` 陣列**以累加方式合併：對於覆寫中宣告的每個事件，附加那些 `.hooks[0].command` 在即時陣列中還沒出現的條目（字串相等比對）。即時條目會原樣保留，永遠不會移除任何條目。

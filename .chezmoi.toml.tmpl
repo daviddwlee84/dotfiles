@@ -35,6 +35,20 @@ installAiDesktopApps = {{ promptBoolOnce . "installAiDesktopApps" "Install AI de
 {{ else -}}
 installAiDesktopApps = false
 {{ end -}}
+# Agent 完成任務時的提示方式。只控制「掛不掛 hook」——
+# peon CLI 只要裝了 coding agents 就會裝，隨時可以手動玩。
+# none   = 安靜，不掛任何 hook
+# notify = 現況：notify.sh -> apprise -> 桌面通知橫幅
+# peon   = peon-ping 遊戲語音 + 它自己的 overlay 橫幅（預設 sc2_scv：Job's finished!）
+# both   = 兩者都掛（apprise 橫幅 + 語音 + peon overlay，會有兩個橫幅）
+# headless（server）一律 none：沒有音效裝置也沒有通知 daemon。
+# peon 的音量/音效包/通知樣式由 `peon` CLI 自己管，chezmoi 不碰，
+# 所以隨便調都不會產生 chezmoi diff。見 docs/tools/agent-sounds.md
+{{ if or (eq $profile "macos") (eq $profile "ubuntu_desktop") -}}
+agentSounds = {{ promptChoiceOnce . "agentSounds" "Agent completion feedback (none|notify|peon|both)" (list "none" "notify" "peon" "both") "notify" | quote }}
+{{ else -}}
+agentSounds = "none"
+{{ end -}}
 # 是否安裝 Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)
 installPythonUvTools = {{ promptBoolOnce . "installPythonUvTools" "Install Python CLI tools via uv (mlflow, sqlit-tui, tmuxp, etc.)" true }}
 # 是否安裝 standalone JS/npm CLI utilities (readability-cli for `readnode`, etc.)

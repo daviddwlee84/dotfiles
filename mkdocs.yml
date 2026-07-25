@@ -301,6 +301,7 @@ nav:
           - SSH agent: tools/ssh-agent.md
       - Editor & agents:
           - Agent overlays (Claude/OpenCode/Codex/Cursor): tools/agent-overlays.md
+          - Agent completion sounds (peon-ping / OpenPeon): tools/agent-sounds.md
           - Agent pane discovery (tv agent-panes + recon): tools/agent-panes-discovery.md
           - Agent quota warmup (agent-warmup): tools/agent-warmup.md
           - Agent skills: tools/agent-skills.md

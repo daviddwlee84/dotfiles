@@ -1245,3 +1245,151 @@
   register: claude_hud_sync
   changed_when: "'status=changed' in claude_hud_sync.stdout"
   ignore_errors: true
+
+# === peon-ping (agent completion sounds) ===
+#
+# Install-only, and deliberately NOT gated on `coding_agents_sounds`: the binary
+# lands on any desktop box that gets coding agents so `peon preview`,
+# `peon packs list`, `peon volume` are always available to experiment with.
+# Only the HOOK WIRING is gated, and that lives in
+# dot_claude/modify_settings.json.tmpl. See docs/tools/agent-sounds.md.
+#
+# ‼️  NEVER run `peon-ping-setup` on a managed machine. It merges hook entries
+# into ~/.claude/settings.json — chezmoi's job here — and it also leaks past
+# $HOME into the real ~/.config/opencode because it honours $XDG_CONFIG_HOME
+# (verified 2026-07; see pitfalls/peon-ping-setup-escapes-home.md). Same rule as
+# workmux's `wm setup`. `brew install` alone is binary-only, which is what we want.
+#
+# The `peon` CLI is fully standalone: it creates its own tool-agnostic root at
+# ~/.openpeon (packs + config.json) and never needs the ~/.claude/hooks/peon-ping
+# tree that peon-ping-setup would build. libexec/peon.sh resolves packs from
+# there via its packs-anchored fallback, so the only thing we stage is a single
+# symlink at the canonical hook path the overlay references.
+
+- name: Tap peon-ping formula (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - coding_agents_install_peon | default(true) | bool
+  community.general.homebrew_tap:
+    name: PeonPing/tap
+    state: present
+
+# Homebrew 6.0 formula-trust gate — same treatment as the devtools role's
+# third-party taps. See pitfalls/homebrew-6-refuses-untrusted-tap-formula.md.
+- name: Check trust state of the peon-ping tap (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - coding_agents_install_peon | default(true) | bool
+  ansible.builtin.command: "brew tap-info PeonPing/tap"
+  register: coding_agents_peon_tap_info
+  changed_when: false
+  failed_when: false
+
+- name: Trust the peon-ping tap (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - coding_agents_install_peon | default(true) | bool
+    - "'Untrusted' in (coding_agents_peon_tap_info.stdout | default(''))"
+  ansible.builtin.command: "brew trust PeonPing/tap"
+  changed_when: true
+
+- name: Install peon-ping (macOS)
+  when:
+    - ansible_facts["os_family"] == "Darwin"
+    - coding_agents_install_peon | default(true) | bool
+  community.general.homebrew:
+    name: peon-ping
+    state: present
+
+# Linux has no brew formula for this. `--openpeon` reroots the whole install at
+# the tool-agnostic ~/.openpeon so ~/.claude/settings.json is never touched;
+# `--no-rc` keeps it out of .bashrc/.zshrc (our shell config is chezmoi's).
+- name: Install peon-ping (Linux, ~/.openpeon root, no rc edits)
+  when:
+    - ansible_facts["os_family"] != "Darwin"
+    - coding_agents_install_peon | default(true) | bool
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh \
+      | bash -s -- --openpeon --no-rc --packs={{ coding_agents_peon_default_pack }}
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.openpeon/hooks/peon-ping/peon.sh"
+  ignore_errors: true
+
+# Seed the default pack ONCE. `creates:` is load-bearing: peon's config.json is
+# rewritten at runtime by `peon packs use` / `volume` / `notifications`, and we
+# deliberately do NOT manage it with chezmoi (tweaking it must not produce
+# drift). Without the guard, every apply would stomp a pack you switched to.
+- name: Seed peon-ping default sound pack (first run only)
+  when: coding_agents_install_peon | default(true) | bool
+  ansible.builtin.shell: |
+    set -o pipefail
+    peon packs use --install {{ coding_agents_peon_default_pack }}
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.openpeon/config.json"
+  ignore_errors: true
+
+# The overlay's hook command references this fixed path (and it is the same path
+# peon-ping-setup would use, so a hand-run setup later is a no-op rather than a
+# conflict). Only staged when a tier actually wires hooks.
+- name: Stage peon-ping hook adapter for Claude Code
+  when:
+    - coding_agents_install_peon | default(true) | bool
+    - coding_agents_sounds in ['peon', 'both']
+  block:
+    - name: Resolve peon-ping libexec path
+      ansible.builtin.shell: |
+        set -o pipefail
+        if [ -x "$(brew --prefix peon-ping 2>/dev/null)/libexec/peon.sh" ]; then
+          printf '%s' "$(brew --prefix peon-ping)/libexec/peon.sh"
+        elif [ -x "$HOME/.openpeon/hooks/peon-ping/peon.sh" ]; then
+          printf '%s' "$HOME/.openpeon/hooks/peon-ping/peon.sh"
+        fi
+      args:
+        executable: /bin/bash
+      register: coding_agents_peon_sh
+      changed_when: false
+      failed_when: false
+
+    - name: Symlink peon.sh into the canonical Claude hook path
+      when: coding_agents_peon_sh.stdout | default('') | length > 0
+      ansible.builtin.file:
+        src: "{{ coding_agents_peon_sh.stdout }}"
+        dest: "{{ ansible_env.HOME }}/.claude/hooks/peon-ping/peon.sh"
+        state: link
+        force: true
+  ignore_errors: true
+
+# OpenCode uses a plugin, not hooks. Upstream ships it as a SYMLINK into the
+# package's libexec (that is what peon-ping-setup creates), so we link it too
+# rather than vendoring a copy into chezmoi — a vendored copy would go stale on
+# every peon-ping upgrade, exactly the failure mode
+# dot_config/opencode/plugins/workmux-status.ts warns about in its header.
+- name: Stage peon-ping plugin for OpenCode
+  when:
+    - coding_agents_install_peon | default(true) | bool
+    - coding_agents_sounds in ['peon', 'both']
+  block:
+    - name: Resolve peon-ping OpenCode adapter path
+      ansible.builtin.shell: |
+        set -o pipefail
+        for c in "$(brew --prefix peon-ping 2>/dev/null)/libexec/adapters/opencode/peon-ping.ts" \
+                 "$HOME/.openpeon/hooks/peon-ping/adapters/opencode/peon-ping.ts"; do
+          [ -f "$c" ] && { printf '%s' "$c"; break; }
+        done
+      args:
+        executable: /bin/bash
+      register: coding_agents_peon_oc
+      changed_when: false
+      failed_when: false
+
+    - name: Symlink the peon-ping OpenCode plugin
+      when: coding_agents_peon_oc.stdout | default('') | length > 0
+      ansible.builtin.file:
+        src: "{{ coding_agents_peon_oc.stdout }}"
+        dest: "{{ ansible_env.HOME }}/.config/opencode/plugins/peon-ping.ts"
+        state: link
+        force: true
+  ignore_errors: true

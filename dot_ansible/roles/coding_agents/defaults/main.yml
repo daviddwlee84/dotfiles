@@ -1,2 +1,16 @@
 ---
 # Default variables for coding_agents role
+
+# Agent completion feedback tier, set from the `agentSounds` chezmoi prompt via
+# EXTRA_VARS (none | notify | peon | both). See docs/tools/agent-sounds.md.
+#
+# This role only uses it to decide whether to link peon-ping's hook adapters
+# into place. The peon-ping BINARY installs regardless of the tier (on desktop
+# profiles) so `peon preview` / `peon packs list` are always available to
+# experiment with — the hook wiring is what the prompt gates.
+coding_agents_sounds: notify
+
+# Sound pack seeded on the very first install only (creates:-guarded, so a
+# later `peon packs use <other>` sticks forever). sc2_scv = StarCraft II Terran
+# SCV; its task.complete line is "Job's finished!".
+coding_agents_peon_default_pack: sc2_scv

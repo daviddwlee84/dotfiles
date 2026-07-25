@@ -37,7 +37,7 @@ LSP infra plugins from [`create_lazy-lock.json`](../../dot_config/nvim/create_la
 
 ### Via Claude Code plugins
 
-[`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) overlays `enabledPlugins` into `~/.claude/settings.json`:
+[`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) overlays `enabledPlugins` into `~/.claude/settings.json`:
 
 ```json
 "enabledPlugins": {
@@ -91,7 +91,7 @@ cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock
 
 ### To Claude Code
 
-Edit [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) → add to the `enabledPlugins` map inside the `overlay` heredoc:
+Edit [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) → add to the `enabledPlugins` map inside the `overlay` heredoc:
 
 ```json
 "enabledPlugins": {

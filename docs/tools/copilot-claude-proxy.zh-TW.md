@@ -66,7 +66,7 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 
 | 層 | 擁有者 | 為什麼代理設定「不能」放這裡 |
 |---|---|---|
-| `~/.claude/settings.json` | chezmoi（`dot_claude/modify_settings.json`） | 會讓 *每個* 專案永遠走代理；還會跟 chezmoi 的合併打架 |
+| `~/.claude/settings.json` | chezmoi（`dot_claude/modify_settings.json.tmpl`） | 會讓 *每個* 專案永遠走代理；還會跟 chezmoi 的合併打架 |
 | `./.claude/settings.json` | `claude-plans-here`（`plansDirectory`） | 會 commit 進 git —— 代理設定會外洩給整個團隊 |
 
 所以代理使用沒人佔用的兩層：

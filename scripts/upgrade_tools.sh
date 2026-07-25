@@ -836,6 +836,18 @@ cat_agents() {
     ran_any=1
   fi
 
+  # peon-ping — `peon update` refreshes the binary AND re-syncs sound packs.
+  # Install-only elsewhere (ansible seeds the pack once); this is the explicit
+  # upgrade path. Safe to run at any agentSounds tier — the binary is installed
+  # regardless of whether hooks are wired. On macOS the formula comes from the
+  # PeonPing/tap, so `upgrade-brew` may bump it first; `peon update` is then a
+  # cheap no-op that still refreshes packs. See docs/tools/agent-sounds.md.
+  if command -v peon >/dev/null 2>&1; then
+    info "Upgrading peon-ping (binary + sound packs)"
+    _run_sh "${_timeout_bin:+$_timeout_bin 180 }peon update" || any_fail=1
+    ran_any=1
+  fi
+
   # OpenCode — `opencode upgrade`
   if command -v opencode >/dev/null 2>&1; then
     _try_self_update_then_curl "OpenCode" \

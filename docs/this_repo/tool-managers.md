@@ -1109,6 +1109,7 @@ list.
 | **opentofu** (`tofu`) | brew formula | Cloudsmith apt repo → GitHub release | iac_tools |
 | **OrbStack** | brew cask | n/a | docker |
 | **pandoc** | brew | apt | devtools |
+| **peon-ping** (`peon`) | brew tap `PeonPing/tap` (needs `brew trust`, Homebrew 6 gate) | `install.sh --openpeon --no-rc` | coding_agents — agent completion sounds; **never run `peon-ping-setup`** (hooks are declared in `dot_claude/modify_settings.json.tmpl`). Gated by the `agentSounds` prompt. See [agent-sounds.md](../tools/agent-sounds.md) |
 | **piper.yazi** | `ya pkg` (Yazi plugin) | `ya pkg` | devtools (yazi) |
 | **playerctl / wmctrl / xdotool** | n/a (playerctl: brew via media_control) | apt | gui_apps_linux; playerctl also via media_control (gated `installMediaControl`, backs `sysplay`/`sysnow`) |
 | **poppler** (`pdftoppm`) | brew | apt (`poppler-utils`) | devtools — yazi PDF preview. See [yazi-previews.md](../tools/yazi-previews.md) |

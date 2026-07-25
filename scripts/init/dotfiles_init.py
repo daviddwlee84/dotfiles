@@ -223,6 +223,23 @@ PROMPTS: tuple[Prompt, ...] = (
            condition=When(os=frozenset({"darwin"})), else_value=False,
            prompt_text="Install AI desktop apps via macOS Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)",
            comment="是否安裝 macOS AI desktop apps via Homebrew Brewfile (Claude, ChatGPT, OpenCode, Antigravity, Codex, Ollama app)"),
+    Prompt("agentSounds", "choice", "Coding agents & AI",
+           "Agent completion feedback",
+           "none = silent; notify = desktop banner (apprise); "
+           "peon = game voice lines + peon's own overlay (peon-ping); both = banner + voice.",
+           default="notify",
+           prompt_text="Agent completion feedback (none|notify|peon|both)",
+           choices=("none", "notify", "peon", "both"),
+           condition=When(profile=_DESKTOP_PROFILES), else_value="none",
+           comment=("Agent 完成任務時的提示方式。只控制「掛不掛 hook」——\n"
+                    "peon CLI 只要裝了 coding agents 就會裝，隨時可以手動玩。\n"
+                    "none   = 安靜，不掛任何 hook\n"
+                    "notify = 現況：notify.sh -> apprise -> 桌面通知橫幅\n"
+                    "peon   = peon-ping 遊戲語音 + 它自己的 overlay 橫幅（預設 sc2_scv：Job's finished!）\n"
+                    "both   = 兩者都掛（apprise 橫幅 + 語音 + peon overlay，會有兩個橫幅）\n"
+                    "headless（server）一律 none：沒有音效裝置也沒有通知 daemon。\n"
+                    "peon 的音量/音效包/通知樣式由 `peon` CLI 自己管，chezmoi 不碰，\n"
+                    "所以隨便調都不會產生 chezmoi diff。見 docs/tools/agent-sounds.md")),
 
     # --- Dev tooling -----------------------------------------------------
     Prompt("installPythonUvTools", "bool", "Dev tooling",
@@ -567,6 +584,9 @@ BUNDLES: dict[str, dict[str, object]] = {
         "backupMode": "off",
         "allowPartialFailure": False,
         "noRoot": False,
+        # No audio device and no notification daemon in CI / Docker, and the
+        # peon-ping hook would fire on every turn for nothing.
+        "agentSounds": "none",
         # Vim mode off: CI / Docker shells don't benefit from modal editing,
         # and emacs keymap matches what most non-interactive automation
         # expects (Ctrl+L = clear, Ctrl+H = backspace, no mode flicker).

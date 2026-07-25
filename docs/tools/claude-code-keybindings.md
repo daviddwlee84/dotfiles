@@ -61,7 +61,7 @@ If/when Claude Code grows a per-mode action, fold the new action into [`dot_clau
 
 ## How the `modify_` overlay works
 
-[`dot_claude/modify_keybindings.json`](../../dot_claude/modify_keybindings.json) is a tiny shell script (mirrors the shape of [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json)). Two execution paths:
+[`dot_claude/modify_keybindings.json`](../../dot_claude/modify_keybindings.json) is a tiny shell script (mirrors the shape of [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl)). Two execution paths:
 
 1. **Bootstrap (empty stdin — live file does not exist yet)**: emit a minimal stub containing only `$schema` + `$docs`. Claude Code falls back to built-in defaults for any binding not present in the file.
 2. **Steady-state (live file exists)**: pipe the live JSON into `jq '. * $overlay'`, which deep-merges the overlay over the live tree. The live `.bindings` array is preserved verbatim because the overlay has no `.bindings` key and `jq`'s `*` operator only replaces arrays that match an overlay key path.
@@ -113,6 +113,6 @@ Don't write this filter speculatively — wait until there's a concrete binding 
 
 ## See also
 
-- [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) — the sibling overlay for `settings.json`. The hook-aware merger pattern there is the reference for any future array-merge work in this overlay.
+- [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) — the sibling overlay for `settings.json`. The hook-aware merger pattern there is the reference for any future array-merge work in this overlay.
 - [`docs/tools/agent-overlays.md`](agent-overlays.md) — overall design of the coding-agent CLI overlays in this repo (Claude / OpenCode / Codex / Cursor).
 - [`docs/tools/chezmoi-prefixes.md`](chezmoi-prefixes.md) — `modify_` vs `create_` semantics and the rationale for choosing `modify_` here.

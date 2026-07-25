@@ -53,7 +53,7 @@ Touching the `🤖`/`💬`/`✅` per-tmux-window status mechanism requires keepi
 1. `dot_ansible/roles/devtools/tasks/main.yml` — binary install (brew tap on macOS; GitHub release `.tar.gz` on Linux)
 2. `dot_config/workmux/config.yaml` — `status_format: false` is load-bearing
 3. `dot_config/tmux/theme.catppuccin.conf` — `#{?@workmux_status, #{@workmux_status},}` appended to `@catppuccin_window_text` and `@catppuccin_window_current_text`
-4. `dot_claude/modify_settings.json` — `Stop`/`SubagentStop`/`UserPromptSubmit`/`Notification` hooks calling `workmux set-window-status` (hook-aware merger preserves CodeIsland entries)
+4. `dot_claude/modify_settings.json.tmpl` — `Stop`/`SubagentStop`/`UserPromptSubmit`/`Notification` hooks calling `workmux set-window-status` (hook-aware merger preserves CodeIsland entries). The workmux entries are **unconditional**; the `agentSounds` prompt gates only the notify.sh / peon-ping entries in the same file (see [docs/tools/agent-sounds.md](docs/tools/agent-sounds.md))
 5. `dot_config/opencode/plugins/workmux-status.ts` + `dot_config/opencode/modify_package.json`
 6. `dot_config/shell/60_tmux_status.sh` — generic POSIX `tmux_status_set/get/clear/clear_all/list/run` for non-agent producers
 

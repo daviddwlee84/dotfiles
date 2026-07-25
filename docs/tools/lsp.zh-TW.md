@@ -42,7 +42,7 @@ LazyVim 的核心 spec 也會自動透過 `lazydev.nvim` 接上 **`lua_ls`**（L
 
 ### 透過 Claude Code 外掛
 
-[`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) 將 `enabledPlugins` overlay 進 `~/.claude/settings.json`：
+[`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 將 `enabledPlugins` overlay 進 `~/.claude/settings.json`：
 
 ```json
 "enabledPlugins": {
@@ -96,7 +96,7 @@ cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock
 
 ### 加入 Claude Code
 
-編輯 [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) → 在 `overlay` heredoc 內的 `enabledPlugins` 對應中加入：
+編輯 [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) → 在 `overlay` heredoc 內的 `enabledPlugins` 對應中加入：
 
 ```json
 "enabledPlugins": {

@@ -72,7 +72,7 @@ and use `wm add -x claude` in its place.
 | Binary install (Linux) | `dot_ansible/roles/devtools/tasks/main.yml` (workmux block) | Downloads `workmux-linux-{amd64,arm64}.tar.gz` from GitHub releases to `~/.local/bin/`; symlinks `wm -> workmux` |
 | Global config | [`dot_config/workmux/config.yaml`](../../dot_config/workmux/config.yaml) | `nerdfont: false` + `status_format: false` (we manage the tmux format ourselves) |
 | Tmux window format | [`dot_config/tmux/theme.catppuccin.conf`](../../dot_config/tmux/theme.catppuccin.conf) | Appends `#{?@workmux_status, #{@workmux_status},}` to `@catppuccin_window_text` / `@catppuccin_window_current_text` |
-| Claude hooks | [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) | Adds `Stop` / `SubagentStop` / `UserPromptSubmit` / `Notification` hooks calling `workmux set-window-status` |
+| Claude hooks | [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) | Adds `Stop` / `SubagentStop` / `UserPromptSubmit` / `Notification` hooks calling `workmux set-window-status` |
 | OpenCode plugin | [`dot_config/opencode/plugins/workmux-status.ts`](../../dot_config/opencode/plugins/workmux-status.ts) | Vendored copy of upstream plugin — listens to OpenCode events, calls `workmux set-window-status` |
 | OpenCode plugin deps | [`dot_config/opencode/modify_package.json`](../../dot_config/opencode/modify_package.json) | jq-merges `@opencode-ai/plugin: 1.4.3` into existing `package.json` |
 | Shell helpers | [`dot_config/zsh/tools/38_workmux.zsh`](../../dot_config/zsh/tools/38_workmux.zsh) | `wmclear` (manual marker reset), `wmsb` alias, `wm='workmux'` fallback alias |
@@ -81,7 +81,7 @@ What is **NOT** managed (by design):
 
 - `wm setup` is not auto-run. It would write the same Claude/OpenCode hooks
   we already manage above, leading to duplicate entries (the hook-aware
-  merger in `modify_settings.json` would deduplicate them but the cleaner
+  merger in `modify_settings.json.tmpl` would deduplicate them but the cleaner
   path is to skip `wm setup` entirely on managed machines). On a fresh box
   the chezmoi layer installs everything `wm setup` would have done.
 - `~/.config/workmux/state/` (per-machine runtime state — XDG state dir).
@@ -131,7 +131,7 @@ of the [original investigation](../../pitfalls/workmux-status-leak.md).
 This repo fixes both leak modes:
 
 1. **Claude `Stop` + `SubagentStop` hooks** — managed in
-   [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json).
+   [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl).
    Every Claude turn end calls `workmux set-window-status done`, which
    immediately makes ✅ appear and then auto-clears on focus. Fixes the
    by-design leak.
@@ -291,7 +291,7 @@ To add tracking for a new agent **on every machine** (not just one box):
      etc.), add the hook entries to that overlay's template so the
      hook-aware merger preserves user/runtime additions.
    - For agents without an overlay yet, model after
-     [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json)
+     [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl)
      or [`dot_config/opencode/plugins/workmux-status.ts`](../../dot_config/opencode/plugins/workmux-status.ts).
 3. Wrap the actual `workmux set-window-status` call with
    `command -v workmux >/dev/null 2>&1 && ... || true` so the hook no-ops

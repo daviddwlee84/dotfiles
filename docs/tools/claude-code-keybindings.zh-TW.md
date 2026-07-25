@@ -66,7 +66,7 @@ jq '.bindings[] | .context' ~/.claude/keybindings.json
 
 ## `modify_` 覆蓋層的運作方式
 
-[`dot_claude/modify_keybindings.json`](../../dot_claude/modify_keybindings.json) 是一個小型的 shell 腳本（鏡映 [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) 的結構）。有兩條執行路徑：
+[`dot_claude/modify_keybindings.json`](../../dot_claude/modify_keybindings.json) 是一個小型的 shell 腳本（鏡映 [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) 的結構）。有兩條執行路徑：
 
 1. **Bootstrap（stdin 為空——即時檔案尚未存在）**：產出僅包含 `$schema` + `$docs` 的最小 stub。任何不在檔案中的綁定，Claude Code 會回退至內建預設值。
 2. **穩態（即時檔案已存在）**：將即時 JSON 餵入 `jq '. * $overlay'`，對即時樹進行深度合併。即時的 `.bindings` 陣列會被原樣保留，因為覆蓋層沒有 `.bindings` 鍵，而 `jq` 的 `*` 運算子只會替換符合覆蓋層鍵路徑的陣列。
@@ -118,6 +118,6 @@ chezmoi apply ~/.claude/keybindings.json  # 第二次執行為 idempotent
 
 ## 另見
 
-- [`dot_claude/modify_settings.json`](../../dot_claude/modify_settings.json) — `settings.json` 的姊妹覆蓋層。其中具有 hook 感知的合併器模式，是本覆蓋層未來陣列合併工作的參考。
+- [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.json.tmpl) — `settings.json` 的姊妹覆蓋層。其中具有 hook 感知的合併器模式，是本覆蓋層未來陣列合併工作的參考。
 - [`docs/tools/agent-overlays.md`](agent-overlays.md) — 本 repo 中編碼代理 (coding agent) CLI 覆蓋層的整體設計（Claude / OpenCode / Codex / Cursor）。
 - [`docs/tools/chezmoi-prefixes.md`](chezmoi-prefixes.md) — `modify_` 與 `create_` 的語意以及在這裡選擇 `modify_` 的理由。

@@ -82,7 +82,7 @@ Two of those layers are already owned by other tooling and must stay clean:
 
 | Layer | Owner | Why proxy config must NOT go here |
 |---|---|---|
-| `~/.claude/settings.json` | chezmoi (`dot_claude/modify_settings.json`) | always-on for *every* project; fights the chezmoi merge |
+| `~/.claude/settings.json` | chezmoi (`dot_claude/modify_settings.json.tmpl`) | always-on for *every* project; fights the chezmoi merge |
 | `./.claude/settings.json` | `claude-plans-here` (`plansDirectory`) | committed to git — proxy config would leak to the team |
 
 So the proxy uses the two layers nobody else owns:

@@ -193,7 +193,7 @@ herdr 首次執行的 onboarding 會提議**安裝可選的 agent 整合**（`he
 
 | Agent | `herdr integration install` 建立什麼 | 會碰到 repo 管理的檔案嗎？ |
 |---|---|---|
-| claude | `~/.claude/hooks/herdr-agent-state.sh` **+ `~/.claude/settings.json` 裡一個 hook 項目** | 會——但 repo 的 hook-aware `modify_settings.json` merger 會**保留**它（跟它對待 CodeIsland 一樣）。`chezmoi apply` 是 no-op；不會把 herdr hook 拔掉。 |
+| claude | `~/.claude/hooks/herdr-agent-state.sh` **+ `~/.claude/settings.json` 裡一個 hook 項目** | 會——但 repo 的 hook-aware `modify_settings.json.tmpl` merger 會**保留**它（跟它對待 CodeIsland 一樣）。`chezmoi apply` 是 no-op；不會把 herdr hook 拔掉。 |
 | codex | 只有 `~/.codex/herdr-agent-state.sh` | 不會——`~/.codex/config.toml` 不動（與 chezmoi 計算出的目標相同）。 |
 | opencode | `~/.config/opencode/plugins/herdr-agent-state.js`（獨立 plugin） | 不會——只有 `workmux-status.ts` 受管；herdr 的 plugin 共存。 |
 | cursor | `~/.cursor/herdr-agent-state.sh` + hook | 腳本在 chezmoi 之外；共存。 |

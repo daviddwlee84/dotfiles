@@ -149,7 +149,7 @@
 
 - `private_executable_dot_ssh/private_readonly_id_ed25519` — 目錄為 private，檔案為 private+readonly。（實務上：不要把私鑰 commit 進去；此處只為展示順序。）
 - `create_private_dot_ssh/create_private_config` — 建立時為 0600 的 create-once SSH 設定。
-- `modify_private_dot_claude/modify_settings.json` — 本 repo 實際使用的模式（見[下方案例研究](#dot_claudemodify_settingsjson--partial-json-management-via-jq)）。
+- `modify_private_dot_claude/modify_settings.json.tmpl` — 本 repo 實際使用的模式（見[下方案例研究](#dot_claudemodify_settingsjson--partial-json-management-via-jq)）。
 
 如果不小心把堆疊順序弄錯，`chezmoi chattr` 會幫你規範化：
 
@@ -184,7 +184,7 @@ chezmoi chattr +private,+readonly ~/.config/foo/bar
 
 由 app 在執行階段主動重寫（新增鍵、重新排序……）的檔案，但你只想強制其中部分鍵。
 
-- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json`，一個用 `jq` 深度合併 (deep-merge) 受管理覆蓋層 (overlay) 的腳本。見[下方案例研究](#dot_claudemodify_settingsjson--partial-json-management-via-jq)。
+- **`~/.claude/settings.json`** → `dot_claude/modify_settings.json.tmpl`，一個用 `jq` 深度合併 (deep-merge) 受管理覆蓋層 (overlay) 的腳本。見[下方案例研究](#dot_claudemodify_settingsjson--partial-json-management-via-jq)。
 - **`~/.docker/config.json`** → 一個 modify 腳本，重寫 `proxies.default` 同時保留 `auths` / `credsStore`。見 [docs/tools/containers.md](containers.md)。
 - 經驗法則：如果 app 擁有檔案，而你只在乎 N 個鍵，`modify_` 比完整受管理樣板更划算。
 
@@ -305,7 +305,7 @@ External 的求值會在 `.chezmoiscripts/global/run_onchange_after_20_ansible_r
 
 下面是上述 `modify_` / `create_` 模式的三個具體實作說明，附帶我們踩過的失敗模式。
 
-### `dot_claude/modify_settings.json` — 透過 jq 進行部分 JSON 管理
+### `dot_claude/modify_settings.json.tmpl` — 透過 jq 進行部分 JSON 管理
 
 Claude Code 會在執行階段重寫 `~/.claude/settings.json`（新增 `permissions`、`skipAutoPermissionPrompt`、重新排序鍵）。靜態的受管理檔案會在每次 apply 時都產生 diff。
 
@@ -315,7 +315,7 @@ Claude Code 會在執行階段重寫 `~/.claude/settings.json`（新增 `permiss
 - Claude Code 新增的其他任何鍵（model、permissions、`skipAutoPermissionPrompt` 等）會被原封不動保留。
 - 覆蓋層中的陣列會整批取代對應陣列，因此 `hooks.Notification` 不會累積重複項。
 
-要管理額外的鍵，把它加到 `dot_claude/modify_settings.json` 中的 `overlay` heredoc。需要 `jq`（由 `base` ansible role 安裝）。來源檔案必須具備 exec bit（git mode `100755`）。
+要管理額外的鍵，把它加到 `dot_claude/modify_settings.json.tmpl` 中的 `overlay` heredoc。需要 `jq`（由 `base` ansible role 安裝）。來源檔案必須具備 exec bit（git mode `100755`）。
 
 **失敗模式**：如果實際的 `~/.claude/settings.json` 含有無效 JSON（例如 Claude Code 寫入了多餘的尾隨逗號），`jq` 會以 parse error 中止，腳本以非零狀態退出。chezmoi 會記錄 `chezmoi: .claude/settings.json: exit status 5` 並跳過該檔案；損壞的實際檔案保持不動，等待手動檢視。絕不會寫出部分 / 損毀的輸出。修好或刪除實際檔案後再執行 `chezmoi apply`。
 
