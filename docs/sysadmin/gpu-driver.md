@@ -189,36 +189,56 @@ mappings (`libglxserver_nvidia.so.<old>`, `libEGL_nvidia.so.<old>`, …) and
 **any** X restart — logout, user switch, `systemctl restart gdm3`, suspend —
 comes back on the new libs against the old module and lands on a black screen.
 
-### amdgpu is broken on kernel 7.0.0-28 (blacklisted)
+### amdgpu is currently blacklisted — and that was probably a mistake
+
+`/etc/modprobe.d/blacklist-amdgpu.conf` exists on this box. It was added on
+2026-07-25 after a `-22` probe failure that turned out to be **an artefact of
+being booted in recovery mode**, not a driver bug:
 
 ```
-amdgpu: vga_switcheroo: detected switching method \_SB_.PCI0.GP17.VGA_.ATPX handle
-amdgpu: ATPX version 1, functions 0x00000000
 amdgpu 0000:0c:00.0: probe with driver amdgpu failed with error -22
+$ cat /proc/cmdline
+… ro recovery nomodeset dis_ucode_ldr        # <- nomodeset is why
 ```
 
-ATPX is the **laptop hybrid-graphics** ACPI switching interface. The board
-exposes it on a desktop part with an all-zero function bitmask, and amdgpu
-bails with `EINVAL`. Firmware is present (not a missing-firmware case), and
-6.17.0-35-generic probes the same hardware fine — this is a 7.0 regression.
+On a **normal** command line, same kernel, amdgpu initialises completely — all
+ten IP blocks, VBIOS fetched, 2048M of VRAM ready. See
+[`pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/recovery-mode-resume-keeps-nomodeset-in-cmdline.md).
+The ATPX / vga_switcheroo lines that look alarming appear on healthy boots too.
 
-Worse, the failure is **nondeterministic**. When amdgpu half-initialises
-instead of cleanly failing, the desktop session hangs retrying dbus activation
-for 20+ minutes:
-
-```
-amdgpu 0000:0c:00.0: [drm] *ERROR* Not enough memory for command submission!
-dbus-daemon: Failed to activate service 'org.freedesktop.Notifications': timed out
-```
-
-One such boot took **57 minutes** to reach a usable desktop. Hence:
+**Remove the blacklist** unless the 57-minute boot below actually recurs:
 
 ```bash
-echo 'blacklist amdgpu' | sudo tee /etc/modprobe.d/blacklist-amdgpu.conf
+sudo rm /etc/modprobe.d/blacklist-amdgpu.conf
 sudo update-initramfs -u -k all
 ```
 
-Zero cost — the iGPU has no display attached and contributes nothing.
+### The 57-minute boot is still unexplained
+
+Separately, one boot on a normal command line ran 17:17:53 → 18:14:38 without
+reaching a usable desktop. What is established:
+
+- amdgpu initialised cleanly at 17:17:55 — not the cause.
+- `dbus-daemon … Failed to activate service 'org.freedesktop.Notifications':
+  timed out (service_start_timeout=120000ms)`, repeating every ~2m10s from 17:54.
+- The `amdgpu … [drm] *ERROR* Not enough memory for command submission!` burst
+  is timestamped 18:14:38 — the **last** second of that boot, i.e. during the
+  forced reboot, not during startup.
+- GDM started `gdm-wayland-session`, whereas the previous 12-day session was
+  X11. `nvidia_drm modeset=1` is set and `/etc/gdm3/custom.conf` has no
+  `WaylandEnable=false`, so nothing stopped GDM picking Wayland after the
+  kernel + driver jump.
+
+The X11 → Wayland flip is the strongest correlate but is **not proven**. If the
+long boot recurs, change the session type first — not the GPU driver:
+
+```bash
+# /etc/gdm3/custom.conf
+[daemon]
+WaylandEnable=false
+```
+
+…or just pick "Ubuntu on Xorg" (gear icon) at the greeter.
 
 ### Would moving the display to the iGPU help?
 
@@ -231,8 +251,8 @@ with it, compositing stops stealing SM time, and — the one that matters here �
 **X can be restarted without touching the GPU**, which removes the black-screen
 trap above entirely.
 
-Blocked on the amdgpu `-22` probe failure. Revisit if a later kernel fixes it,
-or on 6.17.0-35 where amdgpu works.
+Prerequisites: remove the amdgpu blacklist, boot on a normal command line, then
+attach a cable to the motherboard output and set the BIOS primary display.
 
 ## Related
 
