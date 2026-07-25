@@ -39,10 +39,26 @@ BOOT_IMAGE=/vmlinuz-7.0.0-28-generic root=UUID=… ro recovery nomodeset dis_uco
 ```
 
 - `nomodeset` — in-tree DRM drivers refuse to do kernel mode setting.
-  amdgpu's probe bails with `EINVAL` (`-22`).
-- `dis_ucode_ldr` — **CPU microcode updates are disabled**. On a modern AMD or
-  Intel part that silently drops shipped errata and security fixes. This is the
-  reason not to linger here even if everything seems fine.
+  amdgpu's probe bails with `EINVAL` (`-22`). **This is the only one of the
+  three that reliably does anything.**
+- `recovery` and `dis_ucode_ldr` — on kernel 7.0 the kernel does not even
+  recognise them:
+  ```
+  kernel: Unknown kernel command line parameters "recovery dis_ucode_ldr",
+          will be passed to user space
+  ```
+  `recovery` is consumed by Ubuntu's init scripts (and after "resume" it does
+  not restrict the systemd target — `graphical.target` comes up normally).
+
+Don't assume `dis_ucode_ldr` cost you microcode fixes without checking — on a
+board whose BIOS already ships the revision the kernel would load, it is a
+no-op. Compare the normal boot against the recovery boot:
+
+```
+boot -2 (normal):   microcode: Current revision: 0x0b404035
+                    microcode: Updated early from: 0x0b404035   # same rev = no-op
+boot  0 (recovery): /proc/cpuinfo -> microcode : 0xb404035      # identical
+```
 
 The ATPX / vga_switcheroo lines are a **red herring** — they appear on a
 perfectly healthy boot too. Don't chase them.
@@ -76,9 +92,12 @@ Confirm you are out:
 
 ```bash
 cat /proc/cmdline                  # should be: ro quiet splash vt.handoff=7
-grep -m1 microcode /proc/cpuinfo   # microcode line present again
 ls /sys/class/drm/ | grep card     # card2 back (if amdgpu is not blacklisted)
 ```
+
+Don't use `grep microcode /proc/cpuinfo` as the check — that line is present
+either way. `journalctl -k -b | grep microcode:` is the honest one: the loader
+only logs on a boot where it actually ran.
 
 ## Prevention
 
