@@ -1,0 +1,84 @@
+#!/usr/bin/env zsh
+# nvidia-driver-drift-check
+#   Detect drift between the LOADED NVIDIA kernel module and the ON-DISK
+#   userspace libraries -- the exact failure mode of 2026-07-25, where
+#   unattended-upgrades replaced the userspace under a live CUDA context and
+#   nvidia-smi started reporting "Driver/library version mismatch".
+#
+#   exit 0 : in sync, or no NVIDIA driver loaded (nothing to check)
+#   exit 1 : DRIFT -- new CUDA processes will fail until a reboot
+#
+#   -q | --quiet : print at most ONE line (to stderr) on drift, nothing when in
+#                  sync. Intended for interactive shell startup; skips the
+#                  fuser(1) scan, which costs ~240ms because it walks /proc.
+#
+#   Silence a known, already-acknowledged drift (e.g. while a long training run
+#   keeps the reboot blocked) by recording the exact version pair:
+#       echo "580.159.03->580.173.02" > ~/.cache/nvidia-drift-ack
+#   The banner returns automatically as soon as either version changes.
+
+emulate -L zsh
+setopt local_options no_nomatch
+
+local quiet=0
+[[ ${1:-} == (-q|--quiet) ]] && quiet=1
+
+# ---- 1. version of the kernel module currently loaded in RAM ---------------
+local running=""
+if [[ -r /sys/module/nvidia/version ]]; then
+    running=$(</sys/module/nvidia/version)
+elif [[ -r /proc/driver/nvidia/version ]]; then
+    # "NVRM version: NVIDIA UNIX x86_64 Kernel Module  580.159.03  Fri Apr ..."
+    local -a f=( ${(s: :)"$(</proc/driver/nvidia/version)"} )
+    running=${${(M)f:#<->.<->.<->}[1]}
+fi
+[[ -z $running ]] && exit 0        # no proprietary driver loaded -> not applicable
+
+# ---- 2. version of the userspace on disk (this is what NVML reports) -------
+# NOTE: a naive libnvidia-ml.so.[0-9]* glob also matches the soname symlink
+# libnvidia-ml.so.1 and yields a bogus "version" of 1. Require a dotted
+# version and exclude symlinks with the (N^@) qualifier.
+local -a cands=( /usr/lib/*-linux-gnu/libnvidia-ml.so.<->.<->.<->(N^@) )
+(( ${#cands} == 0 )) && exit 0
+local userspace=${${cands[1]:t}#libnvidia-ml.so.}
+
+if [[ $running == $userspace ]]; then
+    (( quiet )) || print "nvidia OK: kernel module $running == userspace $userspace"
+    exit 0
+fi
+
+# ---- 3. drift ---------------------------------------------------------------
+local ack=${XDG_CACHE_HOME:-$HOME/.cache}/nvidia-drift-ack
+if [[ -r $ack && "$(<$ack)" == "${running}->${userspace}" ]]; then
+    exit 1                          # known and acknowledged: stay silent
+fi
+
+if (( quiet )); then
+    print -u2 "!! NVIDIA drift: kernel=${running} userspace=${userspace} -- new CUDA procs will fail; reboot needed. Details: nvidia-driver-drift-check"
+    exit 1
+fi
+
+print -u2 "=============================================================="
+print -u2 " NVIDIA DRIVER / LIBRARY MISMATCH - NVIDIA 驅動與函式庫不一致"
+print -u2 "=============================================================="
+print -u2 "  loaded kernel module 執行中核心模組 : ${running}"
+print -u2 "  on-disk userspace  磁碟上使用者空間 : ${userspace}"
+print -u2 ""
+print -u2 "  nvidia-smi will report 'Failed to initialize NVML: Driver/"
+print -u2 "  library version mismatch'; new CUDA processes will FAIL."
+print -u2 "  Already-running jobs keep working (they hold the old, deleted"
+print -u2 "  .so inodes). The only fix is a reboot."
+print -u2 "  已在跑的工作不受影響；唯一的修復方式是重新開機。"
+
+# fuser walks all of /proc (~240ms here) - only pay for it in verbose mode.
+local -a pids=( ${(z)"$(fuser /dev/nvidia0 2>/dev/null)"} )
+if (( ${#pids} )); then
+    print -u2 ""
+    print -u2 "  WARNING: ${#pids} process(es) currently hold /dev/nvidia0."
+    print -u2 "  A reboot WILL kill them. 重開機會殺掉這些工作："
+    ps -o pid=,etime=,comm= -p ${(j:,:)pids} 2>/dev/null | sed 's/^/    /' >&2
+fi
+print -u2 ""
+print -u2 "  Silence until the versions change:"
+print -u2 "    echo '${running}->${userspace}' > ${ack}"
+exit 1
