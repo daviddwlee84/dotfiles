@@ -124,6 +124,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + S` | 複製聚焦 pane 的 **內容**（完整 scrollback） | command pane |
 | `` prefix + p `` | **複製檔案路徑** ——兩層 fzf（cwd 下存在的路徑在上），複製解析後的絕對路徑（`x copy`） | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
+| `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
 | `prefix + O` | herdr-plus **Projects**（layout launcher） | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
@@ -311,6 +312,34 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 | `tv herdr-review` / `prefix+i` | **收件匣**:只列出被標記的 pane。`Enter` focus 過去並**保留** ⭐（你可能還在 review 中）;`Alt+C` focus **並**清除（「mark read」） |
 
 三個名字必須一起動:`review-mark.sh` 裡的 `TOKEN`、[`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml) 裡的 `.tokens.review` 查詢,以及 sidebar row layout 裡的 `"$review"`。
+
+## 在 popup 裡執行任意指令（`prefix + E`） {#run-any-command}
+
+`prefix + G` 已經示範了那個形狀 —— 一個暫時性的 pane，跑完就消失 —— 但它的指令是寫死的。`prefix + E` 就是它的一般化版本：**用 fzf 從 shell 歷史挑一條指令（或直接打一條新的），它會在聚焦 pane 的 cwd 執行，結束後 popup 自己關掉。** 輔助腳本：`~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh)。
+
+**為什麼用 `type = "popup"` 而不是其他做法** —— 這是這裡唯一不是 command *pane* 的綁定：
+
+| 做法 | 問題 |
+|---|---|
+| `type = "pane"`（`prefix+G/M/N/`` ` ``） | 執行期間會切開**平鋪版面**，整個重排 |
+| `prefix + c` → 打指令 → `exit` | 四個步驟，而且會弄亂 tab bar |
+| `prefix + `` ` ``（scratch shell） | 留下一個要自己 exit 的 shell |
+| **`type = "popup"`** | session-modal，浮在版面**之上** —— 什麼都不重排，關掉就回到原位 |
+
+`type = "popup"` 需要 **herdr ≥ 0.7.4**（#1125 加入，`width`/`height` 支援 cell 數或百分比）。它才是真正的 `tmux display-popup -E` 對應物。
+
+**它沒辦法做成 herdr-plus Quick Action**（`prefix + y`），雖然那是最直覺會去找的地方。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是 `btop`/`nvtop` 是 command pane 而不是 Quick Action 的原因），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
+
+行為：
+
+| | |
+|---|---|
+| **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` 的 `foreground_cwd` → `$PWD`。優先用環境變數的好處是：即使 CLI 與舊 server protocol 不相容，它照樣能運作 |
+| **選取** | fzf 翻 `$HISTFILE`（預設 `~/.zsh_history`），最新在上、已去重。打了沒 match 的字再按 Enter 就當作**新指令**執行；`Esc` 則什麼都不做。沒有 fzf 時退回純 `read` 提示 |
+| **shell** | 預設 `$SHELL -ic`，所以這個 repo 的 alias 與 function 都能解析（`gst`、`cas`、`x` …）。`--sh` 改用 `sh -c` —— 快，但 alias 不存在 |
+| **結束時** | 成功就關閉；失敗則印出 `[exit N]` 並等你按 Enter，讓錯誤訊息不會一閃而過。可用 `HERDR_RUN_HOLD=always\|never` 覆寫 |
+
+> 有兩個可攜性陷阱已經在腳本裡處理掉了，如果你要改它值得先知道：`~/.zsh_history` 是 extended-history 格式（`: <ts>:<elapsed>;<cmd>`）**而且含有非 UTF-8 位元組**，所以除非在 `LC_ALL=C` 下解析，BSD `sed` 會以 `sed: RE error: illegal byte sequence` 中止；另外「最新在上」的反轉用 POSIX `awk` 實作，因為 `tail -r` 只有 BSD 有、`tac` 只有 GNU 有。
 
 ## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
 

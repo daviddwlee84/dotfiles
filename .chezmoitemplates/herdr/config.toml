@@ -132,6 +132,32 @@ type = "pane"
 command = "$SHELL"
 description = "scratch shell (popup pane)"
 
+# --- Run an arbitrary command in a floating popup (prefix+E) ---
+# The generalisation of prefix+G: instead of a hardcoded tool, fzf-pick or type
+# any command, run it in the FOCUSED PANE'S cwd, and the popup closes itself when
+# the command exits. Helper: ~/.config/herdr/run-command.sh.
+#
+# type = "popup" (herdr >= 0.7.4) is the tmux `display-popup -E` analog: it floats
+# ABOVE the tiled layout instead of splitting it, so nothing reflows and you land
+# back exactly where you were. That is why this one is NOT type = "pane" like the
+# lazygit/btop/scratch bindings above.
+#
+# Deliberately not a herdr-plus Quick Action (prefix+y): Quick Actions run through
+# `sh -c` with no PTY/stdin (the same reason btop/nvtop are command panes) and
+# every action is a fixed command string with no free-text field.
+#
+# Exit behaviour: closes on success, holds on failure so the error stays readable.
+# Override with HERDR_RUN_HOLD=always|never. `--sh` runs via `sh -c` (fast, no
+# aliases) instead of the default `$SHELL -ic` (sources the interactive rc, so
+# this repo's aliases/functions resolve).
+[[keys.command]]
+key = "prefix+E"
+type = "popup"
+command = "~/.config/herdr/run-command.sh"
+width = "80%"
+height = "70%"
+description = "run a command in the pane cwd (popup)"
+
 # --- New tab at the workspace ("space") root dir (prefix+C) ---
 # herdr's native new-tab (prefix+c) and the mouse "+" button follow new_cwd,
 # which on herdr >=0.7.x means the FOCUSED pane's live cwd (issue #912 made

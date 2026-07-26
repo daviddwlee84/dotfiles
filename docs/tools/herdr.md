@@ -119,6 +119,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + S` | copy focused pane's **content** (full scrollback) | command pane |
 | `` prefix + p `` | **copy a file path** from the pane — two-tier fzf (paths that exist under the pane cwd on top), copies the resolved absolute path (`x copy`) | command pane |
 | `` prefix + ` `` | scratch shell | command pane |
+| `prefix + E` | **run any command** in the pane's cwd — fzf-pick from history or type it; the popup closes itself when the command exits ([details](#run-any-command)) | command **popup** |
 | `prefix + O` | herdr-plus **Projects** (layout launcher) | plugin action |
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
@@ -306,6 +307,34 @@ Surfaces (all sharing one script, `~/.config/herdr/review-mark.sh` = `dot_config
 | `tv herdr-review` / `prefix+i` | the **inbox**: lists only flagged panes. `Enter` focuses & **keeps** the ⭐ (you may still be mid-review); `Alt+C` focuses **and** clears it ("mark read") |
 
 Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review` lookups in [`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml), and `"$review"` in the sidebar row layout.
+
+## Run any command in a popup (`prefix + E`) {#run-any-command}
+
+`prefix + G` proves the shape — a transient pane that runs something and vanishes when it exits — but its command is hardcoded. `prefix + E` is the generalisation: **fzf-pick a command from shell history (or just type a new one), it runs in the focused pane's cwd, and the popup closes itself on exit.** Helper: `~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh).
+
+**Why `type = "popup"` and not the alternatives** — this is the only binding here that is not a command *pane*:
+
+| Approach | Problem |
+|---|---|
+| `type = "pane"` (`prefix+G/M/N/`` ` ``) | splits the **tiled layout** for the duration; everything reflows |
+| `prefix + c` → type → `exit` | four steps, and churns the tab bar |
+| `prefix + `` ` `` (scratch shell) | leaves you in a shell you have to exit by hand |
+| **`type = "popup"`** | session-modal float **above** the layout — nothing reflows, and you land exactly where you were |
+
+`type = "popup"` requires **herdr ≥ 0.7.4** (added in #1125, with `width`/`height` in cells or percentages). It is the true `tmux display-popup -E` analog.
+
+**It cannot be a herdr-plus Quick Action** (`prefix + y`), which is the intuitive place to look. Two blockers: Quick Actions run through `sh -c` with **no PTY/stdin** — the same reason `btop`/`nvtop` are command panes rather than Quick Actions — and every action is a fixed `command = "…"` string with no free-text field.
+
+Behaviour:
+
+| | |
+|---|---|
+| **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` `foreground_cwd` → `$PWD`. Preferring the env var means it still works when the CLI is protocol-mismatched with a stale server |
+| **picker** | fzf over `$HISTFILE` (default `~/.zsh_history`), newest-first and de-duplicated. Typing something with no match and pressing Enter runs it as a **new** command; `Esc` runs nothing. Falls back to a plain `read` prompt when fzf is absent |
+| **shell** | `$SHELL -ic` by default, so this repo's aliases and functions resolve (`gst`, `cas`, `x`, …). `--sh` switches to `sh -c` — fast, but aliases do not exist |
+| **on exit** | closes on success; on failure prints `[exit N]` and waits for Enter so the error stays readable. `HERDR_RUN_HOLD=always\|never` overrides |
+
+> Two portability traps are handled inside the helper and are worth knowing if you edit it: `~/.zsh_history` is extended-history format (`: <ts>:<elapsed>;<cmd>`) **and contains non-UTF8 bytes**, so BSD `sed` aborts with `sed: RE error: illegal byte sequence` unless the parse runs under `LC_ALL=C`; and the newest-first reversal uses POSIX `awk` because `tail -r` is BSD-only while `tac` is GNU-only.
 
 ## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
 
