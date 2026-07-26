@@ -497,6 +497,9 @@ copilot-proxy logs 60                # tail the proxy log
 
 - [Copilot embeddings → semantic search](copilot-embeddings.md) — the same proxy's
   `/v1/embeddings` endpoint wired into `copilot-embed` + `semsearch` (local semantic search)
+- [Raycast AI BYOK → the local Copilot proxy](raycast-ai-byok.md) — the same proxy
+  behind Raycast's Quick AI / AI Chat / AI Commands (`copilot-raycast`), plus the
+  zero-quota probe that tells usable model ids from ones `/v1/models` only claims
 - [caozhiyuan/copilot-api](https://github.com/caozhiyuan/copilot-api) — the
   maintained fork this setup runs (npm `@jeffreycao/copilot-api`)
 - [ericc-ch/copilot-api](https://github.com/ericc-ch/copilot-api) — the

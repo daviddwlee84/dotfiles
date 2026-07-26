@@ -128,6 +128,8 @@ plugins:
             Agent pane discovery (tv agent-panes + recon): Agent pane 探索 (tv agent-panes + recon)
             Agent skills: Agent skills
             Claude Code keybindings: Claude Code 鍵位
+            Raycast AI BYOK → the local Copilot proxy: Raycast AI 自帶模型 (BYOK) → 本機 Copilot 代理 (proxy)
+            Copilot embeddings (semantic search): Copilot embeddings（語意搜尋）
             Language servers (LSP): 語言伺服器 (LSP)
             SpecStory internals: SpecStory 內部運作
             git diff workflow: git diff 工作流程
@@ -307,6 +309,8 @@ nav:
           - Agent skills: tools/agent-skills.md
           - Claude Code keybindings: tools/claude-code-keybindings.md
           - Copilot → Claude Code proxy: tools/copilot-claude-proxy.md
+          - Copilot embeddings (semantic search): tools/copilot-embeddings.md
+          - Raycast AI BYOK → the local Copilot proxy: tools/raycast-ai-byok.md
           - Language servers (LSP): tools/lsp.md
           - OpenCode: tools/opencode.md
           - specify-cli: tools/specify_cli.md

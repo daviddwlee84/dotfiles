@@ -411,6 +411,9 @@ copilot-proxy logs 60                # tail 代理的 log
 
 - [Copilot embeddings → 語意搜尋](copilot-embeddings.zh-TW.md) —— 同一個 proxy 的
   `/v1/embeddings` 端點，接成 `copilot-embed` + `semsearch`（本機語意搜尋）
+- [Raycast AI 自帶模型 (BYOK) → 本機 Copilot 代理 (proxy)](raycast-ai-byok.zh-TW.md)
+  —— 同一個 proxy 接進 Raycast 的 Quick AI / AI Chat / AI Commands（`copilot-raycast`），
+  以及那個分辨「真的能用」與「`/v1/models` 只是宣稱有」的零額度探針
 - [copilot-api](https://github.com/ericc-ch/copilot-api) —— 代理本體
 - [`bunx` CLI aliases](../shells/aliases.md#copilot--claude-code-代理-proxy)
 - [Claude Code 設定優先序](https://code.claude.com/docs/en/settings) —— 為什麼
