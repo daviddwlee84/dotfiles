@@ -3,7 +3,7 @@
 # Lists herdr panes carrying a "review-pending" flag (⭐) — the ones whose agent
 # finished but you haven't reviewed yet. Companion to `herdr-agent-panes.toml`;
 # the flag is set by hmark / prefix+m (see dot_config/herdr/executable_review-mark.sh)
-# and stored as the pane's `custom_status` metadata, orthogonal to agent state.
+# and stored as the pane's `review` metadata TOKEN, orthogonal to agent state.
 # Bound to `prefix+i` in ~/.config/herdr/config.toml.
 #
 # Enter jumps to the pane's WORKSPACE + TAB but KEEPS the ⭐ (you may still be
@@ -12,12 +12,14 @@
 # granularity — enough with one agent per tab. See docs/tools/herdr.md.
 #
 # Source: TSV from `herdr pane list` (native JSON, NO --json flag) via jq,
-# filtered to panes whose custom_status contains "REVIEW" (glyph-agnostic; keep
-# in sync with the MATCH substring in review-mark.sh):
+# filtered to panes that HAVE a non-empty `tokens.review` — presence is the flag,
+# so the glyph text is free-form. Keep the token name in sync with TOKEN in
+# review-mark.sh. herdr >= 0.7.4 (0.7.4 replaced the flat `custom_status` field
+# with this token map; on older herdr the filter silently matches nothing):
 #   0. pane_id        (w1:p1)
 #   1. workspace_id   (w1)
 #   2. tab_id         (w1:t1)
-#   3. custom_status  (⭐ REVIEW)
+#   3. tokens.review  (⭐ REVIEW)
 #   4. cwd            (foreground cwd, falling back to pane cwd)
 
 [metadata]
@@ -26,7 +28,7 @@ description = "Review-pending herdr panes (⭐) — jump to sessions you flagged
 requirements = ["herdr", "jq"]
 
 [source]
-command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | select(.custom_status? // "" | test("REVIEW")) | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.custom_status)\t\(.foreground_cwd // .cwd)"' '''
+command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | select((.tokens.review? // "") != "") | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.tokens.review)\t\(.foreground_cwd // .cwd)"' '''
 display = "{split:\t:0}  {split:\t:3}  {split:\t:4|split:/:-1}"
 output = "{split:\t:0}"
 

@@ -36,6 +36,25 @@ pane_gaps = true
 confirm_close = true
 show_agent_labels_on_pane_borders = true
 
+# Expanded Agent sidebar row layout. herdr's own default is
+#   [["state_icon", "workspace", "tab"], ["agent"]]
+# and we append the `$review` metadata token so the review-pending ⭐ (prefix+m /
+# hmark) is actually VISIBLE in the sidebar.
+#
+# Required since herdr 0.7.4: `--custom-status` / the flat `custom_status` field
+# were replaced by a namespaced token map, and unlike custom_status a token is
+# rendered ONLY where a row layout names it — set a token with no layout entry
+# and the flag silently exists in the API but shows up nowhere.
+#
+# Keep `$review` in sync with TOKEN in dot_config/herdr/executable_review-mark.sh.
+# NOTE this pins the layout: upstream changes to the default rows will NOT reach
+# us, so re-check this block against `herdr --default-config` on herdr upgrades.
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "workspace", "tab", "$review"],
+  ["agent"],
+]
+
 [terminal]
 shell_mode = "auto"           # login/non-login auto-detect; follows $SHELL
 # CWD policy for new panes/tabs/workspaces (no explicit --cwd). Values:
@@ -163,8 +182,8 @@ command = "tv fleet-hosts"
 description = "Fleet hosts SSH picker (tv)"
 
 # --- Review-pending flag (mark-unread / ⭐) ---
-# prefix+m toggles a per-pane "I still need to review this" flag (herdr
-# custom-status, orthogonal to agent state — survives the pane going idle when
+# prefix+m toggles a per-pane "I still need to review this" flag (a herdr
+# metadata token, orthogonal to agent state — survives the pane going idle when
 # you peek in). prefix+i opens the flagged-panes inbox. Uses $HERDR_ACTIVE_PANE_ID
 # (the keybind-context var; NOT the ambient $HERDR_PANE_ID). Logic lives in
 # ~/.config/herdr/review-mark.sh; see docs/tools/herdr.md.

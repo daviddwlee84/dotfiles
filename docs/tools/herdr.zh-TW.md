@@ -81,7 +81,7 @@ description = "new tab at the workspace (space) root dir"
 | 檔案路徑選單（`prefix+p`；tmux 上為 extrakto `prefix+Tab`） | **自訂 command pane + 輔助腳本** | `prefix+p` → `path-pick.sh`——兩層（cwd 下存在的優先）→ `x copy` |
 | 無縫 `Ctrl-hjkl` nvim↔pane 導覽 | **沒有 herdr-aware smart-splits** | **缺口**——見下方 workaround |
 | OSC133 copy-mode（`cpout`/`cpblock`） | tmux 專屬 | **缺口**——`cpcmd`（zsh history）仍可用 |
-| 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --custom-status`（逐 pane、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
+| 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --token`（逐 pane metadata token、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
 | AI session-summary / agent-wakeup 擷取 | 可改用 `herdr pane read` / `pane list --json` 重寫 | **延後**——超出試用範圍 |
 
 ## 快捷鍵 (Keybindings)
@@ -198,7 +198,7 @@ Projects 範本由 chezmoi 管理於 `dot_config/herdr/plugins/config/cloudmanic
 
 - `herdr-sesh`（`dot_config/television/cable/herdr-sesh.toml`）—— 列出 herdr session/workspace + zoxide 目錄；Enter 會分派 `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd`，而不是 `sesh connect` / `tmux switch-client`。
 - `herdr-agent-panes`（`dot_config/television/cable/herdr-agent-panes.toml`）—— 與 `agent-panes` 同來源，但切換/kill 改用 `herdr pane focus` / `herdr pane close`。
-- `herdr-review`（`dot_config/television/cable/herdr-review.toml`）—— **待 review 收件匣**：只列出帶 ⭐ 旗標的 pane（`custom_status ~ REVIEW`）。Enter 會 focus 該 pane 的 workspace/tab 並**保留**旗標;`Alt+C` 則 focus **並**清除旗標（「mark read」）。綁在 `prefix+i`。見下方 **待 review 旗標** 一節。
+- `herdr-review`（`dot_config/television/cable/herdr-review.toml`）—— **待 review 收件匣**：只列出帶 ⭐ 旗標的 pane（`tokens.review` 非空）。Enter 會 focus 該 pane 的 workspace/tab 並**保留**旗標;`Alt+C` 則 focus **並**清除旗標（「mark read」）。綁在 `prefix+i`。見下方 **待 review 旗標** 一節。
 
 原本綁 tmux 的 `sesh` / `agent-panes` channel 保持不變以利共存。
 
@@ -291,14 +291,16 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 <ssh-target> 'uname -sm'   # 應印出�
 
 tmux 那邊有逐視窗書籤（`@bookmark_status` + `toggle-bookmark.sh`,靠 `#{?@bookmark_status,…}` 渲染）。herdr **沒有 `#{@option}` 狀態列插值**,所以那套機制不能直接移植——但這裡真正重要的用途可以:**「agent 跑完了（`done`）但我還沒 review」**。herdr 一旦你點進去瞄一眼就把 `done` pane 塌成 `idle`,唯一還需要注意的訊號就此消失。
 
-解法用 herdr 的**逐 pane custom-status metadata**,它與原生 agent 偵測正交:
+解法用 herdr 的**逐 pane metadata token**,它與原生 agent 偵測正交:
 
 ```bash
-herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
-herdr pane report-metadata <pane> --source review --clear-custom-status         # 清除
+herdr pane report-metadata <pane> --source review --token review="⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
+herdr pane report-metadata <pane> --source review --clear-token review         # 清除
 ```
 
-已驗證:一個 pane 可以同時帶 `custom_status:"⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `custom_status` 欄位,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。
+已驗證:一個 pane 可以同時帶 `tokens.review = "⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `tokens` map,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。token 的**存在與否**就是旗標本身,所以字符文字可以自由替換。
+
+> **只支援 herdr ≥ 0.7.4,而且 token 需要 row layout 才看得見。** 0.7.4 把 `--custom-status` / 扁平的 `custom_status` 欄位換成了這個帶命名空間的 token map——這是一次**靜默移除**,沒有被列進 breaking change。兩個後果:在更舊的 herdr 上這支 helper 會以 `unknown --custom-status` 死掉;而且不像 `custom_status`,token **只**會在 sidebar row layout 有指名它的地方渲染。這就是為什麼 `.chezmoitemplates/herdr/config.toml` 釘住了 `[ui.sidebar.agents] rows`,在 herdr 預設的第一列後面補上 `"$review"`——拿掉它旗標本身仍然運作（`prefix+i` 照樣列得出來）,但 sidebar 上的 ⭐ 會消失。見 [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md)。
 
 各介面（共用同一支腳本 `~/.config/herdr/review-mark.sh` = `dot_config/herdr/executable_review-mark.sh`,即 tmux `toggle-bookmark.sh` 的對應物）:
 
@@ -308,7 +310,7 @@ herdr pane report-metadata <pane> --source review --clear-custom-status         
 | `prefix+m` | 切換 focus pane 的旗標（用 `$HERDR_ACTIVE_PANE_ID`） |
 | `tv herdr-review` / `prefix+i` | **收件匣**:只列出被標記的 pane。`Enter` focus 過去並**保留** ⭐（你可能還在 review 中）;`Alt+C` focus **並**清除（「mark read」） |
 
-**Caveat——`custom_status` 每 pane 單值。** 延後中的用量狀態 driver（下方）也會推 `--custom-status`;雖然用不同 `--source`,`herdr pane get` 只吐一個扁平的 `custom_status`,兩者會爭同一個可見標籤。目前無實際衝突（driver 未建、review 旗標短暫）,但見 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+三個名字必須一起動:`review-mark.sh` 裡的 `TOKEN`、[`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml) 裡的 `.tokens.review` 查詢,以及 sidebar row layout 裡的 `"$review"`。
 
 ## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
 
@@ -358,13 +360,13 @@ URL 選單的複製路徑姊妹版。`prefix+p` 開一個 fzf 彈窗,列出聚�
 
 ## AI 用量 / 額度狀態
 
-herdr **沒有原生的用量/額度/token 顯示**（側欄只顯示 agent *狀態*）。它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去（與上方 **待 review 旗標** 用的是同一個 hook——注意兩者都寫入單一的逐 pane `custom_status`）。有一個 Codex-only 的社群 plugin（[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)）已從 [CodexBar](https://github.com/steipete/CodexBar) 讀的同一份 `~/.codex` 資料做到這件事；但沒有東西涵蓋 Claude/ChatGPT 額度。延後——CodexBar 的選單列仍是多供應商的檢視。設計與選項記在 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+herdr **沒有原生的用量/額度/token 顯示**（側欄只顯示 agent *狀態*）。它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --token usage="…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去（與上方 **待 review 旗標** 用的是同一個 hook,但 herdr 0.7.4 起 token 是帶命名空間的 map,所以 `usage` token 與 `review` token 可以並存,不再互搶單一欄位）。有一個 Codex-only 的社群 plugin（[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)）已從 [CodexBar](https://github.com/steipete/CodexBar) 讀的同一份 `~/.codex` 資料做到這件事；但沒有東西涵蓋 Claude/ChatGPT 額度。延後——CodexBar 的選單列仍是多供應商的檢視。設計與選項記在 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
 
 ## 缺口（沒有乾淨的 herdr 對應）
 
 - **無縫 `Ctrl-hjkl` nvim↔pane 導覽。** `vim-tmux-navigator` 與 tmux 耦合（`is_vim` 的 `ps`/`pane_tty` 啟發式 + nvim plugin）。herdr 沒有 smart-splits 對應物——它的 pane focus 是 `prefix+h/j/k/l`，在邊界不會穿透進 nvim 的 splits。Workaround：在 nvim 裡用它自己的 `<C-w>hjkl`。這是相對 tmux 最大的 UX 退步。
 - **OSC133 copy-mode**（`cpout` / `cpblock`、prompt 跳轉、最後輸出 yank）是 tmux 專屬。herdr 的 copy mode（`prefix+[`）是 vi 風格但沒有 OSC133 的 prompt 邊界感知。`cpcmd`（zsh history，與多工器無關）仍可用。
-- **裝飾用的狀態列符號**（📌/🔖 當作自由浮動的視窗標籤）：herdr 沒有 `#{@option}` 的 format-string 插值,所以 tmux 風格的狀態列書籤不能移植。*（但「mark-unread / 待 review ⭐」這個具體用途已解決——見上方 **待 review 旗標** 一節——靠逐 pane 的 `custom_status` metadata;只剩純裝飾的狀態列符號仍是缺口。）*
+- **裝飾用的狀態列符號**（📌/🔖 當作自由浮動的視窗標籤）：herdr 沒有 `#{@option}` 的 format-string 插值,所以 tmux 風格的狀態列書籤不能移植。*（但「mark-unread / 待 review ⭐」這個具體用途已解決——見上方 **待 review 旗標** 一節——靠逐 pane 的 metadata token;只剩純裝飾的狀態列符號仍是缺口。）*
 - **逐鍵 pane 縮放。** tmux 把 `prefix+H/J/K/L`（與 `M-hjkl` 微調）直接綁成縮放;herdr 沒有逐鍵縮放——它用模態的 `resize_mode`（`prefix+r`）再按 `h/j/k/l`。不是精確對等,但是相近的對應物。
 
 > **不是缺口：** vi copy-mode 本身*是*原生（`prefix+[`），且逐 pane 的 agent 狀態是原生偵測——我原本以為會缺的兩件事，結果都內建了。

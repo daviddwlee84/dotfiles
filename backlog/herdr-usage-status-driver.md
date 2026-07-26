@@ -15,12 +15,14 @@ Decision at research time: **keep CodexBar as the primary usage view; do not ins
 herdr can render arbitrary status TEXT next to a pane/agent in the sidebar via the metadata API:
 
 ```
-herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% • Codex 78%5h" --ttl-ms <n>
+herdr pane report-metadata <pane_id> --source <id> --token usage="Claude 62% • Codex 78%5h" --ttl-ms <n>
 ```
 
-`--custom-status` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. (`herdr pane report-agent … --custom-status` is the other entry point.) No core/config change required.
+`--token` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. No core change required, but see the render note below.
 
-> **⚠ Shared field with the review-pending flag (shipped 2026-07).** `custom_status` is a **single value per pane**. The review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, script `dot_config/herdr/executable_review-mark.sh`, `--source review`) already writes `custom_status`. Although this driver would use a different `--source`, `herdr pane get` exposes only ONE flattened `custom_status`, so the two producers contend for the visible label (last-writer / internal priority). When this driver is built, decide the interaction explicitly — e.g. compose both into one string, give the review ⭐ priority when set, or move one producer to `--title` / `--state-label` instead of `--custom-status`.
+> **✅ The contention blocker is GONE (herdr 0.7.4, verified 2026-07-26).** This note previously warned that `custom_status` was a **single value per pane**, so this driver and the review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, `--source review`) would fight over one visible label. herdr 0.7.4 replaced `--custom-status` with a **namespaced token map** (up to 32 tokens per pane, names `^[A-Za-z0-9_-]{1,32}$`), so a `usage` token and the `review` token now coexist cleanly. No interaction decision needed.
+>
+> **New requirement in its place:** a token renders **only** where a sidebar row layout names it. The review flag already pins `[ui.sidebar.agents] rows` in `.chezmoitemplates/herdr/config.toml` with `"$review"`; this driver must append `"$usage"` to that same layout (one shared block — don't add a second). See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](../pitfalls/herdr-0.7.4-drops-custom-status.md).
 
 ## Prior art (herdr plugins)
 
@@ -31,7 +33,7 @@ herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% �
 ## Options when this is picked up
 
 - **A — install the Codex-only plugin** (Effort S): add `herdr plugin install jerryfane/herdr-codex-usage-kit` to the `# --- herdr-plus plugin ---` block pattern in `dot_ansible/roles/devtools/tasks/main.yml` (idempotent, mirrors how `cloudmanic/herdr-plus` is installed). Gets Codex quota in the sidebar. Update `docs/this_repo/tool-managers.md` A–Z + `docs/tools/herdr.md`. **Leaves Claude/ChatGPT uncovered.**
-- **B — DIY driver** (Effort M): a small background loop (shell or uv script) that computes `"Claude X% • Codex Y%"` and calls `herdr pane report-metadata … --custom-status` for each agent pane. Data sources, cheapest first:
+- **B — DIY driver** (Effort M): a small background loop (shell or uv script) that computes `"Claude X% • Codex Y%"` and calls `herdr pane report-metadata … --token usage=…` for each agent pane. Data sources, cheapest first:
   1. Reuse **CodexBar's own cached data** — CodexBar reads `~/.codex` (rate_limits) and `~/.claude`; if it caches to `~/.config/codexbar/` or similar, read that instead of re-deriving. (Verify what CodexBar persists; it's a mix of local files + OAuth/cookies/Keychain.)
   2. Codex: read `~/.codex/sessions` rate_limits directly (same as the plugin).
   3. Claude: `~/.claude` usage files if present; else scrape the Claude CLI. Hardest part; may not be cleanly file-derivable.

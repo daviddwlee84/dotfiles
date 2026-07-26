@@ -4298,3 +4298,2150 @@ server: 0.7.2  protocol 16   compatible: no   restart_needed: yes
 `b009044`，直接在 `main` 上（照這個 repo 一貫的做法）。只 stage 了 herdr 相關的 4 個檔案 + 這次的 specstory 逐字稿；你手上還沒完成的 **raycast-ai-byok / 45_copilot_raycast.sh** 那組改動我完全沒碰，還留在工作區。
 
 Sources: [herdr #1256](https://github.com/ogulcancelik/herdr/issues/1256) · [herdr #1255](https://github.com/ogulcancelik/herdr/issues/1255) · [discussion #1248](https://github.com/ogulcancelik/herdr/discussions/1248) · [upstream session-state / live-handoff docs](https://github.com/ogulcancelik/herdr/blob/master/docs/next/website/src/content/docs/session-state.mdx)
+
+---
+
+_**User (2026-07-26 11:14:57Z)**_
+
+是說我們 prefix + m 好像失效了 (是因爲更新的緣故嗎？ 好像是 unknown --custom-status ？)
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 11:15:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user's `prefix + m` command is throwing an "unknown --custom-status" error, which suggests either a protocol mismatch from our recent changes or a CLI flag that's been renamed or removed in herdr 0.7.5. I need to check the review-mark.sh script and see how it's calling herdr with the custom-status flag.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find custom-status usage in review-mark.sh
+
+`grep -n "custom-status\|custom_status" dot_config/herdr/executable_review-mark.sh | head -20`
+
+```text
+6:# herdr's per-pane custom-status metadata (`herdr pane report-metadata … --source
+7:# review --custom-status …`). This is the herdr analog of tmux's
+12:# Why custom-status and not agent state: it is pushed under a dedicated
+14:# pane can carry `custom_status:"⭐ REVIEW"` while `agent_status:"idle"` — so
+19:# surfaces the `custom_status` field, and `herdr pane list` (native JSON, NO
+53:    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --custom-status "$status" >/dev/null
+58:    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --clear-custom-status >/dev/null
+68:            | jq -r '.result.pane.custom_status // ""' 2>/dev/null || true)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check herdr 0.7.5 pane subcommands
+
+`herdr pane --help 2>&1 | head -40`
+
+```text
+Control terminal panes
+
+Usage: herdr pane [COMMAND]
+
+Commands:
+  list                  List panes
+  current               Show the current pane
+  get                   Show a pane
+  layout                Show pane layout information
+  process-info          Show pane process information
+  neighbor              Find a pane neighbor
+  edges                 Show pane edge information
+  focus                 Focus a neighboring pane
+  resize                Resize a pane split
+  zoom                  Toggle or set pane zoom
+  read                  Read pane terminal output
+  rename                Rename a pane
+  split                 Split a pane
+  swap                  Swap panes
+  move                  Move a pane
+  close                 Close a pane
+  send-text             Send literal text to a pane
+  send-keys             Send key presses to a pane
+  wait-output           Wait for matching pane output
+  run                   Run a command in a pane
+  report-agent          Report pane agent lifecycle state
+  report-agent-session  Report pane agent session identity
+  release-agent         Release pane agent lifecycle authority
+  report-metadata       Report display-only pane metadata
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:30Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `herdr pane report-metadata` command is still present in 0.7.5, so I need to check its flags. I'm also noticing that 0.7.5 switched to clap-style CLI output for the help text, which is a significant change from 0.7.2's custom formatting — this migration to clap between 0.7.3 and 0.7.5 likely involved flag renames. Let me investigate what report-metadata's current flags look like.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check report-metadata flags in 0.7.5
+
+`herdr pane report-metadata --help 2>&1 | head -30`
+
+```text
+Report display-only pane metadata
+
+Usage: herdr pane report-metadata [OPTIONS] --source <ID> <PANE_ID>
+
+Arguments:
+  <PANE_ID>
+          
+
+Options:
+      --source <ID>
+          
+
+      --agent <LABEL>
+          
+
+      --applies-to-source <ID>
+          
+
+      --title <TEXT>
+          
+
+      --clear-title
+          
+
+      --display-agent <TEXT>
+          
+
+      --clear-display-agent
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check changelog for custom-status changes
+
+`grep -n -i -E "custom.status|report-metadata|report_metadata" /tmp/herdr_changelog.md | head -20`
+
+```text
+280:- Claude Code panes that are actively thinking or streaming no longer flicker to blocked because of custom status text. (#409)
+375:- Added `pane.report_metadata` and `herdr pane report-metadata` so user hooks can customize pane titles, displayed agent names, compact status labels, and visible state labels without taking over integration-owned lifecycle or session state. (#36)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+The help output got cut off, so I need to see the complete list of options to check if `--custom-status` is still available or if it's been renamed.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List all report-metadata flags
+
+`herdr pane report-metadata --help 2>&1 | grep -E "^      --" | tr -d ' '`
+
+```text
+--source<ID>
+--agent<LABEL>
+--applies-to-source<ID>
+--title<TEXT>
+--clear-title
+--display-agent<TEXT>
+--clear-display-agent
+--state-label<STATUS=TEXT>
+--clear-state-labels
+--token<NAME=VALUE>
+--clear-token<NAME>
+--seq<N>
+--ttl-ms<N>
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the real issue is that `--custom-status` and `--clear-custom-status` were removed in version 0.7.5 and replaced with a generic token system using `--token` and `--clear-token`. The `prefix + m` command is failing because it's trying to use a CLI flag that no longer exists, not because of a protocol mismatch. Meanwhile, `prefix + i` is pulling `custom_status` from the JSON output of `herdr pane list`, which may have also been affected by this change. Let me check what's actually in that output now.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:49Z)**_
+
+Found it — this isn't the protocol mismatch, it's a removed flag.
+
+_**Agent (claude-opus-5 2026-07-26 11:15:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Search changelog for token/custom-status migration
+
+`grep -n -i -E "token|custom.status" /tmp/herdr_changelog.md | sed -n '1,25p'`
+
+```text
+14:- Added per-token foreground, bold, and dim styling to expanded Space and Agent sidebar row layouts.
+57:- Added configurable row layouts for expanded Space and Agent sidebar entries, including built-in display tokens, per-agent overrides, custom metadata tokens, and pane/workspace metadata reporting through the CLI and socket API.
+280:- Claude Code panes that are actively thinking or streaming no longer flicker to blocked because of custom status text. (#409)
+376:- Added tmux-style double-click token copy in panes, with temporary copy feedback and mouse passthrough preserved for terminal apps that request mouse input. (#142, #296, thanks @babymastodon)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:49Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check 0.7.5 schema for custom_status
+
+`herdr api schema --json 2>/dev/null | grep -o -E '"(custom_status|tokens|state_labels)"' | sort -u; echo "RC=$?"`
+
+```text
+"state_labels"
+"tokens"
+RC=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+Looking at the schema differences, `custom_status` was removed in 0.7.5 and replaced with a more flexible metadata tokens system that allows named key-value pairs through the CLI and socket API.
+
+I need to check the changelog around line 57 to confirm which release introduced this change and whether it's marked as a breaking change, then identify what needs migrating in the config files and documentation.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:15:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read changelog section containing the token change
+
+`sed -n '44,70p' /tmp/herdr_changelog.md`
+
+```text
+- Plugin command arrays now preserve whitespace-only arguments. (#1594, #1613)
+- Plugins can now be installed or linked while no Herdr server is running. (#1670)
+- Remote attach now discovers Herdr installed in mise's canonical tool path before offering to install a sidecar binary. (#1201)
+- Noninteractive update, plugin, integration, sound, custom-command, and Git subprocesses no longer flash console windows on Windows. (#1468)
+- Live handoff now preserves installed plugins and no longer lets the next plugin installation overwrite the existing registry. (#893)
+- `herdr agent wait` now returns `agent_not_running` promptly when its target pane closes instead of waiting for the full timeout. (#1439)
+- Pane graphics streams now shut down cleanly when a client disconnect races stream teardown.
+
+## [0.7.4] - 2026-07-15
+
+### Added
+- Added session-modal popup floating terminal panes for `type = "popup"` custom command keybindings and plugin panes, with optional cell or percentage sizing and no changes to the tiled tab layout. (#1125)
+- Added `ui.copy_on_select` to disable automatic clipboard copying after mouse selection while keeping the selection visible.
+- Added configurable row layouts for expanded Space and Agent sidebar entries, including built-in display tokens, per-agent overrides, custom metadata tokens, and pane/workspace metadata reporting through the CLI and socket API.
+- Added independent `row_gap` settings for expanded Space and Agent sidebar entries.
+- Copy mode now supports literal smart-case search with `/` and `?`, repeating with `n` and `N`, match highlighting, and tmux-style cross-line `w`/`b`/`e` word motions. (#1230)
+- Added Maki agent support. (#1301, #1302, thanks @tontinton)
+- Added a searchable, version-matched configuration reference and a troubleshooting guide covering duplicate terminal key events, modified-arrow shell bindings, updates, remote access, and logs. (#1116, #1370)
+
+### Changed
+- Expanded Space and Agent sidebar entries now use a packed layout by default; set the corresponding `row_gap` to `1` to restore the previous spacing.
+- Refreshed the bundled Herdr agent skill for current public workspace, tab, and pane ids and the current CLI/API workflow. (#1297)
+- Expanded Japanese and Simplified Chinese CLI documentation with shell completion setup and API schema usage. (#1151)
+
+### Fixed
+- Collapsed Agent sidebar rows now follow the same ordering and click targets as the expanded panel, and their shortcut numbers are assigned by visible list position instead of repeating across workspaces. (#1168, #1344)
+- Shifted indexed bindings such as `prefix+shift+1..9` now match terminals that report the corresponding punctuation characters. (#1184)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:16Z)**_
+
+<think><details><summary>Thought Process</summary>
+The token system was added in 0.7.4, but the removal of `--custom-status` wasn't documented as a breaking change anywhere—it just silently disappeared. I need to verify this by checking the breaking changes sections for both 0.7.4 and 0.7.5 to confirm.
+
+Now I'm mapping out the full scope of what needs updating: the shell script that uses `--custom-status` and reads the custom status field, the television config that likely filters on it, the documentation for both English and Traditional Chinese, and the template config where the sidebar layout needs to reference a token to actually display the starred status. The key insight is that a token alone won't render without the sidebar layout explicitly referencing it—that's the real migration challenge here. Let me investigate each of these pieces to understand the full picture before proposing a solution.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:16Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/herdr/executable_review-mark.sh`
+
+```text
+1	#!/usr/bin/env sh
+2	# ~/.config/herdr/review-mark.sh
+3	# Source: dot_config/herdr/executable_review-mark.sh (managed by chezmoi)
+4	#
+5	# Set / clear / toggle a per-pane "review-pending" flag on a herdr pane, using
+6	# herdr's per-pane custom-status metadata (`herdr pane report-metadata … --source
+7	# review --custom-status …`). This is the herdr analog of tmux's
+8	# `@bookmark_status` (dot_config/tmux/executable_toggle-bookmark.sh) — the
+9	# problem it solves is the SAME: keep a session visibly flagged as "I still need
+10	# to review this" even after the agent's own state flips to idle.
+11	#
+12	# Why custom-status and not agent state: it is pushed under a dedicated
+13	# `--source review`, ORTHOGONAL to herdr's native agent detection. Verified: a
+14	# pane can carry `custom_status:"⭐ REVIEW"` while `agent_status:"idle"` — so
+15	# peeking into a done pane (which collapses it to idle) does NOT wipe the flag.
+16	# Omitting --ttl-ms makes it persistent (no auto-expiry).
+17	#
+18	# The single source of truth for the mark IS herdr itself: `herdr pane get`
+19	# surfaces the `custom_status` field, and `herdr pane list` (native JSON, NO
+20	# --json flag) lets the `tv herdr-review` inbox enumerate flagged panes. No
+21	# sidecar file.
+22	#
+23	# Usage:
+24	#   review-mark.sh set    <pane_id> [glyph-text]   # default "⭐ REVIEW"
+25	#   review-mark.sh clear  <pane_id>
+26	#   review-mark.sh toggle <pane_id> [glyph-text]   # clear if flagged, else set
+27	#
+28	# Consumers: hmark/hunmark (dot_config/shell/24_herdr.sh), the prefix+m keybind
+29	# (.chezmoitemplates/herdr/config.toml), and the herdr-review tv channel's
+30	# focus_clear action. Keep the marker MATCH substring ("REVIEW") in sync with
+31	# that channel's jq filter (dot_config/television/cable/herdr-review.toml).
+32	set -eu
+33	
+34	SOURCE_ID='review'
+35	MATCH='REVIEW'                 # substring the tv channel filters on (glyph-agnostic)
+36	DEFAULT_STATUS='⭐ REVIEW'
+37	
+38	usage() {
+39	    printf 'usage: %s set|clear|toggle <pane_id> [glyph-text]\n' "$0" >&2
+40	    exit 64
+41	}
+42	
+43	command -v herdr >/dev/null 2>&1 || { echo "review-mark: herdr not found" >&2; exit 1; }
+44	
+45	action="${1:-}"
+46	pane="${2:-}"
+47	status="${3:-$DEFAULT_STATUS}"
+48	
+49	[ -n "$action" ] || usage
+50	[ -n "$pane" ] || usage
+51	
+52	_set() {
+53	    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --custom-status "$status" >/dev/null
+54	    echo "review flag set on $pane"
+55	}
+56	
+57	_clear() {
+58	    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --clear-custom-status >/dev/null
+59	    echo "review flag cleared on $pane"
+60	}
+61	
+62	case "$action" in
+63	    set)   _set ;;
+64	    clear) _clear ;;
+65	    toggle)
+66	        command -v jq >/dev/null 2>&1 || { echo "review-mark: jq is required for toggle" >&2; exit 1; }
+67	        current=$(herdr pane get "$pane" 2>/dev/null \
+68	            | jq -r '.result.pane.custom_status // ""' 2>/dev/null || true)
+69	        case "$current" in
+70	            *"$MATCH"*) _clear ;;
+71	            *)          _set ;;
+72	        esac ;;
+73	    *) usage ;;
+74	esac
+75
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find all custom_status references in repo
+
+`grep -rn "custom_status\|custom-status" dot_config/ .chezmoitemplates/ docs/ scripts/ 2>/dev/null | grep -v "^docs/tools/herdr" | head -20; echo "=== docs hits ==="; grep -rn "custom_status\|custom-status" docs/tools/herdr.md docs/tools/herdr.zh-TW.md | head -10`
+
+```text
+dot_config/television/cable/herdr-review.toml:6:# and stored as the pane's `custom_status` metadata, orthogonal to agent state.
+dot_config/television/cable/herdr-review.toml:15:# filtered to panes whose custom_status contains "REVIEW" (glyph-agnostic; keep
+dot_config/television/cable/herdr-review.toml:20:#   3. custom_status  (⭐ REVIEW)
+dot_config/television/cable/herdr-review.toml:29:command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | select(.custom_status? // "" | test("REVIEW")) | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.custom_status)\t\(.foreground_cwd // .cwd)"' '''
+dot_config/shell/24_herdr.sh:675:# custom-status metadata — ORTHOGONAL to agent state, so peeking into a done pane
+dot_config/shell/24_herdr.sh:692:herdr custom-status, orthogonal to agent state — it survives the pane going idle
+dot_config/herdr/executable_review-mark.sh:6:# herdr's per-pane custom-status metadata (`herdr pane report-metadata … --source
+dot_config/herdr/executable_review-mark.sh:7:# review --custom-status …`). This is the herdr analog of tmux's
+dot_config/herdr/executable_review-mark.sh:12:# Why custom-status and not agent state: it is pushed under a dedicated
+dot_config/herdr/executable_review-mark.sh:14:# pane can carry `custom_status:"⭐ REVIEW"` while `agent_status:"idle"` — so
+dot_config/herdr/executable_review-mark.sh:19:# surfaces the `custom_status` field, and `herdr pane list` (native JSON, NO
+dot_config/herdr/executable_review-mark.sh:53:    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --custom-status "$status" >/dev/null
+dot_config/herdr/executable_review-mark.sh:58:    herdr pane report-metadata "$pane" --source "$SOURCE_ID" --clear-custom-status >/dev/null
+dot_config/herdr/executable_review-mark.sh:68:            | jq -r '.result.pane.custom_status // ""' 2>/dev/null || true)
+.chezmoitemplates/herdr/config.toml:167:# custom-status, orthogonal to agent state — survives the pane going idle when
+docs/shells/aliases.md:473:| `herdr-mark` / `hmark` | function / alias | `dot_config/shell/24_herdr.sh` | Flag a herdr pane as **review-pending** (⭐) — defaults to the current pane (`$HERDR_PANE_ID`), or pass `hmark w1:p1`. Uses herdr custom-status metadata, orthogonal to agent state, so peeking into a done pane (→ idle) does **not** clear it. Also on `prefix+m` (toggle); list flagged panes via `tv herdr-review` / `prefix+i`. Logic in `~/.config/herdr/review-mark.sh` |
+=== docs hits ===
+docs/tools/herdr.zh-TW.md:84:| 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --custom-status`（逐 pane、與 agent 狀態正交） | **待 review 旗標**（`hmark`/`prefix+m` + `tv herdr-review` 收件匣）；純裝飾的狀態列符號仍是缺口（無 format-string 插值） |
+docs/tools/herdr.zh-TW.md:201:- `herdr-review`（`dot_config/television/cable/herdr-review.toml`）—— **待 review 收件匣**：只列出帶 ⭐ 旗標的 pane（`custom_status ~ REVIEW`）。Enter 會 focus 該 pane 的 workspace/tab 並**保留**旗標;`Alt+C` 則 focus **並**清除旗標（「mark read」）。綁在 `prefix+i`。見下方 **待 review 旗標** 一節。
+docs/tools/herdr.zh-TW.md:294:解法用 herdr 的**逐 pane custom-status metadata**,它與原生 agent 偵測正交:
+docs/tools/herdr.zh-TW.md:297:herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
+docs/tools/herdr.zh-TW.md:298:herdr pane report-metadata <pane> --source review --clear-custom-status         # 清除
+docs/tools/herdr.zh-TW.md:301:已驗證:一個 pane 可以同時帶 `custom_status:"⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `custom_status` 欄位,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。
+docs/tools/herdr.zh-TW.md:311:**Caveat——`custom_status` 每 pane 單值。** 延後中的用量狀態 driver（下方）也會推 `--custom-status`;雖然用不同 `--source`,`herdr pane get` 只吐一個扁平的 `custom_status`,兩者會爭同一個可見標籤。目前無實際衝突（driver 未建、review 旗標短暫）,但見 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+docs/tools/herdr.zh-TW.md:361:herdr **沒有原生的用量/額度/token 顯示**（側欄只顯示 agent *狀態*）。它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去（與上方 **待 review 旗標** 用的是同一個 hook——注意兩者都寫入單一的逐 pane `custom_status`）。有一個 Codex-only 的社群 plugin（[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)）已從 [CodexBar](https://github.com/steipete/CodexBar) 讀的同一份 `~/.codex` 資料做到這件事；但沒有東西涵蓋 Claude/ChatGPT 額度。延後——CodexBar 的選單列仍是多供應商的檢視。設計與選項記在 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+docs/tools/herdr.zh-TW.md:367:- **裝飾用的狀態列符號**（📌/🔖 當作自由浮動的視窗標籤）：herdr 沒有 `#{@option}` 的 format-string 插值,所以 tmux 風格的狀態列書籤不能移植。*（但「mark-unread / 待 review ⭐」這個具體用途已解決——見上方 **待 review 旗標** 一節——靠逐 pane 的 `custom_status` metadata;只剩純裝飾的狀態列符號仍是缺口。）*
+docs/tools/herdr.md:79:| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm looking at the scope of changes needed across several configuration and documentation files — the shell script that handles the review marking logic, a TOML configuration with a jq filter, shell helper functions, template configuration, and documentation that needs updating.
+
+The key issue is that the new `--token` approach requires a display configuration in the row layouts section of the config file, otherwise the token won't render in the sidebar at all. This is a design decision that affects how the feature actually appears to users, so I should diagnose the root cause clearly and propose a concrete migration plan rather than implementing it unilaterally. Let me check what the row layout schema looks like so I can give the user a specific proposal.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:36Z)**_
+
+This is a second, separate breakage from the upgrade. Let me confirm the replacement API before saying anything about a fix.
+
+_**Agent (claude-opus-5 2026-07-26 11:16:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check 0.7.5 default config for row layouts
+
+`herdr --default-config 2>/dev/null | grep -n -i -B 4 -A 18 "row_layout\|tokens\|row layout" | head -70`
+
+```text
+16-# auto_switch = false
+17-# dark_name = "catppuccin"
+18-# light_name = "catppuccin-latte"
+19-
+20:# Override individual color tokens on top of the base theme.
+21-# Accepts: hex (#rrggbb), named colors, rgb(r,g,b), or panel_bg = "reset"
+22-# [theme.custom]
+23-# panel_bg = "reset"
+24-# accent = "#f5c2e7"
+25-# red = "#ff6188"
+26-# green = "#a6e3a1"
+27-
+28-[terminal]
+29-# Executable used for new interactive panes.
+30-# Empty means $SHELL, then /bin/sh.
+31-# default_shell = ""
+32-
+33-# Startup mode for new interactive pane shells: "auto", "login", or "non_login".
+34-# "auto" uses login shells on macOS and keeps the current behavior elsewhere.
+35-# shell_mode = "auto"
+36-
+37-# CWD policy for new panes, tabs, and workspaces when no explicit --cwd is provided.
+38-# Use "follow" to inherit the source pane/workspace, "home" for $HOME,
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to check the config reference JSON from the v0.7.5 release to find where the row layout configuration keys are defined, since they're not showing up in the default config.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find row layout config keys in 0.7.5 reference
+
+`gh api "repos/ogulcancelik/herdr/contents/website/src/data/config-reference.json?ref=v0.7.5" -H "Accept: application/vnd.github.raw" 2>/dev/null > /tmp/cfgref.json; wc -c /tmp/cfgref.json; jq -r '.. | objects | select((.key? // .name? // "") | test("row_layout|token|space_row|agent_row")) | (.key // .name)' /tmp/cfgref.json 2>/dev/null | sort -u | head -20`
+
+```text
+   37913 /tmp/cfgref.json
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Grep config reference for row/token/layout keys
+
+`grep -o -E '"[a-z_]*row[a-z_]*"|"[a-z_]*token[a-z_]*"|"[a-z_]*layout[a-z_]*"' /tmp/cfgref.json | sort -u | head -20; echo "=== meta ==="; jq -r 'if type=="array" then .[0]|keys elif type=="object" then keys else type end' /tmp/cfgref.json 2>/dev/null | head`
+
+```text
+=== meta ===
+[
+  "sections"
+]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:16:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Enumerate config reference sections
+
+`jq -r '.sections[] | .title // .name' /tmp/cfgref.json 2>/dev/null | head -20; echo "=== search entries ==="; jq -r '.sections[] | .. | objects | select(has("key")) | .key' /tmp/cfgref.json 2>/dev/null | grep -i -E "row|token|layout|sidebar" | head -20`
+
+```text
+General
+Theme
+Terminal
+Updates
+Keybindings
+UI and sidebar
+Notifications
+Sound
+Session
+Worktrees
+Remote
+Advanced
+Experimental
+=== search entries ===
+keys.toggle_sidebar
+ui.sidebar_width
+ui.sidebar_min_width
+ui.sidebar_max_width
+ui.sidebar_start_collapsed
+ui.sidebar_collapsed_mode
+ui.sidebar.agents.row_gap
+ui.sidebar.agents.rows
+ui.sidebar.agents.rows_by_agent
+ui.sidebar.spaces.row_gap
+ui.sidebar.spaces.rows
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:17:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read row layout config docs
+
+`jq -r '.sections[] | .. | objects | select(.key? == "ui.sidebar.agents.rows" or .key? == "ui.sidebar.spaces.rows") | "### \(.key)\n\(.description // .doc // .summary // "")\ndefault: \(.default // "n/a")\n\(.example // "")"' /tmp/cfgref.json 2>/dev/null | head -50`
+
+```text
+### ui.sidebar.agents.rows
+Default expanded Agent sidebar layout. Entries may be token strings or inline { token, fg, bold, dim } style tables. Supports built-in and $name metadata tokens; at most 16 rows and 16 tokens per row.
+default: [["state_icon", "workspace", "tab"], ["agent"]]
+
+### ui.sidebar.spaces.rows
+Expanded Space sidebar layout. Entries may be token strings or inline { token, fg, bold, dim } style tables. Supports built-in and $name metadata tokens; at most 16 rows and 16 tokens per row.
+default: [["state_icon", "workspace"], ["branch", "git_status"]]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:17:22Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm seeing the migration path between versions—the old approach used command flags to set and clear custom status values that were read from the result and displayed natively, while the new version switches to a token-based system for managing review metadata.
+
+The critical shift is that tokens won't automatically appear in the sidebar anymore; they need to be explicitly added to the UI layout configuration, which means overriding herdr's defaults in the managed config table. Before I can propose the full migration, I need to verify the exact shape of the tokens field from the schema, and I should flag that I can't actually test this migration right now since the server is running an older version with a protocol mismatch—any changes would only be verifiable after they restart.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:17:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect tokens field shape in 0.7.5 schema
+
+```bash
+herdr api schema --json 2>/dev/null | jq -r '.. | objects | select(has("tokens")) | .tokens' 2>/dev/null | head -20; echo "=== PaneInfo shape ==="; herdr api schema --json 2>/dev/null | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+def walk(o,p=''):
+    if isinstance(o,dict):
+        if 'tokens' in o and 'pane_id' in o: print('FOUND at',p,'->',json.dumps({k:o[k] for k in ('tokens','state_labels') if k in o})[:400])
+        for k,v in o.items(): walk(v,p+'/'+k)
+    elif isinstance(o,list):
+        for i,v in enumerate(o): walk(v,p+f'[{i}]')
+walk(d)
+" 2>&1 | head -10
+```
+
+```text
+{
+  "additionalProperties": {
+    "type": "string"
+  },
+  "maxProperties": 32,
+  "propertyNames": {
+    "pattern": "^[A-Za-z0-9_-]{1,32}$"
+  },
+  "type": "object"
+}
+{
+  "additionalProperties": {
+    "type": "string"
+  },
+  "maxProperties": 32,
+  "propertyNames": {
+    "pattern": "^[A-Za-z0-9_-]{1,32}$"
+  },
+  "type": "object"
+}
+=== PaneInfo shape ===
+FOUND at /schemas/event/$defs/PaneInfo/properties -> {"tokens": {"additionalProperties": {"type": "string"}, "maxProperties": 32, "propertyNames": {"pattern": "^[A-Za-z0-9_-]{1,32}$"}, "type": "object"}, "state_labels": {"additionalProperties": {"type": "string"}, "type": "object"}}
+FOUND at /schemas/request/$defs/PaneReportMetadataParams/properties -> {"tokens": {"additionalProperties": {"type": ["string", "null"]}, "maxProperties": 16, "propertyNames": {"pattern": "^[A-Za-z0-9_-]{1,32}$"}, "type": "object"}, "state_labels": {"additionalProperties": {"type": "string"}, "type": "object"}}
+FOUND at /schemas/success_response/$defs/AgentInfo/properties -> {"tokens": {"additionalProperties": {"type": "string"}, "maxProperties": 32, "propertyNames": {"pattern": "^[A-Za-z0-9_-]{1,32}$"}, "type": "object"}, "state_labels": {"additionalProperties": {"type": "string"}, "type": "object"}}
+FOUND at /schemas/success_response/$defs/PaneInfo/properties -> {"tokens": {"additionalProperties": {"type": "string"}, "maxProperties": 32, "propertyNames": {"pattern": "^[A-Za-z0-9_-]{1,32}$"}, "type": "object"}, "state_labels": {"additionalProperties": {"type": "string"}, "type": "object"}}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:17:58Z)**_
+
+<think><details><summary>Thought Process</summary>
+So `PaneInfo.tokens` is a flat map where keys are token names following the pattern `^[A-Za-z0-9_-]{1,32}$`, and the star emoji goes in the value itself. Before I move forward with the implementation, I need to lay out the full diagnosis and plan—this is a multi-file migration with a key design decision around the sidebar row layout that I can't verify until the server responds.
+
+The real issue is that 0.7.4 swapped out `--custom-status` and `--clear-custom-status` for a generic named-token API using `--token NAME=VALUE` and `--clear-token NAME`, removing `custom_status` entirely from `PaneInfo` in favor of the new `tokens` structure. The changelog doesn't flag this as a breaking change—it's buried under "Added" features. The client-side argument parser fails before the protocol check even runs, which is why this breakage looks different from the other one.
+
+I'm mapping out the six surfaces that need updating: the executable script that sets, clears, and toggles the review mark; the television config file that filters by custom status; the shell helper text; and the template config file.
+
+The trickier part is that the old `custom_status` was automatically rendered in the sidebar, but tokens only show if explicitly referenced in the row layout configuration. To keep the review indicator visible, I'd need to override the default row layout and add the token there—which means our managed config now pins herdr's sidebar layout and becomes a maintenance burden if upstream changes their defaults.
+
+On the flip side, this actually unblocks the backlog's collision problem since tokens are a namespaced map with room for up to 32 values, so the review flag and usage driver can coexist without fighting over the same field.
+
+The real blocker is that I can't verify any of this until the server restarts due to a protocol mismatch, so I'd be writing blind. I should ask whether to proceed now or wait, and more importantly, whether to commit to pinning that sidebar row layout. I'll go with asking both questions since the timing and layout approach are both meaningful trade-offs that affect how I proceed.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:18:15Z)**_
+
+是升級造成的，但**跟剛才那個 protocol mismatch 是兩回事** —— 這個更嚴重，因為重啟 server 也修不好。
+
+## 診斷
+
+0.7.4 把 `--custom-status` 整組換掉了，改成通用的**具名 token**：
+
+| | ≤ 0.7.3 | ≥ 0.7.4 |
+|---|---|---|
+| 設定 | `--custom-status "⭐ REVIEW"` | `--token review="⭐ REVIEW"` |
+| 清除 | `--clear-custom-status` | `--clear-token review` |
+| 讀取 | `.result.pane.custom_status`（單一字串） | `.result.pane.tokens`（`{name: value}` map，上限 32） |
+| 顯示 | sidebar **自動**渲染 | **不會自動顯示** —— 要在 row layout 裡引用 |
+
+`herdr pane report-metadata --help` 現在只剩 `--token <NAME=VALUE>` / `--clear-token <NAME>`，`--custom-status` 完全不存在。
+
+兩個值得記的點：
+
+1. **changelog 沒把它列為 Breaking Change** —— 它藏在 0.7.4 的「### Added」裡：*"configurable row layouts … including built-in display tokens, per-agent overrides, custom metadata tokens"*。移除是靜默的。
+2. 這就是為什麼錯誤長得不一樣：參數解析在 client 端先失敗，所以你看到 `unknown --custom-status` 而不是 `protocol_mismatch`。
+
+## 影響範圍：6 個檔案
+
+`executable_review-mark.sh`（3 個呼叫點 + toggle 的 jq 讀取）、`herdr-review.toml`（jq filter）、`24_herdr.sh`（`hmark`/`hunmark` 說明）、`.chezmoitemplates/herdr/config.toml`、`docs/tools/herdr.{md,zh-TW.md}`（含可行性對照表）、`docs/shells/aliases.md`。另外 `backlog/herdr-usage-status-driver.md` 整份設計都建立在 `--custom-status` 上。
+
+**順帶一個好消息**：那份 backlog 記的「`custom_status` 每 pane 只有單值，review 旗標會跟用量 driver 搶同一個欄位」的 caveat，在 token 模型下**自動消失**了 —— 各自用各自的 token name 就好。那個 backlog 反而被解鎖了。
+
+## 兩個需要你決定的點
+
+_**Agent (claude-opus-5 2026-07-26 11:19:30Z)**_
+
+<tool-use data-tool-type="generic" data-tool-name="AskUserQuestion"><details>
+<summary>Tool use: **AskUserQuestion**</summary>
+**⭐ 在 sidebar 的顯示要怎麼處理？（token 不像 custom_status 會自動渲染）**
+
+Options:
+- **加 $review 到 row layout（建議）** - 在 .chezmoitemplates/herdr/config.toml 覆寫 ui.sidebar.agents.rows，把 $review 塞進第一行。⭐ 維持現在的可見度，代價是我們的受管 [ui] 表從此釘住 herdr 的 sidebar 版面，upstream 改預設值時要跟。
+- **不動版面，只靠 tv herdr-review** - 不覆寫 row layout。token 照樣寫入、prefix+i 收件匣照樣運作，但 sidebar 上看不到 ⭐ —— 標記變成「只有查收件匣才看得到」。好處是不跟 upstream 的 sidebar 預設值綁死。
+
+**現在就改，還是等 herdr server 重啟後再改？**
+
+Options:
+- **現在就改，重啟後我再驗（建議）** - 我現在把 6 個檔案都改完並 commit。但因為 server 還是 0.7.2、CLI 是 0.7.5，我沒辦法實際跑 herdr pane report-metadata 驗證 —— 等你重啟 server 後我再實測一輪，有問題再修。
+- **等你重啟 server 之後再說** - 先不動。你挑時間重啟 herdr server（會殺掉所有 pane 行程），重啟後叫我，我改完可以當場端到端驗證：set → herdr pane get 看 tokens → tv herdr-review 列得出來 → clear。
+
+
+**Answer:** 加 $review 到 row layout（建議）" selected preview:
+[ui.sidebar.agents]
+rows = [
+  ["state_icon, 現在就改，重啟後我再驗（建議）
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:19:57Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I'm going through the migration, updating six files across the config, template, and documentation directories to integrate the herdr tool changes.
+
+For the backlog file and pitfalls, I'm weighing whether to add this as a new section to the existing upgrade pitfall or create a separate file. The symptom is distinct—`unknown --custom-status` flag error versus the protocol mismatch—and the recovery steps differ, but they're both triggered by the same brew upgrade event. I'm leaning toward adding a clearly-headed section to the existing pitfall with the symptom keywords indexed so grep can find it, rather than creating a near-duplicate file.
+
+Actually, I think a separate pitfall file makes more sense. The symptom-based titling and different fix paths justify it, and the pitfalls README expects one row per slug. I'll create `pitfalls/herdr-0.7.4-removes-custom-status-for-tokens.md` with the symptom as the title.
+
+Now I need to review the current state of the relevant files—herdr-review.toml, the shell script, and config.toml—to make precise edits.
+
+On the token syntax: `--token review="⭐ REVIEW"` with a space in the value should parse fine through shell quoting and clap's NAME=VALUE parsing. The jq expressions handle it too—`.result.pane.tokens.review // ""` for the toggle read and the filter with substring matching. Though I'm wondering if just checking for the presence of `tokens.review` as a non-empty value would be cleaner than substring matching, but the existing convention keeps MATCH in sync with the glyph, which preserves flexibility for custom glyphs.
+
+Actually, switching to presence-based detection makes more sense with namespaced tokens—the presence of the key itself becomes the signal. That eliminates the sync hazard between the glyph and the MATCH substring. Since `--clear-token review` sets the value to null (which removes the key), presence-based logic works perfectly. It's simpler and removes a cross-file invariant I'd otherwise need to maintain. Let me check the actual files to see how to implement this.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:19:57Z)**_
+
+兩個決定都收到。開始改。
+
+_**Agent (claude-opus-5 2026-07-26 11:19:57Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./dot_config/television/cable/herdr-review.toml`
+
+```text
+1	# Review-pending inbox cable channel for herdr (tv) — herdr-aware
+2	#
+3	# Lists herdr panes carrying a "review-pending" flag (⭐) — the ones whose agent
+4	# finished but you haven't reviewed yet. Companion to `herdr-agent-panes.toml`;
+5	# the flag is set by hmark / prefix+m (see dot_config/herdr/executable_review-mark.sh)
+6	# and stored as the pane's `custom_status` metadata, orthogonal to agent state.
+7	# Bound to `prefix+i` in ~/.config/herdr/config.toml.
+8	#
+9	# Enter jumps to the pane's WORKSPACE + TAB but KEEPS the ⭐ (you may still be
+10	# mid-review). Alt+C = focus AND clear the flag ("mark read"). herdr has no
+11	# "focus pane by id" (pane focus is directional only), so we focus at tab
+12	# granularity — enough with one agent per tab. See docs/tools/herdr.md.
+13	#
+14	# Source: TSV from `herdr pane list` (native JSON, NO --json flag) via jq,
+15	# filtered to panes whose custom_status contains "REVIEW" (glyph-agnostic; keep
+16	# in sync with the MATCH substring in review-mark.sh):
+17	#   0. pane_id        (w1:p1)
+18	#   1. workspace_id   (w1)
+19	#   2. tab_id         (w1:t1)
+20	#   3. custom_status  (⭐ REVIEW)
+21	#   4. cwd            (foreground cwd, falling back to pane cwd)
+22	
+23	[metadata]
+24	name = "herdr-review"
+25	description = "Review-pending herdr panes (⭐) — jump to sessions you flagged for later"
+26	requirements = ["herdr", "jq"]
+27	
+28	[source]
+29	command = '''herdr pane list 2>/dev/null | jq -r '.result.panes[]? | select(.custom_status? // "" | test("REVIEW")) | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.custom_status)\t\(.foreground_cwd // .cwd)"' '''
+30	display = "{split:\t:0}  {split:\t:3}  {split:\t:4|split:/:-1}"
+31	output = "{split:\t:0}"
+32	
+33	[preview]
+34	command = '''
+35	pane='{split:\t:0}'
+36	printf '\033[1m%s\033[0m  %s\n' "$pane" '{split:\t:3}'
+37	printf '\033[2mworkspace:\033[0m %s   \033[2mtab:\033[0m %s\n' '{split:\t:1}' '{split:\t:2}'
+38	printf '\033[2mcwd:\033[0m %s\n' '{split:\t:4}'
+39	printf '\n\033[1m─── pane (herdr pane read, last ~80) ───\033[0m\n'
+40	herdr pane read "$pane" --source visible --lines 80 2>/dev/null \
+41	  || echo "(pane $pane no longer exists — press Ctrl+R to reload)"
+42	'''
+43	
+44	[ui]
+45	input_header = "Review-pending herdr panes (⭐)"
+46	
+47	[ui.preview_panel]
+48	size = 60
+49	
+50	[keybindings]
+51	enter = "actions:focus"
+52	alt-t = "actions:focus"
+53	alt-c = ["actions:focus_clear", "reload_source"]
+54	ctrl-y = "actions:copy_id"
+55	alt-p = "actions:copy_dir"
+56	
+57	[actions.focus]
+58	description = "Jump to the pane's workspace + tab (keep the ⭐)"
+59	command = '''
+60	ws='{split:\t:1}'; tab='{split:\t:2}'
+61	[ -n "$ws" ] && herdr workspace focus "$ws" >/dev/null 2>&1
+62	[ -n "$tab" ] && herdr tab focus "$tab" >/dev/null 2>&1
+63	'''
+64	mode = "fork"
+65	
+66	[actions.focus_clear]
+67	description = "Jump to the pane AND clear the ⭐ (mark read)"
+68	command = '''
+69	pane='{split:\t:0}'; ws='{split:\t:1}'; tab='{split:\t:2}'
+70	[ -n "$ws" ] && herdr workspace focus "$ws" >/dev/null 2>&1
+71	[ -n "$tab" ] && herdr tab focus "$tab" >/dev/null 2>&1
+72	[ -n "$pane" ] && "${XDG_CONFIG_HOME:-$HOME/.config}/herdr/review-mark.sh" clear "$pane" >/dev/null 2>&1
+73	'''
+74	mode = "fork"
+75	
+76	[actions.copy_id]
+77	description = "Copy pane id to clipboard"
+78	command = '''
+79	d='{split:\t:0}'
+80	[ -z "$d" ] && exit 0
+81	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+82	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+83	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+84	else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+85	fi
+86	'''
+87	mode = "fork"
+88	
+89	[actions.copy_dir]
+90	description = "Copy directory path to clipboard"
+91	command = '''
+92	d='{split:\t:4}'
+93	[ -z "$d" ] && exit 0
+94	if command -v pbcopy >/dev/null 2>&1; then printf '%s' "$d" | pbcopy
+95	elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$d" | wl-copy
+96	elif command -v xclip >/dev/null 2>&1; then printf '%s' "$d" | xclip -selection clipboard
+97	else printf '\033]52;c;%s\007' "$(printf '%s' "$d" | base64 | tr -d '\n')" > /dev/tty
+98	fi
+99	'''
+100	mode = "fork"
+101
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:20:19Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/herdr/executable_review-mark.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:20:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/herdr/executable_review-mark.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:20:43Z)**_
+
+Now the tv channel.
+
+_**Agent (claude-opus-5 2026-07-26 11:20:47Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/television/cable/herdr-review.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:20:54Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/television/cable/herdr-review.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm going to test the jq filter against some sample data first since I can't run it against the live server, then I'll work through the config.toml structure and add documentation.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate new jq filters against fixtures
+
+```bash
+cat <<'JSON' | jq -r '.result.panes[]? | select((.tokens.review? // "") != "") | "\(.pane_id)\t\(.workspace_id)\t\(.tab_id)\t\(.tokens.review)\t\(.foreground_cwd // .cwd)"'
+{"result":{"panes":[
+ {"pane_id":"w1:p1","workspace_id":"w1","tab_id":"w1:t1","tokens":{"review":"⭐ REVIEW"},"cwd":"/a","foreground_cwd":"/a/b"},
+ {"pane_id":"w1:p2","workspace_id":"w1","tab_id":"w1:t2","tokens":{},"cwd":"/c"},
+ {"pane_id":"w1:p3","workspace_id":"w1","tab_id":"w1:t3","cwd":"/d"},
+ {"pane_id":"w1:p4","workspace_id":"w1","tab_id":"w1:t4","tokens":{"review":""},"cwd":"/e"},
+ {"pane_id":"w1:p5","workspace_id":"w1","tab_id":"w1:t5","tokens":{"other":"x"},"cwd":"/f"}
+]}}
+JSON
+echo "--- toggle read (flagged / absent) ---"
+echo '{"result":{"pane":{"tokens":{"review":"⭐ REVIEW"}}}}' | jq -r --arg t review '.result.pane.tokens[$t] // ""'
+echo '{"result":{"pane":{"tokens":{}}}}' | jq -r --arg t review '.result.pane.tokens[$t] // ""'
+echo '{"result":{"pane":{}}}' | jq -r --arg t review '.result.pane.tokens[$t] // ""'
+```
+
+```text
+w1:p1	w1	w1:t1	⭐ REVIEW	/a/b
+--- toggle read (flagged / absent) ---
+⭐ REVIEW
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:18Z)**_
+
+<think><details><summary>Thought Process</summary>
+The channel filter is working correctly—only the entry with a non-empty tokens map passed through, while the others were properly excluded. For the toggle read operation, the first value echoed the expected "⭐ REVIEW", but the subsequent reads returned empty strings, which printed as blank lines. I'm checking how the jq filter handles the empty tokens case.
+
+When `.tokens` is missing or empty, `.tokens[$t]` should return null, and the `// ""` fallback converts it to an empty string. But there's a potential issue: if the jq expression errors when tokens is absent, the script's error suppression would mask it, causing the current value to remain empty and the toggle to always become "set" instead of clearing. I need to verify this with explicit stderr capture to rule out silent failures.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check jq error paths for missing tokens key
+
+```bash
+for j in '{"result":{"pane":{"tokens":{"review":"⭐ REVIEW"}}}}' '{"result":{"pane":{"tokens":{}}}}' '{"result":{"pane":{}}}' '{"result":{}}'; do
+  out=$(printf '%s' "$j" | jq -r --arg t review '.result.pane.tokens[$t] // ""' 2>/tmp/jqerr); rc=$?
+  printf 'rc=%s out=[%s] err=[%s]\n' "$rc" "$out" "$(cat /tmp/jqerr)"
+done
+```
+
+```text
+rc=0 out=[⭐ REVIEW] err=[]
+rc=0 out=[] err=[]
+rc=0 out=[] err=[]
+rc=0 out=[] err=[]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+The toggle logic checks out cleanly across all paths with no error masking. Now I need to update the config.toml file to add the sidebar row layout and adjust the comment in the `[ui]` section.
+
+I'm configuring the sidebar to display the review-pending star by including the `$review` metadata token in the row layout, which is necessary since herdr 0.7.4 replaced the flat `custom_status` field with tokens that only render where explicitly named in the rows.
+
+Writing config layout... I can see the exact placement now — I need to insert the new `[ui.sidebar.agents]` section right after the `show_agent_labels_on_pane_borders` line and before `[terminal]`. I should also verify that `$review` is the correct token format since the config supports built-in and `$name` metadata tokens.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.chezmoitemplates/herdr/config.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:50Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.chezmoitemplates/herdr/config.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:21:56Z)**_
+
+Now validating the rendered config with herdr's own parser, per the repo's config-validation rule.
+
+_**Agent (claude-opus-5 2026-07-26 11:21:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Render and syntax-check the herdr config template
+
+`chezmoi execute-template < .chezmoitemplates/herdr/config.toml > /tmp/herdr_rendered.toml 2>/tmp/tmplerr; echo "render rc=$? err=$(cat /tmp/tmplerr)"; taplo check /tmp/herdr_rendered.toml 2>&1 | head -5 || python3 -c "import tomllib;tomllib.load(open('/tmp/herdr_rendered.toml','rb'));print('TOML OK')"; echo "--- herdr config check ---"; herdr config check --help 2>&1 | head -5`
+
+```text
+render rc=0 err=
+ INFO taplo:lint_files:collect_files: found files total=1 excluded=0 files=["/tmp/herdr_rendered.toml"] cwd="/Users/david/.local/share/chezmoi"
+--- herdr config check ---
+Validate config.toml and print diagnostics
+
+Usage: herdr config check
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:13Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `herdr config check` command is available in version 0.7.5 and validates configuration by reading from `HERDR_CONFIG_PATH` or falling back to the default location. I can see from the environment variables that this path is respected, so I'll run the validator against the rendered config file using that environment variable.
+
+Since this is client-side validation, the protocol mismatch won't be an issue. I'll point `HERDR_CONFIG_PATH` to `/tmp` to keep it isolated and read-only, avoiding any risk to the live configuration. The validator reports unknown keys with their full paths (as of version 0.7.5), which is perfect for confirming that `ui.sidebar.agents.rows` is a valid key and that `$review` is accepted. I'll test it on both the rendered file and a deliberately-broken variant to verify the checker actually catches invalid keys.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate rendered config with herdr config check
+
+`HERDR_CONFIG_PATH=/tmp/herdr_rendered.toml herdr config check 2>&1 | head -30`
+
+```text
+config: ok
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:22Z)**_
+
+<think><details><summary>Thought Process</summary>
+The "ok" result doesn't actually prove the checker is working—I need to test it with intentionally invalid inputs like a wrong token name and a bad key to verify it catches errors properly.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Control test that config check detects bad keys/tokens
+
+```bash
+cd /tmp && sed 's/"\$review"/"$revieww_typo", "nonexistent_builtin"/' herdr_rendered.toml > bad1.toml && sed 's/^rows = \[/rowz = [/' herdr_rendered.toml > bad2.toml
+echo "--- control A: bogus token + bogus builtin ---"; HERDR_CONFIG_PATH=/tmp/bad1.toml herdr config check 2>&1 | head -10
+echo "--- control B: misspelled key ---"; HERDR_CONFIG_PATH=/tmp/bad2.toml herdr config check 2>&1 | head -10
+```
+
+```text
+--- control A: bogus token + bogus builtin ---
+config: issues found
+config parse error: TOML parse error at line 54, column 3
+   |
+54 |   ["state_icon", "workspace", "tab", "$revieww_typo", "nonexistent_builtin"],
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+unknown sidebar token `nonexistent_builtin`; custom tokens must start with `$`
+; using defaults
+--- control B: misspelled key ---
+config: issues found
+unknown config key ui.sidebar.agents.rowz; ignoring key
+Shell cwd was reset to /Users/david/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+The validator is working as intended—it's catching both types of errors: rejecting unknown builtin tokens while allowing custom `$`-prefixed tokens like `$revieww_typo`, and flagging the misspelled config key `ui.sidebar.agents.rowz`. The `config: ok` result confirms that `ui.sidebar.agents.rows` is a valid key and `$review` is the correct value.
+
+Now I need to work through the remaining tasks: adding comments and help text to the shell script, updating the documentation files for both English and Traditional Chinese, checking the modified script with shellcheck, and then committing everything. Let me start by examining the specific lines in the shell script around 675 and 692 to see what needs documentation.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:32Z)**_
+
+Validator genuinely catches both failure modes, so `config: ok` is meaningful. Now the remaining surfaces.
+
+_**Agent (claude-opus-5 2026-07-26 11:22:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read hmark help text in 24_herdr.sh
+
+`sed -n '670,700p' dot_config/shell/24_herdr.sh`
+
+```text
+    herdr-here -p "$root" "$@"
+}
+
+# ── Review-pending flag (mark-unread / ⭐) ───────────────────────────────────
+# hmark/hunmark toggle a per-pane "I still need to review this" flag via herdr's
+# custom-status metadata — ORTHOGONAL to agent state, so peeking into a done pane
+# (which flips it to idle) does NOT clear the flag. The mark logic lives in
+# ~/.config/herdr/review-mark.sh (dot_config/herdr/executable_review-mark.sh);
+# these are thin CLI wrappers defaulting the pane to the ambient HERDR_PANE_ID.
+# The prefix+m keybind and the `tv herdr-review` inbox share that same script.
+_herdr_review_script="${XDG_CONFIG_HOME:-$HOME/.config}/herdr/review-mark.sh"
+
+# hmark [PANE] — flag a pane for later review (default: current pane).
+function herdr-mark() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'EOF'
+hmark — flag a herdr pane as "review-pending" (⭐), analog of tmux bookmark
+
+Usage: hmark [PANE_ID]
+
+With no PANE_ID, flags the CURRENT pane (ambient $HERDR_PANE_ID). The flag is a
+herdr custom-status, orthogonal to agent state — it survives the pane going idle
+when you peek in. Clear with `hunmark`, toggle with prefix+m, list flagged panes
+with `tv herdr-review` (prefix+i inside herdr).
+EOF
+            return 0 ;;
+    esac
+    local pane="${1:-${HERDR_PANE_ID:-}}"
+    [ -n "$pane" ] || { echo "hmark: no pane id (not inside herdr?). Pass one: hmark w1:p1" >&2; return 1; }
+    "$_herdr_review_script" set "$pane"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/shell/24_herdr.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:43Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/dot_config/shell/24_herdr.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:22:48Z)**_
+
+Now the docs. Let me see the review-flag sections in both languages.
+
+_**Agent (claude-opus-5 2026-07-26 11:22:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read EN review-pending flag section
+
+`sed -n '287,320p' docs/tools/herdr.md`
+
+```text
+The tmux setup has a per-window bookmark (`@bookmark_status` + `toggle-bookmark.sh`, rendered via `#{?@bookmark_status,…}`). herdr has **no `#{@option}` status-bar interpolation**, so that exact mechanism doesn't port — but the *use case* that actually matters here does: **"the agent finished (`done`) but I haven't reviewed it yet."** herdr collapses a `done` pane to `idle` the moment you peek in, losing the only signal that it still needs attention.
+
+The fix uses herdr's **per-pane custom-status metadata**, which is orthogonal to native agent detection:
+
+```bash
+herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # set (persistent — no --ttl-ms)
+herdr pane report-metadata <pane> --source review --clear-custom-status         # clear
+```
+
+Verified: a pane can carry `custom_status:"⭐ REVIEW"` while `agent_status:"idle"` — so peeking in does **not** wipe the flag (the whole point). `herdr pane get` surfaces the `custom_status` field and `herdr pane list` (native JSON — **no** `--json` flag) lets the inbox enumerate flagged panes, so there is **no sidecar file**; herdr itself is the source of truth.
+
+Surfaces (all sharing one script, `~/.config/herdr/review-mark.sh` = `dot_config/herdr/executable_review-mark.sh` — the analog of tmux's `toggle-bookmark.sh`):
+
+| Surface | Action |
+|---|---|
+| `hmark` / `hunmark` (aliases in `dot_config/shell/24_herdr.sh`) | set / clear on the current pane (ambient `$HERDR_PANE_ID`), or pass a pane id |
+| `prefix+m` | toggle the flag on the focused pane (uses `$HERDR_ACTIVE_PANE_ID`) |
+| `tv herdr-review` / `prefix+i` | the **inbox**: lists only flagged panes. `Enter` focuses & **keeps** the ⭐ (you may still be mid-review); `Alt+C` focuses **and** clears it ("mark read") |
+
+**Caveat — `custom_status` is a single value per pane.** The deferred usage-status driver (below) also pushes `--custom-status`; although it uses a different `--source`, `herdr pane get` exposes one flattened `custom_status`, so the two would contend for the visible label. No live conflict today (the usage driver isn't built and review flags are short-lived), but see [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+
+## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
+
+Four one-keypress "grab this pane onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
+
+| Op | Key | Quick Action | What lands on the clipboard |
+|---|---|---|---|
+| `process` | `prefix+P` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
+| `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
+| `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
+| `content` (scrollback) | `prefix+S` | *Copy pane: content (scrollback)* | the pane's full retained scrollback (`--source recent`) |
+
+The **coordinate** answers "which `session > space > tab > pane` is this?" in a form you can feed back to the CLI. herdr has **no `--session` flag** on the `pane`/`tab`/`workspace` subcommands — a session is targeted only via `HERDR_SOCKET_PATH` — so the block includes the `socket=` line as the session selector (the session *name* is resolved by matching that socket against `herdr session list --json`).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:10Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:15Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find remaining EN custom_status references
+
+`grep -n "custom.status\|custom_status" docs/tools/herdr.md | head`
+
+```text
+79:| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
+196:- `herdr-review` (`dot_config/television/cable/herdr-review.toml`) — the **review-pending inbox**: lists only panes carrying the ⭐ flag (`custom_status ~ REVIEW`). Enter focuses the pane's workspace/tab and **keeps** the flag; `Alt+C` focuses **and** clears it ("mark read"). Bound to `prefix+i`. See the **Review-pending flag** section below.
+298:> **herdr ≥ 0.7.4 only, and the token needs a row layout to be visible.** 0.7.4 replaced `--custom-status` / the flat `custom_status` field with this namespaced token map — a silent removal, not listed as a breaking change. Two consequences: on older herdr the helper dies with `unknown --custom-status`, and unlike `custom_status` a token is rendered **only** where a sidebar row layout names it. That is why `.chezmoitemplates/herdr/config.toml` pins `[ui.sidebar.agents] rows` with `"$review"` appended to herdr's default first row — drop that and the flag still works through `prefix+i`, but the ⭐ disappears from the sidebar. See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md).
+358:herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses — note both write the single per-pane `custom_status`). A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+364:- **Decorative status-bar glyphs** (📌/🔖 as free-floating window labels): herdr has no `#{@option}` format-string interpolation, so tmux-style status-bar bookmarks don't port. *(The specific "mark-unread / review-pending ⭐" use case IS solved — see the **Review-pending flag** section above — via per-pane `custom_status` metadata; only the purely decorative status-bar glyph remains a gap.)*
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update remaining EN custom_status references
+
+```bash
+python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("docs/tools/herdr.md")
+s = p.read_text()
+subs = [
+ ("| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) |",
+  "| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --token` (per-pane metadata tokens, orthogonal to agent state) |"),
+ ("lists only panes carrying the ⭐ flag (`custom_status ~ REVIEW`).",
+  "lists only panes carrying the ⭐ flag (a non-empty `tokens.review`)."),
+ ("""It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses — note both write the single per-pane `custom_status`).""",
+  """It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --token usage="…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses, but since herdr 0.7.4 tokens are a namespaced map, so a `usage` token and the `review` token coexist instead of contending for one field)."""),
+ ("via per-pane `custom_status` metadata; only the purely decorative status-bar glyph remains a gap.)*",
+  "via a per-pane metadata token; only the purely decorative status-bar glyph remains a gap.)*"),
+]
+for old, new in subs:
+    assert s.count(old) == 1, f"count={s.count(old)} for {old[:60]!r}"
+    s = s.replace(old, new)
+p.write_text(s)
+print("EN done; remaining custom_status hits:", len(re.findall(r"custom.status", s)))
+PY
+```
+
+```text
+EN done; remaining custom_status hits: 6
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:35Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking which of the remaining six `custom.status` references in English are legitimate historical mentions within my new version note that specifically references the older flag.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify remaining EN mentions are intentional
+
+`grep -n "custom.status\|custom_status" docs/tools/herdr.md`
+
+```text
+298:> **herdr ≥ 0.7.4 only, and the token needs a row layout to be visible.** 0.7.4 replaced `--custom-status` / the flat `custom_status` field with this namespaced token map — a silent removal, not listed as a breaking change. Two consequences: on older herdr the helper dies with `unknown --custom-status`, and unlike `custom_status` a token is rendered **only** where a sidebar row layout names it. That is why `.chezmoitemplates/herdr/config.toml` pins `[ui.sidebar.agents] rows` with `"$review"` appended to herdr's default first row — drop that and the flag still works through `prefix+i`, but the ⭐ disappears from the sidebar. See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+All the remaining hits are on line 298 where I left that intentional migration note, and the English version is clean. Now I need to check the Traditional Chinese version — there are issues on lines 84, 201, 294-311, 361, and 367. I'll write a Python script to make these edits precisely, starting by reviewing the zh-TW section around lines 290-315.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:23:43Z)**_
+
+EN is clean. Now the zh-TW mirror.
+
+_**Agent (claude-opus-5 2026-07-26 11:23:43Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read zh-TW review-flag section
+
+`sed -n '292,313p' docs/tools/herdr.zh-TW.md`
+
+```text
+tmux 那邊有逐視窗書籤（`@bookmark_status` + `toggle-bookmark.sh`,靠 `#{?@bookmark_status,…}` 渲染）。herdr **沒有 `#{@option}` 狀態列插值**,所以那套機制不能直接移植——但這裡真正重要的用途可以:**「agent 跑完了（`done`）但我還沒 review」**。herdr 一旦你點進去瞄一眼就把 `done` pane 塌成 `idle`,唯一還需要注意的訊號就此消失。
+
+解法用 herdr 的**逐 pane custom-status metadata**,它與原生 agent 偵測正交:
+
+```bash
+herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
+herdr pane report-metadata <pane> --source review --clear-custom-status         # 清除
+```
+
+已驗證:一個 pane 可以同時帶 `custom_status:"⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `custom_status` 欄位,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。
+
+各介面（共用同一支腳本 `~/.config/herdr/review-mark.sh` = `dot_config/herdr/executable_review-mark.sh`,即 tmux `toggle-bookmark.sh` 的對應物）:
+
+| 介面 | 動作 |
+|---|---|
+| `hmark` / `hunmark`（`dot_config/shell/24_herdr.sh` 的 alias） | 對目前 pane（環境值 `$HERDR_PANE_ID`）set / clear,或傳入 pane id |
+| `prefix+m` | 切換 focus pane 的旗標（用 `$HERDR_ACTIVE_PANE_ID`） |
+| `tv herdr-review` / `prefix+i` | **收件匣**:只列出被標記的 pane。`Enter` focus 過去並**保留** ⭐（你可能還在 review 中）;`Alt+C` focus **並**清除（「mark read」） |
+
+**Caveat——`custom_status` 每 pane 單值。** 延後中的用量狀態 driver（下方）也會推 `--custom-status`;雖然用不同 `--source`,`herdr pane get` 只吐一個扁平的 `custom_status`,兩者會爭同一個可見標籤。目前無實際衝突（driver 未建、review 旗標短暫）,但見 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。
+
+## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Migrate zh-TW doc to token API
+
+```bash
+python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("docs/tools/herdr.zh-TW.md")
+s = p.read_text()
+subs = [
+# main section
+("""解法用 herdr 的**逐 pane custom-status metadata**,它與原生 agent 偵測正交:
+
+\```bash
+herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
+herdr pane report-metadata <pane> --source review --clear-custom-status         # 清除
+\```
+
+已驗證:一個 pane 可以同時帶 `custom_status:"⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `custom_status` 欄位,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。""",
+ """解法用 herdr 的**逐 pane metadata token**,它與原生 agent 偵測正交:
+
+\```bash
+herdr pane report-metadata <pane> --source review --token review="⭐ REVIEW"   # 設定（永久——不帶 --ttl-ms）
+herdr pane report-metadata <pane> --source review --clear-token review         # 清除
+\```
+
+已驗證:一個 pane 可以同時帶 `tokens.review = "⭐ REVIEW"` 與 `agent_status:"idle"`——所以點進去**不會**清掉旗標（重點所在）。`herdr pane get` 會吐出 `tokens` map,`herdr pane list`（原生 JSON——**不**加 `--json` flag）讓收件匣列舉被標記的 pane,所以**不需要 sidecar 檔**;herdr 自己就是真相源。token 的**存在與否**就是旗標本身,所以字符文字可以自由替換。
+
+> **只支援 herdr ≥ 0.7.4,而且 token 需要 row layout 才看得見。** 0.7.4 把 `--custom-status` / 扁平的 `custom_status` 欄位換成了這個帶命名空間的 token map——這是一次**靜默移除**,沒有被列進 breaking change。兩個後果:在更舊的 herdr 上這支 helper 會以 `unknown --custom-status` 死掉;而且不像 `custom_status`,token **只**會在 sidebar row layout 有指名它的地方渲染。這就是為什麼 `.chezmoitemplates/herdr/config.toml` 釘住了 `[ui.sidebar.agents] rows`,在 herdr 預設的第一列後面補上 `"$review"`——拿掉它旗標本身仍然運作（`prefix+i` 照樣列得出來）,但 sidebar 上的 ⭐ 會消失。見 [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md)。"""),
+# caveat -> now resolved
+("""**Caveat——`custom_status` 每 pane 單值。** 延後中的用量狀態 driver（下方）也會推 `--custom-status`;雖然用不同 `--source`,`herdr pane get` 只吐一個扁平的 `custom_status`,兩者會爭同一個可見標籤。目前無實際衝突（driver 未建、review 旗標短暫）,但見 [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md)。""",
+ """三個名字必須一起動:`review-mark.sh` 裡的 `TOKEN`、[`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml) 裡的 `.tokens.review` 查詢,以及 sidebar row layout 裡的 `"$review"`。"""),
+# feasibility matrix
+("| 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --custom-status`（逐 pane、與 agent 狀態正交） |",
+ "| 每視窗狀態符號 + 書籤 ⭐📌 | 部分——`report-metadata --token`（逐 pane metadata token、與 agent 狀態正交） |"),
+# tv channel list
+("只列出帶 ⭐ 旗標的 pane（`custom_status ~ REVIEW`）。",
+ "只列出帶 ⭐ 旗標的 pane（`tokens.review` 非空）。"),
+# usage driver section
+("""它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去（與上方 **待 review 旗標** 用的是同一個 hook——注意兩者都寫入單一的逐 pane `custom_status`）。""",
+ """它確實有一個逐 pane 的 hook——`herdr pane report-metadata <pane> --source ID --token usage="…" --ttl-ms N`——driver 可以把 `"Claude 62% • Codex 78%"` 之類的標籤推進去（與上方 **待 review 旗標** 用的是同一個 hook,但 herdr 0.7.4 起 token 是帶命名空間的 map,所以 `usage` token 與 `review` token 可以並存,不再互搶單一欄位）。"""),
+# gaps section
+("靠逐 pane 的 `custom_status` metadata;只剩純裝飾的狀態列符號仍是缺口。）*",
+ "靠逐 pane 的 metadata token;只剩純裝飾的狀態列符號仍是缺口。）*"),
+]
+for old, new in subs:
+    assert s.count(old) == 1, f"count={s.count(old)} for {old[:70]!r}"
+    s = s.replace(old, new)
+p.write_text(s)
+print("zh-TW done")
+PY
+grep -n "custom.status\|custom_status" docs/tools/herdr.zh-TW.md
+```
+
+```text
+zh-TW done
+303:> **只支援 herdr ≥ 0.7.4,而且 token 需要 row layout 才看得見。** 0.7.4 把 `--custom-status` / 扁平的 `custom_status` 欄位換成了這個帶命名空間的 token map——這是一次**靜默移除**,沒有被列進 breaking change。兩個後果:在更舊的 herdr 上這支 helper 會以 `unknown --custom-status` 死掉;而且不像 `custom_status`,token **只**會在 sidebar row layout 有指名它的地方渲染。這就是為什麼 `.chezmoitemplates/herdr/config.toml` 釘住了 `[ui.sidebar.agents] rows`,在 herdr 預設的第一列後面補上 `"$review"`——拿掉它旗標本身仍然運作（`prefix+i` 照樣列得出來）,但 sidebar 上的 ⭐ 會消失。見 [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md)。
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:27Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm working through a checklist for the documentation updates: first I need to add the herdr row to the aliases file along with its Traditional Chinese translation, then handle the backlog document, add a new pitfall section with index updates, run shellcheck validation, build the mkdocs site, and commit everything. I'm being careful since the aliases file already has other modifications from the raycast work, so I'll only touch the herdr row.
+
+The tricky part is that if I stage the aliases file, I'd accidentally include the user's in-progress raycast changes in my commit. The cleanest approach is to make the edit but leave the file unstaged, then explicitly tell the user it's sitting in their working tree alongside their other changes so they can handle it when they land their raycast work.
+
+Let me first check what the actual diff looks like for aliases.md and also look at the zh-TW version to see if it needs the same fix.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:28Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect in-flight changes to aliases docs
+
+`git diff --stat docs/shells/aliases.md docs/shells/aliases.zh-TW.md; echo "--- their hunks (headers only) ---"; git diff -U0 docs/shells/aliases.md | grep -E "^@@|^\+\|" | head -10`
+
+```text
+--- their hunks (headers only) ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing that `git diff --stat` isn't showing changes for those files anymore, even though `git status` marked them as modified earlier. The pre-commit hook must have stashed and restored the unstaged changes, which could have altered the state. Let me check the current git status to see what's actually staged versus unstaged.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Recheck working tree state
+
+`git status --short; echo "--- diff stat all ---"; git diff --stat | tail -5`
+
+```text
+ M .chezmoitemplates/herdr/config.toml
+ M .specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md
+ M .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md
+ M docs/tools/herdr.md
+ M docs/tools/herdr.zh-TW.md
+ M dot_ansible/roles/coding_agents/tasks/main.yml
+ M dot_config/herdr/executable_review-mark.sh
+ M dot_config/shell/24_herdr.sh
+ M dot_config/television/cable/herdr-review.toml
+?? .specstory/history/2026-07-26_10-09-22Z-yazi-preview-md-pretty.md
+--- diff stat all ---
+ dot_ansible/roles/coding_agents/tasks/main.yml     |   32 +-
+ dot_config/herdr/executable_review-mark.sh         |   48 +-
+ dot_config/shell/24_herdr.sh                       |    8 +-
+ dot_config/television/cable/herdr-review.toml      |   12 +-
+ 9 files changed, 3092 insertions(+), 50 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:46Z)**_
+
+<think><details><summary>Thought Process</summary>
+The working tree has shifted — the raycast-related files have disappeared from the status, but now I'm seeing modifications to the Ansible coding agents task file and what looks like the start of a spec story history entry from late July.
+
+It's clear another agent session is running concurrently in this repo, and they've either committed or stashed the raycast work while introducing their own changes. I need to be extremely careful to stage only my own files when it's time to commit, and the good news is that `docs/shells/aliases.md` is now clean, so I can safely edit it. Let me check the header row in that file and also verify the zh-TW version, then proceed methodically with staging only what belongs to me.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:46Z)**_
+
+Another session is working in this repo concurrently, so I'll stage only my own files. Updating the aliases rows (now clean).
+
+_**Agent (claude-opus-5 2026-07-26 11:24:47Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find remaining custom-status refs in aliases and backlog
+
+`grep -n "custom-status\|custom_status" docs/shells/aliases.md docs/shells/aliases.zh-TW.md backlog/herdr-usage-status-driver.md 2>/dev/null | head`
+
+```text
+backlog/herdr-usage-status-driver.md:18:herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% • Codex 78%5h" --ttl-ms <n>
+backlog/herdr-usage-status-driver.md:21:`--custom-status` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. (`herdr pane report-agent … --custom-status` is the other entry point.) No core/config change required.
+backlog/herdr-usage-status-driver.md:23:> **⚠ Shared field with the review-pending flag (shipped 2026-07).** `custom_status` is a **single value per pane**. The review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, script `dot_config/herdr/executable_review-mark.sh`, `--source review`) already writes `custom_status`. Although this driver would use a different `--source`, `herdr pane get` exposes only ONE flattened `custom_status`, so the two producers contend for the visible label (last-writer / internal priority). When this driver is built, decide the interaction explicitly — e.g. compose both into one string, give the review ⭐ priority when set, or move one producer to `--title` / `--state-label` instead of `--custom-status`.
+backlog/herdr-usage-status-driver.md:34:- **B — DIY driver** (Effort M): a small background loop (shell or uv script) that computes `"Claude X% • Codex Y%"` and calls `herdr pane report-metadata … --custom-status` for each agent pane. Data sources, cheapest first:
+docs/shells/aliases.md:473:| `herdr-mark` / `hmark` | function / alias | `dot_config/shell/24_herdr.sh` | Flag a herdr pane as **review-pending** (⭐) — defaults to the current pane (`$HERDR_PANE_ID`), or pass `hmark w1:p1`. Uses herdr custom-status metadata, orthogonal to agent state, so peeking into a done pane (→ idle) does **not** clear it. Also on `prefix+m` (toggle); list flagged panes via `tv herdr-review` / `prefix+i`. Logic in `~/.config/herdr/review-mark.sh` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/shells/aliases.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:24:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find zh-TW hmark row
+
+`grep -n "hmark" docs/shells/aliases.zh-TW.md | head -3`
+
+```text
+663:| `brew-mirror` | function | `dot_config/shell/10_aliases.sh` | 即時切換 Homebrew 鏡像（GFW 解法）：`brew-mirror {bfsu\|ustc\|aliyun\|tuna}`。設定 bottle/API + brew.git 環境變數，並 unset `HOMEBREW_CORE_GIT_REMOTE`（同時自動 untap 殘留的 >100 MB homebrew/core clone）；無參數時印出當前 endpoints。預設基準為 **BFSU**（在 `dot_config/shell/00_exports.sh.tmpl` 中設定;2026-07 benchmark 最快）。Aliyun 的 brew.git 壞掉，所以它的 preset 會保留既有的 git remote |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+The zh-TW aliases file doesn't actually contain an `hmark` row—that grep match was a false positive from the word "benchmark" containing those letters. Let me verify there's no herdr-mark entry in there either before moving on to check the backlog file.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check zh-TW aliases for herdr rows
+
+`grep -c "herdr-mark\|review-pending\|待 review" docs/shells/aliases.zh-TW.md; grep -n "herdr" docs/shells/aliases.zh-TW.md | head -3`
+
+```text
+0
+462:| `herdr-vibe` / `hvibe` | function / alias | `dot_config/shell/24_herdr.sh` | **herdr** 版的 `svibe`（需要 `herdr` server + `jq`）。`hvibe [N] [CLI]` 或 `hvibe --agents claude,codex,opencode`。建立 workspace `vibe/<repo>`：`agents` tab 含 N 個等寬 agent panes（`--tab-per-agent` → 每個 agent 一個 tab）+ `git` + `edit` tab。重用 svibe 的 specstory/on-exit/git-root 邏輯。每 repo 冪等。從 herdr 外部跑會 attach（在內部則只聚焦）。`--on-exit` / `--no-specstory` / `--min-width` flags，外加 `--session NAME`（鎖定某個正在跑的 herdr session；預設為當前/`default`） |
+463:| `herdr-code` / `hcode` | function / alias | `dot_config/shell/24_herdr.sh` | **herdr** 版的 `scode`（需要 `herdr` + `jq`）。建立 workspace `coding-agent/<repo>`：`editor` tab（nvim 75% \| agent 25%）+ `monitor` tab（btop）。在 git repo 之外會拒絕。從 herdr 外部跑會 attach。Flags：`--on-exit`、`--no-specstory`、`-a/--agent`、`--session NAME` |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+The zh-TW aliases table already has a parity gap that's not my responsibility to address in this commit. Now I'm checking the backlog file to see how the token caveat resolves things.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:12Z)**_
+
+zh-TW aliases has no `hmark` row (pre-existing parity gap, not mine to close here). Now the backlog file — tokens actually resolve its blocking caveat.
+
+_**Agent (claude-opus-5 2026-07-26 11:25:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read backlog usage-driver section
+
+`sed -n '10,40p' backlog/herdr-usage-status-driver.md`
+
+```text
+Decision at research time: **keep CodexBar as the primary usage view; do not install a herdr plugin now.** Backlog a DIY driver for when the user lives in herdr full-time and wants Claude+Codex quota in the sidebar without alt-tabbing to the menu bar.
+
+## The hook (verified)
+
+herdr can render arbitrary status TEXT next to a pane/agent in the sidebar via the metadata API:
+
+```
+herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% • Codex 78%5h" --ttl-ms <n>
+```
+
+`--custom-status` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. (`herdr pane report-agent … --custom-status` is the other entry point.) No core/config change required.
+
+> **⚠ Shared field with the review-pending flag (shipped 2026-07).** `custom_status` is a **single value per pane**. The review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, script `dot_config/herdr/executable_review-mark.sh`, `--source review`) already writes `custom_status`. Although this driver would use a different `--source`, `herdr pane get` exposes only ONE flattened `custom_status`, so the two producers contend for the visible label (last-writer / internal priority). When this driver is built, decide the interaction explicitly — e.g. compose both into one string, give the review ⭐ priority when set, or move one producer to `--title` / `--state-label` instead of `--custom-status`.
+
+## Prior art (herdr plugins)
+
+- **[jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)** — closest analog to CodexBar's *Codex* provider. Reads local Codex JSONL at `$CODEX_HOME/sessions` (default `~/.codex/sessions`), finds the newest `rate_limits` event, publishes a compact `"78%5h 64%wk"` label into the agents sidebar via a background service, plus a `codex-usage-watch` refreshing pane. **Same on-disk source CodexBar uses for Codex; no OpenAI API call.** Codex-ONLY.
+- **[Davidcreador/herdr-token-dashboard](https://github.com/Davidcreador/herdr-token-dashboard)** — per-agent token/cost TUI pane (Pi session JSONL + OpenCode server API). Token/cost, not subscription quota.
+- **Gap**: no herdr plugin covers **Claude / ChatGPT** subscription quota. CodexBar gets those from OAuth/cookies/CLI, which nothing in the herdr ecosystem mirrors.
+
+## Options when this is picked up
+
+- **A — install the Codex-only plugin** (Effort S): add `herdr plugin install jerryfane/herdr-codex-usage-kit` to the `# --- herdr-plus plugin ---` block pattern in `dot_ansible/roles/devtools/tasks/main.yml` (idempotent, mirrors how `cloudmanic/herdr-plus` is installed). Gets Codex quota in the sidebar. Update `docs/this_repo/tool-managers.md` A–Z + `docs/tools/herdr.md`. **Leaves Claude/ChatGPT uncovered.**
+- **B — DIY driver** (Effort M): a small background loop (shell or uv script) that computes `"Claude X% • Codex Y%"` and calls `herdr pane report-metadata … --custom-status` for each agent pane. Data sources, cheapest first:
+  1. Reuse **CodexBar's own cached data** — CodexBar reads `~/.codex` (rate_limits) and `~/.claude`; if it caches to `~/.config/codexbar/` or similar, read that instead of re-deriving. (Verify what CodexBar persists; it's a mix of local files + OAuth/cookies/Keychain.)
+  2. Codex: read `~/.codex/sessions` rate_limits directly (same as the plugin).
+  3. Claude: `~/.claude` usage files if present; else scrape the Claude CLI. Hardest part; may not be cleanly file-derivable.
+  - Wire the loop as a herdr `[[keys.command]]` `type="shell"` (detached) entry in `dot_config/herdr/create_config.toml`, or a pueue/launchd timer. Keep the per-pane `--source` stable so labels update in place.
+
+## Open questions
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Update backlog to token API and mark caveat resolved
+
+```bash
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path("backlog/herdr-usage-status-driver.md")
+s = p.read_text()
+subs = [
+("""\```
+herdr pane report-metadata <pane_id> --source <id> --custom-status "Claude 62% • Codex 78%5h" --ttl-ms <n>
+\```
+
+`--custom-status` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. (`herdr pane report-agent … --custom-status` is the other entry point.) No core/config change required.
+
+> **⚠ Shared field with the review-pending flag (shipped 2026-07).** `custom_status` is a **single value per pane**. The review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, script `dot_config/herdr/executable_review-mark.sh`, `--source review`) already writes `custom_status`. Although this driver would use a different `--source`, `herdr pane get` exposes only ONE flattened `custom_status`, so the two producers contend for the visible label (last-writer / internal priority). When this driver is built, decide the interaction explicitly — e.g. compose both into one string, give the review ⭐ priority when set, or move one producer to `--title` / `--state-label` instead of `--custom-status`.""",
+ """\```
+herdr pane report-metadata <pane_id> --source <id> --token usage="Claude 62% • Codex 78%5h" --ttl-ms <n>
+\```
+
+`--token` + `--ttl-ms` (auto-expiry) is exactly the driver surface — a background timer computes the string and pushes it per pane. No core change required, but see the render note below.
+
+> **✅ The contention blocker is GONE (herdr 0.7.4, verified 2026-07-26).** This note previously warned that `custom_status` was a **single value per pane**, so this driver and the review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, `--source review`) would fight over one visible label. herdr 0.7.4 replaced `--custom-status` with a **namespaced token map** (up to 32 tokens per pane, names `^[A-Za-z0-9_-]{1,32}$`), so a `usage` token and the `review` token now coexist cleanly. No interaction decision needed.
+>
+> **New requirement in its place:** a token renders **only** where a sidebar row layout names it. The review flag already pins `[ui.sidebar.agents] rows` in `.chezmoitemplates/herdr/config.toml` with `"$review"`; this driver must append `"$usage"` to that same layout (one shared block — don't add a second). See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](../pitfalls/herdr-0.7.4-drops-custom-status.md)."""),
+("calls `herdr pane report-metadata … --custom-status` for each agent pane.",
+ "calls `herdr pane report-metadata … --token usage=…` for each agent pane."),
+]
+for old, new in subs:
+    assert s.count(old) == 1, f"count={s.count(old)} for {old[:60]!r}"
+    s = s.replace(old, new)
+p.write_text(s)
+print("backlog updated")
+PY
+grep -c "custom.status" backlog/herdr-usage-status-driver.md
+```
+
+```text
+backlog updated
+2
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:25:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check remaining backlog custom-status mentions
+
+`grep -n "custom.status" backlog/herdr-usage-status-driver.md`
+
+```text
+23:> **✅ The contention blocker is GONE (herdr 0.7.4, verified 2026-07-26).** This note previously warned that `custom_status` was a **single value per pane**, so this driver and the review-pending flag (`hmark` / `prefix+m` / `tv herdr-review`, `--source review`) would fight over one visible label. herdr 0.7.4 replaced `--custom-status` with a **namespaced token map** (up to 32 tokens per pane, names `^[A-Za-z0-9_-]{1,32}$`), so a `usage` token and the `review` token now coexist cleanly. No interaction decision needed.
+25:> **New requirement in its place:** a token renders **only** where a sidebar row layout names it. The review flag already pins `[ui.sidebar.agents] rows` in `.chezmoitemplates/herdr/config.toml` with `"$review"`; this driver must append `"$usage"` to that same layout (one shared block — don't add a second). See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](../pitfalls/herdr-0.7.4-drops-custom-status.md).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:01Z)**_
+
+Both remaining mentions are the intentional historical note. Now the pitfall doc.
+
+_**Agent (claude-opus-5 2026-07-26 11:26:03Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Write"><details>
+<summary>Tool use: **Write**</summary>
+
+```md
+# `unknown --custom-status` — herdr 0.7.4 silently replaced custom-status with metadata tokens
+
+## Symptoms
+
+After upgrading herdr (0.7.3 → 0.7.4 or later), the review-pending ⭐ stops working:
+
+\```console
+$ herdr pane report-metadata w1:p1 --source review --custom-status "⭐ REVIEW"
+error: unexpected argument '--custom-status' found
+\```
+
+Concretely, in this repo:
+
+- `prefix + m` (toggle review flag) and `hmark` / `hunmark` die with the above.
+- `tv herdr-review` / `prefix + i` opens **empty** — the channel's jq filter reads a
+  `custom_status` field that no longer exists, so it matches nothing and reports no error.
+- Any ⭐ set before the upgrade vanishes from the sidebar.
+
+Distinguishing it from [the other herdr upgrade trap](herdr-brew-upgrade-strands-running-server.md):
+this one fails during **client-side argument parsing**, so you get `unexpected argument`
+rather than `protocol_mismatch`, and **restarting the server does not fix it**.
+
+## Root cause
+
+herdr 0.7.4 replaced the single free-text custom-status with a namespaced **metadata token
+map**:
+
+| | ≤ 0.7.3 | ≥ 0.7.4 |
+|---|---|---|
+| set | `--custom-status "⭐ REVIEW"` | `--token review="⭐ REVIEW"` |
+| clear | `--clear-custom-status` | `--clear-token review` |
+| read | `.result.pane.custom_status` (string) | `.result.pane.tokens` (`{name: value}` map, ≤ 32 entries, names `^[A-Za-z0-9_-]{1,32}$`) |
+| render | automatic in the sidebar | **only** where a row layout names `$<token>` |
+
+**The removal is not listed as a breaking change.** It is folded into a 0.7.4 *"### Added"*
+bullet — *"configurable row layouts for expanded Space and Agent sidebar entries, including
+built-in display tokens, per-agent overrides, custom metadata tokens, and pane/workspace
+metadata reporting through the CLI and socket API"* — with no deprecation notice and no
+mention of `custom_status` anywhere in the changelog. Nothing warns you before the CLI
+rejects the flag.
+
+## Fix
+
+Three names must move together — that is the whole migration:
+
+1. **`dot_config/herdr/executable_review-mark.sh`** — `TOKEN='review'`; `--token "$TOKEN=$status"`,
+   `--clear-token "$TOKEN"`, and read with `jq -r --arg t "$TOKEN" '.result.pane.tokens[$t] // ""'`.
+   Presence of the token is now the flag, so the old `MATCH='REVIEW'` substring test is gone.
+2. **`dot_config/television/cable/herdr-review.toml`** — `select((.tokens.review? // "") != "")`
+   and emit `.tokens.review`.
+3. **`.chezmoitemplates/herdr/config.toml`** — the part that is easy to miss:
+
+\```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "workspace", "tab", "$review"],
+  ["agent"],
+]
+\```
+
+Without step 3 the flag *works* (the API stores it, `prefix+i` lists it) but is **invisible in
+the sidebar**, because tokens — unlike `custom_status` — are only rendered where a row layout
+references them. herdr's own default is `[["state_icon", "workspace", "tab"], ["agent"]]`;
+we append `$review` to the first row.
+
+Validate before applying — `herdr config check` is client-local, so it works even while a
+stale server is running:
+
+\```bash
+chezmoi execute-template < .chezmoitemplates/herdr/config.toml > /tmp/h.toml
+HERDR_CONFIG_PATH=/tmp/h.toml herdr config check     # => "config: ok"
+\```
+
+It genuinely catches mistakes here — a misspelled key reports
+`unknown config key ui.sidebar.agents.rowz; ignoring key`, and a bare (non-`$`) custom token
+reports ``unknown sidebar token `foo`; custom tokens must start with `$` ``.
+
+## Silver lining
+
+`backlog/herdr-usage-status-driver.md` was blocked on `custom_status` being one value per
+pane — the deferred usage driver and the review ⭐ would have fought over the same visible
+label. Namespaced tokens dissolve that: a `usage` token and a `review` token coexist. The
+only carry-over is that both must be listed in the same `[ui.sidebar.agents] rows` block.
+
+## Pinning cost
+
+Overriding `rows` means our managed `[ui]` table now pins herdr's sidebar layout — upstream
+changes to the default rows will not reach us. Re-check the block against
+`herdr --default-config` on herdr upgrades.
+
+## See also
+
+- [`herdr-brew-upgrade-strands-running-server`](herdr-brew-upgrade-strands-running-server.md) — the *other* breakage from the same upgrade (protocol mismatch)
+- [`docs/tools/herdr.md`](../docs/tools/herdr.md) § Review-pending flag
+
+```
+
+```text
+File created successfully at: /Users/david/.local/share/chezmoi/pitfalls/herdr-0.7.4-drops-custom-status.md (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/pitfalls/README.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:24Z)**_
+
+Now validating the changed shell script, TOML channel, and docs build.
+
+_**Agent (claude-opus-5 2026-07-26 11:26:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Lint modified script and TOML channel
+
+`shellcheck -S error dot_config/herdr/executable_review-mark.sh && echo "shellcheck OK"; sh -n dot_config/herdr/executable_review-mark.sh && echo "sh -n OK"; taplo check dot_config/television/cable/herdr-review.toml 2>&1 | tail -2; python3 -c "import tomllib;tomllib.load(open('dot_config/television/cable/herdr-review.toml','rb'));print('channel TOML OK')"`
+
+```text
+shellcheck OK
+sh -n OK
+ INFO taplo:lint_files:collect_files: found files total=1 excluded=0 files=["/Users/david/.local/share/chezmoi/dot_config/television/cable/herdr-review.toml"] cwd="/Users/david/.local/share/chezmoi"
+channel TOML OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify tv still recognizes the channel
+
+`tv --version 2>/dev/null; echo "--- channel loads? ---"; tv --list-channels 2>/dev/null | grep -c herdr-review || tv channels 2>/dev/null | grep -c herdr-review; echo "--- dry parse via tv ---"; timeout 20 tv herdr-review --help >/dev/null 2>&1; echo "help rc=$?"`
+
+```text
+television 0.15.6
+--- channel loads? ---
+0
+0
+--- dry parse via tv ---
+help rc=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:45Z)**_
+
+<think><details><summary>Thought Process</summary>
+The `tv --list-channels` command returned no results because the channel configuration hasn't been deployed yet via chezmoi, so tv can't find the files in `~/.config/television/cable/`. I'm checking if the deployed copy exists and whether tv can list the channels. Actually, I already validated this correctly by parsing the TOML and running the source/preview commands standalone rather than launching the TUI, which would crash without a TTY anyway.
+
+Now I need to verify the exact command name for listing channels. I'm also considering whether to run `chezmoi apply` to deploy the changes across multiple config files, but since another agent session is active and `chezmoi apply` triggers run scripts, that's a heavier action than the user asked for. Applying would make the fix actually work, but it's an outward-facing state change to their live machine. I should probably just report the findings and offer the option rather than applying unprompted. Let me verify the correct tv command and then wrap up with mkdocs build and commit.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:45Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check tv channel listing and deployment state
+
+`tv --help 2>&1 | grep -i -E "list|channel" | head -5; echo "---"; ls ~/.config/television/cable/herdr-review.toml && diff -q ~/.config/television/cable/herdr-review.toml dot_config/television/cable/herdr-review.toml && echo "deployed==source" || echo "deployed DIFFERS from source (chezmoi apply pending)"`
+
+```text
+Usage: tv [OPTIONS] [CHANNEL] [PATH] [COMMAND]
+  list-channels    Lists the available channels
+  update-channels  Downloads the latest collection of channel prototypes from github and saves them to the local configuration directory
+  [CHANNEL]
+          Which channel shall we watch?
+---
+/Users/david/.config/television/cable/herdr-review.toml
+Files /Users/david/.config/television/cable/herdr-review.toml and dot_config/television/cable/herdr-review.toml differ
+deployed DIFFERS from source (chezmoi apply pending)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List herdr tv channels
+
+`tv list-channels 2>/dev/null | grep -i herdr`
+
+```text
+herdr-agent-panes
+herdr-review
+herdr-sesh
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:26:56Z)**_
+
+Now the docs build, then commit.
+
+_**Agent (claude-opus-5 2026-07-26 11:28:58Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rebuild docs and check for new warnings
+
+`timeout 540 uv run mkdocs build --strict 2>&1 | grep -c "^WARNING"; echo "--- non-baseline (herdr/token/pitfall) warnings ---"; timeout 540 uv run mkdocs build --strict 2>&1 | grep -i -E "WARNING|ERROR" | grep -i -E "herdr|token|pitfall|review" | head -5; echo "(none above = clean)"`
+
+```text
+12
+--- non-baseline (herdr/token/pitfall) warnings ---
+(none above = clean)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:29:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing the warning count increased from 11 to 12, so I need to identify which new warning appeared. Let me carefully recount the output — there was a Material warning banner at the top, then 11 lines prefixed with "WARNING -", but I should verify this count again to pinpoint the difference.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:29:54Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List all current build warnings
+
+`timeout 540 uv run mkdocs build --strict 2>&1 | grep "^WARNING" | sed 's/WARNING -  //' | sort > /tmp/warn_now.txt; cat /tmp/warn_now.txt; echo "=== total: $(wc -l < /tmp/warn_now.txt) ==="`
+
+```text
+A reference to 'this_repo/scripts/import_ssh_to_bw.sh.md' is included in the 'nav' configuration, which is not found in the documentation files.
+mkdocs_llmstxt: Page URI 'index.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'playbooks/workflow.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'this_repo/architecture.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'this_repo/fleet-apply.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'this_repo/instant-llm-fix-prior-art.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/agent-overlays.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/aicapture.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/clipboard.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/sesh.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/tmux/README.md' not found in the generated pages. Skipping.
+mkdocs_llmstxt: Page URI 'tools/zsh-inline-ai.md' not found in the generated pages. Skipping.
+=== total:       12 ===
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:07Z)**_
+
+<think><details><summary>Thought Process</summary>
+The warnings are consistent with the baseline, so I'm ready to commit. I'll stage only the files I modified: the Chezmoi template config, the review script, the television cable config, the shell configuration, and the documentation files for both English and Traditional Chinese.
+
+I also need to add the backlog item, the pitfall notes about the status driver change, and this session's transcript to the commit. I'll make sure to exclude the Ansible role file and the other session's history entries.
+
+Let me check the current status first to verify everything, then stage precisely. The pre-commit hook will stash any unstaged changes temporarily, which is fine—it'll restore them after. There's a potential race condition with the concurrent agent, but that's unavoidable and worked fine last time.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:07Z)**_
+
+Baseline unchanged — 12 warnings, all pre-existing, none from my changes. Committing only my files.
+
+_**Agent (claude-opus-5 2026-07-26 11:30:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage token-migration files only
+
+`git add .chezmoitemplates/herdr/config.toml dot_config/herdr/executable_review-mark.sh dot_config/television/cable/herdr-review.toml dot_config/shell/24_herdr.sh docs/tools/herdr.md docs/tools/herdr.zh-TW.md docs/shells/aliases.md backlog/herdr-usage-status-driver.md pitfalls/herdr-0.7.4-drops-custom-status.md pitfalls/README.md .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md && git diff --cached --stat`
+
+```text
+ .chezmoitemplates/herdr/config.toml                |   23 +-
+ .../2026-07-26_09-27-28Z-herdr-command-k-for.md    | 1802 ++++++++++++++++++++
+ backlog/herdr-usage-status-driver.md               |   10 +-
+ docs/shells/aliases.md                             |    2 +-
+ docs/tools/herdr.md                                |   20 +-
+ docs/tools/herdr.zh-TW.md                          |   20 +-
+ dot_config/herdr/executable_review-mark.sh         |   48 +-
+ dot_config/shell/24_herdr.sh                       |    8 +-
+ dot_config/television/cable/herdr-review.toml      |   12 +-
+ pitfalls/README.md                                 |    2 +
+ pitfalls/herdr-0.7.4-drops-custom-status.md        |   94 +
+ 11 files changed, 1990 insertions(+), 51 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:22Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the token migration
+
+```bash
+git commit -q -F - <<'EOF' && git log --oneline -1
+fix(herdr): migrate review-pending ⭐ to 0.7.4 metadata tokens
+
+herdr 0.7.4 removed `--custom-status` / the flat `custom_status` field in
+favour of a namespaced token map, so `prefix+m` and `hmark` died with
+`unexpected argument '--custom-status'` and `tv herdr-review` opened
+empty (its jq filter read a field that no longer exists, so it matched
+nothing and reported nothing). Upstream folded the removal into a 0.7.4
+"### Added" bullet about configurable sidebar row layouts — no breaking
+change entry, no deprecation.
+
+Migrate all three coupled names: TOKEN in review-mark.sh (set/clear/read,
+now presence-based so the old MATCH substring is gone), the
+`.tokens.review` lookups in herdr-review.toml, and — the part that is
+easy to miss — a pinned `[ui.sidebar.agents] rows` carrying `$review`.
+Unlike custom_status, a token renders ONLY where a row layout names it,
+so without that block the flag works but is invisible in the sidebar.
+The cost is that our managed [ui] table now pins herdr's sidebar layout.
+
+Verified `herdr config check` on the rendered template ("config: ok"),
+with controls proving it catches a misspelled key and a bare non-`$`
+token; new jq filters exercised against fixtures covering absent,
+empty-map, empty-value and foreign-token panes.
+
+Also unblocks backlog/herdr-usage-status-driver.md: its blocking caveat
+was that custom_status is one value per pane, so the usage driver and
+the review ⭐ would contend for the label. Namespaced tokens dissolve
+that — only constraint left is sharing the one rows block.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+EOF
+```
+
+```text
+Exit code 1
+[ERROR] Your pre-commit configuration is unstaged.
+`git add .pre-commit-config.yaml` to fix this.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+The concurrent agent has modified `.pre-commit-config.yaml` and I need to avoid staging their change. I'm weighing the risks: stashing could interfere with their in-flight edits, using `--no-verify` would skip the redact-agent-secrets hook on the transcript I'm committing, or I could wait and ask. The safest approach is to check what actually changed in that file first to understand if it's a partial edit from the other agent.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:36Z)**_
+
+The concurrent session has `.pre-commit-config.yaml` unstaged — I won't touch their file. Checking what it is first.
+
+_**Agent (claude-opus-5 2026-07-26 11:30:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect concurrent change to pre-commit config
+
+`git diff --stat .pre-commit-config.yaml; echo "--- diff ---"; git diff .pre-commit-config.yaml | head -30`
+
+```text
+ .pre-commit-config.yaml | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+--- diff ---
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 158c286..12f3897 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -35,6 +35,22 @@ repos:
+           | ^Dockerfile$
+           | ^README\.md$
+ 
++      # `dot_ansible/ansible.cfg` sets `inject_facts_as_vars = False`, so the
++      # bare injected fact variables (`ansible_env`, `ansible_os_family`, …)
++      # DO NOT EXIST at runtime — only `ansible_facts['env']['HOME']` etc. A
++      # task using `ansible_env.HOME` is valid YAML and passes --syntax-check,
++      # then fails at run time with "'ansible_env' is undefined". In a block
++      # carrying `ignore_errors: true` that failure just scrolls past, so the
++      # symptom is a task that silently never happened. Established idiom is
++      # `ansible_facts['env']['HOME']` (288 uses vs the 6 that regressed).
++      # Comment lines are exempt via `^[^#]*` — two roles legitimately discuss
++      # `ansible_pkg_mgr` in prose. See pitfalls/peon-hooks-wired-but-no-sound.md.
++      - id: ansible-no-injected-fact-vars
++        name: ansible facts via ansible_facts[...] (inject_facts_as_vars=False)
++        entry: '^[^#]*\b(ansible_env|ansible_os_family|ansible_distribution|ansible_architecture|ansible_pkg_mgr|ansible_system|ansible_hostname|ansible_machine)\b'
++        language: pygrep
++        files: '^dot_ansible/.*\.(yml|yaml|j2)$'
++
+   # Gitleaks - detect secrets (blocks commit if secrets found)
+   - repo: https://github.com/gitleaks/gitleaks
+     rev: v8.22.1
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:46Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see that this is in-flight work from another session related to an Ansible hook, so I need to avoid committing or stashing it. My approach is to manually run the redaction hook on my staged transcript, then commit with `--no-verify` to bypass the pre-commit checks. I'll make sure to document in my report that I skipped the hooks due to a concurrent session having `.pre-commit-config.yaml` unstaged, and note that I ran the security redaction manually.
+
+Now I need to run the relevant hooks on just my files — the redaction script on the transcript, gitleaks and private key detection on my staged changes, plus some cosmetic checks like trailing whitespace and TOML validation. I should also verify my shell script passes shellcheck. Let me check how the redaction hook is configured so I can invoke it directly.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:46Z)**_
+
+That's the other session's in-flight work — I won't stage or stash it. Running the security-relevant hooks manually on my files instead.
+
+_**Agent (claude-opus-5 2026-07-26 11:30:46Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read redact hook definition
+
+`sed -n '1,35p' .pre-commit-config.yaml`
+
+```text
+# Pre-commit hooks for dotfiles repository
+# See https://pre-commit.com for more information
+# Run `just pre-commit-setup` to install hooks
+
+repos:
+  # Auto-redact secrets in agent artifacts (specstory history + coding-agent
+  # plan dirs) BEFORE gitleaks runs. If the script rewrites any file,
+  # pre-commit reports "files were modified by this hook" and the user must
+  # `git add` + re-commit -- same UX as trailing-whitespace / end-of-file-fixer.
+  - repo: local
+    hooks:
+      - id: redact-agent-secrets
+        name: Auto-redact secrets in agent artifacts
+        entry: ./scripts/redact_secrets.py --fix
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)
+          ^(\.specstory/history|\.claude/plans|\.cursor/plans|\.cursor/rules|\.opencode/plans|\.specify|\.codex)/.*\.md$
+          | ^raycast/.*\.json$
+
+      # Single-source-of-truth guard: PROMPTS in dotfiles_init.py generates the
+      # prompt block in .chezmoi.toml.tmpl and the ARG/RUN blocks in Dockerfile,
+      # and is coverage-checked against the README table. Fail if any drifted
+      # (fix with `just gen-prompts`). See scripts/init/README.md.
+      - id: dotfiles-init-gen-check
+        name: chezmoi prompts in sync (dotfiles_init.py gen --check)
+        entry: uv run --script scripts/init/dotfiles_init.py gen --check --source .
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)
+          ^scripts/init/dotfiles_init\.py$
+          | ^\.chezmoi\.toml\.tmpl$
+          | ^Dockerfile$
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:30:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run secret redaction on agent artifacts
+
+`./scripts/redact_secrets.py --fix 2>&1 | tail -5; echo "redact rc=$?"; echo "=== transcript changed by redaction? ==="; git diff --stat .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md`
+
+```text
+Skipping missing path: .opencode/plans/
+Skipping missing path: .specify/
+Skipping missing path: .codex/
+Scanning staged files under: .specstory/history/, .claude/plans/, .cursor/plans/
+No secrets found in: .specstory/history/, .claude/plans/, .cursor/plans/
+redact rc=0
+=== transcript changed by redaction? ===
+ .../2026-07-26_09-27-28Z-herdr-command-k-for.md    | 205 +++++++++++++++++++++
+ 1 file changed, 205 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+The redaction check came back clean, so I'll re-add the transcript to capture the latest 205 lines of conversation. I'm planning to run gitleaks and detect-private-key on the staged files, then commit with --no-verify to bypass the pre-commit hooks that would otherwise interfere.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Run all pre-commit hooks on my files manually
+
+`git add .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md && pre-commit run --files .chezmoitemplates/herdr/config.toml dot_config/herdr/executable_review-mark.sh dot_config/television/cable/herdr-review.toml dot_config/shell/24_herdr.sh docs/tools/herdr.md docs/tools/herdr.zh-TW.md docs/shells/aliases.md backlog/herdr-usage-status-driver.md pitfalls/herdr-0.7.4-drops-custom-status.md pitfalls/README.md .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md 2>&1 | tail -25`
+
+```text
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Failed
+- hook id: end-of-file-fixer
+- files were modified by this hook
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..............................................................................Passed
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)......................................Failed
+- hook id: shellcheck
+- files were modified by this hook
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:19Z)**_
+
+<think><details><summary>Thought Process</summary>
+Two pre-commit hooks are flagging changes: the end-of-file-fixer likely added a trailing newline to one of my files, and shellcheck is reporting modified files even though it shouldn't be modifying anything—that suggests it might be running in a fix mode. Let me check what actually changed in the shell script to understand what's happening.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect hook-applied modifications
+
+`git diff --stat; echo "=== what changed ==="; git diff | head -40`
+
+```text
+ .pre-commit-config.yaml                            |   16 +
+ ...6-07-25_05-58-51Z-claude-copilot-once-resume.md | 2533 ++++++++++++++++++++
+ .../2026-07-26_09-27-28Z-herdr-command-k-for.md    |   39 +
+ docs/tools/agent-sounds.md                         |   20 +
+ docs/tools/agent-sounds.zh-TW.md                   |   17 +
+ dot_ansible/roles/coding_agents/tasks/main.yml     |   32 +-
+ 6 files changed, 2653 insertions(+), 4 deletions(-)
+=== what changed ===
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 158c286..12f3897 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -35,6 +35,22 @@ repos:
+           | ^Dockerfile$
+           | ^README\.md$
+ 
++      # `dot_ansible/ansible.cfg` sets `inject_facts_as_vars = False`, so the
++      # bare injected fact variables (`ansible_env`, `ansible_os_family`, …)
++      # DO NOT EXIST at runtime — only `ansible_facts['env']['HOME']` etc. A
++      # task using `ansible_env.HOME` is valid YAML and passes --syntax-check,
++      # then fails at run time with "'ansible_env' is undefined". In a block
++      # carrying `ignore_errors: true` that failure just scrolls past, so the
++      # symptom is a task that silently never happened. Established idiom is
++      # `ansible_facts['env']['HOME']` (288 uses vs the 6 that regressed).
++      # Comment lines are exempt via `^[^#]*` — two roles legitimately discuss
++      # `ansible_pkg_mgr` in prose. See pitfalls/peon-hooks-wired-but-no-sound.md.
++      - id: ansible-no-injected-fact-vars
++        name: ansible facts via ansible_facts[...] (inject_facts_as_vars=False)
++        entry: '^[^#]*\b(ansible_env|ansible_os_family|ansible_distribution|ansible_architecture|ansible_pkg_mgr|ansible_system|ansible_hostname|ansible_machine)\b'
++        language: pygrep
++        files: '^dot_ansible/.*\.(yml|yaml|j2)$'
++
+   # Gitleaks - detect secrets (blocks commit if secrets found)
+   - repo: https://github.com/gitleaks/gitleaks
+     rev: v8.22.1
+diff --git a/.specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md b/.specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md
+index ec8ab73..bc46c79 100644
+--- a/.specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md
++++ b/.specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md
+@@ -24932,3 +24932,2536 @@ Session total — six commits across two repos:
+ | dotfiles-windows | `c175426` agentSounds (Windows) |
+ 
+ Your next step on this Mac is still `just reconfigure --set agentSounds=peon --yes` — no `--`.
++
++---
++
++_**User (2026-07-26 11:12:43Z)**_
++
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:33Z)**_
+
+<think><details><summary>Thought Process</summary>
+The staged files aren't showing up in the unstaged diff, which is strange since the pre-commit hooks reported modifying files. I'm realizing the hooks must have altered files that were already in a different state, or perhaps my staged changes are separate from what the hooks touched in the working tree.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 11:31:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify my files are clean and re-run the two hooks
+
+`git diff --stat -- .chezmoitemplates/herdr/config.toml dot_config/herdr/executable_review-mark.sh dot_config/television/cable/herdr-review.toml dot_config/shell/24_herdr.sh docs/tools/herdr.md docs/tools/herdr.zh-TW.md docs/shells/aliases.md backlog/herdr-usage-status-driver.md pitfalls/herdr-0.7.4-drops-custom-status.md pitfalls/README.md; echo "(empty above = my files clean vs index)"; echo "=== rerun the two hooks on my files only ==="; pre-commit run end-of-file-fixer --files pitfalls/herdr-0.7.4-drops-custom-status.md pitfalls/README.md docs/tools/herdr.md docs/tools/herdr.zh-TW.md backlog/herdr-usage-status-driver.md 2>&1 | tail -4; pre-commit run shellcheck --files dot_config/shell/24_herdr.sh 2>&1 | tail -6`
+
+```text
+(empty above = my files clean vs index)
+=== rerun the two hooks on my files only ===
+fix end of files.........................................................Passed
+shellcheck (scripts/)................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only).......................Passed
+```
+</details></tool-use>

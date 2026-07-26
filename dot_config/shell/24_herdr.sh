@@ -672,7 +672,7 @@ EOF
 
 # ── Review-pending flag (mark-unread / ⭐) ───────────────────────────────────
 # hmark/hunmark toggle a per-pane "I still need to review this" flag via herdr's
-# custom-status metadata — ORTHOGONAL to agent state, so peeking into a done pane
+# `review` metadata token — ORTHOGONAL to agent state, so peeking into a done pane
 # (which flips it to idle) does NOT clear the flag. The mark logic lives in
 # ~/.config/herdr/review-mark.sh (dot_config/herdr/executable_review-mark.sh);
 # these are thin CLI wrappers defaulting the pane to the ambient HERDR_PANE_ID.
@@ -689,9 +689,9 @@ hmark — flag a herdr pane as "review-pending" (⭐), analog of tmux bookmark
 Usage: hmark [PANE_ID]
 
 With no PANE_ID, flags the CURRENT pane (ambient $HERDR_PANE_ID). The flag is a
-herdr custom-status, orthogonal to agent state — it survives the pane going idle
-when you peek in. Clear with `hunmark`, toggle with prefix+m, list flagged panes
-with `tv herdr-review` (prefix+i inside herdr).
+herdr metadata token (`review`), orthogonal to agent state — it survives the pane
+going idle when you peek in. Clear with `hunmark`, toggle with prefix+m, list
+flagged panes with `tv herdr-review` (prefix+i inside herdr).
 EOF
             return 0 ;;
     esac

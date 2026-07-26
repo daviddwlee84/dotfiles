@@ -76,7 +76,7 @@ description = "new tab at the workspace (space) root dir"
 | File-path picker (`prefix+p`; extrakto `prefix+Tab` on tmux) | **Custom command pane + helper** | `prefix+p` → `path-pick.sh` — two-tier (exists-under-cwd first) → `x copy` |
 | Seamless `Ctrl-hjkl` nvim↔pane nav | **No herdr-aware smart-splits** | **Gap** — workaround below |
 | OSC133 copy-mode (`cpout`/`cpblock`) | tmux-specific | **Gap** — `cpcmd` (zsh history) still works |
-| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --custom-status` (per-pane, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
+| Per-window status glyphs + bookmarks ⭐📌 | Partial — `report-metadata --token` (per-pane metadata tokens, orthogonal to agent state) | **Review-pending flag** (`hmark`/`prefix+m` + `tv herdr-review` inbox); decorative status-bar glyphs still a gap (no format-string interpolation) |
 | AI session-summary / agent-wakeup capture | re-portable against `herdr pane read` / `pane list --json` | **Deferred** — out of trial scope |
 
 ## Keybindings
@@ -193,7 +193,7 @@ Most `tv` channels (`tools`, `fleet-hosts`, `mlflow`, `kill-process`, `ssh-confi
 
 - `herdr-sesh` (`dot_config/television/cable/herdr-sesh.toml`) — lists herdr sessions/workspaces + zoxide dirs; Enter dispatches `herdr session attach` / `herdr workspace focus` / `herdr workspace create --cwd` instead of `sesh connect` / `tmux switch-client`.
 - `herdr-agent-panes` (`dot_config/television/cable/herdr-agent-panes.toml`) — same source as `agent-panes`, but switch/kill use `herdr pane focus` / `herdr pane close`.
-- `herdr-review` (`dot_config/television/cable/herdr-review.toml`) — the **review-pending inbox**: lists only panes carrying the ⭐ flag (`custom_status ~ REVIEW`). Enter focuses the pane's workspace/tab and **keeps** the flag; `Alt+C` focuses **and** clears it ("mark read"). Bound to `prefix+i`. See the **Review-pending flag** section below.
+- `herdr-review` (`dot_config/television/cable/herdr-review.toml`) — the **review-pending inbox**: lists only panes carrying the ⭐ flag (a non-empty `tokens.review`). Enter focuses the pane's workspace/tab and **keeps** the flag; `Alt+C` focuses **and** clears it ("mark read"). Bound to `prefix+i`. See the **Review-pending flag** section below.
 
 The original tmux-bound `sesh` / `agent-panes` channels are left intact for coexistence.
 
@@ -286,14 +286,16 @@ Notes: this repo's tmux uses many root-table `bind -n C-*` bindings that **shado
 
 The tmux setup has a per-window bookmark (`@bookmark_status` + `toggle-bookmark.sh`, rendered via `#{?@bookmark_status,…}`). herdr has **no `#{@option}` status-bar interpolation**, so that exact mechanism doesn't port — but the *use case* that actually matters here does: **"the agent finished (`done`) but I haven't reviewed it yet."** herdr collapses a `done` pane to `idle` the moment you peek in, losing the only signal that it still needs attention.
 
-The fix uses herdr's **per-pane custom-status metadata**, which is orthogonal to native agent detection:
+The fix uses herdr's **per-pane metadata tokens**, which are orthogonal to native agent detection:
 
 ```bash
-herdr pane report-metadata <pane> --source review --custom-status "⭐ REVIEW"   # set (persistent — no --ttl-ms)
-herdr pane report-metadata <pane> --source review --clear-custom-status         # clear
+herdr pane report-metadata <pane> --source review --token review="⭐ REVIEW"   # set (persistent — no --ttl-ms)
+herdr pane report-metadata <pane> --source review --clear-token review         # clear
 ```
 
-Verified: a pane can carry `custom_status:"⭐ REVIEW"` while `agent_status:"idle"` — so peeking in does **not** wipe the flag (the whole point). `herdr pane get` surfaces the `custom_status` field and `herdr pane list` (native JSON — **no** `--json` flag) lets the inbox enumerate flagged panes, so there is **no sidecar file**; herdr itself is the source of truth.
+Verified: a pane can carry `tokens.review = "⭐ REVIEW"` while `agent_status:"idle"` — so peeking in does **not** wipe the flag (the whole point). `herdr pane get` surfaces the `tokens` map and `herdr pane list` (native JSON — **no** `--json` flag) lets the inbox enumerate flagged panes, so there is **no sidecar file**; herdr itself is the source of truth. Presence of the token *is* the flag, so the glyph text is free-form.
+
+> **herdr ≥ 0.7.4 only, and the token needs a row layout to be visible.** 0.7.4 replaced `--custom-status` / the flat `custom_status` field with this namespaced token map — a silent removal, not listed as a breaking change. Two consequences: on older herdr the helper dies with `unknown --custom-status`, and unlike `custom_status` a token is rendered **only** where a sidebar row layout names it. That is why `.chezmoitemplates/herdr/config.toml` pins `[ui.sidebar.agents] rows` with `"$review"` appended to herdr's default first row — drop that and the flag still works through `prefix+i`, but the ⭐ disappears from the sidebar. See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md).
 
 Surfaces (all sharing one script, `~/.config/herdr/review-mark.sh` = `dot_config/herdr/executable_review-mark.sh` — the analog of tmux's `toggle-bookmark.sh`):
 
@@ -303,7 +305,7 @@ Surfaces (all sharing one script, `~/.config/herdr/review-mark.sh` = `dot_config
 | `prefix+m` | toggle the flag on the focused pane (uses `$HERDR_ACTIVE_PANE_ID`) |
 | `tv herdr-review` / `prefix+i` | the **inbox**: lists only flagged panes. `Enter` focuses & **keeps** the ⭐ (you may still be mid-review); `Alt+C` focuses **and** clears it ("mark read") |
 
-**Caveat — `custom_status` is a single value per pane.** The deferred usage-status driver (below) also pushes `--custom-status`; although it uses a different `--source`, `herdr pane get` exposes one flattened `custom_status`, so the two would contend for the visible label. No live conflict today (the usage driver isn't built and review flags are short-lived), but see [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review` lookups in [`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml), and `"$review"` in the sidebar row layout.
 
 ## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
 
@@ -353,13 +355,13 @@ Helper: `~/.config/herdr/path-pick.sh` = [`dot_config/herdr/executable_path-pick
 
 ## AI usage / quota status
 
-herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --custom-status "…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses — note both write the single per-pane `custom_status`). A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --token usage="…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses, but since herdr 0.7.4 tokens are a namespaced map, so a `usage` token and the `review` token coexist instead of contending for one field). A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
 
 ## Gaps (no clean herdr equivalent)
 
 - **Seamless `Ctrl-hjkl` nvim↔pane navigation.** `vim-tmux-navigator` is tmux-coupled (the `is_vim` `ps`/`pane_tty` heuristic + the nvim plugin). herdr has no smart-splits equivalent — its pane focus is `prefix+h/j/k/l`, which won't pass through to nvim splits at the edge. Workaround: inside nvim use its own `<C-w>hjkl`. This is the biggest UX regression vs tmux.
 - **OSC133 copy-mode** (`cpout` / `cpblock`, prompt-jump, last-output yank) is tmux-specific. herdr's copy mode (`prefix+[`) is vi-style but has no OSC133 prompt-boundary awareness. `cpcmd` (zsh history, multiplexer-agnostic) still works.
-- **Decorative status-bar glyphs** (📌/🔖 as free-floating window labels): herdr has no `#{@option}` format-string interpolation, so tmux-style status-bar bookmarks don't port. *(The specific "mark-unread / review-pending ⭐" use case IS solved — see the **Review-pending flag** section above — via per-pane `custom_status` metadata; only the purely decorative status-bar glyph remains a gap.)*
+- **Decorative status-bar glyphs** (📌/🔖 as free-floating window labels): herdr has no `#{@option}` format-string interpolation, so tmux-style status-bar bookmarks don't port. *(The specific "mark-unread / review-pending ⭐" use case IS solved — see the **Review-pending flag** section above — via a per-pane metadata token; only the purely decorative status-bar glyph remains a gap.)*
 - **Per-key pane resize.** tmux binds `prefix+H/J/K/L` (and `M-hjkl` for fine steps) to resize directly; herdr has no per-key resize — it uses a modal `resize_mode` (`prefix+r`), then `h/j/k/l`. Not exact parity, but a close analog.
 
 > **Not a gap:** vi copy-mode itself *is* native (`prefix+[`), and per-pane agent state is detected natively — the two things I expected to be missing turned out to be built in.
