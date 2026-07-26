@@ -26,7 +26,8 @@ container / e-book formats yazi ignores by default.
 | HEIC / JPEG-XL / fonts | image / sample | yazi built-in → **ImageMagick ≥7.1.1** + chafa | media (gated) |
 | csv / tsv / parquet / xlsx / db / sqlite / feather | table | duckdb.yazi + fallbacks | plugin — see [data-viewers.md](data-viewers.md) |
 | docx / **pptx** / legacy / ODF | text (image-only pptx → slide-1 thumbnail) | view-office (doxx / markitdown / chafa / LibreOffice) | plugin — see [office-viewers.md](office-viewers.md) |
-| txt / json / md / source | text (+ syntax) | yazi built-in / `bat` | always |
+| **Markdown** .md / .markdown | rendered (headings, tables, code blocks) | piper → **glow** (`*.md` rule) | baseline |
+| txt / json / source | text (+ syntax) | yazi built-in / `bat` | always |
 
 - **Baseline** tools are installed unconditionally by the `devtools` role (next to yazi).
 - **Media (gated)** tools live in the `media_tools` role behind the `installMediaTools` prompt
@@ -108,18 +109,22 @@ lever. `--probe off` merely disables color auto-detection (chafa falls back to `
 defaults; previews look the same), and the shim is **inert on graphics terminals** (yazi never calls
 chafa there). Caveat: launch yazi from a configured shell so `~/.dotfiles/bin` is on `PATH`.
 
-## Config-wired previewers (EPUB · Kindle · dmg)
+## Config-wired previewers (Markdown · EPUB · Kindle · dmg)
 
-Everything above except EPUB, Kindle e-books, and dmg is pure tool-install — yazi's built-ins handle
-the routing. Those mimes aren't in yazi's built-in sets, so `dot_config/yazi/yazi.toml` wires them via
-[`piper.yazi`](office-viewers.md#the-ya-pkg-plugin-mechanism):
+Everything above except Markdown, EPUB, Kindle e-books, and dmg is pure tool-install — yazi's built-ins
+handle the routing. Those four are wired explicitly in `dot_config/yazi/yazi.toml` via
+[`piper.yazi`](office-viewers.md#the-ya-pkg-plugin-mechanism) — the last three because their mimes
+aren't in yazi's built-in sets at all, Markdown because we deliberately **override** a built-in that
+works:
 
 ```toml
+{ url = "*.md",   run = 'piper -- glow -w "$w" -s "$t" "$1" 2>/dev/null || cat "$1"' },  # + *.markdown
 { url = "*.epub", run = 'piper -- pandoc -f epub -t plain "$1" 2>/dev/null | head -n 500' },
 { url = "*.mobi", run = 'piper -- view-ebook --preview --width "$w" "$1"' },  # + *.azw *.azw3 *.fb2
 { url = "*.dmg",  run = 'piper -- ( 7zz l "$1" 2>/dev/null || 7z l "$1" 2>/dev/null ) | head -n 200' },
 ```
 
+- **Markdown → rendered** via [`glow`](#markdown-glow) — see below.
 - **EPUB → full text** via pandoc (pandoc reads EPUB but not the Kindle formats).
 - **Kindle `.mobi`/`.azw`/`.azw3`/`.fb2` → metadata** via [`view-ebook`](#kindle-e-books-calibre)
   (calibre `ebook-meta`). There's no fast headless way to render mobi/azw *text*, so the preview is a
@@ -128,6 +133,57 @@ the routing. Those mimes aren't in yazi's built-in sets, so `dot_config/yazi/yaz
 - `2>/dev/null` is **load-bearing** — piper renders any stderr as an error preview.
 - **No rule needed** for `.zip` / `.tar.*` / `.7z` / `.rar` or zip-based `.apk` / `.jar` / `.whl` /
   `.xpi` — yazi's built-in archive previewer lists them for free once 7-Zip is installed.
+
+### Markdown: rendered, not raw {#markdown-glow}
+
+Out of the box yazi previews `.md` with its built-in **`code`** previewer: syntect syntax
+highlighting over the *raw source*, so you read `## Heading`, `**bold**`, `| a | b |` and un-fenced
+code as literal markup. Useful when you're about to edit the file, much less useful when you're
+skimming a README to find out what a repo does.
+
+`glow` renders it instead — headings, emphasis, lists, blockquotes, tables and fenced code blocks
+come out as styled text:
+
+```toml
+{ url = "*.md", run = 'piper -- CLICOLOR_FORCE=1 glow -w "$w" -s "$t" "$1" 2>/dev/null || cat "$1"' },
+```
+
+- **`$w`** is the preview pane width, from piper. glow hard-wraps to exactly that, so nothing
+  overflows or gets truncated mid-table when you resize.
+- **`$t`** is `dark` or `light`, also from piper — yazi's own terminal background detection, so the
+  rendered colors follow the terminal instead of being pinned to a dark palette.
+- **`CLICOLOR_FORCE=1` is load-bearing** — see [below](#glow-colorless).
+- **`|| cat "$1"`** keeps a plain-text preview (rather than an empty pane) on the rare host where the
+  `devtools` role skipped glow because there's no release for the architecture.
+- **Scrolling works.** piper re-runs glow and skips `job.skip` lines per scroll step; worst measured
+  case is ~160 ms on a 2.8 MB markdown file, so it stays responsive on realistic files.
+- **Want the raw source?** `Enter` / `o` opens the file in `$EDITOR` (nvim), which is the natural place
+  to read markup anyway. There's no in-yazi toggle back to the built-in previewer.
+- **Known cosmetic quirk**: glow prints link *destinations* inline, resolved to absolute paths — a
+  relative `[yazi](tmux/README.md)` renders as **yazi** followed by the full
+  `/Users/…/docs/tools/tmux/README.md`. That's glow's link style, not a config error; it makes
+  link-dense docs (like this repo's) noisier than prose files.
+
+#### Formatted but colorless → `CLICOLOR_FORCE=1` {#glow-colorless}
+
+Without that variable the preview comes out *shaped* correctly — wrapped, indented, bulleted — but
+entirely monochrome. It looks like a theme problem; it isn't.
+
+glow renders through glamour → lipgloss → **termenv**, and termenv picks its color profile by probing
+stdout. piper hands the child a **pipe**, not a pty, so the probe returns the `Ascii` profile and
+glow emits attribute-only escapes — `ESC[;;1m` instead of `ESC[38;5;252;1m`. The bold/reverse bits
+survive (hence visible structure), every color component is dropped.
+
+`CLICOLOR_FORCE=1` is the documented termenv override, and it's what the upstream
+[`glow.yazi`](https://github.com/Reledia/glow.yazi) plugin sets for the same reason.
+
+One caveat worth knowing: when termenv is *forced* out of an `Ascii` detection it falls back to plain
+**ANSI-16**, not 256-color — no combination of `TERM` / `COLORTERM` / `FORCE_COLOR` changes that
+(verified). Colors therefore come from your terminal's 16-color palette, so they follow your theme.
+Getting glow's native 256-color output would require running it under a real pty; the trade-offs are
+recorded in [`backlog/yazi-markdown-preview-truecolor.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/yazi-markdown-preview-truecolor.md).
+
+
 
 ### Kindle e-books (calibre) {#kindle-e-books-calibre}
 
@@ -151,6 +207,7 @@ never touching a version you manage yourself. (EPUB stays on pandoc's full-text 
 | ffmpeg | `ffmpeg` (`media_tools`, gated) | apt `ffmpeg` (gated) | video thumbnails |
 | ImageMagick | `imagemagick` (`media_tools`, gated) | apt `imagemagick` (gated) | HEIC / JPEG-XL / fonts |
 | pandoc | `pandoc` (already in `devtools`) | apt `pandoc` | EPUB text |
+| glow | `glow` (already in `devtools`) | GitHub release → `~/.local/bin` (x86_64/arm64) | rendered Markdown |
 | calibre (`ebook-meta`) | `calibre` cask — opt-in `installCalibre` | apt `calibre` — opt-in | Kindle .mobi/.azw/.azw3 metadata |
 
 ## Gotchas
@@ -165,8 +222,11 @@ never touching a version you manage yourself. (EPUB stays on pandoc's full-text 
   hand). Everything else in the baseline works without it.
 - **resvg on Linux is best-effort.** No apt package → the role tries Linuxbrew then a one-time
   `cargo install resvg`. If neither is available, SVG simply previews as raw text — non-fatal.
-- **Lowercase globs.** The `*.epub` / `*.dmg` / `*.mobi` rules match lowercase extensions; `Book.EPUB`
-  won't fire (yazi's built-ins are mime-based and unaffected).
+- **Lowercase globs.** The `*.md` / `*.epub` / `*.dmg` / `*.mobi` rules match lowercase extensions;
+  `Book.EPUB` won't fire (yazi's built-ins are mime-based and unaffected).
+- **Markdown preview is rendered, not raw.** `.md` goes through glow, so you see formatted output
+  rather than the source markup — press `Enter` to open the raw file in `$EDITOR`. See
+  [above](#markdown-glow).
 - **Kindle previews are metadata, not text.** `.mobi`/`.azw`/`.azw3` show the book's title / author /
   description (via calibre `ebook-meta`), not the prose — there's no fast headless mobi/azw text
   renderer. Needs calibre (the `installCalibre` prompt, or a manual install). EPUB gets full text (pandoc).
@@ -187,7 +247,7 @@ never touching a version you manage yourself. (EPUB stays on pandoc's full-text 
 | chafa `--probe off` shim (fixes the rename/shell popup) | `dot_dotfiles/bin/executable_chafa` |
 | Media tool install (ffmpeg/ImageMagick, gated) | `dot_ansible/roles/media_tools/tasks/main.yml` |
 | calibre install (opt-in `installCalibre`) | `dot_ansible/roles/devtools/tasks/main.yml` |
-| EPUB / Kindle / dmg previewer rules | `dot_config/yazi/yazi.toml` `[plugin] prepend_previewers` |
+| EPUB / Kindle / dmg / Markdown previewer rules | `dot_config/yazi/yazi.toml` `[plugin] prepend_previewers` |
 | Kindle metadata dispatcher | `dot_dotfiles/bin/executable_view-ebook` (+ 56_view_ebook_completion.*) |
 | pptx image-only thumbnail | `dot_dotfiles/bin/executable_view-office` (`render_pptx`) |
 | yazi install | `dot_ansible/roles/devtools/tasks/main.yml` (`# --- yazi ---`) |

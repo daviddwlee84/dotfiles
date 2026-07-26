@@ -212,6 +212,9 @@ marimo_py_sandbox = [
 #   3. CONTAINERS / e-books yazi's built-ins skip → piper: .epub (pandoc text),
 #      Kindle .mobi/.azw/.azw3/.fb2 (view-ebook → calibre metadata), and .dmg
 #      (7-Zip listing) — none of these mimes are in the built-in archive set.
+#   4. MARKDOWN → piper piping `glow`: .md/.markdown render as formatted text
+#      instead of raw syntax-highlighted source. This one OVERRIDES a working
+#      built-in (the `code` previewer), unlike 1–3 which fill gaps.
 #
 # CONTRACTS / gotchas:
 #   - view-office entries must stay in sync with view-office's --preview/--width
@@ -251,6 +254,21 @@ prepend_previewers = [
   { url = "*.ods", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.odp", run = 'piper -- view-office --preview --width "$w" "$1"' },
   { url = "*.rtf", run = 'piper -- view-office --preview --width "$w" "$1"' },
+
+  # --- Markdown → glow (RENDERED, not raw). Overrides yazi's built-in `code`
+  # previewer, which only syntax-highlights the raw source (`# heading`, `**bold**`
+  # markers visible). glow draws headings, emphasis, lists, tables and fenced code
+  # blocks as styled text. `$w` = pane width (glow hard-wraps to exactly that, so
+  # nothing overflows), `$t` = "dark"/"light" from yazi's own terminal detection.
+  # CLICOLOR_FORCE=1 is LOAD-BEARING: piper gives the child a PIPE, so glow's
+  # termenv probe returns the Ascii profile and emits attribute-only escapes
+  # (`ESC[;;1m` — bold survives, every color component stripped) → formatted but
+  # colorless. Forcing it restores color (capped at ANSI-16; 256-color needs a
+  # real pty). `|| cat` keeps a plain-text preview on hosts where the glow install
+  # was skipped (unsupported arch) instead of an empty pane. Press Enter/o for the
+  # raw source in $EDITOR. See docs/tools/yazi-previews.md § Markdown.
+  { url = "*.md", run = 'piper -- CLICOLOR_FORCE=1 glow -w "$w" -s "$t" "$1" 2>/dev/null || cat "$1"' },
+  { url = "*.markdown", run = 'piper -- CLICOLOR_FORCE=1 glow -w "$w" -s "$t" "$1" 2>/dev/null || cat "$1"' },
 
   # --- Containers yazi's built-in previewers skip → piper ---
   # EPUB (application/epub+zip) → pandoc plain text; .dmg (application/x-apple-
