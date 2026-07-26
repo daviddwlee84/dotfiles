@@ -418,7 +418,7 @@ info:
 completions-refresh:
     ./scripts/generate_completions.sh --force
 
-# Upgrade everything: externals, brew, mise, uv, npm, cargo, go, dotnet, gem, flatpak, warp, agents, plugins
+# Upgrade everything: externals, brew, mise, uv, npm, cargo, go, dotnet, gem, flatpak, warp, atuin, herdr, agents, plugins
 upgrade-all:
     ./scripts/upgrade_tools.sh all
 
@@ -465,6 +465,13 @@ upgrade-warp:
 # Linux-only: `atuin update` (re-runs setup.atuin.sh on failure). macOS atuin is in upgrade-brew.
 upgrade-atuin:
     ./scripts/upgrade_tools.sh atuin
+
+# Linux-only: `herdr update --handoff` (live, pane-preserving). Must be run from
+# OUTSIDE herdr after detaching (prefix+q) — the handoff replaces the server that
+# owns your pane, so herdr refuses from inside one. macOS herdr is in upgrade-brew
+# (upstream disables `herdr update` on brew installs). See docs/tools/herdr.md.
+upgrade-herdr:
+    ./scripts/upgrade_tools.sh herdr
 
 # curl|bash installers: Claude Code, OpenCode, Cursor CLI, Ollama, llmfit, RTK
 upgrade-agents:

@@ -85,7 +85,11 @@ rm -rf ~/.config/opencode/peon-ping
 ```
 
 Do **not** blanket-remove `~/.config/opencode/plugins/` — `workmux-status.ts`
-and `herdr-agent-state.js` live there too and are chezmoi-managed.
+(chezmoi-managed) and `herdr-agent-state.js` live there too. The herdr one is
+**not** chezmoi-managed: herdr writes it via `herdr integration install
+opencode`, it is versioned independently, and every herdr upgrade stales it
+(`herdr integration status` → `outdated (v7 < v9)`). Delete it and no
+`chezmoi apply` will bring it back — reinstall through herdr.
 
 ## Why this matters here
 

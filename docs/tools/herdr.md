@@ -8,7 +8,20 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
   - macOS — Homebrew (`herdr` is in homebrew-core; managed by the `dot_ansible/roles/devtools/tasks/main.yml` macOS list)
   - Linux — GitHub release **single static binary** (`herdr-linux-{x86_64,aarch64}`) into `~/.local/bin/herdr` (managed by the `# --- herdr ... ---` block in the same role). No tarball, so no unarchive step.
 - **Verify**: `herdr --version` · validate config with `herdr server reload-config`
-- **Upgrade**: brew on macOS; `herdr update` for the self-managed Linux binary
+- **Upgrade**: brew on macOS; `just upgrade-herdr` (→ `herdr update --handoff`) for the self-managed Linux binary — **run it from outside herdr**, see below
+
+> **`herdr update` refuses to run from inside a herdr pane.** The handoff replaces the server process that owns the pane you are typing in, so it fails closed:
+>
+> ```console
+> $ herdr update --handoff          # from a pane inside herdr
+> update failed: run `herdr update` outside herdr after detaching from the session
+> ```
+>
+> The flow is **detach (`prefix+q`) → run it in a plain terminal → reattach with bare `herdr`**. Detaching does not kill anything (client close ≠ session loss), and `--handoff` then swaps the server without exiting pane processes — verified 2026-07 upgrading 0.7.1 → 0.7.5 with a Claude Code session running in a pane, which survived uninterrupted. `just upgrade-herdr` encodes this: it *skips with instructions* rather than failing when it detects `HERDR_ENV`/`HERDR_PANE_ID`, so `just upgrade-all` from a herdr pane doesn't die here. Full trace: [`pitfalls/herdr-update-handoff-refuses-inside-pane.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-update-handoff-refuses-inside-pane.md).
+
+> **Install is version-blind; upgrades are yours to run.** The Linux ansible task gates on `herdr --version` returning non-zero — *"is it installed at all"*, not *"is it current"* — so a fresh box gets whatever is latest that day and `chezmoi apply` never touches it again. This is the repo's [install-vs-upgrade split](../this_repo/upgrades.md) working as designed, but herdr drifts faster than most because its config can outrun the binary (a `[[keys.command]]` using `type = "popup"`, added in 0.7.4, makes an older herdr reject **the entire keys block** — `reload-config` reports `status: "partial"` + `keeping current keys settings`, and only that one diagnostic line tells you).
+
+> **Every herdr upgrade stales the agent integrations.** `herdr integration status` versions each one (`current (v9)` / `outdated (v7 < v9)`); reinstall with `herdr integration install <agent>`. These files (`~/.claude/hooks/herdr-agent-state.sh`, `~/.codex/herdr-agent-state.sh`, `~/.cursor/herdr-agent-state.sh`, `~/.config/opencode/plugins/herdr-agent-state.js`) are written by herdr and are **not** chezmoi-managed, so `chezmoi apply` will not restore or clobber them. `just upgrade-herdr` reports which went stale but deliberately does not auto-install them.
 - **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving whatever herdr writes back at runtime (see [Config management](#config-management-why-modify_)).
 
 > **Upgrading strands a running server (macOS).** herdr's socket API is protocol-versioned, and a package-manager upgrade cannot restart the server — so after `brew upgrade herdr` every CLI call (and therefore every `tv herdr-*` channel, `hvibe`/`hcode`, and `[[keys.command]]` helper) fails `protocol_mismatch` until the server restarts, which kills all pane processes. `herdr update --handoff` — the live, pane-preserving path — is **disabled on Homebrew/mise/Nix installs**, so macOS has no way to avoid the restart; Linux's self-managed binary does. Check with `herdr status` (`compatible:` / `restart_needed:`), not `herdr --version`. Full recovery matrix: [`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md).

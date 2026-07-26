@@ -87,7 +87,7 @@ ONLY=""
 SKIP=""
 SELECTED=()
 
-ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin agents plugins yazi-plugins)
+ALL_CATEGORIES=(externals brew mise uv npm cargo go dotnet gem flatpak warp atuin herdr agents plugins yazi-plugins)
 
 usage() {
   cat <<EOF
@@ -137,14 +137,26 @@ while [[ $# -gt 0 ]]; do
       SELECTED=("${ALL_CATEGORIES[@]}")
       shift
       ;;
-    externals | brew | mise | uv | npm | cargo | go | dotnet | gem | flatpak | warp | atuin | agents | plugins | yazi-plugins)
+    # Positional category names are matched against ALL_CATEGORIES rather than
+    # a literal alternation. A hardcoded second copy of the list drifts
+    # silently: the usage text and the validation loop below both read
+    # ALL_CATEGORIES, so a category added there but missed here would be
+    # advertised as valid and then rejected as "Unknown argument".
+    *)
+      _known=0
+      for valid in "${ALL_CATEGORIES[@]}"; do
+        [[ "$1" == "$valid" ]] && {
+          _known=1
+          break
+        }
+      done
+      if [[ "$_known" -ne 1 ]]; then
+        error "Unknown argument: $1"
+        usage
+        exit 2
+      fi
       SELECTED+=("$1")
       shift
-      ;;
-    *)
-      error "Unknown argument: $1"
-      usage
-      exit 2
       ;;
   esac
 done
@@ -757,6 +769,74 @@ cat_atuin() {
 }
 
 # ============================================================================
+# Category: herdr — `herdr update --handoff` for the self-managed Linux binary
+# ============================================================================
+# herdr is the one tool here whose upgrade CANNOT be driven from the terminal
+# you are sitting in. The devtools ansible role gates its install on
+# `herdr --version` returning non-zero — i.e. "is it installed at all", not "is
+# it current" — so once present, `chezmoi apply` never touches it again and the
+# box silently drifts versions behind. This category is the explicit upgrade
+# path that install-only design implies.
+#
+# Three guards, all of which SKIP rather than fail, so `upgrade-all` isn't
+# derailed by an environment herdr can't be upgraded from:
+#   1. not installed
+#   2. not Linux — macOS gets herdr from homebrew-core (cat_brew), and upstream
+#      DISABLES `herdr update` on brew/mise/Nix installs precisely because the
+#      package manager owns the binary. See
+#      pitfalls/herdr-brew-upgrade-strands-running-server.md.
+#   3. running inside a herdr pane — the handoff replaces the server process
+#      that owns your pane, so herdr refuses. This is the non-obvious one:
+#      `just upgrade-all` from a herdr pane would otherwise fail here every
+#      single time. See pitfalls/herdr-update-handoff-refuses-inside-pane.md.
+#
+# `--handoff` is the live, pane-preserving path: the server is replaced without
+# killing pane processes, so running coding agents survive the upgrade. Without
+# it, the restart exits every pane process.
+cat_herdr() {
+  if ! command -v herdr >/dev/null 2>&1; then
+    warn "herdr not installed — skipping"
+    return $SKIP_RC
+  fi
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    info "Not Linux — herdr upgraded via brew (cat_brew); \`herdr update\` is disabled on brew installs, skipping"
+    return $SKIP_RC
+  fi
+  # HERDR_ENV is the ambient marker herdr injects into every pane shell; the
+  # pane id is checked too so a stray export doesn't mask a real pane.
+  if [[ -n "${HERDR_ENV:-}" || -n "${HERDR_PANE_ID:-}" ]]; then
+    warn "Running inside a herdr pane — \`herdr update --handoff\` refuses here"
+    warn "  Detach (prefix+q), then from a plain terminal: herdr update --handoff"
+    warn "  Panes and their processes survive the detach AND the handoff."
+    return $SKIP_RC
+  fi
+
+  info "Upgrading herdr (Linux, self-managed binary, live handoff)"
+  if ! _run herdr update --handoff; then
+    error "herdr update --handoff failed"
+    return 1
+  fi
+
+  # The updater replaces the server, so attached clients must reconnect, and
+  # each agent integration is a versioned file herdr wrote OUTSIDE chezmoi's
+  # tree — a herdr upgrade leaves them stale. Report rather than auto-install:
+  # these land in agent config dirs (~/.claude/hooks/, ~/.codex/, ~/.cursor/,
+  # ~/.config/opencode/plugins/), and silently writing there is the caller's
+  # call to make. Same "warn, don't silently edit" rule as cat_yazi_plugins.
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    local outdated
+    outdated=$(herdr integration status 2>/dev/null | grep -c 'outdated' || true)
+    if [[ "${outdated:-0}" -gt 0 ]]; then
+      warn "$outdated herdr integration(s) now outdated — run \`herdr integration status\` and reinstall each:"
+      herdr integration status 2>/dev/null | grep 'outdated' || true
+      warn "  e.g. herdr integration install opencode"
+    fi
+  fi
+  warn "Reconnect clients with \`herdr\` (the session's server was replaced)"
+  return 0
+}
+
+# ============================================================================
 # Category: yazi-plugins — `ya pkg upgrade` for Yazi plugins (piper.yazi, …)
 # ============================================================================
 # `chezmoi apply` is install-only: it materializes plugins from the pinned
@@ -1017,6 +1097,7 @@ for cat in "${ALL_CATEGORIES[@]}"; do
         flatpak) run_category flatpak cat_flatpak ;;
         warp) run_category warp cat_warp ;;
         atuin) run_category atuin cat_atuin ;;
+        herdr) run_category herdr cat_herdr ;;
         agents) run_category agents cat_agents ;;
         plugins) run_category plugins cat_plugins ;;
         yazi-plugins) run_category yazi-plugins cat_yazi_plugins ;;

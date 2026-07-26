@@ -1063,7 +1063,7 @@ list.
 | **grammarly-desktop** | brew cask | n/a | Brewfile.darwin |
 | **grc** | brew | apt | devtools |
 | **gum** | brew | GitHub release | devtools |
-| **herdr** | brew (homebrew-core) | GitHub release single binary → `~/.local/bin/herdr` | devtools |
+| **herdr** | brew (homebrew-core) | GitHub release single binary → `~/.local/bin/herdr` | devtools · upgrade: `just upgrade-herdr` (`herdr update --handoff`, Linux only, **must run outside herdr**) |
 | **herdr-plus** (herdr plugin) | `herdr plugin install cloudmanic/herdr-plus` (prebuilt binary when no Go; idempotent ansible task) | same | devtools |
 | **Homebrew** | curl installer | same (Linux, gated) | bootstrap |
 | **htop** | brew | apt | devtools |

@@ -13,7 +13,20 @@
   - macOS —— Homebrew（`herdr` 在 homebrew-core；由 `dot_ansible/roles/devtools/tasks/main.yml` 的 macOS 清單管理）
   - Linux —— GitHub release 的**單一靜態 binary**（`herdr-linux-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`（由同一 role 中 `# --- herdr ... ---` 區塊管理）。沒有 tarball，所以不需要解壓步驟。
 - **驗證 (Verify)**：`herdr --version`；用 `herdr server reload-config` 驗證設定檔
-- **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `herdr update`
+- **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `just upgrade-herdr`（即 `herdr update --handoff`）—— **必須在 herdr 外面跑**，見下
+
+> **`herdr update` 在 herdr pane 裡面會拒絕執行。** handoff 要換掉的正是持有你當下這個 pane 的 server process，所以它 fail closed：
+>
+> ```console
+> $ herdr update --handoff          # 在 herdr 裡面的 pane 執行
+> update failed: run `herdr update` outside herdr after detaching from the session
+> ```
+>
+> 正確流程是 **detach（`prefix+q`）→ 在一般終端機執行 → 用裸的 `herdr` 重新接上**。detach 不會殺掉任何東西（關 client ≠ 掉 session），接著 `--handoff` 會在不結束 pane 行程的情況下換掉 server —— 2026-07 實測 0.7.1 → 0.7.5，pane 裡有一個 Claude Code session 全程存活。`just upgrade-herdr` 把這件事寫進流程：偵測到 `HERDR_ENV`/`HERDR_PANE_ID` 時它會**跳過並印出指示**而不是失敗，所以在 herdr pane 裡跑 `just upgrade-all` 不會死在這一步。完整記錄：[`pitfalls/herdr-update-handoff-refuses-inside-pane.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-update-handoff-refuses-inside-pane.md)。
+
+> **安裝不看版本，升級要自己跑。** Linux 的 ansible task 是用 `herdr --version` 的 rc 當條件 —— 判斷的是「**有沒有裝**」而不是「**是不是最新**」—— 所以新機器拿到的是當天的 latest，之後 `chezmoi apply` 再也不會碰它。這是本 repo [install-vs-upgrade 分離](../this_repo/upgrades.md)的設計，但 herdr 比多數工具更容易出事，因為它的 config 會跑在 binary 前面（`[[keys.command]]` 用了 0.7.4 才有的 `type = "popup"`，舊版 herdr 會拒絕**整個 keys 區塊** —— `reload-config` 回 `status: "partial"` + `keeping current keys settings`，而且只有那一行 diagnostic 會告訴你）。
+
+> **每次 herdr 升級都會讓 agent integration 過期。** `herdr integration status` 會標出各自的版本（`current (v9)` / `outdated (v7 < v9)`），用 `herdr integration install <agent>` 重裝。這些檔案（`~/.claude/hooks/herdr-agent-state.sh`、`~/.codex/herdr-agent-state.sh`、`~/.cursor/herdr-agent-state.sh`、`~/.config/opencode/plugins/herdr-agent-state.js`）是 herdr 自己寫的，**不歸** chezmoi 管，所以 `chezmoi apply` 既不會還原也不會覆蓋它們。`just upgrade-herdr` 會回報哪些過期了，但刻意不自動安裝。
 - **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
 
 > **升級會讓正在跑的 server 被擱淺（macOS）。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 macOS 沒辦法迴避這次重啟；Linux 的自管 binary 則可以。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
