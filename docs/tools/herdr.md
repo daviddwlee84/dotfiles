@@ -11,6 +11,8 @@ This repo ships herdr as a **trial tool that coexists with tmux** — you run `h
 - **Upgrade**: brew on macOS; `herdr update` for the self-managed Linux binary
 - **Config**: `~/.config/herdr/config.toml` — chezmoi **`modify_` overlay** (`dot_config/herdr/modify_config.toml.tmpl` + managed body in `.chezmoitemplates/herdr/config.toml`). The overlay enforces our managed tables on every `chezmoi apply` while preserving whatever herdr writes back at runtime (see [Config management](#config-management-why-modify_)).
 
+> **Upgrading strands a running server (macOS).** herdr's socket API is protocol-versioned, and a package-manager upgrade cannot restart the server — so after `brew upgrade herdr` every CLI call (and therefore every `tv herdr-*` channel, `hvibe`/`hcode`, and `[[keys.command]]` helper) fails `protocol_mismatch` until the server restarts, which kills all pane processes. `herdr update --handoff` — the live, pane-preserving path — is **disabled on Homebrew/mise/Nix installs**, so macOS has no way to avoid the restart; Linux's self-managed binary does. Check with `herdr status` (`compatible:` / `restart_needed:`), not `herdr --version`. Full recovery matrix: [`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md).
+
 > **Not gated by `enableVimMode`.** That flag governs shell + tmux modal editing; herdr's copy mode (`prefix+[`) is vi-style natively regardless (`h/j/k/l`, `w/b/e`, `{`/`}`, `v`/Space to select, `y`/Enter to copy, `q`/Esc to leave), so there is nothing to gate.
 
 ---
@@ -90,7 +92,7 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + h/j/k/l` | focus pane | built-in default |
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | split side-by-side / stacked (tmux muscle memory — both the intuitive key and the tmux default) | rebound (arrays) |
 | `prefix + z` / `prefix + x` | zoom / close pane | built-in default |
-| `prefix + w` / `prefix + g` | workspace navigator (navigate-mode: **`j`/`k`** *or* arrows to move, Enter to pick) / session navigator | built-in; `navigate_workspace_*` rebound to `j`/`k` + arrows |
+| `prefix + w` / `prefix + g` | workspace navigator (navigate-mode: **`j`/`k`** *or* arrows to move, Enter to pick) / session navigator ([in-popup keys](#navigator-keys)) | built-in; `navigate_workspace_*` rebound to `j`/`k` + arrows |
 | `prefix + ctrl + 1..9` | jump directly to **workspace** N (`switch_workspace`) | rebound (indexed) |
 | `prefix + alt + 1..9` | jump directly to **agent** N's pane (`focus_agent`) | rebound (indexed) |
 
@@ -121,6 +123,29 @@ Prefix is `ctrl+b` (same as tmux). Built-in actions can only be *rebound* (herdr
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > Uppercase letters resolve to `prefix+shift+<letter>`, which herdr reserves for built-ins (`shift+g` worktree, `shift+t` rename-tab, `shift+h/j/k/l` swap-pane). `prefix+G`/`prefix+T` are freed by the rebinds above; `herdr server reload-config` reports any remaining collisions in its `diagnostics`.
+
+### Session navigator (`prefix + g`) — in-popup keys {#navigator-keys}
+
+The navigator is herdr's Cmd-K analog: a `space → tab → pane` tree with fuzzy search and agent-state filters. Its footer only advertises `enter switch · / search · b/w/i/d/a states · j/k/↑↓ move · esc close`, but several keys are live and **undocumented upstream** (verified against herdr 0.7.5 `src/app/input/modal.rs`):
+
+| Key | Effect |
+|---|---|
+| `space` | **toggle expand/collapse of the highlighted space** — fires only on a *space* row; silently no-ops on tab/pane rows |
+| `ctrl + d` / `ctrl + u` | half-page down / up |
+| `home` / `end` (or `G`) | first / last row |
+| `backspace` | drop an active state filter (`b`/`w`/`i`/`d`) back to all |
+| `a` | clear the query **and** the state filter |
+| `esc` | closes the popup immediately (on ≤ 0.7.2 it cleared query + filter first and only closed on a second press) |
+
+**Three limits that stop `space` from acting as a collapse-all** (`src/app/actions.rs`):
+
+1. **Every open resets to fully expanded** — `open_navigator_from()` clears `expanded_workspaces` then re-inserts every workspace. Collapse state does not survive closing the popup.
+2. **Any search query or `b`/`w`/`i`/`d` filter force-expands everything** (`expanded = query_kind != Empty || …`). Collapsing only has a visible effect under `a` / empty query.
+3. **The navigator's expand set is separate from the sidebar's** `collapsed_space_keys` — the latter is what `~/.config/herdr/session.json` persists, driven by the sidebar's right-click `Expand` / `Close group` menu. Collapsing a space in one does not affect the other.
+
+There is **no expand-all / collapse-all and no depth cap**. Upstream asks for both were closed unactioned under the issue-template policy (issues are bug-only): [#1256](https://github.com/ogulcancelik/herdr/issues/1256) (`ui.goto_depth = "workspace" | "tab" | "pane"`) and [#1255](https://github.com/ogulcancelik/herdr/issues/1255) (vim `h`/`l` to collapse/expand) → [discussion #1248](https://github.com/ogulcancelik/herdr/discussions/1248).
+
+> **For a spaces-only overview, reach for `prefix + T`** (`tv herdr-sesh`) instead. It is a flat workspace list by construction — a permanent collapse-all view — and it can additionally *create* a space from a zoxide frecency dir, which the native navigator cannot. `prefix + w` is the other space-level option (native sidebar navigate mode) but has no fuzzy search.
 
 ## Session helpers: `hvibe` / `hcode` / `hhere` / `hroot` (herdr analogs of `svibe` / `scode` / `shere` / `sroot`)
 

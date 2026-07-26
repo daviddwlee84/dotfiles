@@ -16,6 +16,8 @@
 - **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `herdr update`
 - **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
 
+> **升級會讓正在跑的 server 被擱淺（macOS）。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 macOS 沒辦法迴避這次重啟；Linux 的自管 binary 則可以。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
+
 > **不受 `enableVimMode` 控制。** 該 flag 管的是 shell + tmux 的 modal 編輯；herdr 的 copy mode（`prefix+[`）天生就是 vi 風格（`h/j/k/l`、`w/b/e`、`{`/`}`、`v`/Space 選取、`y`/Enter 複製、`q`/Esc 離開），沒有東西需要 gate。
 
 ---
@@ -95,7 +97,7 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + h/j/k/l` | 聚焦 pane | built-in default |
 | `prefix + \|` / `prefix + %` · `prefix + minus` / `prefix + "` | 左右分割 / 上下分割（tmux 肌肉記憶——直覺鍵與 tmux 預設鍵都綁） | rebound（陣列 arrays） |
 | `prefix + z` / `prefix + x` | zoom / 關 pane | built-in default |
-| `prefix + w` / `prefix + g` | workspace 導覽（navigate-mode:**`j`/`k`** 或方向鍵移動,Enter 選定) / session navigator | built-in;`navigate_workspace_*` 重綁成 `j`/`k` + 方向鍵 |
+| `prefix + w` / `prefix + g` | workspace 導覽（navigate-mode:**`j`/`k`** 或方向鍵移動,Enter 選定) / session navigator（[popup 內按鍵](#navigator-keys)） | built-in;`navigate_workspace_*` 重綁成 `j`/`k` + 方向鍵 |
 | `prefix + ctrl + 1..9` | 直接跳到 **workspace** N（`switch_workspace`) | rebound (indexed) |
 | `prefix + alt + 1..9` | 直接跳到 **agent** N 的 pane（`focus_agent`) | rebound (indexed) |
 
@@ -126,6 +128,29 @@ Prefix 是 `ctrl+b`（跟 tmux 一樣）。內建 action 只能*重綁 (rebind)*
 | `prefix + y` | herdr-plus **Quick Actions** | plugin action |
 
 > 大寫字母會解析成 `prefix+shift+<letter>`，herdr 保留給內建（`shift+g` worktree、`shift+t` rename-tab、`shift+h/j/k/l` swap-pane）。`prefix+G`/`prefix+T` 由上面的重綁釋放出來；`herdr server reload-config` 會在它的 `diagnostics` 回報任何殘餘衝突。
+
+### Session navigator（`prefix + g`）——popup 內的按鍵 {#navigator-keys}
+
+navigator 是 herdr 的 Cmd-K 對應物：一棵 `space → tab → pane` 樹，帶模糊搜尋與 agent 狀態過濾。它的 footer 只寫了 `enter switch · / search · b/w/i/d/a states · j/k/↑↓ move · esc close`，但還有幾個鍵是有效的、而且**上游沒有文件**（對照 herdr 0.7.5 `src/app/input/modal.rs` 驗證）：
+
+| 按鍵 | 作用 |
+|---|---|
+| `space` | **展開／收起游標所在的 space** ——只在 *space* 那一行有效；停在 tab/pane 行時靜默無反應 |
+| `ctrl + d` / `ctrl + u` | 下／上翻半頁 |
+| `home` / `end`（或 `G`） | 跳到第一／最後一列 |
+| `backspace` | 取消目前的狀態過濾（`b`/`w`/`i`/`d`），回到全部 |
+| `a` | 同時清掉查詢字串**與**狀態過濾 |
+| `esc` | 直接關閉 popup（≤ 0.7.2 是先清查詢＋過濾，要按第二次才關） |
+
+**三個限制，讓 `space` 沒辦法當成 collapse-all 用**（`src/app/actions.rs`）：
+
+1. **每次開啟都重置成全部展開** —— `open_navigator_from()` 會清掉 `expanded_workspaces` 再把每個 workspace 塞回去。收起狀態不會跨越關閉 popup。
+2. **只要有搜尋字串或 `b`/`w`/`i`/`d` 過濾就強制全展開**（`expanded = query_kind != Empty || …`）。只有在 `a` / 空查詢下，收起才看得到效果。
+3. **navigator 的展開集合與 sidebar 的 `collapsed_space_keys` 是兩套獨立的** —— 後者才是 `~/.config/herdr/session.json` 持久化的那個，由 sidebar 右鍵選單的 `Expand` / `Close group` 驅動。在其中一邊收起某個 space，不會影響另一邊。
+
+**沒有 expand-all / collapse-all，也沒有深度上限。** 上游對兩者的請求都因 issue 模板政策（issue 只收 bug）被直接關掉：[#1256](https://github.com/ogulcancelik/herdr/issues/1256)（`ui.goto_depth = "workspace" | "tab" | "pane"`）與 [#1255](https://github.com/ogulcancelik/herdr/issues/1255)（vim `h`/`l` 收合展開）→ [discussion #1248](https://github.com/ogulcancelik/herdr/discussions/1248)。
+
+> **想要只看 space 層的總覽，改用 `prefix + T`**（`tv herdr-sesh`）。它本質上就是一份扁平的 workspace 清單——等於永久的 collapse-all 視圖——而且還能從 zoxide frecency 目錄*建立*新 space，這是原生 navigator 做不到的。`prefix + w` 是另一個 space 層的選項（原生 sidebar navigate mode），但沒有模糊搜尋。
 
 ## Session 輔助函式：`hvibe` / `hcode` / `hhere` / `hroot`（`svibe` / `scode` / `shere` / `sroot` 的 herdr 版）
 
