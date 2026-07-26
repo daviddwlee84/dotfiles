@@ -132,6 +132,27 @@ jq '.last_played' ~/.openpeon/.state.json   # -> {"task.complete": "sounds/JobsF
 
 各層級的 hook 接線有 `tests/unit/agent_overlays.bats` 覆蓋。
 
+## 兩個看起來壞了、其實是正常的行為
+
+**你正在看終端機時不會跳 banner —— 這是刻意的。** peon 用 focus 來 gate overlay
+（`peon.sh` 裡的 `notify … gate` / `suppressed` 分支）：聲音一定會播，但終端機在最前景時
+就不跳橫幅，因為你本來就看得到結果。切到別的 app 再讓它跑完就會看到。可以用
+`peon debug on` 確認 —— 有跳時 log 是 `dispatch event=Stop focused=false`，被擋掉時是
+`suppressed event=Stop focused=true`。
+
+**`peon notifications test` 印出「sending test notification」然後什麼都沒發生。**
+上游 bug，在 2.35.1 上驗證過 —— 不影響真正的通知。這個子指令跑的是
+`PEON_TEST=1 send_notification …`，而 `PEON_TEST=1` 會讓 `find_bundled_script`
+跳過 Cellar/sibling 的 fallback（這個 flag 本來是給上游自己的「script 不存在」測試用的）。
+我們的 `PEON_DIR` 是 `~/.openpeon`，底下沒有 `scripts/`，所以查找失敗，`send_notification`
+直接走到 `[ -z "$notify_script" ] && return 0` —— 一次安靜的成功。連 debug log 都不會寫，
+這是跟「真的壞掉」最快的區分方式。要測就用一次真正的、非前景的 turn。
+
+另外，`Notification` 事件只對 peon 認得的訊息類型發通知（`idle_prompt`、
+`elicitation_dialog`）；其他都會記
+`route category=none suppressed=True reason=unknown_notification`。
+`permission_prompt` 刻意只改 tab 標題 —— 它的聲音來自另一個 `PermissionRequest` 事件。
+
 ## 之後要改層級
 
 `agentSounds` 是 `promptChoiceOnce` —— 只在你的 chezmoi config 裡沒有它時才會問。

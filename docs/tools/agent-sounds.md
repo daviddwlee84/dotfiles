@@ -149,6 +149,32 @@ Per-tier hook wiring is covered by `tests/unit/agent_overlays.bats`
 (`agentSounds tiers gate…`, `peon tier keeps its hook guarded…`, `lowering the
 tier prunes OUR entries…`).
 
+## Two behaviours that look broken but aren't
+
+**No banner while you're looking at the terminal — by design.** peon gates the
+overlay on focus (`peon.sh`, the `notify … gate` / `suppressed` branch): the
+sound always plays, but the banner is skipped when the terminal is frontmost,
+since you'd see the result anyway. Switch to another app before the turn ends
+and the banner appears. Confirm with `peon debug on` — the log line reads
+`dispatch event=Stop focused=false` when it fires and
+`suppressed event=Stop focused=true` when it doesn't.
+
+**`peon notifications test` prints its banner-sending line and does nothing.**
+Upstream bug, verified on 2.35.1 — real notifications are unaffected. The
+subcommand runs `PEON_TEST=1 send_notification …`, and `PEON_TEST=1` makes
+`find_bundled_script` skip its Cellar/sibling fallback (the flag exists for
+upstream's own "missing script" test cases). `PEON_DIR` is `~/.openpeon`, which
+has no `scripts/`, so the lookup fails and `send_notification` hits its
+`[ -z "$notify_script" ] && return 0` — a silent success. Nothing is even
+written to the debug log, which is the quickest way to tell this apart from a
+real notification problem. Test with a genuine unfocused turn instead.
+
+Note also that `Notification` events only notify for the message types peon
+recognises (`idle_prompt`, `elicitation_dialog`); anything else logs
+`route category=none suppressed=True reason=unknown_notification`.
+`permission_prompt` deliberately only sets the tab title — its sound comes from
+the separate `PermissionRequest` event.
+
 ## Changing tier later
 
 `agentSounds` is a `promptChoiceOnce` — it's only asked when absent from your
