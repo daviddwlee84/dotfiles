@@ -27,8 +27,9 @@
 #   copilot-here [on|off|status] - sticky per-project toggle via the gitignored
 #                                ./.claude/settings.local.json (never touches the
 #                                committed .claude/settings.json)
-#   copilot-model [<id>|-l|-c] - switch the pinned model (edits settings.local.json
-#                                when copilot-here is on, else the global state file)
+#   copilot-model [<id>|-l|-c|--auto] - switch the pinned model (edits settings.local.json
+#                                when copilot-here is on, else the global state file;
+#                                --auto = Claude > Codex > GPT > Gemini from served list)
 #
 # Settings-layer design (why settings.local.json / env vars, and NOT the
 # committed .claude/settings.json nor ~/.claude/settings.json):
@@ -824,7 +825,8 @@ copilot-proxy() {
         else
           _bad "pinned model" "$_model  ($_src)"
           _hint "not in the served list → every request returns 400 model_not_supported"
-          _hint "copilot-model -l   # list served ids"
+          _hint "copilot-model --auto   # Claude > Codex > GPT > Gemini from served list"
+          _hint "copilot-model -l       # list served ids"
         fi
       else
         _bad "served" "could not fetch $(_copilot_base)/v1/models"
@@ -1445,6 +1447,51 @@ _copilot_here_drift() {
 
 # --- model switcher -------------------------------------------------------------
 
+# Pick the best served model for Claude Code / copilot-run.
+# Preference (first match wins): Claude (known ids, else any claude-*) →
+# *codex* → non-mini gpt-5* → any gpt-* → non-flash gemini → any gemini → last resort.
+# Appends [1m] for Claude ids known to expose a 1M window to Claude Code.
+# Reads newline-separated raw proxy ids on stdin; prints one id (may include [1m]).
+_copilot_pick_best_model() {
+  local models preferred c
+  models="$(command cat)"
+  [ -n "$models" ] || return 1
+
+  for preferred in \
+    claude-opus-5 claude-opus-4-8 claude-opus-4-7 claude-opus-4-6 \
+    claude-sonnet-5 claude-sonnet-4-6 claude-sonnet-4-5 \
+    claude-opus-4-5 claude-haiku-4-5
+  do
+    if printf '%s\n' "$models" | command grep -qxF "$preferred"; then
+      case "$preferred" in
+        claude-opus-5|claude-opus-4-8|claude-sonnet-5) printf '%s[1m]' "$preferred" ;;
+        *) printf '%s' "$preferred" ;;
+      esac
+      return 0
+    fi
+  done
+  c="$(printf '%s\n' "$models" | command grep -E '^claude-' | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  # Codex family first when Anthropic is geo-/policy-filtered out of the catalog.
+  c="$(printf '%s\n' "$models" | command grep -iE 'codex' | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-5' | command grep -vE 'mini|nano' \
+        | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^gpt-' | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command grep -viE 'flash' \
+        | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+  c="$(printf '%s\n' "$models" | command grep -E '^gemini-' | command sort -V | command tail -1)"
+  if [ -n "$c" ]; then printf '%s' "$c"; return 0; fi
+
+  printf '%s\n' "$models" | command sort -V | command tail -1
+}
+
 # Switch which Copilot model is pinned. Claude Code's own /model picker sends
 # dated Anthropic ids the Copilot backend rejects (model_not_supported), so pin
 # here. Use the HYPHENATED ids the proxy lists (claude-opus-4-8); an optional
@@ -1458,6 +1505,7 @@ _copilot_here_drift() {
 # Example:
 #   copilot-model opus-5           # fuzzy → claude-opus-5 (the default; opus-4-8 etc. work too)
 #   copilot-model 'opus-5[1m]'     # same + 1M-context hint for Claude Code
+#   copilot-model --auto           # Claude > Codex > GPT > Gemini from live served list
 #   copilot-model -l               # list available (live from proxy)
 #   copilot-model -c               # print current (+ where it came from)
 copilot-model() {
@@ -1511,7 +1559,8 @@ copilot-model() {
       fi
       return 0 ;;
     -h|--help)
-      printf '%s\n' "Usage: copilot-model [<model-id>|-l|-c]"
+      printf '%s\n' "Usage: copilot-model [<model-id>|-l|-c|--auto]"
+      printf '%s\n' "  --auto  pick best from live served list: Claude > Codex > GPT > Gemini"
       printf '%s\n' "  Writes ./.claude/settings.local.json when copilot-here is on,"
       printf '%s\n' "  else the global state file used by claude-copilot / copilot-run."
       return 0 ;;
@@ -1524,15 +1573,35 @@ copilot-model() {
   local models want resolved
   models="$(_copilot_model_list 2>/dev/null)"
 
+  # --auto: Claude > Codex > GPT > Gemini from the live served catalog.
+  # Use when a sticky pin (e.g. gemini from a Claude-less geo day) is stale, or
+  # when Anthropic is filtered out and you want the best Codex/GPT instead.
+  if [ "$arg" = "--auto" ] || [ "$arg" = "-a" ]; then
+    if [ -z "$models" ]; then
+      printf '%s\n' "copilot-model: --auto needs a reachable proxy (or static fallback list empty)" >&2
+      return 1
+    fi
+    resolved="$(printf '%s\n' "$models" | _copilot_pick_best_model)" || {
+      printf '%s\n' "copilot-model: --auto could not pick a model" >&2
+      return 1
+    }
+    case "$resolved" in
+      claude-*) printf '%s\n' "copilot-model: --auto → $resolved  (Claude preferred)" >&2 ;;
+      *codex*|*Codex*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude; best Codex)" >&2 ;;
+      gpt-*|o[0-9]*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/Codex; best GPT)" >&2 ;;
+      gemini-*) printf '%s\n' "copilot-model: --auto → $resolved  (no Claude/Codex/GPT; best Gemini)" >&2 ;;
+      *) printf '%s\n' "copilot-model: --auto → $resolved" >&2 ;;
+    esac
+    # $resolved already set — fall through to the write path below
   # No arg + fzf available → interactive pick.
-  if [ -z "$arg" ]; then
+  elif [ -z "$arg" ]; then
     if ! command -v fzf >/dev/null 2>&1; then
       printf '%s\n' "copilot-model: pass a model id (fzf not found). Try: copilot-model -l" >&2
       return 1
     fi
     local cur; cur="$(_copilot_model_current)"
     want="$(printf '%s\n' "$models" | command fzf --prompt="model> " --height=40% --reverse \
-      --header="current: $cur")" || { printf '%s\n' "cancelled"; return 0; }
+      --header="current: $cur  |  tip: copilot-model --auto")" || { printf '%s\n' "cancelled"; return 0; }
     [ -n "$want" ] || { printf '%s\n' "cancelled"; return 0; }
     resolved="$want"
   else
@@ -1565,6 +1634,13 @@ copilot-model() {
       fi
     fi
     resolved="$resolved$suffix"
+  fi
+
+  # --auto already set $resolved above; the empty/fuzzy branches set it too.
+  # Guard: if somehow still empty, bail.
+  if [ -z "${resolved:-}" ]; then
+    printf '%s\n' "copilot-model: no model resolved" >&2
+    return 1
   fi
 
   local old; old="$(_copilot_model_current)"

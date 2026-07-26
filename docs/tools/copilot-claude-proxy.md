@@ -260,7 +260,7 @@ so plain `claude` (and `scode`/`svibe` panes, which just run
   drifted from the current defaults) with the exact diff and a `copilot-here on`
   refresh hint, and warns when the proxy isn't running.
 
-### `copilot-model [<id>|-l|-c]`
+### `copilot-model [<id>|-l|-c|--auto]`
 
 Switches the pinned Copilot model. Requires `jq`. Write target — never the
 committed `.claude/settings.json`:
@@ -281,6 +281,11 @@ Behavior:
   section below.
 - Validated against the live proxy `/v1/models` (falls back to a static Claude
   list if the proxy is down); typos and ambiguous prefixes are rejected.
+- `--auto` / `-a`: pick the best **served** id — Claude (known prefs + `[1m]`
+  when applicable) → `*codex*` → non-mini `gpt-5*` → any `gpt-*` → Gemini.
+  Use after a Claude-less geo day left you pinned on Gemini, or when Anthropic
+  is filtered out and you want Codex instead. Does **not** run automatically
+  from `doctor` (only hints).
 - No argument → `fzf` picker. `-c` prints the current model and which layer it
   came from.
 - Writes both `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_OPUS_MODEL` —

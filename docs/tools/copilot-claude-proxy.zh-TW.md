@@ -212,7 +212,7 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
   的其他內容會保留，檔案清空時才刪除。
 - `status` —— 有沒有釘選？base URL / 模型是什麼？代理沒在跑時會警告。
 
-### `copilot-model [<id>|-l|-c]`
+### `copilot-model [<id>|-l|-c|--auto]`
 
 切換釘選的 Copilot 模型。需要 `jq`。寫入目標 —— 永遠不是會 commit 的
 `.claude/settings.json`：
@@ -230,6 +230,10 @@ copilot-run claude --resume         # 裸 claude，不經 specstory
   它是只給 Claude Code 看的 1M context 提示，詳見下方模型 id 章節。
 - 會對照即時的代理 `/v1/models` 驗證（代理未啟動時退回靜態 Claude 清單）；打錯字與不明確的
   前綴會被拒絕。
+- `--auto` / `-a`：從**目前 served** 清單挑最佳 —— Claude（含適用的 `[1m]`）→
+  `*codex*` → 非 mini 的 `gpt-5*` → 其他 `gpt-*` → Gemini。適合 Claude 被
+  geo-filter 那天 pin 到 Gemini 之後要自動升回，或 Anthropic 不可用時改用 Codex。
+  `doctor` **不會**自動改 pin，只會提示跑 `--auto`。
 - 無參數 → `fzf` 選單。`-c` 印出目前模型以及它來自哪一層。
 - 同時寫入 `ANTHROPIC_MODEL` 與 `ANTHROPIC_DEFAULT_OPUS_MODEL` ——
   **變更只在下次 `claude` 啟動時生效**（env 在啟動時讀取）。切換模型 **不需要** 重啟代理。
