@@ -536,7 +536,7 @@
 
 ### Proxy 輔助
 
-> 可攜的 loopback proxy 輔助函式。遵循 `$LOCAL_PROXY_URL`（可選 `$LOCAL_PROXY_SOCKS_URL` 用於分離的 Clash `socks-port:` 設定）；否則優先使用作用中的 Clash 設定（`mixed-port:` 或 `port:`/`socks-port:`，來自 `~/.config/clash/config.yaml` 或 `~/Library/Application Support/clash/config.yaml`），最後退回以 `nc -z -w1` 探測 7890/7891/1087/8118/8080 等埠。偵測結果按 shell 快取 (cache)；`proxy-off` 與 `proxy-refresh` 會在下次查詢前清除該快取。設定 `$LOCAL_PROXY_AUTO_ACTIVATE=1` 可在 shell 啟動時自動匯出環境變數。完整指南：[docs/tools/web-reader.md](../tools/web-reader.md)。另見：[docs/tools/containers.md](../tools/containers.md)，了解 `$LOCAL_PROXY_URL` 如何餵給由 chezmoi 管理的 `~/.docker/config.json` `proxies.default` 區塊。
+> 可攜的 loopback proxy 輔助函式。遵循 `$LOCAL_PROXY_URL`（可選 `$LOCAL_PROXY_SOCKS_URL` 用於分離的 Clash `socks-port:` 設定）。偵測順序：環境變數 → **macOS System Proxy**（HTTPEnable 且 loopback 埠在聽 —— Clash Verge / CFW「系統代理」寫入處）→ Clash Verge / mihomo / CFW 設定檔（宣告的埠必須真的在聽）→ 探測 `7897/7890/7891/17890/1087/8118/8080`。優先 System Proxy 可避免舊的 `~/.config/clash` 蓋過正在跑的 Verge `7897`。偵測結果按 shell 快取；`proxy-off` / `proxy-refresh` 會清除。設定 `$LOCAL_PROXY_AUTO_ACTIVATE=1` 可在啟動時自動匯出。完整指南：[docs/tools/web-reader.md](../tools/web-reader.md)。Copilot 的 Node 客戶端需另外帶 `HTTPS_PROXY` / `--proxy-env`——見 [docs/tools/copilot-claude-proxy.md](../tools/copilot-claude-proxy.md)。
 
 | Command | Type | Source File | Description |
 |---------|------|-------------|-------------|

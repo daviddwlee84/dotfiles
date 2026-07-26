@@ -122,8 +122,13 @@ fi
 : "${_NET_PROXY_CACHE:=}"
 : "${_NET_PROXY_SOCKS_CACHE:=}"
 : "${_NET_PROXY_SOURCE_CACHE:=}"
-__NET_PROXY_PROBE_PORTS=(7890 7891 1087 8118 8080)
+# Verge mixed-port defaults to 7897; Ubuntu mihomo bring-up often uses 17890
+# while legacy CFW still holds 7890/7891.
+__NET_PROXY_PROBE_PORTS=(7897 7890 7891 17890 1087 8118 8080)
 __NET_PROXY_CLASH_CONFIG_CANDIDATES=(
+  "$HOME/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/config.yaml"
+  "$HOME/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/clash-verge.yaml"
+  "$HOME/.config/mihomo/config.yaml"
   "$HOME/.config/clash/config.yaml"
   "$HOME/.config/clash/config.yml"
   "$HOME/Library/Application Support/clash/config.yaml"
@@ -179,31 +184,70 @@ __net_yaml_scalar() {
   ' "$config_path"
 }
 
+# macOS: honor the *active* System Settings proxy when it points at a live
+# loopback port. Clash Verge / CFW "System Proxy" writes here; Node/bun do NOT
+# read it — only curl/scutil consumers do — but it is still the best signal of
+# which local port the user intends right now (beats a stale ~/.config/clash).
+__net_detect_system_proxy() {
+  command -v scutil >/dev/null 2>&1 || return 1
+  local host port enable
+  enable="$(command scutil --proxy 2>/dev/null | command awk '/HTTPEnable/ {print $3; exit}')"
+  [[ "$enable" == "1" ]] || return 1
+  host="$(command scutil --proxy 2>/dev/null | command awk '/HTTPProxy/ {print $3; exit}')"
+  port="$(command scutil --proxy 2>/dev/null | command awk '/HTTPPort/ {print $3; exit}')"
+  [[ -n "$host" && -n "$port" ]] || return 1
+  # Only auto-trust loopback / explicit local proxies — never silently route
+  # shell helpers through a remote corporate proxy discovered via scutil.
+  case "$host" in
+    127.0.0.1|localhost|::1) ;;
+    *) return 1 ;;
+  esac
+  __net_port_open "$port" || return 1
+  __net_set_proxy_cache \
+    "http://127.0.0.1:$port" \
+    "socks5://127.0.0.1:$port" \
+    "macOS system proxy"
+  return 0
+}
+
 __net_detect_clash_proxy() {
-  local config_path mixed_port http_port socks_port socks_url=""
-  config_path="$(__net_find_clash_config)" || return 1
+  local config_path mixed_port http_port socks_port socks_url="" source_label
+  # Prefer a config whose declared port is *actually listening* — an old CFW
+  # yaml sitting next to a live Verge instance used to win and report a dead
+  # 7891 while traffic was on 7897.
+  local candidate
+  for candidate in "${__NET_PROXY_CLASH_CONFIG_CANDIDATES[@]}"; do
+    [[ -f "$candidate" ]] || continue
+    config_path="$candidate"
+    source_label="clash/mihomo config"
+    case "$candidate" in
+      *clash-verge*) source_label="clash-verge config" ;;
+      */mihomo/*)    source_label="mihomo config" ;;
+    esac
 
-  mixed_port="$(__net_yaml_scalar "mixed-port" "$config_path")"
-  if [[ -n "$mixed_port" ]] && __net_port_open "$mixed_port"; then
-    __net_set_proxy_cache \
-      "http://127.0.0.1:$mixed_port" \
-      "socks5://127.0.0.1:$mixed_port" \
-      "clash config"
-    return 0
-  fi
-
-  http_port="$(__net_yaml_scalar "port" "$config_path")"
-  socks_port="$(__net_yaml_scalar "socks-port" "$config_path")"
-  if [[ -n "$http_port" ]] && __net_port_open "$http_port"; then
-    if [[ -n "$socks_port" ]] && __net_port_open "$socks_port"; then
-      socks_url="socks5://127.0.0.1:$socks_port"
+    mixed_port="$(__net_yaml_scalar "mixed-port" "$config_path")"
+    if [[ -n "$mixed_port" ]] && __net_port_open "$mixed_port"; then
+      __net_set_proxy_cache \
+        "http://127.0.0.1:$mixed_port" \
+        "socks5://127.0.0.1:$mixed_port" \
+        "$source_label"
+      return 0
     fi
-    __net_set_proxy_cache \
-      "http://127.0.0.1:$http_port" \
-      "$socks_url" \
-      "clash config"
-    return 0
-  fi
+
+    http_port="$(__net_yaml_scalar "port" "$config_path")"
+    socks_port="$(__net_yaml_scalar "socks-port" "$config_path")"
+    if [[ -n "$http_port" ]] && __net_port_open "$http_port"; then
+      socks_url=""
+      if [[ -n "$socks_port" ]] && __net_port_open "$socks_port"; then
+        socks_url="socks5://127.0.0.1:$socks_port"
+      fi
+      __net_set_proxy_cache \
+        "http://127.0.0.1:$http_port" \
+        "$socks_url" \
+        "$source_label"
+      return 0
+    fi
+  done
 
   return 1
 }
@@ -216,17 +260,21 @@ __net_detect_proxy() {
       "LOCAL_PROXY_URL env"
     return 0
   fi
-  if __net_detect_clash_proxy; then
-    return 0
-  fi
+  # Cache hit (including cached "none") — skip re-probe until proxy-refresh.
   if [[ -n "$_NET_PROXY_CACHE" ]]; then
     [[ "$_NET_PROXY_CACHE" == "none" ]] && return 1
+    return 0
+  fi
+  if __net_detect_system_proxy; then
+    return 0
+  fi
+  if __net_detect_clash_proxy; then
     return 0
   fi
   local port
   for port in "${__NET_PROXY_PROBE_PORTS[@]}"; do
     if __net_port_open "$port"; then
-      __net_set_proxy_cache "http://127.0.0.1:$port" "" "probe"
+      __net_set_proxy_cache "http://127.0.0.1:$port" "socks5://127.0.0.1:$port" "probe"
       return 0
     fi
   done

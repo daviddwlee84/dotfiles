@@ -91,6 +91,7 @@ Claude Code 由低到高合併設定：`~/.claude/settings.json`（user）→
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | 代理監聽的 port |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` 秒數（節流；請溫和） |
+| `COPILOT_HTTP_PROXY` | `auto` | GitHub `/models` 用的上游 HTTP proxy：`auto`（本機 Clash/Verge/mihomo 有在聽就帶 `--proxy-env`）、`never`（直連）、`always`（一定要偵測到 proxy）、或明確 URL |
 | `COPILOT_API_PKG` | `copilot-api@0.7.0` | 要安裝的套件規格（釘選/升級）。改了會自動重裝。 |
 | `COPILOT_INSTALL_NOPROXY` | `0` | `1` = 安裝時把 proxy 環境變數拿掉，跳過「bun 無法透過 proxy 解析」那 45 秒的卡頓 |
 
@@ -287,12 +288,17 @@ binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時�
 完整事後檢討與可 grep 的原始症狀：
 [`pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md)。
 
-### 模型清單只在啟動時抓一次 —— 一次抓壞，整個 session 就毀了
+### 模型清單只在啟動時抓一次 —— 直連被 geo-filter / 一次抓壞，整個 session 就毀了
 
-`copilot-api` 只在**行程啟動時**向 GitHub 抓一次 `/models`，然後快取整個生命週期，
-不會定期更新、也不會在 cache miss 時重抓。若那一次請求剛好碰上 VPN / Clash 節點不穩，
-代理就會帶著一份**被截斷的清單**啟動 —— 通常只剩非 Anthropic 的模型 —— 之後每個
-`claude-*` 請求都會回 `400 model_not_supported`，直到你重啟為止。
+`copilot-api` 只在**行程啟動時**向 GitHub 抓一次 `/models`，然後快取整個生命週期。
+有兩種看起來一樣的壞法：
+
+1. **Egress geo-filter（離開 TUN 後最常見）** — 同一組 token，直連／CN 出口 Claude = 0，
+   走海外 Clash 節點 Claude = 8。Node / OpenCode **不讀** macOS System Proxy；以前
+   Clash for Windows 的 TUN / Mixin 把所有 TCP 抓進去所以沒感覺，換成只有 System Proxy
+   （Clash Verge）就會啟動成「沒有 Claude」的清單。預設 `COPILOT_HTTP_PROXY=auto` 會在
+   偵測到本機 proxy 時自動帶 `--proxy-env`。
+2. **節點抖一下** — 那一次請求碰上壞 hop，快取成截斷清單。
 
 線索在啟動 banner：
 
@@ -301,9 +307,8 @@ binary，所以熱啟動完全不碰網路。安裝本身有 timeout 且逾時�
 ℹ Models refresh: 21 new     ← 正常
 ```
 
-log 裡沒有任何其他線索能把這個情況跟「我的組織停用了 Claude」區分開 —— 兩者產生的
-GitHub 400 一模一樣。`copilot-proxy doctor` 會把代理的快取清單跟即時上游清單相比對，
-直接告訴你是哪一種。若是快取問題，修法就只是 `copilot-proxy restart`。完整說明：
+`copilot-proxy doctor` 會做 **直連 vs 走 proxy** 的上游 A/B，並對照代理已服務的清單，
+避免再把 geo-filter 誤判成「組織停用 Claude」。完整說明：
 [`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md)。
 
 ### `settings.local.json` 的 env 蓋過 shell env（官方文件說法相反）

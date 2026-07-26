@@ -111,6 +111,7 @@ Manages the background proxy on `$COPILOT_PROXY_PORT` (default `4141`).
 | Env var | Default | Meaning |
 |---|---|---|
 | `COPILOT_PROXY_PORT` | `4141` | port the proxy listens on |
+| `COPILOT_HTTP_PROXY` | `auto` | How Node reaches GitHub `/models` at startup: `auto` attaches `--proxy-env` + `HTTPS_PROXY` when `proxy-status` detects Clash Verge / mihomo / CFW (or macOS System Proxy); `always` same but warns if none found; `never` skips (non-GFW hosts); or an explicit `http://127.0.0.1:PORT`. **Node ignores the macOS System Proxy** — TUN/Mixin used to hide this by capturing all TCP. |
 | `COPILOT_API_PKG` | `@jeffreycao/copilot-api@1.13.14` | package spec to install (pin / upgrade; `copilot-api@0.7.0` = old original). Changing it re-installs. |
 | `COPILOT_PROXY_RATE` | `15` | `--rate-limit` seconds — **original package only** (the fork has no rate limiter) |
 | `COPILOT_PROXY_QUIET` | `0` | `1` = inject extra quota-saving Claude Code env (see below); off by default because it slightly degrades the UX |
@@ -356,25 +357,33 @@ and is exactly what breaks bun.
 Full post-mortem, with the verbatim symptoms to grep:
 [`pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-proxy-start-hangs-at-resolving-dependencies.md).
 
-### The model list is fetched ONCE at startup — a flaky fetch poisons the session
+### The model list is fetched ONCE at startup — geo + flaky fetches poison the session
 
 `copilot-api` fetches `/models` from GitHub when the process starts, caches the
-result for its whole lifetime, and never re-fetches. If that one request lands
-while a VPN/Clash node is degraded, the proxy comes up serving a **truncated
-list** — typically the non-Anthropic models only — and then every
-`claude-*` request returns `400 model_not_supported` until you restart it.
+result for its whole lifetime, and never re-fetches. Two common ways that one
+request returns a **Claude-less** catalog:
+
+1. **Egress geo-filter (GFW hosts, post-TUN)** — GitHub serves Claude ids when the
+   request egresses overseas (e.g. Singapore VLESS), and omits them on direct/CN
+   egress. **Node does not honor the macOS System Proxy**, so with only
+   System Proxy / no TUN, `copilot-api` and OpenCode fetch the direct catalog
+   (0 Claude) while `curl` through Clash still sees Claude. Fix: `copilot-proxy
+   start` with `COPILOT_HTTP_PROXY=auto` (default) attaches `--proxy-env` +
+   `HTTPS_PROXY` when `proxy-status` finds a local proxy. OpenCode needs the
+   same env in its launch environment.
+2. **Flaky node** — a degraded Clash node returns a truncated list; restart after
+   the node is healthy.
 
 The tell is in the startup banner:
 
 ```
-ℹ Models refresh: 13 new     ← degraded: no claude ids in the list below
-ℹ Models refresh: 21 new     ← healthy
+ℹ Models refresh: 17 new     ← often the direct/CN catalog (no claude ids)
+ℹ Models refresh: 25 new     ← healthy via overseas proxy (includes claude-*)
 ```
 
-Nothing else in the logs distinguishes this from "my org disabled Claude" — both
-produce the identical GitHub 400. `copilot-proxy doctor` compares the proxy's
-cached list against a live upstream fetch and tells you which one you have. Fix
-for the cache case is just `copilot-proxy restart`. Full write-up:
+`copilot-proxy doctor` A/Bs **upstream direct** vs **upstream via proxy** vs the
+**served** cache so it no longer mis-labels geo-filter as "org entitlement".
+Full write-up:
 [`pitfalls/copilot-api-caches-degraded-model-list-at-startup.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/copilot-api-caches-degraded-model-list-at-startup.md).
 
 ### `settings.local.json` env beats shell env (docs say otherwise)

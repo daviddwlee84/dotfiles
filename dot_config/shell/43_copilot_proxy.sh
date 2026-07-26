@@ -55,6 +55,14 @@
 #
 # Env (set in ~/.shellrc.adhoc or ~/.config/{zsh/secrets.zsh,bash/secrets.sh}):
 #   COPILOT_PROXY_PORT   default: 4141        - port the proxy listens on
+#   COPILOT_HTTP_PROXY   default: auto        - Node→GitHub /models egress:
+#                          auto   = if proxy-status finds Clash/Verge/mihomo (or
+#                                   macOS System Proxy), start with --proxy-env
+#                                   + HTTPS_PROXY. Node ignores System Proxy;
+#                                   TUN/Mixin used to hide this on GFW hosts.
+#                          always = same, but warn when no local proxy is found
+#                          never  = never pass --proxy-env (non-GFW machines)
+#                          http://127.0.0.1:PORT = force that URL
 #   COPILOT_API_PKG      default: @jeffreycao/copilot-api@1.13.14
 #                                             - package spec to install (pin/
 #                                               upgrade; copilot-api@0.7.0 = old
@@ -365,18 +373,26 @@ _copilot_probe() {
   printf '%s' "$out"
 }
 
-# Model ids GitHub serves for this account RIGHT NOW, bypassing the proxy.
+# Model ids GitHub serves for this account RIGHT NOW.
 #
 # Why this exists: copilot-api fetches /models ONCE at startup and caches it for
-# the whole process lifetime. A degraded startup fetch (flaky VPN/Clash node,
-# transient GitHub response) leaves the proxy serving a truncated list forever,
-# and every request for a missing model returns a 400 "model_not_supported" that
-# looks exactly like an entitlement problem. Comparing live-upstream against
-# proxy-cached is the only way to tell those two apart. Verified 2026-07.
+# the whole process lifetime. A degraded OR geo-filtered startup fetch leaves
+# the proxy serving a truncated list forever, and every request for a missing
+# model returns a 400 "model_not_supported" that looks exactly like an
+# entitlement problem. Comparing live-upstream against proxy-cached is the only
+# way to tell those apart. Verified 2026-07.
+#
+# $1 selects the egress path for the curl probe (curl follows the macOS system
+# proxy by default — which is exactly what made the old doctor mis-diagnose
+# "entitlement" when System Proxy was ON but Node was going direct):
+#   (empty)           — curl defaults (may use System Proxy on macOS)
+#   direct            — --noproxy '*' (true direct egress)
+#   http://host:port  — force -x that proxy
 #
 # Secrets: the ghu_/bearer tokens are passed via `curl -K -` (stdin config), NOT
 # argv — argv is world-readable via `ps`. Never echo either token.
 _copilot_upstream_models() {
+  local via="${1:-}"
   local tokfile="$HOME/.local/share/copilot-api/github_token"
   [ -f "$tokfile" ] || return 1
   command -v jq >/dev/null 2>&1 || return 1
@@ -385,9 +401,21 @@ _copilot_upstream_models() {
   ghu="$(command head -n 1 "$tokfile" 2>/dev/null)"
   [ -n "$ghu" ] || return 1
 
+  # Transport: keep as one argv word so zsh doesn't glob `*`.
+  local xargs=()
+  case "$via" in
+    "") ;;
+    direct) xargs=(--noproxy '*') ;;
+    http://*|https://*|socks5://*|socks5h://*) xargs=(-x "$via") ;;
+    *) return 1 ;;
+  esac
+
+  # bash arrays work when this file is sourced from bash; zsh too. Avoid
+  # unquoted $* expansion of `--noproxy *`.
   ex="$(printf 'header = "Authorization: token %s"\n' "$ghu" \
         | command curl -fsS --max-time 10 -K - \
             -H 'user-agent: GitHubCopilotChat/0.26.7' \
+            "${xargs[@]}" \
             https://api.github.com/copilot_internal/v2/token 2>/dev/null)" || return 1
 
   api="$(printf '%s' "$ex" | jq -r '.endpoints.api // "https://api.githubcopilot.com"' 2>/dev/null)"
@@ -398,9 +426,51 @@ _copilot_upstream_models() {
         | command curl -fsS --max-time 12 -K - \
             -H 'user-agent: GitHubCopilotChat/0.26.7' \
             -H 'copilot-integration-id: vscode-chat' \
+            "${xargs[@]}" \
             "$api/models" 2>/dev/null)" || return 1
 
   printf '%s' "$up" | jq -r '.data[]?.id // empty' 2>/dev/null | command sort -u
+}
+
+# Resolve the HTTP(S) proxy URL that Node should use for GitHub /models.
+# Prints a URL or nothing. Never prints secrets. Relies on 50_networking.sh
+# helpers when available; falls back to macOS System Proxy / common ports.
+#
+# COPILOT_HTTP_PROXY:
+#   auto|always|never|<url>
+_copilot_resolve_http_proxy() {
+  local mode="${COPILOT_HTTP_PROXY:-auto}"
+  case "$mode" in
+    never|off|0|false|no) return 0 ;;
+    http://*|https://*|socks5://*|socks5h://*)
+      printf '%s' "$mode"
+      return 0
+      ;;
+    always|auto|on|1|true|yes|"") ;;
+    *)
+      printf '%s\n' "copilot-proxy: unknown COPILOT_HTTP_PROXY='$mode' (use auto|always|never|http://...)" >&2
+      return 0
+      ;;
+  esac
+
+  # Prefer the shared detector (Clash Verge / mihomo / CFW / System Proxy).
+  if command -v __net_detect_proxy >/dev/null 2>&1; then
+    if __net_detect_proxy 2>/dev/null \
+       && [ -n "${_NET_PROXY_CACHE:-}" ] \
+       && [ "$_NET_PROXY_CACHE" != "none" ]; then
+      printf '%s' "$_NET_PROXY_CACHE"
+      return 0
+    fi
+  fi
+
+  # Fallback when 50_networking.sh isn't sourced yet (rare; file order is 43→50).
+  local sys
+  sys="$(_copilot_system_proxy)"
+  if [ -n "$sys" ]; then
+    printf '%s' "http://$sys"
+    return 0
+  fi
+  return 0
 }
 
 # Normalise a model id for cross-source comparison: lowercase, dots -> dashes
@@ -480,24 +550,57 @@ copilot-proxy() {
       # launch (the old `bunx <pkg> start`) is what used to hang forever behind a
       # socks proxy, with nothing but "Resolving dependencies" in the log.
       _copilot_ensure_pkg || return 1
-      local bin srv_pid
+      local bin srv_pid http_proxy_url use_proxy_env=0
       bin="$(_copilot_pkg_bin)"
+      http_proxy_url="$(_copilot_resolve_http_proxy)"
+      if [ -n "$http_proxy_url" ]; then
+        use_proxy_env=1
+        printf '%s\n' "copilot-proxy: Node will fetch /models via $http_proxy_url (--proxy-env; COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto})"
+      else
+        case "${COPILOT_HTTP_PROXY:-auto}" in
+          always|on|1|true|yes)
+            printf '%s\n' "copilot-proxy: COPILOT_HTTP_PROXY=always but no local proxy detected — starting DIRECT (Claude catalog may be geo-filtered)." >&2
+            printf '%s\n' "  hint: start Clash Verge / mihomo, or set COPILOT_HTTP_PROXY=http://127.0.0.1:7897" >&2
+            ;;
+        esac
+      fi
 
       # Flag sets differ per package: only the original has --rate-limit/--wait
       # (the fork ships no rate limiter — mitigate with COPILOT_PROXY_QUIET=1).
+      # --proxy-env makes Node honour HTTPS_PROXY (macOS System Proxy alone is ignored).
       if [ "$(_copilot_pkg_flavor)" = "original" ]; then
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port (rate-limit ${COPILOT_PROXY_RATE:-15}s) ..."
-        # nohup + background; detach so it survives the shell. Log to a file.
-        nohup "$bin" start \
-          --port "$port" \
-          --rate-limit "${COPILOT_PROXY_RATE:-15}" \
-          --wait \
-          >"$logf" 2>&1 &
+        # Original package: HTTPS_PROXY alone is enough (no --proxy-env flag).
+        if [ "$use_proxy_env" -eq 1 ]; then
+          nohup env HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
+            http_proxy="$http_proxy_url" https_proxy="$http_proxy_url" \
+            "$bin" start \
+            --port "$port" \
+            --rate-limit "${COPILOT_PROXY_RATE:-15}" \
+            --wait \
+            >"$logf" 2>&1 &
+        else
+          nohup "$bin" start \
+            --port "$port" \
+            --rate-limit "${COPILOT_PROXY_RATE:-15}" \
+            --wait \
+            >"$logf" 2>&1 &
+        fi
       else
         printf '%s\n' "copilot-proxy: starting ($pkg) on port $port ..."
-        nohup "$bin" start \
-          --port "$port" \
-          >"$logf" 2>&1 &
+        # Fork: needs --proxy-env so Node fetch honours HTTPS_PROXY.
+        if [ "$use_proxy_env" -eq 1 ]; then
+          nohup env HTTP_PROXY="$http_proxy_url" HTTPS_PROXY="$http_proxy_url" \
+            http_proxy="$http_proxy_url" https_proxy="$http_proxy_url" \
+            "$bin" start \
+            --port "$port" \
+            --proxy-env \
+            >"$logf" 2>&1 &
+        else
+          nohup "$bin" start \
+            --port "$port" \
+            >"$logf" 2>&1 &
+        fi
       fi
       srv_pid=$!
       printf '%s\n' "$srv_pid" >"$pidf"
@@ -657,6 +760,14 @@ copilot-proxy() {
 
       printf '\n%s\n' "Models"
       local _served _n _claude _model _src _pin
+      local _http_proxy _up_direct _up_via _dir_n _dir_c _via_n _via_c
+      _http_proxy="$(_copilot_resolve_http_proxy)"
+      if [ -n "$_http_proxy" ]; then
+        _note "http proxy" "$_http_proxy (COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto}) — Node needs --proxy-env to use this"
+      else
+        _skip "http proxy" "none detected (COPILOT_HTTP_PROXY=${COPILOT_HTTP_PROXY:-auto})"
+      fi
+
       if _served="$(_copilot_served_models)" && [ -n "$_served" ]; then
         _n="$(printf '%s\n' "$_served" | command grep -c .)"
         _claude="$(printf '%s\n' "$_served" | command grep -ci '^claude' || true)"
@@ -667,38 +778,43 @@ copilot-proxy() {
           _bad "claude models" "0 of $_n — the proxy is serving no Anthropic models"
         fi
 
-        # Live upstream vs proxy-cached. This distinguishes the two causes of a
-        # 400 model_not_supported that are otherwise indistinguishable:
-        #   stale cache  -> upstream HAS claude, proxy doesn't  -> restart
-        #   entitlement  -> upstream lacks claude too           -> org policy
-        local _up _up_claude _missing _served_norm _m
-        if _up="$(_copilot_upstream_models)" && [ -n "$_up" ]; then
-          _up_claude="$(printf '%s\n' "$_up" | command grep -ci '^claude' || true)"
-          _ok "upstream" "$(printf '%s\n' "$_up" | command grep -c .) ids from GitHub, $_up_claude claude"
-          # set-difference without process substitution (POSIX subset: this file
-          # is sourced by both bash and zsh, and `<(...)` is neither's contract).
-          _served_norm="$(printf '%s\n' "$_served" | _copilot_norm_models)"
-          _missing="$(printf '%s\n' "$_up" | _copilot_norm_models | command grep -i '^claude' \
-            | while IFS= read -r _m; do
-                [ -n "$_m" ] || continue
-                printf '%s\n' "$_served_norm" | command grep -qxF "$_m" || printf '%s\n' "$_m"
-              done)"
-          if [ -n "$_missing" ]; then
-            _bad "STALE CACHE" "upstream serves claude ids the proxy does not:"
-            printf '%s\n' "$_missing" | while IFS= read -r _m; do [ -n "$_m" ] && _hint "$_m"; done
-            _hint "copilot-api caches /models at STARTUP — a flaky fetch poisons the session"
-            _hint "copilot-proxy restart   # re-fetch the list"
-          elif [ "$_up_claude" -gt 0 ] && [ "$_claude" -eq 0 ]; then
-            _bad "STALE CACHE" "upstream has claude, the proxy does not"
-            _hint "copilot-proxy restart"
-          elif [ "$_up_claude" -eq 0 ]; then
-            _note "entitlement" "GitHub itself serves no claude models for this account"
-            _hint "org Copilot policy disables Anthropic — a restart will NOT help"
-          else
-            _ok "cache" "proxy list matches upstream (no claude ids missing)"
-          fi
+        # A/B: true-direct vs via local Clash/Verge. GitHub geo-filters the
+        # Claude catalog on CN egress; curl's default path follows System Proxy
+        # so a single "upstream" probe used to mis-label that as entitlement.
+        _dir_c=0; _via_c=0
+        if _up_direct="$(_copilot_upstream_models direct)" && [ -n "$_up_direct" ]; then
+          _dir_n="$(printf '%s\n' "$_up_direct" | command grep -c .)"
+          _dir_c="$(printf '%s\n' "$_up_direct" | command grep -ci '^claude' || true)"
+          _ok "upstream direct" "$_dir_n ids, $_dir_c claude (--noproxy)"
         else
-          _skip "upstream" "could not query GitHub directly (need token + jq) — cache check skipped"
+          _skip "upstream direct" "could not query GitHub direct (need token + jq, or blocked)"
+        fi
+        if [ -n "$_http_proxy" ]; then
+          if _up_via="$(_copilot_upstream_models "$_http_proxy")" && [ -n "$_up_via" ]; then
+            _via_n="$(printf '%s\n' "$_up_via" | command grep -c .)"
+            _via_c="$(printf '%s\n' "$_up_via" | command grep -ci '^claude' || true)"
+            _ok "upstream via proxy" "$_via_n ids, $_via_c claude ($_http_proxy)"
+          else
+            _bad "upstream via proxy" "no response through $_http_proxy"
+            _hint "Clash/mihomo node may be down — try another PROXY selection"
+          fi
+        fi
+
+        if [ "$_via_c" -gt 0 ] && [ "$_dir_c" -eq 0 ]; then
+          _note "egress geo" "Claude appears ONLY via local proxy — GitHub filters Anthropic on direct/CN egress"
+          if [ "$_claude" -eq 0 ]; then
+            _bad "MISSING --proxy-env" "copilot-api started without HTTPS_PROXY, so it cached the direct (no-Claude) catalog"
+            _hint "copilot-proxy restart   # auto uses --proxy-env when a local proxy is detected"
+            _hint "or: COPILOT_HTTP_PROXY=http://127.0.0.1:7897 copilot-proxy restart"
+          fi
+        elif [ "$_via_c" -eq 0 ] && [ "$_dir_c" -eq 0 ] && [ -n "${_up_direct}${_up_via}" ]; then
+          _note "entitlement" "neither direct nor via-proxy catalogs include Claude"
+          _hint "org Copilot policy may disable Anthropic — a restart will NOT help"
+        elif [ "$_claude" -eq 0 ] && [ "$_via_c" -gt 0 ]; then
+          _bad "STALE CACHE" "via-proxy upstream has Claude but the running process does not"
+          _hint "copilot-proxy restart"
+        elif [ "$_claude" -gt 0 ]; then
+          _ok "cache" "served Claude list looks healthy"
         fi
 
         _pin="$(_copilot_effective_model)"
@@ -712,6 +828,18 @@ copilot-proxy() {
         fi
       else
         _bad "served" "could not fetch $(_copilot_base)/v1/models"
+        # Still run the A/B so a stopped proxy doesn't hide the geo diagnosis.
+        if _up_direct="$(_copilot_upstream_models direct)" && [ -n "$_up_direct" ]; then
+          _dir_c="$(printf '%s\n' "$_up_direct" | command grep -ci '^claude' || true)"
+          _ok "upstream direct" "$(printf '%s\n' "$_up_direct" | command grep -c .) ids, $_dir_c claude"
+        fi
+        if [ -n "$_http_proxy" ] && _up_via="$(_copilot_upstream_models "$_http_proxy")" && [ -n "$_up_via" ]; then
+          _via_c="$(printf '%s\n' "$_up_via" | command grep -ci '^claude' || true)"
+          _ok "upstream via proxy" "$(printf '%s\n' "$_up_via" | command grep -c .) ids, $_via_c claude"
+          if [ "$_via_c" -gt 0 ]; then
+            _hint "start with proxy: copilot-proxy start   # will attach --proxy-env automatically"
+          fi
+        fi
       fi
 
       printf '\n%s\n' "Upstream (GitHub Copilot API)"
@@ -757,9 +885,9 @@ copilot-proxy() {
         _skip "clash/mihomo" "not running"
       fi
       if [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ]; then
-        _note "env proxy" "HTTPS_PROXY is set — bun/node honour this, the macOS setting alone they ignore"
+        _note "env proxy" "HTTPS_PROXY is set — bun/node honour this (and --proxy-env), the macOS System Proxy alone they ignore"
       else
-        _skip "env proxy" "HTTPS_PROXY unset (bun reaches upstream directly)"
+        _skip "env proxy" "HTTPS_PROXY unset in this shell (copilot-proxy start auto-injects it when a local proxy is detected)"
       fi
 
       printf '\n%s\n' "Live probe"
@@ -893,8 +1021,10 @@ copilot-proxy() {
       ;;
     -h|--help|help)
       printf '%s\n' "Usage: copilot-proxy [start|stop|restart|status|doctor [--live]|logs [shim|N [gen]]|shim [on|off|status]|whoami|auth|reinstall]"
-      printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, model entitlement, upstream"
-      printf '%s\n' "                        reachability. --live adds one real request (costs 1 quota unit)."
+      printf '%s\n' "  doctor (alias: test)  diagnose prereqs, auth, proxy, Claude catalog (direct vs via"
+      printf '%s\n' "                        Clash), upstream reachability. --live costs 1 quota unit."
+      printf '%s\n' "  COPILOT_HTTP_PROXY    auto|always|never|http://127.0.0.1:PORT  (default auto)"
+      printf '%s\n' "                        auto attaches --proxy-env when proxy-status finds a local proxy."
       printf '%s\n' "  reinstall             wipe + re-install the pinned package (a version bump"
       printf '%s\n' "                        re-installs on its own; this is for a corrupted prefix)."
       ;;
