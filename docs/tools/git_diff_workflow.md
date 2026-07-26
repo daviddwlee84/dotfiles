@@ -57,7 +57,9 @@ This keeps LazyGit aligned with the existing `delta`-first CLI setup while avoid
 
 Both `diffnav` and `gh-dash` look better with a Nerd Font because their interfaces rely on icon glyphs. This repo already manages Hack Nerd Font on desktop profiles.
 
-The `bat` Tokyo Night warning is fixed by managing the upstream `tokyonight_night.tmTheme` file directly and rebuilding the bat theme cache after apply.
+The `bat` Tokyo Night warning (`[bat warning]: Unknown theme 'tokyonight_night', using default.`, printed on every `delta` render) is fixed by managing the upstream `tokyonight_night.tmTheme` file directly and compiling it into bat's cache after apply.
+
+bat never reads `.tmTheme` at runtime — only the bincode cache under `~/.cache/bat`, which `bat cache --build` writes. That cache lives outside chezmoi's control, so `.chezmoiscripts/global/run_after_25_bat_theme.sh.tmpl` re-checks it on **every** apply (cache present? written by the current bat version? newer than the theme source?) and rebuilds only when stale. `dot_config/shell/25_bat.sh` correspondingly exports `BAT_THEME` only when the compiled cache exists, so a host without one falls back to bat's default silently instead of warning on every line. See [`pitfalls/bat-theme-cache-cleared-never-rebuilt.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/bat-theme-cache-cleared-never-rebuilt.md).
 
 ## References
 

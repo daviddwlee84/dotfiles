@@ -62,7 +62,9 @@ git:
 
 `diffnav` 與 `gh-dash` 在搭配 Nerd Font 時外觀更佳，因為它們的介面仰賴圖示字符 (icon glyph)。本倉庫已在桌面 profile 上管理 Hack Nerd Font。
 
-`bat` 的 Tokyo Night 警告，透過直接管理上游的 `tokyonight_night.tmTheme` 檔案、並在 apply 後重建 bat 主題快取 (cache) 來修正。
+`bat` 的 Tokyo Night 警告（`[bat warning]: Unknown theme 'tokyonight_night', using default.`，每次 `delta` 繪製時都會印出一行），透過直接管理上游的 `tokyonight_night.tmTheme` 檔案、並在 apply 後把它編譯進 bat 快取 (cache) 來修正。
+
+bat 執行期並不讀取 `.tmTheme`，只讀 `~/.cache/bat` 底下由 `bat cache --build` 產生的 bincode 快取。該快取位於 chezmoi 管轄範圍之外，因此 `.chezmoiscripts/global/run_after_25_bat_theme.sh.tmpl` 會在**每次** apply 都重新檢查（快取存在嗎？是目前這個 bat 版本寫的嗎？比主題原始檔新嗎？），只有過期時才重建。對應地，`dot_config/shell/25_bat.sh` 只在編譯後的快取確實存在時才 export `BAT_THEME`，所以沒有快取的機器會靜默退回 bat 內建預設主題，而不是每一行都跳警告。詳見 [`pitfalls/bat-theme-cache-cleared-never-rebuilt.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/bat-theme-cache-cleared-never-rebuilt.md)。
 
 ## 參考資料
 

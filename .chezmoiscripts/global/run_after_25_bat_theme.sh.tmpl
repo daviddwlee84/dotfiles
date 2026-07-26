@@ -1,0 +1,122 @@
+#!/bin/bash
+# Keep bat's compiled theme cache in sync with the managed Tokyo Night theme.
+#
+# `run_after_*`, NOT `run_onchange_after_*` (which is what this used to be).
+# The cache lives OUTSIDE chezmoi's control (`~/.cache/bat/*.bin`, compiled from
+# `~/.config/bat/themes/`) and is wiped or invalidated out-of-band by events that
+# never touch the `.tmTheme` file, so its content hash is the wrong gate:
+#
+#   - `bat cache --clear` — the documented delta-crash recovery in
+#     pitfalls/git-delta-empty-stdin-huge-allocation.md
+#   - this script's own delta health check below (it clears on incompatibility)
+#   - a `~/.cache` wipe, or a $HOME restored/synced without `~/.cache`
+#   - a `bat` upgrade: the cache is bincode keyed to the bat version that wrote
+#     it, so the new bat ignores (and warns about) a cache from the old one
+#
+# Under the old onchange hash, none of those re-ran this script, so the cache
+# stayed missing forever and EVERY `bat` invocation — including every fzf / tv /
+# yazi preview that shells out to bat — printed:
+#
+#   [bat warning]: Unknown theme 'tokyonight_night', using default.
+#
+# See pitfalls/bat-theme-cache-cleared-never-rebuilt.md.
+#
+# Cost when the cache is already healthy: 3 `bat` invocations + 2 stat calls
+# (~150 ms, no `bat cache --build`). The expensive rebuild only runs when
+# something is actually stale.
+#
+# Skip this hook entirely (cache left exactly as-is):
+#   export CHEZMOI_SKIP_BAT_CACHE=1
+
+set -e
+
+[ "${CHEZMOI_SKIP_BAT_CACHE:-0}" = "1" ] && exit 0
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# `brew shellenv` costs ~190 ms — more than everything else this script does on
+# the healthy path. Only pay it when bat isn't already reachable (it is whenever
+# `chezmoi apply` was launched from an interactive shell).
+load_brew_env() {
+{{ if eq .chezmoi.os "darwin" -}}
+    if [[ -f /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -f /usr/local/bin/brew ]]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+{{ else -}}
+    if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    elif [[ -d "$HOME/.linuxbrew" ]]; then
+        eval "$("$HOME/.linuxbrew/bin/brew" shellenv)"
+    fi
+{{ end -}}
+}
+
+info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+
+command -v bat >/dev/null 2>&1 || load_brew_env
+if ! command -v bat >/dev/null 2>&1; then
+    # Quiet: bat is optional, and this script now runs on every apply.
+    exit 0
+fi
+
+CACHE_DIR="$(bat --cache-dir)"
+THEME_FILE="$(bat --config-dir)/themes/tokyonight_night.tmTheme"
+BAT_VERSION="$(bat --version | awk '{print $2}')"
+
+if [[ ! -f "$THEME_FILE" ]]; then
+    warn "bat theme file not found: $THEME_FILE"
+    exit 0
+fi
+
+# Fast path — the compiled cache exists, was written by THIS bat version, and is
+# newer than the theme source. Anything else falls through to a rebuild.
+if [[ -f "$CACHE_DIR/themes.bin" ]] \
+    && [[ ! "$THEME_FILE" -nt "$CACHE_DIR/themes.bin" ]] \
+    && grep -qx "bat_version: $BAT_VERSION" "$CACHE_DIR/metadata.yaml" 2>/dev/null; then
+    exit 0
+fi
+
+# A (bat, delta) pair already proven incompatible below stays cleared — without
+# this stamp the script would rebuild → delta-check → clear on every single
+# apply, forever. The stamp lives outside $CACHE_DIR because `bat cache --clear`
+# removes that directory wholesale.
+STAMP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/chezmoi"
+STAMP="$STAMP_DIR/bat-cache-delta-incompatible"
+if command -v delta >/dev/null 2>&1; then
+    DELTA_VERSION="$(delta --version | awk '{print $2}')"
+else
+    DELTA_VERSION="none"
+fi
+STAMP_KEY="bat=$BAT_VERSION delta=$DELTA_VERSION"
+
+if [[ -f "$STAMP" ]] && [[ "$(cat "$STAMP")" == "$STAMP_KEY" ]]; then
+    info "bat cache intentionally left empty: $STAMP_KEY is a known delta-incompatible pair"
+    info "  (see pitfalls/git-delta-empty-stdin-huge-allocation.md; rm $STAMP to retry)"
+    exit 0
+fi
+
+info "Rebuilding bat theme cache (bat $BAT_VERSION)"
+bat cache --build >/dev/null
+
+# delta embeds its own bat; a cache written by an incompatible bat makes delta
+# abort with a bogus multi-petabyte allocation. Verify on the rendering path —
+# `delta --version` does NOT exercise it. Do not regress this to a version check.
+if [[ "$DELTA_VERSION" != "none" ]] && ! printf '' | delta --no-gitconfig --paging=never >/dev/null 2>&1; then
+    warn "bat cache is incompatible with delta $DELTA_VERSION; clearing cache so git pager keeps working"
+    bat cache --clear >/dev/null
+    mkdir -p "$STAMP_DIR"
+    printf '%s\n' "$STAMP_KEY" >"$STAMP"
+    warn "BAT_THEME stays unset in the shell (dot_config/shell/25_bat.sh) — bat uses its own default"
+    exit 0
+fi
+rm -f "$STAMP"
+
+if bat --list-themes 2>/dev/null | grep -qx 'tokyonight_night'; then
+    success "bat theme cache rebuilt (tokyonight_night available)"
+else
+    warn "bat cache rebuilt but 'tokyonight_night' is not listed — BAT_THEME will stay unset"
+fi
