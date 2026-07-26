@@ -134,11 +134,24 @@ type = "pane"
 command = "nvtop"
 description = "nvtop GPU monitor (popup pane)"
 
+# --- Scratch shell as a real floating popup (prefix+`) ---
+# Was type = "pane", which took over the layout — it read as a zoom of the
+# current window rather than a scratch space. type = "popup" (herdr >= 0.7.4)
+# floats ABOVE the tiled layout instead, so nothing reflows and quitting the
+# shell puts you back exactly where you were.
+#
+# The lazygit/btop/nvtop bindings above deliberately STAY type = "pane": you
+# quit those immediately (`q`) and return, so the temporary split costs nothing
+# and a modal popup would buy nothing. Popups are session-modal — you cannot
+# interact with another pane while one is open — which is the trade-off that
+# decides this per binding rather than globally.
 [[keys.command]]
 key = "prefix+`"
-type = "pane"
+type = "popup"
 command = "$SHELL"
-description = "scratch shell (popup pane)"
+width = "85%"
+height = "80%"
+description = "scratch shell (popup)"
 
 # --- Run an arbitrary command in a floating popup (prefix+E) ---
 # The generalisation of prefix+G: instead of a hardcoded tool, fzf-pick or type

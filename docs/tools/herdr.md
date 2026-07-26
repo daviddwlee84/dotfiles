@@ -329,12 +329,13 @@ Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review
 
 | Approach | Problem |
 |---|---|
-| `type = "pane"` (`prefix+G/M/N/`` ` ``) | splits the **tiled layout** for the duration; everything reflows |
+| `type = "pane"` (`prefix+G/M/N`) | splits the **tiled layout** for the duration; everything reflows |
 | `prefix + c` → type → `exit` | four steps, and churns the tab bar |
-| `prefix + `` ` `` (scratch shell) | leaves you in a shell you have to exit by hand |
 | **`type = "popup"`** | session-modal float **above** the layout — nothing reflows, and you land exactly where you were |
 
 `type = "popup"` requires **herdr ≥ 0.7.4** (added in #1125, with `width`/`height` in cells or percentages). It is the true `tmux display-popup -E` analog.
+
+`prefix + `` ` `` (scratch shell) is a popup too, for the same reason — as a command pane it took over the layout and read as a *zoom* of the current window rather than a scratch space. `prefix+G` / `prefix+M` / `prefix+N` (lazygit / btop / nvtop) deliberately stay `type = "pane"`: you quit those immediately with `q`, so the temporary split costs nothing, and popups are **session-modal** — you cannot touch another pane while one is open. That modality is why this is decided per binding rather than globally.
 
 **It cannot be a herdr-plus Quick Action** (`prefix + y`), which is the intuitive place to look. Two blockers: Quick Actions run through `sh -c` with **no PTY/stdin** — the same reason `btop`/`nvtop` are command panes rather than Quick Actions — and every action is a fixed `command = "…"` string with no free-text field.
 
@@ -343,11 +344,13 @@ Behaviour:
 | | |
 |---|---|
 | **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` `foreground_cwd` → `$PWD`. Preferring the env var means it still works when the CLI is protocol-mismatched with a stale server |
-| **picker** | fzf over `$HISTFILE` (default `~/.zsh_history`), newest-first and de-duplicated. Typing something with no match and pressing Enter runs it as a **new** command; `Esc` runs nothing. Falls back to a plain `read` prompt when fzf is absent |
+| **picker** | fzf over `$HISTFILE` (default `~/.zsh_history`), newest-first and de-duplicated. **Enter** runs the highlighted history entry; **`Alt+Enter` runs exactly what you typed**, even when history still matches it; typing something with no match at all and pressing Enter also runs it as a new command; `Esc` runs nothing. Falls back to a plain `read` prompt when fzf is absent |
 | **shell** | `$SHELL -ic` by default, so this repo's aliases and functions resolve (`gst`, `cas`, `x`, …). `--sh` switches to `sh -c` — fast, but aliases do not exist |
 | **on exit** | closes on success; on failure prints `[exit N]` and waits for Enter so the error stays readable. `HERDR_RUN_HOLD=always\|never` overrides |
 
 > Two portability traps are handled inside the helper and are worth knowing if you edit it: `~/.zsh_history` is extended-history format (`: <ts>:<elapsed>;<cmd>`) **and contains non-UTF8 bytes**, so BSD `sed` aborts with `sed: RE error: illegal byte sequence` unless the parse runs under `LC_ALL=C`; and the newest-first reversal uses POSIX `awk` because `tail -r` is BSD-only while `tac` is GNU-only.
+
+> **Why `Alt+Enter` had to exist.** Plain Enter cannot express *"run exactly what I typed"* while fzf still has a match — type `ls -la` with `ls -la /tmp` in history and Enter takes the history entry, which makes the picker feel like it can only replay old commands. `--expect=alt-enter` adds the escape hatch. Note that fzf's line layout is **not fixed**: with `--print-query --expect`, a no-match Enter prints only the query (one line), while an accepted match prints query / key / selection. The helper therefore reads the key from line 2 (empty or absent ⇒ plain Enter) and only trusts line 3 on exit code 0.
 
 ## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
 

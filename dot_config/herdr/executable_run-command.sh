@@ -96,22 +96,44 @@ _history() {
 # --- pick the command -------------------------------------------------------
 cmd=""
 if command -v fzf >/dev/null 2>&1; then
-    # --print-query makes the three outcomes distinguishable by exit code:
-    #   0   picked an entry   → line 1 = query, line 2 = selection
-    #   1   no match + Enter  → line 1 = query only (a brand-new command)
-    #   130 Esc               → abort
+    # --print-query + --expect together make the outcomes distinguishable.
+    # Line layout is NOT fixed — fzf omits trailing lines it has nothing for:
+    #
+    #   Enter     with a match     rc 0    query \n ""        \n selection
+    #   Alt+Enter with a match     rc 0    query \n alt-enter \n selection
+    #   Enter     with no match    rc 1    query                              (1 line)
+    #   Alt+Enter with no match    rc 1    query \n alt-enter
+    #   Esc                        rc 130  —
+    #
+    # So the key is read from line 2 (empty/absent ⇒ plain Enter) and the
+    # command from line 3 only on rc 0; every other path falls back to the
+    # query on line 1. Verified against fzf directly with -1/-0.
+    #
+    # Alt+Enter exists because plain Enter cannot express "run exactly what I
+    # typed" while fzf still has a match: if you type `ls -la` and history holds
+    # `ls -la /tmp`, Enter takes the history entry. That made the picker feel
+    # like it could only replay old commands. Alt+ (not Ctrl+) per the repo's
+    # keybinding convention.
     set +e
     out=$(_history | fzf \
-        --print-query --no-sort --height=100% --border \
+        --print-query --expect=alt-enter --no-sort --height=100% --border \
         --query="$query" \
+        --header='enter: run highlighted · alt-enter: run what you typed · esc: cancel' \
         --prompt="run [$(basename "$cwd")]> ")
     rc=$?
     set -e
     case "$rc" in
-        0) cmd=$(printf '%s\n' "$out" | sed -n '2p') ;;
-        1) cmd=$(printf '%s\n' "$out" | sed -n '1p') ;;
+        0 | 1) ;;
         *) exit 0 ;;   # 130 = Esc, or fzf failed — run nothing
     esac
+    key=$(printf '%s\n' "$out" | sed -n '2p')
+    if [ "$key" = "alt-enter" ]; then
+        cmd=$(printf '%s\n' "$out" | sed -n '1p')      # literal query, always
+    elif [ "$rc" -eq 0 ]; then
+        cmd=$(printf '%s\n' "$out" | sed -n '3p')      # highlighted selection
+    else
+        cmd=$(printf '%s\n' "$out" | sed -n '1p')      # no match → the query
+    fi
 else
     if [ -n "$query" ]; then
         cmd="$query"

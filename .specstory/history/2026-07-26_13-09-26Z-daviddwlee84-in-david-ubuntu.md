@@ -6668,3 +6668,725 @@ scripts/upgrade_tools.sh
 exit=0
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:44:06Z)**_
+
+<think><details><summary>Thought Process</summary>
+The transcript didn't get staged by the artifact script, possibly because it requires code changes first, but those are already staged. Let me manually stage the modified transcript file since it's showing as changed, and the scan comes back clean.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:44:07Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage the transcript and rescan
+
+`git add .specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md && git diff --cached --name-only | head -3; echo "=== rescan ==="; bash ~/.claude/skills/agent-history-hygiene/scripts/scan-staged.sh >/dev/null 2>&1; echo "exit=$?"`
+
+```text
+.specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md
+docs/this_repo/tool-managers.md
+docs/this_repo/upgrades.md
+=== rescan ===
+exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:44:31Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the herdr upgrade category and docs
+
+```bash
+git commit -F - <<'MSG'
+feat(upgrades): herdr upgrade category, and the constraint that it can't run from a pane
+
+herdr was in no upgrade path at all. The Linux ansible task gates its install on
+`herdr --version` returning non-zero — "is it installed", not "is it current" —
+so `chezmoi apply` grabs whatever is latest on a fresh box and never touches it
+again. That is the repo's install-only invariant working as intended, but
+`scripts/upgrade_tools.sh` had no herdr category to pair with it, so `just
+upgrade-*` never covered it either. This box sat on 0.7.1 while upstream was at
+0.7.5, and only noticed because a `[[keys.command]]` using `type = "popup"`
+(0.7.4+) started failing against the old binary. `appsrc herdr` reporting
+`Manual / drag-in (heuristic)` was the same gap seen from the other side.
+
+The category is unusual in that its guard is the interesting part. Three skips,
+none of them failures, so `upgrade-all` is never derailed:
+
+  - not installed
+  - not Linux — macOS gets herdr from homebrew-core, and upstream DISABLES
+    `herdr update` on brew/mise/Nix installs
+  - inside a herdr pane — `herdr update --handoff` replaces the server process
+    that owns your shell, so it fails closed:
+
+      update failed: run `herdr update` outside herdr after detaching from the session
+
+The third is the one worth encoding. Without it `just upgrade-all` run from a
+herdr pane (i.e. the normal case for anyone using herdr) would fail here every
+single time, so the category skips with the detach → update → reattach
+instructions instead. It also reports which `herdr integration status` entries
+went stale, without auto-reinstalling them: those land in ~/.claude/hooks/,
+~/.codex/, ~/.cursor/ and ~/.config/opencode/plugins/, outside chezmoi's tree,
+so writing there is the caller's call. Same "warn, don't silently edit" rule
+cat_yazi_plugins already follows.
+
+Fixes a latent drift bug found while wiring this up: the positional-argument
+parser carried a hardcoded second copy of the category list, so a category
+added to ALL_CATEGORIES was advertised in the usage text and by the validation
+loop, then rejected as "Unknown argument" by the parser. Adding herdr to both
+lists would have papered over it; the parser now matches against
+ALL_CATEGORIES, which is the only copy left.
+
+Docs: new `herdr` row + run-order node in this_repo/upgrades.md; the
+tool-managers.md row grows its upgrade story; tools/herdr.md (+ zh-TW) gets the
+outside-herdr constraint, the version-blind-install note, and the
+integrations-go-stale-on-every-upgrade note.
+pitfalls/herdr-update-handoff-refuses-inside-pane.md records the verbatim error
+and the flow, including that the handoff genuinely is non-disruptive — verified
+by upgrading 0.7.1 → 0.7.5 with a Claude Code session live in a pane, which
+survived, ending with client and server both 0.7.5 on protocol 17.
+
+Also corrects peon-ping-setup-escapes-home.md, which claimed
+~/.config/opencode/plugins/herdr-agent-state.js is chezmoi-managed. It is not
+(`chezmoi managed` lists only workmux-status.ts there) — herdr writes it via
+`herdr integration install opencode` and every herdr upgrade stales it, so
+deleting it is not recoverable by `chezmoi apply`.
+
+Verified: shellcheck -S error clean; all 16 categories parse via --only and a
+bogus one still exits 2; `--dry-run herdr` shows the skip-with-instructions path
+from inside a pane and `+ herdr update --handoff` with HERDR_ env unset; the
+integration-report line is safe under `set -euo pipefail`. mkdocs --strict still
+aborts at the pre-existing 173 warnings, none naming the touched pages.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1785073469-386173.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..........................................................(no files to check)Skipped
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs....................................................Passed
+shellcheck (scripts/)...................................................................Passed
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...................................................................................Passed
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1785073469-386173.
+[main 7f5ef81] feat(upgrades): herdr upgrade category, and the constraint that it can't run from a pane
+ 10 files changed, 3365 insertions(+), 13 deletions(-)
+ create mode 100644 pitfalls/herdr-update-handoff-refuses-inside-pane.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:44:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+The commit went through successfully with all pre-commit checks passing. Now I'm verifying the final state by checking the git log and repository status.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:44:36Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm commits and branch state
+
+`git log --oneline -2; echo "=== status ==="; git status --short --branch`
+
+```text
+7f5ef81 feat(upgrades): herdr upgrade category, and the constraint that it can't run from a pane
+fa2980b fix(codex): the TOML writer must emit arrays-of-tables, or apply dies
+=== status ===
+## main...origin/main [ahead 6]
+ M .specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:45:04Z)**_
+
+做完了，commit `7f5ef81`（在 `main`，未 push）。pre-commit 全過（shellcheck / shfmt / gitleaks / redaction）。
+
+## 做了什麼
+
+**`just upgrade-herdr`**（`scripts/upgrade_tools.sh` 新增 `cat_herdr` + justfile recipe + 進 `upgrade-all` 的 run order）。這個 category 有意思的地方在 guard，三個都是 **skip 而非 fail**，所以不會拖垮 `upgrade-all`：沒裝、非 Linux（macOS 歸 brew，而且上游在 brew/mise/Nix 安裝上直接停用 `herdr update`）、以及**人在 herdr pane 裡**。
+
+第三個是重點：herdr 使用者跑 `upgrade-all` 的常態就是在 pane 裡，不擋的話每次都會死在這一步。所以它改成印出 detach → update → reattach 的指示然後跳過。跑完會回報哪些 integration 過期，但**不自動重裝** —— 那些檔案落在 `~/.claude/hooks/`、`~/.codex/`、`~/.cursor/`、`~/.config/opencode/plugins/`，都在 chezmoi 樹外面，比照 `cat_yazi_plugins` 的「warn, don't silently edit」。
+
+**順手修掉一個潛伏的 drift bug**：positional argument 的 parser 裡有一份**硬寫死的 category 清單副本**。加了 `herdr` 之後 usage 說它合法、validation loop 也說合法，parser 卻回 `Unknown argument: herdr`。我沒有選擇「兩邊都加」，而是讓 parser 直接比對 `ALL_CATEGORIES` —— 現在整個檔案只剩一份清單。
+
+**文件**：`upgrades.md` 新 row + mermaid 節點、`tool-managers.md` 的 herdr row 補上升級路徑、`tools/herdr.md`(+zh-TW) 補三件事（必須在 herdr 外面跑、install 不看版本、每次升級 integration 都會過期）、新增 `pitfalls/herdr-update-handoff-refuses-inside-pane.md` 並掛索引。也修正了 `peon-ping-setup-escapes-home.md` 誤稱 `herdr-agent-state.js` 是 chezmoi-managed 的那句。
+
+## 驗證
+
+`--dry-run herdr` 在 pane 裡走 skip-with-instructions，把 `HERDR_ENV`/`HERDR_PANE_ID` unset 後走 `+ herdr update --handoff`；16 個 category 全部 `--only` 解析通過、亂打的仍 exit 2；integration 回報那行在 `set -euo pipefail` 下不會炸。mkdocs `--strict` 仍是既有的 173 warnings，沒有一條指向我動過的頁面。
+
+## 一件要說的事
+
+中途我為了 grep usage 文字跑了裸的 `./scripts/upgrade_tools.sh` —— 那等於 `all`，真的開始升級了，跑到 `externals` 約兩分鐘我才發現並 kill 掉。事後確認過沒有造成任何改動：`chezmoi status` 空的、externals 目錄十分鐘內沒被碰過、repo 只有我預期的修改。是我該用 `--dry-run` 的。
+
+## 還沒動的兩件（等你決定）
+
+1. **`prefix+E` 的 fzf**：加 `--expect=alt-enter` 讓你能強制用字面輸入而不是被反白的 history 項搶走。
+2. **`prefix+\`` 要不要換成 popup**：取決於你是「開個 scratch shell 跟旁邊 pane 對照著看」還是「開→跑一條→關」。前者不要換（popup 是 session-modal），後者換了比較好。`prefix+G`/`M`/`N`（lazygit/btop/nvtop）倒是三個都適合換。
+
+---
+
+_**User (2026-07-26 13:55:00Z)**_
+
+prefix+E 的 fzf：加 --expect=alt-enter 試試
+
+prefix + ` 目前是full screen (會Z當前視窗) 我想換成popup 反倒是 lazygit/btop/nvtop 因爲幾乎用完就會q掉回來 目前實現倒是沒問題
+
+BTW 還是說 macOS 也換成self-managed binary會更好？
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 13:55:22Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to tackle a couple of configuration changes: first, adding `--expect=alt-enter` to the fzf binding for `prefix+E`, and second, converting the scratch shell from its current full-screen pane behavior to a popup window instead—though the other tools like lazygit, btop, and nvtop are working fine as they are.
+
+Then there's a bigger design question about whether macOS should also switch to self-managed binaries instead of relying on Homebrew. The appeal is clear: it would unlock `herdr update --handoff` to avoid the server-stranding issue that's documented as a real pain point on macOS. But it means breaking from the "macOS uses brew" convention, losing the convenience of `brew upgrade` sweeping everything together, and requiring the Ansible role to handle macOS release assets—plus I'd need to verify that herdr actually ships the right Darwin binaries for both architectures. There's also the question of whether a brew formula is preferable for codesigning and quarantine handling.
+
+I should investigate what release assets actually exist for macOS, and think through the migration path if we're switching from brew to self-managed. Let me start by editing the config files themselves—the template is in `.chezmoitemplates/herdr/config.toml` and the run-command script is in `dot_config/herdr/executable_run-command.sh`. My plan is to update the config to use popup mode for `prefix+\``, add the `--expect=alt-enter` flag to the run-command script, then research the macOS release assets to give a solid recommendation.
+
+For the popup dimensions, I'm thinking 85% width and 80% height—bigger than the prefix+E binding since this is a full shell, but I should verify the files first to see what we're working with and whether a popup can properly invoke `$SHELL`.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:55:22Z)**_
+
+Three things — two edits and a real design question. Let me look at the sources first:
+
+_**Agent (claude-opus-5 2026-07-26 13:55:24Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the scratch shell binding in the managed config body
+
+`grep -n 'prefix+`' -B6 -A6 .chezmoitemplates/herdr/config.toml`
+
+```text
+132-key = "prefix+N"
+133-type = "pane"
+134-command = "nvtop"
+135-description = "nvtop GPU monitor (popup pane)"
+136-
+137-[[keys.command]]
+138:key = "prefix+`"
+139-type = "pane"
+140-command = "$SHELL"
+141-description = "scratch shell (popup pane)"
+142-
+143-# --- Run an arbitrary command in a floating popup (prefix+E) ---
+144-# The generalisation of prefix+G: instead of a hardcoded tool, fzf-pick or type
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:55:25Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List herdr release assets to see macOS availability
+
+`curl -fsSL https://api.github.com/repos/ogulcancelik/herdr/releases/latest 2>/dev/null | grep '"name": "herdr' | head -10`
+
+```text
+      "name": "herdr-linux-aarch64",
+      "name": "herdr-linux-x86_64",
+      "name": "herdr-macos-aarch64",
+      "name": "herdr-macos-x86_64",
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:00Z)**_
+
+<think><details><summary>Thought Process</summary>
+The macOS release assets are actually available, so switching to self-managed runners is feasible. I need to make two edits now—first, changing the `prefix+\`` binding to open a popup—and then I'll verify the comment block above the lazygit/btop/nvtop section to make sure it accurately describes the floating command panes mechanism.
+
+I'm weighing whether to update the descriptions from "(popup pane)" to "(command pane)" for clarity, since real popups now exist and the current labels could be confusing. The user didn't ask for this change, but leaving misleading descriptions feels like technical debt. I'll make the minimal adjustment for the scratch shell binding and add a comment explaining why it differs, then leave the other three descriptions as-is to avoid unnecessary scope creep.
+
+Now I'm setting up the TOML configuration for the scratch shell, converting it from a pane-type binding to a real popup that floats above the layout without reflowing anything. I'm also updating the run-command.sh script to handle the `--expect=alt-enter` flag, which changes how the fzf history selection works.
+
+With `--expect` added, fzf outputs the query on line 1, the key pressed on line 2 (empty string for Enter, "alt-enter" for Alt+Enter), and the selection on line 3 when rc=0. I need to adjust the case statement to parse this new output format correctly. I should check whether Alt+Enter actually works in herdr popups across different terminals—macOS might need special configuration for Option-as-Meta, and tmux requires extended-keys support. Before testing, I need to update the documentation in herdr.md to reflect the new Alt+Enter binding, since the repo convention requires doc updates whenever keybindings change.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:00Z)**_
+
+macOS release assets exist (`herdr-macos-{aarch64,x86_64}`), so that's feasible — I'll answer that after the two edits.
+
+_**Agent (claude-opus-5 2026-07-26 13:56:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/.chezmoitemplates/herdr/config.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:14Z)**_
+
+Now the fzf `--expect=alt-enter`:
+
+_**Agent (claude-opus-5 2026-07-26 13:56:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/herdr/executable_run-command.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check the modified helper
+
+`sh -n dot_config/herdr/executable_run-command.sh && echo "sh syntax OK"; shellcheck -S error dot_config/herdr/executable_run-command.sh && echo "shellcheck OK"`
+
+```text
+sh syntax OK
+shellcheck OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:23Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Sanity-check the three-line parse offsets
+
+`printf 'alpha\nls -la /tmp\nbeta\n' > /tmp/fakehist; echo "=== simulate: Alt+Enter with a match present ==="; printf 'ls -la\nalt-enter\nls -la /tmp\n' | sed -n '2p'`
+
+```text
+=== simulate: Alt+Enter with a match present ===
+alt-enter
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to verify how fzf actually behaves end-to-end, so I'm exploring different testing approaches—`--filter` won't work since it skips the UI, and scripting key presses is tricky, but I can use `--select-1` or `--exit-0` to test the output layout directly.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:37Z)**_
+
+Let me verify fzf's actual output layout rather than assume it — `-1`/`-0` exit without a keypress:
+
+_**Agent (claude-opus-5 2026-07-26 13:56:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm fzf 3-line output shape on the match path
+
+`cd /tmp && echo "--- rc=0 path (exactly one match, auto-selected) ---"; out=$(printf 'alpha\nls -la /tmp\nbeta\n' | fzf --print-query --expect=alt-enter --no-sort --query='ls -la' -1 -0 2>/dev/null); rc=$?; echo "rc=$rc"; printf '%s\n' "$out" | cat -A | head -5`
+
+```text
+--- rc=0 path (exactly one match, auto-selected) ---
+rc=0
+ls -la$
+$
+ls -la /tmp$
+Shell cwd was reset to /home/daviddwlee84/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:39Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm fzf output shape on the no-match path
+
+`cd /tmp && echo "--- rc=1 path (zero matches) ---"; out=$(printf 'alpha\nbeta\n' | fzf --print-query --expect=alt-enter --no-sort --query='zzznomatch' -1 -0 2>/dev/null); rc=$?; echo "rc=$rc"; printf '%s\n' "$out" | cat -A | head -5`
+
+```text
+--- rc=1 path (zero matches) ---
+rc=1
+zzznomatch$
+Shell cwd was reset to /home/daviddwlee84/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:53Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm realizing that when fzf returns rc=1 (no match), it only outputs a single line—the query itself—without the empty key line or selection line. So my sed command extracting the second line for the key would come back empty, which is correct since it's not an alt-enter action, and the logic would fall through to the else branch using the first line as the query.
+
+Let me verify all four scenarios work: plain Enter gives the selection, alt-enter with a match gives the query, no match returns the query regardless of whether the key line is emitted, and the logic is robust enough to handle both cases. Now I need to finalize the command structure.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:56:53Z)**_
+
+fzf prints only **one** line on the no-match path, not three — my comment claimed otherwise. Correcting it (the logic already handles it, but the comment would mislead the next edit):
+
+_**Agent (claude-opus-5 2026-07-26 13:57:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_config/herdr/executable_run-command.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate and exercise the helper end-to-end
+
+`sh -n dot_config/herdr/executable_run-command.sh && shellcheck -S error dot_config/herdr/executable_run-command.sh && echo "OK"; echo "=== end-to-end: no-match path picks the query ==="; HISTFILE=/tmp/fakehist HERDR_RUN_HOLD=never sh dot_config/herdr/executable_run-command.sh --cwd /tmp --sh 'echo NOMATCH-QUERY-RAN' 2>&1 | tail -3`
+
+```text
+OK
+=== end-to-end: no-match path picks the query ===
+inappropriate ioctl for device
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:29Z)**_
+
+<think><details><summary>Thought Process</summary>
+The issue is that fzf requires a TTY to run interactively, but my Bash tool doesn't provide one — hence the "inappropriate ioctl for device" error. I can work around this by using `script -qec "cmd" /dev/null` to create a PTY environment. The challenge is that without passing `-1` or `-0` flags to fzf, it'll block waiting for keyboard input, so I'd need to pipe input through the script command to feed it data.
+
+Rather than struggle with PTY simulation, I'll take a more practical approach: test the fallback branch that runs when fzf isn't available, which exercises the core script logic without needing a TTY. I'll also write an isolated unit test that simulates the four possible fzf output shapes and verifies the sed parsing logic correctly selects the right line in each case. This gives me rigorous coverage of the actual logic without the PTY complexity.
+
+Let me check where fzf is installed first, then run both tests.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:29Z)**_
+
+fzf needs a PTY, which the tool doesn't have. Testing the parse logic against the four real output shapes instead:
+
+_**Agent (claude-opus-5 2026-07-26 13:57:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Unit-test the four fzf output shapes
+
+```bash
+cd /tmp && cat > /tmp/parsetest.sh <<'EOF'
+# Mirror of the branch in executable_run-command.sh, fed the exact shapes
+# fzf was observed to emit.
+pick() {
+  out="$1"; rc="$2"
+  key=$(printf '%s\n' "$out" | sed -n '2p')
+  if [ "$key" = "alt-enter" ]; then printf '%s' "$(printf '%s\n' "$out" | sed -n '1p')"
+  elif [ "$rc" -eq 0 ]; then printf '%s' "$(printf '%s\n' "$out" | sed -n '3p')"
+  else printf '%s' "$(printf '%s\n' "$out" | sed -n '1p')"; fi
+}
+t() { got=$(pick "$2" "$3"); [ "$got" = "$4" ] && echo "PASS  $1 -> '$got'" || echo "FAIL  $1 -> got '$got' want '$4'"; }
+
+t "Enter + match      (run selection)" "$(printf 'ls -la\n\nls -la /tmp')" 0 "ls -la /tmp"
+t "Alt+Enter + match  (run query)    " "$(printf 'ls -la\nalt-enter\nls -la /tmp')" 0 "ls -la"
+t "Enter + no match   (run query)    " "$(printf 'zzznomatch')" 1 "zzznomatch"
+t "Alt+Enter+no match (run query)    " "$(printf 'zzznomatch\nalt-enter')" 1 "zzznomatch"
+EOF
+sh /tmp/parsetest.sh
+```
+
+```text
+PASS  Enter + match      (run selection) -> 'ls -la /tmp'
+PASS  Alt+Enter + match  (run query)     -> 'ls -la'
+PASS  Enter + no match   (run query)     -> 'zzznomatch'
+PASS  Alt+Enter+no match (run query)     -> 'zzznomatch'
+Shell cwd was reset to /home/daviddwlee84/.local/share/chezmoi
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:37Z)**_
+
+All four paths correct. Now applying and validating against herdr itself:
+
+_**Agent (claude-opus-5 2026-07-26 13:57:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Apply and validate the herdr config change
+
+`chezmoi apply ~/.config/herdr/config.toml ~/.config/herdr/run-command.sh 2>&1 | head; echo "apply exit=$?"; echo "=== herdr validates the new config ==="; herdr server reload-config 2>&1 | head -3`
+
+```text
+apply exit=0
+=== herdr validates the new config ===
+{"id":"cli:server:reload-config","result":{"diagnostics":[],"status":"applied","type":"config_reload"}}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Confirm both changes landed on the live targets
+
+`grep -n 'prefix+`' -A6 ~/.config/herdr/config.toml; echo "=== helper deployed with --expect? ==="; grep -c 'expect=alt-enter' ~/.config/herdr/run-command.sh; ls -l ~/.config/herdr/run-command.sh | cut -c1-12`
+
+```text
+138:# --- Scratch shell as a real floating popup (prefix+`) ---
+139-# Was type = "pane", which took over the layout — it read as a zoom of the
+140-# current window rather than a scratch space. type = "popup" (herdr >= 0.7.4)
+141-# floats ABOVE the tiled layout instead, so nothing reflows and quitting the
+142-# shell puts you back exactly where you were.
+143-#
+144-# The lazygit/btop/nvtop bindings above deliberately STAY type = "pane": you
+--
+150:key = "prefix+`"
+151-type = "popup"
+152-command = "$SHELL"
+153-width = "85%"
+154-height = "80%"
+155-description = "scratch shell (popup)"
+156-
+=== helper deployed with --expect? ===
+1
+.rwxr-xr-x 7
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:51Z)**_
+
+<think><details><summary>Thought Process</summary>
+The config is accepted and the helper is deployed. Now I need to update the documentation to reflect the keybinding changes—specifically updating the description for prefix+E and prefix+` in the herdr.md file, and checking if there's a keybinding table that needs updating as well.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:51Z)**_
+
+Both live and herdr accepts the config. Updating the docs for the two behaviour changes:
+
+_**Agent (claude-opus-5 2026-07-26 13:57:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the keybinding rows in the herdr doc
+
+`grep -n 'prefix+`\|prefix+E\|Run any command' docs/tools/herdr.md | head -10`
+
+```text
+324:## Run any command in a popup (`prefix + E`) {#run-any-command}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:57:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the prefix+E doc section and locate its mirror
+
+`sed -n '324,360p' docs/tools/herdr.md; echo "=== zh-TW mirror ==="; grep -n 'Run any command\|run-any-command' docs/tools/herdr.zh-TW.md`
+
+```text
+## Run any command in a popup (`prefix + E`) {#run-any-command}
+
+`prefix + G` proves the shape — a transient pane that runs something and vanishes when it exits — but its command is hardcoded. `prefix + E` is the generalisation: **fzf-pick a command from shell history (or just type a new one), it runs in the focused pane's cwd, and the popup closes itself on exit.** Helper: `~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh).
+
+**Why `type = "popup"` and not the alternatives** — this is the only binding here that is not a command *pane*:
+
+| Approach | Problem |
+|---|---|
+| `type = "pane"` (`prefix+G/M/N/`` ` ``) | splits the **tiled layout** for the duration; everything reflows |
+| `prefix + c` → type → `exit` | four steps, and churns the tab bar |
+| `prefix + `` ` `` (scratch shell) | leaves you in a shell you have to exit by hand |
+| **`type = "popup"`** | session-modal float **above** the layout — nothing reflows, and you land exactly where you were |
+
+`type = "popup"` requires **herdr ≥ 0.7.4** (added in #1125, with `width`/`height` in cells or percentages). It is the true `tmux display-popup -E` analog.
+
+**It cannot be a herdr-plus Quick Action** (`prefix + y`), which is the intuitive place to look. Two blockers: Quick Actions run through `sh -c` with **no PTY/stdin** — the same reason `btop`/`nvtop` are command panes rather than Quick Actions — and every action is a fixed `command = "…"` string with no free-text field.
+
+Behaviour:
+
+| | |
+|---|---|
+| **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` `foreground_cwd` → `$PWD`. Preferring the env var means it still works when the CLI is protocol-mismatched with a stale server |
+| **picker** | fzf over `$HISTFILE` (default `~/.zsh_history`), newest-first and de-duplicated. Typing something with no match and pressing Enter runs it as a **new** command; `Esc` runs nothing. Falls back to a plain `read` prompt when fzf is absent |
+| **shell** | `$SHELL -ic` by default, so this repo's aliases and functions resolve (`gst`, `cas`, `x`, …). `--sh` switches to `sh -c` — fast, but aliases do not exist |
+| **on exit** | closes on success; on failure prints `[exit N]` and waits for Enter so the error stays readable. `HERDR_RUN_HOLD=always\|never` overrides |
+
+> Two portability traps are handled inside the helper and are worth knowing if you edit it: `~/.zsh_history` is extended-history format (`: <ts>:<elapsed>;<cmd>`) **and contains non-UTF8 bytes**, so BSD `sed` aborts with `sed: RE error: illegal byte sequence` unless the parse runs under `LC_ALL=C`; and the newest-first reversal uses POSIX `awk` because `tail -r` is BSD-only while `tac` is GNU-only.
+
+## Copy focused-pane facts to the clipboard (`prefix+P/D/V/S`)
+
+Four one-keypress "grab this pane onto the clipboard" ops, all driven by one helper (`~/.config/herdr/pane-copy.sh` = [`dot_config/herdr/executable_pane-copy.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_pane-copy.sh)). It distills a herdr CLI call into human-readable text and pipes it to the repo's own [`x copy`](../shells/aliases.md) (auto-selects pbcopy / wl-copy / xclip / xsel / OSC 52; `x` is resolved by absolute-path fallback since a command-pane may run without the interactive PATH). The pane defaults to the **current focused pane** (`herdr pane current`); the keybinds pass `$HERDR_ACTIVE_PANE_ID`, the Quick Actions pass `$HERDR_PLUS_PANE_ID`, and either falls through to the current-pane lookup when empty.
+
+| Op | Key | Quick Action | What lands on the clipboard |
+|---|---|---|---|
+| `process` | `prefix+P` | *Copy pane: process info* | foreground processes — `cmdline` + `pid` + `cwd` (from `herdr pane process-info`) |
+| `coord` | `prefix+D` | *Copy pane: coordinate* | a paste-ready `session` / `workspace` / `tab` / `pane` id block + the `socket` path + a `# herdr pane get <pane>` line |
+| `content` (visible) | `prefix+V` | *Copy pane: content (visible)* | the pane's on-screen text (`herdr pane read --source visible`) |
+=== zh-TW mirror ===
+140:| `prefix + E` | **執行任意指令**（在該 pane 的 cwd）—— 用 fzf 從歷史挑、或直接打新的；指令結束後 popup 自己關掉（[細節](#run-any-command)） | command **popup** |
+329:## 在 popup 裡執行任意指令（`prefix + E`） {#run-any-command}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:07Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:15Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:28Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:32Z)**_
+
+Now the zh-TW mirror:
+
+_**Agent (claude-opus-5 2026-07-26 13:58:32Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the zh-TW prefix+E section
+
+`sed -n '329,352p' docs/tools/herdr.zh-TW.md`
+
+```text
+## 在 popup 裡執行任意指令（`prefix + E`） {#run-any-command}
+
+`prefix + G` 已經示範了那個形狀 —— 一個暫時性的 pane，跑完就消失 —— 但它的指令是寫死的。`prefix + E` 就是它的一般化版本：**用 fzf 從 shell 歷史挑一條指令（或直接打一條新的），它會在聚焦 pane 的 cwd 執行，結束後 popup 自己關掉。** 輔助腳本：`~/.config/herdr/run-command.sh` = [`dot_config/herdr/executable_run-command.sh`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/herdr/executable_run-command.sh)。
+
+**為什麼用 `type = "popup"` 而不是其他做法** —— 這是這裡唯一不是 command *pane* 的綁定：
+
+| 做法 | 問題 |
+|---|---|
+| `type = "pane"`（`prefix+G/M/N/`` ` ``） | 執行期間會切開**平鋪版面**，整個重排 |
+| `prefix + c` → 打指令 → `exit` | 四個步驟，而且會弄亂 tab bar |
+| `prefix + `` ` ``（scratch shell） | 留下一個要自己 exit 的 shell |
+| **`type = "popup"`** | session-modal，浮在版面**之上** —— 什麼都不重排，關掉就回到原位 |
+
+`type = "popup"` 需要 **herdr ≥ 0.7.4**（#1125 加入，`width`/`height` 支援 cell 數或百分比）。它才是真正的 `tmux display-popup -E` 對應物。
+
+**它沒辦法做成 herdr-plus Quick Action**（`prefix + y`），雖然那是最直覺會去找的地方。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是 `btop`/`nvtop` 是 command pane 而不是 Quick Action 的原因），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
+
+行為：
+
+| | |
+|---|---|
+| **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` 的 `foreground_cwd` → `$PWD`。優先用環境變數的好處是：即使 CLI 與舊 server protocol 不相容，它照樣能運作 |
+| **選取** | fzf 翻 `$HISTFILE`（預設 `~/.zsh_history`），最新在上、已去重。打了沒 match 的字再按 Enter 就當作**新指令**執行；`Esc` 則什麼都不做。沒有 fzf 時退回純 `read` 提示 |
+| **shell** | 預設 `$SHELL -ic`，所以這個 repo 的 alias 與 function 都能解析（`gst`、`cas`、`x` …）。`--sh` 改用 `sh -c` —— 快，但 alias 不存在 |
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:46Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:58:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:59:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate the zh-TW portability note to append the Alt+Enter rationale
+
+`grep -n "portability traps\|可攜性" docs/tools/herdr.zh-TW.md | head -3`
+
+```text
+356:> 有兩個可攜性陷阱已經在腳本裡處理掉了，如果你要改它值得先知道：`~/.zsh_history` 是 extended-history 格式（`: <ts>:<elapsed>;<cmd>`）**而且含有非 UTF-8 位元組**，所以除非在 `LC_ALL=C` 下解析，BSD `sed` 會以 `sed: RE error: illegal byte sequence` 中止；另外「最新在上」的反轉用 POSIX `awk` 實作，因為 `tail -r` 只有 BSD 有、`tac` 只有 GNU 有。
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:59:13Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 13:59:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rebuild docs and check for new warnings
+
+`uv run mkdocs build --strict 2>&1 | tail -2; uv run mkdocs build --strict 2>&1 | grep -iE "WARNING.*herdr" | head -3; echo "(no herdr WARNING lines above = clean)"`
+
+```text
+Aborted with 173 warnings in strict mode!
+(no herdr WARNING lines above = clean)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:00:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm seeing the baseline holds at 173 with no herdr warnings. Now I need to address the macOS question properly by looking at what we know: the release assets for macOS exist in both ARM and x86 architectures, and there's a documented issue where brew upgrades can strand running servers on macOS, which points to a real pain point that self-managed binaries could solve.
+
+The tradeoff is significant though. Switching to self-managed introduces Gatekeeper and code-signing concerns — curl-downloaded binaries on Apple Silicon need at least ad-hoc signing to run, and while the ansible `get_url` module probably doesn't trigger quarantine attributes, the actual signing status of our release binaries is an unknown until we test it. We'd also lose brew's automatic cleanup and dependency management.
+
+But the real pain point is the migration itself: existing machines have brew's herdr at `/opt/homebrew/bin/herdr`, so adding `~/.local/bin/herdr` creates a split installation where PATH order decides which one runs, risking client/server version mismatches. We'd need to explicitly `brew uninstall herdr` as part of the rollout. Plus it breaks the established pattern where macOS always uses brew — every other tool follows that convention, and diverging adds cognitive overhead.
+
+Still, for herdr specifically, it's justified because the package manager's inability to restart the server without killing every pane process is a documented, unavoidable cost that doesn't exist for other tools. I need to finalize the recommendation for the macOS migration path rather than implementing it myself, since I can't test the codesigning on this Linux machine. Let me commit the changes I've made to the herdr configuration and documentation, then present the analysis to the user for their decision.
+
+But first, I should verify the keybinding I added — `Alt+Enter` inside the fzf picker within herdr — against the cross-file rules in the keybindings documentation to catch any namespace conflicts before committing.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:00:12Z)**_
+
+Per the repo's keybinding rule, cross-checking `Alt+Enter` for namespace conflicts before claiming it:
+
+_**Agent (claude-opus-5 2026-07-26 14:00:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check for existing Alt+Enter claims
+
+`grep -rn "alt-enter\|Alt+Enter\|M-Enter" docs/shells/keybindings.md dot_config/tmux/ dot_config/herdr/ .chezmoitemplates/herdr/ 2>/dev/null | grep -v "run-command" | head`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>

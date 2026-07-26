@@ -334,12 +334,13 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 
 | 做法 | 問題 |
 |---|---|
-| `type = "pane"`（`prefix+G/M/N/`` ` ``） | 執行期間會切開**平鋪版面**，整個重排 |
+| `type = "pane"`（`prefix+G/M/N`） | 執行期間會切開**平鋪版面**，整個重排 |
 | `prefix + c` → 打指令 → `exit` | 四個步驟，而且會弄亂 tab bar |
-| `prefix + `` ` ``（scratch shell） | 留下一個要自己 exit 的 shell |
 | **`type = "popup"`** | session-modal，浮在版面**之上** —— 什麼都不重排，關掉就回到原位 |
 
 `type = "popup"` 需要 **herdr ≥ 0.7.4**（#1125 加入，`width`/`height` 支援 cell 數或百分比）。它才是真正的 `tmux display-popup -E` 對應物。
+
+`prefix + `` ` ``（scratch shell）基於同樣理由也是 popup —— 當它還是 command pane 時會佔滿版面，感覺像是把當前視窗 *zoom* 起來而不是開一塊暫存空間。`prefix+G` / `prefix+M` / `prefix+N`（lazygit / btop / nvtop）則刻意維持 `type = "pane"`：那幾個你按 `q` 就馬上退出，暫時切開版面沒有代價；而 popup 是 **session-modal** —— 開著的時候不能操作其他 pane。正因為這個模態特性，這件事是逐個綁定決定，而不是全域切換。
 
 **它沒辦法做成 herdr-plus Quick Action**（`prefix + y`），雖然那是最直覺會去找的地方。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是 `btop`/`nvtop` 是 command pane 而不是 Quick Action 的原因），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
 
@@ -348,11 +349,13 @@ herdr pane report-metadata <pane> --source review --clear-token review         #
 | | |
 |---|---|
 | **cwd** | `--cwd` → `$HERDR_ACTIVE_PANE_CWD` → `herdr pane get` 的 `foreground_cwd` → `$PWD`。優先用環境變數的好處是：即使 CLI 與舊 server protocol 不相容，它照樣能運作 |
-| **選取** | fzf 翻 `$HISTFILE`（預設 `~/.zsh_history`），最新在上、已去重。打了沒 match 的字再按 Enter 就當作**新指令**執行；`Esc` 則什麼都不做。沒有 fzf 時退回純 `read` 提示 |
+| **選取** | fzf 翻 `$HISTFILE`（預設 `~/.zsh_history`），最新在上、已去重。**Enter** 執行反白的那筆歷史；**`Alt+Enter` 執行你字面打的內容**，即使歷史裡還有 match 也一樣；完全沒 match 時按 Enter 同樣會當作新指令執行；`Esc` 則什麼都不做。沒有 fzf 時退回純 `read` 提示 |
 | **shell** | 預設 `$SHELL -ic`，所以這個 repo 的 alias 與 function 都能解析（`gst`、`cas`、`x` …）。`--sh` 改用 `sh -c` —— 快，但 alias 不存在 |
 | **結束時** | 成功就關閉；失敗則印出 `[exit N]` 並等你按 Enter，讓錯誤訊息不會一閃而過。可用 `HERDR_RUN_HOLD=always\|never` 覆寫 |
 
 > 有兩個可攜性陷阱已經在腳本裡處理掉了，如果你要改它值得先知道：`~/.zsh_history` 是 extended-history 格式（`: <ts>:<elapsed>;<cmd>`）**而且含有非 UTF-8 位元組**，所以除非在 `LC_ALL=C` 下解析，BSD `sed` 會以 `sed: RE error: illegal byte sequence` 中止；另外「最新在上」的反轉用 POSIX `awk` 實作，因為 `tail -r` 只有 BSD 有、`tac` 只有 GNU 有。
+
+> **為什麼非要有 `Alt+Enter`。** 只要 fzf 還有 match，單純的 Enter 就無法表達「**執行我字面打的那串**」—— 打 `ls -la` 而歷史裡有 `ls -la /tmp`，Enter 會選走歷史那筆，於是整個 picker 感覺起來只能重播舊指令。`--expect=alt-enter` 就是那個逃生口。要注意 fzf 的輸出行數**不是固定的**：在 `--print-query --expect` 下，沒有 match 的 Enter 只會印出 query（一行），而選中時才印出 query / key / selection 三行。所以腳本是從第 2 行讀 key（空的或不存在 ⇒ 純 Enter），而且只在 exit code 0 時才相信第 3 行。
 
 ## 複製聚焦 pane 的資訊到剪貼簿（`prefix+P/D/V/S`）
 
