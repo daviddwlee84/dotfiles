@@ -68,7 +68,7 @@ description = "new tab at the workspace (space) root dir"
 | Splits / zoom / new tab+workspace / pane nav | **Native** `[keys]` actions | Rebound to tmux muscle memory |
 | Session persistence (resurrect/continuum) | **Native** detach/reattach | Skipped — native |
 | Mouse / right-click menus | **Native** mouse-first | Skipped — native |
-| Agent status 🤖/💬/✅ (workmux, 6 files) | **Native** agent-state rollups in sidebar | Skipped — native (workmux untouched for tmux) |
+| Agent status 🤖/💬/✅ (workmux, 6 files) | **Native** agent-state rollups in sidebar | Skipped — native (workmux untouched for tmux). Panel ordered as an **attention queue**, not grouped by space: `ui.agent_panel_sort = "priority"` (herdr's default is `"spaces"`) |
 | `sesh` fuzzy switch + `tmuxp` layouts | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects templates |
 | `tv` channel popups (`prefix+T/U/a`) | **Custom command panes** (`[[keys.command]] type="pane"`) | Key bindings + 2 herdr-aware channels |
 | lazygit / scratch popups | **Custom command panes** | Key bindings |

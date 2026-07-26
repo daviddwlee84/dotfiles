@@ -73,7 +73,7 @@ description = "new tab at the workspace (space) root dir"
 | Splits / zoom / 開新 tab+workspace / pane 導覽 | **原生** `[keys]` actions | 重綁成 tmux 肌肉記憶 |
 | Session 持久化（resurrect/continuum） | **原生** detach/reattach | 略過——原生 |
 | 滑鼠 / 右鍵選單 | **原生** mouse-first | 略過——原生 |
-| Agent 狀態 🤖/💬/✅（workmux，6 檔案） | **原生** 側欄 agent-state 彙整 | 略過——原生（tmux 端 workmux 不動） |
+| Agent 狀態 🤖/💬/✅（workmux，6 檔案） | **原生** 側欄 agent-state 彙整 | 略過——原生（tmux 端 workmux 不動）。面板改用**注意力佇列**排序，而非依 space 分組：`ui.agent_panel_sort = "priority"`（herdr 預設是 `"spaces"`） |
 | `sesh` 模糊切換 + `tmuxp` layout | **Plugin** [herdr-plus](https://github.com/cloudmanic/herdr-plus) Projects + Quick Actions | Plugin + Projects 範本 |
 | `tv` channel 彈窗（`prefix+T/U/a`） | **自訂 command pane**（`[[keys.command]] type="pane"`） | Key bindings + 2 個 herdr-aware channel |
 | lazygit / scratch 彈窗 | **自訂 command pane** | Key bindings |

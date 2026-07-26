@@ -29268,3 +29268,841 @@ Also worth knowing: `Notification` events only fire for message types peon recog
 Documented both in `docs/tools/agent-sounds.md` + zh-TW, committed as `c4ff98d`. I restored `peon debug off` and removed the probe logs — `chezmoi status` shows no peon drift, confirming the unmanaged-config design works as intended.
 
 One correction: I said mkdocs went 11 → 12 warnings. It didn't — I was comparing mkdocs's own "Aborted with 11 warnings" against my own `grep -c`. The warning set is byte-identical to baseline.
+
+---
+
+_**User (2026-07-26 12:00:15Z)**_
+
+<bash-input>peon help</bash-input>
+
+_**User (2026-07-26 12:00:16Z)**_
+
+<bash-stdout>Usage: peon &lt;command&gt;
+
+Commands:
+  pause                Mute sounds
+  resume               Unmute sounds
+  mute                 Alias for 'pause'
+  unmute               Alias for 'resume'
+  toggle               Toggle mute on/off
+  status               Check if paused or active
+  volume [0.0-1.0]     Get or set volume level
+  rotation [mode]      Get or set pack rotation mode (random|round-robin|shuffle|session_override)
+  notifications on        Enable desktop notification popups (sounds continue playing)
+  notifications off       Disable desktop notification popups (sounds continue playing)
+  notifications overlay   Use large overlay banners (default)
+  notifications standard  Use standard system notifications
+  notifications position [pos]  Get or set overlay position
+                       Positions: top-center (default), top-right, top-left,
+                       bottom-right, bottom-left, bottom-center
+  notifications dismiss [N]  Get or set auto-dismiss time in seconds (0 = persistent)
+  notifications label [text|reset]  Get, set, or reset notification label override
+  notifications template [key] [fmt]  Get/set message templates (keys: stop, permission, error, idle, question)
+  notifications test      Send a test notification
+  popups on|off         Alias for 'notifications' - toggle desktop notification popups
+  preview [category]   Play all sounds from a category (default: session.start)
+  preview --list       List all categories and sound counts in the active pack
+                       Categories: session.start, task.acknowledge, task.complete,
+                       task.error, input.required, resource.limit, user.spam
+  debug on             Enable debug logging
+  debug off            Disable debug logging
+  debug status         Show debug state, log directory, file count, total size
+  logs                 Show last 50 lines of today's log
+  logs --last N        Show last N lines across all log files
+  logs --session ID    Filter today's log by session ID
+  logs --session ID --all  Search across all log files for session ID
+  logs --clear         Delete all log files (with confirmation)
+  setup                Interactive setup wizard
+  update               Update peon-ping and refresh all sound packs
+  help                 Show this help
+
+Pack management:
+  packs list              List installed sound packs
+  packs list --registry   List all available packs from registry
+  packs list --registry --lang=&lt;codes&gt; Filter registry list by language
+  packs install &lt;p1,p2&gt;   Download and install new packs
+  packs install --all     Download all packs from registry
+  packs install --all --lang=&lt;codes&gt; Download packs matching language(s)
+  packs install-local &lt;path&gt; Install a pack from a local directory
+  packs use &lt;name&gt;        Switch to a specific pack
+  packs use --install &lt;n&gt; Switch to pack, installing from registry if needed
+  packs next              Cycle to the next pack
+  packs remove &lt;p1,p2&gt;    Remove specific packs
+  packs remove --all      Remove all packs except the active one
+  packs bind &lt;name&gt;       Bind a pack to the current directory
+  packs bind --pattern &lt;g&gt; Bind a pack to a path glob
+  packs unbind            Remove the current directory binding
+  packs unbind --pattern &lt;g&gt; Remove a specific path binding
+  packs bindings          List all path-based pack bindings
+  packs ide-bind &lt;ide&gt; &lt;pack&gt; [--install]  Bind a pack to an IDE id
+  packs ide-unbind &lt;ide&gt;  Remove an IDE binding
+  packs ide-bindings      List all IDE-based pack bindings
+  packs exclude add &lt;g&gt;   Silence sounds &amp; notifications when cwd matches
+  packs exclude remove &lt;g&gt; Stop silencing the given path
+  packs exclude list      List silenced paths
+  packs rotation list     Show current rotation list and mode
+  packs rotation add &lt;p&gt;  Add pack(s) to rotation (comma-separated)
+  packs rotation add --install &lt;p&gt;  Add to rotation, installing from registry if needed
+  packs rotation remove &lt;p&gt; Remove pack(s) from rotation
+  packs rotation clear    Clear all packs from rotation
+
+Sound management (per-sound toggles within a pack):
+  sounds list [pack]                      List sounds in a pack, marking disabled ones
+  sounds disable &lt;cat&gt; &lt;file&gt; [--pack=&lt;p&gt;] Disable a specific sound within a category
+  sounds enable &lt;cat&gt; &lt;file&gt; [--pack=&lt;p&gt;]  Re-enable a previously disabled sound
+
+Mobile notifications:
+  mobile ntfy &lt;topic&gt;      Set up ntfy.sh push notifications
+  mobile pushover          Set up Pushover push notifications
+  mobile telegram          Set up Telegram bot notifications
+  mobile on                Re-enable mobile notifications (after off)
+  mobile off               Disable mobile notifications
+  mobile status            Show mobile config
+  mobile test              Send a test notification
+
+Trainer (exercise reminders):
+  trainer on           Enable trainer mode
+  trainer off          Disable trainer mode
+  trainer status       Show today's progress
+  trainer log &lt;n&gt; &lt;ex&gt; Log completed reps (e.g. log 25 pushups)
+  trainer goal &lt;n&gt;     Set daily goal for all exercises
+  trainer goal &lt;ex&gt; &lt;n&gt; Set daily goal for one exercise
+  trainer help         Show trainer help
+
+Debug logging:
+  debug on               Enable debug logging
+  debug off              Disable debug logging
+  debug status           Show debug logging state
+
+Log management:
+  logs                   Show last 50 lines of the most recent log
+  logs --last N          Show last N lines of the most recent log
+  logs --session &lt;id&gt;    Filter log entries by session ID
+  logs --session &lt;id&gt; --all  Search across all log files
+  logs --prune           Delete log files older than debug_retention_days
+  logs --clear           Delete all log files
+
+Relay (SSH/devcontainer/Codespaces):
+  ssh-audio [mode]        SSH routing mode: relay (default), auto, or local
+  relay [--port=N]        Start audio relay on your local machine
+  relay --bind=&lt;addr&gt;     Bind relay to a specific address (default: 127.0.0.1)
+  relay --daemon          Start relay in background
+  relay --stop            Stop background relay
+  relay --status          Check if relay is running</bash-stdout><bash-stderr></bash-stderr>
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 12:00:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing the user ran `peon help` and shared the output with me. The system caveat says I shouldn't respond to local command outputs unless explicitly asked, but since they're showing me this help text, they're likely asking about relevant features. Let me reconsider whether this falls under that restriction or if it's an implicit request for information about what peon offers. n mention `packs exclude` and `packs bind` for more advanced use cases, but those aren't directly relevant to what we just debugged. I'll keep the focus tight on `preview --list` for answering their original question about multiple finish sounds, and `peon logs` as the better debugging approach than manual file inspection.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:00:37Z)**_
+
+Three of those are directly relevant to what we just dug through — and one would have saved me effort:
+
+_**Agent (claude-opus-5 2026-07-26 12:00:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Native category listing
+
+`peon preview --list 2>&1 | head -15`
+
+```text
+peon-ping: categories in Emm's StarCraft II SCV
+
+  input.required           4 sounds
+  resource.limit           1 sound
+  session.start            2 sounds
+  task.acknowledge         21 sounds
+  task.complete            1 sound
+  task.error               8 sounds
+  user.spam                7 sounds
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:00:48Z)**_
+
+`peon preview --list` confirms the counts natively — same numbers I got from the manifest, one command instead of `jq`. `task.complete 1 sound`.
+
+Three things in that help output worth knowing given what we just found:
+
+- **`peon logs`** — a built-in log reader (`--session <id>`, `--last N`, `--prune`). I was catting `~/.openpeon/logs/*.log` by hand; this is the supported way, and `peon debug status` shows state + file count + size.
+- **`peon notifications dismiss N` / `position`** — since the banner only shows when you're *away* from the terminal, `dismiss 0` makes it persistent until clicked, which fits that usage better than the 4s default.
+- **`peon sounds disable <cat> <file>`** — per-sound toggles. Relevant because `task.acknowledge` has 21 variants firing on every prompt you submit; you can prune the ones that grate without leaving the pack.
+
+Also note `mobile test` is a separate code path from the broken `notifications test`, so it isn't affected by the `PEON_TEST=1` bug.
+
+One thing the help *doesn't* surface: `task.complete` having a single sound is a property of `sc2_scv`, not of peon. If you want variety on completion, `peon packs list --registry` has ~349 packs, and `peon packs rotation add` can cycle several — with `rotation shuffle` picking a different pack per event.
+
+---
+
+_**User (2026-07-26 12:00:49Z)**_
+
+我看它有很多功能 還有哪些我們能用上的？
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 12:01:17Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking which features of peon would be useful for their specific setup. I should think through their environment—chezmoi dotfiles, tmux, multiple machines accessed via SSH, and various coding agents—and identify which peon capabilities would actually matter to them rather than listing everything.
+
+Looking at what peon offers, a few stand out as genuinely relevant: the relay and SSH audio feature would let them hear agent output from remote hosts (their fleet machines, dev VMs), which is significant since they run long agent turns on remote systems. The pack binding and exclusion features would help them manage different configurations per directory or IDE, which matters given they're juggling multiple agents like Claude Code, OpenCode, Cursor, and others. The IDE-specific pack binding is particularly useful—they could set different audio packs depending on which agent is running, so they'd know which one just finished a task. I need to verify these features actually work in their environment, especially the relay setup since it's both high-value and complex. The key constraint is that peon's config shouldn't be chezmoi-managed to avoid drift, so these settings would be runtime-only per machine—either set manually or seeded during install like they did with sc2_scv. Let me start by checking whether peon properly detects the IDE. I'll be careful not to run anything that could trigger sounds or start background processes—`peon relay --status` and `peon ssh-audio` with no arguments are both safe read-only checks, so I'll start there.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Probe IDE binding support
+
+```bash
+echo "=== ide bindings + recognized IDE ids ==="; peon packs ide-bindings 2>&1 | head -8
+P=/usr/local/opt/peon-ping/libexec; grep -nE "ide_id|IDE_ID=|'claude'|opencode|cursor|codex" $P/peon.sh | grep -iE 'ide' | head -12
+```
+
+```text
+=== ide bindings + recognized IDE ids ===
+No IDE bindings configured.
+Recent IDEs: claude
+Supported IDE ids: claude, codex, cursor, opencode, kilo, kiro, gemini, copilot, windsurf, kimi, antigravity, amp, deepagents, openclaw, rovodev
+1570:def normalize_ide_id(value):
+1596:status_ide = normalize_ide_id(
+1618:        ide = normalize_ide_id(r.get('ide', ''))
+1829:        ides.append(('OpenCode', opencode_dir, 'installed'))
+1831:        ides.append(('OpenCode', opencode_dir, 'detected (not set up)'))
+1880:        ides.append(('OpenAI Codex', codex_dir, 'installed'))
+1882:        ides.append(('OpenAI Codex', codex_dir, 'detected (not set up)'))
+2691:KNOWN_IDES = ['claude', 'codex', 'cursor', 'opencode', 'kilo', 'kiro', 'gemini', 'copilot', 'windsurf',
+2694:def normalize_ide_id(value):
+2713:ide_id = normalize_ide_id(ide_arg)
+2714:if not ide_id:
+2726:    if normalize_ide_id(rule.get('ide', '')) == ide_id:
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:20Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Probe SSH relay feature
+
+`echo "=== ssh-audio mode ==="; peon ssh-audio 2>&1 | head -6; echo; echo "=== relay status ==="; peon relay --status 2>&1 | head -4; echo; echo "=== docs bundled ==="; ls /usr/local/opt/peon-ping/libexec/docs/ 2>&1 | head -20`
+
+```text
+=== ssh-audio mode ===
+peon-ping: ssh audio mode relay
+
+=== relay status ===
+peon-ping relay is not running
+
+=== docs bundled ===
+peon-icon.png
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to know if remote machines can play completion sounds locally through SSH relay, and whether different audio packs can be assigned per machine for identification. I'm diving into how the relay mechanism actually works — specifically what transport layer carries the audio from remote peon to the local relay daemon, and whether the `ssh-audio` mode configuration allows per-machine customization.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:32Z)**_
+
+Good question — and that's the feature I was about to flag as the highest-value one. Let me check how the transport actually works before recommending it:
+
+_**Agent (claude-opus-5 2026-07-26 12:01:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find relay transport mechanism
+
+`P=/usr/local/opt/peon-ping/libexec; grep -n 'RELAY_PORT\|relay_port\|PEON_RELAY\|SSH_CONNECTION\|RemoteForward\|localhost' $P/peon.sh | head -20`
+
+```text
+10:      if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_CLIENT:-}" ]; then
+22:      elif [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_CLIENT:-}" ]; then
+675:      [ "$PEON_PLATFORM" = "ssh" ] && relay_host_default="localhost"
+676:      local relay_host="${PEON_RELAY_HOST:-$relay_host_default}"
+677:      local relay_port="${PEON_RELAY_PORT:-19998}"
+696:          "http://${relay_host}:${relay_port}/play?file=${encoded_path}" >/dev/null 2>&1; then
+709:            "http://${relay_host}:${relay_port}/play?file=${encoded_path}" 2>/dev/null
+712:            "http://${relay_host}:${relay_port}/play?file=${encoded_path}" >/dev/null 2>&1 &
+1034:      [ "$PEON_PLATFORM" = "ssh" ] && relay_host_default="localhost"
+1035:      local relay_host="${PEON_RELAY_HOST:-$relay_host_default}"
+1036:      local relay_port="${PEON_RELAY_PORT:-19998}"
+1044:          "http://${relay_host}:${relay_port}/notify" >/dev/null 2>&1 &
+1049:          "http://${relay_host}:${relay_port}/notify" >/dev/null 2>&1
+1437:      _relay_host_default="localhost"
+1439:      _relay_host="${PEON_RELAY_HOST:-$_relay_host_default}"
+1440:      _relay_port="${PEON_RELAY_PORT:-19998}"
+1445:          _relay_status="running on ${_relay_host}:${_relay_port}"
+6060:        _relay_host = os.environ.get('PEON_RELAY_HOST',
+6061:            'host.docker.internal' if _relay_platform == 'devcontainer' else 'localhost')
+6062:        _relay_port = os.environ.get('PEON_RELAY_PORT', '19998')
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:33Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read remote-hook script
+
+`P=/usr/local/opt/peon-ping/libexec; echo "=== remote-hook.sh header ==="; sed -n '1,40p' $P/scripts/remote-hook.sh 2>&1`
+
+```text
+=== remote-hook.sh header ===
+#!/bin/bash
+# Minimal peon-ping relay hook for remote Claude Code sessions
+#
+# This hook is for machines where peon-ping isn't installed but a relay
+# is accessible (e.g., over SSH port forwarding). It sends category names
+# to the relay, which handles sound selection server-side.
+#
+# Setup:
+#   1. On your LOCAL machine: peon relay --daemon
+#   2. SSH with port forwarding: ssh -R 19998:localhost:19998 <host>
+#   3. Copy this script to the remote machine
+#   4. Register in ~/.claude/settings.json:
+#      {
+#        "hooks": {
+#          "SessionStart": [{"command": "bash /path/to/remote-hook.sh"}],
+#          "Stop": [{"command": "bash /path/to/remote-hook.sh"}],
+#          "PermissionRequest": [{"command": "bash /path/to/remote-hook.sh"}]
+#        }
+#      }
+#
+# The relay URL defaults to localhost:19998 (SSH tunnel). Override with:
+#   PEON_RELAY_URL=http://host.docker.internal:19998  (for devcontainers)
+#
+set -uo pipefail
+
+RELAY_URL="${PEON_RELAY_URL:-http://127.0.0.1:19998}"
+
+# Parse hook event from JSON stdin
+EVENT=$(cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('hook_event_name',''))" 2>/dev/null)
+
+# Map Claude Code events to CESP categories
+case "$EVENT" in
+  SessionStart)      CATEGORY="session.start" ;;
+  Stop)              CATEGORY="task.complete" ;;
+  PermissionRequest) CATEGORY="input.required" ;;
+  *)                 exit 0 ;;  # Ignore other events
+esac
+
+# Fire and forget - don't block Claude Code
+curl -sf "${RELAY_URL}/play?category=${CATEGORY}" >/dev/null 2>&1 &
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the relay is an HTTP server running locally on port 19998 that remote hosts can reach through SSH reverse port forwarding, allowing them to send requests to `http://localhost:19998/play?...`. There are two operational modes depending on whether the peon runs fully on the remote machine or elsewhere, with the remote detecting its context via the SSH_CONNECTION environment variable.
+
+For the user's question about distinguishing which machine completed a task through different sound effects, I'm considering two approaches: either installing the full peon on each remote host with its own config file so each machine can have its own sound pack, or using the remote-hook.sh method where the relay selects sounds server-side — though that second approach would make all machines sound identical unless the relay can distinguish between them somehow.
+
+The key issue is whether the relay server can actually read file paths from the remote filesystem when a remote host sends `?file=<path>`. If the local relay can't access those remote paths, then each machine would need the same pack installed locally, which defeats the purpose. I need to check how the relay's `/play` handler actually processes file paths to understand which approach would work.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:01:49Z)**_
+
+Now the mechanism is clear: the relay is an **HTTP server on `localhost:19998` on your Mac**, reached from remotes over an SSH **reverse** tunnel (`ssh -R 19998:localhost:19998`). Two client modes — one sends `?file=<path>`, the other `?category=<name>`. That distinction decides your per-machine question, so let me read the server:
+
+_**Agent (claude-opus-5 2026-07-26 12:01:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find relay server handler
+
+`P=/usr/local/opt/peon-ping/libexec; grep -n "'/play'\|/play?\|def do_GET\|category=\|parse_qs" $P/peon.sh | sed -n '1,25p'`
+
+```text
+696:          "http://${relay_host}:${relay_port}/play?file=${encoded_path}" >/dev/null 2>&1; then
+709:            "http://${relay_host}:${relay_port}/play?file=${encoded_path}" 2>/dev/null
+712:            "http://${relay_host}:${relay_port}/play?file=${encoded_path}" >/dev/null 2>&1 &
+5226:    log('route', category='none', suppressed=True, reason='excluded_dir', pattern=_excluded_dir_pattern)
+5243:        log('route', category='none', suppressed=True, reason='delegate_mode')
+5249:        log('route', category='none', suppressed=True, reason='agent_session')
+5589:    log('route', category='none', suppressed=True, reason='subagent_event')
+5602:        log('route', category='none', suppressed=True, reason='compact_source')
+5637:        log('route', category='task.complete', suppressed=True, reason='subagent_session')
+5682:        log('route', category='none', suppressed=True, reason='unknown_notification')
+5692:        log('route', category='input.required', suppressed=True, reason='subagent_session')
+5718:        log('route', category='none', suppressed=True, reason='non_bash_tool_failure')
+5728:        log('route', category='task.complete', suppressed=True, reason='subagent_stop_suppressed')
+5750:    log('route', category='none', suppressed=True, reason='subagent_start')
+5776:    log('route', category='none', suppressed=True, reason='session_end_cleanup')
+5786:    log('route', category='none', suppressed=True, reason='unknown_event')
+5799:        log('route', category='task.complete', suppressed=True, reason='debounce_5s')
+5824:            log('route', category='task.complete', suppressed=True, reason='idle_prompt_repeat')
+5844:            log('route', category='session.start', suppressed=True, reason='session_start_cooldown')
+5853:        log('route', category=category, suppressed=True, reason='replay_suppression')
+5859:    log('route', category=category, suppressed=True, reason='category_disabled')
+5885:    log('route', category=category, suppressed=bool(paused), reason=_route_reason)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm wondering if the relay server might be implemented as a separate Python component rather than being part of peon.sh's do_GET handler. Let me search for where the relay function is defined and look for HTTPServer or BaseHTTPRequestHandler imports to track down the implementation.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:03Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate relay HTTP server
+
+`P=/usr/local/opt/peon-ping/libexec; grep -n 'HTTPServer\|BaseHTTPRequestHandler\|do_GET\|relay_serve\|start_relay' $P/peon.sh | head -10`
+
+```text
+(Bash completed with no output)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find relay server file
+
+`P=/usr/local/opt/peon-ping/libexec; grep -rln 'do_GET\|HTTPServer' $P/ 2>/dev/null | head; echo "=== relay subcommand ==="; grep -n '^  relay)\|relay)' $P/peon.sh | head -5`
+
+```text
+/usr/local/opt/peon-ping/libexec/relay.sh
+=== relay subcommand ===
+3755:  relay)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read relay server query params
+
+`P=/usr/local/opt/peon-ping/libexec; grep -n "file\b.*param\|'file'\|'category'\|'pack'\|def do_GET" $P/relay.sh | head -15`
+
+```text
+451:    def do_GET(self):
+507:            self.send_error(400, "Missing file or category parameter")
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read relay do_GET body
+
+`P=/usr/local/opt/peon-ping/libexec; sed -n '451,510p' $P/relay.sh`
+
+```text
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+
+        if parsed.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+            return
+
+        if parsed.path == "/state":
+            try:
+                with open(REMOTE_STATE_FILE) as f:
+                    data = f.read()
+            except FileNotFoundError:
+                data = "{}"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data.encode())
+            return
+
+        if parsed.path != "/play":
+            self.send_error(404)
+            return
+
+        # Honor `peon pause`: when the .paused flag is set, the relay daemon
+        # stays silent too (peon.sh writes this file on `peon pause`). Without
+        # this check, remote sessions kept playing sounds after pause (#521).
+        # Acknowledge with 200 so the caller doesn't treat it as an error.
+        if os.path.exists(PAUSED_FILE):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK: paused")
+            return
+
+        params = urllib.parse.parse_qs(parsed.query)
+
+        # --- New: category-based sound selection ---
+        category = params.get("category", [""])[0]
+        if category:
+            sound_file, volume = pick_sound_for_category(category)
+            if not sound_file:
+                self.send_error(404, f"No sounds for category: {category}")
+                return
+            play_sound_on_host(sound_file, volume)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(f"OK: {os.path.basename(sound_file)}".encode())
+            return
+
+        # --- Legacy: file-based playback ---
+        file_rel = params.get("file", [""])[0]
+        if not file_rel:
+            self.send_error(400, "Missing file or category parameter")
+            return
+
+        # --- Path traversal protection ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the category parameter makes the relay machine pick a sound from its local active pack, meaning all remote hosts hear the same audio, while the file parameter uses a relative path resolved against the local packs directory with path traversal protection—the remote client sends a relative path like `sc2_scv/sounds/` that gets resolved locally.
+
+This means if different remote hosts have different packs active, they'll each send their own pack's file path, and the local Mac will play whichever file exists in its own packs directory. For this to work as intended, the local Mac needs to have all the same packs installed that the remote hosts are using. Let me verify how the path resolution actually works and confirm that the file parameter is indeed sending a relative path.
+
+I should also check whether the user's SSH config for their fleet hosts already includes the `RemoteForward` directive, or if that needs to be added to their chezmoi-managed dotfiles. That's the key integration point to make this work end-to-end.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:38Z)**_
+
+Now the key detail — `?category=` is picked by the **local** relay (so every host would sound identical), but `?file=` plays a path resolved against the local packs dir. Let me confirm it's a *relative* path, which is what makes per-host packs work:
+
+_**Agent (claude-opus-5 2026-07-26 12:02:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read path resolution logic
+
+`P=/usr/local/opt/peon-ping/libexec; sed -n '510,535p' $P/relay.sh`
+
+```text
+        # --- Path traversal protection ---
+        file_rel = urllib.parse.unquote(file_rel)
+        file_rel = posixpath.normpath(file_rel)
+        if file_rel.startswith("/") or ".." in file_rel.split("/"):
+            self.send_error(403, "Forbidden")
+            return
+        full_path = os.path.realpath(os.path.join(PEON_DIR, file_rel))
+        if not is_path_allowed(full_path):
+            self.send_error(403, "Forbidden")
+            return
+        if not os.path.isfile(full_path):
+            self.send_error(404, "File not found")
+            return
+        _AUDIO_EXT = {'.wav', '.mp3', '.ogg', '.flac', '.aac', '.m4a', '.opus'}
+        if os.path.splitext(full_path)[1].lower() not in _AUDIO_EXT:
+            self.send_error(403, "Forbidden: not an audio file")
+            return
+
+        vol = self.headers.get("X-Volume", "0.5")
+        try:
+            vol = str(max(0.0, min(1.0, float(vol))))
+        except ValueError:
+            vol = "0.5"
+
+        play_sound_on_host(full_path, vol)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:38Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+See how remote builds the file param
+
+`P=/usr/local/opt/peon-ping/libexec; sed -n '685,700p' $P/peon.sh`
+
+```text
+      # SSH local mode bypasses relay and plays on the SSH host.
+      if [ "$PEON_PLATFORM" = "ssh" ] && [ "$ssh_mode" = "local" ]; then
+        local player
+        player=$(detect_linux_player "${LINUX_AUDIO_PLAYER:-}") || player=""
+        if [ -n "$player" ]; then
+          play_linux_sound "$file" "$vol" "$player"
+          [ "${PEON_TEST:-0}" = "1" ] || save_sound_pid $!
+        fi
+      # SSH auto mode tries relay first, then falls back to local playback.
+      elif [ "$PEON_PLATFORM" = "ssh" ] && [ "$ssh_mode" = "auto" ]; then
+        if curl -sf --connect-timeout 1 --max-time 2 -H "X-Volume: $vol" \
+          "http://${relay_host}:${relay_port}/play?file=${encoded_path}" >/dev/null 2>&1; then
+          :
+        else
+          local player
+          player=$(detect_linux_player "${LINUX_AUDIO_PLAYER:-}") || player=""
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the relay resolves relative paths against the local PEON_DIR on each machine, meaning different hosts can play different sounds by using their own active pack. The path traversal protection checks for absolute paths, parent directory references, valid audio extensions, and runs the allowed path validation. Each remote host independently sets its active pack through the `peon packs use` command, which is how different sounds per machine gets implemented.
+
+Now I need to trace where `encoded_path` comes from — specifically whether the remote sends an absolute or relative path. If it's absolute, the relay would reject it as a security violation, so there must be a relativization step somewhere before transmission.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:02:49Z)**_
+
+`full_path = os.path.realpath(os.path.join(PEON_DIR, file_rel))` — the relay plays **its own local copy** of that relative path. Let me confirm the remote actually relativizes (an absolute path would 403):
+
+_**Agent (claude-opus-5 2026-07-26 12:02:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check path relativization
+
+`P=/usr/local/opt/peon-ping/libexec; grep -n 'encoded_path=' $P/peon.sh | head -3; echo "---"; sed -n '/encoded_path=/,+6p' $P/peon.sh | head -12`
+
+```text
+680:      encoded_path=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$rel_path" 2>/dev/null || echo "$rel_path")
+---
+      encoded_path=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$rel_path" 2>/dev/null || echo "$rel_path")
+
+      local ssh_mode="relay"
+      [ "$PEON_PLATFORM" = "ssh" ] && ssh_mode="$(ssh_audio_mode)"
+
+      # SSH local mode bypasses relay and plays on the SSH host.
+      if [ "$PEON_PLATFORM" = "ssh" ] && [ "$ssh_mode" = "local" ]; then
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:03:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the design checks out — `$rel_path` is indeed relativized, and the relay's path validation would block anything absolute, confirming it must be relative to PEON_DIR. Now I can give the user a direct answer: yes to both parts. Remote completions can reach the local Mac through `peon relay --daemon` with an SSH reverse tunnel, and each machine can have its own distinct sound since the remote system sends the audio signal.
+
+To make this work, each host needs its own active pack configured via `peon packs use`, and the Mac must have those same packs installed locally since it plays its own copy. For wiring this into the repo, I need to check if it manages SSH config for the `RemoteForward` directive on fleet hosts, and whether the remote's `modify_settings.json.tmpl` properly gates the peon hooks on `agentSounds` — which means david_ubuntu needs that tier choice the user mentioned earlier. The relay daemon on the Mac could run via launchd or shell startup, though I should check what conventions the repo already follows for daemons.
+
+One practical gotcha: if multiple SSH sessions run concurrently with reverse tunnels, the second session's `RemoteForward` to port 19998 will fail to bind since the first session already claimed it — but the session still works because peon on the remote reaches the already-bound port from session 1's tunnel. However, if session 1 closes, that tunnel dies while session 2 remains active, breaking connectivity. Worth flagging that caveat.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:03:10Z)**_
+
+Confirmed — `$rel_path`, relative to `PEON_DIR`. **So yes to both parts of your question.** Let me check how it would slot into the fleet SSH setup:
+
+_**Agent (claude-opus-5 2026-07-26 12:03:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check ssh config management and fleet hosts
+
+```bash
+echo "=== does the repo manage ssh config? ==="; ls dot_ssh/ 2>/dev/null || find . -maxdepth 2 -name '*ssh*config*' -not -path './.git/*' 2>/dev/null | head -5
+echo; echo "=== fleet hosts ==="; grep -oE '^\s*(host|name)\s*=.*' dot_config/fleet/*.toml 2>/dev/null | head -10 || ls dot_config/fleet/ 2>/dev/null
+```
+
+```text
+=== does the repo manage ssh config? ===
+private_config.d
+create_private_config
+
+=== fleet hosts ===
+(eval):2: no matches found: dot_config/fleet/*.toml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:03:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect ssh config layout
+
+```bash
+echo "=== dot_ssh structure ==="; ls -la dot_ssh/ dot_ssh/private_config.d/ 2>&1 | head -20
+echo; echo "=== live ssh hosts (fleet-ish) ==="; grep -iE '^Host ' ~/.ssh/config 2>/dev/null | head -10
+```
+
+```text
+=== dot_ssh structure ===
+dot_ssh/:
+drwxr-xr-x@    - david 15 Apr 20:29 private_config.d
+.rw-r--r--@ 1.2k david 15 Apr 20:29 create_private_config
+
+dot_ssh/private_config.d/:
+.rw-r--r--@ 264 david 12 Feb 00:33 create_private_00-defaults
+.rw-r--r--@ 931 david 15 Apr 20:29 create_private_01_git
+
+=== live ssh hosts (fleet-ish) ===
+Host zyc_friend
+Host trading-vm
+Host trading-vm-root
+Host aws
+Host solomon
+Host frp3
+Host frp4
+Host local_mac
+Host ts_ms_hanru
+Host local_ubuntu
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:03:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+The SSH config uses `create_private_*` prefixes, which means chezmoi seeds the files once and then leaves them alone—so `~/.ssh/config` and its `config.d/` subdirectory are user-owned after initial setup. This means I can safely add `RemoteForward` directives there as manual edits without worrying about chezmoi reverting them, though the changes won't automatically propagate to new machines.
+
+To sync changes across machines, I'd need to update the source template directly using the refresh command. Now I can give a complete answer: yes, remote-to-local audio works via an HTTP relay daemon on the Mac with SSH reverse tunneling, and yes, per-machine sound packs are possible because each host can independently choose which pack to use through its local config—the Mac just needs those same packs installed since it plays its own local copy. The setup requires the relay daemon running on the Mac and `RemoteForward` entries in the SSH config for each host.
+
+For the implementation details: the remote machines need peon installed with the relay audio tier enabled (Ansible already handles this on Linux), and the fallback behavior matters—`ssh-audio auto` gracefully switches to local playback if the relay is unreachable, whereas the current `relay` default goes silent if the tunnel drops. There's also the edge case that multiple concurrent SSH sessions to the same host will share the first tunnel binding, and I should verify the exact fallback logic from the code to make sure I'm describing it correctly.
+
+Beyond SSH, the other genuinely useful features worth mentioning are `packs ide-bind` to distinguish between different agents, `packs exclude add` to silence notifications in specific directories, `packs bind --pattern` for per-project configuration, and `mobile ntfy/telegram` for push notifications to your phone during long-running tasks—which notably sends regardless of whether the IDE is in focus. I should check what packs are available across different systems so I can give a concrete example — like suggesting a specific voice for Mac versus Ubuntu. Let me query the registry to see what options exist.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:03:44Z)**_
+
+The SSH config uses `create_private_*` — seeded once, never rewritten, so adding forwards there won't drift. Let me get concrete pack options for distinguishing hosts:
+
+_**Agent (claude-opus-5 2026-07-26 12:03:51Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List registry packs
+
+`timeout 45 peon packs list --registry 2>&1 | head -30`
+
+```text
+Fetching pack registry...
+Registry: 350 packs available
+  abbot                    The Abbot (Stronghold Crusader)
+  abes-oddysee-abe         Abe's Oddysee - Abe
+  abes-oddysee-slig        Abe's Oddysee - Slig
+  acolyte_de               Undead Acolyte (DE)
+  acolyte_es               Acólito Muertos Vivientes Warcraft III (ES)
+  acolyte_ru               Undead Acolyte (Russian)
+  ae_qianyu                明日方舟:终末地 陈千语
+  afewgoodmen              A Few Good Men
+  airplane                 Airplane!
+  alan-rickman             Alan Rickman
+  aliens                   Aliens (1986)
+  ana                      Overwatch - Ana
+  anchorman_brick          Brick Tamland
+  anchorman_burgundy       Ron Burgundy
+  anchorman_news_team      News Team
+  anime-girls              Anime Girls
+  anran                    Overwatch - Anran
+  aod                      Army of Darkness
+  aoe2                     Age of Empires II Taunts
+  aoe2-villager-turkish-female Age of Empires 2 Turkish (Female)
+  aoe2-villager-turkish-male Age of Empires 2 Turkish (Male)
+  aoe3-villager-turkish    Age of Empires 3 Turkish
+  aoe4_fr_imperial         Age of Empires IV - French Villager Voices
+  aom-greeks               Age of Mythology - Greeks
+  aom-italian              Age of Mythology - Italian
+  aom_greek                Age of Mythology - Greek Villager
+  arc-raiders-emotes       Arc Raiders Emotes
+  arc_raiders              Arc Raiders Pack
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:04:09Z)**_
+
+<think><details><summary>Thought Process</summary>
+I should find thematically-related StarCraft packs to create a coherent naming scheme across machines—using different units from the same game makes it instantly clear which system you're on. Let me search the registry for StarCraft-themed options and put together a recommendation that's both practical and satisfying.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:04:09Z)**_
+
+350 packs. Since you already know the SCV voice, staying in the same game makes hosts instantly distinguishable:
+
+_**Agent (claude-opus-5 2026-07-26 12:04:11Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find sibling RTS packs
+
+`timeout 45 peon packs list --registry 2>&1 | grep -iE 'starcraft|sc2|sc1|zerg|protoss|terran|drone|probe|marine|warcraft|peon|peasant' | head -20`
+
+```text
+  acolyte_es               Acólito Muertos Vivientes Warcraft III (ES)
+  cxq-peon                 Baby & Friends Sound Pack
+  peasant                  Human Peasant
+  peasant_cz               Lidský rolník (CZ)
+  peasant_es               Campesino Humano (ES)
+  peasant_fr               Paysan Humain (FR)
+  peasant_ru               Human Peasant (Russian)
+  peon                     Orc Peon
+  peon_cz                  Orčí peón (CZ)
+  peon_de                  Orc Peon (DE)
+  peon_es                  Peon Orco (ES)
+  peon_fr                  Peon Orc (FR)
+  peon_pl                  Orc Peon (Polish)
+  peon_ru                  Orc Peon (Russian)
+  protoss                  Protoss (StarCraft)
+  ra2_peon                 Red Alert 2 Voice Lines
+  sc2_abathur              StarCraft II Abathur
+  sc2_abathur_zh           StarCraft II Abathur (Chinese)
+  sc2_alarak               StarCraft II Alarak
+  sc2_alarak_zh            StarCraft II Alarak (Chinese)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:04:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've got plenty of StarCraft 2 pack options to work with, so let me focus on the worker units that would be most useful — the Protoss probe and Zerg drone are solid choices, along with the Orc peon from the Warcraft universe.
+
+Now I'm thinking through the actual setup: the relay daemon handles the reverse tunnel, and since each host sends its own relative path to play a local copy of the sound pack, the Mac will need those packs installed too. I should lay out the four key setup steps and then mention the two main caveats — the ssh-audio mode behavior when the tunnel goes down, and the authentication considerations.
+
+For the pack scheme, I realize the real design question is reproducibility: peon's config isn't managed by chezmoi, so we could either manually run `peon packs use` on each host, or extend the ansible seed to use a per-host pack variable. Since we already have `coding_agents_peon_default_pack` as a role default, I can set it per-host through the ansible inventory with extra vars — that's the clean, reproducible approach.
+
+I'll structure the answer to cover the direct yes, how it works, the setup steps, both caveats, the pack scheme, mention a few other useful features like ide-bind and exclude, and offer to wire it all up.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:04:46Z)**_
+
+**Yes to both** — and the mechanism happens to be exactly right for what you want.
+
+**How remote audio works:** `peon relay --daemon` runs an HTTP server on `localhost:19998` on your Mac. The remote reaches it through an SSH **reverse** tunnel (`-R 19998:localhost:19998`). The remote host does the event routing and pack selection itself, then asks your Mac to play the result.
+
+**Why per-machine voices work:** the remote sends a **relative** path (`$rel_path`), and the relay resolves it against its *own* `PEON_DIR`:
+
+```python
+full_path = os.path.realpath(os.path.join(PEON_DIR, file_rel))
+```
+
+So `local_ubuntu` running the Orc Peon pack sends `packs/peon/sounds/WorkComplete.mp3`, and your Mac plays **its own copy** of that file. Each host's active pack is its own `~/.openpeon/config.json` — unmanaged by chezmoi, so setting it per host produces zero drift.
+
+**The one catch that follows from this:** your Mac must have every pack the remotes use installed locally, or it 404s. The remote picks *which* file; the Mac supplies it.
+
+A scheme that fits, staying in one universe so it's instantly recognizable:
+
+| Host | Pack | Completion line |
+|---|---|---|
+| Mac | `sc2_scv` (current) | "Job's finished!" |
+| `local_ubuntu` | `peon` — Orc Peon | "Work complete!" |
+| others | `peasant`, `protoss` | — |
+
+`peon` being the project's namesake is a nice touch. There are also ~40 `sc2_*` character packs including Chinese variants (`sc2_abathur_zh` etc.).
+
+**What wiring it needs:**
+
+1. Mac: `peon relay --daemon` must be running — that's the real operational cost, and it needs a decision (manual, login item, or brew service).
+2. `RemoteForward 19998 localhost:19998` per host in `~/.ssh/config`. Your SSH files are `create_private_*` — seeded once, never rewritten — so edits are safe, but propagating to new machines means copying back to source with `cp "$(chezmoi source-path …)"`.
+3. Remote: peon is already installed there by the `coding_agents` role, and `ssh-audio` already defaults to `relay`. It needs `agentSounds=peon` — `david_ubuntu` is still unset.
+4. Per-host pack: the role already has `coding_agents_peon_default_pack` as a variable, so this is a per-host ansible override rather than manual `peon packs use` on each box — that keeps it reproducible without managing peon's config.
+
+**Two caveats worth knowing before committing:**
+
+- `ssh-audio relay` (the default) has **no fallback** — if the tunnel is down, the remote is simply silent. `ssh-audio auto` tries the relay, then falls back to playing on the remote itself. For a laptop that isn't always tunneling, `auto` is the safer default.
+- With multiple concurrent SSH sessions to one host, only the first `-R` binds 19998; later ones warn but still work *through* the first tunnel — until that first session disconnects, which silently breaks the rest.
+
+**Other features actually worth using**, beyond the ones I mentioned last turn:
+
+- **`peon packs ide-bind <ide> <pack>`** — a different voice per *agent* (`claude`, `codex`, `opencode`, `cursor`, `antigravity` are all recognized). Combined with per-host packs you'd hear both which machine and which agent.
+- **`peon packs exclude add <glob>`** — silence sounds and notifications entirely under matching paths.
+- **`peon mobile ntfy <topic>`** — phone push. Notably, the code path I read sends **regardless of the focus gate**, so unlike the overlay it fires even when you're staring at the terminal — a better fit for long fleet runs.
+
+Want me to wire up the relay path? The reversible parts (SSH forwards, per-host pack via the ansible variable, `ssh-audio auto`) are straightforward; the one that needs your call is how the relay daemon should start on the Mac.

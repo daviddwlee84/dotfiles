@@ -36,6 +36,14 @@ pane_gaps = true
 confirm_close = true
 show_agent_labels_on_pane_borders = true
 
+# Agent sidebar ordering. herdr's default is "spaces" (grouped by space);
+# "priority" turns the panel into an attention queue (blocked/waiting agents
+# float to the top) instead of a per-space grouping. With many concurrent agent
+# panes the queue is what you actually scan, so this is the more useful default
+# here. Valid values: "spaces" | "priority" ("workspaces" is an alias for
+# "spaces").
+agent_panel_sort = "priority"
+
 # Expanded Agent sidebar row layout. herdr's own default is
 #   [["state_icon", "workspace", "tab"], ["agent"]]
 # and we append the `$review` metadata token so the review-pending ⭐ (prefix+m /

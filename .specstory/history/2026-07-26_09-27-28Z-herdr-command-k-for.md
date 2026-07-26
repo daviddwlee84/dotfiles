@@ -8395,3 +8395,379 @@ Check working tree before staging
 ?? dot_config/herdr/executable_run-command.sh
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:28:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+The other session's changes have been committed and are gone, but their transcript file is still showing as modified. Looking at my own changes, I have updates to the herdr configuration and documentation files, plus a new executable script and a plan file that got cut off.
+
+Now I'm checking whether the pre-commit hooks will run properly — the config file isn't in the status output so it should be clean. I need to verify the repo's convention for committing plan files by checking CLAUDE.md and the agent-history-hygiene skill, and I can see from earlier that plan files do get committed alongside diffs. So I'll go ahead and stage everything for commit with hooks enabled.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:28:15Z)**_
+
+Other session's work has landed and `.pre-commit-config.yaml` is clean again, so hooks will run normally this time.
+
+_**Agent (claude-opus-5 2026-07-26 12:28:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage prefix+E feature files
+
+`git add .chezmoitemplates/herdr/config.toml docs/tools/herdr.md docs/tools/herdr.zh-TW.md dot_config/herdr/executable_run-command.sh .claude/plans/transient-cooking-dongarra.md .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md && git diff --cached --stat`
+
+```text
+ .chezmoitemplates/herdr/config.toml                |   26 +
+ .claude/plans/transient-cooking-dongarra.md        |  158 ++
+ .../2026-07-26_09-27-28Z-herdr-command-k-for.md    | 1812 ++++++++++++++++++++
+ docs/tools/herdr.md                                |   29 +
+ docs/tools/herdr.zh-TW.md                          |   29 +
+ dot_config/herdr/executable_run-command.sh         |  152 ++
+ 6 files changed, 2206 insertions(+)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:28:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the prefix+E feature
+
+```bash
+git commit -q -F - <<'EOF' 2>&1 | tail -25; git log --oneline -1
+feat(herdr): prefix+E runs any command in a floating popup
+
+prefix+G proves the shape the user wanted — a transient pane that runs
+something and vanishes when it exits — but its command is hardcoded, and
+every workaround has friction: `prefix+c` + type + `exit` is four steps
+and churns the tab bar, and the scratch shell leaves a shell to exit by
+hand. prefix+E generalises it: fzf-pick from shell history (or type a new
+command), run it in the focused pane's cwd, popup closes itself on exit.
+
+Uses `type = "popup"` (herdr >= 0.7.4, #1125) — the real `tmux
+display-popup -E` analog. Unlike the `type = "pane"` bindings beside it
+(lazygit/btop/nvtop/scratch), a popup floats ABOVE the tiled layout
+instead of splitting it, so nothing reflows. Deliberately NOT a
+herdr-plus Quick Action, which is the intuitive place to look: those run
+via `sh -c` with no PTY/stdin (the same reason btop/nvtop are command
+panes) and carry a fixed command string with no free-text field.
+
+Runs through `$SHELL -ic` so this repo's large alias/function set
+resolves; `--sh` is the fast escape hatch. Closes on success, holds on
+failure so the error stays readable (HERDR_RUN_HOLD=always|never).
+
+Two portability traps found while building the history picker, both
+fixed and documented: ~/.zsh_history holds non-UTF8 bytes, so BSD sed
+aborts with "RE error: illegal byte sequence" unless parsed under
+LC_ALL=C; and the newest-first reversal uses POSIX awk because `tail -r`
+is BSD-only while `tac` is GNU-only.
+
+Verified without a working server (the running one is still 0.7.2):
+shellcheck clean at all levels, `herdr config check` ok on the rendered
+template, and the helper driven standalone across every branch — success
+closes, failure holds with [exit N], HERDR_RUN_HOLD=never skips the hold,
+bad --cwd falls back to $PWD, `$SHELL -ic` resolves the `gst` alias while
+`--sh` correctly does not. Not yet exercised in-app: that needs the herdr
+server restarted onto 0.7.5.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+EOF
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /Users/david/.cache/pre-commit/patch1785068914-17228.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..............................................................................Passed
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /Users/david/.cache/pre-commit/patch1785068914-17228.
+68b4eae feat(herdr): prefix+E runs any command in a floating popup
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:28:46Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="TaskUpdate"><details>
+<summary>Tool use: **TaskUpdate**</summary>
+
+```text
+Updated task #4 status
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:29:19Z)**_
+
+Done — `68b4eae`, all hooks passing this time.
+
+## `prefix + E` — 執行任意指令的浮動 popup
+
+回答你原本的問題：**`prefix + y`（Quick Actions）做不到這件事**，而且不是設定問題，是機制限制。兩個硬阻礙：Quick Actions 透過 `sh -c` 執行、**沒有 PTY/stdin**（這正是你的 `btop`/`nvtop` 當初被做成 command pane 而不是 Quick Action 的原因，理由就寫在你 config 裡那段註解），而且每個 action 都是寫死的 `command = "…"` 字串，沒有自由輸入欄位。
+
+好消息是 **herdr 0.7.4 剛好加了你要的那個原語**：`type = "popup"`（#1125）—— session-modal 浮動終端，**不動平鋪版面**。這才是真正的 `tmux display-popup -E` 對應物。你剛升上 0.7.5，所以現在能用。
+
+| 做法 | 為什麼不夠好 |
+|---|---|
+| `type = "pane"`（你的 `prefix+G`/`M`/`N`/`` ` ``） | 執行期間切開版面，整個重排 |
+| `prefix + c` → 打 → `exit` | 四步驟 + 弄亂 tab bar |
+| `prefix + `` ` `` | 留一個要自己 exit 的 shell |
+| **`type = "popup"`** | 浮在版面之上，關掉就回原位 |
+
+按照你選的三個決定實作：fzf 翻歷史 + 自由輸入、失敗才停留、預設 interactive shell 加 `--sh` 逸出口。
+
+## 過程中抓到的兩個可攜性 bug
+
+這兩個都是我自己 pipeline 裡的，在寫進腳本前就先驗出來了：
+
+1. **`~/.zsh_history` 含非 UTF-8 位元組** —— macOS 的 BSD `sed` 會直接以 `sed: RE error: illegal byte sequence` 中止。實測：預設 locale 失敗、`LC_ALL=C` 乾淨。整個歷史解析都包在 `LC_ALL=C` 底下。
+2. **`tail -r` 是 BSD 限定、`tac` 是 GNU 限定** —— 這 repo 跨 macOS/Linux，所以「最新在上」的反轉改用 POSIX `awk` 做。
+
+另外 fzf 的三種結果剛好可以用 exit code 乾淨區分（實測過）：選到既有指令 = 0（取第 2 行）、打了新指令沒 match = 1（取第 1 行的 query）、Esc = 130（什麼都不做）。
+
+## 驗證
+
+server 還是 0.7.2，所以我全部用**不需要 server** 的方式驗：
+
+- shellcheck **全等級**乾淨（不只 `-S error`）、`sh -n` 過
+- `herdr config check` 對 render 後的 template 回 `config: ok`（`prefix+E` 不撞任何內建 —— 內建佔用的 shift 鍵是 `d g n p r t w x`）
+- 腳本獨立跑過**每一條分支**：成功關閉 / 失敗顯示 `[exit 1]` 並等待 / `HERDR_RUN_HOLD=never` 不等 / `hold=always` 成功也等 / `--cwd` 有效 / 壞的 `--cwd` 退回 `$PWD` / `$SHELL -ic` 解得出 `gst` alias 而 `--sh` 解不出（確認這個 trade-off 是真的）
+- mkdocs warning **逐行 diff 與 baseline 完全相同**（12 行），兩語言的 `#run-any-command` 錨點都正確產生
+
+有一個中途的假警報值得提：無 TTY 測試時 `zsh -i` 會噴 `can't change option: zle`。我用 `script(1)` 給真 TTY 重測，**警告消失、輸出乾淨帶色**——那純粹是我測試環境的產物，popup 裡永遠有 PTY，不會出現。
+
+## 還沒驗的一件事
+
+在 herdr 裡實際按下 `prefix + E`。這需要 `chezmoi apply` + **重啟 herdr server**（跟 ⭐ 那個 migration 卡在同一個地方）。等你重啟完，我一次把兩件事都端到端跑完。
+
+Commit `68b4eae` 只包含我的檔案 + plan file + 本次逐字稿；另一個 session 的 ansible / agent-sounds / peon 那批已經自己 commit 掉了，我沒碰。
+
+---
+
+_**User (2026-07-26 12:37:31Z)**_
+
+一個小改動 把 agents default sorting 從 grouped 改成 priority
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 12:37:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update herdr's `agent_panel_sort` configuration from its current grouped/spaces setting to priority. Looking at the config structure, I can see the enum supports `spaces`, `workspaces`, and `priority` values, so I'll modify the [ui] table in `.chezmoitemplates/herdr/config.toml` to make this switch.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:37:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check agent_panel_sort key and allowed values
+
+`herdr --default-config 2>/dev/null | grep -n -B 4 -A 4 "agent_panel_sort"; echo "=== config reference ==="; jq -r '.sections[] | .. | objects | select(.key? == "ui.agent_panel_sort") | "key: \(.key)\ndesc: \(.description // "")\ndefault: \(.default // "n/a")\nvalues: \(.values // .options // .allowed // "n/a")"' /tmp/cfgref.json 2>/dev/null`
+
+```text
+207-# hide_tab_bar_when_single_tab = false
+208-
+209-# Agent panel ordering: "spaces" (grouped by space) or "priority" (attention queue).
+210-# "workspaces" is accepted as an alias for "spaces".
+211:# agent_panel_sort = "spaces"
+212-
+213-# Expanded agent rows. Built-ins are state_icon, state_text, workspace, tab, pane, agent,
+214-# terminal_title, and terminal_title_stripped.
+215-# Custom values reported through pane metadata use a $name token.
+=== config reference ===
+key: ui.agent_panel_sort
+desc: Agent sidebar ordering. Saved values are "spaces" or "priority"; "workspaces" is accepted as an alias for "spaces".
+default: "spaces"
+values: ["spaces","priority"]
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:37:57Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've confirmed the sort setting defaults to grouping by spaces, but we need to switch it to priority mode for the attention queue. The row tokens I'm using—state_icon, state_text, workspace, tab, pane, agent, terminal_title, and the custom $name field—are all valid, which checks out with my earlier validation. Now I'm ready to make the configuration change.
+
+I'll add `agent_panel_sort = "priority"` to the [ui] table in the config file with a brief comment explaining the change. After that, I should run the config check to make sure everything validates correctly, then see if there's a natural place in the documentation to mention this setting—though it's a small enough change that it might not warrant a doc update if agent panel ordering isn't already documented there.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:37:57Z)**_
+
+`ui.agent_panel_sort` — default `"spaces"` (grouped), target `"priority"` (attention queue).
+
+_**Agent (claude-opus-5 2026-07-26 12:37:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/.chezmoitemplates/herdr/config.toml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:09Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate agent_panel_sort change with control test
+
+```bash
+chezmoi execute-template < .chezmoitemplates/herdr/config.toml > /tmp/h3.toml && HERDR_CONFIG_PATH=/tmp/h3.toml herdr config check 2>&1 | head -4; echo "--- rendered value ---"; grep -n "agent_panel_sort" /tmp/h3.toml
+echo "=== control: does check reject a bogus value? ==="
+sed 's/agent_panel_sort = "priority"/agent_panel_sort = "bogus"/' /tmp/h3.toml > /tmp/h3bad.toml && HERDR_CONFIG_PATH=/tmp/h3bad.toml herdr config check 2>&1 | head -4
+```
+
+```text
+config: ok
+--- rendered value ---
+45:agent_panel_sort = "priority"
+=== control: does check reject a bogus value? ===
+config: issues found
+config parse error: TOML parse error at line 45, column 20
+   |
+45 | agent_panel_sort = "bogus"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:18Z)**_
+
+<think><details><summary>Thought Process</summary>
+The validation is working correctly—the enum accepts "priority" and rejects invalid values like "bogus". Now I'm wondering if this behavioral change to the agent panel ordering deserves documentation, so I'm checking if the docs already mention sidebar behavior and looking for a natural place to add it in the tools guide.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find sidebar mentions in docs
+
+`grep -n -i "sidebar\|側欄" docs/tools/herdr.md | head -8`
+
+```text
+71:| Agent status 🤖/💬/✅ (workmux, 6 files) | **Native** agent-state rollups in sidebar | Skipped — native (workmux untouched for tmux) |
+145:3. **The navigator's expand set is separate from the sidebar's** `collapsed_space_keys` — the latter is what `~/.config/herdr/session.json` persists, driven by the sidebar's right-click `Expand` / `Close group` menu. Collapsing a space in one does not affect the other.
+149:> **For a spaces-only overview, reach for `prefix + T`** (`tv herdr-sesh`) instead. It is a flat workspace list by construction — a permanent collapse-all view — and it can additionally *create* a space from a zoxide frecency dir, which the native navigator cannot. `prefix + w` is the other space-level option (native sidebar navigate mode) but has no fuzzy search.
+167:- **Agent visibility**: herdr tracks agent state **per pane**, so in the default splits layout every agent still surfaces individually in herdr's agent tracking (verified: two agents in one tab appear as two separate entries in `herdr agent list`). The compact left sidebar rolls a *tab's* status into one dot — use `--tab-per-agent` if you want each agent to own a tab-level status dot.
+203:herdr detects agent state natively and rolls it up into the sidebar (a blocked agent marks its pane/tab/workspace). Claude Code is detected via **screen-manifest heuristics** (terminal title + OSC progress), not lifecycle hooks. If the heuristics prove insufficient, state can be pushed explicitly:
+299:> **herdr ≥ 0.7.4 only, and the token needs a row layout to be visible.** 0.7.4 replaced `--custom-status` / the flat `custom_status` field with this namespaced token map — a silent removal, not listed as a breaking change. Two consequences: on older herdr the helper dies with `unknown --custom-status`, and unlike `custom_status` a token is rendered **only** where a sidebar row layout names it. That is why `.chezmoitemplates/herdr/config.toml` pins `[ui.sidebar.agents] rows` with `"$review"` appended to herdr's default first row — drop that and the flag still works through `prefix+i`, but the ⭐ disappears from the sidebar. See [`pitfalls/herdr-0.7.4-drops-custom-status.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-0.7.4-drops-custom-status.md).
+309:Three names must move together: `TOKEN` in `review-mark.sh`, the `.tokens.review` lookups in [`herdr-review.toml`](https://github.com/daviddwlee84/dotfiles/blob/main/dot_config/television/cable/herdr-review.toml), and `"$review"` in the sidebar row layout.
+387:herdr has **no native usage/quota/token display** (the sidebar shows agent *state* only). It does expose a per-pane hook — `herdr pane report-metadata <pane> --source ID --token usage="…" --ttl-ms N` — that a driver could push a `"Claude 62% • Codex 78%"` label into (the same hook the **Review-pending flag** section above uses, but since herdr 0.7.4 tokens are a namespaced map, so a `usage` token and the `review` token coexist instead of contending for one field). A Codex-only community plugin ([jerryfane/herdr-codex-usage-kit](https://github.com/jerryfane/herdr-codex-usage-kit)) already does this from the same `~/.codex` data [CodexBar](https://github.com/steipete/CodexBar) reads; nothing covers Claude/ChatGPT quota. Deferred — CodexBar's menu bar stays the multi-provider view. Design + options captured in [`backlog/herdr-usage-status-driver.md`](https://github.com/daviddwlee84/dotfiles/blob/main/backlog/herdr-usage-status-driver.md).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm noticing that the `[ui]` settings aren't documented in a dedicated section, and both the row layout pin and `agent_panel_sort` are deviations from herdr's defaults that need clarification in the docs. The challenge is figuring out whether to add this to the existing note around line 299 or create a separate explanation since they're distinct `[ui]` customizations.
+
+Given the user wants a small change, I should keep it minimal — just a one-line mention. The feasibility matrix around line 71 seems like the natural spot: I can amend the "Agent status" cell in the third column to note that the sidebar is sorted as an attention queue using `agent_panel_sort = "priority"`. That's tidy and contextually appropriate, and I'll make the same edit in both language versions.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:32Z)**_
+
+No dedicated `[ui]` section in the docs, but the feasibility matrix has the right cell for it.
+
+_**Agent (claude-opus-5 2026-07-26 12:38:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:38:38Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /Users/david/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:39:35Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rebuild docs and check working tree
+
+`timeout 540 uv run mkdocs build --strict 2>&1 | grep "^WARNING" | sed 's/WARNING -  //' | sort > /tmp/warn3.txt; diff /tmp/warn_now.txt /tmp/warn3.txt && echo "✅ warnings identical to baseline"; git status --short`
+
+```text
+✅ warnings identical to baseline
+ M .chezmoitemplates/herdr/config.toml
+ M .specstory/history/2026-07-25_05-58-51Z-claude-copilot-once-resume.md
+ M .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md
+ M docs/tools/herdr.md
+ M docs/tools/herdr.zh-TW.md
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:39:48Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit agent panel sort change
+
+```bash
+git add .chezmoitemplates/herdr/config.toml docs/tools/herdr.md docs/tools/herdr.zh-TW.md .specstory/history/2026-07-26_09-27-28Z-herdr-command-k-for.md && git commit -q -F - <<'EOF' 2>&1 | grep -E "Failed|error|Passed.*[Ff]ail" ; git log --oneline -1
+feat(herdr): sort the agent sidebar as an attention queue
+
+herdr's default `ui.agent_panel_sort = "spaces"` groups the agent panel
+by space. With this many concurrent agent panes the thing you actually
+scan is "who needs me", so switch to "priority", which floats blocked /
+waiting agents to the top.
+
+Verified with `herdr config check` on the rendered template (ok), plus a
+control confirming the checker validates the enum rather than passing any
+string through — `agent_panel_sort = "bogus"` is rejected at parse time.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+EOF
+```
+
+```text
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+f6af3c6 feat(herdr): sort the agent sidebar as an attention queue
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 12:40:04Z)**_
+
+Done — `f6af3c6`.
+
+```toml
+[ui]
+agent_panel_sort = "priority"   # herdr default is "spaces"
+```
+
+`"priority"` 把 agent 面板變成**注意力佇列**（blocked / waiting 的浮到最上面），取代原本依 space 分組。
+
+驗證：`herdr config check` 對 render 後的 template 回 `config: ok`，另外跑了個**反例對照**確認這個檢查真的在驗 enum 而不是任何字串都放行 —— `agent_panel_sort = "bogus"` 會在 parse 階段就被擋下來。mkdocs warning 與 baseline 逐行相同。
+
+順帶在兩個語言的可行性對照表補了一行，記錄這是**偏離 herdr 預設**的設定（跟 `[ui.sidebar.agents] rows` 那個 pin 一樣，都屬於「我們的受管 `[ui]` 表蓋掉上游預設」，升級時值得複查的那類）。
+
+---
+
+目前累積三件事都在等同一個動作 —— **重啟 herdr server**（`chezmoi apply` + 重啟）：
+
+| | 狀態 |
+|---|---|
+| ⭐ review flag 遷移到 token（`9d3a9da`） | 等 apply + 重啟 |
+| `prefix + E` 執行任意指令 popup（`68b4eae`） | 等 apply + 重啟（`type = "popup"` 需要 ≥ 0.7.4，但 server 還在 0.7.2） |
+| agent 面板排序（`f6af3c6`） | 只需要 apply + `herdr server reload-config`… 但 reload 也走 socket，一樣卡在 protocol mismatch |
+
+等你挑好時間重啟，叫我一聲，我一次把三件事端到端驗完。
