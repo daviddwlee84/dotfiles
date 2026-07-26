@@ -42,12 +42,14 @@ LSP infra plugins from [`create_lazy-lock.json`](../../dot_config/nvim/create_la
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
-  "claude-hud@claude-hud": true
+  "claude-hud@claude-hud": false
 }
 ```
 
 - **`pyright-lsp@claude-plugins-official`** — Python LSP for Claude Code, sourced from the official marketplace.
-- **`claude-hud@claude-hud`** — the statusline plugin that shows the "LSP Plugin Recommendation" prompt when you open a file whose extension matches a marketplace LSP that isn't installed yet (e.g. opening a `.go` file triggers a popup for `gopls-lsp@claude-plugins-official`).
+- **`claude-hud@claude-hud`** — the statusline plugin, deliberately `false`. Disabling it drops its two install/config-time commands (`claude-hud:setup` / `claude-hud:configure`) out of every session's skill listing, which is the only context they were costing. The HUD itself is unaffected: `statusLine.command` globs `~/.claude/plugins/cache/claude-hud/*/` and execs `dist/index.js` directly, never resolving through the plugin loader. Updates are likewise unaffected — they run through [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py) (`just upgrade-plugins`), which only touches `installed_plugins.json` and the versioned cache dir. See [upgrades.md](../this_repo/upgrades.md).
+
+> The "LSP Plugin Recommendation" popup — the one that offers e.g. `gopls-lsp@claude-plugins-official` when you open a `.go` file — is **Claude Code's own** feature, not claude-hud's (its `src/` contains no LSP code). It keeps working with claude-hud disabled.
 
 The overlay deep-merges via a hook-aware `jq` script ([details](agent-overlays.md)) so Claude / CodeIsland runtime additions to `hooks.*` arrays are preserved instead of replaced.
 
@@ -96,7 +98,7 @@ Edit [`dot_claude/modify_settings.json.tmpl`](../../dot_claude/modify_settings.j
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
-  "claude-hud@claude-hud": true,
+  "claude-hud@claude-hud": false,
   "gopls-lsp@claude-plugins-official": true
 }
 ```

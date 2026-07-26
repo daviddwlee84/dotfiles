@@ -45,6 +45,27 @@
 # where the binary isn't installed yet (fresh box, Linux without ansible),
 # mirroring the mandatory `command -v workmux` guard.
 #
+# claude-hud is deliberately `enabledPlugins: false`. It ships two commands
+# (`claude-hud:setup` / `claude-hud:configure`) that are install/config-time
+# only, yet every session paid ~45 tokens to list them to the model. This is
+# NOT a `skillOverrides` job — verified 2026-07 on CC 2.1.220 that neither
+# "off" nor "user-invocable-only" gates *plugin* commands (the listing filter
+# keys on a name that differs from the displayed `claude-hud:setup`); those
+# values only work for user skills in ~/.claude/skills/.
+#
+# Disabling costs nothing here, because claude-hud is wired around the plugin
+# system on every axis we use:
+#   * the statusLine below globs ~/.claude/plugins/cache/claude-hud/*/ and
+#     execs dist/index.js directly — it never resolves through the plugin
+#     loader, so the HUD keeps rendering (verified by piping a real stdin
+#     payload through it with the plugin disabled);
+#   * updates come from roles/coding_agents/files/claude_hud_sync.py via
+#     `just upgrade-plugins`, which only rewrites installed_plugins.json and
+#     the versioned cache dir — it never reads enabledPlugins.
+# Trade-off: `/claude-hud:setup` and `/claude-hud:configure` stop resolving.
+# Flip this to true (or toggle in `/plugin`) for the rare reconfigure, then
+# flip back. Day-to-day config lives in dot_claude/plugins/claude-hud/config.json.
+#
 # See: docs/tools/agent-overlays.md → "CodeIsland integration".
 set -eu
 
@@ -149,7 +170,7 @@ overlay=$(cat <<'JSON'
   },
   "enabledPlugins": {
     "pyright-lsp@claude-plugins-official": true,
-    "claude-hud@claude-hud": true
+    "claude-hud@claude-hud": false
   },
   "extraKnownMarketplaces": {
     "claude-hud": {

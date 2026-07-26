@@ -47,12 +47,14 @@ LazyVim 的核心 spec 也會自動透過 `lazydev.nvim` 接上 **`lua_ls`**（L
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
-  "claude-hud@claude-hud": true
+  "claude-hud@claude-hud": false
 }
 ```
 
 - **`pyright-lsp@claude-plugins-official`**——Claude Code 用的 Python LSP，來自官方市集。
-- **`claude-hud@claude-hud`**——statusline 外掛，當你開啟的檔案副檔名對應到尚未安裝的市集 LSP 時，會顯示「LSP Plugin Recommendation」提示（例如打開 `.go` 檔會跳出 `gopls-lsp@claude-plugins-official` 的彈窗）。
+- **`claude-hud@claude-hud`**——statusline 外掛，刻意設為 `false`。停用後，它那兩個只在安裝／設定時才用得到的指令（`claude-hud:setup` / `claude-hud:configure`）就不會再出現在每個 session 的 skill 清單裡——那正是它們唯一佔用的 context。HUD 本身不受影響：`statusLine.command` 是直接 glob `~/.claude/plugins/cache/claude-hud/*/` 並執行 `dist/index.js`，完全不經過外掛載入器。更新同樣不受影響——更新是走 [`claude_hud_sync.py`](../../dot_ansible/roles/coding_agents/files/claude_hud_sync.py)（`just upgrade-plugins`），它只會動 `installed_plugins.json` 與帶版本的快取目錄。詳見 [upgrades.md](../this_repo/upgrades.md)。
+
+> 「LSP Plugin Recommendation」彈窗——就是你開啟 `.go` 檔時會推薦 `gopls-lsp@claude-plugins-official` 的那個——是 **Claude Code 自己的**功能，不是 claude-hud 的（它的 `src/` 裡沒有任何 LSP 相關程式碼）。claude-hud 停用後它照常運作。
 
 該 overlay 透過一個能感知 hook 的 `jq` 腳本進行深度合併（[詳見](agent-overlays.md)），所以 Claude / CodeIsland 在 runtime 加入 `hooks.*` 陣列的內容會被保留，而不會被取代。
 
@@ -101,7 +103,7 @@ cp ~/.config/nvim/lazy-lock.json "$(chezmoi source-path ~/.config/nvim/lazy-lock
 ```json
 "enabledPlugins": {
   "pyright-lsp@claude-plugins-official": true,
-  "claude-hud@claude-hud": true,
+  "claude-hud@claude-hud": false,
   "gopls-lsp@claude-plugins-official": true
 }
 ```
