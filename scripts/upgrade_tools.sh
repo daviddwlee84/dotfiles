@@ -769,7 +769,7 @@ cat_atuin() {
 }
 
 # ============================================================================
-# Category: herdr — `herdr update --handoff` for the self-managed Linux binary
+# Category: herdr — `herdr update --handoff` for the self-managed binary
 # ============================================================================
 # herdr is the one tool here whose upgrade CANNOT be driven from the terminal
 # you are sitting in. The devtools ansible role gates its install on
@@ -781,9 +781,10 @@ cat_atuin() {
 # Three guards, all of which SKIP rather than fail, so `upgrade-all` isn't
 # derailed by an environment herdr can't be upgraded from:
 #   1. not installed
-#   2. not Linux — macOS gets herdr from homebrew-core (cat_brew), and upstream
-#      DISABLES `herdr update` on brew/mise/Nix installs precisely because the
-#      package manager owns the binary. See
+#   2. not a self-managed install — upstream DISABLES `herdr update` on
+#      Homebrew/mise/Nix because the package manager owns the binary, which
+#      leaves no pane-preserving path at all. This repo therefore installs the
+#      GitHub-release binary on macOS too; see
 #      pitfalls/herdr-brew-upgrade-strands-running-server.md.
 #   3. running inside a herdr pane — the handoff replaces the server process
 #      that owns your pane, so herdr refuses. This is the non-obvious one:
@@ -793,15 +794,44 @@ cat_atuin() {
 # `--handoff` is the live, pane-preserving path: the server is replaced without
 # killing pane processes, so running coding agents survive the upgrade. Without
 # it, the restart exits every pane process.
+# Detect where the herdr binary came from. Upstream disables `herdr update`
+# on package-manager installs (Homebrew/mise/Nix) because the manager owns the
+# binary — so the pane-preserving `--handoff` path only exists for the
+# self-managed GitHub-release binary. Mirrors _uv_install_style.
+_herdr_install_style() {
+  local p
+  p="$(command -v herdr 2>/dev/null || true)"
+  case "$p" in
+    */homebrew/* | */Cellar/* | */linuxbrew/*) echo brew ;;
+    *"/.local/share/mise/"* | */mise/installs/*) echo mise ;;
+    "$HOME"/.local/bin/herdr) echo self ;;
+    *)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula herdr >/dev/null 2>&1; then
+        echo brew
+      else
+        echo self
+      fi
+      ;;
+  esac
+}
+
 cat_herdr() {
   if ! command -v herdr >/dev/null 2>&1; then
     warn "herdr not installed — skipping"
     return $SKIP_RC
   fi
-  if [[ "$(uname -s)" != "Linux" ]]; then
-    info "Not Linux — herdr upgraded via brew (cat_brew); \`herdr update\` is disabled on brew installs, skipping"
+
+  local style
+  style="$(_herdr_install_style)"
+  if [[ "$style" != "self" ]]; then
+    warn "herdr came from $style — upstream disables \`herdr update\` on $style installs"
+    warn "  There is no pane-preserving upgrade from there; a restart exits every pane process."
+    warn "  This repo installs the self-managed binary on macOS too — re-run \`chezmoi apply\`"
+    warn "  (devtools role) to migrate off $style, then \`just upgrade-herdr\` works."
     return $SKIP_RC
   fi
+
   # HERDR_ENV is the ambient marker herdr injects into every pane shell; the
   # pane id is checked too so a stray export doesn't mask a real pane.
   if [[ -n "${HERDR_ENV:-}" || -n "${HERDR_PANE_ID:-}" ]]; then
@@ -811,7 +841,7 @@ cat_herdr() {
     return $SKIP_RC
   fi
 
-  info "Upgrading herdr (Linux, self-managed binary, live handoff)"
+  info "Upgrading herdr (self-managed binary, live handoff)"
   if ! _run herdr update --handoff; then
     error "herdr update --handoff failed"
     return 1

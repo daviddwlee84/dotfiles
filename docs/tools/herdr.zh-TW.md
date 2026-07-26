@@ -10,8 +10,8 @@
 本 repo 把 herdr 當作一個**與 tmux 共存的試用工具 (trial tool)**——你只會執行 `herdr` *或* `tmux`，永不巢狀 (nested)。既有的 tmux / `sesh` / `tmuxp` / workmux 設定完全不動；herdr 純粹是加法，讓你能在不失去日常工具的前提下評估它。
 
 - **安裝 (Install)**：
-  - macOS —— Homebrew（`herdr` 在 homebrew-core；由 `dot_ansible/roles/devtools/tasks/main.yml` 的 macOS 清單管理）
-  - Linux —— GitHub release 的**單一靜態 binary**（`herdr-linux-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`（由同一 role 中 `# --- herdr ... ---` 區塊管理）。沒有 tarball，所以不需要解壓步驟。
+  - **兩個平台都是** —— GitHub release 的**單一靜態 binary**（`herdr-{linux,macos}-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`，由 `dot_ansible/roles/devtools/tasks/main.yml` 中 `# --- herdr ... ---` 區塊管理。沒有 tarball，所以不需要解壓步驟。
+  - macOS **刻意不走** Homebrew，而且這是本 repo 唯一這樣做的工具。上游在 Homebrew/mise/Nix 安裝上停用 `herdr update`，因為 binary 歸套件管理器所有 —— 那等於拿掉了**唯一**能保住 pane 的升級路徑，只剩下重啟 server（也就是殺掉每一個 pane 內的行程）這一條。所以我們捨棄 formula 改用 release binary，讓 macOS 也拿得到 `--handoff`。切換前就裝好的機器，由同一個 role 裡的一次性 `brew uninstall herdr` 遷移（兩份都留著會讓 `PATH` 上出現兩個 binary，最糟是自己對自己 `protocol_mismatch`）。
 - **驗證 (Verify)**：`herdr --version`；用 `herdr server reload-config` 驗證設定檔
 - **升級 (Upgrade)**：macOS 用 brew；自管的 Linux binary 用 `just upgrade-herdr`（即 `herdr update --handoff`）—— **必須在 herdr 外面跑**，見下
 
@@ -29,7 +29,7 @@
 > **每次 herdr 升級都會讓 agent integration 過期。** `herdr integration status` 會標出各自的版本（`current (v9)` / `outdated (v7 < v9)`），用 `herdr integration install <agent>` 重裝。這些檔案（`~/.claude/hooks/herdr-agent-state.sh`、`~/.codex/herdr-agent-state.sh`、`~/.cursor/herdr-agent-state.sh`、`~/.config/opencode/plugins/herdr-agent-state.js`）是 herdr 自己寫的，**不歸** chezmoi 管，所以 `chezmoi apply` 既不會還原也不會覆蓋它們。`just upgrade-herdr` 會回報哪些過期了，但刻意不自動安裝。
 - **設定 (Config)**：`~/.config/herdr/config.toml` —— chezmoi **`modify_` 覆蓋層 (overlay)**（`dot_config/herdr/modify_config.toml.tmpl` + 受管本體 `.chezmoitemplates/herdr/config.toml`）。覆蓋層在每次 `chezmoi apply` 強制套用我們受管的表 (tables)，同時保留 herdr 在執行期寫回的東西（見 [設定管理](#config-management-modify_)）。
 
-> **升級會讓正在跑的 server 被擱淺（macOS）。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 macOS 沒辦法迴避這次重啟；Linux 的自管 binary 則可以。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
+> **為什麼套件管理器裝的 herdr 會擱淺自己的 server —— 這就是 macOS 離開 Homebrew 的原因。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 brew 裝的 herdr 沒辦法迴避這次重啟。本 repo 現在在 macOS 上也改裝自管的 release binary，正是為了補掉這個缺口；下面那篇 pitfall 仍然保留，因為它描述的是任何**尚未遷移**的機器上會發生的事（而且 `just upgrade-herdr` 偵測到套件管理器安裝時會跳過並印出指示）。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
 
 > **不受 `enableVimMode` 控制。** 該 flag 管的是 shell + tmux 的 modal 編輯；herdr 的 copy mode（`prefix+[`）天生就是 vi 風格（`h/j/k/l`、`w/b/e`、`{`/`}`、`v`/Space 選取、`y`/Enter 複製、`q`/Esc 離開），沒有東西需要 gate。
 

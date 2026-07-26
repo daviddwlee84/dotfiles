@@ -83,10 +83,11 @@
       - worktrunk
       - workmux
       - zellij
-      # herdr — Rust terminal multiplexer + AI-agent orchestrator. Trial tool
-      # that COEXISTS with tmux/zellij (you run one or the other); not a
-      # replacement. Config in ~/.config/herdr/config.toml. See docs/tools/herdr.md.
-      - herdr
+      # herdr is deliberately NOT here — see the `# --- herdr ... ---` block
+      # further down. It is the one tool this repo installs from GitHub
+      # releases on macOS too, because upstream disables `herdr update` on
+      # Homebrew installs and that removes the only pane-preserving upgrade
+      # path. docs/tools/herdr.md has the reasoning.
       - btop
       - htop
       - duckdb
@@ -4626,14 +4627,40 @@
         state: absent
 
 # --- herdr (Rust terminal multiplexer + AI-agent orchestrator) ---
-# Trial tool that COEXISTS with tmux/zellij; not a replacement. macOS gets it
-# from the brew list above (homebrew-core formula). On Linux, releases ship a
-# SINGLE static binary (herdr-linux-{x86_64,aarch64}) — no tarball, so this is
-# simpler than the workmux/worktrunk release tasks (no unarchive, sidesteps the
-# macOS BSD-tar .tar.gz pitfall entirely). Config in ~/.config/herdr/config.toml
-# (chezmoi-managed). Self-managed installs upgrade via `herdr update`.
+# Trial tool that COEXISTS with tmux/zellij; not a replacement. Config in
+# ~/.config/herdr/config.toml (chezmoi-managed).
+#
+# Installed from GitHub releases on BOTH platforms — the one place this repo
+# deliberately bypasses Homebrew on macOS. Reason: herdr runs a persistent
+# server whose socket API is protocol-versioned, so picking up a new version
+# means either a live handoff or a server restart, and a restart EXITS EVERY
+# PANE PROCESS (shells, dev servers, running coding agents). `herdr update
+# --handoff` is the pane-preserving path, and upstream DISABLES `herdr update`
+# entirely on Homebrew/mise/Nix installs because the package manager owns the
+# binary. A brew-installed herdr therefore has no way to upgrade without
+# killing your work — see pitfalls/herdr-brew-upgrade-strands-running-server.md.
+# The self-managed binary does, so both platforms use it.
+#
+# Releases ship a SINGLE static binary per platform+arch (herdr-{linux,macos}-
+# {x86_64,aarch64}) — no tarball, so this is simpler than the workmux/worktrunk
+# release tasks (no unarchive, sidesteps the macOS BSD-tar .tar.gz pitfall).
+#
+# Upgrades are NOT done here (install-only, like every other role): use
+# `just upgrade-herdr` → `herdr update --handoff`, from OUTSIDE herdr.
+- name: Migrate herdr off Homebrew (macOS, one-time)
+  # Boxes provisioned before this switch have herdr from homebrew-core. Leaving
+  # it installed means TWO binaries on PATH (/opt/homebrew/bin vs ~/.local/bin)
+  # with the winner decided by PATH order — and the worst case is a client from
+  # one and a running server from the other, i.e. a self-inflicted
+  # protocol_mismatch. Uninstall before the release binary lands.
+  when: ansible_facts["os_family"] == "Darwin"
+  community.general.homebrew:
+    name: herdr
+    state: absent
+  failed_when: false
+
 - name: Check if herdr is installed
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] in ["Debian", "Darwin"]
   ansible.builtin.command: herdr --version
   register: herdr_check
   changed_when: false
@@ -4641,9 +4668,9 @@
   environment:
     PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
 
-- name: Install herdr from GitHub releases (Debian/Ubuntu, user-level)
+- name: Install herdr from GitHub releases (Linux + macOS, user-level)
   when:
-    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["os_family"] in ["Debian", "Darwin"]
     - herdr_check.rc != 0
     - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
   block:
@@ -4675,13 +4702,18 @@
       register: herdr_release
 
     - name: Set herdr download URL fact
+      # Asset names are herdr-{linux,macos}-{x86_64,aarch64}. `macos`, not
+      # `darwin` — matching ansible's os_family here would silently select
+      # nothing and fall through to the skip below.
       when: herdr_arch | trim != ''
       ansible.builtin.set_fact:
         herdr_download_url: >-
           {{
             (
               herdr_release.json.assets
-              | selectattr('name', 'equalto', 'herdr-linux-' ~ herdr_arch)
+              | selectattr('name', 'equalto',
+                  'herdr-' ~ ('macos' if ansible_facts['os_family'] == 'Darwin' else 'linux')
+                  ~ '-' ~ herdr_arch)
               | map(attribute='browser_download_url')
               | first
             )

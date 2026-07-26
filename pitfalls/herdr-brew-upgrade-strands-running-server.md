@@ -58,12 +58,27 @@ The trap is the recovery path, not the diagnosis:
 > package managers, so `herdr update` is disabled there and cannot perform live handoff."*
 > ([session-state docs](https://github.com/ogulcancelik/herdr/blob/master/docs/next/website/src/content/docs/session-state.mdx))
 
-So on **macOS (this repo installs herdr via homebrew-core)** there is **no** way to pick up a
-new herdr version without stopping the server, and stopping the server **kills every pane
-process** — shells, dev servers, tests, and every running coding agent.
+So on a **Homebrew-installed herdr** there is **no** way to pick up a new herdr version
+without stopping the server, and stopping the server **kills every pane process** — shells,
+dev servers, tests, and every running coding agent.
 
-Linux hosts are the opposite case: this repo installs the self-managed GitHub-release binary
-into `~/.local/bin/herdr`, so `herdr update --handoff` *is* available there.
+Self-managed hosts are the opposite case: the GitHub-release binary in `~/.local/bin/herdr`
+does have `herdr update --handoff`.
+
+> **Resolved for this repo (2026-07): macOS no longer uses the formula.** Because the
+> capability gap above is a property of the *install channel*, not the platform, the
+> `devtools` role now installs the `herdr-macos-{x86_64,aarch64}` release binary into
+> `~/.local/bin/herdr` on macOS as well, with a one-time `brew uninstall herdr` to migrate
+> boxes provisioned earlier. Leaving both in place would put two herdr binaries on `PATH`
+> and let you `protocol_mismatch` against yourself. `just upgrade-herdr` then drives
+> `herdr update --handoff` on both platforms and *skips with instructions* if it still finds
+> a package-managed install.
+>
+> This page stays because it remains accurate for any unmigrated box, for a herdr installed
+> by mise/Nix, and for anyone who reinstalls the formula by hand. The recovery options below
+> are what you have when the handoff is unavailable — see also
+> [`herdr-update-handoff-refuses-inside-pane`](herdr-update-handoff-refuses-inside-pane.md)
+> for the separate trap that the handoff refuses to run from inside a pane.
 
 ## Fix / workaround
 

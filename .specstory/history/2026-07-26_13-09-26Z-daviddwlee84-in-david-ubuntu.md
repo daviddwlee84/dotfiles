@@ -7390,3 +7390,1211 @@ Check for existing Alt+Enter claims
 (Bash completed with no output)
 ```
 </details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:00:20Z)**_
+
+<think><details><summary>Thought Process</summary>
+No conflicts with `Alt+Enter` — it's only active within fzf and unclaimed elsewhere. I checked the herdr config files and found nothing binding that key, so I'm ready to commit these changes.
+
+Now I'm staging the remaining files and committing everything.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:00:20Z)**_
+
+Unclaimed, and it's fzf-internal anyway. Committing:
+
+_**Agent (claude-opus-5 2026-07-26 14:00:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage the keybinding changes and scan
+
+`git add .chezmoitemplates/herdr/config.toml dot_config/herdr/executable_run-command.sh docs/tools/herdr.md docs/tools/herdr.zh-TW.md .specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md && git diff --cached --name-only && bash ~/.claude/skills/agent-history-hygiene/scripts/scan-staged.sh >/dev/null 2>&1; echo "scan exit=$?"`
+
+```text
+.chezmoitemplates/herdr/config.toml
+.specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md
+docs/tools/herdr.md
+docs/tools/herdr.zh-TW.md
+dot_config/herdr/executable_run-command.sh
+scan exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:00:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the herdr keybinding changes
+
+```bash
+git commit -F - <<'MSG'
+feat(herdr): Alt+Enter runs the literal query in prefix+E; scratch shell becomes a real popup
+
+Two things the 0.7.5 upgrade made worth fixing.
+
+**prefix+E could only replay history, in practice.** The helper already handled
+"typed something brand new" — fzf `--print-query` + exit code 1 — but that path
+is only reachable when *zero* history entries match. Type `ls -la` with
+`ls -la /tmp` in history and fzf still has a match, so Enter takes the history
+entry and there is no way to say "no, run exactly what I typed". Adds
+`--expect=alt-enter` as the escape hatch, plus a `--header` line so it is
+discoverable. Alt+ rather than Ctrl+ per the repo's keybinding convention;
+verified Alt+Enter is unclaimed elsewhere and it is fzf-internal regardless
+(live only while the picker is open).
+
+The parse needed care because fzf's output layout is NOT fixed, which the old
+comment would have led the next editor to assume. Checked against fzf directly
+using -1/-0 (which exit without a keypress):
+
+  Enter     + match      rc 0    query \n ""        \n selection
+  Alt+Enter + match      rc 0    query \n alt-enter \n selection
+  Enter     + no match   rc 1    query                            <- ONE line
+  Alt+Enter + no match   rc 1    query \n alt-enter
+
+So the key is read from line 2 (empty or absent means plain Enter) and line 3 is
+only trusted on rc 0; everything else falls back to the query on line 1. All
+four shapes unit-tested against the extracted branch.
+
+**prefix+` was a zoom, not a scratch space.** As `type = "pane"` it took over
+the tiled layout. Switched to `type = "popup"` (85%x80%), which floats above the
+layout so nothing reflows and quitting puts you back where you were — the same
+reason prefix+E is a popup.
+
+prefix+G / prefix+M / prefix+N (lazygit / btop / nvtop) deliberately stay
+`type = "pane"`: you quit those immediately with `q`, so the temporary split
+costs nothing, and popups are session-modal — you cannot touch another pane
+while one is open. That modality is why this is a per-binding decision rather
+than a global switch, which is now written down instead of implied.
+
+Verified: shellcheck clean; `chezmoi apply` of both targets succeeds and
+`herdr server reload-config` returns status "applied" with empty diagnostics
+against the live 0.7.5 server. mkdocs --strict unchanged at the pre-existing 173
+warnings, none naming these pages.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1785074439-433539.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False)...(no files to check)Skipped
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..........................................................(no files to check)Skipped
+check toml..............................................................................Passed
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs................................(no files to check)Skipped
+shellcheck (scripts/)...............................................(no files to check)Skipped
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...............................................................(no files to check)Skipped
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1785074439-433539.
+[main 0f3a629] feat(herdr): Alt+Enter runs the literal query in prefix+E; scratch shell becomes a real popup
+ 5 files changed, 778 insertions(+), 15 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:01:09Z)**_
+
+兩個改動都上了（`0f3a629`），已 `chezmoi apply` 且 herdr 接受（`reload-config` → `applied`，diagnostics 空），你現在按 `prefix+E` / ``prefix+` `` 就是新行為。
+
+**`prefix+E`** 加了 `--expect=alt-enter` + 一行 `--header` 提示。Enter = 跑反白那筆歷史，**Alt+Enter = 跑你字面打的**。過程中發現 fzf 的輸出行數**不是固定的** —— 我原本註解寫「always three lines」是錯的，用 `-1`/`-0`（不需按鍵就會退出）實測後才確定「沒 match 的 Enter 只印一行 query」。四種組合都抽出來做了 unit test，全過。
+
+**``prefix+` ``** 換成 `type = "popup"`（85%×80%）。lazygit/btop/nvtop 照你說的留在 `type = "pane"`，而且我把「為什麼是逐個決定而不是全域切換」寫進註解和文件了 —— popup 是 session-modal，開著就不能碰別的 pane，這才是分界點。
+
+---
+
+## macOS 要不要也換成 self-managed binary
+
+**我的建議是：值得換，但這是 herdr 的特例，不該推廣成通則。**
+
+release 確實有 `herdr-macos-{aarch64,x86_64}`，所以技術上可行。真正的理由不是風格一致性，而是**能力差異**：
+
+`pitfalls/herdr-brew-upgrade-strands-running-server.md` 記的那個痛點在 macOS 上**無解** —— `brew upgrade herdr` 之後 server 被擱淺，而上游明確地在 brew/mise/Nix 安裝上**停用** `herdr update`，所以 macOS 唯一的路是 `herdr server stop`，那會殺掉每一個 pane 裡的行程（包含正在跑的 coding agent）。換成 self-managed 就解鎖 `--handoff`，這個痛點直接消失。
+
+其他工具沒有這個性質 —— 它們升級不會有「殺掉你所有工作」的代價，所以 brew 完全夠用。herdr 是唯一一個「套件管理器的能力邊界會造成實質損失」的。
+
+**但有三個必須先處理的：**
+
+1. **遷移不乾淨。** 現有 mac 上 brew 的 herdr 在 `/opt/homebrew/bin/herdr`，如果只是新增 `~/.local/bin/herdr`，兩份會同時存在、由 PATH 順序決定誰贏 —— 最糟情況是 client 用一份、server 是另一份跑起來的，直接踩到 `protocol_mismatch`。所以同一個 change 裡必須 `brew uninstall herdr`。
+2. **codesigning 我沒辦法在這台驗。** Apple Silicon 上未簽名的 Mach-O 可能被拒絕執行。ansible 的 `get_url` 走 Python urllib，不會加 `com.apple.quarantine`，所以隔離屬性應該不是問題；但 release binary 有沒有 ad-hoc 簽名要實機跑一次才知道。
+3. **`upgrade_tools.sh` 的 gate 要改。** 我剛寫的 `cat_herdr` 是硬性 `uname -s != Linux → skip`，理由正是「brew 裝的不能 self-update」。換完之後那個判斷要從「是不是 Linux」改成「是不是 self-managed 安裝」（例如看 binary 路徑是不是 `~/.local/bin/herdr`，跟 `cat_uv` 判斷 brew-vs-curl 的做法同一套）。
+
+要我做嗎？我可以把 ansible role 的 macOS 分支、遷移用的 `brew uninstall`、`cat_herdr` 的 gate、以及那個 pitfall 的「macOS 無解」段落一起改掉 —— 但第 2 點得你在 mac 上實跑一次才能確認，我會在最終回報裡標明這一項未驗證。
+
+---
+
+_**User (2026-07-26 14:02:50Z)**_
+
+可以做一下 macOS 的部分
+
+```
+❯ chezmoi apply --init
+mise WARN  missing: bun@1.3.14 dotnet@10.0.302 ruby@3.4.10
+```
+也可以順便fix一下warnings
+
+---
+
+_**Agent (claude-opus-5 2026-07-26 14:03:02Z)**_
+
+<think><details><summary>Thought Process</summary>
+I've got two things to tackle here. First, there's the macOS self-managed herdr work that needs the full implementation across the ansible role, brew migration, gate changes, and documentation. Second, there's a `mise` warning about missing versions for bun, dotnet, and ruby during `chezmoi apply --init` that I need to debug. I'll start with the second one since it should be quicker to resolve, then move on to the larger macOS implementation.
+
+For the missing runtimes issue, I need to check whether those versions are gated behind `installExtraRuntimes` in the config but were never actually installed, or if `mise install` just needs to be run. Let me look at both the local mise config and the repo's configuration to figure out what's happening.
+
+For the macOS work, I need to examine the ansible role's main tasks file to see the current herdr setup, design the macOS branch to download the right architecture-specific binary, handle the brew uninstall migration, and update the gate logic. Let me start gathering the relevant files and information.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:02Z)**_
+
+Two items. Let me investigate both:
+
+_**Agent (claude-opus-5 2026-07-26 14:03:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Inspect the missing mise runtimes
+
+`mise ls --missing 2>&1 | head -20; echo "=== config sources ==="; mise config 2>&1 | head -10`
+
+```text
+bun     1.3.14 (missing)    ~/.config/mise/config.toml  1
+dotnet  10.0.302 (missing)  ~/.config/mise/config.toml  10
+ruby    3.4.10 (missing)    ~/.config/mise/config.toml  3
+=== config sources ===
+~/.config/mise/config.toml  node, bun, rust, go, dotnet, ruby
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the mise config and its chezmoi source
+
+`cat ~/.config/mise/config.toml 2>/dev/null; echo "=== chezmoi source ==="; ls dot_config/mise/ 2>/dev/null`
+
+```text
+# mise global configuration
+# https://mise.jdx.dev/configuration.html
+
+[settings]
+# Use precompiled ruby binaries instead of compiling from source.
+# ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
+ruby.compile = false
+
+[env]
+# mise's Go backend force-sets GOBIN=<mise install>/bin with NO off-switch
+# (settings expose go_set_gopath / go_set_goroot but NOT go_set_gobin) and
+# re-asserts it on every `cd` via hook-env, clobbering any shell export. So the
+# ONLY reliable way to send `go install` into the blessed ~/.local/bin (instead
+# of the version-pinned toolchain dir, which is wiped on every `go` upgrade) is
+# to override GOBIN here in mise's own [env]. GOPATH is left to the shell
+# (dot_config/shell/02_legacy_tools.sh) because mise ships go_set_gopath=false
+# and never touches it. Non-mise shells fall back to that same module; the
+# go_tools ansible role + scripts/upgrade_tools.sh cat_go pin both explicitly.
+GOBIN = "/home/daviddwlee84/.local/bin"
+
+[tools]
+# Node.js LTS for LazyVim LSP servers and tree-sitter-cli — always installed
+# (nvim LSP/treesitter + npm-based coding agents hard-depend on it).
+node = "lts"
+# Bun for bunx CLI tools. Pin the major: bun is pre-1.x-mindset and ships
+# behavior changes on minors, so "latest" can break tooling — "1" tracks the
+# 1.x line and picks up patches without surprise majors.
+bun = "1"
+# Rust toolchain for cargo tools. Use the channel name so rustup-backed builds
+# see RUSTUP_TOOLCHAIN=stable instead of a concrete version.
+rust = "stable"
+# Go toolchain (replaces the macOS-only brew install in the security_tools
+# role; gives Linux hosts a managed Go too). "latest" is safe here the way
+# rust="stable" is: Go's compatibility promise (https://go.dev/doc/go1compat)
+# means new releases don't break existing code — unlike bun/dotnet, which
+# get pinned majors below.
+go = "latest"
+# .NET SDK (installDotnetTools=true). Pin the major to the current LTS (10):
+# .NET majors are not drop-in (TFM bumps, SDK behavior changes) and 8/9 are at
+# or near EOL by mid-2026, so "latest" risks both breakage and an unsupported
+# train. Bump this deliberately when the next LTS (12) ships.
+dotnet = "10"
+# Ruby for gem tools
+ruby = "3"
+=== chezmoi source ===
+config.toml.tmpl
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:11Z)**_
+
+<think><details><summary>Thought Process</summary>
+The mise config declares specific versions for bun, dotnet, and ruby, but they're not actually installed. The config is managed through chezmoi as a template file, and I'm noticing the dotnet entry has a comment about `installDotnetTools=true`, which suggests the template might be conditionally including these tool declarations based on certain flags.
+
+The issue is likely that the template unconditionally declares these tools in the mise config, but the ansible role only installs them when the corresponding prompts are enabled. This creates a mismatch — on systems where those prompts are false, you end up with permanent `mise WARN missing:` messages even though the config declares them.
+
+I need to check the actual template source to see if there are conditional guards around these tool declarations, and then verify what the chezmoi data values are for `installDotnetTools` and `installExtraRuntimes`.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check whether the mise template gates the runtimes
+
+`grep -n "if \|end}}\|bun\|dotnet\|ruby\|go =\|rust" dot_config/mise/config.toml.tmpl | head -30`
+
+```text
+1:{{- $noRoot := false }}{{ if hasKey . "noRoot" }}{{ $noRoot = .noRoot }}{{ end -}}
+2:{{- /* installExtraRuntimes gates rust/bun/ruby (~1.8GB). Default TRUE when the
+5:{{- $extraRuntimes := true }}{{ if hasKey . "installExtraRuntimes" }}{{ $extraRuntimes = .installExtraRuntimes }}{{ end -}}
+10:{{- $dotnet := false }}{{ if hasKey . "installDotnetTools" }}{{ $dotnet = .installDotnetTools }}{{ end -}}
+13:       baseline, and mise's rustup channel is gated on a TUNA mirror that
+15:       and document the manual fallbacks (NodeSource RPM, direct rustup,
+16:       skip dotnet) in docs/infra/linux-toolchain-baseline.md. */ -}}
+18:{{- if eq .chezmoi.os "linux" -}}
+21:  {{- if hasKey $rel "id" -}}{{ $id = $rel.id }}{{- end -}}
+23:  {{- if hasKey $rel "idLike" -}}{{ $idLike = $rel.idLike }}{{- end -}}
+25:  {{- if hasKey $rel "versionID" -}}{{ $verID = $rel.versionID }}{{- end -}}
+26:  {{- if and (or (eq $id "centos") (eq $id "rhel") (eq $id "scientific") (contains "rhel" $idLike)) (eq $verID "7") -}}
+34:# Use precompiled ruby binaries instead of compiling from source.
+35:# ruby-build needs libffi-dev + a working C toolchain; precompiled avoids all that.
+36:ruby.compile = false
+51:{{ if $oldEL -}}
+57:#   - Rust: install via rustup directly (avoids mise's TUNA mirror gap):
+58:#       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+64:ruby = "3"
+69:{{ if $extraRuntimes -}}
+70:# Bun for bunx CLI tools. Pin the major: bun is pre-1.x-mindset and ships
+73:bun = "1"
+74:# Rust toolchain for cargo tools. Use the channel name so rustup-backed builds
+76:rust = "stable"
+79:# rust="stable" is: Go's compatibility promise (https://go.dev/doc/go1compat)
+80:# means new releases don't break existing code — unlike bun/dotnet, which
+82:go = "latest"
+84:# bun/rust/go skipped: installExtraRuntimes=false (lean VM / CI)
+86:{{ if $dotnet -}}
+91:dotnet = "10"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check the relevant chezmoi prompt values
+
+`chezmoi data | jq '{installDotnetTools, installExtraRuntimes, installRubyTools, installJsTools, profile}' 2>/dev/null`
+
+```text
+{
+  "installDotnetTools": true,
+  "installExtraRuntimes": true,
+  "installRubyTools": null,
+  "installJsTools": null,
+  "profile": "ubuntu_desktop"
+}
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:25Z)**_
+
+<think><details><summary>Thought Process</summary>
+I'm checking how the template gates the runtime declarations—it looks like Ruby is declared unconditionally before the conditional block for extra runtimes, which contradicts the comment suggesting it should be gated by `installExtraRuntimes`. Let me verify the actual structure to understand what's being declared and when.
+
+The real issue is that while bun, dotnet, and ruby are declared in the template, they're not actually installed—only node, rust, and go seem to be present. This suggests the ansible role's `mise install` step either skipped these tools, failed during installation, or the role only installs a subset. I need to find where the ansible role handles installing mise tools and determine whether it should be installing all of them or if there's a separate fix needed to prevent this warning from recurring.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:25Z)**_
+
+The mise template is correctly gated (`installExtraRuntimes` + `installDotnetTools` are both true here), so these three *should* be installed. Finding what's meant to install them:
+
+_**Agent (claude-opus-5 2026-07-26 14:03:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find where ansible installs mise runtimes
+
+`grep -rn "mise install\|mise use\|mise_install" dot_ansible/roles/ .chezmoiscripts/ 2>/dev/null | head -10`
+
+```text
+dot_ansible/roles/rust_cargo_tools/tasks/main.yml:18:# Guard on the actual cargo binary, NOT the mise installs/rust dir. mise's rust
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:38:# constrained hardware. Partial success is fine — user can re-run `mise install`.
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:50:  register: mise_install
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:51:  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:60:  register: mise_install
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:61:  changed_when: "'install' in mise_install.stderr or 'install' in mise_install.stdout"
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:76:    - mise_install.rc is defined
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:77:    - mise_install.rc != 0
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:83:  register: mise_install_retry
+dot_ansible/roles/lazyvim_deps/tasks/main.yml:84:  changed_when: "'install' in mise_install_retry.stderr or 'install' in mise_install_retry.stdout"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List installed runtimes and test installing bun
+
+`mise ls 2>&1 | head -12; echo "=== can they install? try bun (fast) ==="; timeout 100 mise install bun@1.3.14 2>&1 | tail -5`
+
+```text
+bun     1.3.8
+bun     1.3.14 (missing)    ~/.config/mise/config.toml  1
+dotnet  10.0.203
+dotnet  10.0.302 (missing)  ~/.config/mise/config.toml  10
+go      1.26.4              ~/.config/mise/config.toml  latest
+go      1.26.5
+node    24.13.0
+node    24.18.0             ~/.config/mise/config.toml  lts
+ruby    3.4.8
+ruby    3.4.10 (missing)    ~/.config/mise/config.toml  3
+rust    stable (symlink)    ~/.config/mise/config.toml  stable
+rust    1.93.0 (symlink)
+=== can they install? try bun (fast) ===
+mise bun@1.3.14      [2/3] generate checksum bun-linux-x64.zip
+mise bun@1.3.14      [3/3] extract bun-linux-x64.zip
+mise bun@1.3.14      [3/3] bun -v
+mise bun@1.3.14      [3/3] 1.3.14
+mise bun@1.3.14    ✓ installed
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:52Z)**_
+
+<think><details><summary>Thought Process</summary>
+So the "missing" warnings aren't actually errors—they're just flagging that the installed versions are older than what the version constraints resolve to. Bun 1.3.8 is behind the latest 1.x, dotnet 10.0.203 is behind 10.0.302, and ruby 3.4.8 is behind 3.4.10. This is normal version drift, not a configuration problem.
+
+The fix is straightforward: running `mise install` (which `just upgrade-mise` handles) will pull down the newer versions that match those fuzzy constraints. The warning will keep appearing after each upstream release until I update, which is the expected behavior for this kind of loose pinning.
+
+I'll kick off `mise install` in the background to grab dotnet and ruby while I tackle the macOS herdr cleanup — removing it from the brew list and adding a migration task to uninstall it.
+
+Then I need to generalize the GitHub-release block to handle both Linux and macOS with the right asset naming, update the upgrade script to detect self-managed installs instead of gating on Linux, and add documentation across the English and Traditional Chinese docs plus the pitfalls section.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:52Z)**_
+
+Now I understand the mise warning — it's **not** a broken config. Starting the fix in the background while I do the macOS work:
+
+_**Agent (claude-opus-5 2026-07-26 14:03:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Install the missing mise runtimes
+
+`mise install 2>&1 | tail -20`
+
+```text
+Command running in background with ID: bavqlekb3. Output is being written to: /tmp/claude-1000/-home-daviddwlee84--local-share-chezmoi/ec3adba4-f9db-41c8-aee2-7f516dae1280/tasks/bavqlekb3.output. You will be notified when it completes. To check interim output, use Read on that file path.
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read cat_uv install-style dispatch idiom
+
+`sed -n '395,432p' scripts/upgrade_tools.sh`
+
+```text
+    "$HOME"/.local/bin/uv | "$HOME"/.cargo/bin/uv) echo curl ;;
+    *)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula uv >/dev/null 2>&1; then
+        echo brew
+      else
+        echo curl
+      fi
+      ;;
+  esac
+}
+
+cat_uv() {
+  if ! command -v uv >/dev/null 2>&1; then
+    warn "uv not found — skipping"
+    return $SKIP_RC
+  fi
+
+  local any_fail=0 style
+  style="$(_uv_install_style)"
+  info "Updating uv itself (install style: $style)"
+
+  case "$style" in
+    brew)
+      # Homebrew-installed uv refuses `uv self update` ("self-update is
+      # disabled for this build"). Use the right channel instead.
+      if ! _run brew upgrade uv; then
+        warn "brew upgrade uv failed — leaving uv at current version"
+      fi
+      ;;
+    curl | *)
+      # `uv self update` works for the standalone curl-installer and any
+      # binary that wasn't built with self-update disabled.
+      if ! _run uv self update; then
+        warn "uv self update failed (style=$style); falling back to no-op"
+      fi
+      ;;
+  esac
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:03:57Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the head of the uv install-style detector
+
+`sed -n '385,398p' scripts/upgrade_tools.sh`
+
+```text
+  case "$p" in
+    */homebrew/* | */Cellar/* | */linuxbrew/*) echo brew ;;
+    /usr/local/bin/uv)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula uv >/dev/null 2>&1; then
+        echo brew
+      else
+        echo curl
+      fi
+      ;;
+    "$HOME"/.local/bin/uv | "$HOME"/.cargo/bin/uv) echo curl ;;
+    *)
+      if command -v brew >/dev/null 2>&1 \
+        && brew list --formula uv >/dev/null 2>&1; then
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:02Z)**_
+
+Now the ansible role — the macOS branch. Reading the current herdr entries:
+
+_**Agent (claude-opus-5 2026-07-26 14:04:02Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Locate herdr in the macOS brew list
+
+`grep -n "      - herdr" -B4 -A2 dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+85-      - zellij
+86-      # herdr — Rust terminal multiplexer + AI-agent orchestrator. Trial tool
+87-      # that COEXISTS with tmux/zellij (you run one or the other); not a
+88-      # replacement. Config in ~/.config/herdr/config.toml. See docs/tools/herdr.md.
+89:      - herdr
+90-      - btop
+91-      - htop
+--
+4689-          }}
+4690-
+4691-    - name: Skip herdr if download URL could not be determined
+4692-      when:
+4693:        - herdr_arch | trim != ''
+4694:        - herdr_download_url | trim == ''
+4695-      ansible.builtin.debug:
+4696-        msg: "herdr skipped: could not determine download URL for architecture {{ herdr_arch }}"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:12Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:18Z)**_
+
+Now rewriting the herdr install block to cover both platforms, with the brew migration:
+
+_**Agent (claude-opus-5 2026-07-26 14:04:18Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the herdr block header to replace precisely
+
+`sed -n '4628,4662p' dot_ansible/roles/devtools/tasks/main.yml`
+
+```text
+# --- herdr (Rust terminal multiplexer + AI-agent orchestrator) ---
+# Trial tool that COEXISTS with tmux/zellij; not a replacement. macOS gets it
+# from the brew list above (homebrew-core formula). On Linux, releases ship a
+# SINGLE static binary (herdr-linux-{x86_64,aarch64}) — no tarball, so this is
+# simpler than the workmux/worktrunk release tasks (no unarchive, sidesteps the
+# macOS BSD-tar .tar.gz pitfall entirely). Config in ~/.config/herdr/config.toml
+# (chezmoi-managed). Self-managed installs upgrade via `herdr update`.
+- name: Check if herdr is installed
+  when: ansible_facts["os_family"] == "Debian"
+  ansible.builtin.command: herdr --version
+  register: herdr_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "{{ ansible_facts['env']['HOME'] }}/.local/bin:/usr/local/bin:{{ ansible_facts['env']['PATH'] }}"
+
+- name: Install herdr from GitHub releases (Debian/Ubuntu, user-level)
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - herdr_check.rc != 0
+    - target_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+  block:
+    - name: Ensure ~/.local/bin exists (herdr)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Set herdr architecture mapping
+      ansible.builtin.set_fact:
+        herdr_arch: >-
+          {{
+            'x86_64' if target_architecture in ['x86_64', 'amd64']
+            else 'aarch64' if target_architecture in ['aarch64', 'arm64']
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:44Z)**_
+
+Now the asset name must vary by OS, not be hardcoded to `linux`:
+
+_**Agent (claude-opus-5 2026-07-26 14:04:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the hardcoded linux asset name
+
+`grep -n "herdr-linux" -B8 -A12 dot_ansible/roles/devtools/tasks/main.yml | head -35`
+
+```text
+4703-
+4704-    - name: Set herdr download URL fact
+4705-      when: herdr_arch | trim != ''
+4706-      ansible.builtin.set_fact:
+4707-        herdr_download_url: >-
+4708-          {{
+4709-            (
+4710-              herdr_release.json.assets
+4711:              | selectattr('name', 'equalto', 'herdr-linux-' ~ herdr_arch)
+4712-              | map(attribute='browser_download_url')
+4713-              | first
+4714-            )
+4715-            | default('', true)
+4716-          }}
+4717-
+4718-    - name: Skip herdr if download URL could not be determined
+4719-      when:
+4720-        - herdr_arch | trim != ''
+4721-        - herdr_download_url | trim == ''
+4722-      ansible.builtin.debug:
+4723-        msg: "herdr skipped: could not determine download URL for architecture {{ herdr_arch }}"
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:04:58Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/dot_ansible/roles/devtools/tasks/main.yml has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:04Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Verify mise runtimes installed
+
+`tail -6 /tmp/claude-1000/-home-daviddwlee84--local-share-chezmoi/ec3adba4-f9db-41c8-aee2-7f516dae1280/tasks/bavqlekb3.output; echo "=== still missing? ==="; mise ls --missing 2>&1 | head; echo "(empty = fixed)"`
+
+```text
+mise dotnet@10.0.302 [1/3] dotnet-install: Binaries of dotnet can be found in /home/daviddwlee84/.local/share/mise/installs/dotnet/10.0.203
+mise dotnet@10.0.302 [1/3] dotnet-install: Note that the script does not resolve dependencies during installation.
+mise dotnet@10.0.302 [1/3] dotnet-install: To check the list of dependencies, go to https://learn.microsoft.com/dotnet/core/install, select your operating system and check the "Dependencies" section.
+mise dotnet@10.0.302 [1/3] dotnet-install: Installation finished successfully.
+mise dotnet@10.0.302 [1/3] dotnet --list-sdks
+mise dotnet@10.0.302 ✓ installed
+=== still missing? ===
+(empty = fixed)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:22Z)**_
+
+<think><details><summary>Thought Process</summary>
+The mise warning is resolved now that all three tools are installed. Let me verify the warning is gone by testing mise directly, since it was being triggered during chezmoi apply. Now I'm moving on to update the gate condition in `cat_herdr` for macOS compatibility.
+
+I'm creating a helper function that detects whether herdr was installed via Homebrew, mise, or as a self-managed binary by checking the command path and falling back to brew queries if needed. Then in the gate, I'll check the install style and warn the user if herdr came from a package manager, since those disable the `herdr update` command — the repo prefers self-managed installs on macOS and suggests re-running chezmoi apply with the devtools role to migrate.
+
+Now I need to remove the Linux-only check entirely and implement these changes. I should also note that `herdr update` should work on self-managed macOS binaries since the disabling is tied to the install source, though I can't verify this from Linux.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:22Z)**_
+
+mise warning is fixed (all three installed, `mise ls --missing` empty). Back to herdr — the `cat_herdr` gate must now key on *install style*, not OS:
+
+_**Agent (claude-opus-5 2026-07-26 14:05:30Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/scripts/upgrade_tools.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:45Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/scripts/upgrade_tools.sh has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate script and test install-style detection
+
+`bash -n scripts/upgrade_tools.sh && shellcheck -S error scripts/upgrade_tools.sh && echo "OK"; echo "=== style detection on this box ==="; bash -c 'source <(sed -n "/^_herdr_install_style/,/^}/p" scripts/upgrade_tools.sh); _herdr_install_style'`
+
+```text
+OK
+=== style detection on this box ===
+self
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:05:52Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Lint the modified ansible role
+
+`ansible-lint dot_ansible/roles/devtools/tasks/main.yml 2>&1 | tail -12 || python3 -c "import yaml,sys; yaml.safe_load(open('dot_ansible/roles/devtools/tasks/main.yml')); print('YAML parses OK')"`
+
+```text
+zsh: command not found: ansible-lint
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:00Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate the ansible role YAML and playbook syntax
+
+`python3 -c "import yaml; yaml.safe_load(open('dot_ansible/roles/devtools/tasks/main.yml')); print('YAML parses OK')"; echo "=== ansible syntax-check ==="; cd dot_ansible 2>/dev/null && ansible-playbook --syntax-check site.yml 2>&1 | tail -5`
+
+```text
+YAML parses OK
+=== ansible syntax-check ===
+[ERROR]: the playbook: site.yml could not be found
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the playbook entrypoint
+
+`ls dot_ansible/*.yml 2>/dev/null; grep -n "ansible-playbook\|playbook" justfile | head -5`
+
+```text
+(eval):1: no matches found: dot_ansible/*.yml
+ugrep: warning: justfile: No such file or directory
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List ansible dir and find playbook invocation
+
+`cd /home/daviddwlee84/.local/share/chezmoi && ls dot_ansible/ && grep -n "ansible-playbook" justfile | head -3`
+
+```text
+callback_plugins
+inventories
+playbooks
+roles
+ansible.cfg
+218:    ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/base.yml
+219:    ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/macos.yml
+220:    ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/linux.yml
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:19Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Syntax-check all three playbooks
+
+`for p in base macos linux; do ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/$p.yml >/dev/null 2>&1 && echo "$p.yml syntax OK" || echo "$p.yml FAILED"; done`
+
+```text
+base.yml syntax OK
+macos.yml syntax OK
+linux.yml syntax OK
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+The syntax checks pass, but that's just the first step. I need to validate the actual logic, particularly the asset-name Jinja expression I added. Let me test that expression in isolation using Ansible's templating engine to make sure it renders correctly.
+
+I'll write a small test playbook that simulates both the Darwin and Linux cases by setting a fake os_family variable, then renders the same expression logic to verify it selects the right asset name. I should also cross-check against the actual release asset list to confirm that `herdr-macos-aarch64` gets picked for Darwin on arm64.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:39Z)**_
+
+`--syntax-check` is only a first pass. Since I can't run this on macOS, let me verify the asset-selection expression actually resolves for Darwin against the real release JSON:
+
+_**Agent (claude-opus-5 2026-07-26 14:06:40Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Test the asset-selection expression for all platform/arch combos
+
+```bash
+cat > /tmp/herdr-asset-test.yml <<'EOF'
+- hosts: localhost
+  gather_facts: false
+  vars:
+    assets:
+      - {name: "herdr-linux-aarch64", browser_download_url: "URL/linux-aarch64"}
+      - {name: "herdr-linux-x86_64",  browser_download_url: "URL/linux-x86_64"}
+      - {name: "herdr-macos-aarch64", browser_download_url: "URL/macos-aarch64"}
+      - {name: "herdr-macos-x86_64",  browser_download_url: "URL/macos-x86_64"}
+  tasks:
+    - name: render the same expression for each platform/arch combo
+      ansible.builtin.debug:
+        msg: "{{ item.os }}/{{ item.arch }} -> {{ (assets | selectattr('name','equalto', 'herdr-' ~ ('macos' if item.os == 'Darwin' else 'linux') ~ '-' ~ item.arch) | map(attribute='browser_download_url') | first) | default('<<EMPTY>>', true) }}"
+      loop:
+        - {os: "Darwin", arch: "aarch64"}
+        - {os: "Darwin", arch: "x86_64"}
+        - {os: "Debian", arch: "x86_64"}
+        - {os: "Debian", arch: "aarch64"}
+      loop_control: {label: "{{ item.os }}/{{ item.arch }}"}
+EOF
+ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook -i localhost, -c local /tmp/herdr-asset-test.yml 2>&1 | grep -E "msg|EMPTY" | head -8
+```
+
+```text
+    msg: Darwin/aarch64 -> URL/macos-aarch64
+    msg: Darwin/x86_64 -> URL/macos-x86_64
+    msg: Debian/x86_64 -> URL/linux-x86_64
+    msg: Debian/aarch64 -> URL/linux-aarch64
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:49Z)**_
+
+<think><details><summary>Thought Process</summary>
+All four combos are working as expected. Now I need to update the documentation across several files—the herdr installation instructions for both English and Traditional Chinese versions, the tool managers reference, the upgrades guide, and add a note about the herdr-brew upgrade pitfall.
+
+I should also check if README.md mentions herdr and whether it needs updating given this shift from brew to GitHub releases. Then I'll clean up the temporary playbook and batch all these changes together.
+</details></think>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:49Z)**_
+
+All four combos resolve. Now the docs:
+
+_**Agent (claude-opus-5 2026-07-26 14:06:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Check whether README mentions herdr
+
+`rm -f /tmp/herdr-asset-test.yml; grep -n "herdr" README.md | head -5; echo "--- (empty = README doesn't name herdr) ---"`
+
+```text
+268:- `~/.config/herdr/config.toml` - Herdr config (Rust terminal multiplexer + AI-agent orchestrator; **trial tool that coexists with tmux**, not a replacement). Catppuccin theme, tmux-like keybindings, `tv`/lazygit command-panes, herdr-plus Projects layouts, and native agent-state indicators. Managed via a `modify_` tomlkit overlay (enforces our tables every apply, preserves herdr's runtime writeback). Behavior model (two cwd fields, OSC7 tracking, nesting inside tmux) + feasibility matrix + documented gaps (seamless nvim nav, OSC133 copy-mode) in [docs/tools/herdr.md](docs/tools/herdr.md)
+--- (empty = README doesn't name herdr) ---
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:06:50Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the install bullets to rewrite
+
+`sed -n '8,12p' docs/tools/herdr.md`
+
+```text
+  - macOS — Homebrew (`herdr` is in homebrew-core; managed by the `dot_ansible/roles/devtools/tasks/main.yml` macOS list)
+  - Linux — GitHub release **single static binary** (`herdr-linux-{x86_64,aarch64}`) into `~/.local/bin/herdr` (managed by the `# --- herdr ... ---` block in the same role). No tarball, so no unarchive step.
+- **Verify**: `herdr --version` · validate config with `herdr server reload-config`
+- **Upgrade**: brew on macOS; `just upgrade-herdr` (→ `herdr update --handoff`) for the self-managed Linux binary — **run it from outside herdr**, see below
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:01Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Find the now-outdated macOS warning callout
+
+`grep -n "Upgrading strands a running server (macOS)" docs/tools/herdr.md | head -2`
+
+```text
+27:> **Upgrading strands a running server (macOS).** herdr's socket API is protocol-versioned, and a package-manager upgrade cannot restart the server — so after `brew upgrade herdr` every CLI call (and therefore every `tv herdr-*` channel, `hvibe`/`hcode`, and `[[keys.command]]` helper) fails `protocol_mismatch` until the server restarts, which kills all pane processes. `herdr update --handoff` — the live, pane-preserving path — is **disabled on Homebrew/mise/Nix installs**, so macOS has no way to avoid the restart; Linux's self-managed binary does. Check with `herdr status` (`compatible:` / `restart_needed:`), not `herdr --version`. Full recovery matrix: [`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md).
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:22Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:27Z)**_
+
+Now the zh-TW mirror:
+
+_**Agent (claude-opus-5 2026-07-26 14:07:27Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the zh-TW install bullets and callout
+
+`sed -n '12,14p' docs/tools/herdr.zh-TW.md; echo "=== warning callout line ==="; grep -n "升級會讓正在跑的 server 被擱淺" docs/tools/herdr.zh-TW.md`
+
+```text
+- **安裝 (Install)**：
+  - macOS —— Homebrew（`herdr` 在 homebrew-core；由 `dot_ansible/roles/devtools/tasks/main.yml` 的 macOS 清單管理）
+  - Linux —— GitHub release 的**單一靜態 binary**（`herdr-linux-{x86_64,aarch64}`）放到 `~/.local/bin/herdr`（由同一 role 中 `# --- herdr ... ---` 區塊管理）。沒有 tarball，所以不需要解壓步驟。
+=== warning callout line ===
+32:> **升級會讓正在跑的 server 被擱淺（macOS）。** herdr 的 socket API 有 protocol 版本號，而套件管理器的升級沒辦法重啟 server —— 所以 `brew upgrade herdr` 之後，每一個 CLI 呼叫（連帶所有 `tv herdr-*` channel、`hvibe`/`hcode`、以及各個 `[[keys.command]]` helper）都會 `protocol_mismatch` 失敗，直到 server 重啟為止，而重啟會殺掉所有 pane 內的行程。`herdr update --handoff`——那個能保住 pane 的 live 路徑——在 **Homebrew/mise/Nix 安裝上是停用的**，所以 macOS 沒辦法迴避這次重啟；Linux 的自管 binary 則可以。要用 `herdr status`（看 `compatible:` / `restart_needed:`）判斷，不要看 `herdr --version`。完整的復原對照表：[`pitfalls/herdr-brew-upgrade-strands-running-server.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/herdr-brew-upgrade-strands-running-server.md)。
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:41Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:07:55Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/tools/herdr.zh-TW.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:02Z)**_
+
+Now the two `this_repo/` index docs and the pitfall's now-outdated "macOS has no way" conclusion:
+
+_**Agent (claude-opus-5 2026-07-26 14:08:02Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/tool-managers.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:15Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:20Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/docs/this_repo/upgrades.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:26Z)**_
+
+Now the pitfall whose conclusion this change invalidates:
+
+_**Agent (claude-opus-5 2026-07-26 14:08:26Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Read the pitfall conclusion to amend
+
+`sed -n '60,72p' pitfalls/herdr-brew-upgrade-strands-running-server.md; echo "=== header/status ==="; sed -n '1,3p' pitfalls/herdr-brew-upgrade-strands-running-server.md`
+
+```text
+So on **macOS (this repo installs herdr via homebrew-core)** there is **no** way to pick up a
+new herdr version without stopping the server, and stopping the server **kills every pane
+process** — shells, dev servers, tests, and every running coding agent.
+
+Linux hosts are the opposite case: this repo installs the self-managed GitHub-release binary
+into `~/.local/bin/herdr`, so `herdr update --handoff` *is* available there.
+
+## Fix / workaround
+
+There is no way to un-stage the upgrade short of `brew install herdr@<old>` (no such
+formula exists). Pick one:
+
+=== header/status ===
+# herdr CLI dies with `protocol_mismatch` after `brew upgrade herdr` — and Homebrew installs cannot live-handoff
+
+## Symptoms
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:40Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+
+```text
+The file /home/daviddwlee84/.local/share/chezmoi/pitfalls/herdr-brew-upgrade-strands-running-server.md has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:08:49Z)**_
+
+Final validation across everything:
+
+_**Agent (claude-opus-5 2026-07-26 14:08:56Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Validate script, playbooks, and the herdr dry-run
+
+`shellcheck -S error scripts/upgrade_tools.sh && echo "shellcheck OK"; for p in base macos linux; do ANSIBLE_CONFIG=dot_ansible/ansible.cfg ansible-playbook --syntax-check dot_ansible/playbooks/$p.yml >/dev/null 2>&1 && echo "$p.yml OK" || echo "$p.yml FAILED"; done; echo "=== dry-run herdr ==="; ./scripts/upgrade_tools.sh --dry-run herdr 2>&1 | grep -E "WARN|INFO|\+" | tail -5`
+
+```text
+shellcheck OK
+base.yml OK
+macos.yml OK
+linux.yml OK
+=== dry-run herdr ===
+[WARN]   Detach (prefix+q), then from a plain terminal: herdr update --handoff
+[WARN]   Panes and their processes survive the detach AND the handoff.
+[WARN] category 'herdr' skipped (prerequisite missing)
+[INFO] Upgrade Summary
+[WARN] SKIPPED: herdr (prerequisite missing)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:09:14Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Rebuild docs and count new warnings
+
+`uv run mkdocs build --strict 2>&1 | tail -1; uv run mkdocs build --strict 2>&1 | grep -icE "^WARNING.*herdr|^WARNING.*upgrades|^WARNING.*tool-managers"; echo "^ new warnings naming touched pages (0 = clean)"`
+
+```text
+Aborted with 173 warnings in strict mode!
+0
+^ new warnings naming touched pages (0 = clean)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:09:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Stage everything and scan for secrets
+
+`git add -A ':!.specstory' && git add .specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md && git diff --cached --name-only; bash ~/.claude/skills/agent-history-hygiene/scripts/scan-staged.sh >/dev/null 2>&1; echo "scan exit=$?"`
+
+```text
+.specstory/history/2026-07-26_13-09-26Z-daviddwlee84-in-david-ubuntu.md
+docs/this_repo/tool-managers.md
+docs/this_repo/upgrades.md
+docs/tools/herdr.md
+docs/tools/herdr.zh-TW.md
+dot_ansible/roles/devtools/tasks/main.yml
+pitfalls/herdr-brew-upgrade-strands-running-server.md
+scripts/upgrade_tools.sh
+scan exit=0
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:09:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the macOS self-managed herdr switch
+
+```bash
+git commit -F - <<'MSG'
+feat(herdr): install the release binary on macOS too, so --handoff exists there
+
+macOS was the one platform where a herdr upgrade had no non-destructive path.
+pitfalls/herdr-brew-upgrade-strands-running-server.md documents the dead end:
+`brew upgrade herdr` bumps the binary but cannot restart the server, so every
+CLI call fails `protocol_mismatch` until you `herdr server stop` — which exits
+every pane process, including running coding agents. The fix upstream provides,
+`herdr update --handoff`, is explicitly DISABLED on Homebrew/mise/Nix installs
+because the package manager owns the binary.
+
+That gap is a property of the install channel, not of macOS. Releases ship
+herdr-macos-{x86_64,aarch64} alongside the Linux assets, so the devtools role
+now installs the same self-managed binary into ~/.local/bin/herdr on both
+platforms and herdr leaves the macOS brew list. This is the only tool in the
+repo that deliberately bypasses Homebrew on macOS, and the comment block says
+why so it doesn't read as an oversight later.
+
+Migration matters here: a box provisioned before this change has brew's herdr in
+/opt/homebrew/bin and would now also get ~/.local/bin/herdr, with PATH order
+picking the winner. The bad case is a client from one and a running server from
+the other — protocol_mismatch against yourself. So the role runs a one-time
+`brew uninstall herdr` on Darwin first (failed_when: false, so it is a no-op on
+boxes that never had it).
+
+cat_herdr's guard changes from "is this Linux" to "is this a self-managed
+install", mirroring _uv_install_style: brew/Cellar/linuxbrew/mise paths report
+their manager, ~/.local/bin reports self, and anything else falls back to a
+`brew list --formula herdr` probe. A package-managed herdr now skips with a
+message pointing at `chezmoi apply` to migrate, rather than being silently
+skipped for being on the wrong OS.
+
+Docs: install bullets in tools/herdr.md (+ zh-TW) now say both-platforms and
+carry the reasoning; the "macOS has no way to avoid the restart" callout is
+rewritten, since that is no longer true here. The pitfall keeps its content but
+gains a resolution note — it still describes any unmigrated box, a mise/Nix
+install, or a hand-reinstalled formula. tool-managers.md and upgrades.md rows
+drop "Linux only".
+
+Verified: shellcheck clean; all three playbooks pass --syntax-check; YAML
+parses; the asset-selection Jinja was rendered through ansible for all four
+platform/arch combos against the real release asset names
+(Darwin/aarch64 -> herdr-macos-aarch64, Debian/x86_64 -> herdr-linux-x86_64,
+etc.) since `macos` vs ansible's `Darwin` is exactly the kind of mismatch that
+would silently select nothing; install-style detection returns `self` on this
+box; mkdocs --strict unchanged at the pre-existing 173 warnings.
+
+NOT verified, and I cannot verify it from Linux: that the macos release binary
+actually executes on Apple Silicon (codesigning/ad-hoc signature). ansible's
+get_url does not set com.apple.quarantine, so Gatekeeper's quarantine prompt
+should not apply, but the signature itself needs one real run on a Mac.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+MSG
+```
+
+```text
+[WARNING] Unstaged files detected.
+[INFO] Stashing unstaged files to /home/daviddwlee84/.cache/pre-commit/patch1785074982-462381.
+Auto-redact secrets in agent artifacts..................................................Passed
+chezmoi prompts in sync (dotfiles_init.py gen --check)..............(no files to check)Skipped
+ansible facts via ansible_facts[...] (inject_facts_as_vars=False).......................Passed
+Detect hardcoded secrets................................................................Passed
+detect private key......................................................................Passed
+check for added large files.............................................................Passed
+check for merge conflicts...............................................................Passed
+fix end of files........................................................................Passed
+trim trailing whitespace................................................................Passed
+check yaml..............................................................................Passed
+check toml..........................................................(no files to check)Skipped
+check json..........................................................(no files to check)Skipped
+check that executables have shebangs....................................................Passed
+shellcheck (scripts/)...................................................................Passed
+shellcheck (dot_config/{shell,bash}/, errors only)..................(no files to check)Skipped
+shfmt...................................................................................Passed
+Lint GitHub Actions workflow files..................................(no files to check)Skipped
+[INFO] Restored changes from /home/daviddwlee84/.cache/pre-commit/patch1785074982-462381.
+[main 3e702ad] feat(herdr): install the release binary on macOS too, so --handoff exists there
+ 8 files changed, 1174 insertions(+), 37 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (claude-opus-5 2026-07-26 14:10:13Z)**_
+
+兩件都做完了。
+
+## mise 的 warning — 不是設定壞掉，是版本漂移
+
+`mise ls` 一看就清楚：
+
+```
+bun     1.3.8      →  1.3.14 (missing)
+dotnet  10.0.203   →  10.0.302 (missing)
+ruby    3.4.8      →  3.4.10 (missing)
+```
+
+config 裡是模糊 pin（`bun = "1"`、`dotnet = "10"`、`ruby = "3"`），mise 解析成「當下最新的 1.x / 10.x / 3.x」，只要上游出了新 patch，已裝的舊版就會被標成 `missing`。template 的 gating 是對的（`installExtraRuntimes` 和 `installDotnetTools` 在這台都是 true），ansible 也沒問題 —— 這純粹是 install-only 設計在 mise 上的顯現。
+
+跑了 `mise install`，三個都裝上，`mise ls --missing` 現在是空的。日後同樣的 warning 再出現，`just upgrade-mise` 就會收掉（`mise upgrade` 會遵守那些 constraint）。
+
+## macOS 改用 self-managed binary（`3e702ad`）
+
+核心判斷是：那個能力差距是**安裝管道**的性質，不是 macOS 的性質。release 本來就有 `herdr-macos-{x86_64,aarch64}`，所以 devtools role 兩個平台都裝同一份到 `~/.local/bin/herdr`，herdr 從 macOS 的 brew 清單移除。
+
+**遷移有處理**：舊機器上 brew 的 herdr 在 `/opt/homebrew/bin`，如果只是新增而不移除，兩份會同時在 `PATH` 上、由順序決定誰贏 —— 最糟是 client 用一份、server 是另一份跑的，自己對自己 `protocol_mismatch`。所以 Darwin 分支先跑一次性的 `brew uninstall herdr`（`failed_when: false`，沒裝過的機器就是 no-op）。
+
+**`cat_herdr` 的 gate 從「是不是 Linux」改成「是不是 self-managed 安裝」**，比照 `_uv_install_style` 的做法。brew 裝的現在會跳過並叫你重跑 `chezmoi apply` 遷移，而不是因為「OS 不對」被默默略過。
+
+## 驗證
+
+shellcheck 過、三個 playbook `--syntax-check` 都過、YAML 解析過。比較值得說的是 asset 選取那段 Jinja —— 我把它丟進 ansible 對四種 platform/arch 組合實際 render 過（`Darwin/aarch64 → herdr-macos-aarch64`、`Debian/x86_64 → herdr-linux-x86_64` …），因為 asset 名是 `macos` 而 ansible 的 fact 是 `Darwin`，這種不一致會**靜默選不到東西**然後掉進 skip 分支，不會報錯。install-style 偵測在這台回 `self`。mkdocs `--strict` 仍是既有的 173 warnings。
+
+**一項我驗不了**：macOS release binary 在 Apple Silicon 上能不能真的執行（codesigning）。ansible 的 `get_url` 走 urllib，不會加 `com.apple.quarantine`，所以 Gatekeeper 的隔離提示應該不會出現；但簽章本身要在 Mac 上實跑一次才知道。這點我寫進 commit message 了。
+
+---
+
+⚠️ 另外要跟你說一件我搞砸的事：稍早為了 grep usage 文字，我跑了裸的 `./scripts/upgrade_tools.sh` —— 那等於 `all`，真的開始升級了，跑到 `externals` 約兩分鐘才被我 kill 掉。事後確認沒造成改動（`chezmoi status` 空、externals 目錄沒被碰、repo 只有預期的修改），但我當時應該加 `--dry-run` 的。
+
+現在 `main` 領先 origin 9 個 commit，都還沒 push。
