@@ -100,9 +100,18 @@ finds packs there via its packs-anchored fallback.
 | **Codex** | peon-ping's own adapter | `~/.codex/hooks.json` is an always-ignored CodeIsland sidecar |
 | **Cursor** | peon-ping's own adapter | `~/.cursor/hooks.json`, same |
 
-Codex/Cursor hook files are *deliberately unmanaged* by chezmoi
+Codex/Cursor `hooks.json` files are *deliberately unmanaged* by chezmoi
 ([`.chezmoiignore.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoiignore.tmpl)),
 so peon-ping's adapter writing them conflicts with nothing.
+
+`~/.codex/config.toml` is the exception: the Codex adapter *also* appends
+`[[hooks.<Event>]]` blocks there, and that file **is** a `modify_` target. It
+round-trips fine, but only because the overlay's TOML writer explicitly handles
+arrays-of-tables — it did not at first, and the whole file failed to apply with
+`TypeError: unsupported scalar type for TOML emit: dict`. If peon-ping (or any
+other installer) starts writing a TOML construct the writer doesn't know, that
+apply breaks again; see
+[agent-overlays.md](agent-overlays.md#the-writer-must-cover-every-construct-a-foreign-writer-can-inject).
 
 ## The one place we subtract
 

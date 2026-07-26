@@ -18,8 +18,15 @@
 #     `{ ... }` syntax and fails to quote keys with special characters
 #     (e.g. `github@openai-curated`), producing invalid TOML on round-trip.
 #   - Python 3.11+ ships `tomllib` built-in for reads; the inline writer below
-#     handles the small schema this file uses (scalars, nested string-key
-#     tables, no arrays-of-tables) and quotes every table key for safety.
+#     handles the schema this file uses (scalars, nested string-key tables,
+#     arrays-of-tables, inline tables inside mixed arrays) and quotes every
+#     table key for safety.
+#
+# Comments do NOT survive the round-trip (tomllib discards them). That is safe
+# for peon-ping's `# peon-ping Codex hooks begin` / `# install_dir = …` markers:
+# its uninstaller (`hooks/peon-ping/scripts/codex-config.py`) also matches
+# `[[hooks.<Event>.hooks]]` sections by adapter path, so it still finds and
+# replaces its own block after the markers are stripped.
 #
 # Merge precedence (later wins):
 #   1. Stripped live (everything except [projects] and [marketplaces.*]).
@@ -61,6 +68,7 @@ fi
 # anything goes wrong (tomllib missing on Python <3.11, malformed live file),
 # Python prints to stderr and exits non-zero -> chezmoi skips the file.
 CODEX_LIVE="$base" CODEX_OVERLAY="$overlay" "$@" <<'PYEOF'
+import datetime
 import os
 import sys
 
@@ -151,28 +159,70 @@ def fmt_scalar(v) -> str:
         # Use basic-string with escaping. tomllib accepts both basic and
         # literal; basic is universal.
         return '"' + v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+    if isinstance(v, (datetime.datetime, datetime.date, datetime.time)):
+        # tomllib decodes bare TOML date-times into datetime objects;
+        # isoformat() is RFC 3339, which is exactly TOML's syntax. Unquoted
+        # on purpose — quoting would demote them to strings on re-read.
+        return v.isoformat()
     if isinstance(v, list):
         return "[" + ", ".join(fmt_scalar(x) for x in v) + "]"
+    if isinstance(v, dict):
+        # Inline table. Only reached for a table nested in a list that
+        # is_table_array() rejected (mixed or empty); an all-table list is
+        # emitted as [[array-of-tables]] headers by emit_table instead.
+        inner = ", ".join(f"{quote_key(k)} = {fmt_scalar(x)}" for k, x in v.items())
+        return "{ " + inner + " }" if inner else "{}"
     raise TypeError(f"unsupported scalar type for TOML emit: {type(v).__name__}")
 
 
-def emit_table(prefix: str, table: dict, out: list[str]) -> None:
-    """Emit a TOML table. `prefix` is the dotted header path (already quoted
-    where needed); empty for root. Scalars come first, then nested tables."""
-    scalars = {k: v for k, v in table.items() if not isinstance(v, dict)}
-    sub = {k: v for k, v in table.items() if isinstance(v, dict)}
+def is_table_array(v) -> bool:
+    """True for a list emittable as `[[header]]` blocks: non-empty, all tables.
 
-    if prefix and (scalars or not sub):
+    Empty lists (`k = []`) and mixed lists have no array-of-tables spelling,
+    so they stay inline arrays and go through fmt_scalar. Codex itself writes
+    no arrays-of-tables, but peon-ping's Codex adapter installs `[[hooks.
+    <Event>]]` / `[[hooks.<Event>.hooks]]` blocks into this file, and those
+    have to round-trip.
+    """
+    return isinstance(v, list) and bool(v) and all(isinstance(x, dict) for x in v)
+
+
+def emit_table(prefix: str, table: dict, out: list[str], *, header: bool = True) -> None:
+    """Emit a TOML table. `prefix` is the dotted header path (already quoted
+    where needed); empty for root. Scalars come first, then nested tables,
+    then arrays-of-tables. `header=False` skips the `[prefix]` line for an
+    array-of-tables element whose `[[prefix]]` header the caller already
+    wrote."""
+    scalars = {
+        k: v for k, v in table.items() if not isinstance(v, dict) and not is_table_array(v)
+    }
+    sub = {k: v for k, v in table.items() if isinstance(v, dict)}
+    arrays = {k: v for k, v in table.items() if is_table_array(v)}
+
+    if header and prefix and (scalars or not (sub or arrays)):
         out.append(f"[{prefix}]")
     for k, v in scalars.items():
         out.append(f"{quote_key(k)} = {fmt_scalar(v)}")
-    if scalars and sub:
+    if scalars and (sub or arrays):
         out.append("")
 
+    # Plain sub-tables MUST precede arrays-of-tables at every level: after a
+    # `[[p.arr]]` header, a following `[p.plain]` would still resolve against
+    # `p`, but the reader's "last [[…]] element" cursor makes that far easier
+    # to get wrong on the next edit. Emitting siblings first keeps each
+    # `[[…]]` block self-contained, which is also what peon-ping's section
+    # scanner expects (parent immediately followed by its handlers).
     for k, v in sub.items():
         sub_prefix = f"{prefix}.{quote_key(k)}" if prefix else quote_key(k)
         emit_table(sub_prefix, v, out)
         out.append("")
+
+    for k, items in arrays.items():
+        sub_prefix = f"{prefix}.{quote_key(k)}" if prefix else quote_key(k)
+        for item in items:
+            out.append(f"[[{sub_prefix}]]")
+            emit_table(sub_prefix, item, out, header=False)
+            out.append("")
 
 
 def quote_key(k: str) -> str:

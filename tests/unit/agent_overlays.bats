@@ -264,6 +264,73 @@ websocket_connect_timeout_ms = 5000
   echo "$output" | yq -p toml -e '.model_providers["openai-gfw"].websocket_connect_timeout_ms == 5000' >/dev/null
 }
 
+@test "codex modify_config.toml: peon-ping [[hooks.*]] arrays-of-tables round-trip" {
+  _have_chezmoi || skip "chezmoi not installed"
+  command -v yq >/dev/null 2>&1 || skip "yq not installed"
+  yq --version 2>&1 | grep -qi 'mikefarah' || skip "wrong yq variant"
+
+  local script="$RENDER_DIR/codex-aot.sh"
+  _render "$SOURCE_DIR/dot_codex/modify_config.toml.tmpl" "$script"
+
+  # peon-ping's Codex adapter (hooks/peon-ping/scripts/codex-config.py) writes
+  # [[hooks.<Event>]] / [[hooks.<Event>.hooks]] blocks into this file, and Codex
+  # itself writes a plain [hooks.state."<path>:<event>:0:0"] sibling. The
+  # emitter used to assume "no arrays-of-tables" and died with
+  # `TypeError: unsupported scalar type for TOML emit: dict`, failing the whole
+  # apply. Also covers an empty array and a mixed array (neither has a [[…]]
+  # spelling — both must stay inline).
+  local live='[hooks.state."/home/me/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:deadbeef"
+
+[[hooks.SessionStart]]
+matcher = "startup|resume|clear"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "bash /home/me/.openpeon/hooks/peon-ping/adapters/codex.sh"
+timeout = 30
+
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "bash /home/me/.openpeon/hooks/peon-ping/adapters/codex.sh"
+timeout = 30
+
+[weird]
+empty_list = []
+mixed = [1, { a = 2 }]
+'
+
+  run bash -c "printf '%s' \"\$1\" | '$script'" _ "$live"
+  [ "$status" -eq 0 ]
+
+  echo "$output" | yq -p toml -e '.hooks.SessionStart | length == 1' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].matcher == "startup|resume|clear"' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].type == "command"' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].timeout == 30' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.SessionStart[0].hooks[0].command | test("adapters/codex.sh")' >/dev/null
+  # Matcher-less event survives as a one-element array with only .hooks.
+  echo "$output" | yq -p toml -e '.hooks.Stop | length == 1' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.Stop[0] | has("matcher") | not' >/dev/null
+  echo "$output" | yq -p toml -e '.hooks.Stop[0].hooks[0].timeout == 30' >/dev/null
+  # Codex's own [hooks.state] table is a plain sibling of the arrays.
+  echo "$output" | yq -p toml -e '.hooks.state["/home/me/.codex/hooks.json:session_start:0:0"].trusted_hash == "sha256:deadbeef"' >/dev/null
+  # Lists with no [[…]] spelling stay inline.
+  echo "$output" | yq -p toml -e '.weird.empty_list | length == 0' >/dev/null
+  echo "$output" | yq -p toml -e '.weird.mixed[0] == 1' >/dev/null
+  echo "$output" | yq -p toml -e '.weird.mixed[1].a == 2' >/dev/null
+  # Overlay still applied alongside all of the above.
+  echo "$output" | yq -p toml -e '.personality == "pragmatic"' >/dev/null
+
+  # Byte-identical on re-application: chezmoi runs this on every apply, so a
+  # non-idempotent emitter would show a permanent diff.
+  local pass1 pass2
+  pass1=$(printf '%s' "$live" | "$script")
+  pass2=$(printf '%s' "$pass1" | "$script")
+  [ "$pass1" = "$pass2" ]
+}
+
 @test "opencode migrate: legacy config.json renamed when modern absent" {
   local fake_home="$RENDER_DIR/home"
   mkdir -p "$fake_home/.config/opencode"

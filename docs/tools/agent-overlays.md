@@ -148,9 +148,25 @@ The `.chezmoiignore.tmpl` presence-gates the entire `~/.cursor/`, `~/.codex/`, a
 2. Pop `[projects]` and `[marketplaces]` subtrees into `state`.
 3. Read overlay TOML into a `dict`.
 4. Deep-merge: `live_minus_state <- overlay <- state`. Argument order is merge precedence (later wins). State wins last so per-project trust never gets clobbered by an overlay churn.
-5. Emit TOML via a 30-line writer that quotes all non-bareword keys (handles `github@openai-curated` and `/Users/me/foo`-style project keys).
+5. Emit TOML via a small writer that quotes all non-bareword keys (handles `github@openai-curated` and `/Users/me/foo`-style project keys).
 
 The script falls through to passing the live file untouched if `python3` or `tomllib`/`tomli` are missing; chezmoi will skip the file for that apply.
+
+### The writer must cover every construct a foreign writer can inject
+
+The emitter is hand-rolled, so it only knows the TOML constructs it was written for — and `~/.codex/config.toml` has *three* writers besides this repo: Codex itself, and any hook installer the user runs. When one of them introduces a construct the writer doesn't handle, the whole file fails to apply with a Python traceback rather than degrading:
+
+```
+TypeError: unsupported scalar type for TOML emit: dict
+chezmoi: .codex/config.toml: exit status 1
+```
+
+That was [peon-ping](https://github.com/PeonPing/peon-ping)'s Codex adapter installing `[[hooks.<Event>]]` / `[[hooks.<Event>.hooks]]` **arrays-of-tables**, which the writer originally excluded by design. Currently handled: scalars, nested string-key tables, arrays-of-tables, inline tables (for tables inside a mixed or empty array, which have no `[[…]]` spelling), and bare RFC 3339 date-times. Two ordering rules are load-bearing:
+
+- **Plain sub-tables emit before arrays-of-tables at every level.** Codex writes a `[hooks.state."<path>:<event>:0:0"]` table as a sibling of peon-ping's `[[hooks.*]]` blocks; emitting siblings first keeps each `[[…]]` block self-contained instead of relying on the reader's "last `[[…]]` element" cursor.
+- **A parent `[[hooks.<Event>]]` is immediately followed by its `[[hooks.<Event>.hooks]]` handlers**, which is what peon-ping's own section scanner assumes when it uninstalls.
+
+Comments do **not** survive the round-trip — `tomllib` discards them, so peon-ping's `# peon-ping Codex hooks begin` / `# install_dir = …` markers disappear on first apply. That is safe: its uninstaller (`hooks/peon-ping/scripts/codex-config.py`) also matches handler sections by adapter path, so it still finds and replaces its own block without the markers. Any *new* hook installer should be checked for the same property before trusting the round-trip.
 
 ## OpenCode legacy `config.json` migration
 
@@ -194,6 +210,7 @@ chezmoi apply
 - Each overlay enforces its declared keys.
 - Live runtime keys outside the overlay are preserved verbatim.
 - Codex `[projects.*]` and `[marketplaces.*]` round-trip unchanged (the round-trip property is the load-bearing invariant — break it and machines start clobbering each other's per-project trust).
+- Codex `[[hooks.*]]` arrays-of-tables (installed by peon-ping) round-trip alongside Codex's own `[hooks.state.*]` table, and empty / mixed arrays stay inline — the regression guard for the `unsupported scalar type for TOML emit: dict` apply failure.
 - The modify_ scripts are idempotent (running output through the script again produces the same output).
 - The OpenCode migration handles all three input states: legacy-only, both-present, neither-present.
 - The Claude hook-aware merger (see next section): notify.sh added when missing; CodeIsland entries preserved; idempotency on re-apply; non-hook deep-merge preserves user siblings.

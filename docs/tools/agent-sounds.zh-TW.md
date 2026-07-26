@@ -90,9 +90,17 @@ workmux `wm setup` 的既有規則一樣。
 | **Codex** | 交給 peon-ping 自己的 adapter | `~/.codex/hooks.json` 是被永久忽略的 CodeIsland sidecar |
 | **Cursor** | 交給 peon-ping 自己的 adapter | `~/.cursor/hooks.json`，同上 |
 
-Codex/Cursor 的 hook 檔是**刻意不被 chezmoi 管**的
+Codex/Cursor 的 `hooks.json` 是**刻意不被 chezmoi 管**的
 （[`.chezmoiignore.tmpl`](https://github.com/daviddwlee84/dotfiles/blob/main/.chezmoiignore.tmpl)），
 所以 peon-ping 的 adapter 去寫它們不會跟任何東西衝突。
+
+`~/.codex/config.toml` 是例外：Codex adapter **也**會往那裡追加
+`[[hooks.<Event>]]` 區塊，而那個檔案**是** `modify_` 目標。它能正常 round-trip，
+但前提是 overlay 的 TOML writer 有明確處理 array-of-tables —— 一開始並沒有，
+於是整個檔案 apply 失敗並噴出
+`TypeError: unsupported scalar type for TOML emit: dict`。往後只要 peon-ping
+（或其他安裝器）開始寫 writer 不認得的 TOML 結構，apply 就會再壞一次；見
+[agent-overlays.md](agent-overlays.md#the-writer-must-cover-every-construct-a-foreign-writer-can-inject)。
 
 ## 唯一一處我們會「減」的地方
 
