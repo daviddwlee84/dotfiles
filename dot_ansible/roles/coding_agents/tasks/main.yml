@@ -1314,7 +1314,7 @@
       | bash -s -- --openpeon --no-rc --packs={{ coding_agents_peon_default_pack }}
   args:
     executable: /bin/bash
-    creates: "{{ ansible_env.HOME }}/.openpeon/hooks/peon-ping/peon.sh"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.openpeon/hooks/peon-ping/peon.sh"
   ignore_errors: true
 
 # Seed the default pack ONCE. `creates:` is load-bearing: peon's config.json is
@@ -1328,7 +1328,7 @@
     peon packs use --install {{ coding_agents_peon_default_pack }}
   args:
     executable: /bin/bash
-    creates: "{{ ansible_env.HOME }}/.openpeon/config.json"
+    creates: "{{ ansible_facts['env']['HOME'] }}/.openpeon/config.json"
   ignore_errors: true
 
 # The overlay's hook command references this fixed path (and it is the same path
@@ -1353,11 +1353,25 @@
       changed_when: false
       failed_when: false
 
+    # ‼️  `state: link` does NOT create intermediate directories — it fails with
+    # `Errno 2 ... No such file or directory` when the parent is missing, which
+    # it always is on a box that never ran peon-ping-setup. Combined with this
+    # block's `ignore_errors` and the overlay's `[ -x ... ] || true` guard, that
+    # produced a fully silent failure: all 9 Claude hook events "completed
+    # successfully" while never playing anything.
+    # See pitfalls/peon-hooks-wired-but-no-sound.md.
+    - name: Ensure the Claude peon-ping hook directory exists
+      when: coding_agents_peon_sh.stdout | default('') | length > 0
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.claude/hooks/peon-ping"
+        state: directory
+        mode: "0755"
+
     - name: Symlink peon.sh into the canonical Claude hook path
       when: coding_agents_peon_sh.stdout | default('') | length > 0
       ansible.builtin.file:
         src: "{{ coding_agents_peon_sh.stdout }}"
-        dest: "{{ ansible_env.HOME }}/.claude/hooks/peon-ping/peon.sh"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.claude/hooks/peon-ping/peon.sh"
         state: link
         force: true
   ignore_errors: true
@@ -1385,11 +1399,21 @@
       changed_when: false
       failed_when: false
 
+    # Same `state: link` parent-dir caveat as the Claude hook above. This dir
+    # normally already exists (workmux-status.ts lives here), but a fresh box
+    # with OpenCode not yet launched has no plugins/ dir at all.
+    - name: Ensure the OpenCode plugins directory exists
+      when: coding_agents_peon_oc.stdout | default('') | length > 0
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.config/opencode/plugins"
+        state: directory
+        mode: "0755"
+
     - name: Symlink the peon-ping OpenCode plugin
       when: coding_agents_peon_oc.stdout | default('') | length > 0
       ansible.builtin.file:
         src: "{{ coding_agents_peon_oc.stdout }}"
-        dest: "{{ ansible_env.HOME }}/.config/opencode/plugins/peon-ping.ts"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.config/opencode/plugins/peon-ping.ts"
         state: link
         force: true
   ignore_errors: true

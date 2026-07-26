@@ -125,6 +125,26 @@ jq '.hooks | keys' ~/.claude/settings.json
 peon volume 0.4 && chezmoi diff # MUST be empty — proves config isn't managed
 ```
 
+**None of the four lines above proves sound will actually fire**, which is worth
+knowing because that exact combination once passed on a fully silent machine
+(→ [`peon-hooks-wired-but-no-sound`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/peon-hooks-wired-but-no-sound.md)).
+`peon status` only inspects `~/.openpeon`; `preview` bypasses the hook entirely;
+the settings keys can be present while the hook target is missing, because the
+hook's own `[ -x … ] || true` guard turns a missing player into a *successful*
+no-op that Claude reports as `completed successfully`.
+
+The staging symlink is the thing to check, plus firing the hook the way Claude
+Code does:
+
+```sh
+ls -la ~/.claude/hooks/peon-ping/peon.sh    # symlink -> <brew prefix>/libexec/peon.sh
+echo '{"hook_event_name":"Stop","session_id":"probe","cwd":"'"$PWD"'"}' \
+  | "$HOME/.claude/hooks/peon-ping/peon.sh"
+jq '.last_played' ~/.openpeon/.state.json   # -> {"task.complete": "sounds/JobsFinished.mp3"}
+```
+
+`.last_played` is the only machine-checkable proof that audio dispatched.
+
 Per-tier hook wiring is covered by `tests/unit/agent_overlays.bats`
 (`agentSounds tiers gate…`, `peon tier keeps its hook guarded…`, `lowering the
 tier prunes OUR entries…`).

@@ -35,6 +35,22 @@ repos:
           | ^Dockerfile$
           | ^README\.md$
 
+      # `dot_ansible/ansible.cfg` sets `inject_facts_as_vars = False`, so the
+      # bare injected fact variables (`ansible_env`, `ansible_os_family`, …)
+      # DO NOT EXIST at runtime — only `ansible_facts['env']['HOME']` etc. A
+      # task using `ansible_env.HOME` is valid YAML and passes --syntax-check,
+      # then fails at run time with "'ansible_env' is undefined". In a block
+      # carrying `ignore_errors: true` that failure just scrolls past, so the
+      # symptom is a task that silently never happened. Established idiom is
+      # `ansible_facts['env']['HOME']` (288 uses vs the 6 that regressed).
+      # Comment lines are exempt via `^[^#]*` — two roles legitimately discuss
+      # `ansible_pkg_mgr` in prose. See pitfalls/peon-hooks-wired-but-no-sound.md.
+      - id: ansible-no-injected-fact-vars
+        name: ansible facts via ansible_facts[...] (inject_facts_as_vars=False)
+        entry: '^[^#]*\b(ansible_env|ansible_os_family|ansible_distribution|ansible_architecture|ansible_pkg_mgr|ansible_system|ansible_hostname|ansible_machine)\b'
+        language: pygrep
+        files: '^dot_ansible/.*\.(yml|yaml|j2)$'
+
   # Gitleaks - detect secrets (blocks commit if secrets found)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.22.1

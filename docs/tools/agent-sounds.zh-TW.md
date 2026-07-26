@@ -113,6 +113,23 @@ jq '.hooks | keys' ~/.claude/settings.json
 peon volume 0.4 && chezmoi diff # 必須是空的 —— 證明 config 沒被管
 ```
 
+**上面四行全過也不代表真的會發出聲音**。這組指令曾經在一台完全沒聲音的機器上全部通過
+（→ [`peon-hooks-wired-but-no-sound`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/peon-hooks-wired-but-no-sound.md)）：
+`peon status` 只看 `~/.openpeon`；`preview` 根本繞過 hook；而 settings 裡的 key 可以
+存在、hook 指向的檔案卻不存在 —— 因為 hook 自己的 `[ -x … ] || true` 保護會把「播放器
+不存在」變成一次**成功**的 no-op，Claude 於是回報 `completed successfully`。
+
+真正要檢查的是那個 staging symlink，以及用 Claude Code 的方式實際觸發一次：
+
+```sh
+ls -la ~/.claude/hooks/peon-ping/peon.sh    # symlink -> <brew prefix>/libexec/peon.sh
+echo '{"hook_event_name":"Stop","session_id":"probe","cwd":"'"$PWD"'"}' \
+  | "$HOME/.claude/hooks/peon-ping/peon.sh"
+jq '.last_played' ~/.openpeon/.state.json   # -> {"task.complete": "sounds/JobsFinished.mp3"}
+```
+
+`.last_played` 是唯一能被機器檢查、證明聲音真的送出去的證據。
+
 各層級的 hook 接線有 `tests/unit/agent_overlays.bats` 覆蓋。
 
 ## 之後要改層級
