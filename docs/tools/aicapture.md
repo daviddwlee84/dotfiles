@@ -197,6 +197,37 @@ Defaults are tuned for Haiku-class models — fast (~5s round-trip) and cheap (~
 AICAP_CLAUDE_MODEL=sonnet aifix 3
 ```
 
+## Maintaining the agent list (SSOT + its four consumers)
+
+[`dot_config/shell/04_ai_agents.sh`](../../dot_config/shell/04_ai_agents.sh) is the
+**single source of truth** for the agent autodetect order and the
+`AICAP_<AGENT>_MODEL` defaults. Edit that file and nothing else for a default
+change — but be aware it has four *non-shell* consumers that **regex-parse the
+same file** because they run in cron / tmux-popup contexts where the shell
+environment isn't inherited:
+
+| Consumer | Why it can't just read the env |
+|---|---|
+| `dot_config/tmux/executable_tmux-session-summary.py` | tmux popup, no interactive shell |
+| `scripts/aiblock.py` | spawned by the TUI |
+| `dot_dotfiles/bin/executable_pqsum` | invoked over SSH by `fleet pueue` |
+| `scripts/fleet/exec.py` | invoked over SSH by `fleet exec` |
+
+Each agent's `-m` / `--model` flag is emitted **only** when its variable is
+non-empty, so a retired model ID falls through to the CLI's own default instead
+of hard-failing.
+
+Adding a **new agent** means touching all six places: one `AICAP_<AGENT>_MODEL`
+line in the SSOT, the `_aiagent_invoke` case in
+`dot_config/shell/04_ai_capture.sh`, and the `AGENT_CONFIG` dict in each of the
+four Python consumers above.
+
+!!! note "Four consumers is the pain threshold"
+
+    The duplication is already past comfortable. The queued fix is to extract a
+    shared `scripts/aisum/__init__.py` parser; land that refactor before adding
+    a fifth callsite rather than after.
+
 ## Requirements
 
 | What | For |

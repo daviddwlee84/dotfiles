@@ -70,6 +70,13 @@ legacy `~/bin` so a stale download in `~/bin` doesn't shadow a fresher
 This is a known divergence from your interactive shell's PATH order — see
 [pueue.md § PATH augmentation](pueue.md) for the full rationale.
 
+!!! warning "Maintainers: the prelude is duplicated in two files"
+
+    `scripts/fleet/exec.py:_PATH_PRELUDE` and `scripts/fleet/pueue.py:_REMOTE_CMD`
+    each embed their own copy of the order above. They **must** stay in sync —
+    editing one alone makes `fleet exec` and `fleet pueue` disagree about which
+    binary they find on the same host, with no error to point at it.
+
 ## AI summary mode
 
 `fleet exec --ai` pipes the merged per-host JSON through the configured

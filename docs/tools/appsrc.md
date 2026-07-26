@@ -165,3 +165,29 @@ scan ~15 s cold, ~5 s warm (~2 200 items); `which` is instant.
 [`docs/this_repo/tool-managers.md`](../this_repo/tool-managers.md), which records
 how **this repo** installs tools by design; `appsrc` inspects whatever is
 actually on the machine.
+
+## Maintaining it
+
+Four things bite if you don't know them:
+
+- **Everything lives in the one launcher.** Detection, sizing and the inline
+  `AppsrcTUI` are all in `dot_dotfiles/bin/executable_appsrc` — there is
+  deliberately **no** `scripts/appsrc/` package; the TUI calls the same module
+  functions the CLI does. `textual` is declared in the PEP 723 header only and
+  imported lazily inside `do_tui`, so the plain CLI never pays for it.
+- **Mirror the mnemonics.** The TUI's `BINDINGS` letters
+  (`s`ize / `o`source / `n`ame / `t`ldr / `m`an / `y`copy / `r`eveal) and the
+  `tv appsrc` / `tv appsrc-size` channels' `Alt+<letter>` actions are
+  intentionally the same letters so muscle memory carries between the fast
+  picker and the sortable dashboard. Change one → change both, same commit.
+- **`scan --tsv` column order is a wire format.** It is
+  `name·source·path·kind·package[·size]`, and both `.toml` channels index into it
+  with `{split:\t:N}`. Reordering or inserting a column silently shifts every
+  picker field — fix the channels in the same commit.
+- **TUI subprocess work must be asyncio-native.** Never call blocking
+  `subprocess` inside a `@work(thread=True)` worker; it intermittently deadlocks
+  into an empty table with no crash (a Textual pilot test still passes — only a
+  real terminal hangs). Use `create_subprocess_exec`. See
+  [`pitfalls/appsrc-tui-subprocess-thread-hang.md`](https://github.com/daviddwlee84/dotfiles/blob/main/pitfalls/appsrc-tui-subprocess-thread-hang.md).
+  Relatedly, the filter `Input` stays `can_focus=False` until `/` opens it —
+  otherwise it swallows the single-letter keybindings.
